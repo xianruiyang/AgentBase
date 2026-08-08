@@ -1,0 +1,3 @@
+schema: sgy.config/v1
+engine: untrusted.exe
+cache: on

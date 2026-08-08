@@ -1,0 +1,54 @@
+{
+  "name": "@simplechat/vscode-lsp-mcp-workspace",
+  "version": "0.1.21",
+  "private": true,
+  "description": "Independent VS Code LSP MCP companion workspace.",
+  "author": "SimpleChat contributors",
+  "license": "Apache-2.0",
+  "packageManager": "npm@11.6.2",
+  "engines": {
+    "node": ">=22.9.0 <27"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "clean": "node ./scripts/workspaces.mjs clean",
+    "workspace:check": "node ./scripts/workspaces.mjs check",
+    "build": "node ./scripts/workspaces.mjs build",
+    "typecheck": "tsc -p tsconfig.check.json --pretty false",
+    "lint": "eslint . --max-warnings 0",
+    "test": "node ./scripts/workspaces.mjs test",
+    "test:stage-b": "node ./scripts/stage-b-integration.mjs",
+    "test:stage-c": "node ./scripts/stage-c-integration.mjs",
+    "test:integration:read-hierarchy": "node ./tests/integration/extension-host-read-hierarchy.mjs",
+    "test:integration:mutation-command": "node ./tests/integration/extension-host-mutation-command.mjs",
+    "test:integration:all-tools": "node ./tests/integration/extension-host-all-tools.mjs",
+    "test:integration:install": "node ./tests/integration/install-lifecycle.mjs",
+    "test:integration:doctor": "node ./tests/integration/doctor-runtime.mjs",
+    "test:integration:doctor:packaged": "node ./tests/integration/doctor-packaged.mjs",
+    "test:integration:coexistence": "node ./tests/integration/coexistence.mjs",
+    "test:manual:multilanguage": "node ./tests/integration/extension-host-multilanguage.mjs",
+    "dependency:audit": "node ./scripts/dependency-audit.mjs --check",
+    "dependency:audit:write": "node ./scripts/dependency-audit.mjs --write",
+    "docs:check": "node ./scripts/docs-check.mjs",
+    "release:build": "node ./scripts/release.mjs",
+    "release:verify": "node ./scripts/release.mjs --verify-reproducible",
+    "verify": "node ./scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "22.20.1",
+    "@types/vscode": "1.125.0",
+    "@vscode/test-electron": "3.0.0",
+    "@vscode/vsce": "3.9.1",
+    "esbuild": "0.28.1",
+    "eslint": "9.39.5",
+    "globals": "17.7.0",
+    "node-gyp": "12.4.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.64.0",
+    "yauzl": "3.2.1",
+    "yazl": "2.5.1"
+  }
+}

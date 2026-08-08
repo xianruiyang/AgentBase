@@ -1,0 +1,29 @@
+{
+  "name": "@simplechat/vscode-lsp-mcp-protocol",
+  "version": "0.1.21",
+  "private": true,
+  "description": "Shared protocol and runtime boundaries for the VS Code LSP MCP companion.",
+  "author": "SimpleChat contributors",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json --pretty false",
+    "test": "node --test dist/*.test.js"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "yaml": "2.9.0"
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Change Governance"
+  short_description: "为复杂变更裁决根因、长期架构落点、职责迁移、共享门禁与完成审计"
+  default_prompt: "使用 $change-governance 裁决这项复杂变更的根因、长期架构落点、职责入口、迁移条件与验证证据。"

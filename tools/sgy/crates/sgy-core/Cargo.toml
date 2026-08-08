@@ -1,0 +1,42 @@
+[package]
+name = "sgy-core"
+description = "Protocol-independent core for the ast-grep Token-Safe YAML wrapper"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+test-helper = []
+
+[[bin]]
+name = "sgy-engine-fixture"
+path = "tests/helpers/engine_fixture.rs"
+required-features = ["test-helper"]
+
+[[bin]]
+name = "sgy-process-fixture"
+path = "tests/helpers/process_fixture.rs"
+required-features = ["test-helper"]
+
+[dependencies]
+atomic-write-file.workspace = true
+command-group.workspace = true
+file-id.workspace = true
+fs2.workspace = true
+humantime.workspace = true
+saphyr-parser.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+ulid.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+signal-hook.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+ctrlc.workspace = true
+
+[lints]
+workspace = true

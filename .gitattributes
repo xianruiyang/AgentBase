@@ -1,0 +1,16 @@
+# Keep repository text deterministic across Windows and Unix environments.
+* text=auto eol=lf
+
+# Common binary artifacts.
+*.dll -text
+*.exe -text
+*.gif -text
+*.ico -text
+*.jpeg -text
+*.jpg -text
+*.pdf -text
+*.png -text
+*.tgz -text
+*.vsix -text
+*.wasm -text
+*.zip -text

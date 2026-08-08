@@ -1,0 +1,33 @@
+{
+  "name": "@simplechat/vscode-lsp-mcp-win32-security",
+  "version": "0.1.21",
+  "private": true,
+  "description": "Minimal stable Node-API boundary for Windows IPC security.",
+  "author": "SimpleChat contributors",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "binding.gyp",
+    "build/Release/*.node",
+    "dist",
+    "native"
+  ],
+  "gypfile": true,
+  "scripts": {
+    "install": "node ./scripts/install.mjs",
+    "build": "node ./scripts/build.mjs",
+    "build:native": "node ./scripts/build-native.mjs",
+    "build:native:x64": "node ./scripts/build-native.mjs x64",
+    "build:native:arm64": "node ./scripts/build-native.mjs arm64",
+    "test": "node --test dist/index.test.js"
+  }
+}

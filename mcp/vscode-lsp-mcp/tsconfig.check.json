@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@simplechat/vscode-lsp-mcp-protocol": [
+        "./packages/protocol/src/index.ts"
+      ],
+      "@simplechat/vscode-lsp-mcp-win32-security": [
+        "./packages/win32-security/src/index.ts"
+      ]
+    },
+    "noEmit": true,
+    "composite": false,
+    "incremental": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": [
+    "packages/*/src/**/*.ts"
+  ]
+}

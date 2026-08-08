@@ -1,0 +1,4 @@
+interface:
+  display_name: "fd Usage"
+  short_description: "以固定基准目录、对象类型和结果上限安全发现文件或目录"
+  default_prompt: "使用 $fd-usage 有界查找文件或目录，明确区分匹配模式、搜索路径和结果上限。"

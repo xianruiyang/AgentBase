@@ -1,0 +1,526 @@
+{
+  "schema_version": 2,
+  "purpose": "发布前验证候选全局 AGENTS.md 与全部关键 skill 的触发边界。期望值只用于结果判定，不应暴露给接受场景请求的评估模型。",
+  "global_max_bytes": 20480,
+  "required_skills": [
+    "ast-grep-token-safe",
+    "change-governance",
+    "codex-event-logger",
+    "codex-qq-hook",
+    "cpp-engineering-rules",
+    "fd-usage",
+    "powershell-usage",
+    "rg-token-safe",
+    "symbol-structure-workflow",
+    "task-table-manager",
+    "understand-space"
+  ],
+  "allowed_behavior_tags": [
+    "read_only",
+    "modify_authorized_scope",
+    "fact_first",
+    "challenge_false_premise",
+    "no_alternative_execution",
+    "long_term_total_cost",
+    "architecture_integrated",
+    "no_scope_expansion"
+  ],
+  "cases": [
+    {
+      "id": "mechanical-document-edit",
+      "kind": "boundary",
+      "request": "把 README 中一个已经明确指定的旧路径替换为新路径。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "codex-event-logger",
+        "codex-qq-hook",
+        "cpp-engineering-rules",
+        "powershell-usage",
+        "symbol-structure-workflow",
+        "task-table-manager",
+        "understand-space"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": [
+        "architecture_integrated"
+      ]
+    },
+    {
+      "id": "specified-local-implementation",
+      "kind": "boundary",
+      "request": "按已经完整指定的接口，在现有模块中增加一个局部返回字段并运行相关测试。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "architecture-discovery-before-implementation",
+      "kind": "behavior",
+      "request": "为现有账户设置增加一个持久化字段，接口行为和验收结果已经明确，但用户没有指定应在哪个模块或入口实现。请完成这个任务。",
+      "expected_skills": [
+        "change-governance"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "lifecycle-and-entry.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "architecture_integrated"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "implicit-architecture-integration",
+      "kind": "behavior",
+      "request": "为现有账户设置增加一个持久化字段，接口行为和验收结果已经明确但未指定实现方式；项目已有唯一设置 owner 和 schema migration 入口。请实现。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "architecture_integrated"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "one-off-generated-artifact",
+      "kind": "negative",
+      "request": "生成一份仅用于本轮比较、任务结束后丢弃且不进入项目的临时文本表；格式和内容都已指定。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": [
+        "architecture_integrated"
+      ]
+    },
+    {
+      "id": "specified-synthesis-artifact",
+      "kind": "boundary",
+      "request": "根据已经确认的权威素材，为指定受众编写一份带明确验收约束的实施说明。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "cpp-include-edit",
+      "kind": "positive",
+      "request": "修改 C++ 公共头的 include 和前置声明，保持公开 API 不变。",
+      "expected_skills": [
+        "cpp-engineering-rules"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "cpp-module-cycle-diagnosis",
+      "kind": "positive",
+      "request": "诊断并修复两个 C++ 模块之间反复出现的循环依赖。",
+      "expected_skills": [
+        "cpp-engineering-rules",
+        "change-governance"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [
+        "causal-analysis.md",
+        "lifecycle-and-entry.md",
+        "verification-and-gates.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "ast-structural-call-search",
+      "kind": "positive",
+      "request": "查找所有把 await 表达式作为第二个实参的 send 调用，并先预览结构化改写。",
+      "expected_skills": [
+        "ast-grep-token-safe",
+        "symbol-structure-workflow"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "literal-text-search",
+      "kind": "negative",
+      "request": "在源码中用 rg 查找字面量 FEATURE_DISABLED，输出需要保留文件定位并限制行数。",
+      "expected_skills": [
+        "rg-token-safe"
+      ],
+      "forbidden_skills": [
+        "ast-grep-token-safe",
+        "fd-usage",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "bounded-file-discovery",
+      "kind": "positive",
+      "request": "使用 fd 从项目根目录有界查找名称为 package.json 的文件，最多返回 20 个。",
+      "expected_skills": [
+        "fd-usage"
+      ],
+      "forbidden_skills": [
+        "ast-grep-token-safe",
+        "rg-token-safe",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "powershell-command-authoring",
+      "kind": "positive",
+      "request": "为 Windows PowerShell 5.1 编写一条安全读取 UTF-8 JSON 并检查原生命令退出码的命令。",
+      "expected_skills": [
+        "powershell-usage"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "semantic-safe-rename",
+      "kind": "positive",
+      "request": "跨文件安全重命名这个重载方法，只改同一符号的真实引用并读回诊断。",
+      "expected_skills": [
+        "symbol-structure-workflow"
+      ],
+      "forbidden_skills": [
+        "ast-grep-token-safe",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "event-log-context-recovery",
+      "kind": "positive",
+      "request": "上下文刚被压缩，请从项目级 Codex 运行记录恢复当前轮最近的用户要求、活跃 goal 和文件操作。",
+      "expected_skills": [
+        "codex-event-logger"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "qq-hook-explicit-enable",
+      "kind": "positive",
+      "request": "为当前工作区和当前对话开启 Codex QQ 完成提醒。",
+      "expected_skills": [
+        "codex-qq-hook"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "cross-turn-dependent-plan",
+      "kind": "positive",
+      "request": "这个迁移要跨多轮执行，任务之间有真实依赖，并且下周要按证据审计完成状态；请建立并执行任务表。",
+      "expected_skills": [
+        "task-table-manager"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "coordinate-frame-conversion",
+      "kind": "positive",
+      "request": "把屏幕像素位置转换为世界坐标，说明视口、相机投影和父级变换，并给出可读回验收条件。",
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "bug-root-cause-fix",
+      "kind": "positive",
+      "request": "找出这个 bug 的根因并修复，证明原输入不再走错误路径。",
+      "expected_skills": [
+        "change-governance"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "causal-analysis.md",
+        "verification-and-gates.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "formal-entry-migration",
+      "kind": "positive",
+      "request": "把旧配置入口迁移到新入口，保留三个月兼容期并定义退出条件。",
+      "expected_skills": [
+        "change-governance"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [
+        "lifecycle-and-entry.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "project-metadata-refresh",
+      "kind": "positive",
+      "request": "架构入口变更后，重写 project-metadata.md 的当前状态和验证依据。",
+      "expected_skills": [
+        "change-governance"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [
+        "records-and-metadata.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "shared-blocking-gate",
+      "kind": "positive",
+      "request": "设计一个会阻断所有合并的共享检查，并证明每个失败都代表契约违反。",
+      "expected_skills": [
+        "change-governance"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [
+        "verification-and-gates.md"
+      ],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "current-context-is-sufficient",
+      "kind": "negative",
+      "request": "当前对话已经完整给出目标和刚完成的修改，请根据这些内容继续做下一项。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "codex-event-logger",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "ordinary-completion-no-qq",
+      "kind": "negative",
+      "request": "汇报刚才这个单文件机械修改是否完成。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "codex-event-logger",
+        "codex-qq-hook",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "cpp-word-in-document",
+      "kind": "negative",
+      "request": "把 README 里一句“支持 C++”改成“支持 C++20”，不要改源码。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "cpp-engineering-rules",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "known-file-content-search",
+      "kind": "negative",
+      "request": "在已经确定的 config.toml 文件中查找字符串 model_provider，并限制输出。",
+      "expected_skills": [
+        "rg-token-safe"
+      ],
+      "forbidden_skills": [
+        "ast-grep-token-safe",
+        "fd-usage",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "mechanical-coordinate-field-edit",
+      "kind": "negative",
+      "request": "把已指定 JSON 文件中的 x 字段从 1 精确改成 2；对象、字段和值都已确认，不需要计算位置关系。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "symbol-structure-workflow",
+        "understand-space"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "single-turn-checklist",
+      "kind": "negative",
+      "request": "这次单轮只检查三个已经列明的配置字段并回复结果。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "windows-prose-without-command",
+      "kind": "negative",
+      "request": "解释 README 中提到的 Windows 用户目录是什么意思，不需要给出或执行 PowerShell 命令。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "powershell-usage"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "fact-conflict-read-only",
+      "kind": "behavior",
+      "request": "我坚持配置文件里已经有 enable=true，但直接读到的文件没有这个字段。请判断哪个事实为准并解释，不要修改文件。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "fact_first",
+        "challenge_false_premise"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "long-term-without-scope-expansion",
+      "kind": "behavior",
+      "request": "两个实现方案都在已授权范围内并能满足相同目标：一个少改两行但永久增加第二状态源，另一个收敛到现有唯一入口。请选择并实施，但不要顺带重构其他模块。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "architecture_integrated",
+        "long_term_total_cost",
+        "no_scope_expansion"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "review-only-no-alternative-execution",
+      "kind": "behavior",
+      "request": "只评审这个临时方案的长期风险并提出建议，不要修改任何文件，也不要替我实施更好的方案。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "no_alternative_execution"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    }
+  ]
+}

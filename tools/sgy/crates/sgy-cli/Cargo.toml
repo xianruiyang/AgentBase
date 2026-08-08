@@ -1,0 +1,33 @@
+[package]
+name = "sgy-cli"
+description = "Command-line adapter for the ast-grep Token-Safe YAML wrapper"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+test-helper = []
+
+[[bin]]
+name = "sgy"
+path = "src/main.rs"
+
+[[bin]]
+name = "sgy-native-fixture"
+path = "tests/helpers/native_fixture.rs"
+required-features = ["test-helper"]
+
+[dependencies]
+clap.workspace = true
+serde_json.workspace = true
+sgy-core = { path = "../sgy-core" }
+thiserror.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+saphyr-parser.workspace = true
+tempfile.workspace = true

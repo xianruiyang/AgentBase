@@ -1,0 +1,16 @@
+{
+  "default_enabled": false,
+  "enabled_thread_ids": [],
+  "disabled_thread_ids": [],
+  "enabled_thread_names": [],
+  "disabled_thread_names": [],
+  "message": {
+    "stop_template": "work_complete",
+    "prefix": " ",
+    "max_chars": 1200,
+    "completion_max_chars": 700
+  },
+  "goal": {
+    "aware": true
+  }
+}

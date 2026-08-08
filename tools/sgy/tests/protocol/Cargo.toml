@@ -1,0 +1,25 @@
+[package]
+name = "sgy-protocol-tests"
+description = "Real PTY, LSP, and artifact protocol verification for sgy"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "sgy-protocol-driver"
+path = "../../crates/sgy-cli/src/main.rs"
+
+[dependencies]
+sgy-cli = { path = "../../crates/sgy-cli" }
+sgy-core = { path = "../../crates/sgy-core" }
+
+[dev-dependencies]
+portable-pty.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

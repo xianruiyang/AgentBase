@@ -1,0 +1,19 @@
+"$schema": "https://json.schemastore.org/sarif-2.1.0.json"
+"futureMetadata":
+  "enabled": true
+"runs":
+  -
+    "results":
+      -
+        "level": "warning"
+        "locations": []
+        "message":
+          "text": |-
+            first
+            second
+        "ruleId": "rule-x"
+    "tool":
+      "driver":
+        "name": "ast-grep"
+        "rules": []
+"version": "2.1.0"

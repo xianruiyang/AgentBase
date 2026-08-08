@@ -1,0 +1,7 @@
+id: no-console
+language: TypeScript
+rule:
+  pattern: console.log($A)
+fix: logger.info($A)
+message: avoid console.log
+severity: warning

@@ -1,0 +1,17 @@
+schema: sgy.skill-runtime/v1
+version: 0.1.0
+build_toolchain: rustc 1.85.0
+ast_grep_verified:
+  - 0.41.1
+  - 0.42.0
+  - 0.44.1
+targets:
+  - target: x86_64-pc-windows-msvc
+    path: bin/windows-x86_64/sgy.exe
+    bytes: 1865216
+    sha256: 9f3dcfff9f3ae8b061cfedf70bd6ae01b81a0717d5399e0a7616417fe692b636
+  - target: x86_64-unknown-linux-gnu
+    path: bin/linux-x86_64/sgy
+    bytes: 2128416
+    sha256: 4df2efb4e18490ddc154d5c50816ef8c9b6a1135825b0d6780b62f6494cc48ae
+licenses: legal/

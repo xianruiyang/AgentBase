@@ -1,0 +1,10 @@
+sgy
+Copyright 2026 sgy contributors
+
+This product includes third-party Rust components. Their package names,
+versions, declared SPDX expressions, and complete license texts are provided in
+THIRD_PARTY_LICENSES.txt. Machine-readable dependency data is provided in
+sbom.spdx.json.
+
+ast-grep is an external executable dependency and is not distributed inside the
+sgy release archive.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Token-Safe rg 搜索"
+  short_description: "在 PowerShell 中以有界、可定位且低重复的格式安全执行 rg 搜索"
+  default_prompt: "使用 $rg-token-safe 在当前项目中有界搜索目标文本并保留准确文件定位。"

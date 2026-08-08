@@ -1,0 +1,4 @@
+interface:
+  display_name: "C++ 架构与编译依赖"
+  short_description: "维护 C++ 职责边界、include、PCH 与 unity build"
+  default_prompt: "使用 $cpp-engineering-rules 审查这项 C++ 改动的职责归属、include 边界和编译依赖。"

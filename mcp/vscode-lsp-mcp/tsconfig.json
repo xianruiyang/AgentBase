@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/protocol"
+    },
+    {
+      "path": "./packages/win32-security"
+    },
+    {
+      "path": "./packages/extension"
+    },
+    {
+      "path": "./packages/server"
+    }
+  ]
+}
+

@@ -1,0 +1,5 @@
+run
+-p
+console.log($A)
+--json=compact
+src

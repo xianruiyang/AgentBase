@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "p6-build",
+      "type": "process",
+      "command": "__NODE_PATH__",
+      "args": ["__TASK_SCRIPT__", "build", "__TASK_MARKER__", "${workspaceFolder}"],
+      "problemMatcher": []
+    },
+    {
+      "label": "p6-test",
+      "type": "process",
+      "command": "__NODE_PATH__",
+      "args": ["__TASK_SCRIPT__", "test", "__TASK_MARKER__"],
+      "problemMatcher": []
+    },
+    {
+      "label": "p6-format",
+      "type": "process",
+      "command": "__NODE_PATH__",
+      "args": ["__TASK_SCRIPT__", "format", "__TASK_MARKER__"],
+      "problemMatcher": []
+    },
+    {
+      "label": "p6-fail",
+      "type": "process",
+      "command": "__NODE_PATH__",
+      "args": ["__TASK_SCRIPT__", "fail", "__TASK_MARKER__"],
+      "problemMatcher": []
+    },
+    {
+      "label": "p6-timeout",
+      "type": "process",
+      "command": "__NODE_PATH__",
+      "args": ["__TASK_SCRIPT__", "timeout", "__TASK_MARKER__"],
+      "problemMatcher": []
+    },
+    {
+      "label": "p6-interactive-input",
+      "type": "process",
+      "command": "__NODE_PATH__",
+      "args": ["__TASK_SCRIPT__", "${input:p6Choice}", "__TASK_MARKER__"],
+      "problemMatcher": []
+    },
+    {
+      "label": "p6-interactive-command",
+      "type": "process",
+      "command": "__NODE_PATH__",
+      "args": ["__TASK_SCRIPT__", "${command:p6.test.interactiveProbe}", "__TASK_MARKER__"],
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "p6Choice",
+      "type": "pickString",
+      "description": "P6-003 must reject this before UI",
+      "options": ["unsafe"]
+    }
+  ]
+}

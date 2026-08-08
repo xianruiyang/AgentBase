@@ -1,0 +1,26 @@
+{
+  "name": "@simplechat/vscode-lsp-mcp-server",
+  "version": "0.1.21",
+  "private": true,
+  "description": "Stdio MCP server package for the VS Code LSP MCP companion.",
+  "author": "SimpleChat contributors",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "vscode-lsp-mcp": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json --pretty false",
+    "test": "node --test dist/*.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@simplechat/vscode-lsp-mcp-protocol": "0.1.21",
+    "@simplechat/vscode-lsp-mcp-win32-security": "0.1.21"
+  }
+}

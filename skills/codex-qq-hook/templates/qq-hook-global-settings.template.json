@@ -1,0 +1,10 @@
+{
+  "bot": {
+    "app_id": "替换为 QQ 开放平台 AppID",
+    "target_type": "user",
+    "openid": "替换为目标用户 QQ_BOT_OPENID",
+    "group_openid": "",
+    "channel_id": "",
+    "is_wakeup": false
+  }
+}

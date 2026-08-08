@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Table Manager"
+  short_description: "构建可追溯规划链，并以最小上下文执行和审计长期任务"
+  default_prompt: "使用 $task-table-manager 建立或修复有证据支撑的规划链，并以最小上下文执行和审计跨轮任务。"

@@ -1,0 +1,8 @@
+node_modules/
+packages/*/dist/
+packages/*/build/
+/dist/
+coverage/
+.vscode-test/
+*.vsix
+/.vscode-lsp-mcp/

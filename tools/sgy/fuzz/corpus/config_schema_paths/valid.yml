@@ -1,0 +1,5 @@
+schema: sgy.config/v1
+profile: token-safe
+max_detail_results: 40
+max_text_chars: 400
+max_context_bytes: 24576

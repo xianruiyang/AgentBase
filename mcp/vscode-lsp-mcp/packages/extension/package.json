@@ -1,0 +1,147 @@
+{
+  "name": "vscode-lsp-mcp-companion",
+  "displayName": "VS Code LSP MCP Companion",
+  "description": "Expose active VS Code language providers through an independent MCP companion.",
+  "publisher": "simplechat",
+  "version": "0.1.21",
+  "private": true,
+  "author": "SimpleChat contributors",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "contributes": {
+    "configuration": {
+      "title": "VS Code LSP MCP Companion",
+      "properties": {
+        "vscodeLspMcp.providerTimeoutMs": {
+          "type": "integer",
+          "scope": "window",
+          "description": "Maximum time in milliseconds for one VS Code language-provider operation. Reload the window after changing this setting.",
+          "default": 60000,
+          "minimum": 1000,
+          "maximum": 90000
+        },
+        "vscodeLspMcp.commandPolicy": {
+          "type": "object",
+          "scope": "window",
+          "description": "Execution policy for standard user commands, trusted-workspace tasks, and explicitly authorized custom commands. Runtime validation remains authoritative.",
+          "default": {
+            "allowStandardCommands": true,
+            "allowWorkspaceTasks": true,
+            "commands": [],
+            "tasks": []
+          },
+          "additionalProperties": false,
+          "properties": {
+            "allowStandardCommands": {
+              "type": "boolean",
+              "default": true,
+              "description": "Allow bounded save, debug-control, window reload, and Extension Host reload commands in trusted workspaces without per-command entries."
+            },
+            "allowWorkspaceTasks": {
+              "type": "boolean",
+              "default": true,
+              "description": "Allow discovered foreground ProcessExecution and ShellExecution tasks in trusted workspaces without per-task entries. Interactive variables, CustomExecution, and background tasks remain blocked."
+            },
+            "commands": {
+              "type": "array",
+              "maxItems": 256,
+              "default": [],
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "commandId",
+                  "nonInteractive",
+                  "completion",
+                  "maxTimeoutMs"
+                ],
+                "properties": {
+                  "commandId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "nonInteractive": {
+                    "const": true
+                  },
+                  "completion": {
+                    "const": "promise"
+                  },
+                  "maxTimeoutMs": {
+                    "type": "integer",
+                    "minimum": 1000,
+                    "maximum": 600000
+                  },
+                  "argumentSchema": {
+                    "type": "object",
+                    "description": "Draft 2020-12 schema for the complete command arguments array. Every object schema must be closed."
+                  }
+                }
+              }
+            },
+            "tasks": {
+              "type": "array",
+              "maxItems": 256,
+              "default": [],
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rootAlias",
+                  "taskName",
+                  "nonInteractive",
+                  "allowDependencies",
+                  "maxTimeoutMs"
+                ],
+                "properties": {
+                  "rootAlias": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "taskName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "nonInteractive": {
+                    "const": true
+                  },
+                  "allowDependencies": {
+                    "type": "boolean"
+                  },
+                  "maxTimeoutMs": {
+                    "type": "integer",
+                    "minimum": 1000,
+                    "maximum": 600000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json --pretty false",
+    "test": "node --test dist/*.test.js"
+  },
+  "dependencies": {
+    "@simplechat/vscode-lsp-mcp-protocol": "0.1.21",
+    "@simplechat/vscode-lsp-mcp-win32-security": "0.1.21"
+  }
+}

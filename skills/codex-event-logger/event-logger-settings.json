@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "mode": "all",
+  "workspace_roots": [],
+  "events": [
+    "UserPromptSubmit",
+    "Stop",
+    "PreToolUse",
+    "PostToolUse"
+  ],
+  "output_dir_name": "codexRuntimeLogFile",
+  "conversation_file_name": "conversation.json",
+  "file_operations_file_name": "file-operations.jsonl",
+  "record_shell_file_operations": true,
+  "record_active_goal": true,
+  "goal_db_path": null,
+  "max_text_chars": 12000,
+  "lock_timeout_seconds": 3
+}

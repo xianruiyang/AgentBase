@@ -1,0 +1,8 @@
+sgy is dual-licensed under either of the following licenses, at your option:
+
+- Apache License, Version 2.0 (`LICENSE-APACHE`)
+- MIT License (`LICENSE-MIT`)
+
+Third-party components retain their own licenses. Release archives include
+`THIRD_PARTY_LICENSES.txt` and `sbom.spdx.json` with the applicable dependency
+license evidence.

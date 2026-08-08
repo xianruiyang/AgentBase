@@ -1,0 +1,35 @@
+[
+  {
+    "file": "src/示例.ts",
+    "range": {
+      "start": { "line": 0, "column": 1 },
+      "end": { "line": 0, "column": 9 }
+    },
+    "text": "foo(a)\n",
+    "replacement": "bar(a)",
+    "metaVariables": {
+      "single": { "A": { "text": "a" } },
+      "multi": {},
+      "transformed": {}
+    },
+    "nullField": null,
+    "empty": [],
+    "future": {
+      "huge": 1234567890123456789012345678901234567890,
+      "tiny": 0.000000000000000000000000000000000000000123
+    },
+    "ambiguous": "true",
+    "merge": { "<<": "literal" }
+  },
+  {
+    "ruleId": "no-console",
+    "severity": "warning",
+    "message": "avoid console",
+    "file": "src/a.ts",
+    "range": {
+      "start": { "line": 4, "column": 2 },
+      "end": { "line": 4, "column": 13 }
+    },
+    "unknown": true
+  }
+]

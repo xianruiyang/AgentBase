@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "evaluator": "codex-gpt5-architecture-routing-v2",
+  "candidate_bundle_sha256": "9E4D082E17AB120043FBCE18A6D8C0A218C20A95869F2CBFC9AF713A6BB17E0E",
+  "evaluation_input_sha256": "E57CFC80ADFA242A51523CC60D229DACB844BA81E9AC7A2906E702E7A564DE60",
+  "cases": [
+    {
+      "id": "mechanical-document-edit",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["modify_authorized_scope"],
+      "note": "对象、替换和验收已明确，属于已授权的普通机械文档修改。"
+    },
+    {
+      "id": "specified-local-implementation",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["modify_authorized_scope"],
+      "note": "接口、模块和验收均已指定，按普通局部实现与定向测试处理。"
+    },
+    {
+      "id": "architecture-discovery-before-implementation",
+      "selected_skills": ["change-governance"],
+      "selected_change_governance_references": ["lifecycle-and-entry.md"],
+      "behavior_tags": ["modify_authorized_scope", "architecture_integrated"],
+      "note": "持久化结果已授权，但正确 owner 与正式入口尚未确认，需先裁决职责落点。"
+    },
+    {
+      "id": "implicit-architecture-integration",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["modify_authorized_scope", "architecture_integrated"],
+      "note": "唯一设置 owner 与迁移入口已确认，应直接沿既有职责和入口集成。"
+    },
+    {
+      "id": "one-off-generated-artifact",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "一次性文本产物不进入项目且规格完整，不构成长期开发表面或治理任务。"
+    },
+    {
+      "id": "specified-synthesis-artifact",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "素材、受众与验收约束已确认，按普通综合写作产出即可。"
+    },
+    {
+      "id": "cpp-include-edit",
+      "selected_skills": ["cpp-engineering-rules"],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["modify_authorized_scope"],
+      "note": "公共 C++ 头的 include 与前置声明修改强制适用 C++ 依赖规则。"
+    },
+    {
+      "id": "cpp-module-cycle-diagnosis",
+      "selected_skills": ["change-governance", "cpp-engineering-rules"],
+      "selected_change_governance_references": ["causal-analysis.md", "lifecycle-and-entry.md", "verification-and-gates.md"],
+      "behavior_tags": ["modify_authorized_scope", "architecture_integrated"],
+      "note": "反复循环依赖要求确认原因、模块职责与依赖方向，并验证错误机制已改变。"
+    },
+    {
+      "id": "ast-structural-call-search",
+      "selected_skills": ["ast-grep-token-safe", "symbol-structure-workflow"],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "调用实参与 await 的语法关系需结构搜索，且改写仅预览不得应用。"
+    },
+    {
+      "id": "literal-text-search",
+      "selected_skills": ["rg-token-safe"],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "字面量 rg 搜索输出进入上下文，必须保留定位并限制宽度与总行数。"
+    },
+    {
+      "id": "bounded-file-discovery",
+      "selected_skills": ["fd-usage"],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "请求明确使用 fd 做有基准目录和结果上限的文件发现。"
+    },
+    {
+      "id": "powershell-command-authoring",
+      "selected_skills": ["powershell-usage"],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "任务直接要求编写兼容 PowerShell 5.1 的编码与退出码安全命令。"
+    },
+    {
+      "id": "semantic-safe-rename",
+      "selected_skills": ["symbol-structure-workflow"],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["modify_authorized_scope"],
+      "note": "跨文件重载方法重命名必须依赖同一符号身份、受限预览和诊断读回。"
+    },
+    {
+      "id": "event-log-context-recovery",
+      "selected_skills": ["codex-event-logger"],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "上下文压缩后恢复用户要求、goal 与文件操作正是运行记录恢复场景。"
+    },
+    {
+      "id": "qq-hook-explicit-enable",
+      "selected_skills": ["codex-qq-hook"],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["modify_authorized_scope"],
+      "note": "用户明确授权为当前工作区和对话开启 QQ 完成提醒。"
+    },
+    {
+      "id": "cross-turn-dependent-plan",
+      "selected_skills": ["task-table-manager"],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["modify_authorized_scope"],
+      "note": "工作跨轮、存在真实依赖并要求持久证据审计，必须使用任务表。"
+    },
+    {
+      "id": "coordinate-frame-conversion",
+      "selected_skills": ["understand-space"],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "屏幕到世界转换依赖视口、投影、父级坐标系及读回验收。"
+    },
+    {
+      "id": "bug-root-cause-fix",
+      "selected_skills": ["change-governance"],
+      "selected_change_governance_references": ["causal-analysis.md", "verification-and-gates.md"],
+      "behavior_tags": ["modify_authorized_scope"],
+      "note": "根因修复需用直接证据收敛机制，并证明原输入不再经过错误路径。"
+    },
+    {
+      "id": "formal-entry-migration",
+      "selected_skills": ["change-governance"],
+      "selected_change_governance_references": ["lifecycle-and-entry.md"],
+      "behavior_tags": ["modify_authorized_scope", "architecture_integrated"],
+      "note": "正式入口迁移含限期兼容和退出条件，必须治理权威入口与生命周期。"
+    },
+    {
+      "id": "project-metadata-refresh",
+      "selected_skills": ["change-governance"],
+      "selected_change_governance_references": ["records-and-metadata.md"],
+      "behavior_tags": ["modify_authorized_scope"],
+      "note": "重写 project-metadata.md 当前状态和验证依据属于长期 metadata 维护。"
+    },
+    {
+      "id": "shared-blocking-gate",
+      "selected_skills": ["change-governance"],
+      "selected_change_governance_references": ["verification-and-gates.md"],
+      "behavior_tags": ["read_only"],
+      "note": "共享阻断门禁必须证明每个失败都能可靠推出目标契约被违反。"
+    },
+    {
+      "id": "current-context-is-sufficient",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["modify_authorized_scope"],
+      "note": "当前对话已提供充分目标和改动状态，应沿用上下文而非形式化读取历史记录。"
+    },
+    {
+      "id": "ordinary-completion-no-qq",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "普通单文件完成汇报既不触发治理审计，也不授权或触发 QQ 提醒配置。"
+    },
+    {
+      "id": "cpp-word-in-document",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["modify_authorized_scope"],
+      "note": "C++ 仅是 README 文案，未修改或审查 C++ 源码与编译依赖。"
+    },
+    {
+      "id": "known-file-content-search",
+      "selected_skills": ["rg-token-safe"],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "已知单文件中的字符串搜索应走受限 rg，并使用单文件定位模式。"
+    },
+    {
+      "id": "mechanical-coordinate-field-edit",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["modify_authorized_scope"],
+      "note": "x 只是已确认字段名，精确值替换不依赖任何空间关系或坐标转换。"
+    },
+    {
+      "id": "single-turn-checklist",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "单轮检查三个明确字段无需建立跨轮任务表。"
+    },
+    {
+      "id": "windows-prose-without-command",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only"],
+      "note": "只解释 Windows 文案且不编写或执行 PowerShell 命令，不触发 PowerShell skill。"
+    },
+    {
+      "id": "fact-conflict-read-only",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only", "fact_first", "challenge_false_premise"],
+      "note": "直接读到的适用文件证据优先，需指出用户断言冲突且不得修改文件。"
+    },
+    {
+      "id": "long-term-without-scope-expansion",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["modify_authorized_scope", "long_term_total_cost", "architecture_integrated", "no_scope_expansion"],
+      "note": "应在授权范围内收敛到唯一入口，避免永久第二状态源且不顺带重构。"
+    },
+    {
+      "id": "review-only-no-alternative-execution",
+      "selected_skills": [],
+      "selected_change_governance_references": [],
+      "behavior_tags": ["read_only", "no_alternative_execution"],
+      "note": "授权仅限风险评审与建议，不能把建议升级为文件修改或替代方案实施。"
+    }
+  ]
+}

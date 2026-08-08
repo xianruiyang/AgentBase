@@ -1,0 +1,4 @@
+interface:
+  display_name: "空间理解"
+  short_description: "在正确性依赖空间关系时规范化维度、坐标系与用户空间意图"
+  default_prompt: "使用 $understand-space 处理这项依赖空间语义或坐标转换的任务，先确认维度、坐标系和语义主体，再比较、操作或读回验收。"

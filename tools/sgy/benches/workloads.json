@@ -1,0 +1,37 @@
+{
+  "schema": "sgy.benchmark-workloads/v1",
+  "sizes": {
+    "small": 8,
+    "medium": 80,
+    "large": 800
+  },
+  "commands": {
+    "run": {
+      "pattern": "console.log($A)",
+      "language": "ts"
+    },
+    "scan": {
+      "rule": "no-dangerous-call",
+      "severity": "warning"
+    },
+    "rewrite": {
+      "pattern": "legacyCall($A)",
+      "rewrite": "modernCall($A)",
+      "language": "ts",
+      "mode": "preview"
+    }
+  },
+  "information_tasks": [
+    "exact_total_count",
+    "exact_unique_file_count",
+    "visible_finding_detail",
+    "all_result_identities_addressable",
+    "command_specific_semantics",
+    "long_text_available_or_truncation_disclosed"
+  ],
+  "process": {
+    "sort_single_run_records": 5000,
+    "sort_multi_run_records": 20050,
+    "sort_key": "file"
+  }
+}

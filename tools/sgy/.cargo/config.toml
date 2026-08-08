@@ -1,0 +1,6 @@
+[alias]
+ci-build = "build --workspace --all-targets --all-features"
+ci-test = "test --workspace --all-targets --all-features"
+fmt-check = "fmt --all -- --check"
+lint = "clippy --workspace --all-targets --all-features -- -D warnings"
+

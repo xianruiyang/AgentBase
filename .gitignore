@@ -1,0 +1,51 @@
+# Codex workspace state
+.codex/
+codexRuntimeLogFile/
+
+# Python
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.venv/
+**/venv/
+*.py[cod]
+
+# Local secrets and machine state
+.env
+.env.*
+!.env.example
+.idea/
+.vs/
+.DS_Store
+Thumbs.db
+
+# Node and VS Code integration runtime
+**/node_modules/
+**/coverage/
+**/.vscode-test/
+**/.eslintcache
+**/*.tsbuildinfo
+mcp/vscode-lsp-mcp/.vscode-lsp-mcp/
+mcp/vscode-lsp-mcp/dist/
+mcp/vscode-lsp-mcp/packages/*/dist/
+mcp/vscode-lsp-mcp/packages/*/build/
+mcp/vscode-lsp-mcp/packages/win32-security/Release/
+mcp/vscode-lsp-mcp/tests/fixtures/**/bin/
+mcp/vscode-lsp-mcp/tests/fixtures/**/obj/
+
+# Rust
+tools/sgy/target/
+tools/sgy/dist/
+tools/sgy/fuzz/artifacts/
+
+# Runtime logs
+**/runtimeLogs/
+*.log
+
+# Generated AgentBase packages and deployment simulations
+development/plugin-packaging/dist/
+development/codex-deployment/sandbox/
+
+# Development helper binaries
+development/codex-qq-hook/*.exe

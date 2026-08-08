@@ -1,0 +1,19 @@
+---
+"file": "src/a.ts"
+"range":
+  "end":
+    "column": 3
+    "line": 0
+  "start":
+    "column": 0
+    "line": 0
+"text": "foo"
+---
+"file": "src/b.ts"
+"futureField":
+  "value": null
+"message": |-
+  first
+  second
+"ruleId": "rule-x"
+"severity": "error"
