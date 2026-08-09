@@ -1,0 +1,6 @@
+name = "terra"
+description = "Use Terra for general tasks that should balance quality, speed, and cost."
+model = "gpt-5.6-terra"
+developer_instructions = """
+Complete exploration, analysis, and routine implementation efficiently. Return concise, verifiable results.
+"""

@@ -1,16 +1,16 @@
 # AgentBase
 
-本项目集中维护候选全局 `AGENTS.md`、可移植 Codex 关键设置、11 个关键 skill、对应开发工程以及实际依赖的 MCP/CLI。所有改动先进入本目录真源，通过静态合同、盲测和隔离发布验证后，再由用户明确决定是否发布到 Codex。
+本项目集中维护候选全局 `AGENTS.md`、可移植 Codex 关键设置与自定义子代理、11 个关键 skill、对应开发工程以及实际依赖的 MCP/CLI。所有改动先进入本目录真源，通过静态合同、盲测和隔离发布验证后，再由用户明确决定是否发布到 Codex。
 
 ## 真源与安装副本
 
 - `global/AGENTS.md` 是全局规则候选真源，不自动覆盖 Codex 用户目录。
-- `global/config.toml` 是经过筛选的可移植 Codex 设置真源；`global/hooks.template.json` 是按目标 Codex 根目录解析的 hooks 真源。二者都不会因文件存在而自动覆盖用户配置。
+- `global/config.toml` 是经过筛选的可移植 Codex 设置真源；`global/hooks.template.json` 是按目标 Codex 根目录解析的 hooks 真源；`global/agents/*.toml` 是自定义子代理真源。它们都不会因文件存在而自动覆盖用户配置。
 - `skills/<skill-name>/` 是已迁入 skill 的唯一开发真源。
 - `mcp/<mcp-name>/` 是 skill 所依赖 MCP 的开发与发布真源。
 - `tools/<tool-name>/` 是 skill 捆绑或调用的非 MCP 工具开发真源。
 - `development/<name>/` 只承载验证、打包、部署和不随 skill 安装的开发资料。
-- `C:\Users\gzxt\.codex` 中的 `AGENTS.md`、同名 skill、`config.toml` 与 `hooks.json` 都是安装目标或宿主状态，不反向定义本项目。
+- `C:\Users\gzxt\.codex` 中的 `AGENTS.md`、同名 skill、`config.toml`、`hooks.json` 与 `agents/*.toml` 都是安装目标或宿主状态，不反向定义本项目。
 - 原工程目录只作为迁移来源保留，不自动双向同步；缓存、测试输出和构建产物不属于真源。
 
 ## 当前全局内核
@@ -49,7 +49,7 @@
 | `development/codex-qq-hook` | `codex-qq-hook` | Webhook 辅助程序和开发说明；正式运行脚本仍在 skill 真源 |
 | `development/skill-routing` | 全局规则与 11 个 skill | 静态触发合同、盲测输入生成与结果判定 |
 | `development/plugin-packaging` | 11 个 skill | 生成并校验 `agentbase-core` 本地插件包 |
-| `development/codex-deployment` | 全局规则、可移植设置、hooks 与 11 个 skill | 校验、可选设置安装、带备份发布和可验证回滚 |
+| `development/codex-deployment` | 全局规则、可移植设置、hooks、自定义子代理与 11 个 skill | 校验、可选设置安装、带备份发布和可验证回滚 |
 
 `vscode-lsp-mcp` 保持独立发布真源：它已有 `release:build` 和 `release:verify`，且还包含 VS Code companion 与安装生命周期。插件包不复制 MCP，也不创建第二套安装入口；`symbol-structure-workflow/agents/openai.yaml` 只声明对 `vscode-lsp-mcp` 的工具依赖。旧的 `vscode-mcp` 与 `ast-mcp` 不属于当前权威依赖。
 
@@ -93,23 +93,25 @@
 
 `global/hooks.template.json` 保存全局事件记录与按工作区显式开启的 QQ 完成提醒 hook；部署时只把 `{{CODEX_ROOT}}` 解析为用户明确指定的 Codex 根目录。新机器必须通过 `/hooks` 审查并信任实际命令，项目不复制旧机器的信任哈希。
 
+`global/agents/` 保存 `luna`、`sol`、`terra` 三个当前自定义子代理角色。每个文件独立声明角色名、用途、模型和开发者指令；未重复声明的推理强度继续继承 `global/config.toml` 的 `[agents]` 默认值。部署只管理这三个同名文件，不替换目标机器的整个 `agents/` 目录。
+
 复制仓库到另一台 Windows 机器后的完整准备、独立插件/MCP 前置条件和恢复边界见 [`development/codex-deployment/README.md`](development/codex-deployment/README.md)。
 
 ## 校验、发布与回滚
 
-部署入口默认校验全局规则、11 个 skill、可移植设置、hooks 模板和 MCP 独立发布入口：
+部署入口默认校验全局规则、11 个 skill、可移植设置、hooks 模板、自定义子代理和 MCP 独立发布入口：
 
 ```powershell
 & 'D:\program\AgentBase\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot 'D:\program\AgentBase'
 ```
 
-只有用户明确决定加载时，才对精确指定的 Codex 根目录执行发布。默认发布会先在目标目录内分阶段复制和校验，再把原 `AGENTS.md` 与 11 个同名 skill 移入带清单的备份；不会修改其他 skill、`config.toml`、`hooks.json`、插件 marketplace 或 MCP：
+只有用户明确决定加载时，才对精确指定的 Codex 根目录执行发布。默认发布会先在目标目录内分阶段复制和校验，再把原 `AGENTS.md` 与 11 个同名 skill 移入带清单的备份；不会修改其他 skill、`config.toml`、`hooks.json`、`agents/`、插件 marketplace 或 MCP：
 
 ```powershell
 & 'D:\program\AgentBase\development\codex-deployment\manage_agentbase.ps1' -Action Publish -ProjectRoot 'D:\program\AgentBase' -CodexRoot 'C:\Users\gzxt\.codex'
 ```
 
-在新机器上显式选择 `-InstallPortableSettings` 时，同一发布事务还会备份并替换 `config.toml` 与 `hooks.json`；省略该开关继续保持默认边界：
+在新机器上显式选择 `-InstallPortableSettings` 时，同一发布事务还会备份并替换 `config.toml`、`hooks.json` 与三个同名自定义子代理文件；目标机器的其他 agent 保持不变，省略该开关继续保持默认边界：
 
 ```powershell
 & 'D:\program\AgentBase\development\codex-deployment\manage_agentbase.ps1' -Action Publish -ProjectRoot 'D:\program\AgentBase' -CodexRoot 'C:\Users\gzxt\.codex' -InstallPortableSettings
@@ -126,4 +128,4 @@
 ## 当前发布状态
 
 - 当前 2026-08-09 候选已通过正式入口发布到 `C:\Users\gzxt\.codex`，`source_bundle_sha256` 为 `C1F2DE4B49BE22F6A8C4F4C6E221C0861D268010A54B9FF679C7A7B33F75E085`；本次唯一新增的回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260809-020034-01d48b20\`。
-- 本次发布替换全局 `AGENTS.md` 与 11 个同名 skill，MCP 未改变；可移植设置是在本次发布之后加入的候选真源，当前安装的 `config.toml`、`hooks.json`、个人 marketplace 和其他安装内容未由新入口重发。当前运行不会追溯重建启动时的指令链，新任务或重新启动的会话才会按已发布文件重新发现规则。
+- 本次发布替换全局 `AGENTS.md` 与 11 个同名 skill，MCP 未改变；可移植设置和自定义子代理是在本次发布之后加入的候选真源，当前安装的 `config.toml`、`hooks.json`、`agents/*.toml`、个人 marketplace 和其他安装内容未由新入口重发。当前运行不会追溯重建启动时的指令链，新任务或重新启动的会话才会按已发布文件重新发现规则。

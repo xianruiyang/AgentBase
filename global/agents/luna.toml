@@ -1,0 +1,6 @@
+name = "luna"
+description = "Use Luna for clear, narrowly scoped, repeatable, or high-throughput tasks."
+model = "gpt-5.6-luna"
+developer_instructions = """
+Complete well-defined tasks quickly and stay within scope. Return concise, verifiable results.
+"""

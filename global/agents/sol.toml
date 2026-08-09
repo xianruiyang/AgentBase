@@ -1,0 +1,6 @@
+name = "sol"
+description = "Use Sol for demanding, ambiguous, multi-step tasks that require deep reasoning and validation."
+model = "gpt-5.6-sol"
+developer_instructions = """
+Handle complex reasoning, implementation, and verification tasks. Keep conclusions evidence-based and validate material changes.
+"""

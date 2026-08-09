@@ -226,6 +226,68 @@ function Test-PortableConfigSource {
     }
 }
 
+function Get-ValidatedPortableAgentSources {
+    param(
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+        throw "Portable Codex agents directory is missing: $Path"
+    }
+
+    $expectedAgents = [ordered]@{
+        luna = [ordered]@{
+            description = "Use Luna for clear, narrowly scoped, repeatable, or high-throughput tasks."
+            model = "gpt-5.6-luna"
+            developer_instructions = "Complete well-defined tasks quickly and stay within scope. Return concise, verifiable results."
+        }
+        sol = [ordered]@{
+            description = "Use Sol for demanding, ambiguous, multi-step tasks that require deep reasoning and validation."
+            model = "gpt-5.6-sol"
+            developer_instructions = "Handle complex reasoning, implementation, and verification tasks. Keep conclusions evidence-based and validate material changes."
+        }
+        terra = [ordered]@{
+            description = "Use Terra for general tasks that should balance quality, speed, and cost."
+            model = "gpt-5.6-terra"
+            developer_instructions = "Complete exploration, analysis, and routine implementation efficiently. Return concise, verifiable results."
+        }
+    }
+    $entries = @(Get-ChildItem -LiteralPath $Path -Force | Sort-Object Name)
+    $expectedNames = @($expectedAgents.Keys | ForEach-Object { "{0}.toml" -f $_ })
+    $actualNames = @($entries.Name)
+    if (($actualNames -join '|') -ne ($expectedNames -join '|')) {
+        throw "Portable Codex agents contain an unexpected file set: $($actualNames -join ', ')"
+    }
+
+    foreach ($entry in $entries) {
+        if ($entry.PSIsContainer -or ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Portable Codex agent must be a real TOML file: $($entry.FullName)"
+        }
+        $agentName = [IO.Path]::GetFileNameWithoutExtension($entry.Name)
+        $spec = $expectedAgents[$agentName]
+        $expectedLines = @(
+            "name = `"$agentName`""
+            "description = `"$($spec.description)`""
+            "model = `"$($spec.model)`""
+            'developer_instructions = """'
+            [string]$spec.developer_instructions
+            '"""'
+        )
+        $actualLines = @(Get-Content -LiteralPath $entry.FullName -Encoding UTF8 | ForEach-Object { $_.Trim() } | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_)
+        })
+        if (($actualLines -join [Environment]::NewLine) -ne ($expectedLines -join [Environment]::NewLine)) {
+            throw "Portable Codex agent differs from the reviewed contract: $($entry.Name)"
+        }
+        $raw = Get-Content -LiteralPath $entry.FullName -Raw -Encoding UTF8
+        if ($raw -match '(?i)([a-z]:[\\/]|\\\\|https?://|api[_-]?key|password|secret|credential|trusted_hash|mcp_servers|skills\.config)') {
+            throw "Portable Codex agent contains a machine path, external dependency, or sensitive setting: $($entry.Name)"
+        }
+    }
+
+    return $entries
+}
+
 function Test-HooksTemplateSource {
     param(
         [string]$Path
@@ -317,12 +379,18 @@ function Get-ValidatedSource {
     & (Join-Path $Root "development\skill-routing\validate_contract.ps1") -ProjectRoot $Root | Out-Null
     $portableConfigPath = Join-Path $Root "global\config.toml"
     $hooksTemplatePath = Join-Path $Root "global\hooks.template.json"
+    $portableAgentsPath = Join-Path $Root "global\agents"
     Test-PortableConfigSource -Path $portableConfigPath
     Test-HooksTemplateSource -Path $hooksTemplatePath
-    $portableSettingsFingerprint = Get-TextSha256 ((@(
+    $portableAgentFiles = @(Get-ValidatedPortableAgentSources -Path $portableAgentsPath)
+    $portableSettingsRecords = @(
         "global/config.toml|$(Get-PathFingerprint $portableConfigPath)"
         "global/hooks.template.json|$(Get-PathFingerprint $hooksTemplatePath)"
-    )) -join [Environment]::NewLine)
+    )
+    foreach ($portableAgentFile in $portableAgentFiles) {
+        $portableSettingsRecords += "global/agents/$($portableAgentFile.Name)|$(Get-PathFingerprint $portableAgentFile.FullName)"
+    }
+    $portableSettingsFingerprint = Get-TextSha256 ($portableSettingsRecords -join [Environment]::NewLine)
 
     $contract = Get-Content -LiteralPath (Join-Path $Root "development\skill-routing\trigger-cases.json") -Raw -Encoding UTF8 | ConvertFrom-Json
     $targets = New-Object 'System.Collections.Generic.List[object]'
@@ -361,6 +429,16 @@ function Get-ValidatedSource {
             installed_path = Join-Path $InstallRoot "hooks.json"
             kind = "file"
         })
+        foreach ($portableAgentFile in $portableAgentFiles) {
+            $relativePath = "agents\$($portableAgentFile.Name)"
+            $targets.Add([pscustomobject]@{
+                relative_path = $relativePath
+                source_path = $portableAgentFile.FullName
+                source_text = $null
+                installed_path = Join-Path $InstallRoot $relativePath
+                kind = "file"
+            })
+        }
     }
 
     $mcpPackagePath = Join-Path $Root "mcp\vscode-lsp-mcp\package.json"
@@ -380,6 +458,8 @@ function Get-ValidatedSource {
         portable_settings_sha256 = $portableSettingsFingerprint
         portable_config_path = $portableConfigPath
         hooks_template_path = $hooksTemplatePath
+        portable_agents_path = $portableAgentsPath
+        portable_agent_names = @($portableAgentFiles.BaseName)
     }
 }
 
@@ -423,6 +503,8 @@ if ($Action -eq "Validate") {
         portable_settings_sha256 = $source.portable_settings_sha256
         portable_config = $source.portable_config_path
         hooks_template = $source.hooks_template_path
+        portable_agents = $source.portable_agents_path
+        portable_agent_count = @($source.portable_agent_names).Count
     }
     return
 }
@@ -481,6 +563,7 @@ if ($Action -eq "Publish") {
             source_bundle_sha256 = $sourceFingerprint
             portable_settings_sha256 = $source.portable_settings_sha256
             portable_settings_installed = [bool]$InstallPortableSettings
+            portable_agent_names = @($source.portable_agent_names)
             installed_bundle_sha256 = $null
             targets = $targetStates
             backed_up_targets = @()
@@ -570,6 +653,7 @@ if ($Action -eq "Publish") {
         backup_path = Split-Path -Parent $manifestPath
         mcp_changed = $false
         portable_settings_installed = [bool]$InstallPortableSettings
+        portable_agent_count = if ($InstallPortableSettings) { @($source.portable_agent_names).Count } else { 0 }
     }
     return
 }

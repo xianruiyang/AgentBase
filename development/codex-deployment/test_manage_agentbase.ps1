@@ -49,6 +49,7 @@ if (-not [string]::IsNullOrWhiteSpace($RetainedTestRootToClean)) {
 
 try {
     New-Item -ItemType Directory -Path (Join-Path $codexRoot "skills\user-skill") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $codexRoot "agents") -Force | Out-Null
     Write-FixtureText -Path (Join-Path $codexRoot "AGENTS.md") -Text ("old agents" + [Environment]::NewLine)
     Write-FixtureText -Path (Join-Path $codexRoot "config.toml") -Text ((@(
         'model = "old-model"'
@@ -66,10 +67,22 @@ try {
         'description: keep'
         '---'
     ) -join [Environment]::NewLine) + [Environment]::NewLine)
+    Write-FixtureText -Path (Join-Path $codexRoot "agents\luna.toml") -Text ((@(
+        'name = "luna"'
+        'description = "old luna"'
+        'developer_instructions = "old"'
+    ) -join [Environment]::NewLine) + [Environment]::NewLine)
+    Write-FixtureText -Path (Join-Path $codexRoot "agents\user-agent.toml") -Text ((@(
+        'name = "user_agent"'
+        'description = "keep"'
+        'developer_instructions = "keep"'
+    ) -join [Environment]::NewLine) + [Environment]::NewLine)
 
     $originalAgentsHash = (Get-FileHash -LiteralPath (Join-Path $codexRoot "AGENTS.md") -Algorithm SHA256).Hash
     $originalConfigHash = (Get-FileHash -LiteralPath (Join-Path $codexRoot "config.toml") -Algorithm SHA256).Hash
     $originalHooksHash = (Get-FileHash -LiteralPath (Join-Path $codexRoot "hooks.json") -Algorithm SHA256).Hash
+    $originalLunaHash = (Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\luna.toml") -Algorithm SHA256).Hash
+    $originalUserAgentHash = (Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\user-agent.toml") -Algorithm SHA256).Hash
 
     $defaultPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
     if ([bool]$defaultPublish.portable_settings_installed) {
@@ -81,11 +94,20 @@ try {
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "hooks.json") -Algorithm SHA256).Hash -ne $originalHooksHash) {
         throw "Default publish changed hooks.json"
     }
+    if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\luna.toml") -Algorithm SHA256).Hash -ne $originalLunaHash) {
+        throw "Default publish changed a custom agent"
+    }
+    if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\user-agent.toml") -Algorithm SHA256).Hash -ne $originalUserAgentHash) {
+        throw "Default publish changed an unrelated custom agent"
+    }
     & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $defaultPublish.backup_path | Out-Null
 
     $settingsPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings
     if (-not [bool]$settingsPublish.portable_settings_installed) {
         throw "Portable-settings publish did not report settings installation"
+    }
+    if ([int]$settingsPublish.portable_agent_count -ne 3) {
+        throw "Portable-settings publish reported an unexpected custom-agent count"
     }
     $sourceConfigHash = (Get-FileHash -LiteralPath (Join-Path $ProjectRoot "global\config.toml") -Algorithm SHA256).Hash
     $installedConfigHash = (Get-FileHash -LiteralPath (Join-Path $codexRoot "config.toml") -Algorithm SHA256).Hash
@@ -101,13 +123,31 @@ try {
     if (-not $firstCommand.Contains($codexRoot)) {
         throw "Installed hooks do not reference the selected Codex root"
     }
+    $sourceAgentFiles = @(Get-ChildItem -LiteralPath (Join-Path $ProjectRoot "global\agents") -File -Filter "*.toml")
+    foreach ($sourceAgentFile in $sourceAgentFiles) {
+        $installedAgentPath = Join-Path (Join-Path $codexRoot "agents") $sourceAgentFile.Name
+        if (-not (Test-Path -LiteralPath $installedAgentPath -PathType Leaf)) {
+            throw "Portable custom agent was not installed: $($sourceAgentFile.Name)"
+        }
+        if ((Get-FileHash -LiteralPath $installedAgentPath -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $sourceAgentFile.FullName -Algorithm SHA256).Hash) {
+            throw "Installed custom agent does not match the portable source: $($sourceAgentFile.Name)"
+        }
+    }
     if (-not (Test-Path -LiteralPath (Join-Path $codexRoot "skills\user-skill\SKILL.md") -PathType Leaf)) {
         throw "Unrelated user skill was removed"
+    }
+    if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\user-agent.toml") -Algorithm SHA256).Hash -ne $originalUserAgentHash) {
+        throw "Unrelated custom agent was changed"
     }
     $manifest = Get-Content -LiteralPath (Join-Path $settingsPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
     $manifestTargets = @($manifest.targets.relative_path | Sort-Object)
     if ($manifestTargets -notcontains "config.toml" -or $manifestTargets -notcontains "hooks.json") {
         throw "Portable settings are missing from the rollback manifest"
+    }
+    foreach ($agentName in @("luna", "sol", "terra")) {
+        if ($manifestTargets -notcontains "agents\$agentName.toml") {
+            throw "Portable custom agent is missing from the rollback manifest: $agentName"
+        }
     }
 
     & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $settingsPublish.backup_path | Out-Null
@@ -120,6 +160,17 @@ try {
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "hooks.json") -Algorithm SHA256).Hash -ne $originalHooksHash) {
         throw "Rollback did not restore hooks.json"
     }
+    if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\luna.toml") -Algorithm SHA256).Hash -ne $originalLunaHash) {
+        throw "Rollback did not restore the original luna agent"
+    }
+    foreach ($agentName in @("sol", "terra")) {
+        if (Test-Path -LiteralPath (Join-Path $codexRoot "agents\$agentName.toml")) {
+            throw "Rollback did not remove the newly installed custom agent: $agentName"
+        }
+    }
+    if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\user-agent.toml") -Algorithm SHA256).Hash -ne $originalUserAgentHash) {
+        throw "Rollback changed the unrelated custom agent"
+    }
     if (-not (Test-Path -LiteralPath (Join-Path $codexRoot "skills\user-skill\SKILL.md") -PathType Leaf)) {
         throw "Rollback removed the unrelated user skill"
     }
@@ -128,9 +179,11 @@ try {
     [pscustomobject]@{
         default_publish_preserved_settings = $true
         explicit_publish_installed_settings = $true
+        custom_agents_installed = $true
         hooks_root_resolved = $true
         rollback_restored_settings = $true
         unrelated_skill_preserved = $true
+        unrelated_agent_preserved = $true
         explicit_target_count = $manifestTargets.Count
     }
 }
