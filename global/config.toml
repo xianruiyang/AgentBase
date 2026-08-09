@@ -1,0 +1,34 @@
+# AgentBase portable Codex defaults.
+#
+# This file intentionally contains only reviewed, machine-independent settings.
+# Authentication, project trust, plugin/cache state, MCP paths, hook trust hashes,
+# runtime-generated notify/node_repl settings, and local secrets are excluded.
+# Installing this file replaces the target Codex user's config.toml, so use the
+# deployment entry point with -InstallPortableSettings only after reviewing it.
+
+model = "gpt-5.6-sol"
+model_reasoning_effort = "max"
+personality = "pragmatic"
+sandbox_mode = "danger-full-access"
+service_tier = "priority"
+
+[agents]
+enabled = true
+default_subagent_model = "gpt-5.6-luna"
+default_subagent_reasoning_effort = "max"
+
+[windows]
+sandbox = "elevated"
+
+[features]
+hooks = true
+multi_agent = true
+js_repl = false
+
+[desktop]
+conversationDetailMode = "STEPS_COMMANDS"
+followUpQueueMode = "queue"
+notifications-turn-mode = "always"
+ambient-suggestions-enabled = false
+show-context-window-usage = true
+enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "ultra", "max"]

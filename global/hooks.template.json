@@ -1,0 +1,64 @@
+{
+  "description": "AgentBase global event logging and opt-in QQ completion hooks.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "timeout": 10,
+            "statusMessage": "Recording Codex user prompt"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "timeout": 10,
+            "statusMessage": "Recording Codex turn stop"
+          },
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-qq-hook\\scripts\\codex_stop_qq_notify.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-qq-hook\\scripts\\codex_stop_qq_notify.ps1\"",
+            "timeout": 30,
+            "statusMessage": "Sending QQ completion notification"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "timeout": 10,
+            "statusMessage": "Recording Codex pre-tool snapshot"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "timeout": 10,
+            "statusMessage": "Recording Codex file operations"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -4,7 +4,7 @@
 
 must: 本文件只补充 `AgentBase` 项目约定，继承全局 `AGENTS.md`；项目架构、正式入口和当前状态以 `README.md` 为索引，不在本文件重复维护易失效的数量、哈希或发布日期
 
-must: 本项目的权威来源按职责划分：`global/AGENTS.md` 维护候选全局规则，`skills/` 维护 skill，`mcp/` 维护 MCP，`tools/` 维护非 MCP 工具，`development/` 只维护验证、打包、部署和开发资料
+must: 本项目的权威来源按职责划分：`global/AGENTS.md` 维护候选全局规则，`global/config.toml` 与 `global/hooks.template.json` 维护可移植 Codex 设置和 hooks 模板，`skills/` 维护 skill，`mcp/` 维护 MCP，`tools/` 维护非 MCP 工具，`development/` 只维护验证、打包、部署和开发资料
 
 must: `C:\Users\gzxt\.codex` 中的同名内容是安装目标，不是项目真源；不得从安装副本反向决定项目内容，也不得绕过项目正式入口形成双向同步
 
@@ -16,6 +16,8 @@ must: 不手工创建 `backup`、`copy`、`draft` 等冗余副本；只有正式
 
 must: `.codex/`、`codexRuntimeLogFile/`、`node_modules/`、`dist/`、`target/`、运行日志、覆盖率和部署沙箱是本地状态或可重建产物，不得作为项目真源提交
 
+must: 可移植 Codex 设置不得包含认证、凭据、项目绝对路径、信任哈希、历史、缓存或宿主自动生成状态；机器相关 MCP 和插件安装只记录正式安装入口与前置条件，不伪装成可直接复制的配置
+
 must: 修改全局规则或 skill 的触发语义时，同步维护 `development/skill-routing/validate_contract.ps1` 和适用的 `trigger-cases.json`；不得为保留旧字符串检查而在正式规则中制造重复表述
 
 must: 文档只更新被本次改动直接影响的事实，删除或改写已经失效的状态，不机械追加新的“当前状态”段落
@@ -26,6 +28,12 @@ must: 全局规则或 skill 变更至少运行：
 
 ```powershell
 & 'D:\program\AgentBase\development\skill-routing\validate_contract.ps1' -ProjectRoot 'D:\program\AgentBase'
+```
+
+must: 修改 `global/config.toml`、`global/hooks.template.json` 或部署合同后运行：
+
+```powershell
+& 'D:\program\AgentBase\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot 'D:\program\AgentBase'
 ```
 
 should: 修改 `mcp/vscode-lsp-mcp` 或 `tools/sgy` 时，先运行其 README 或清单定义的受影响模块验证；只有公共契约或发布范围受影响时才运行完整验证
