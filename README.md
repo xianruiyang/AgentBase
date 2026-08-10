@@ -129,5 +129,5 @@
 
 ## 当前发布状态
 
-- 当前项目候选在已发布 bundle `074FCC00F384403F3F6E1A3F72E9FE4395ADA0ECC045A44ED04C4753017FDD5C` 基础上新增 `reasoning-governor`，并把任务表的线程深度脚本降为兼容转发；候选尚未执行 `Publish`，`C:\Users\gzxt\.codex` 仍保持原 11 个 skill 的已安装版本。
-- 本次候选不修改 `global/hooks.template.json`，不引入 `Stop` hook、临时推理 state 或自动恢复等级，也不改变任务表 CLI、`plan.json`、`state.json`、MCP、`config.toml`、`agents/*.toml`、个人 marketplace 和现有任务目录。此前回滚备份仍位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-121914-c4659bb8\`。
+- 当前 2026-08-10 候选已通过正式入口发布到 `C:\Users\gzxt\.codex`，`source_bundle_sha256` 为 `95FB7BA6A0AF0D812E0E10E8A5E1694D9AA8977FCE269E4E4F1C2EDC0725FA2C`；本次发布的回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-134007-79dd2f52\`。
+- 本次发布安装了候选全局规则与 12 个同名 skill，包括 `reasoning-governor` 和任务表兼容转发；安装侧文件哈希及 governor 的只读 IPC 状态读回均已验证。发布未启用 `-InstallPortableSettings`，因此没有替换 `config.toml`、`hooks.json` 或 `agents/*.toml`；发布前后三个已安装自定义子代理均与项目真源一致，MCP、插件 marketplace、任务目录及其他宿主状态未改变。当前运行不会追溯重建启动时的指令链，新任务或重启后的会话才会按本次发布内容重新发现规则与 skill。
