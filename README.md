@@ -129,5 +129,5 @@
 
 ## 当前发布状态
 
-- 最近一次已安装到 `C:\Users\gzxt\.codex` 的版本，其 `source_bundle_sha256` 为 `95FB7BA6A0AF0D812E0E10E8A5E1694D9AA8977FCE269E4E4F1C2EDC0725FA2C`；对应回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-134007-79dd2f52\`。该版本安装了当时的候选全局规则与 12 个同名 skill，但未使用 `-InstallPortableSettings`，因此没有替换 `config.toml`、`hooks.json` 或 `agents/*.toml`。
-- 项目真源中的当前候选已在本地通过验证，但尚未发布或装载到 Codex。安装副本不是项目真源；只有用户明确决定加载后才运行正式发布入口。Codex 当前运行也不会追溯重建启动时的指令链，新任务或重启后的会话才会发现已发布的新规则与 skill。
+- 当前候选已于 2026-08-10 通过正式入口发布到 `C:\Users\gzxt\.codex`，source 与 installed bundle 的 SHA-256 均为 `566B4C2B51787781480B2D7AC7AC3CF1215308E5661CADA46CCAA8FE83EAC685`；对应回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-154511-413f5589\`。
+- 本次发布只安装候选全局规则与 12 个同名 skill，清单共 13 个目标；未启用 `-InstallPortableSettings`，因此没有替换 `config.toml`、`hooks.json` 或 `agents/*.toml`，MCP 与插件也未改变。安装副本不是项目真源；当前任务不会追溯重建启动时的全局指令链，新任务或重启后的会话才能完整使用本次发布内容。
