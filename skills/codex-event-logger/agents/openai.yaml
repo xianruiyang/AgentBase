@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex 运行记录恢复"
-  short_description: "按需读取 Codex 对话、goal 与文件操作记录以恢复或追溯上下文"
-  default_prompt: "使用 $codex-event-logger 在当前上下文不足或用户要求追溯时恢复相关对话、goal 和文件操作状态。"
+  short_description: "按需有界读取 Codex 对话、goal 与文件操作记录以恢复或追溯上下文"
+  default_prompt: "使用 $codex-event-logger 在当前上下文不足或用户要求追溯时有界恢复相关对话、goal 和文件操作状态。"

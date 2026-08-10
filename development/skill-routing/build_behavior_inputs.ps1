@@ -52,9 +52,8 @@ $cases = @($contract.cases | ForEach-Object {
 })
 
 $candidateFiles = @(Join-Path $ProjectRoot "global\AGENTS.md")
-foreach ($skill in @($contract.required_skills)) {
-    $skillRoot = Join-Path (Join-Path $ProjectRoot "skills") ([string]$skill)
-    $candidateFiles += @(Get-ChildItem -LiteralPath $skillRoot -Recurse -Force -File | Select-Object -ExpandProperty FullName)
+foreach ($skillSource in $skillSources) {
+    $candidateFiles += @($skillSource.skill_path, $skillSource.metadata_path)
 }
 $candidateRecords = @($candidateFiles | Sort-Object -Unique | ForEach-Object {
     $item = Get-Item -LiteralPath $_

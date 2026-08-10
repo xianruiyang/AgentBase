@@ -1,6 +1,6 @@
 # Codex deployment
 
-`manage_agentbase.ps1` is the only AgentBase entry point that installs files into a Codex home. It validates project truth, stages the complete selected payload, backs up every target, installs atomically, verifies fingerprints, and records a rollback manifest.
+`manage_agentbase.ps1` is the only AgentBase entry point that installs files into a Codex home. It validates project truth, stages the complete selected payload, backs up every target, installs atomically, verifies fingerprints, and records a rollback manifest. Directory payloads exclude runtime-only caches, logs, coverage output, dependency trees, build directories, and temporary files from both copying and fingerprinting, so local execution cannot change the deployable bundle.
 
 ## Payloads
 

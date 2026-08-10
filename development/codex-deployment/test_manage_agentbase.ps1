@@ -15,6 +15,9 @@ $codexRoot = Join-Path $testRoot "codex"
 $manage = Join-Path $ProjectRoot "development\codex-deployment\manage_agentbase.ps1"
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $succeeded = $false
+$sourceCacheRoot = Join-Path $ProjectRoot "skills\codex-event-logger\tests\__pycache__"
+$sourceCacheProbe = Join-Path $sourceCacheRoot ("agentbase-deployment-probe-" + [guid]::NewGuid().ToString("N") + ".pyc")
+$sourceCacheRootCreated = $false
 
 function Write-FixtureText {
     param(
@@ -48,6 +51,17 @@ if (-not [string]::IsNullOrWhiteSpace($RetainedTestRootToClean)) {
 }
 
 try {
+    $baselineValidation = & $manage -Action Validate -ProjectRoot $ProjectRoot
+    if (-not (Test-Path -LiteralPath $sourceCacheRoot -PathType Container)) {
+        New-Item -ItemType Directory -Path $sourceCacheRoot | Out-Null
+        $sourceCacheRootCreated = $true
+    }
+    [IO.File]::WriteAllBytes($sourceCacheProbe, [byte[]]@(1, 2, 3, 4))
+    $cacheValidation = & $manage -Action Validate -ProjectRoot $ProjectRoot
+    if ([string]$baselineValidation.source_bundle_sha256 -ne [string]$cacheValidation.source_bundle_sha256) {
+        throw "A runtime cache file changed the deployable source fingerprint"
+    }
+
     New-Item -ItemType Directory -Path (Join-Path $codexRoot "skills\user-skill") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $codexRoot "agents") -Force | Out-Null
     Write-FixtureText -Path (Join-Path $codexRoot "AGENTS.md") -Text ("old agents" + [Environment]::NewLine)
@@ -100,6 +114,12 @@ try {
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\user-agent.toml") -Algorithm SHA256).Hash -ne $originalUserAgentHash) {
         throw "Default publish changed an unrelated custom agent"
     }
+    $installedRuntimeArtifacts = @(Get-ChildItem -LiteralPath (Join-Path $codexRoot "skills") -Recurse -Force -File | Where-Object {
+        $_.FullName -match '(?i)[\\/]__pycache__[\\/]' -or $_.Extension -in @('.pyc', '.pyo')
+    })
+    if ($installedRuntimeArtifacts.Count -ne 0) {
+        throw "Default publish copied runtime artifacts into the Codex skill payload"
+    }
     & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $defaultPublish.backup_path | Out-Null
 
     $settingsPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings
@@ -150,6 +170,10 @@ try {
         }
     }
 
+    $installedCacheRoot = Join-Path $codexRoot "skills\codex-event-logger\tests\__pycache__"
+    New-Item -ItemType Directory -Path $installedCacheRoot -Force | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $installedCacheRoot "runtime-probe.pyc"), [byte[]]@(5, 6, 7, 8))
+
     & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $settingsPublish.backup_path | Out-Null
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "AGENTS.md") -Algorithm SHA256).Hash -ne $originalAgentsHash) {
         throw "Rollback did not restore AGENTS.md"
@@ -182,12 +206,23 @@ try {
         custom_agents_installed = $true
         hooks_root_resolved = $true
         rollback_restored_settings = $true
+        runtime_artifacts_excluded = $true
+        runtime_cache_ignored_for_rollback_drift = $true
         unrelated_skill_preserved = $true
         unrelated_agent_preserved = $true
         explicit_target_count = $manifestTargets.Count
     }
 }
 finally {
+    if (Test-Path -LiteralPath $sourceCacheProbe -PathType Leaf) {
+        Remove-Item -LiteralPath $sourceCacheProbe -Force
+    }
+    if ($sourceCacheRootCreated -and (Test-Path -LiteralPath $sourceCacheRoot -PathType Container)) {
+        $remainingCacheItems = @(Get-ChildItem -LiteralPath $sourceCacheRoot -Force)
+        if ($remainingCacheItems.Count -eq 0) {
+            Remove-Item -LiteralPath $sourceCacheRoot -Force
+        }
+    }
     if ($succeeded -and (Test-Path -LiteralPath $testRoot)) {
         Remove-TestRootSafely -Path $testRoot
     }

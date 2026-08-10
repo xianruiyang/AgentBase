@@ -412,10 +412,10 @@ goal 相关记录不应假设固定链路。
 建议文件：
 
 ```text
-C:\Users\gzxt\.codex\skills\codex-event-logger\SKILL.md
-C:\Users\gzxt\.codex\skills\codex-event-logger\scripts\codex_event_logger.ps1
-C:\Users\gzxt\.codex\skills\codex-event-logger\scripts\codex_event_logger.py
-C:\Users\gzxt\.codex\skills\codex-event-logger\event-logger-settings.json
+<CODEX_ROOT>\skills\codex-event-logger\SKILL.md
+<CODEX_ROOT>\skills\codex-event-logger\scripts\codex_event_logger.ps1
+<CODEX_ROOT>\skills\codex-event-logger\scripts\codex_event_logger.py
+<CODEX_ROOT>\skills\codex-event-logger\event-logger-settings.json
 ```
 
 PowerShell 入口只负责：
@@ -440,7 +440,7 @@ Python 脚本负责：
 默认配置文件放在 skill 内：
 
 ```text
-C:\Users\gzxt\.codex\skills\codex-event-logger\event-logger-settings.json
+<CODEX_ROOT>\skills\codex-event-logger\event-logger-settings.json
 ```
 
 项目级覆盖配置可选：
@@ -497,7 +497,7 @@ skill 默认配置 -> 项目级覆盖配置
 全局 hook 配置路径：
 
 ```text
-C:\Users\gzxt\.codex\hooks.json
+<CODEX_ROOT>\hooks.json
 ```
 
 示例：
@@ -638,33 +638,33 @@ private_key
 
 ## 查询脚本输出
 
-后续可补一个查询脚本：
+当前只读查询入口：
 
 ```text
-C:\Users\gzxt\.codex\skills\codex-event-logger\scripts\query_codex_turn_log.py
+<CODEX_ROOT>\skills\codex-event-logger\scripts\read_codex_turn_log.py
 ```
 
-常用查询：
+当前职责：
 
 ```text
-按项目根目录查询最近 N 轮
-按 session_id 查询轮次列表
-按 turn_id 展开 conversation.json 和 file-operations.jsonl
-查找 prompt 为 null 但存在 last_assistant_message 的轮次
-统计每轮工具数量和耗时
+按明确 session_id 有界列出最近 N 轮
+读取该 session 最新一轮或明确 turn 目录
+读取 conversation.json 前检查大小
+只读取 file-operations.jsonl 的有界尾部和有限记录
+对单行、字符串、集合深度和集合项数继续限幅并再次脱敏
 ```
 
-推荐输出：
+默认边界：
 
 ```text
-[2026-07-04 01:20:00] user_prompt
-session_id: ...
-turn_id: ...
-cwd: D:\program\RealSimpleChat
-prompt: ...
-file_operations: 3
-assistant_final: ...
+conversation.json: 最大 256 KiB，超限只返回大小和 too_large
+file-operations.jsonl: 只读末尾 256 KiB、最多 80 条
+JSONL 单行: 最大 32 KiB
+输出字符串: 最大 12,000 字符
+列出 turn: 最多 50 个
 ```
+
+输出为结构化 JSON，并同时报告实际文件大小、适用上限、截断状态和跳过原因。跨会话全文搜索、任意统计或无界展开不属于该入口职责；需要时先用明确会话和时间范围收窄，再增加独立的有界查询能力。
 
 ## 验收方法
 
@@ -683,6 +683,7 @@ assistant_final: ...
 11. 检查 `apply_patch` 的新增行区间使用修改后文件行号，删除行区间使用修改前文件行号。
 12. 检查 `file-operations.jsonl` 不记录具体改动内容。
 13. 检查超长输出已截断。
+14. 运行 `tests/test_event_logger.py`，确认读取器拒绝展开超限 conversation、只返回有限 JSONL 记录，并且不会输出被拒绝文件的正文。
 
 ## 当前结论
 

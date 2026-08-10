@@ -1,6 +1,6 @@
 ---
 name: symbol-structure-workflow
-description: "以成本分层方式定位代码、查询 VS Code 语义并安全修改源码。用于文本/符号/结构搜索、定义与引用、类型与层级、诊断、重命名、Code Action、格式化及修改验证；在受限 rg、$ast-grep-token-safe、vscode-lsp-mcp 和项目编辑工具间选择，只在结论确实依赖符号身份时升级到高消耗 LSP。"
+description: "以成本分层方式定位并安全修改需要结构或符号语义的代码。用于任务需要在受限 rg、$ast-grep-token-safe、vscode-lsp-mcp 与项目编辑工具间选择，或结论依赖定义、引用、类型、层级、诊断、安全重命名、Code Action 或格式化时；普通字符串、注释、日志、配置和文件名搜索不触发，直接使用对应文本或文件发现 skill。"
 ---
 
 # Symbol Structure Workflow

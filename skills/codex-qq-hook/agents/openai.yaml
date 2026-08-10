@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex QQ Hook"
-  short_description: "按用户明确要求配置当前工作区的 Codex QQ 完成提醒开关"
-  default_prompt: "使用 $codex-qq-hook 开启、关闭或查看当前工作区的 Codex QQ 完成提醒。"
+  short_description: "按明确授权配置、迁移和排查 Codex QQ 完成提醒"
+  default_prompt: "使用 $codex-qq-hook 开启、关闭、只读查看或排查当前工作区的 Codex QQ 完成提醒。"

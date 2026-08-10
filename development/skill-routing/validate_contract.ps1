@@ -102,8 +102,10 @@ $descriptionBoundaryFragments = @{
     "ast-grep-token-safe" = "不用于单纯字符串"
     "change-governance" = "不用于规格已完整"
     "codex-event-logger" = "当前上下文充分"
+    "codex-qq-hook" = "状态查询不得创建或改写配置"
     "powershell-usage" = "不用于没有 PowerShell 命令"
     "reasoning-governor" = "没有 active Goal 时不用于模型自主切换"
+    "symbol-structure-workflow" = "普通字符串"
     "task-table-manager" = "不用于单轮修改"
     "understand-space" = "不因正文偶然出现空间词触发"
 }
@@ -128,6 +130,23 @@ foreach ($skill in $requiredSkills) {
         Assert-True ($descriptionMatch.Groups["description"].Value.Contains($descriptionBoundaryFragments[$skill])) "Skill description is missing its non-trigger boundary: $skill"
     }
 
+    $rootMarkdown = @(Get-ChildItem -LiteralPath $skillRoot -File -Filter "*.md")
+    $unexpectedRootMarkdown = @($rootMarkdown | Where-Object { $_.Name -ne "SKILL.md" })
+    Assert-True ($unexpectedRootMarkdown.Count -eq 0) "Skill root contains auxiliary Markdown outside SKILL.md: $skill"
+
+    $referenceRoot = Join-Path $skillRoot "references"
+    if (Test-Path -LiteralPath $referenceRoot -PathType Container) {
+        foreach ($referenceFile in @(Get-ChildItem -LiteralPath $referenceRoot -File -Filter "*.md")) {
+            $relativeTarget = "references/$($referenceFile.Name)"
+            Assert-True ($skillContent.Contains("]($relativeTarget)")) "Skill reference is not linked directly from SKILL.md: $skill/$relativeTarget"
+            $referenceLines = @(Get-Content -LiteralPath $referenceFile.FullName -Encoding UTF8)
+            if ($referenceLines.Count -gt 100) {
+                $referenceContent = $referenceLines -join [Environment]::NewLine
+                Assert-True ($referenceContent -match '(?m)^## 目录\s*$') "Skill reference longer than 100 lines is missing a table of contents: $skill/$relativeTarget"
+            }
+        }
+    }
+
     $metadata = Get-Content -LiteralPath $metadataPath -Raw -Encoding UTF8
     $displayMatch = [regex]::Match($metadata, '(?m)^\s{2}display_name:\s*"(?<value>[^"]+)"\s*$')
     $shortMatch = [regex]::Match($metadata, '(?m)^\s{2}short_description:\s*"(?<value>[^"]+)"\s*$')
@@ -138,6 +157,13 @@ foreach ($skill in $requiredSkills) {
     $shortLength = $shortMatch.Groups["value"].Value.Length
     Assert-True ($shortLength -ge 25 -and $shortLength -le 64) "short_description for $skill must be 25-64 characters; got $shortLength"
     Assert-True ($promptMatch.Groups["value"].Value.Contains('$' + $skill)) "default_prompt must explicitly reference the skill token: $skill"
+}
+
+foreach ($behaviorScriptName in @("build_behavior_inputs.ps1", "validate_behavior_results.ps1")) {
+    $behaviorScriptContent = Get-Content -LiteralPath (Join-Path $PSScriptRoot $behaviorScriptName) -Raw -Encoding UTF8
+    Assert-True (-not ($behaviorScriptContent -match 'Get-ChildItem[^\r\n]+-Recurse')) "$behaviorScriptName must not hash recursive skill artifacts"
+    Assert-True ($behaviorScriptContent.Contains('"SKILL.md"')) "$behaviorScriptName must hash each evaluated SKILL.md"
+    Assert-True ($behaviorScriptContent.Contains('"agents\openai.yaml"')) "$behaviorScriptName must hash each evaluated agents/openai.yaml"
 }
 
 $governorSkillPath = Join-Path $ProjectRoot "skills\reasoning-governor\SKILL.md"
@@ -158,6 +184,31 @@ $legacyPowerShellContent = Get-Content -LiteralPath $legacyPowerShellPath -Raw -
 Assert-True ($taskTableSkillContent.Contains('`$reasoning-governor`')) "task-table-manager must delegate reasoning depth to reasoning-governor"
 Assert-True ($legacyNodeContent.Contains('../../reasoning-governor/scripts/reasoning-governor.mjs')) "Legacy Node reasoning entry must forward to reasoning-governor"
 Assert-True ($legacyPowerShellContent.Contains('reasoning-governor\scripts\reasoning-governor.ps1')) "Legacy PowerShell reasoning entry must forward to reasoning-governor"
+
+$qqSwitchPath = Join-Path $ProjectRoot "skills\codex-qq-hook\scripts\qq_hook_switch.ps1"
+$qqSwitchContent = Get-Content -LiteralPath $qqSwitchPath -Raw -Encoding UTF8
+$qqStatusIndex = $qqSwitchContent.IndexOf('if ($Action -eq "status")', [StringComparison]::Ordinal)
+$qqDirectoryWriteIndex = $qqSwitchContent.IndexOf('New-Item -ItemType Directory', [StringComparison]::Ordinal)
+$qqFileWriteIndex = $qqSwitchContent.IndexOf('Set-Content -LiteralPath $ConfigPath', [StringComparison]::Ordinal)
+Assert-True ($qqStatusIndex -ge 0) "codex-qq-hook switch is missing its status branch"
+Assert-True ($qqDirectoryWriteIndex -gt $qqStatusIndex) "codex-qq-hook status must return before directory creation"
+Assert-True ($qqFileWriteIndex -gt $qqStatusIndex) "codex-qq-hook status must return before file writes"
+Assert-True (-not $qqSwitchContent.Contains('default-on')) "codex-qq-hook exposes an undocumented default-on mutation"
+Assert-True (-not $qqSwitchContent.Contains('default-off')) "codex-qq-hook exposes an undocumented default-off mutation"
+Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\tests\test_qq_hook_switch.ps1") -PathType Leaf) "codex-qq-hook is missing its switch regression test"
+
+$eventLoggerRoot = Join-Path $ProjectRoot "skills\codex-event-logger"
+$eventLoggerSkillContent = Get-Content -LiteralPath (Join-Path $eventLoggerRoot "SKILL.md") -Raw -Encoding UTF8
+$eventLoggerReaderPath = Join-Path $eventLoggerRoot "scripts\read_codex_turn_log.py"
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $eventLoggerRoot "HOOK_INSTALL.md"))) "codex-event-logger keeps installation documentation inside the skill root"
+Assert-True (Test-Path -LiteralPath $eventLoggerReaderPath -PathType Leaf) "codex-event-logger is missing its bounded reader"
+Assert-True ($eventLoggerSkillContent.Contains('read_codex_turn_log.py')) "codex-event-logger SKILL.md does not route reads through the bounded reader"
+Assert-True (-not $eventLoggerSkillContent.Contains('Get-Content -Raw')) "codex-event-logger SKILL.md contains an unbounded raw read"
+Assert-True (Test-Path -LiteralPath (Join-Path $eventLoggerRoot "tests\test_event_logger.py") -PathType Leaf) "codex-event-logger is missing its regression tests"
+
+$powerShellSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\powershell-usage\SKILL.md") -Raw -Encoding UTF8
+Assert-True ($powerShellSkillContent.Contains('--heading -M 240 --max-columns-preview')) "powershell-usage rg example is missing bounded file identity and width options"
+Assert-True ($powerShellSkillContent.Contains('Select-Object -First 80')) "powershell-usage rg example is missing its total line limit"
 
 $symbolMetadataPath = Join-Path $ProjectRoot "skills\symbol-structure-workflow\agents\openai.yaml"
 $symbolMetadata = Get-Content -LiteralPath $symbolMetadataPath -Raw -Encoding UTF8
@@ -201,7 +252,10 @@ $requiredCases = @(
     "semantic-safe-rename"
     "event-log-context-recovery"
     "qq-hook-explicit-enable"
+    "qq-hook-status-read-only"
+    "qq-hook-troubleshooting"
     "cross-turn-dependent-plan"
+    "legacy-plan-assets-migration"
     "active-goal-reasoning-shift"
     "explicit-thread-reasoning-setting"
     "reasoning-depth-discussion-only"

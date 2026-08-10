@@ -133,7 +133,8 @@
       "kind": "positive",
       "request": "修改 C++ 公共头的 include 和前置声明，保持公开 API 不变。",
       "expected_skills": [
-        "cpp-engineering-rules"
+        "cpp-engineering-rules",
+        "symbol-structure-workflow"
       ],
       "forbidden_skills": [
         "change-governance",
@@ -151,7 +152,8 @@
       "request": "诊断并修复两个 C++ 模块之间反复出现的循环依赖。",
       "expected_skills": [
         "cpp-engineering-rules",
-        "change-governance"
+        "change-governance",
+        "symbol-structure-workflow"
       ],
       "forbidden_skills": [],
       "expected_change_governance_references": [
@@ -274,6 +276,47 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "qq-hook-status-read-only",
+      "kind": "positive",
+      "request": "只查看当前工作区和当前对话的 QQ 完成提醒状态；配置不存在时也不要创建目录、文件或补写默认值。",
+      "expected_skills": [
+        "codex-qq-hook"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "qq-hook-troubleshooting",
+      "kind": "positive",
+      "request": "我没有收到 QQ 完成提醒；请只读检查 hook、工作区白名单和错误日志，说明链路在哪一步失败。",
+      "expected_skills": [
+        "change-governance",
+        "codex-qq-hook"
+      ],
+      "forbidden_skills": [
+        "codex-event-logger",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "causal-analysis.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
       "id": "cross-turn-dependent-plan",
       "kind": "positive",
       "request": "这个迁移要跨多轮执行，任务之间有真实依赖，并且下周要按证据审计完成状态；请建立并执行任务表。",
@@ -282,6 +325,24 @@
       ],
       "forbidden_skills": [],
       "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "legacy-plan-assets-migration",
+      "kind": "positive",
+      "request": "这个长期计划已有旧 Markdown 任务表、测试和 Gate；我明确授权按既定 v1 协议重新建模并迁移可复用资产，不继承旧 done 状态。",
+      "expected_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [
+        "lifecycle-and-entry.md",
+        "verification-and-gates.md"
+      ],
       "expected_behavior_tags": [
         "modify_authorized_scope"
       ],

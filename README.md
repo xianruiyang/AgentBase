@@ -57,7 +57,7 @@
 
 ## 路由与行为验证
 
-`development/skill-routing/trigger-cases.json` 当前包含 34 个场景。全部 12 个 skill 都至少有一个正向触发和一个相近非触发场景，并额外覆盖事实冲突、只读授权、长期收益、禁止越权替代执行、active Goal 内动态推理切换和显式线程设置，以及三类架构边界：职责与入口已知时直接集成、未知时先治理裁决、一次性产物不得升级为架构工程。
+`development/skill-routing/trigger-cases.json` 当前包含 37 个场景。全部 12 个 skill 都至少有一个正向触发和一个相近非触发场景，并额外覆盖事实冲突、只读授权、长期收益、禁止越权替代执行、active Goal 内动态推理切换、显式线程设置、QQ 只读状态与故障排查、旧任务资产迁移，以及三类架构边界：职责与入口已知时直接集成、未知时先治理裁决、一次性产物不得升级为架构工程。
 
 静态合同会检查全局文件大小与关键语义、规则标签、重复规则、skill frontmatter、`agents/openai.yaml`、MCP 依赖、Markdown 相对引用、场景集合和正/负覆盖：
 
@@ -65,7 +65,7 @@
 & 'D:\program\AgentBase\development\skill-routing\validate_contract.ps1' -ProjectRoot 'D:\program\AgentBase'
 ```
 
-盲测输入生成器只暴露请求、候选规则和允许的行为标签，不暴露期望技能或禁选技能：
+盲测输入生成器只暴露请求、候选规则和允许的行为标签，不暴露期望技能或禁选技能。候选哈希只覆盖评估器实际读取的全局规则、各 skill 的 `SKILL.md` 与 `agents/openai.yaml`，不会被测试缓存或其他未评估的运行产物扰动：
 
 ```powershell
 & 'D:\program\AgentBase\development\skill-routing\build_behavior_inputs.ps1' -ProjectRoot 'D:\program\AgentBase'
@@ -74,10 +74,10 @@
 评估结果必须回传候选 bundle 哈希和输入哈希；候选文件或测试请求变化后，旧结果会自动失效：
 
 ```powershell
-& 'D:\program\AgentBase\development\skill-routing\validate_behavior_results.ps1' -ProjectRoot 'D:\program\AgentBase' -ResultsPath 'D:\program\AgentBase\development\skill-routing\evidence\2026-08-09-architecture-integration-blind-route.json'
+& 'D:\program\AgentBase\development\skill-routing\validate_behavior_results.ps1' -ProjectRoot 'D:\program\AgentBase' -ResultsPath 'D:\program\AgentBase\development\skill-routing\evidence\2026-08-10-skill-audit-remediation-blind-route.json'
 ```
 
-2026-08-09 的只读盲测曾覆盖 31/31 场景并通过必选、禁选、治理参考和行为标签约束，原始结果保存在 `development/skill-routing/evidence/2026-08-09-architecture-integration-blind-route.json`。该证据对应旧候选 bundle `9E4D082E17AB120043FBCE18A6D8C0A218C20A95869F2CBFC9AF713A6BB17E0E` 和输入集合 `E57CFC80ADFA242A51523CC60D229DACB844BA81E9AC7A2906E702E7A564DE60`；当前候选已经变化，因此这份结果只作为历史快照，不能证明新版的实际路由行为。
+2026-08-10 的只读盲测覆盖 37/37 场景并通过必选、禁选、治理参考和行为标签约束，原始结果保存在 `development/skill-routing/evidence/2026-08-10-skill-audit-remediation-blind-route.json`。该证据对应候选 bundle `0463854F738485F9DC22054F9C08AF7F05B8D80BDD6A0389FC38F637F789EAD0` 和输入集合 `4C31F3FE0BA51F9F0481DCC5B8126634392A0362712DD34F8CF4CBA7748A0279`；候选文件或测试请求变化后必须重新生成盲测输入和证据。旧 evidence 文件仅作为历史快照保留。
 
 ## 本地插件打包
 
@@ -129,5 +129,5 @@
 
 ## 当前发布状态
 
-- 当前 2026-08-10 候选已通过正式入口发布到 `C:\Users\gzxt\.codex`，`source_bundle_sha256` 为 `95FB7BA6A0AF0D812E0E10E8A5E1694D9AA8977FCE269E4E4F1C2EDC0725FA2C`；本次发布的回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-134007-79dd2f52\`。
-- 本次发布安装了候选全局规则与 12 个同名 skill，包括 `reasoning-governor` 和任务表兼容转发；安装侧文件哈希及 governor 的只读 IPC 状态读回均已验证。发布未启用 `-InstallPortableSettings`，因此没有替换 `config.toml`、`hooks.json` 或 `agents/*.toml`；发布前后三个已安装自定义子代理均与项目真源一致，MCP、插件 marketplace、任务目录及其他宿主状态未改变。当前运行不会追溯重建启动时的指令链，新任务或重启后的会话才会按本次发布内容重新发现规则与 skill。
+- 最近一次已安装到 `C:\Users\gzxt\.codex` 的版本，其 `source_bundle_sha256` 为 `95FB7BA6A0AF0D812E0E10E8A5E1694D9AA8977FCE269E4E4F1C2EDC0725FA2C`；对应回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-134007-79dd2f52\`。该版本安装了当时的候选全局规则与 12 个同名 skill，但未使用 `-InstallPortableSettings`，因此没有替换 `config.toml`、`hooks.json` 或 `agents/*.toml`。
+- 项目真源中的当前候选已在本地通过验证，但尚未发布或装载到 Codex。安装副本不是项目真源；只有用户明确决定加载后才运行正式发布入口。Codex 当前运行也不会追溯重建启动时的指令链，新任务或重启后的会话才会发现已发布的新规则与 skill。

@@ -11,7 +11,8 @@ description: 管理有证据支撑的规划链和长期执行。用于工作必�
 
 - 只用于跨轮、存在真实依赖或需要持久完成审计的工作。普通修改、一次性分析和简单清单不用。
 - 新计划放在 `docs/plan/<YYYYMMDD>_<NAME>/`；同计划文件以该目录为根。只有用户要求才移入 `old/`。
-- 有 `plan.json` 时走 v1；创建或修改读 `references/create-plan.md`。只有 Markdown 的旧计划按需读 `references/writing.md` 或 `references/execution.md`，不得静默迁移。
+- 有 `plan.json` 时走 v1；创建或修改完整读取 [create-plan.md](references/create-plan.md)。只有 Markdown 的旧计划按需完整读取 [writing.md](references/writing.md) 或 [execution.md](references/execution.md)，不得静默迁移。
+- 用户明确授权把旧任务表、测试、门禁或实现资产重建为 v1 计划时，完整读取 [extract-legacy-assets.md](references/extract-legacy-assets.md)；继续执行中的旧计划不因此迁移。
 - 工具入口是 `<SkillDir>/scripts/taskctl.py`。每次显式传绝对 `--task-dir`；源码范围另传 `--project-root`，状态和临时输出不得写入 skill 目录。
 
 ## 质量边界

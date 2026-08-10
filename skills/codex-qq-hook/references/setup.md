@@ -2,6 +2,11 @@
 
 只有用户明确要求安装、迁移到新电脑、迁移到新工作区、或修复 hook 未安装时，才读取本文件。
 
+## 入口选择
+
+- 复制或克隆完整 `AgentBase` 项目时，使用项目的 `development/codex-deployment/manage_agentbase.ps1 -Action Publish -InstallPortableSettings`；它会在同一事务中安装 skill、解析 `global/hooks.template.json`、备份并验证目标文件。不要再运行本 skill 的独立安装脚本形成第二套项目部署入口。
+- 只有当前 skill 被独立安装、且没有 `AgentBase` 项目部署入口时，才使用下方 `install_global_qq_hook.ps1`。
+
 ## 安装或刷新全局 hook
 
 在目标工作区根目录运行：

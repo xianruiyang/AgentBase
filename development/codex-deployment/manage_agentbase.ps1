@@ -48,6 +48,81 @@ function Get-TextSha256 {
     }
 }
 
+function Test-IsExcludedDeploymentArtifact {
+    param(
+        [string]$RelativePath
+    )
+
+    $segments = @($RelativePath.Replace('\', '/').Split('/', [StringSplitOptions]::RemoveEmptyEntries))
+    $excludedDirectories = @(
+        ".codex",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".tox",
+        "__pycache__",
+        "codexRuntimeLogFile",
+        "coverage",
+        "dist",
+        "htmlcov",
+        "node_modules",
+        "target"
+    )
+    for ($index = 0; $index -lt ($segments.Count - 1); $index++) {
+        if ($excludedDirectories -contains $segments[$index]) {
+            return $true
+        }
+    }
+
+    $leaf = if ($segments.Count -eq 0) { "" } else { $segments[-1] }
+    if ($leaf -in @(".DS_Store", ".coverage", "Thumbs.db", "desktop.ini")) {
+        return $true
+    }
+    return $leaf -match '(?i)\.(log|pyc|pyo|temp|tmp)$' -or $leaf -match '^\.coverage\.'
+}
+
+function Get-DeploymentPayloadFiles {
+    param(
+        [string]$Root
+    )
+
+    $rootItem = Get-Item -LiteralPath $Root -Force
+    if (-not $rootItem.PSIsContainer -or ($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Deployment payload root must be a real directory: $Root"
+    }
+    $rootFull = $rootItem.FullName.TrimEnd('\')
+    return @(Get-ChildItem -LiteralPath $rootFull -Recurse -Force -File | ForEach-Object {
+        if (($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Refusing to deploy a reparse point: $($_.FullName)"
+        }
+        $relativePath = $_.FullName.Substring($rootFull.Length + 1).Replace('\', '/')
+        if (-not (Test-IsExcludedDeploymentArtifact -RelativePath $relativePath)) {
+            $_
+        }
+    } | Sort-Object FullName)
+}
+
+function Copy-DeploymentPayloadDirectory {
+    param(
+        [string]$SourcePath,
+        [string]$DestinationPath
+    )
+
+    $sourceRoot = (Get-Item -LiteralPath $SourcePath -Force).FullName.TrimEnd('\')
+    New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
+    $destinationRoot = (Get-Item -LiteralPath $DestinationPath -Force).FullName.TrimEnd('\')
+    foreach ($sourceFile in @(Get-DeploymentPayloadFiles -Root $sourceRoot)) {
+        $relativePath = $sourceFile.FullName.Substring($sourceRoot.Length + 1)
+        $destinationFile = Join-Path $destinationRoot $relativePath
+        Assert-ChildPath -Root $destinationRoot -Path $destinationFile -Label "Staged payload file"
+        $destinationParent = Split-Path -Parent $destinationFile
+        if (-not (Test-Path -LiteralPath $destinationParent -PathType Container)) {
+            New-Item -ItemType Directory -Path $destinationParent -Force | Out-Null
+        }
+        Copy-Item -LiteralPath $sourceFile.FullName -Destination $destinationFile -Force
+    }
+}
+
 function Get-PathFingerprint {
     param(
         [string]$Path
@@ -66,10 +141,7 @@ function Get-PathFingerprint {
     }
 
     $root = $item.FullName.TrimEnd('\')
-    $records = @(Get-ChildItem -LiteralPath $root -Recurse -Force -File | Sort-Object FullName | ForEach-Object {
-        if (($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-            throw "Refusing to fingerprint a reparse point: $($_.FullName)"
-        }
+    $records = @(Get-DeploymentPayloadFiles -Root $root | ForEach-Object {
         $relativePath = $_.FullName.Substring($root.Length + 1).Replace('\', '/')
         "$relativePath|$($_.Length)|$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)"
     })
@@ -531,6 +603,9 @@ if ($Action -eq "Publish") {
             }
             if ($target.PSObject.Properties.Name -contains "source_text" -and $null -ne $target.source_text) {
                 Write-Utf8NoBomFile -Path $stagePath -Text ([string]$target.source_text)
+            }
+            elseif ($target.kind -eq "directory") {
+                Copy-DeploymentPayloadDirectory -SourcePath $target.source_path -DestinationPath $stagePath
             }
             else {
                 Copy-Item -LiteralPath $target.source_path -Destination $stagePath -Recurse -Force

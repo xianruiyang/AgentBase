@@ -1,11 +1,18 @@
 ---
 name: codex-qq-hook
-description: 配置当前工作区的 Codex QQ 完成提醒开关。用于用户要求开启、关闭或查看当前工作区/当前对话是否允许发送 QQ 完成提醒时，只修改工作区 .codex\\qq-hook-settings.json；默认不发送，主动开启后才把对话 ID 加入 enabled_thread_ids。
+description: 配置和排查 Codex QQ 完成提醒。用于用户明确要求开启、关闭或只读查看当前工作区/当前对话的提醒开关，安装或迁移 QQ hook，设置机器人与目标账号，或排查未发送链路时；状态查询不得创建或改写配置，提醒默认关闭，只有显式开启的对话才加入 enabled_thread_ids。
 ---
 
 # Codex QQ Hook
 
-用中文回复，结果先行。这个 skill 只处理当前工作区的 `.codex\qq-hook-settings.json`。
+用中文回复，结果先行。开关操作只处理当前工作区的 `.codex\qq-hook-settings.json`；安装、全局机器人配置和排障仅在用户明确要求对应动作时进入各自参考。
+
+## 路由
+
+- 开启、关闭或查看工作区/对话开关：直接按本文件执行；`status` 始终只读。
+- 安装、刷新或迁移 hook：完整读取 [setup.md](references/setup.md)。
+- 设置或更换机器人、目标 QQ 用户、OpenID、AppID 或 AppSecret：完整读取 [global-bot.md](references/global-bot.md)。
+- 排查未收到提醒、hook 链路或日志：完整读取 [troubleshooting.md](references/troubleshooting.md)。
 
 ## 配置文件
 
@@ -15,7 +22,7 @@ description: 配置当前工作区的 Codex QQ 完成提醒开关。用于用户
 <WORKSPACE>\.codex\qq-hook-settings.json
 ```
 
-如果文件不存在，直接创建。不要让用户先手动创建。
+执行 `enable` 或 `disable` 时，如果文件不存在就创建，不要让用户先手动创建。执行 `status` 时不得创建目录、文件或补写默认字段，只在内存中使用默认配置生成状态。
 
 最小配置：
 
@@ -78,7 +85,7 @@ description: 配置当前工作区的 Codex QQ 完成提醒开关。用于用户
 ## 查看状态
 
 ```powershell
-& "$env:USERPROFILE\.codex\skills\codex-qq-hook\scripts\qq_hook_switch.ps1" status -ProjectRoot (Get-Location)
+& "$env:USERPROFILE\.codex\skills\codex-qq-hook\scripts\qq_hook_switch.ps1" status -ProjectRoot (Get-Location) -Id $env:CODEX_THREAD_ID
 ```
 
 只告诉用户：

@@ -1,7 +1,7 @@
 interface:
   display_name: "Symbol Structure Workflow"
-  short_description: "按成本分层组合文本、AST、LSP 语义分析与安全源码修改"
-  default_prompt: "使用 $symbol-structure-workflow，按任务选择文本搜索、vscode-lsp-mcp 或项目编辑工具，并完成必要验证。"
+  short_description: "在结构或符号身份相关代码任务中分层选择 AST、LSP 与编辑工具"
+  default_prompt: "使用 $symbol-structure-workflow，在普通文本证据不足时选择 AST、vscode-lsp-mcp 或项目编辑工具并完成验证。"
 dependencies:
   tools:
     - type: "mcp"

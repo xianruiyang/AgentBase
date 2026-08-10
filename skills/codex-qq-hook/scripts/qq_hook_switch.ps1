@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("enable", "disable", "status", "default-on", "default-off")]
+    [ValidateSet("enable", "disable", "status")]
     [string]$Action,
 
     [string]$Id,
@@ -57,12 +57,8 @@ function Remove-Value {
     $Object.$Property = @($Object.$Property | Where-Object { $_ -ne $Value })
 }
 
-$dir = Split-Path -Parent $ConfigPath
-if (-not [string]::IsNullOrWhiteSpace($dir)) {
-    New-Item -ItemType Directory -Force -Path $dir | Out-Null
-}
-
-if (Test-Path -LiteralPath $ConfigPath) {
+$configExists = Test-Path -LiteralPath $ConfigPath -PathType Leaf
+if ($configExists) {
     $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
 } else {
     $config = New-DefaultConfig
@@ -72,13 +68,28 @@ foreach ($property in @("enabled_thread_ids", "disabled_thread_ids", "enabled_th
     Ensure-List $config $property
 }
 
+if ($Action -eq "status") {
+    $threadEnabled = $false
+    $threadDisabled = $false
+    if (-not [string]::IsNullOrWhiteSpace($Id)) {
+        $threadEnabled = @($config.enabled_thread_ids) -contains $Id
+        $threadDisabled = @($config.disabled_thread_ids) -contains $Id
+    }
+
+    [ordered]@{
+        config_exists = [bool]$configExists
+        config_path = $ConfigPath
+        thread_id = if ([string]::IsNullOrWhiteSpace($Id)) { $null } else { $Id }
+        thread_enabled = [bool]$threadEnabled
+        thread_disabled = [bool]$threadDisabled
+        default_enabled = [bool]$config.default_enabled
+        enabled_thread_ids = @($config.enabled_thread_ids)
+        disabled_thread_ids = @($config.disabled_thread_ids)
+    } | ConvertTo-Json -Depth 20
+    return
+}
+
 switch ($Action) {
-    "default-on" {
-        $config.default_enabled = $true
-    }
-    "default-off" {
-        $config.default_enabled = $false
-    }
     "enable" {
         if ([string]::IsNullOrWhiteSpace($Id)) {
             throw "enable requires -Id. Title-based enable is intentionally not used."
@@ -93,7 +104,11 @@ switch ($Action) {
         Remove-Value $config "enabled_thread_ids" $Id
         Add-Unique $config "disabled_thread_ids" $Id
     }
-    "status" {}
+}
+
+$dir = Split-Path -Parent $ConfigPath
+if (-not [string]::IsNullOrWhiteSpace($dir)) {
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
 }
 
 $config | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $ConfigPath -Encoding UTF8

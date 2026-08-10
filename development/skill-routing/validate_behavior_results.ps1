@@ -62,7 +62,10 @@ $allowedBehaviorTags = @(Get-StringArray $contract.allowed_behavior_tags)
 $candidateFiles = @(Join-Path $ProjectRoot "global\AGENTS.md")
 foreach ($skill in $requiredSkills) {
     $skillRoot = Join-Path (Join-Path $ProjectRoot "skills") $skill
-    $candidateFiles += @(Get-ChildItem -LiteralPath $skillRoot -Recurse -Force -File | Select-Object -ExpandProperty FullName)
+    $candidateFiles += @(
+        Join-Path $skillRoot "SKILL.md"
+        Join-Path $skillRoot "agents\openai.yaml"
+    )
 }
 $candidateRecords = @($candidateFiles | Sort-Object -Unique | ForEach-Object {
     $item = Get-Item -LiteralPath $_

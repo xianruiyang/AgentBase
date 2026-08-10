@@ -19,9 +19,12 @@ description: 在 Windows PowerShell 中编写或审查命令时使用，避免 B
 ## 常用写法
 
 ```powershell
-rg.exe -n -F 'Target' <targets>
-if ($LASTEXITCODE -ne 0) {
-    throw "rg failed: $LASTEXITCODE"
+rg.exe -n --heading -M 240 --max-columns-preview `
+    -F 'Target' <targets> |
+    Select-Object -First 80
+$rgExit = $LASTEXITCODE
+if ($rgExit -gt 1) {
+    throw "rg failed: $rgExit"
 }
 ```
 
