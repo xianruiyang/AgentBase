@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reasoning Governor"
+  short_description: "按下一段工作的真实需求自由升降当前 Codex 线程推理深度"
+  default_prompt: "使用 $reasoning-governor 读取并按下一段工作的真实需求调整当前线程推理深度。"

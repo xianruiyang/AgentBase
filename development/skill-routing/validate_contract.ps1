@@ -80,6 +80,7 @@ $requiredGlobalFragments = @(
     '模块测试验证模块契约'
     '原场景、同类变体和相近非触发场景'
     '长期资产的验证还应确认本次改动已接入正确职责和唯一正式入口'
+    '在 active goal 中把深度作为 next-turn 可调配置'
     '简单且已限制的命令输出不创建日志文件'
     '新一轮调试前只清理会干扰当前判断且目标范围明确的旧日志'
 )
@@ -102,6 +103,7 @@ $descriptionBoundaryFragments = @{
     "change-governance" = "不用于规格已完整"
     "codex-event-logger" = "当前上下文充分"
     "powershell-usage" = "不用于没有 PowerShell 命令"
+    "reasoning-governor" = "没有 active Goal 时不用于模型自主切换"
     "task-table-manager" = "不用于单轮修改"
     "understand-space" = "不因正文偶然出现空间词触发"
 }
@@ -137,6 +139,25 @@ foreach ($skill in $requiredSkills) {
     Assert-True ($shortLength -ge 25 -and $shortLength -le 64) "short_description for $skill must be 25-64 characters; got $shortLength"
     Assert-True ($promptMatch.Groups["value"].Value.Contains('$' + $skill)) "default_prompt must explicitly reference the skill token: $skill"
 }
+
+$governorSkillPath = Join-Path $ProjectRoot "skills\reasoning-governor\SKILL.md"
+$governorScriptPath = Join-Path $ProjectRoot "skills\reasoning-governor\scripts\reasoning-governor.mjs"
+$governorSkillContent = Get-Content -LiteralPath $governorSkillPath -Raw -Encoding UTF8
+$governorScriptContent = Get-Content -LiteralPath $governorScriptPath -Raw -Encoding UTF8
+Assert-True ($governorSkillContent.Contains('不使用 `Stop` hook')) "reasoning-governor must keep Stop hooks outside its continuation contract"
+Assert-True ($governorSkillContent.Contains("不保存 pending、previous effort 或自动恢复状态")) "reasoning-governor must not create a second reasoning state source"
+Assert-True ($governorScriptContent.Contains('args.action === "status"')) "reasoning-governor script is missing its read-only status operation"
+Assert-True ($governorScriptContent.Contains('operation: "set"')) "reasoning-governor script is missing its set receipt contract"
+
+$taskTableSkillPath = Join-Path $ProjectRoot "skills\task-table-manager\SKILL.md"
+$taskTableSkillContent = Get-Content -LiteralPath $taskTableSkillPath -Raw -Encoding UTF8
+$legacyNodePath = Join-Path $ProjectRoot "skills\task-table-manager\scripts\set-current-thread-reasoning-depth.mjs"
+$legacyPowerShellPath = Join-Path $ProjectRoot "skills\task-table-manager\scripts\set-current-thread-reasoning-depth.ps1"
+$legacyNodeContent = Get-Content -LiteralPath $legacyNodePath -Raw -Encoding UTF8
+$legacyPowerShellContent = Get-Content -LiteralPath $legacyPowerShellPath -Raw -Encoding UTF8
+Assert-True ($taskTableSkillContent.Contains('`$reasoning-governor`')) "task-table-manager must delegate reasoning depth to reasoning-governor"
+Assert-True ($legacyNodeContent.Contains('../../reasoning-governor/scripts/reasoning-governor.mjs')) "Legacy Node reasoning entry must forward to reasoning-governor"
+Assert-True ($legacyPowerShellContent.Contains('reasoning-governor\scripts\reasoning-governor.ps1')) "Legacy PowerShell reasoning entry must forward to reasoning-governor"
 
 $symbolMetadataPath = Join-Path $ProjectRoot "skills\symbol-structure-workflow\agents\openai.yaml"
 $symbolMetadata = Get-Content -LiteralPath $symbolMetadataPath -Raw -Encoding UTF8
@@ -181,6 +202,9 @@ $requiredCases = @(
     "event-log-context-recovery"
     "qq-hook-explicit-enable"
     "cross-turn-dependent-plan"
+    "active-goal-reasoning-shift"
+    "explicit-thread-reasoning-setting"
+    "reasoning-depth-discussion-only"
     "coordinate-frame-conversion"
     "bug-root-cause-fix"
     "formal-entry-migration"
@@ -248,4 +272,4 @@ foreach ($skill in $requiredSkills) {
     Assert-True ($negativeCoverage[$skill] -gt 0) "Required skill has no non-trigger case: $skill"
 }
 
-Write-Output "Routing contract valid: $($seenCases.Count) cases; 11/11 skills have positive and non-trigger coverage; global, metadata, references, and behavior tags resolve."
+Write-Output "Routing contract valid: $($seenCases.Count) cases; $($requiredSkills.Count)/$($requiredSkills.Count) skills have positive and non-trigger coverage; global, metadata, references, and behavior tags resolve."

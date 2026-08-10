@@ -30,7 +30,7 @@ description: 管理有证据支撑的规划链和长期执行。用于工作必�
 - 只有真实中断、阻塞或下一动作无法恢复时 `checkpoint`。合同变化先释放活动包、更新最早上游、审计候选并 `amend`；禁止直接改活动 `plan.json/state.json`。
 - 最终运行 `audit --all`。只有计划来源仍有效、必要任务和 flow 都有直接证据并返回 completion receipt，才可报告完成或结束 goal。
 
-## Token 与思考深度
+## Token 与推理深度
 
 - 成功证据只读摘要，失败才展开 raw artifact。普通 v1 不写 handoff、memo、`deps_for`、逐轮 Token 报告或重复 changelog；`TASK_TABLE.md` 仅按需生成，且只是只读投影，不代表执行校验通过。
-- 用户未固定深度时，按下一段真实不确定性选择最低充分等级，可升可降。只有目标等级实质不同才运行深度脚本；读回确认后立即结束本轮，新等级仅对下一轮生效，且不进入计划或完成证据。
+- 推理深度不属于计划状态或完成证据。执行 active Goal 时遵守全局动态判断并使用 `$reasoning-governor`；任务行深度仅是开始当前项时的非权威建议，不限制后续根据真实工作变化升降。

@@ -10,6 +10,7 @@
     "cpp-engineering-rules",
     "fd-usage",
     "powershell-usage",
+    "reasoning-governor",
     "rg-token-safe",
     "symbol-structure-workflow",
     "task-table-manager",
@@ -285,6 +286,51 @@
         "modify_authorized_scope"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "active-goal-reasoning-shift",
+      "kind": "positive",
+      "request": "当前有 active Goal。刚得到的证据推翻了原先的简单假设，下一段要做高风险根因裁决；请在继续前重新判断并按需调整当前线程的推理深度。",
+      "expected_skills": [
+        "reasoning-governor"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "explicit-thread-reasoning-setting",
+      "kind": "positive",
+      "request": "把当前 Codex 线程的下一轮推理深度明确设置为 max，并读回确认。",
+      "expected_skills": [
+        "reasoning-governor"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "reasoning-depth-discussion-only",
+      "kind": "negative",
+      "request": "解释为什么没有 active Goal 时不应让模型自主切换当前线程推理深度；只讨论设计，不读取或修改线程设置。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "reasoning-governor",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "coordinate-frame-conversion",

@@ -1,6 +1,6 @@
 # AgentBase
 
-本项目集中维护候选全局 `AGENTS.md`、可移植 Codex 关键设置与自定义子代理、11 个关键 skill、对应开发工程以及实际依赖的 MCP/CLI。所有改动先进入本目录真源，通过静态合同、盲测和隔离发布验证后，再由用户明确决定是否发布到 Codex。
+本项目集中维护候选全局 `AGENTS.md`、可移植 Codex 关键设置与自定义子代理、12 个关键 skill、对应开发工程以及实际依赖的 MCP/CLI。所有改动先进入本目录真源，通过静态合同、盲测和隔离发布验证后，再由用户明确决定是否发布到 Codex。
 
 ## 真源与安装副本
 
@@ -15,13 +15,14 @@
 
 ## 当前全局内核
 
-`global/AGENTS.md` 只保留跨项目都成立的目标、证据、授权、工具路由、修改、验证、记录和交付规则。复杂根因、职责/入口迁移、共享门禁和跨契约审计细节由 `change-governance` 承担；C++、PowerShell、搜索、符号/AST、空间和任务表协议由对应 skill 承担。
+`global/AGENTS.md` 只保留跨项目都成立的目标、证据、授权、工具路由、修改、验证、记录和交付规则。复杂根因、职责/入口迁移、共享门禁和跨契约审计细节由 `change-governance` 承担；C++、PowerShell、搜索、符号/AST、空间、任务表和动态推理协议由对应 skill 承担。
 
-当前候选为 17,310 字节、78 条规范规则，静态合同上限为 20 KiB。与上一候选 16,655 字节、91 条规则相比，规范行减少 13 条，并补齐规范来源、授权边界、正式入口和长期资产等操作性定义。当前内核收敛为三项核心约束：
+当前候选为 18,197 字节、79 条规范规则，静态合同上限为 20 KiB。与上一候选 17,310 字节、78 条规则相比，新增一条 active Goal 内动态升降线程推理深度的全局规则，并把执行协议收敛到独立 skill。当前内核收敛为四项核心约束：
 
 - 规范来源用于确定目标契约，有效证据用于判断系统现状与实现结果；两者不得互相替代，用户目标也不得被系统现状静默改写。
 - 在用户目标和授权范围内按长期净收益与系统总成本选择方案；长期收益不得用于扩大范围或替用户裁决。
 - 不自动把实现收缩成最窄局部补丁；为使用户要求成立并接入唯一正式入口而不可缺少的调整属于本次实现，仅改善整体架构但不影响本次结果的调整需要另行授权。
+- 用户未固定深度时，在 active Goal 内按下一段工作的真实不确定性、后果、可逆性和验证负担自由升降 next-turn 推理深度；不绑定任务项边界，不用 hook 或持久状态模拟续跑。
 
 ## 已迁入的 skill
 
@@ -30,6 +31,7 @@
 | `codex-event-logger` | `D:\program\RealSimpleChat\codex-hook-logging-research\codex-event-logger` | 只在上下文缺失或用户要求追溯时读取项目级运行记录 |
 | `codex-qq-hook` | `D:\program\RealSimpleChat\qq-bot-research\skill-content\codex-qq-hook` | 按用户明确要求配置当前工作区 QQ 完成提醒 |
 | `task-table-manager` | `D:\program\UE\GptProjectTest\UeAgentInterfacePak\skills\task-table-manager` | 管理跨轮、真实依赖和持久完成审计；CLI 与测试自包含在 skill 内 |
+| `reasoning-governor` | 从 `task-table-manager` 的线程深度脚本拆分建源 | 读取和切换当前线程 next-turn 推理深度；模型自主切换只由 active Goal 续跑 |
 | `symbol-structure-workflow` | `D:\program\SimpleChat\SymbolStructureWorkflow\skill` | 在文本、AST、LSP 和编辑工具间分层路由，并声明 `vscode-lsp-mcp` 依赖 |
 | `ast-grep-token-safe` | `D:\program\SimpleChat\SymbolStructureWorkflow\ast-grep-token-safe` | 使用内置 `sgy` 做 Token-Safe AST 搜索与改写 |
 | `rg-token-safe` | 原 Codex 安装副本引导建源 | 有界、可定位、低重复的正文搜索 |
@@ -47,15 +49,15 @@
 | `tools/sgy` | `ast-grep-token-safe` | 构建 skill 内置 `sgy` 的 Rust workspace、测试、fuzz、安装与发布工程 |
 | `development/codex-event-logger` | `codex-event-logger` | hook 设计资料；正式运行脚本仍在 skill 真源 |
 | `development/codex-qq-hook` | `codex-qq-hook` | Webhook 辅助程序和开发说明；正式运行脚本仍在 skill 真源 |
-| `development/skill-routing` | 全局规则与 11 个 skill | 静态触发合同、盲测输入生成与结果判定 |
-| `development/plugin-packaging` | 11 个 skill | 生成并校验 `agentbase-core` 本地插件包 |
-| `development/codex-deployment` | 全局规则、可移植设置、hooks、自定义子代理与 11 个 skill | 校验、可选设置安装、带备份发布和可验证回滚 |
+| `development/skill-routing` | 全局规则与 12 个 skill | 静态触发合同、盲测输入生成与结果判定 |
+| `development/plugin-packaging` | 12 个 skill | 生成并校验 `agentbase-core` 本地插件包 |
+| `development/codex-deployment` | 全局规则、可移植设置、hooks、自定义子代理与 12 个 skill | 校验、可选设置安装、带备份发布和可验证回滚 |
 
 `vscode-lsp-mcp` 保持独立发布真源：它已有 `release:build` 和 `release:verify`，且还包含 VS Code companion 与安装生命周期。插件包不复制 MCP，也不创建第二套安装入口；`symbol-structure-workflow/agents/openai.yaml` 只声明对 `vscode-lsp-mcp` 的工具依赖。旧的 `vscode-mcp` 与 `ast-mcp` 不属于当前权威依赖。
 
 ## 路由与行为验证
 
-`development/skill-routing/trigger-cases.json` 当前包含 31 个场景。全部 11 个 skill 都至少有一个正向触发和一个相近非触发场景，并额外覆盖事实冲突、只读授权、长期收益、禁止越权替代执行，以及三类架构边界：职责与入口已知时直接集成、未知时先治理裁决、一次性产物不得升级为架构工程。
+`development/skill-routing/trigger-cases.json` 当前包含 34 个场景。全部 12 个 skill 都至少有一个正向触发和一个相近非触发场景，并额外覆盖事实冲突、只读授权、长期收益、禁止越权替代执行、active Goal 内动态推理切换和显式线程设置，以及三类架构边界：职责与入口已知时直接集成、未知时先治理裁决、一次性产物不得升级为架构工程。
 
 静态合同会检查全局文件大小与关键语义、规则标签、重复规则、skill frontmatter、`agents/openai.yaml`、MCP 依赖、Markdown 相对引用、场景集合和正/负覆盖：
 
@@ -79,7 +81,7 @@
 
 ## 本地插件打包
 
-`development/plugin-packaging/template/agentbase-core` 是由官方插件脚手架生成并审查后的模板。构建脚本从 `skills/` 真源复制 11 个 skill 到忽略的 `dist/agentbase-core`，生成逐文件哈希清单，并调用官方插件校验器：
+`development/plugin-packaging/template/agentbase-core` 是由官方插件脚手架生成并审查后的模板。构建脚本从 `skills/` 真源复制 12 个 skill 到忽略的 `dist/agentbase-core`，生成逐文件哈希清单，并调用官方插件校验器：
 
 ```powershell
 & 'D:\program\AgentBase\development\plugin-packaging\build_plugin.ps1' -ProjectRoot 'D:\program\AgentBase'
@@ -99,13 +101,13 @@
 
 ## 校验、发布与回滚
 
-部署入口默认校验全局规则、11 个 skill、可移植设置、hooks 模板、自定义子代理和 MCP 独立发布入口：
+部署入口默认校验全局规则、12 个 skill、可移植设置、hooks 模板、自定义子代理和 MCP 独立发布入口：
 
 ```powershell
 & 'D:\program\AgentBase\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot 'D:\program\AgentBase'
 ```
 
-只有用户明确决定加载时，才对精确指定的 Codex 根目录执行发布。默认发布会先在目标目录内分阶段复制和校验，再把原 `AGENTS.md` 与 11 个同名 skill 移入带清单的备份；不会修改其他 skill、`config.toml`、`hooks.json`、`agents/`、插件 marketplace 或 MCP：
+只有用户明确决定加载时，才对精确指定的 Codex 根目录执行发布。默认发布会先在目标目录内分阶段复制和校验，再把原 `AGENTS.md` 与 12 个同名 skill 移入带清单的备份；不会修改其他 skill、`config.toml`、`hooks.json`、`agents/`、插件 marketplace 或 MCP：
 
 ```powershell
 & 'D:\program\AgentBase\development\codex-deployment\manage_agentbase.ps1' -Action Publish -ProjectRoot 'D:\program\AgentBase' -CodexRoot 'C:\Users\gzxt\.codex'
@@ -127,5 +129,5 @@
 
 ## 当前发布状态
 
-- 当前 2026-08-10 候选已通过正式入口发布到 `C:\Users\gzxt\.codex`，`source_bundle_sha256` 为 `074FCC00F384403F3F6E1A3F72E9FE4395ADA0ECC045A44ED04C4753017FDD5C`；本次唯一新增的回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-121914-c4659bb8\`。
-- 本次发布把 `task-table-manager` 已安装的 checkpoint/amend 恢复修复收回项目真源，并以增量返回字段加入 `render.status_counts`；既有 CLI 字段、`plan.json`/`state.json` schema 和 `resume` 可执行任务口径均未改变。发布同时按既有合同替换全局 `AGENTS.md` 与 11 个同名 skill，MCP、`config.toml`、`hooks.json`、`agents/*.toml`、个人 marketplace 和任务目录均未改变；当前运行不会追溯重建启动时的指令链，新任务或重新启动的会话才会按已发布 Skill 指令重新发现规则。
+- 当前项目候选在已发布 bundle `074FCC00F384403F3F6E1A3F72E9FE4395ADA0ECC045A44ED04C4753017FDD5C` 基础上新增 `reasoning-governor`，并把任务表的线程深度脚本降为兼容转发；候选尚未执行 `Publish`，`C:\Users\gzxt\.codex` 仍保持原 11 个 skill 的已安装版本。
+- 本次候选不修改 `global/hooks.template.json`，不引入 `Stop` hook、临时推理 state 或自动恢复等级，也不改变任务表 CLI、`plan.json`、`state.json`、MCP、`config.toml`、`agents/*.toml`、个人 marketplace 和现有任务目录。此前回滚备份仍位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-121914-c4659bb8\`。

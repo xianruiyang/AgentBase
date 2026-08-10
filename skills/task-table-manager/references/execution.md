@@ -58,7 +58,7 @@ Token 摘要仅在用户要求统计时加入。handoff 不粘贴 raw JSON、长
 
 ## 思考深度调节
 
-遵守 `SKILL.md` 的“动态思考深度”。任务行中的深度只作为开始当前项时的初始建议；执行中根据实际不确定性直接选择足够的最低深度，不逐级升级，也不因切换深度强制结束仍可安全完成的工作包。只有当前深度不足以安全继续时才写必要 handoff、设置 next-turn 并结束本轮。
+遵守全局动态推理规则并使用 `$reasoning-governor`。任务行中的深度只作为开始当前项时的初始建议；执行中只要下一段工作的真实不确定性、后果、可逆性或验证负担发生实质变化，就重新判断最低充分等级，不限于任务项边界。有 active Goal 且目标等级不同的，读回 next-turn 设置成功后立即结束当前轮，由 Goal 继续；没有 active Goal 时不自主切换。
 
 ## 修改方案或任务表
 
@@ -99,21 +99,22 @@ Token 摘要仅在用户要求统计时加入。handoff 不粘贴 raw JSON、长
 
 ## 结束本轮
 
-- 当前项完成：更新任务行、handoff、消费者依赖和组 memo；仅当下一动作所需深度与已知当前深度存在实质差异，或当前深度未知但下一动作明确需要特定深度时设置 next-turn。
-- 当前项未完成：只有当前深度不足以安全继续时，保存必要现场、设置 next-turn 后结束。
+- 当前项完成：更新任务行、handoff、消费者依赖和组 memo；下一动作需要不同深度时按 `$reasoning-governor` 协议设置并读回 next-turn。
+- 当前项未完成：下一段工作需要不同深度时，先保存恢复所必需的现场，再按 `$reasoning-governor` 协议设置并结束。
 - 有活动子表：同步主表索引后再结束。
 - 不得把未解决任务标为 `done`。
 
-## 思考深度脚本
+## 推理深度入口
 
-脚本只修改当前 thread 的 next-turn settings，不发送消息、不创建 turn：
+正式入口由 `$reasoning-governor` 持有。先读取当前 thread 的 next-turn settings，只有目标等级不同才设置：
 
 ```powershell
 $env:CODEX_THREAD_ID
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.codex\skills\task-table-manager\scripts\set-current-thread-reasoning-depth.ps1" high
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.codex\skills\reasoning-governor\scripts\reasoning-governor.ps1" -Status
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.codex\skills\reasoning-governor\scripts\reasoning-governor.ps1" -Effort high
 ```
 
-支持 `low`、`medium`、`high`、`xhigh`、`max`、`ultra`。脚本在设置完成后读回线程配置；只有 `ok=true`、`readbackVerified=true`、`matchesRequestedEffort=true` 且 `currentConfiguredEffort` 等于请求值，才表示 next-turn 配置一致。设置不影响已经开始的当前轮，`activeTurnEffortReadable=false` 表示当前轮实际深度不可由该 IPC 读取；新配置在下一次用户消息、goal 唤醒或继续任务表时生效。
+支持 `low`、`medium`、`high`、`xhigh`、`max`、`ultra`。设置成功口径和当前轮不可读边界以 `$reasoning-governor` 为准；旧任务表脚本只服务于发布前已经开始且仍引用旧路径的任务，不再定义行为。确认这些任务完成或已改用正式入口后删除兼容转发，任何新文档不得继续引用旧路径。
 
 ## 禁止
 

@@ -1,6 +1,6 @@
 {
   "name": "agentbase-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AgentBase 关键基础工具与工程治理 skill 的本地可发布集合。",
   "author": {
     "name": "AgentBase maintainers"
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "AgentBase Core",
     "shortDescription": "关键基础工具与工程治理 skills",
-    "longDescription": "提供 AgentBase 维护的 11 个关键 skill，并保留各自的正向触发与非触发边界。",
+    "longDescription": "提供 AgentBase 维护的 12 个关键 skill，并保留各自的正向触发与非触发边界。",
     "developerName": "AgentBase maintainers",
     "category": "Productivity",
     "capabilities": [],

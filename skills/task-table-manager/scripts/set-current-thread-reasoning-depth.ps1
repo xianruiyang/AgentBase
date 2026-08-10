@@ -12,53 +12,26 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$nodeScript = Join-Path $scriptDir "set-current-thread-reasoning-depth.mjs"
+$taskTableSkillRoot = Split-Path -Parent $PSScriptRoot
+$skillsRoot = Split-Path -Parent $taskTableSkillRoot
+$governorScript = Join-Path $skillsRoot "reasoning-governor\scripts\reasoning-governor.ps1"
 
-if (-not (Test-Path -LiteralPath $nodeScript)) {
-    throw "Missing node helper: $nodeScript"
+if (-not (Test-Path -LiteralPath $governorScript -PathType Leaf)) {
+    throw "Missing reasoning-governor compatibility target: $governorScript"
 }
 
-$nodeCandidates = @()
-if ($env:NODE_EXE) {
-    $nodeCandidates += $env:NODE_EXE
+$forward = @{
+    Effort = $Effort
 }
-$nodeCandidates += "node"
-if ($env:LOCALAPPDATA) {
-    $nodeCandidates += (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\bin\node.exe")
+if (-not [string]::IsNullOrWhiteSpace($ThreadId)) {
+    $forward.ThreadId = $ThreadId
 }
-
-$nodeExe = $null
-foreach ($candidate in $nodeCandidates) {
-    if ($candidate -eq "node") {
-        $cmd = Get-Command node -ErrorAction SilentlyContinue
-        if ($cmd) {
-            $nodeExe = $cmd.Source
-            break
-        }
-    } elseif (Test-Path -LiteralPath $candidate) {
-        $nodeExe = $candidate
-        break
-    }
+if (-not [string]::IsNullOrWhiteSpace($HostId)) {
+    $forward.HostId = $HostId
 }
-
-if (-not $nodeExe) {
-    throw "Could not find node.exe."
-}
-
-$argsList = @($nodeScript, "--effort", $Effort)
-
-if ($ThreadId) {
-    $argsList += @("--thread-id", $ThreadId)
-}
-
-if ($HostId) {
-    $argsList += @("--host-id", $HostId)
-}
-
 if ($DebugLog) {
-    $argsList += "--debug"
+    $forward.DebugLog = $true
 }
 
-& $nodeExe @argsList
+& $governorScript @forward
 exit $LASTEXITCODE
