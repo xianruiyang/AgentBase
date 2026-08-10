@@ -127,5 +127,5 @@
 
 ## 当前发布状态
 
-- 当前 2026-08-09 候选已通过正式入口发布到 `C:\Users\gzxt\.codex`，`source_bundle_sha256` 为 `C1F2DE4B49BE22F6A8C4F4C6E221C0861D268010A54B9FF679C7A7B33F75E085`；本次唯一新增的回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260809-020034-01d48b20\`。
-- 本次发布替换全局 `AGENTS.md` 与 11 个同名 skill，MCP 未改变；可移植设置和自定义子代理是在本次发布之后加入的候选真源，当前安装的 `config.toml`、`hooks.json`、`agents/*.toml`、个人 marketplace 和其他安装内容未由新入口重发。当前运行不会追溯重建启动时的指令链，新任务或重新启动的会话才会按已发布文件重新发现规则。
+- 当前 2026-08-10 候选已通过正式入口发布到 `C:\Users\gzxt\.codex`，`source_bundle_sha256` 为 `074FCC00F384403F3F6E1A3F72E9FE4395ADA0ECC045A44ED04C4753017FDD5C`；本次唯一新增的回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-121914-c4659bb8\`。
+- 本次发布把 `task-table-manager` 已安装的 checkpoint/amend 恢复修复收回项目真源，并以增量返回字段加入 `render.status_counts`；既有 CLI 字段、`plan.json`/`state.json` schema 和 `resume` 可执行任务口径均未改变。发布同时按既有合同替换全局 `AGENTS.md` 与 11 个同名 skill，MCP、`config.toml`、`hooks.json`、`agents/*.toml`、个人 marketplace 和任务目录均未改变；当前运行不会追溯重建启动时的指令链，新任务或重新启动的会话才会按已发布 Skill 指令重新发现规则。
