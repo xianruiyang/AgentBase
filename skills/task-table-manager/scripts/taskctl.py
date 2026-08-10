@@ -4122,7 +4122,12 @@ def _command_impact(args: argparse.Namespace) -> dict[str, Any]:
 
 def _command_checkpoint(args: argparse.Namespace) -> dict[str, Any]:
     plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir)
+    # Release is the recovery edge that makes an active package amendable after
+    # an upstream source changed.  Requiring the obsolete source fingerprint on
+    # that one edge creates a deadlock: amend rejects an active package while
+    # release rejects the drift that requires amendment.  Plan/state structure,
+    # revision and active-package ownership remain enforced below.
+    plan, state = _load_plan_state(plan_dir, verify_sources=not args.release)
     assert state is not None
     _require_revision(state, args.expected_revision)
     _require(state["active_package"] is not None, "no active package to checkpoint")
@@ -4752,6 +4757,24 @@ def _command_audit(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def _without_source_fingerprints(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _without_source_fingerprints(child)
+            for key, child in value.items()
+            if key != "source_fingerprint"
+        }
+    if isinstance(value, list):
+        return [_without_source_fingerprints(child) for child in value]
+    return value
+
+
+def _semantic_amendment_changed(old_value: Any, new_value: Any) -> bool:
+    return _without_source_fingerprints(old_value) != _without_source_fingerprints(
+        new_value
+    )
+
+
 def _amendment_impact(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
     old_tasks = _task_map(old)
     new_tasks = _task_map(new)
@@ -4767,45 +4790,47 @@ def _amendment_impact(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any
     changed_requirements = {
         key
         for key in set(old_requirements) | set(new_requirements)
-        if old_requirements.get(key) != new_requirements.get(key)
+        if _semantic_amendment_changed(
+            old_requirements.get(key), new_requirements.get(key)
+        )
     }
     changed_producers = {
         key
         for key in set(old["producers"]) | set(new["producers"])
-        if old["producers"].get(key) != new["producers"].get(key)
+        if _semantic_amendment_changed(
+            old["producers"].get(key), new["producers"].get(key)
+        )
     }
     changed_profiles = {
         key
         for key in set(old["evidence_profiles"]) | set(new["evidence_profiles"])
-        if old["evidence_profiles"].get(key) != new["evidence_profiles"].get(key)
+        if _semantic_amendment_changed(
+            old["evidence_profiles"].get(key), new["evidence_profiles"].get(key)
+        )
     }
     changed_tests = {
         key
         for key in set(old["test_qualifications"]) | set(new["test_qualifications"])
-        if old["test_qualifications"].get(key) != new["test_qualifications"].get(key)
+        if _semantic_amendment_changed(
+            old["test_qualifications"].get(key),
+            new["test_qualifications"].get(key),
+        )
     }
     old_flow_map = {flow["id"]: flow for flow in old.get("acceptance_flows", [])}
     new_flow_map = {flow["id"]: flow for flow in new.get("acceptance_flows", [])}
     changed_flows = {
         key
         for key in set(old_flow_map) | set(new_flow_map)
-        if old_flow_map.get(key) != new_flow_map.get(key)
+        if _semantic_amendment_changed(old_flow_map.get(key), new_flow_map.get(key))
     }
     changed_tasks = {
-        key for key in set(old_tasks) | set(new_tasks) if old_tasks.get(key) != new_tasks.get(key)
+        key
+        for key in set(old_tasks) | set(new_tasks)
+        if _semantic_amendment_changed(old_tasks.get(key), new_tasks.get(key))
     }
     direct: set[str] = set(changed_tasks)
-    changed_source_requirements = {
-        requirement_id
-        for requirement_id, requirement in new_requirements.items()
-        if any(
-            requirement["source_ref"] == source_id
-            or requirement["source_ref"].startswith(source_id + ":")
-            for source_id in changed_sources
-        )
-    }
     for task_id, task in new_tasks.items():
-        if set(task["requirement_ids"]) & (changed_requirements | changed_source_requirements):
+        if set(task["requirement_ids"]) & changed_requirements:
             direct.add(task_id)
         if task["claim_profile"] in changed_profiles:
             direct.add(task_id)

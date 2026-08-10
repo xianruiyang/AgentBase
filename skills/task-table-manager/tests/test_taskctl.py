@@ -642,6 +642,42 @@ class TaskCtlTestCase(unittest.TestCase):
         )
         self.assertFalse(amended["preview"])
 
+    def test_checkpoint_release_is_the_recovery_edge_for_source_drift(self) -> None:
+        plan = self.make_source_exact(make_plan())
+        self.write_plan(plan)
+        self.activate()
+        self.begin("T1")
+
+        design_path = self.project / "docs" / "design.md"
+        design_path.write_text(
+            design_path.read_text(encoding="utf-8") + "upstream changed\n",
+            encoding="utf-8",
+        )
+        blocked = self.command(
+            "checkpoint",
+            "--task-dir",
+            str(self.plan_dir),
+            "--expected-revision",
+            str(self.state()["revision"]),
+            "--next-action",
+            "continue",
+            ok=False,
+        )
+        self.assertEqual(blocked["error"]["code"], "source_drift")
+
+        released = self.command(
+            "checkpoint",
+            "--task-dir",
+            str(self.plan_dir),
+            "--expected-revision",
+            str(self.state()["revision"]),
+            "--next-action",
+            "amend the changed upstream source",
+            "--release",
+        )
+        self.assertTrue(released["ok"])
+        self.assertIsNone(self.state()["active_package"])
+
     def test_relative_project_root_is_rejected(self) -> None:
         self.write_plan(make_plan())
         self.activate()
@@ -1134,6 +1170,8 @@ class TaskCtlTestCase(unittest.TestCase):
             "candidate.json",
         )
         self.assertEqual(preview["impact"]["changed_scope_sources"], ["design"])
+        self.assertEqual(preview["impact"]["changed_requirements"], [])
+        self.assertEqual(preview["impact"]["affected_tasks"], [])
         self.audit_candidate(self.plan_dir / "candidate.json")
         self.command(
             "amend",
