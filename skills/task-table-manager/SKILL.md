@@ -25,6 +25,7 @@ description: 管理有证据支撑的规划链和长期执行。用于工作必�
 
 - 执行、继续或完成计划前必须有对应 active goal；用户发出这类请求即授权创建。Goal 只保存交付结果、绝对任务目录、范围边界和最终条件。
 - Agent 层正常路径是 `resume → begin → close`。`resume` 是唯一恢复入口，不全文读取计划、状态或生成表；`begin` 只组合职责、生命周期、持久化、构建和回退边界已经确认相同的工作；`close` 导入机器证据并返回完成卡和剩余缺口。
+- `resume` 的 `ready_count` 与 `needs_review_count` 只统计依赖检查后可执行的任务，依赖阻断项单列在 `dependency_blocked_ids`；`render.status_counts` 与 `TASK_TABLE.md` totals 统计全部任务并固定包含零值，二者不得混作同一口径。
 - `evidence-context`、`seal-red`、`impact` 等只在当前 runner 或异常恢复确实需要时同轮调用，不创建任务、handoff 或额外对话轮次。依赖任务必须整体 `done`；依赖边 claims 只表示下游消费的证据与 freshness，不是提前开工许可。
 - 只有真实中断、阻塞或下一动作无法恢复时 `checkpoint`。合同变化先释放活动包、更新最早上游、审计候选并 `amend`；禁止直接改活动 `plan.json/state.json`。
 - 最终运行 `audit --all`。只有计划来源仍有效、必要任务和 flow 都有直接证据并返回 completion receipt，才可报告完成或结束 goal。

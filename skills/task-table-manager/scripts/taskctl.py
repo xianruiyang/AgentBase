@@ -3065,13 +3065,20 @@ def _compact_markdown_cell(value: str, *, limit: int = 72) -> str:
     return text[: max(1, limit - 1)].rstrip() + "…"
 
 
+def _task_status_counts(state: dict[str, Any]) -> dict[str, int]:
+    counts = {status: 0 for status in sorted(TASK_STATUSES)}
+    for task_state in state["task_states"].values():
+        counts[task_state["status"]] += 1
+    return counts
+
+
 def _render_markdown(
     plan_dir: Path,
     plan: dict[str, Any],
     state: dict[str, Any],
     *,
     include_details: bool = False,
-) -> None:
+) -> dict[str, int]:
     generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     rows: list[str] = []
     details: list[str] = []
@@ -3135,10 +3142,10 @@ def _render_markdown(
     active_text = "none"
     if active:
         active_text = f"{', '.join(active['task_ids'])} / {active['phase']} / {active['next_action']}"
-    totals = {status: 0 for status in TASK_STATUSES}
-    for task_state in state["task_states"].values():
-        totals[task_state["status"]] += 1
-    totals_text = ", ".join(f"{status}={totals[status]}" for status in sorted(totals) if totals[status])
+    status_counts = _task_status_counts(state)
+    totals_text = ", ".join(
+        f"{status}={count}" for status, count in status_counts.items()
+    )
     flow_rows: list[str] = []
     flow_details: list[str] = []
     for flow in plan.get("acceptance_flows", []):
@@ -3206,6 +3213,7 @@ def _render_markdown(
         ]
     )
     _write_bytes_atomic(plan_dir / "TASK_TABLE.md", markdown.encode("utf-8"))
+    return status_counts
 
 
 def _render_after_state_change(plan_dir: Path, plan: dict[str, Any], state: dict[str, Any]) -> list[str]:
@@ -5218,11 +5226,17 @@ def _command_render(args: argparse.Namespace) -> dict[str, Any]:
         enforce_source_durability=False,
     )
     assert state is not None
-    _render_markdown(plan_dir, plan, state, include_details=args.details)
+    status_counts = _render_markdown(
+        plan_dir,
+        plan,
+        state,
+        include_details=args.details,
+    )
     return {
         "ok": True,
         "path": str(plan_dir / "TASK_TABLE.md"),
         "state_revision": state["revision"],
+        "status_counts": status_counts,
         "view_scope": "read_only_projection",
         "execution_validity": "not_checked",
     }

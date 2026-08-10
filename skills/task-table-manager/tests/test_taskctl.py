@@ -1470,9 +1470,24 @@ class TaskCtlTestCase(unittest.TestCase):
         self.assertEqual(payload["recommended_package"]["tasks"][0]["id"], "T1")
         self.assertIn("outcome", payload["recommended_package"]["tasks"][0])
         self.assertTrue((self.plan_dir / "TASK_TABLE.md").exists())
-        self.command("render", "--task-dir", str(self.plan_dir))
+        rendered = self.command("render", "--task-dir", str(self.plan_dir))
+        self.assertEqual(
+            rendered["status_counts"],
+            {
+                "active": 0,
+                "blocked": 0,
+                "done": 0,
+                "needs_review": 0,
+                "ready": 1,
+                "todo": 1,
+            },
+        )
         markdown = (self.plan_dir / "TASK_TABLE.md").read_text(encoding="utf-8")
         self.assertIn("| ID | 交付结果 | 必要依赖 | 完成证据 | 状态 |", markdown)
+        self.assertIn(
+            "- totals: active=0, blocked=0, done=0, needs_review=0, ready=1, todo=1",
+            markdown,
+        )
         self.assertNotIn("done 100%", markdown)
 
     def test_state_changes_automatically_refresh_task_table(self) -> None:
@@ -1492,6 +1507,44 @@ class TaskCtlTestCase(unittest.TestCase):
         done_markdown = task_table.read_text(encoding="utf-8")
         self.assertIn("active_package: none", done_markdown)
         self.assertIn("| `done` |", done_markdown)
+
+    def test_render_status_counts_preserve_an_active_state(self) -> None:
+        self.write_plan(make_plan())
+        self.activate()
+        self.begin("T1")
+        state_path = self.plan_dir / "state.json"
+        state_before = state_path.read_bytes()
+
+        rendered = self.command("render", "--task-dir", str(self.plan_dir))
+
+        self.assertEqual(state_path.read_bytes(), state_before)
+        self.assertEqual(
+            rendered["status_counts"],
+            {
+                "active": 1,
+                "blocked": 0,
+                "done": 0,
+                "needs_review": 0,
+                "ready": 0,
+                "todo": 0,
+            },
+        )
+        self.assertEqual(self.state()["active_package"]["task_ids"], ["T1"])
+
+    def test_render_counts_all_states_while_resume_counts_actionable_tasks(self) -> None:
+        self.write_plan(make_plan(two_tasks=True))
+        self.activate()
+        state = self.state()
+        state["task_states"]["T2"]["status"] = "needs_review"
+        self.write_json(self.plan_dir / "state.json", state)
+
+        rendered = self.command("render", "--task-dir", str(self.plan_dir))
+        resumed = self.command("resume", "--task-dir", str(self.plan_dir))
+
+        self.assertEqual(rendered["status_counts"]["needs_review"], 1)
+        self.assertEqual(resumed["needs_review_count"], 0)
+        self.assertEqual(resumed["needs_review_ids"], [])
+        self.assertEqual(resumed["dependency_blocked_ids"], ["T2"])
 
     def test_resume_projection_has_a_regression_size_budget(self) -> None:
         self.write_plan(make_plan(two_tasks=True))
@@ -2575,7 +2628,12 @@ class TaskCtlTestCase(unittest.TestCase):
         )
         self.assertEqual(applied["changed_to_needs_review"], ["T1"])
         resumed = self.command("resume", "--plan-dir", str(self.plan_dir))
+        self.assertEqual(resumed["needs_review_count"], 1)
         self.assertEqual(resumed["needs_review_ids"], ["T1"])
+        rendered = self.command("render", "--task-dir", str(self.plan_dir))
+        self.assertEqual(rendered["status_counts"]["needs_review"], 1)
+        markdown = (self.plan_dir / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn("needs_review=1", markdown)
 
     def assert_evidence_rejected(self, report: Path) -> None:
         self.command(
