@@ -24,6 +24,14 @@ must: 文档只更新被本次改动直接影响的事实，删除或改写已�
 
 ## 验证与发布
 
+must: 用户明确要求在新的 Windows 主机准备、复现或部署 AgentBase 时，主机前置安装属于该授权范围；先运行以下正式入口主动安装或升级缺失的 PowerShell 7 与 fd，并读回能力状态，完成后开启新 Codex 任务再继续发布：
+
+```powershell
+& (Join-Path (Get-Location).Path 'development\codex-deployment\bootstrap_windows.ps1') -Action Install
+```
+
+must not: 普通开发、问答或只读审查不得仅因检测到主机工具缺失而安装或升级软件
+
 must: 全局规则或 skill 变更至少运行：
 
 ```powershell

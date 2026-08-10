@@ -23,6 +23,18 @@ The files under `global/agents/` follow the [official Codex custom-agent schema]
 
 `sandbox_mode = "danger-full-access"` and the elevated Windows sandbox reproduce the current local workflow. Review these values before installing on another machine; workspace or organization policy can still restrict them.
 
+## Prepare a Windows host
+
+PowerShell 7 and `fd` are host prerequisites, not part of the AgentBase payload. Codex on Windows prefers `pwsh.exe` when it is available, but the Codex package does not install it; a clean Windows host can otherwise run commands through the older system shell. AgentBase therefore standardizes on PowerShell 7 and requires an `fd` build that supports `--max-results`.
+
+When the user asks Codex to prepare, reproduce, or deploy AgentBase on a new Windows machine, that request authorizes installation of these two prerequisites through the project entry point. Run it before Validate or Publish:
+
+```powershell
+& '.\development\codex-deployment\bootstrap_windows.ps1' -Action Install
+```
+
+The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerShell` and `sharkdp.fd`, installs only missing tools, upgrades an installed tool only when it does not satisfy the required capability, and reads back the resolved executable, version, and `fd --max-results` support. Use `-Action Check` for a read-only audit. If PowerShell was installed during this step, restart the ChatGPT desktop app or begin a new Codex task before continuing so the agent host is rebuilt with `pwsh`.
+
 ## Validate
 
 Validation checks the global rule and Skill contract, the portable config allowlist, the exact custom-agent file/schema contract, the hooks schema and placeholder boundary, and the independent `vscode-lsp-mcp` release owner:
@@ -39,7 +51,7 @@ The repeatable sandbox test covers default preservation, explicit settings and c
 
 ## Publish on another Windows machine
 
-Install and sign in to Codex first. Then clone or copy the repository, review `global/config.toml`, and run from the project root:
+Install and sign in to Codex first. Then clone or copy the repository, run the Windows host preparation above, review `global/config.toml`, and run from the project root:
 
 ```powershell
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Publish -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -InstallPortableSettings

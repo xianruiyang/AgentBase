@@ -449,6 +449,32 @@ function Get-ValidatedSource {
     )
 
     & (Join-Path $Root "development\skill-routing\validate_contract.ps1") -ProjectRoot $Root | Out-Null
+    $hostBootstrapPath = Join-Path $Root "development\codex-deployment\bootstrap_windows.ps1"
+    if (-not (Test-Path -LiteralPath $hostBootstrapPath -PathType Leaf)) {
+        throw "Windows host bootstrap is missing: $hostBootstrapPath"
+    }
+    $hostBootstrapContent = Get-Content -LiteralPath $hostBootstrapPath -Raw -Encoding UTF8
+    $requiredBootstrapFragments = @(
+        'ValidateSet("Check", "Install")'
+        'Microsoft.PowerShell'
+        'sharkdp.fd'
+        '$version.Major -ge 7'
+        '--max-results'
+        'winget.exe'
+    )
+    foreach ($requiredBootstrapFragment in $requiredBootstrapFragments) {
+        if (-not $hostBootstrapContent.Contains($requiredBootstrapFragment)) {
+            throw "Windows host bootstrap is missing required contract fragment: $requiredBootstrapFragment"
+        }
+    }
+    $projectAgentsContent = Get-Content -LiteralPath (Join-Path $Root "AGENTS.md") -Raw -Encoding UTF8
+    $deploymentReadmeContent = Get-Content -LiteralPath (Join-Path $Root "development\codex-deployment\README.md") -Raw -Encoding UTF8
+    if (-not $projectAgentsContent.Contains('bootstrap_windows.ps1') -or -not $projectAgentsContent.Contains('-Action Install')) {
+        throw "Project AGENTS.md does not route Windows reproduction through the host bootstrap"
+    }
+    if (-not $deploymentReadmeContent.Contains('bootstrap_windows.ps1') -or -not $deploymentReadmeContent.Contains('-Action Check')) {
+        throw "Deployment README does not document the Windows host bootstrap lifecycle"
+    }
     $portableConfigPath = Join-Path $Root "global\config.toml"
     $hooksTemplatePath = Join-Path $Root "global\hooks.template.json"
     $portableAgentsPath = Join-Path $Root "global\agents"
@@ -532,6 +558,7 @@ function Get-ValidatedSource {
         hooks_template_path = $hooksTemplatePath
         portable_agents_path = $portableAgentsPath
         portable_agent_names = @($portableAgentFiles.BaseName)
+        host_bootstrap_path = $hostBootstrapPath
     }
 }
 
@@ -577,6 +604,7 @@ if ($Action -eq "Validate") {
         hooks_template = $source.hooks_template_path
         portable_agents = $source.portable_agents_path
         portable_agent_count = @($source.portable_agent_names).Count
+        host_bootstrap = $source.host_bootstrap_path
     }
     return
 }

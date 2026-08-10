@@ -36,7 +36,7 @@
 | `ast-grep-token-safe` | `D:\program\SimpleChat\SymbolStructureWorkflow\ast-grep-token-safe` | 使用内置 `sgy` 做 Token-Safe AST 搜索与改写 |
 | `rg-token-safe` | 原 Codex 安装副本引导建源 | 有界、可定位、低重复的正文搜索 |
 | `fd-usage` | 原 Codex 安装副本引导建源 | 有界文件/目录发现，区分 pattern、path 和对象类型 |
-| `powershell-usage` | 原 Codex 安装副本引导建源 | Windows PowerShell 5.1 命令、路径、编码与退出码规则 |
+| `powershell-usage` | 原 Codex 安装副本引导建源 | 以 PowerShell 7 为基线的 Windows 命令、路径、编码与退出码规则 |
 | `change-governance` | 原全局条件性治理规则拆分建源 | 复杂根因、职责/入口、迁移、共享门禁和跨契约审计 |
 | `cpp-engineering-rules` | 原 Codex 安装副本审查建源 | C++ 职责、公开接口、include、PCH 与 unity build |
 | `understand-space` | `D:\program\UE\GptProjectTest\UeAgentInterfacePak\skills\understand-space` | 只在正确性依赖空间关系、布局或坐标转换时规范化空间意图 |
@@ -77,7 +77,7 @@
 & 'D:\program\AgentBase\development\skill-routing\validate_behavior_results.ps1' -ProjectRoot 'D:\program\AgentBase' -ResultsPath 'D:\program\AgentBase\development\skill-routing\evidence\2026-08-10-skill-audit-remediation-blind-route.json'
 ```
 
-2026-08-10 的只读盲测覆盖 37/37 场景并通过必选、禁选、治理参考和行为标签约束，原始结果保存在 `development/skill-routing/evidence/2026-08-10-skill-audit-remediation-blind-route.json`。该证据对应候选 bundle `0463854F738485F9DC22054F9C08AF7F05B8D80BDD6A0389FC38F637F789EAD0` 和输入集合 `4C31F3FE0BA51F9F0481DCC5B8126634392A0362712DD34F8CF4CBA7748A0279`；候选文件或测试请求变化后必须重新生成盲测输入和证据。旧 evidence 文件仅作为历史快照保留。
+2026-08-10 的只读盲测覆盖 37/37 场景并通过必选、禁选、治理参考和行为标签约束，原始结果保存在 `development/skill-routing/evidence/2026-08-10-skill-audit-remediation-blind-route.json`。该证据对应候选 bundle `0463854F738485F9DC22054F9C08AF7F05B8D80BDD6A0389FC38F637F789EAD0` 和输入集合 `4C31F3FE0BA51F9F0481DCC5B8126634392A0362712DD34F8CF4CBA7748A0279`；当前 PowerShell skill 与对应请求已更新，因此这份 evidence 只作为历史快照，不作为当前候选的行为验证。
 
 ## 本地插件打包
 
@@ -98,6 +98,8 @@
 `global/agents/` 保存 `luna`、`sol`、`terra` 三个当前自定义子代理角色。每个文件独立声明角色名、用途、模型和开发者指令；未重复声明的推理强度继续继承 `global/config.toml` 的 `[agents]` 默认值。部署只管理这三个同名文件，不替换目标机器的整个 `agents/` 目录。
 
 复制仓库到另一台 Windows 机器后的完整准备、独立插件/MCP 前置条件和恢复边界见 [`development/codex-deployment/README.md`](development/codex-deployment/README.md)。
+
+PowerShell 7 与支持 `--max-results` 的 `fd` 是主机前置条件，不随 Codex 或本项目 payload 复制。用户要求在新 Windows 主机复现或部署本项目时，Codex 会先调用 `development/codex-deployment/bootstrap_windows.ps1 -Action Install` 主动补齐并读回验证，再在新任务中继续发布；普通开发和只读审查不会触发主机软件安装。
 
 ## 校验、发布与回滚
 
@@ -129,5 +131,5 @@
 
 ## 当前发布状态
 
-- 当前候选已于 2026-08-10 通过正式入口发布到 `C:\Users\gzxt\.codex`，source 与 installed bundle 的 SHA-256 均为 `566B4C2B51787781480B2D7AC7AC3CF1215308E5661CADA46CCAA8FE83EAC685`；对应回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-154511-413f5589\`。
-- 本次发布只安装候选全局规则与 12 个同名 skill，清单共 13 个目标；未启用 `-InstallPortableSettings`，因此没有替换 `config.toml`、`hooks.json` 或 `agents/*.toml`，MCP 与插件也未改变。安装副本不是项目真源；当前任务不会追溯重建启动时的全局指令链，新任务或重启后的会话才能完整使用本次发布内容。
+- `C:\Users\gzxt\.codex` 仍保持 2026-08-10 通过正式入口安装的基线，installed bundle SHA-256 为 `566B4C2B51787781480B2D7AC7AC3CF1215308E5661CADA46CCAA8FE83EAC685`；对应回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-154511-413f5589\`。
+- 项目真源现已包含尚未发布的 PowerShell 7 skill 与 Windows 主机引导更新，当前 source bundle SHA-256 为 `35393D234AB9BDA96D69CFD89C7F431798D0C9946369C9B2CC50E88B14550D93`，因此 source 与 installed bundle 按预期不同。上次发布只安装全局规则与 12 个同名 skill，未替换 `config.toml`、`hooks.json`、`agents/*.toml`、MCP 或插件；只有用户再次明确要求加载时才会同步安装副本。

@@ -209,6 +209,9 @@ Assert-True (Test-Path -LiteralPath (Join-Path $eventLoggerRoot "tests\test_even
 $powerShellSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\powershell-usage\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($powerShellSkillContent.Contains('--heading -M 240 --max-columns-preview')) "powershell-usage rg example is missing bounded file identity and width options"
 Assert-True ($powerShellSkillContent.Contains('Select-Object -First 80')) "powershell-usage rg example is missing its total line limit"
+Assert-True ($powerShellSkillContent.Contains('PowerShell 7（`pwsh`）')) "powershell-usage does not declare its PowerShell 7 baseline"
+Assert-True ($powerShellSkillContent.Contains('$PSVersionTable.PSVersion.Major -lt 7')) "powershell-usage does not verify its runtime baseline"
+Assert-True (-not $powerShellSkillContent.Contains('Windows PowerShell 5.1')) "powershell-usage keeps obsolete Windows PowerShell 5.1 guidance"
 
 $symbolMetadataPath = Join-Path $ProjectRoot "skills\symbol-structure-workflow\agents\openai.yaml"
 $symbolMetadata = Get-Content -LiteralPath $symbolMetadataPath -Raw -Encoding UTF8
