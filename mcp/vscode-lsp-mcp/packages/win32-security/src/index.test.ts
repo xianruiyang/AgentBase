@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { execFile as execFileCallback } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
 import test from 'node:test';
+import { promisify } from 'node:util';
 import {
   createSecurePipeServer,
   ensureSecureRuntimeDirectory,
@@ -11,6 +13,8 @@ import {
   SUPPORTED_WINDOWS_ARCHITECTURES,
   verifySecureRegistryFile,
 } from './index.js';
+
+const execFile = promisify(execFileCallback);
 
 test('native adapter declares auditable Windows targets', () => {
   assert.deepEqual(SUPPORTED_WINDOWS_ARCHITECTURES, ['x64', 'arm64']);
@@ -26,7 +30,7 @@ test('native adapter implements the frozen Node-API security boundary', {
   assert.equal(info.securityOperationsImplemented, true);
 });
 
-test('runtime directory and registry file have protected current-user/SYSTEM access', {
+test('runtime directory and repaired registry file have protected current-user/SYSTEM access', {
   skip: process.platform !== 'win32',
 }, async () => {
   const info = ensureSecureRuntimeDirectory();
@@ -40,6 +44,12 @@ test('runtime directory and registry file have protected current-user/SYSTEM acc
   const file = path.join(registrations, `test-${randomUUID()}.json`);
   try {
     await writeFile(file, '{}', { flag: 'wx' });
+    await execFile('icacls.exe', [
+      file,
+      '/inheritance:r',
+      '/grant:r',
+      `*${info.currentUserSid}:(F)`,
+    ]);
     assert.equal(verifySecureRegistryFile(file), true);
   } finally {
     await rm(file, { force: true });

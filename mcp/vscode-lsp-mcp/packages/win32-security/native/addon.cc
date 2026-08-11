@@ -298,26 +298,33 @@ bool SecurityIsExact(const SecurityInspection& inspection) {
       inspection.other_users_denied;
 }
 
-bool ApplyProtectedDirectoryDacl(const std::wstring& directory) {
-  PSECURITY_DESCRIPTOR descriptor = CreateSecurityDescriptor(true);
+bool ApplyProtectedSecurity(const std::wstring& object, bool inheritable) {
+  PSECURITY_DESCRIPTOR descriptor = CreateSecurityDescriptor(inheritable);
   if (descriptor == nullptr) {
     return false;
   }
+  PSID owner = nullptr;
+  BOOL owner_defaulted = FALSE;
   PACL dacl = nullptr;
   BOOL present = FALSE;
   BOOL defaulted = FALSE;
-  const bool got_dacl = GetSecurityDescriptorDacl(
+  const bool got_security = GetSecurityDescriptorOwner(
       descriptor,
-      &present,
-      &dacl,
-      &defaulted) != FALSE && present && dacl != nullptr;
+      &owner,
+      &owner_defaulted) != FALSE && owner != nullptr &&
+      GetSecurityDescriptorDacl(
+          descriptor,
+          &present,
+          &dacl,
+          &defaulted) != FALSE && present && dacl != nullptr;
   DWORD status = ERROR_INVALID_SECURITY_DESCR;
-  if (got_dacl) {
+  if (got_security) {
     status = SetNamedSecurityInfoW(
-        const_cast<LPWSTR>(directory.c_str()),
+        const_cast<LPWSTR>(object.c_str()),
         SE_FILE_OBJECT,
-        DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-        nullptr,
+        OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION |
+            PROTECTED_DACL_SECURITY_INFORMATION,
+        owner,
         nullptr,
         dacl,
         nullptr);
@@ -326,32 +333,12 @@ bool ApplyProtectedDirectoryDacl(const std::wstring& directory) {
   return status == ERROR_SUCCESS;
 }
 
+bool ApplyProtectedDirectoryDacl(const std::wstring& directory) {
+  return ApplyProtectedSecurity(directory, true);
+}
+
 bool ApplyProtectedFileDacl(const std::wstring& file) {
-  PSECURITY_DESCRIPTOR descriptor = CreateSecurityDescriptor(false);
-  if (descriptor == nullptr) {
-    return false;
-  }
-  PACL dacl = nullptr;
-  BOOL present = FALSE;
-  BOOL defaulted = FALSE;
-  const bool got_dacl = GetSecurityDescriptorDacl(
-      descriptor,
-      &present,
-      &dacl,
-      &defaulted) != FALSE && present && dacl != nullptr;
-  DWORD status = ERROR_INVALID_SECURITY_DESCR;
-  if (got_dacl) {
-    status = SetNamedSecurityInfoW(
-        const_cast<LPWSTR>(file.c_str()),
-        SE_FILE_OBJECT,
-        DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-        nullptr,
-        nullptr,
-        dacl,
-        nullptr);
-  }
-  LocalFree(descriptor);
-  return status == ERROR_SUCCESS;
+  return ApplyProtectedSecurity(file, false);
 }
 
 bool EnsureSecureDirectory(const std::wstring& directory) {
@@ -1115,11 +1102,7 @@ napi_value VerifySecureRegistryFile(napi_env env, napi_callback_info info) {
       (attributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0;
   if (secure) {
     SecurityInspection inspection = InspectNamedObject(file, SE_FILE_OBJECT, FILE_ALL_ACCESS);
-    if (!inspection.protected_dacl &&
-        inspection.owner_current_user &&
-        inspection.current_user_full_control &&
-        inspection.system_full_control &&
-        inspection.other_users_denied) {
+    if (!SecurityIsExact(inspection)) {
       secure = ApplyProtectedFileDacl(file);
       inspection = InspectNamedObject(file, SE_FILE_OBJECT, FILE_ALL_ACCESS);
     }

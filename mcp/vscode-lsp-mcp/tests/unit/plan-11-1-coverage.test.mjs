@@ -131,7 +131,7 @@ const coverage = Object.freeze([
   {
     id: 'WINDOWS-SECURITY',
     evidence: [
-      evidence('packages/win32-security/src/index.test.ts', 'runtime directory and registry file have protected current-user/SYSTEM access'),
+      evidence('packages/win32-security/src/index.test.ts', 'runtime directory and repaired registry file have protected current-user/SYSTEM access'),
       evidence('packages/win32-security/src/index.test.ts', 'secure named pipe enforces DACL, local byte mode, first instance, cap, and raw I/O'),
     ],
   },
