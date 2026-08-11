@@ -131,5 +131,5 @@ PowerShell 7 与支持 `--max-results` 的 `fd` 是主机前置条件，不随 C
 
 ## 当前发布状态
 
-- `C:\Users\gzxt\.codex` 仍保持 2026-08-10 通过正式入口安装的基线，installed bundle SHA-256 为 `566B4C2B51787781480B2D7AC7AC3CF1215308E5661CADA46CCAA8FE83EAC685`；对应回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260810-154511-413f5589\`。
-- 项目真源现已包含尚未发布的 PowerShell 7 skill 与 Windows 主机引导更新，当前 source bundle SHA-256 为 `73A76B078A5CDDCC4A5A663E57F2AB5461DF31E69A7AA276E251B29784470A2C`，因此 source 与 installed bundle 按预期不同。上次发布只安装全局规则与 12 个同名 skill，未替换 `config.toml`、`hooks.json`、`agents/*.toml`、MCP 或插件；只有用户再次明确要求加载时才会同步安装副本。
+- 当前候选已于 2026-08-11 通过正式入口发布到 `C:\Users\gzxt\.codex`，source 与 installed bundle 的 SHA-256 均为 `73A76B078A5CDDCC4A5A663E57F2AB5461DF31E69A7AA276E251B29784470A2C`；对应回滚备份位于 `C:\Users\gzxt\.codex\backups\AgentBase-20260811-081311-5d4b1b12\`。
+- 本次发布只安装候选全局规则与 12 个同名 skill，未替换 `config.toml`、`hooks.json`、`agents/*.toml`、MCP 或插件。安装副本不是项目真源；当前任务不会追溯重建启动时的全局指令链，新任务或重启后的会话才能完整使用本次发布内容。
