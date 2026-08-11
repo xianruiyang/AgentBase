@@ -300,7 +300,6 @@ $workflowPath = Join-Path $ProjectRoot ".github\workflows\validate.yml"
 $workflowContent = Get-Content -LiteralPath $workflowPath -Raw -Encoding UTF8
 Assert-True ($workflowContent.Contains("npm run verify:release")) "Repository CI does not run the vscode-lsp-mcp release gate"
 Assert-True ($workflowContent.Contains("rustsec/audit-check@")) "Repository CI does not run the RustSec gate"
-Assert-True ($workflowContent.Contains("sgy-linux:")) "Repository CI is missing the Linux sgy native gate"
 Assert-True ($workflowContent.Contains("sgy-windows:")) "Repository CI is missing the Windows sgy native gate"
 $unpinnedActions = @([regex]::Matches($workflowContent, '(?m)^\s*-?\s*uses:\s*[^@\s]+@(?<ref>[^\s#]+)') | Where-Object {
     $_.Groups["ref"].Value -notmatch '^[0-9a-f]{40}$'

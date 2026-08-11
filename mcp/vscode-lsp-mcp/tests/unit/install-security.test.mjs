@@ -12,6 +12,7 @@ import {
   defaultRoots,
   isZipSymlink,
   orderLocatedCodeCliPaths,
+  realPathMatchesManagedLocation,
   validateZipEntryName,
 } from '../../scripts/install-core.mjs';
 import { parseArguments } from '../../scripts/install.mjs';
@@ -49,6 +50,23 @@ test('managed roots reject filesystem/home roots and overlapping configuration',
     () => assertSeparatedRoots(path.join(os.tmpdir(), 'install'), path.join(os.tmpdir(), 'install', 'config')),
     { code: 'UNSAFE_ROOTS' },
   );
+});
+
+test('Windows managed paths accept 8.3 ancestors but reject an escaped canonical parent', () => {
+  const candidate = 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\fixture\\config';
+  const canonicalParent = 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\fixture';
+  assert.equal(realPathMatchesManagedLocation({
+    candidate,
+    actual: path.win32.join(canonicalParent, 'config'),
+    canonicalParent,
+    platform: 'win32',
+  }), true);
+  assert.equal(realPathMatchesManagedLocation({
+    candidate,
+    actual: 'C:\\outside\\config',
+    canonicalParent,
+    platform: 'win32',
+  }), false);
 });
 
 test('server ZIP entry validation rejects traversal, absolute paths, backslashes, and extra roots', () => {

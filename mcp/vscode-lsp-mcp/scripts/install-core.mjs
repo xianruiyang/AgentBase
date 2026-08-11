@@ -139,14 +139,31 @@ export const assertNoSymlinkComponents = async (candidate) => {
   }
 };
 
+export const realPathMatchesManagedLocation = ({
+  candidate,
+  actual,
+  canonicalParent,
+  platform = process.platform,
+}) => {
+  const pathApi = platform === 'win32' ? path.win32 : path.posix;
+  const expected = pathApi.resolve(candidate);
+  const resolvedActual = pathApi.resolve(actual);
+  if (platform !== 'win32') return resolvedActual === expected;
+  return pathApi.dirname(resolvedActual).toLowerCase() ===
+    pathApi.resolve(canonicalParent).toLowerCase();
+};
+
 const assertRealPathMatches = async (candidate) => {
   const expected = path.resolve(candidate);
-  const actual = await realpath(candidate);
-  const comparison = process.platform === 'win32'
-    ? path.resolve(actual).toLowerCase() === expected.toLowerCase()
-    : path.resolve(actual) === expected;
-  if (!comparison) {
-    fail('UNSAFE_REPARSE_POINT', `Managed path resolves outside itself: ${candidate}`);
+  await assertNoSymlinkComponents(expected);
+  const [actual, canonicalParent] = await Promise.all([
+    realpath(expected),
+    realpath(path.dirname(expected)),
+  ]);
+  // Windows realpath expands 8.3 aliases. The component check above rejects
+  // links and junctions, so the canonical parent is the stable boundary.
+  if (!realPathMatchesManagedLocation({ candidate: expected, actual, canonicalParent })) {
+    fail('UNSAFE_REPARSE_POINT', `Managed path resolves outside its canonical parent: ${candidate}`);
   }
 };
 

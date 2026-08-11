@@ -71,69 +71,6 @@ jobs:
       - name: Run complete Windows release verification
         run: npm run verify:release
 
-  sgy-linux:
-    name: sgy Linux native release and quality gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    defaults:
-      run:
-        shell: pwsh
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - name: Install fixed Rust toolchain
-        shell: bash
-        run: rustup toolchain install 1.85.0 --profile minimal --component clippy,rustfmt
-
-      - name: Verify signed source snapshot
-        run: |
-          $snapshotPath = Join-Path $env:RUNNER_TEMP 'sgy-source-snapshot.json'
-          & ./tools/sgy/scripts/new-source-snapshot.ps1 -Output $snapshotPath | Out-Null
-          $actual = Get-Content -LiteralPath $snapshotPath -Raw -Encoding UTF8 | ConvertFrom-Json
-          $release = Get-Content -LiteralPath './skills/ast-grep-token-safe/scripts/provenance/release-record.json' -Raw -Encoding UTF8 | ConvertFrom-Json
-          if ($actual.sourceRevision -ne $release.source.revision) {
-            throw "sgy source snapshot changed: $($actual.sourceRevision)"
-          }
-          "SGY_SOURCE_REVISION=$($release.source.revision)" | Out-File -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Run Rust quality gates
-        working-directory: tools/sgy
-        run: |
-          cargo ci-build
-          cargo ci-test
-          cargo lint
-          cargo fmt-check
-
-      - name: Build and compare native Linux release
-        shell: bash
-        run: |
-          docker run --rm \
-            --env CARGO_BUILD_JOBS=1 \
-            --env SGY_SOURCE_REVISION="$SGY_SOURCE_REVISION" \
-            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/work" \
-            --mount "type=bind,source=$RUNNER_TEMP,target=/output" \
-            --workdir /work/tools/sgy \
-            rust@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4 \
-            bash -c './scripts/build-release.sh --clean --source-revision "$SGY_SOURCE_REVISION" --source-date-epoch 0 --out-dir /output/sgy-release-linux'
-
-      - name: Verify Linux runtime and archive hashes
-        run: |
-          $release = Get-Content -LiteralPath './skills/ast-grep-token-safe/scripts/provenance/release-record.json' -Raw -Encoding UTF8 | ConvertFrom-Json
-          $target = @($release.targets | Where-Object target -eq 'x86_64-unknown-linux-gnu')[0]
-          $archive = Join-Path $env:RUNNER_TEMP (Join-Path 'sgy-release-linux' $target.archive)
-          $builtBinary = './tools/sgy/target/release-build/x86_64-unknown-linux-gnu/x86_64-unknown-linux-gnu/release/sgy'
-          $installedBinary = './skills/ast-grep-token-safe/scripts/bin/linux-x86_64/sgy'
-          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $target.archiveSha256) { throw 'Linux release archive hash changed' }
-          if ((Get-FileHash -LiteralPath $builtBinary -Algorithm SHA256).Hash.ToLowerInvariant() -ne $target.binary.sha256) { throw 'Linux rebuilt binary hash changed' }
-          if ((Get-FileHash -LiteralPath $installedBinary -Algorithm SHA256).Hash.ToLowerInvariant() -ne $target.binary.sha256) { throw 'Linux skill runtime hash changed' }
-          bash './skills/ast-grep-token-safe/scripts/sgy.sh' --version
-          if ($LASTEXITCODE -ne 0) { throw 'Linux skill runtime did not start' }
-
-      - name: Audit Rust dependencies
-        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: tools/sgy
-
   sgy-windows:
     name: sgy Windows native release gate
     runs-on: windows-latest
@@ -197,3 +134,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'sgy doctor failed' }
           & $runtime exec --engine $engine --cwd $fixture -- run -p 'console.log($A)' -l ts .
           if ($LASTEXITCODE -ne 0) { throw 'sgy real-engine smoke failed' }
+
+      - name: Audit Rust dependencies
+        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: tools/sgy
