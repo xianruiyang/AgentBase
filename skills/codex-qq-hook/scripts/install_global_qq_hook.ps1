@@ -2,7 +2,7 @@ param(
     [string]$ProjectRoot,
     [string]$AppId,
     [ValidateSet("user", "group", "channel")]
-    [string]$TargetType = "user",
+    [string]$TargetType,
     [string]$OpenId,
     [string]$GroupOpenId,
     [string]$ChannelId,
@@ -36,25 +36,113 @@ if (-not (Test-Path -LiteralPath $globalTemplatePath)) {
     throw "Global settings template not found: $globalTemplatePath"
 }
 
-$hooks = [ordered]@{
-    hooks = [ordered]@{
-        Stop = @(
-            [ordered]@{
-                hooks = @(
-                    [ordered]@{
-                        type           = "command"
-                        command        = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$stopScript`""
-                        commandWindows = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$stopScript`""
-                        timeout        = 30
-                        statusMessage  = "Sending QQ completion notification"
-                    }
-                )
+function Set-ObjectProperty {
+    param(
+        [object]$Object,
+        [string]$Name,
+        [object]$Value
+    )
+
+    if ($Object.PSObject.Properties.Name -contains $Name) {
+        $Object.$Name = $Value
+        return
+    }
+    $Object | Add-Member -MemberType NoteProperty -Name $Name -Value $Value
+}
+
+function Test-QqStopHandler {
+    param([object]$Handler)
+
+    foreach ($propertyName in @("command", "commandWindows")) {
+        if ($Handler.PSObject.Properties.Name -contains $propertyName) {
+            $commandText = [string]$Handler.$propertyName
+            if ($commandText -match '(?i)(^|[\\/])codex_stop_qq_notify\.ps1(?:["'']|\s|$)') {
+                return $true
             }
-        )
+        }
+    }
+    return $false
+}
+
+function Write-JsonAtomically {
+    param(
+        [string]$Path,
+        [object]$Value
+    )
+
+    $directory = Split-Path -Parent $Path
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    $temporaryPath = Join-Path $directory ("." + [IO.Path]::GetFileName($Path) + "." + [guid]::NewGuid().ToString("N") + ".tmp")
+    try {
+        $text = ($Value | ConvertTo-Json -Depth 30) + [Environment]::NewLine
+        [IO.File]::WriteAllText($temporaryPath, $text, [Text.UTF8Encoding]::new($false))
+        Get-Content -LiteralPath $temporaryPath -Raw -Encoding UTF8 | ConvertFrom-Json | Out-Null
+        [IO.File]::Move($temporaryPath, $Path, $true)
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporaryPath -PathType Leaf) {
+            Remove-Item -LiteralPath $temporaryPath -Force
+        }
     }
 }
-$hooks | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $globalHooksPath -Encoding UTF8
-Get-Content -LiteralPath $globalHooksPath -Raw -Encoding UTF8 | ConvertFrom-Json | Out-Null
+
+if (Test-Path -LiteralPath $globalHooksPath -PathType Leaf) {
+    try {
+        $hooksDocument = Get-Content -LiteralPath $globalHooksPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        throw "Existing hooks.json is invalid; refusing to replace it: $($_.Exception.Message)"
+    }
+}
+else {
+    $hooksDocument = [pscustomobject]@{}
+}
+if ($null -eq $hooksDocument -or $hooksDocument -isnot [pscustomobject]) {
+    throw "Existing hooks.json must contain a JSON object"
+}
+if (-not ($hooksDocument.PSObject.Properties.Name -contains "hooks")) {
+    Set-ObjectProperty -Object $hooksDocument -Name "hooks" -Value ([pscustomobject]@{})
+}
+if ($null -eq $hooksDocument.hooks -or $hooksDocument.hooks -isnot [pscustomobject]) {
+    throw "Existing hooks.json hooks field must contain a JSON object"
+}
+
+$remainingStopGroups = [Collections.Generic.List[object]]::new()
+if ($hooksDocument.hooks.PSObject.Properties.Name -contains "Stop") {
+    foreach ($group in @($hooksDocument.hooks.Stop)) {
+        if ($null -eq $group -or -not ($group.PSObject.Properties.Name -contains "hooks")) {
+            $remainingStopGroups.Add($group)
+            continue
+        }
+        $originalHandlers = @($group.hooks)
+        $remainingHandlers = @($originalHandlers | Where-Object { -not (Test-QqStopHandler -Handler $_) })
+        $removedCount = $originalHandlers.Count - $remainingHandlers.Count
+        if ($removedCount -eq 0) {
+            $remainingStopGroups.Add($group)
+            continue
+        }
+        if ($remainingHandlers.Count -gt 0) {
+            Set-ObjectProperty -Object $group -Name "hooks" -Value $remainingHandlers
+            $remainingStopGroups.Add($group)
+        }
+    }
+}
+
+$command = "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$stopScript`""
+$qqStopGroup = [pscustomobject][ordered]@{
+    hooks = @(
+        [pscustomobject][ordered]@{
+            type = "command"
+            command = $command
+            commandWindows = $command
+            timeout = 30
+            statusMessage = "Sending QQ completion notification"
+        }
+    )
+}
+$remainingStopGroups.Add($qqStopGroup)
+Set-ObjectProperty -Object $hooksDocument.hooks -Name "Stop" -Value $remainingStopGroups.ToArray()
+Write-JsonAtomically -Path $globalHooksPath -Value $hooksDocument
 
 function Enable-HooksFeature {
     param([string]$Path)

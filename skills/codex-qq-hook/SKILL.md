@@ -67,7 +67,8 @@ description: 配置和排查 Codex QQ 完成提醒。用于用户明确要求开
 可用脚本修改，脚本会自动创建配置文件：
 
 ```powershell
-& "$env:USERPROFILE\.codex\skills\codex-qq-hook\scripts\qq_hook_switch.ps1" enable -ProjectRoot (Get-Location) -Id "对话ID"
+$SkillDir = '<skill_dir>'
+& (Join-Path $SkillDir 'scripts\qq_hook_switch.ps1') enable -ProjectRoot (Get-Location) -Id "对话ID"
 ```
 
 回复用户：已为当前工作区开启这个对话的 QQ 完成提醒。
@@ -77,7 +78,8 @@ description: 配置和排查 Codex QQ 完成提醒。用于用户明确要求开
 把当前对话 ID 加入 `disabled_thread_ids`，同时从 `enabled_thread_ids` 移除。
 
 ```powershell
-& "$env:USERPROFILE\.codex\skills\codex-qq-hook\scripts\qq_hook_switch.ps1" disable -ProjectRoot (Get-Location) -Id "对话ID"
+$SkillDir = '<skill_dir>'
+& (Join-Path $SkillDir 'scripts\qq_hook_switch.ps1') disable -ProjectRoot (Get-Location) -Id "对话ID"
 ```
 
 回复用户：已关闭当前工作区这个对话的 QQ 完成提醒。
@@ -85,8 +87,11 @@ description: 配置和排查 Codex QQ 完成提醒。用于用户明确要求开
 ## 查看状态
 
 ```powershell
-& "$env:USERPROFILE\.codex\skills\codex-qq-hook\scripts\qq_hook_switch.ps1" status -ProjectRoot (Get-Location) -Id $env:CODEX_THREAD_ID
+$SkillDir = '<skill_dir>'
+& (Join-Path $SkillDir 'scripts\qq_hook_switch.ps1') status -ProjectRoot (Get-Location) -Id $env:CODEX_THREAD_ID
 ```
+
+`<skill_dir>` 由当前 skill 目录定位，不假定 Codex home 位于特定用户路径。
 
 只告诉用户：
 

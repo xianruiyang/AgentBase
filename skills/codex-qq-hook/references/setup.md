@@ -12,13 +12,14 @@
 在目标工作区根目录运行：
 
 ```powershell
-& "$env:USERPROFILE\.codex\skills\codex-qq-hook\scripts\install_global_qq_hook.ps1" -ProjectRoot (Get-Location)
+$SkillDir = '<skill_dir>'
+& (Join-Path $SkillDir 'scripts\install_global_qq_hook.ps1') -ProjectRoot (Get-Location)
 ```
 
 该脚本会创建或刷新：
 
-- `~\.codex\hooks.json`
-- `~\.codex\qq-hook-global-settings.json`
+- `<CodexRoot>\hooks.json`（只合并本 skill 的 QQ Stop handler，保留其他事件和 handler）
+- `<CodexRoot>\qq-hook-global-settings.json`
 - `<WORKSPACE>\.codex\qq-hook-settings.json`
 
 安装后如 Codex 提示信任 hook，必须信任。修改 `config.toml`、PATH、用户环境变量或 AppSecret 后，建议重启 Codex。
@@ -28,19 +29,22 @@
 进入新工作区后运行安装脚本，然后只把需要提醒的对话 ID 加入该工作区白名单：
 
 ```powershell
-& "$env:USERPROFILE\.codex\skills\codex-qq-hook\scripts\qq_hook_switch.ps1" enable -ProjectRoot (Get-Location) -Id "对话ID"
+$SkillDir = '<skill_dir>'
+& (Join-Path $SkillDir 'scripts\qq_hook_switch.ps1') enable -ProjectRoot (Get-Location) -Id "对话ID"
 ```
 
 新工作区不需要填写 `bot`。
 
 ## 新电脑
 
-复制或安装 `codex-qq-hook` skill 到：
+复制或安装 `codex-qq-hook` skill 到所选 Codex 根目录：
 
 ```text
-%USERPROFILE%\.codex\skills\codex-qq-hook
+<CodexRoot>\skills\codex-qq-hook
 ```
 
 然后运行安装脚本，配置全局 `qq-hook-global-settings.json`，设置 `QQ_BOT_APP_SECRET` 用户环境变量，并重新信任 hook。
 
 不要迁移真实 `QQ_BOT_APP_SECRET` 到文件。
+
+`<skill_dir>` 是本文件所属 skill 目录；`<CodexRoot>` 由它向上两级得到，不假定具体用户名或系统盘。

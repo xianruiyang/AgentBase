@@ -14,10 +14,17 @@ import {
 assert.equal(process.platform, 'win32', 'P7-005 coexistence integration currently targets Windows.');
 
 const componentRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const workflowRoot = path.resolve(componentRoot, '..');
-const workspaceRoot = path.resolve(workflowRoot, '..');
-const vscodeMcpRoot = path.join(workflowRoot, 'vscode-mcp');
-const astMcpRoot = path.join(workflowRoot, 'ast-mcp');
+const vscodeMcpRootInput = process.env.P7_005_VSCODE_MCP_ROOT;
+const astMcpRootInput = process.env.P7_005_AST_MCP_ROOT;
+assert.ok(
+  vscodeMcpRootInput && astMcpRootInput,
+  'P7-005 requires P7_005_VSCODE_MCP_ROOT and P7_005_AST_MCP_ROOT; external components are not vendored by this repository.',
+);
+const vscodeMcpRoot = path.resolve(vscodeMcpRootInput);
+const astMcpRoot = path.resolve(astMcpRootInput);
+const astMcpWorkspaceRoot = path.resolve(
+  process.env.P7_005_AST_MCP_WORKSPACE_ROOT ?? path.dirname(astMcpRoot),
+);
 const reportPath = process.env.P7_005_COEXIST_REPORT_PATH;
 const normalize = (value) => path.resolve(value).toLowerCase();
 const isInside = (parent, candidate) => {
@@ -128,7 +135,7 @@ const servers = [
     command: path.join(astMcpRoot, 'runtime', 'node.exe'),
     args: [path.join(astMcpRoot, 'src', 'server.js')],
     cwd: astMcpRoot,
-    environment: { AST_MCP_ROOT: workspaceRoot },
+    environment: { AST_MCP_ROOT: astMcpWorkspaceRoot },
     requiredTools: ['ast_search', 'ast_rewrite_preview', 'ast_validate_change'],
   },
   {

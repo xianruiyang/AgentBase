@@ -206,6 +206,66 @@ Assert-True ($eventLoggerSkillContent.Contains('read_codex_turn_log.py')) "codex
 Assert-True (-not $eventLoggerSkillContent.Contains('Get-Content -Raw')) "codex-event-logger SKILL.md contains an unbounded raw read"
 Assert-True (Test-Path -LiteralPath (Join-Path $eventLoggerRoot "tests\test_event_logger.py") -PathType Leaf) "codex-event-logger is missing its regression tests"
 
+$sgyScriptsRoot = Join-Path $ProjectRoot "skills\ast-grep-token-safe\scripts"
+$sgyRuntimeManifestPath = Join-Path $sgyScriptsRoot "runtime-manifest.yml"
+$sgyReleaseRecordPath = Join-Path $sgyScriptsRoot "provenance\release-record.json"
+$sgyRuntimeManifest = Get-Content -LiteralPath $sgyRuntimeManifestPath -Raw -Encoding UTF8
+$sgyReleaseRecord = Get-Content -LiteralPath $sgyReleaseRecordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+Assert-True ($sgyReleaseRecord.schema -eq "sgy.skill-runtime-release/v1") "sgy release record has an unsupported schema"
+Assert-True ($sgyReleaseRecord.version -eq "0.1.0") "sgy release record version does not match the skill runtime"
+Assert-True ($sgyReleaseRecord.pathBase -eq "scripts") "sgy release record paths must be relative to the skill scripts directory"
+Assert-True ($sgyReleaseRecord.source.revision -match '^sha256:[0-9a-f]{64}$') "sgy release record has an invalid source revision"
+Assert-True ($sgyRuntimeManifest.Contains("source_revision: $($sgyReleaseRecord.source.revision)")) "sgy runtime manifest does not identify its source revision"
+Assert-True ($sgyRuntimeManifest.Contains("release_record: provenance/release-record.json")) "sgy runtime manifest does not link its release record"
+
+$sgySnapshotPath = Join-Path $sgyScriptsRoot ([string]$sgyReleaseRecord.source.snapshot)
+$sgySnapshot = Get-Content -LiteralPath $sgySnapshotPath -Raw -Encoding UTF8 | ConvertFrom-Json
+Assert-True ($sgySnapshot.schema -eq "sgy.source-snapshot/v1") "sgy source snapshot has an unsupported schema"
+Assert-True ($sgySnapshot.sourceRevision -eq $sgyReleaseRecord.source.revision) "sgy source snapshot revision does not match the release record"
+Assert-True ([int]$sgySnapshot.fileCount -eq [int]$sgyReleaseRecord.source.fileCount) "sgy source snapshot file count does not match the release record"
+
+$sgyCargoLockPath = Join-Path $ProjectRoot ([string]$sgyReleaseRecord.rustsec.projectLockfile)
+$sgyCargoLockHash = (Get-FileHash -LiteralPath $sgyCargoLockPath -Algorithm SHA256).Hash.ToLowerInvariant()
+Assert-True ($sgyCargoLockHash -eq [string]$sgyReleaseRecord.source.cargoLockSha256) "sgy Cargo.lock does not match the signed release source"
+Assert-True ($sgyReleaseRecord.rustsec.status -eq "passed") "sgy RustSec audit is not signed as passed"
+Assert-True ($sgyReleaseRecord.rustsec.cargoAuditArchiveSha256 -match '^[0-9a-f]{64}$') "sgy RustSec tool archive hash is invalid"
+Assert-True ($sgyReleaseRecord.rustsec.advisoryDbRevision -match '^[0-9a-f]{40}$') "sgy RustSec advisory database revision is invalid"
+Assert-True ([int]$sgyReleaseRecord.rustsec.advisoryCount -gt 0) "sgy RustSec audit did not record a non-empty advisory database"
+Assert-True ([int]$sgyReleaseRecord.rustsec.dependencyCount -gt 0) "sgy RustSec audit did not record scanned dependencies"
+
+$sgyTargets = @($sgyReleaseRecord.targets)
+Assert-True ($sgyTargets.Count -eq 2) "sgy release record must contain exactly the two supported native targets"
+$sgyScriptsPrefix = [IO.Path]::GetFullPath($sgyScriptsRoot).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+foreach ($sgyTarget in $sgyTargets) {
+    Assert-True ($sgyTarget.nativeBuild.status -eq "passed") "sgy target is missing passed native build evidence: $($sgyTarget.target)"
+    Assert-True ($sgyTarget.archiveSha256 -match '^[0-9a-f]{64}$') "sgy target has an invalid archive hash: $($sgyTarget.target)"
+
+    $sgyBinaryPath = [IO.Path]::GetFullPath((Join-Path $sgyScriptsRoot ([string]$sgyTarget.binary.path)))
+    $sgyManifestPath = [IO.Path]::GetFullPath((Join-Path $sgyScriptsRoot ([string]$sgyTarget.manifest)))
+    Assert-True ($sgyBinaryPath.StartsWith($sgyScriptsPrefix, [StringComparison]::OrdinalIgnoreCase)) "sgy binary path escapes the skill scripts directory: $($sgyTarget.binary.path)"
+    Assert-True ($sgyManifestPath.StartsWith($sgyScriptsPrefix, [StringComparison]::OrdinalIgnoreCase)) "sgy provenance path escapes the skill scripts directory: $($sgyTarget.manifest)"
+    Assert-True (Test-Path -LiteralPath $sgyBinaryPath -PathType Leaf) "sgy release binary is missing: $($sgyTarget.binary.path)"
+    Assert-True (Test-Path -LiteralPath $sgyManifestPath -PathType Leaf) "sgy target provenance manifest is missing: $($sgyTarget.manifest)"
+
+    $sgyBinaryItem = Get-Item -LiteralPath $sgyBinaryPath
+    $sgyBinaryHash = (Get-FileHash -LiteralPath $sgyBinaryPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-True ([UInt64]$sgyBinaryItem.Length -eq [UInt64]$sgyTarget.binary.bytes) "sgy binary size does not match its release record: $($sgyTarget.target)"
+    Assert-True ($sgyBinaryHash -eq [string]$sgyTarget.binary.sha256) "sgy binary hash does not match its release record: $($sgyTarget.target)"
+    Assert-True ($sgyRuntimeManifest.Contains("sha256: $sgyBinaryHash")) "sgy runtime manifest does not contain the installed binary hash: $($sgyTarget.target)"
+    Assert-True ($sgyRuntimeManifest.Contains("archive_sha256: $($sgyTarget.archiveSha256)")) "sgy runtime manifest does not contain the archive hash: $($sgyTarget.target)"
+
+    $sgyTargetManifest = Get-Content -LiteralPath $sgyManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    Assert-True ($sgyTargetManifest.schema -eq "sgy.release/v1") "sgy target provenance manifest has an unsupported schema: $($sgyTarget.target)"
+    Assert-True ($sgyTargetManifest.target -eq $sgyTarget.target) "sgy target provenance identifies a different target: $($sgyTarget.target)"
+    Assert-True ($sgyTargetManifest.archive -eq $sgyTarget.archive) "sgy target archive name does not match its provenance: $($sgyTarget.target)"
+    Assert-True ($sgyTargetManifest.source.revision -eq $sgyReleaseRecord.source.revision) "sgy target provenance source does not match the release record: $($sgyTarget.target)"
+    Assert-True ($sgyTargetManifest.source.cargoLockSha256 -eq $sgyReleaseRecord.source.cargoLockSha256) "sgy target provenance Cargo.lock does not match the release record: $($sgyTarget.target)"
+    $sgyManifestBinary = @($sgyTargetManifest.files | Where-Object { $_.path -eq [IO.Path]::GetFileName($sgyBinaryPath) })
+    Assert-True ($sgyManifestBinary.Count -eq 1) "sgy target provenance does not contain exactly one runtime binary: $($sgyTarget.target)"
+    Assert-True ($sgyManifestBinary[0].sha256 -eq $sgyBinaryHash) "sgy target provenance binary hash does not match the installed runtime: $($sgyTarget.target)"
+    Assert-True ([UInt64]$sgyManifestBinary[0].bytes -eq [UInt64]$sgyBinaryItem.Length) "sgy target provenance binary size does not match the installed runtime: $($sgyTarget.target)"
+}
+
 $powerShellSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\powershell-usage\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($powerShellSkillContent.Contains('--heading -M 240 --max-columns-preview')) "powershell-usage rg example is missing bounded file identity and width options"
 Assert-True ($powerShellSkillContent.Contains('Select-Object -First 80')) "powershell-usage rg example is missing its total line limit"
@@ -235,6 +295,17 @@ foreach ($markdownFile in $allMarkdownFiles) {
         Assert-True (Test-Path -LiteralPath $resolvedTarget) "Broken relative Markdown link in $($markdownFile.FullName): $target"
     }
 }
+
+$workflowPath = Join-Path $ProjectRoot ".github\workflows\validate.yml"
+$workflowContent = Get-Content -LiteralPath $workflowPath -Raw -Encoding UTF8
+Assert-True ($workflowContent.Contains("npm run verify:release")) "Repository CI does not run the vscode-lsp-mcp release gate"
+Assert-True ($workflowContent.Contains("rustsec/audit-check@")) "Repository CI does not run the RustSec gate"
+Assert-True ($workflowContent.Contains("sgy-linux:")) "Repository CI is missing the Linux sgy native gate"
+Assert-True ($workflowContent.Contains("sgy-windows:")) "Repository CI is missing the Windows sgy native gate"
+$unpinnedActions = @([regex]::Matches($workflowContent, '(?m)^\s*-?\s*uses:\s*[^@\s]+@(?<ref>[^\s#]+)') | Where-Object {
+    $_.Groups["ref"].Value -notmatch '^[0-9a-f]{40}$'
+})
+Assert-True ($unpinnedActions.Count -eq 0) "Repository CI contains an action that is not pinned to a full commit SHA"
 
 $lifecyclePath = Join-Path $ProjectRoot "skills\change-governance\references\lifecycle-and-entry.md"
 $lifecycleContent = Get-Content -LiteralPath $lifecyclePath -Raw -Encoding UTF8

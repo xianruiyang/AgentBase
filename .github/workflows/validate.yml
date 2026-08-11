@@ -1,0 +1,198 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  project-contract:
+    name: Project contract and skill tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: stable
+
+      - name: Validate routing and portable deployment contracts
+        run: |
+          & .\development\skill-routing\validate_contract.ps1 -ProjectRoot $PWD.Path
+          & .\development\codex-deployment\manage_agentbase.ps1 -Action Validate -ProjectRoot $PWD.Path
+          & .\development\codex-deployment\test_manage_agentbase.ps1 -ProjectRoot $PWD.Path
+
+      - name: Run skill regression tests
+        run: |
+          python -X utf8 .\skills\codex-event-logger\tests\test_event_logger.py
+          python -X utf8 .\skills\task-table-manager\tests\test_taskctl.py
+          node --test .\skills\reasoning-governor\tests\test_reasoning_governor.mjs
+          node --test .\skills\task-table-manager\tests\test_reasoning_depth_compatibility.mjs
+          & .\skills\codex-qq-hook\tests\test_qq_hook_switch.ps1
+          & .\skills\codex-qq-hook\tests\test_install_global_qq_hook.ps1
+
+      - name: Test QQ event capture server
+        working-directory: development/codex-qq-hook
+        run: go test .\qq_event_capture.go .\qq_event_capture_test.go
+
+  vscode-lsp-mcp:
+    name: VS Code LSP MCP release gate
+    runs-on: windows-latest
+    timeout-minutes: 50
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: mcp/vscode-lsp-mcp
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: mcp/vscode-lsp-mcp/package-lock.json
+      - run: npm ci
+      - name: Audit all dependencies
+        run: |
+          npm audit
+          npm audit --omit=dev
+      - name: Run complete Windows release verification
+        run: npm run verify:release
+
+  sgy-linux:
+    name: sgy Linux native release and quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install fixed Rust toolchain
+        shell: bash
+        run: rustup toolchain install 1.85.0 --profile minimal --component clippy,rustfmt
+
+      - name: Verify signed source snapshot
+        run: |
+          $snapshotPath = Join-Path $env:RUNNER_TEMP 'sgy-source-snapshot.json'
+          & ./tools/sgy/scripts/new-source-snapshot.ps1 -Output $snapshotPath | Out-Null
+          $actual = Get-Content -LiteralPath $snapshotPath -Raw -Encoding UTF8 | ConvertFrom-Json
+          $release = Get-Content -LiteralPath './skills/ast-grep-token-safe/scripts/provenance/release-record.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($actual.sourceRevision -ne $release.source.revision) {
+            throw "sgy source snapshot changed: $($actual.sourceRevision)"
+          }
+          "SGY_SOURCE_REVISION=$($release.source.revision)" | Out-File -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Run Rust quality gates
+        working-directory: tools/sgy
+        run: |
+          cargo ci-build
+          cargo ci-test
+          cargo lint
+          cargo fmt-check
+
+      - name: Build and compare native Linux release
+        shell: bash
+        run: |
+          docker run --rm \
+            --env CARGO_BUILD_JOBS=1 \
+            --env SGY_SOURCE_REVISION="$SGY_SOURCE_REVISION" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/work" \
+            --mount "type=bind,source=$RUNNER_TEMP,target=/output" \
+            --workdir /work/tools/sgy \
+            rust@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4 \
+            bash -c './scripts/build-release.sh --clean --source-revision "$SGY_SOURCE_REVISION" --source-date-epoch 0 --out-dir /output/sgy-release-linux'
+
+      - name: Verify Linux runtime and archive hashes
+        run: |
+          $release = Get-Content -LiteralPath './skills/ast-grep-token-safe/scripts/provenance/release-record.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          $target = @($release.targets | Where-Object target -eq 'x86_64-unknown-linux-gnu')[0]
+          $archive = Join-Path $env:RUNNER_TEMP (Join-Path 'sgy-release-linux' $target.archive)
+          $builtBinary = './tools/sgy/target/release-build/x86_64-unknown-linux-gnu/x86_64-unknown-linux-gnu/release/sgy'
+          $installedBinary = './skills/ast-grep-token-safe/scripts/bin/linux-x86_64/sgy'
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $target.archiveSha256) { throw 'Linux release archive hash changed' }
+          if ((Get-FileHash -LiteralPath $builtBinary -Algorithm SHA256).Hash.ToLowerInvariant() -ne $target.binary.sha256) { throw 'Linux rebuilt binary hash changed' }
+          if ((Get-FileHash -LiteralPath $installedBinary -Algorithm SHA256).Hash.ToLowerInvariant() -ne $target.binary.sha256) { throw 'Linux skill runtime hash changed' }
+          bash './skills/ast-grep-token-safe/scripts/sgy.sh' --version
+          if ($LASTEXITCODE -ne 0) { throw 'Linux skill runtime did not start' }
+
+      - name: Audit Rust dependencies
+        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: tools/sgy
+
+  sgy-windows:
+    name: sgy Windows native release gate
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+      - name: Install fixed Rust toolchain and ast-grep
+        run: |
+          rustup toolchain install 1.85.0 --profile minimal --component clippy,rustfmt
+          npm install --global @ast-grep/cli@0.44.1
+
+      - name: Verify signed source snapshot
+        run: |
+          $snapshotPath = Join-Path $env:RUNNER_TEMP 'sgy-source-snapshot.json'
+          & .\tools\sgy\scripts\new-source-snapshot.ps1 -Output $snapshotPath | Out-Null
+          $actual = Get-Content -LiteralPath $snapshotPath -Raw -Encoding UTF8 | ConvertFrom-Json
+          $release = Get-Content -LiteralPath '.\skills\ast-grep-token-safe\scripts\provenance\release-record.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($actual.sourceRevision -ne $release.source.revision) {
+            throw "sgy source snapshot changed: $($actual.sourceRevision)"
+          }
+          "SGY_SOURCE_REVISION=$($release.source.revision)" | Out-File -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build and verify native Windows release
+        working-directory: tools/sgy
+        run: |
+          $outputRoot = Join-Path $env:RUNNER_TEMP 'sgy-release-windows'
+          & .\scripts\build-release.ps1 -Clean -SourceRevision $env:SGY_SOURCE_REVISION -SourceDateEpoch 0 -OutDir $outputRoot
+          $release = Get-Content -LiteralPath '..\..\skills\ast-grep-token-safe\scripts\provenance\release-record.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          $target = @($release.targets | Where-Object target -eq 'x86_64-pc-windows-msvc')[0]
+          $archive = Join-Path $outputRoot $target.archive
+          $checksum = Get-Content -LiteralPath ($archive + '.sha256') -Raw -Encoding UTF8
+          $manifestName = [IO.Path]::GetFileNameWithoutExtension([string]$target.archive) + '.manifest.json'
+          $generatedManifest = Get-Content -LiteralPath (Join-Path $outputRoot $manifestName) -Raw -Encoding UTF8 | ConvertFrom-Json
+          $builtBinary = '.\target\release-build\x86_64-pc-windows-msvc\x86_64-pc-windows-msvc\release\sgy.exe'
+          $installedBinary = '..\..\skills\ast-grep-token-safe\scripts\bin\windows-x86_64\sgy.exe'
+          $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if (-not $checksum.StartsWith($archiveHash, [StringComparison]::Ordinal)) { throw 'Windows release checksum sidecar does not match its archive' }
+          if ($generatedManifest.source.revision -ne $release.source.revision) { throw 'Windows release manifest has the wrong source revision' }
+          if ($generatedManifest.target -ne $target.target) { throw 'Windows release manifest has the wrong target' }
+          if ((Get-FileHash -LiteralPath $installedBinary -Algorithm SHA256).Hash.ToLowerInvariant() -ne $target.binary.sha256) { throw 'Windows skill runtime hash changed' }
+          & $builtBinary --version
+          if ($LASTEXITCODE -ne 0) { throw 'Windows rebuilt binary did not start' }
+          & $installedBinary --version
+          if ($LASTEXITCODE -ne 0) { throw 'Windows skill runtime did not start' }
+
+      - name: Run Windows runtime against ast-grep 0.44.1
+        run: |
+          $runtime = (Resolve-Path -LiteralPath '.\skills\ast-grep-token-safe\scripts\bin\windows-x86_64\sgy.exe').Path
+          $engine = Join-Path ((npm root --global).Trim()) '@ast-grep\cli\ast-grep.exe'
+          if (-not (Test-Path -LiteralPath $engine -PathType Leaf)) { throw "Native ast-grep executable is missing: $engine" }
+          $fixture = Join-Path $env:RUNNER_TEMP 'sgy-runtime-fixture'
+          New-Item -ItemType Directory -Path $fixture | Out-Null
+          [IO.File]::WriteAllText((Join-Path $fixture 'sample.ts'), 'console.log(value);', [Text.UTF8Encoding]::new($false))
+          & $runtime doctor --engine $engine --cwd $fixture
+          if ($LASTEXITCODE -ne 0) { throw 'sgy doctor failed' }
+          & $runtime exec --engine $engine --cwd $fixture -- run -p 'console.log($A)' -l ts .
+          if ($LASTEXITCODE -ne 0) { throw 'sgy real-engine smoke failed' }

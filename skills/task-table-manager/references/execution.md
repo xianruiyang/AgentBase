@@ -123,8 +123,9 @@ Token 摘要仅在用户要求统计时加入。handoff 不粘贴 raw JSON、长
 
 ```powershell
 $env:CODEX_THREAD_ID
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.codex\skills\reasoning-governor\scripts\reasoning-governor.ps1" -Status
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.codex\skills\reasoning-governor\scripts\reasoning-governor.ps1" -Effort high
+$ReasoningGovernorSkillDir = '<reasoning-governor-skill-dir>'
+pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $ReasoningGovernorSkillDir 'scripts\reasoning-governor.ps1') -Status
+pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $ReasoningGovernorSkillDir 'scripts\reasoning-governor.ps1') -Effort high
 ```
 
 支持 `low`、`medium`、`high`、`xhigh`、`max`、`ultra`。设置成功口径和当前轮不可读边界以 `$reasoning-governor` 为准；旧任务表脚本只服务于发布前已经开始且仍引用旧路径的任务，不再定义行为。确认这些任务完成或已改用正式入口后删除兼容转发，任何新文档不得继续引用旧路径。

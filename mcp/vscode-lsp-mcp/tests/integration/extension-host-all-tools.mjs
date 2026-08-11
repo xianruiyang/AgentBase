@@ -430,6 +430,7 @@ try {
     line: 1,
     column: 2,
     newName: 'alphaNewName',
+    includeGlobs: ['src/rename.p64'],
   }, true);
   assert.ok(rename.response.data.previewId);
   const renameApply = await call('rename_apply', {

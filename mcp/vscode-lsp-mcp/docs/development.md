@@ -40,10 +40,16 @@ npm audit
 
 ## Integration and release
 
-The complete verification runner builds, checks, tests, packages, validates install/doctor lifecycles, and runs the available VS Code Extension Host suites:
+The normal developer verifier is the deterministic static and unit gate. It checks workspace structure, types, lint, unit tests, documentation, and bundled dependency/license metadata; it does not package or launch VS Code:
 
 ```powershell
 npm run verify
+```
+
+The complete Windows x64 release gate builds twice for reproducibility, validates Stage B/C plus install and doctor lifecycles, and runs the supported VS Code Extension Host suites:
+
+```powershell
+npm run verify:release
 ```
 
 Build a deterministic Windows release:
@@ -53,7 +59,7 @@ npm run release:build
 npm run release:verify
 ```
 
-Release verification builds twice and compares every output hash. It also rejects undeclared files, unsafe archive paths, manifest/hash mismatches, version drift, extension/server smoke failures, and installation lifecycle failures. The current release implementation requires Windows and produces the current process architecture target; only Windows x64 has formal signoff.
+`release:verify` is the reproducible package sub-gate: it builds twice and compares every output hash, then rejects undeclared files, unsafe archive paths, manifest/hash mismatches, version drift, and extension/server smoke failures. `verify:release` owns the broader install, doctor, and Extension Host lifecycle contract. The current release implementation requires Windows and produces the current process architecture target; only Windows x64 has formal signoff.
 
 The manual installed-language matrix is intentionally separate because results depend on machine extensions:
 

@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -16,6 +17,8 @@ import (
 	"strings"
 	"time"
 )
+
+const maxCallbackBodyBytes int64 = 1 << 20
 
 type payload struct {
 	Op int             `json:"op"`
@@ -43,7 +46,7 @@ type captureRecord struct {
 }
 
 func main() {
-	addr := flag.String("addr", ":8080", "listen address")
+	addr := flag.String("addr", "127.0.0.1:8080", "listen address")
 	logFile := flag.String("log", defaultLogFile(), "jsonl log file")
 	flag.Parse()
 
@@ -72,7 +75,16 @@ func main() {
 	log.Printf("Log file: %s", *logFile)
 	log.Printf("After configuring the public HTTPS URL in q.qq.com, send a private message to the bot or @ it in a group.")
 
-	if err := http.ListenAndServe(*addr, mux); err != nil {
+	server := &http.Server{
+		Addr:              *addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
+	}
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
 }
@@ -110,8 +122,14 @@ func handleCallback(w http.ResponseWriter, r *http.Request, publicKey ed25519.Pu
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxCallbackBodyBytes)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "read body failed", http.StatusBadRequest)
 		return
 	}

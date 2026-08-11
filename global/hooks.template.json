@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
-            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "command": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
             "timeout": 10,
             "statusMessage": "Recording Codex user prompt"
           }
@@ -19,15 +19,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
-            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "command": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
             "timeout": 10,
             "statusMessage": "Recording Codex turn stop"
           },
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-qq-hook\\scripts\\codex_stop_qq_notify.ps1\"",
-            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-qq-hook\\scripts\\codex_stop_qq_notify.ps1\"",
+            "command": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-qq-hook\\scripts\\codex_stop_qq_notify.ps1\"",
+            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-qq-hook\\scripts\\codex_stop_qq_notify.ps1\"",
             "timeout": 30,
             "statusMessage": "Sending QQ completion notification"
           }
@@ -39,8 +39,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
-            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "command": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
             "timeout": 10,
             "statusMessage": "Recording Codex pre-tool snapshot"
           }
@@ -52,8 +52,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
-            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "command": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
             "timeout": 10,
             "statusMessage": "Recording Codex file operations"
           }

@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import sqlite3
+import stat
 import sys
 import time
 from contextlib import contextmanager
@@ -149,6 +151,19 @@ def merge_config(base: dict[str, Any], override: dict[str, Any]) -> dict[str, An
     for key, value in override.items():
         merged[key] = value
     return merged
+
+
+def runtime_output_root(project_root: Path, config: dict[str, Any]) -> Path:
+    output_dir = str(config.get("output_dir_name") or "codexRuntimeLogFile")
+    root = (project_root / output_dir).resolve()
+    project = project_root.resolve()
+    try:
+        root.relative_to(project)
+    except ValueError as exc:
+        raise ValueError("event logger output directory must stay inside the project root") from exc
+    if root == project:
+        raise ValueError("event logger output directory must not be the project root")
+    return root
 
 
 def find_project_root(cwd: Path, workspace_roots: list[str]) -> Path:
@@ -400,8 +415,7 @@ def ensure_turn_dir(
     session_id: str,
     turn_id: str,
 ) -> tuple[Path, Path, Path]:
-    output_dir = str(config.get("output_dir_name") or "codexRuntimeLogFile")
-    session_dir = project_root / output_dir / safe_segment(session_id, "unknown_session")
+    session_dir = runtime_output_root(project_root, config) / safe_segment(session_id, "unknown_session")
     safe_turn = safe_segment(turn_id, "unknown_turn")
     index_path = session_dir / ".turn-index.json"
     timeout = float(config.get("lock_timeout_seconds") or 3)
@@ -434,6 +448,118 @@ def ensure_turn_dir(
             initial["goal"] = sanitize_goal(active_goal, max_text)
         write_json_atomic(conversation_file, initial)
     return turn_dir, conversation_file, file_operations_file
+
+
+def bounded_positive_int(config: dict[str, Any], key: str, default: int, maximum: int) -> int:
+    try:
+        value = int(config.get(key, default))
+    except (TypeError, ValueError):
+        value = default
+    return min(max(value, 1), maximum)
+
+
+def is_unlinked_directory(path: Path) -> bool:
+    try:
+        metadata = path.lstat()
+    except OSError:
+        return False
+    if not stat.S_ISDIR(metadata.st_mode):
+        return False
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    file_attributes = getattr(metadata, "st_file_attributes", 0)
+    return not reparse_flag or not (file_attributes & reparse_flag)
+
+
+def prune_session_turns(session_dir: Path, max_turns: int) -> None:
+    turns = sorted(
+        (
+            child
+            for child in session_dir.iterdir()
+            if is_unlinked_directory(child) and not child.name.startswith(".")
+        ),
+        key=lambda path: (path.stat().st_mtime_ns, path.name),
+        reverse=True,
+    )
+    for turn_dir in turns[max_turns:]:
+        shutil.rmtree(turn_dir)
+
+    index_path = session_dir / ".turn-index.json"
+    index = load_json_file(index_path, {})
+    if isinstance(index, dict):
+        existing_names = {
+            child.name
+            for child in session_dir.iterdir()
+            if is_unlinked_directory(child) and not child.name.startswith(".")
+        }
+        retained_index = {
+            key: value
+            for key, value in index.items()
+            if isinstance(value, str) and value in existing_names
+        }
+        if retained_index != index:
+            write_json_atomic(index_path, retained_index)
+
+
+def prune_runtime_logs(project_root: Path, config: dict[str, Any], current_session_id: str) -> None:
+    output_root = runtime_output_root(project_root, config)
+    if not output_root.exists():
+        return
+
+    max_turns = bounded_positive_int(config, "max_turns_per_session", 500, 10000)
+    max_sessions = bounded_positive_int(config, "max_sessions", 200, 5000)
+    retention_days = bounded_positive_int(config, "retention_days", 90, 3650)
+    interval_seconds = bounded_positive_int(
+        config,
+        "retention_check_interval_seconds",
+        3600,
+        86400,
+    )
+    timeout = float(config.get("lock_timeout_seconds") or 3)
+    current_session_name = safe_segment(current_session_id, "unknown_session")
+    state_path = output_root / ".retention-state.json"
+
+    with file_lock(output_root / ".retention.lock", timeout):
+        state = load_json_file(state_path, {})
+        last_run = float(state.get("last_run_unix", 0)) if isinstance(state, dict) else 0.0
+        now = time.time()
+        run_global_retention = now - last_run >= interval_seconds
+
+        sessions = [
+            child
+            for child in output_root.iterdir()
+            if is_unlinked_directory(child) and not child.name.startswith(".")
+        ]
+        for session_dir in sessions:
+            if session_dir.name == current_session_name or run_global_retention:
+                prune_session_turns(session_dir, max_turns)
+
+        if not run_global_retention:
+            return
+
+        cutoff = now - retention_days * 86400
+        for session_dir in sessions:
+            if session_dir.name != current_session_name and session_dir.exists() and session_dir.stat().st_mtime < cutoff:
+                shutil.rmtree(session_dir)
+
+        sessions = sorted(
+            (
+                child
+                for child in output_root.iterdir()
+                if is_unlinked_directory(child) and not child.name.startswith(".")
+            ),
+            key=lambda path: (path.stat().st_mtime_ns, path.name),
+            reverse=True,
+        )
+        retained = {current_session_name}
+        for session_dir in sessions:
+            if len(retained) >= max_sessions:
+                break
+            retained.add(session_dir.name)
+        for session_dir in sessions:
+            if session_dir.name not in retained:
+                shutil.rmtree(session_dir)
+
+        write_json_atomic(state_path, {"last_run_unix": now, "last_run": now_iso()})
 
 
 def update_conversation(
@@ -655,10 +781,8 @@ def apply_patch_text(payload: dict[str, Any]) -> str:
 
 
 def snapshot_dir(project_root: Path, config: dict[str, Any], session_id: str, turn_id: str, tool_use_id: str) -> Path:
-    output_dir = str(config.get("output_dir_name") or "codexRuntimeLogFile")
     return (
-        project_root
-        / output_dir
+        runtime_output_root(project_root, config)
         / ".internal"
         / "pretool-snapshots"
         / safe_segment(session_id, "unknown_session")
@@ -740,7 +864,7 @@ def cleanup_pretool_snapshot(
                 if child.is_file():
                     child.unlink()
             target_dir.rmdir()
-            root = project_root / str(config.get("output_dir_name") or "codexRuntimeLogFile") / ".internal"
+            root = runtime_output_root(project_root, config) / ".internal"
             current = target_dir.parent
             while current != root.parent:
                 try:
@@ -1028,6 +1152,9 @@ def main() -> int:
                 records,
                 config,
             )
+
+    if event == "UserPromptSubmit":
+        prune_runtime_logs(project_root, config, session_id)
 
     return 0
 

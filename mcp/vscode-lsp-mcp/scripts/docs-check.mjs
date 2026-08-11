@@ -105,6 +105,16 @@ for (const { relativePath, manifest } of manifests) {
   assert.equal(entry.name, manifest.name, `package-lock.json name mismatch for ${lockKey}.`);
   assert.equal(entry.license, expectedLicense, `package-lock.json license mismatch for ${lockKey}.`);
 }
+const rootManifest = manifests.find(({ relativePath }) => relativePath === 'package.json')?.manifest;
+assert.ok(rootManifest, 'The root package manifest was not loaded.');
+assert.equal(rootManifest.scripts.verify, 'node ./scripts/verify.mjs');
+assert.equal(rootManifest.scripts['verify:release'], 'node ./scripts/verify-release.mjs');
+const releaseVerifier = await readText('scripts/verify-release.mjs');
+for (const requiredStage of ["'test:stage-b'", "'test:stage-c'"]) {
+  assert.ok(releaseVerifier.includes(requiredStage), `Release verifier is missing ${requiredStage}.`);
+}
+assert.match(documents.get('docs/development.md'), /normal developer verifier[\s\S]*npm run verify/u);
+assert.match(documents.get('docs/development.md'), /complete Windows x64 release gate[\s\S]*npm run verify:release/u);
 
 process.stdout.write(`${JSON.stringify({
   documents: requiredDocuments.length,

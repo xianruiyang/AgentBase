@@ -86,7 +86,7 @@ file-operations.jsonl
 示例：
 
 ```text
-D:\program\RealSimpleChat\codexRuntimeLogFile\019f16b6-de21-7ab2-aaa9-afdd8b0fc176\20260704_013012_123__turn_abc\
+<project_root>\codexRuntimeLogFile\019f16b6-de21-7ab2-aaa9-afdd8b0fc176\20260704_013012_123__turn_abc\
   conversation.json
   file-operations.jsonl
 ```
@@ -510,7 +510,7 @@ skill 默认配置 -> 项目级覆盖配置
         "hooks": [
           {
             "type": "command",
-            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\gzxt\\.codex\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
             "timeout": 10
           }
         ]
@@ -521,7 +521,7 @@ skill 默认配置 -> 项目级覆盖配置
         "hooks": [
           {
             "type": "command",
-            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\gzxt\\.codex\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
             "timeout": 10
           }
         ]
@@ -532,7 +532,7 @@ skill 默认配置 -> 项目级覆盖配置
         "hooks": [
           {
             "type": "command",
-            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\gzxt\\.codex\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
             "timeout": 10
           }
         ]
@@ -543,7 +543,7 @@ skill 默认配置 -> 项目级覆盖配置
         "hooks": [
           {
             "type": "command",
-            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\gzxt\\.codex\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
+            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-event-logger\\scripts\\codex_event_logger.ps1\"",
             "timeout": 10
           }
         ]

@@ -17,7 +17,7 @@
 | Windows x86_64 | 直接调用 `scripts/bin/windows-x86_64/sgy.exe` | 同左 |
 | Linux x86_64 GNU | `scripts/sgy.sh` | `scripts/bin/linux-x86_64/sgy` |
 
-完整 hash 位于 `scripts/runtime-manifest.yml`；许可证、目标平台第三方许可与 SBOM 位于 `scripts/legal/`。sgy 不包含 ast-grep、Node、Python 或语言运行时。
+完整 hash 位于 `scripts/runtime-manifest.yml`；同源快照、两平台原生构建 manifest、归档校验和与 RustSec 结果位于 `scripts/provenance/`，并由 `release-record.json` 汇总。许可证、目标平台第三方许可与 SBOM 位于 `scripts/legal/`。sgy 不包含 ast-grep、Node、Python 或语言运行时。
 
 Windows 不使用 PowerShell `.ps1` 中转 `exec/defaults`：PowerShell 会吞掉独立的 `--` 参数终止标记，破坏 sgy 的 native argv 边界。直接调用 exe 可保持分隔符。
 

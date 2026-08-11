@@ -2,7 +2,7 @@
 
 This product bundles the third-party packages listed below. The package name, version, SPDX license expression, release artifact, and upstream license text were derived from the exact esbuild input graph used by the release pipeline.
 
-## @modelcontextprotocol/sdk 1.29.0
+## @modelcontextprotocol/sdk 1.30.0
 
 License: MIT
 
@@ -140,7 +140,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## fast-uri 3.1.3
+## fast-uri 3.1.5
 
 License: BSD-3-Clause
 

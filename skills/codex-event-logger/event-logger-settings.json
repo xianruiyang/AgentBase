@@ -15,5 +15,9 @@
   "record_active_goal": true,
   "goal_db_path": null,
   "max_text_chars": 12000,
-  "lock_timeout_seconds": 3
+  "lock_timeout_seconds": 3,
+  "retention_days": 90,
+  "max_sessions": 200,
+  "max_turns_per_session": 500,
+  "retention_check_interval_seconds": 3600
 }

@@ -6,7 +6,7 @@ must: 本文件只补充 `AgentBase` 项目约定，继承全局 `AGENTS.md`；�
 
 must: 本项目的权威来源按职责划分：`global/AGENTS.md` 维护候选全局规则，`global/config.toml`、`global/hooks.template.json` 与 `global/agents/` 维护可移植 Codex 设置、hooks 模板和自定义子代理，`skills/` 维护 skill，`mcp/` 维护 MCP，`tools/` 维护非 MCP 工具，`development/` 只维护验证、打包、部署和开发资料
 
-must: `C:\Users\gzxt\.codex` 中的同名内容是安装目标，不是项目真源；不得从安装副本反向决定项目内容，也不得绕过项目正式入口形成双向同步
+must: 由部署入口显式传入的 Codex 根目录中的同名内容是安装目标，不是项目真源；不得从安装副本反向决定项目内容，也不得绕过项目正式入口形成双向同步
 
 ## 维护约定
 
@@ -24,7 +24,7 @@ must: 文档只更新被本次改动直接影响的事实，删除或改写已�
 
 ## 验证与发布
 
-must: 用户明确要求在新的 Windows 主机准备、复现或部署 AgentBase 时，主机前置安装属于该授权范围；先运行以下正式入口主动安装或升级缺失的 PowerShell 7 与 fd，并读回能力状态，完成后开启新 Codex 任务再继续发布：
+must: 用户明确要求在新的 Windows 主机准备、复现或部署 AgentBase 时，主机前置安装属于该授权范围；先运行以下正式入口主动安装或升级缺失的 PowerShell 7、fd、Python 3、Node.js LTS 与已验证 ast-grep，并读回能力状态，完成后开启新 Codex 任务再继续发布：
 
 ```powershell
 & (Join-Path (Get-Location).Path 'development\codex-deployment\bootstrap_windows.ps1') -Action Install
@@ -35,13 +35,13 @@ must not: 普通开发、问答或只读审查不得仅因检测到主机工具�
 must: 全局规则或 skill 变更至少运行：
 
 ```powershell
-& 'D:\program\AgentBase\development\skill-routing\validate_contract.ps1' -ProjectRoot 'D:\program\AgentBase'
+& (Join-Path (Get-Location).Path 'development\skill-routing\validate_contract.ps1') -ProjectRoot (Get-Location).Path
 ```
 
 must: 修改 `global/config.toml`、`global/hooks.template.json`、`global/agents/` 或部署合同后运行：
 
 ```powershell
-& 'D:\program\AgentBase\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot 'D:\program\AgentBase'
+& (Join-Path (Get-Location).Path 'development\codex-deployment\manage_agentbase.ps1') -Action Validate -ProjectRoot (Get-Location).Path
 ```
 
 should: 修改 `mcp/vscode-lsp-mcp` 或 `tools/sgy` 时，先运行其 README 或清单定义的受影响模块验证；只有公共契约或发布范围受影响时才运行完整验证
@@ -49,7 +49,7 @@ should: 修改 `mcp/vscode-lsp-mcp` 或 `tools/sgy` 时，先运行其 README �
 must: 只有用户明确授权加载时，才使用正式部署入口；一次正式发布产生的一份回滚备份是有效部署资产，不再另建手工备份：
 
 ```powershell
-& 'D:\program\AgentBase\development\codex-deployment\manage_agentbase.ps1' -Action Publish -ProjectRoot 'D:\program\AgentBase' -CodexRoot 'C:\Users\gzxt\.codex'
+& (Join-Path (Get-Location).Path 'development\codex-deployment\manage_agentbase.ps1') -Action Publish -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex')
 ```
 
 must: 发布只证明文件已安装并通过发布合同；Codex 每次运行启动时构建指令链，因此当前运行不会追溯加载新规则，行为变化需要在新任务或重启会话中验证

@@ -109,12 +109,16 @@ export const run = async (): Promise<void> => {
         if (basename === 'timeout.ts') {
           counters.timeoutPrepares += 1;
           persistState();
-          return new Promise<vscode.TypeHierarchyItem[]>(() => undefined);
+          return new Promise<vscode.TypeHierarchyItem[]>((resolve) => {
+            setTimeout(() => resolve([]), 5_250);
+          });
         }
         if (basename === 'cancel.ts') {
           counters.cancelPrepares += 1;
           persistState();
-          return new Promise<vscode.TypeHierarchyItem[]>(() => undefined);
+          return new Promise<vscode.TypeHierarchyItem[]>((resolve) => {
+            setTimeout(() => resolve([]), 750);
+          });
         }
         return [];
       },

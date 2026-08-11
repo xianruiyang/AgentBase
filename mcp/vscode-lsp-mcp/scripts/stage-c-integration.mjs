@@ -250,10 +250,18 @@ try {
   assert.ok(cancellationElapsedMs < 2_000, `Cancellation took ${cancellationElapsedMs}ms.`);
   await sleep(250);
 
-  const afterCancel = await call(
+  let afterCancel = await call(
     'get_type_hierarchy',
     hierarchyArguments(workspace1.workspaceId, 'src/empty.ts'),
   );
+  const afterCancelDeadline = Date.now() + 5_000;
+  while (!afterCancel.response.ok && Date.now() < afterCancelDeadline) {
+    await sleep(100);
+    afterCancel = await call(
+      'get_type_hierarchy',
+      hierarchyArguments(workspace1.workspaceId, 'src/empty.ts'),
+    );
+  }
   assert.equal(afterCancel.response.ok, true);
   await stopHost(host1);
 

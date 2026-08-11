@@ -247,14 +247,13 @@ function Test-PortableConfigSource {
 
     $expectedLines = @(
         'model = "gpt-5.6-sol"'
-        'model_reasoning_effort = "max"'
+        'model_reasoning_effort = "medium"'
         'personality = "pragmatic"'
         'sandbox_mode = "danger-full-access"'
         'service_tier = "priority"'
         '[agents]'
         'enabled = true'
         'default_subagent_model = "gpt-5.6-luna"'
-        'default_subagent_reasoning_effort = "max"'
         '[windows]'
         'sandbox = "elevated"'
         '[features]'
@@ -394,8 +393,8 @@ function Test-HooksTemplateSource {
         PreToolUse = 1
         PostToolUse = 1
     }
-    $eventLoggerCommand = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{{CODEX_ROOT}}\skills\codex-event-logger\scripts\codex_event_logger.ps1"'
-    $qqCommand = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{{CODEX_ROOT}}\skills\codex-qq-hook\scripts\codex_stop_qq_notify.ps1"'
+    $eventLoggerCommand = 'pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{{CODEX_ROOT}}\skills\codex-event-logger\scripts\codex_event_logger.ps1"'
+    $qqCommand = 'pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{{CODEX_ROOT}}\skills\codex-qq-hook\scripts\codex_stop_qq_notify.ps1"'
     $allowedCommands = @($eventLoggerCommand, $qqCommand)
     foreach ($eventName in $expectedEvents) {
         $groups = @($document.hooks.$eventName)
@@ -458,9 +457,15 @@ function Get-ValidatedSource {
         'ValidateSet("Check", "Install")'
         'Microsoft.PowerShell'
         'sharkdp.fd'
+        'Python.Python.3.13'
+        'OpenJS.NodeJS.LTS'
+        '@ast-grep/cli@0.44.1'
         '$version.Major -ge 7'
         '--max-results'
+        '[version]"22.9.0"'
+        '[version]"3.11.0"'
         'winget.exe'
+        'npm.cmd'
     )
     foreach ($requiredBootstrapFragment in $requiredBootstrapFragments) {
         if (-not $hostBootstrapContent.Contains($requiredBootstrapFragment)) {

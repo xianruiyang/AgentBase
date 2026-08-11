@@ -18,7 +18,7 @@
 
 ## 验证
 
-开发环境需要 Python 3 与 Windows PowerShell 5.1。修改运行逻辑或读取协议后，应完成：
+开发环境需要 Python 3 与 PowerShell 7。修改运行逻辑或读取协议后，应完成：
 
 ```powershell
 python.exe '.\skills\codex-event-logger\tests\test_event_logger.py'

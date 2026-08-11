@@ -8,7 +8,7 @@
 # deployment entry point with -InstallPortableSettings only after reviewing it.
 
 model = "gpt-5.6-sol"
-model_reasoning_effort = "max"
+model_reasoning_effort = "medium"
 personality = "pragmatic"
 sandbox_mode = "danger-full-access"
 service_tier = "priority"
@@ -16,7 +16,6 @@ service_tier = "priority"
 [agents]
 enabled = true
 default_subagent_model = "gpt-5.6-luna"
-default_subagent_reasoning_effort = "max"
 
 [windows]
 sandbox = "elevated"

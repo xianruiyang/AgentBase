@@ -17,7 +17,7 @@ The default payload remains:
 
 The settings option replaces an existing `config.toml`, `hooks.json`, and the three matching custom-agent files, but the same publish transaction backs them up and the normal rollback action restores them. It does not replace the whole `agents/` directory, so unrelated personal agents remain untouched. Omitting the option preserves the existing default behavior and never touches any settings or agent file.
 
-The portable config reproduces the reviewed model, reasoning, personality, service tier, sandbox, multi-agent, hook, and desktop preferences. The portable agents reproduce the current `luna`, `sol`, and `terra` role descriptions, models, and developer instructions while inheriting unspecified reasoning settings from `[agents]`. The payload deliberately excludes authentication, project trust paths, marketplace/plugin caches, MCP absolute paths, hook trust hashes, runtime-generated `notify` and `node_repl` entries, histories, logs, and secrets.
+The portable config reproduces the reviewed model, balanced main-thread reasoning default, personality, service tier, sandbox, multi-agent, hook, and desktop preferences. The portable agents reproduce the current `luna`, `sol`, and `terra` role descriptions, models, and developer instructions; subagent reasoning effort is intentionally unpinned so model defaults or explicit dispatch settings can choose it. The payload deliberately excludes authentication, project trust paths, marketplace/plugin caches, MCP absolute paths, hook trust hashes, runtime-generated `notify` and `node_repl` entries, histories, logs, and secrets.
 
 The files under `global/agents/` follow the [official Codex custom-agent schema](https://learn.chatgpt.com/docs/agent-configuration/subagents). Codex-provided `default`, `worker`, and `explorer` agents are not duplicated in the repository. They remain owned by the installed Codex release, avoiding custom files that would override built-in agents with the same names.
 
@@ -25,15 +25,15 @@ The files under `global/agents/` follow the [official Codex custom-agent schema]
 
 ## Prepare a Windows host
 
-PowerShell 7 and `fd` are host prerequisites, not part of the AgentBase payload. Codex on Windows prefers `pwsh.exe` when it is available, but the Codex package does not install it; a clean Windows host can otherwise run commands through the older system shell. AgentBase therefore standardizes on PowerShell 7 and requires an `fd` build that supports `--max-results`.
+PowerShell 7, `fd`, Python 3, Node.js LTS, and ast-grep are host prerequisites, not part of the AgentBase payload. Codex on Windows prefers `pwsh.exe` when it is available, but the Codex package does not install it; a clean Windows host can otherwise run commands through the older system shell. AgentBase therefore standardizes on PowerShell 7, requires an `fd` build that supports `--max-results`, Python 3.11+, Node.js `>=22.9 <27`, and the precisely verified ast-grep 0.44.1 runtime used by the bundled `sgy` workflow.
 
-When the user asks Codex to prepare, reproduce, or deploy AgentBase on a new Windows machine, that request authorizes installation of these two prerequisites through the project entry point. Run it before Validate or Publish:
+When the user asks Codex to prepare, reproduce, or deploy AgentBase on a new Windows machine, that request authorizes installation of these prerequisites through the project entry point. Run it before Validate or Publish:
 
 ```powershell
 & '.\development\codex-deployment\bootstrap_windows.ps1' -Action Install
 ```
 
-The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerShell` and `sharkdp.fd`, installs only missing tools, upgrades an installed tool only when it does not satisfy the required capability, and reads back the resolved executable, version, and `fd --max-results` support. Use `-Action Check` for a read-only audit. If PowerShell was installed during this step, restart the ChatGPT desktop app or begin a new Codex task before continuing so the agent host is rebuilt with `pwsh`.
+The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerShell`, `sharkdp.fd`, `Python.Python.3.13`, and `OpenJS.NodeJS.LTS`, then uses that Node installation to install the exact npm package `@ast-grep/cli@0.44.1`. It changes only missing or unsupported prerequisites and reads back every resolved executable and version plus `fd --max-results` support. Use `-Action Check` for a read-only audit. If PowerShell or another PATH-providing prerequisite was installed, restart the ChatGPT desktop app or begin a new Codex task before continuing so the agent host sees the new commands.
 
 ## Validate
 

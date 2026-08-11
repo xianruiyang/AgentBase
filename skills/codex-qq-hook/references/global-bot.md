@@ -7,7 +7,7 @@
 全局配置文件：
 
 ```text
-%USERPROFILE%\.codex\qq-hook-global-settings.json
+<CodexRoot>\qq-hook-global-settings.json
 ```
 
 示例结构：
@@ -42,8 +42,11 @@ AppSecret 写入用户环境变量：
 ```powershell
 $env:QQ_BOT_APP_ID = "你的 AppID"
 $env:QQ_BOT_APP_SECRET = "你的 AppSecret"
-& "$env:USERPROFILE\.codex\skills\codex-qq-hook\scripts\qq_ws_openid_capture.ps1"
+$SkillDir = '<skill_dir>'
+& (Join-Path $SkillDir 'scripts\qq_ws_openid_capture.ps1')
 ```
+
+`<skill_dir>` 是当前 skill 目录；`<CodexRoot>` 由它向上两级得到。
 
 看到 `Identify sent` 后，让目标 QQ 用户扫码聊天并给机器人发一句私聊，读取输出中的 `QQ_BOT_OPENID=...`。
 

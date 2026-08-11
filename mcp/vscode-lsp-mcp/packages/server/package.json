@@ -19,7 +19,7 @@
     "test": "node --test dist/*.test.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@simplechat/vscode-lsp-mcp-protocol": "0.1.21",
     "@simplechat/vscode-lsp-mcp-win32-security": "0.1.21"
   }

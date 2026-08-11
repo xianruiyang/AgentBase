@@ -1,0 +1,74 @@
+{
+  "schema": "sgy.release/v1",
+  "name": "sgy",
+  "version": "0.1.0",
+  "target": "x86_64-unknown-linux-gnu",
+  "archive": "sgy-0.1.0-x86_64-unknown-linux-gnu.zip",
+  "binary": "sgy",
+  "source": {
+    "revision": "sha256:338fe5fa8ec319cc0d4354c2584ab94b4445901903cf30aa0acc1575ade57f09",
+    "sourceDateEpoch": 0,
+    "cargoLockSha256": "305f27f995fafae87d04b0e21476d5b2537df463491dd43152c27ce1aa85a1c5"
+  },
+  "build": {
+    "rustc": "rustc 1.85.0 (4d91de4e4 2025-02-17)",
+    "rustToolchain": "1.85.0",
+    "profile": "release",
+    "deterministicArchive": true
+  },
+  "astGrepCompatibility": {
+    "fixed": "0.42.0",
+    "verified": [
+      "0.41.1",
+      "0.42.0",
+      "0.44.1"
+    ]
+  },
+  "runtime": {
+    "requiredExecutable": "ast-grep",
+    "node": false,
+    "python": false
+  },
+  "files": [
+    {
+      "path": "sgy",
+      "bytes": 2128416,
+      "sha256": "a6c7ea26f8643cb4efb2ba47749bb836b9a0889510c79044859bad309f75fa9d"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2985,
+      "sha256": "7755ad87ea93ef66e53cb4349b4c611ce6fe4bc3c27723eb3373ba1bd6d4cce3"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 330,
+      "sha256": "d5d57cda5b1766fe3772795a52083e16b1454d1f6b2b23c786518aa79839b926"
+    },
+    {
+      "path": "LICENSE-MIT",
+      "bytes": 1073,
+      "sha256": "b94d742a9110832480fd7e291b08c080f28fb74aed6cb21ce736d29082c52458"
+    },
+    {
+      "path": "LICENSE-APACHE",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "NOTICE",
+      "bytes": 381,
+      "sha256": "8c282cb4af2890f1c069ff2a5b010aff445795661fdd52d2b0a621bc8f536408"
+    },
+    {
+      "path": "THIRD_PARTY_LICENSES.txt",
+      "bytes": 197929,
+      "sha256": "057b19555979addaa9e7978534eb5663be9b2ac0f56adf01b584ed1ec36d2062"
+    },
+    {
+      "path": "sbom.spdx.json",
+      "bytes": 32096,
+      "sha256": "4a3352c510df3c4afc9ced584793805f46c936cbf67bed7a3a0e94dc2b8ea249"
+    }
+  ]
+}

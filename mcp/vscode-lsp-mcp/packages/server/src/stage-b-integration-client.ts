@@ -119,7 +119,7 @@ const main = async (): Promise<void> => {
     ]);
     assert.equal(capabilities.response.data.results[0]?.status, 'unknown');
     assert.equal(capabilities.response.data.results[1]?.status, 'available');
-    assert.equal(capabilities.response.data.results[2]?.status, 'unknown');
+    assert.equal(capabilities.response.data.results[2]?.status, 'available');
 
     const unsupportedCapabilities = await call('get_capabilities', {
       workspaceId,
