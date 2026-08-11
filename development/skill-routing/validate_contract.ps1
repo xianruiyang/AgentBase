@@ -210,7 +210,8 @@ $powerShellSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skil
 Assert-True ($powerShellSkillContent.Contains('--heading -M 240 --max-columns-preview')) "powershell-usage rg example is missing bounded file identity and width options"
 Assert-True ($powerShellSkillContent.Contains('Select-Object -First 80')) "powershell-usage rg example is missing its total line limit"
 Assert-True ($powerShellSkillContent.Contains('PowerShell 7（`pwsh`）')) "powershell-usage does not declare its PowerShell 7 baseline"
-Assert-True ($powerShellSkillContent.Contains('$PSVersionTable.PSVersion.Major -lt 7')) "powershell-usage does not verify its runtime baseline"
+Assert-True ($powerShellSkillContent.Contains('项目环境初始化入口一次性完成')) "powershell-usage does not delegate host verification to environment initialization"
+Assert-True (-not $powerShellSkillContent.Contains('$PSVersionTable.PSVersion')) "powershell-usage performs redundant per-command host version detection"
 Assert-True (-not $powerShellSkillContent.Contains('Windows PowerShell 5.1')) "powershell-usage keeps obsolete Windows PowerShell 5.1 guidance"
 
 $symbolMetadataPath = Join-Path $ProjectRoot "skills\symbol-structure-workflow\agents\openai.yaml"

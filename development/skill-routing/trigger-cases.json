@@ -216,7 +216,7 @@
     {
       "id": "powershell-command-authoring",
       "kind": "positive",
-      "request": "为 Codex 在 Windows 上优先使用的 PowerShell 7（pwsh）编写一条安全读取 UTF-8 JSON 并检查原生命令退出码的命令。",
+      "request": "主机初始化已确认使用 PowerShell 7（pwsh）；请编写一条安全读取 UTF-8 JSON 并检查原生命令退出码的命令，不要重复检查宿主版本。",
       "expected_skills": [
         "powershell-usage"
       ],
