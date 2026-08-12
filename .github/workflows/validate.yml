@@ -38,9 +38,9 @@ jobs:
       - name: Run skill regression tests
         run: |
           python -X utf8 .\skills\codex-event-logger\tests\test_event_logger.py
+          python -X utf8 .\skills\delivery-workflow\tests\test_workctl.py
           python -X utf8 .\skills\task-table-manager\tests\test_taskctl.py
           node --test .\skills\reasoning-governor\tests\test_reasoning_governor.mjs
-          node --test .\skills\task-table-manager\tests\test_reasoning_depth_compatibility.mjs
           & .\skills\codex-qq-hook\tests\test_qq_hook_switch.ps1
           & .\skills\codex-qq-hook\tests\test_install_global_qq_hook.ps1
 

@@ -1,140 +1,47 @@
-# Legacy：执行与继续任务表
+# 任务执行与恢复
 
-> 仅用于没有 `plan.json` 的既有 Markdown 计划，以保证进行中的任务不被静默迁移。v1 执行只使用 `SKILL.md` 的 `resume → begin → close/audit` 热路径。
+## 选择当前工作
 
-只在执行、继续、验收、回退或恢复任务项时读取。不要同时加载 `writing.md`，除非当前问题确实要求重构任务表。
+1. 先运行 `taskctl next` 获取推荐任务和诊断；需要查看依赖阻断项时加 `--include-blocked`。
+2. 对候选任务运行 `taskctl context --id <ID> --budget <chars>`，读取任务合同、直接依赖结果、必要上游条目和下游消费者。
+3. 根据用户优先级、真实依赖、并行冲突和当前能力选择任务。CLI 排序只是建议。
+4. 若任务合同不足以执行，修订最早缺失的阶段产物或任务合同，不创建占位结果。
 
-## 目录
+## 状态
 
-- [开始顺序](#开始顺序)
-- [标准执行](#标准执行)
-- [Handoff](#handoff)
-- [思考深度调节](#思考深度调节)
-- [修改方案或任务表](#修改方案或任务表)
-- [子任务表同步](#子任务表同步)
-- [回退](#回退)
-- [结束本轮](#结束本轮)
-- [推理深度入口](#推理深度入口)
-- [禁止](#禁止)
-
-## 开始顺序
-
-1. 读取主任务表“当前状态”和“子任务表索引”。
-2. `active_child_table` 不是 `none` 时，沿 Markdown 链接读取活动子表状态；不要靠目录搜索猜路径。
-3. 选择当前允许执行的一项；除非用户明确要求合并，本轮只完成一项。
-4. 只加载：
-   - 读取条件适用的任务表级依赖。
-   - 当前任务组依赖和组 memo。
-   - 当前任务行、`handoff.md` 和专属 `deps_for`。
-5. 不加载其他组、未来任务或上游 raw 产物全文。
-
-## 标准执行
-
-1. 确认依赖、目标产出、验收标准和当前思考深度。
-2. 将当前项标为 `in_progress`。
-3. 实现并执行最小充分验收。
-4. raw 响应、脚本、截图和日志写入 `<artifact_root>/<任务ID>/`。
-5. 同组后续任务会复用的重要结论更新到 `<artifact_root>/<组ID>/memo.md`，只写路径、用途、范围和简短结论。
-6. 为每个明确消费者分别生成 `deps_for/<consumer_task_id>.md`。
-7. 更新唯一人工交接入口 `handoff.md`。
-8. 只把进度、产物路径和必要依赖链接回写任务表。
-
-## Handoff
-
-```md
-# <ID> <任务名称>
-
-## 输入依赖
-- 任务表级：
-- 任务组级：
-- 任务项级：
-
-## 执行摘要
-- 做了什么：
-- 关键判断：
-
-## 验收结果
-- 方法：
-- 结果：
-
-## 产物
-- `path/to/artifact`
-
-## 未完成/风险
-- 无：
-
-## 后续依赖补充
-- 已生成 `deps_for/<consumer>.md`：
+```text
+todo → claimed → in_progress → review → done
+                   ↘ blocked
 ```
 
-Token 摘要仅在用户要求统计时加入。handoff 不粘贴 raw JSON、长日志或完整执行流水。
+- `claim` 记录 owner；不同任务可以并行领取。
+- `start` 表示开始实际工作。
+- `note` 更新简短进度、阻塞原因或下一动作，不保存运行日志。
+- `complete` 写结果并设为 `done`；模型必须保证结果与有效证据一致。
+- `reopen` 用于已完成任务的合同或完成结论实际失效；必须由当前 owner 操作并写明原因。活动任务的改派使用 `release`，不能用重开清除他人领取。
+- `release` 释放未完成任务的 owner，状态回到 `todo`。
 
-## 思考深度调节
+CLI 会拒绝同一任务被另一 owner 覆盖和 revision 冲突。不同任务的 mutation scope 重叠会返回警告，由执行者协调；这不是自动门禁。
 
-遵守全局动态推理规则并使用 `$reasoning-governor`。任务行中的深度只作为开始当前项时的初始建议；执行中只要下一段工作的真实不确定性、后果、可逆性或验证负担发生实质变化，就重新判断最低充分等级，不限于任务项边界。有 active Goal 且目标等级不同的，读回 next-turn 设置成功后立即结束当前轮，由 Goal 继续；没有 active Goal 时不自主切换。
+## 并行与下游消费
 
-## 修改方案或任务表
+- `hard` 依赖完成前，下游仍可做不消费其结果的分析、取证或准备，但不得假装前置产出已经成立。
+- 完成任务时把后继真正需要的结论写进 `outputs`；原始日志、截图和大型文件保存在项目适合的位置，只登记路径和简要用途。
+- `context` 默认只加载直接依赖结果和一层语义邻接；需要更多时按返回 ID 精确查询。
+- 新证据推翻上游设计或方案时，在结果的 `invalidated_source_ids` 中记录，并回到 `$delivery-workflow` 修订；CLI 不批量重置任务。
 
-任务表未覆盖新问题、关键假设失效、范围显著扩大或任务粒度无法安全推进时，允许修改方案和任务表。
+## 推理与领域 skill
 
-- 修改前记录触发原因、受影响任务和仍有效结论。
-- 不静默改写已完成任务的验收事实。
-- 小范围变化更新原任务项或新增诊断项。
-- 独立复杂范围拆为子方案和子任务表。
-- 重构后检查三层依赖、消费者、`deps_for`、memo、下一动作复杂度和回退边界。
+任务的 `reasoning_hint` 和 `suggested_skills` 只帮助开始工作。执行中按下一段真实不确定性和后果使用 `$reasoning-governor`，按修改对象触发对应领域 skill；不受任务文件固定。
 
-## 子任务表同步
+## 进度报告
 
-创建子表的同一轮必须：
+`taskctl status` 固定返回所有任务状态数量，并可读取交付链索引中的上游未决数量以及结果验证摘要。报告时说明：
 
-1. 在主表“子任务表索引”登记稳定子表 ID、父任务、可点击链接、完成进度、当前子任务、进入条件和回写位置。
-2. 主表 `active_child_table` 指向该链接。
-3. 父任务行“依赖”字段登记同一链接。
-4. 子表状态写入 `parent_table`、`parent_task`、`parent_child_index_id`、`parent_writeback` 和独立 `artifact_root`。
+- 哪些任务完成、进行、评审、阻塞或待办；
+- 哪些关键上游条目仍为 open/unknown；
+- 多少结果包含验证，哪些仍有未决问题。
 
-每次子任务推进、暂停、阻塞或完成时，同步主表索引的 `完成进度` 和 `当前子任务`。子表完成后：
+这些指标互不替代，不合成误导性的总体百分比。
 
-- 索引更新为 `done 100%`。
-- 清空主表 `active_child_table`。
-- 按 `parent_writeback` 更新父任务。
-- 父任务从子表 handoff/专属依赖继续，不读取全部子表 raw 产物。
-
-默认一个父任务只有一个 active 子表；并行必须由用户明确要求。
-
-## 回退
-
-`回退目标` 只有根因明确来自上游时才填写，不是备注或 `git revert`。
-
-- 清除回退目标及其直接/间接下游产物，重置进度后从目标重做。
-- 按回退后的下一动作重新判断思考深度；不自动提高一级，也不只为切换深度结束本轮。
-- 证据冲突、设计假设失效或回退影响跨模块时，先重梳理影响和任务边界；必要时修改或拆分方案与任务表。
-- 根因不明时不机械回退上一项。
-
-## 结束本轮
-
-- 当前项完成：更新任务行、handoff、消费者依赖和组 memo；下一动作需要不同深度时按 `$reasoning-governor` 协议设置并读回 next-turn。
-- 当前项未完成：下一段工作需要不同深度时，先保存恢复所必需的现场，再按 `$reasoning-governor` 协议设置并结束。
-- 有活动子表：同步主表索引后再结束。
-- 不得把未解决任务标为 `done`。
-
-## 推理深度入口
-
-正式入口由 `$reasoning-governor` 持有。先读取当前 thread 的 next-turn settings，只有目标等级不同才设置：
-
-```powershell
-$env:CODEX_THREAD_ID
-$ReasoningGovernorSkillDir = '<reasoning-governor-skill-dir>'
-pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $ReasoningGovernorSkillDir 'scripts\reasoning-governor.ps1') -Status
-pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $ReasoningGovernorSkillDir 'scripts\reasoning-governor.ps1') -Effort high
-```
-
-支持 `low`、`medium`、`high`、`xhigh`、`max`、`ultra`。设置成功口径和当前轮不可读边界以 `$reasoning-governor` 为准；旧任务表脚本只服务于发布前已经开始且仍引用旧路径的任务，不再定义行为。确认这些任务完成或已改用正式入口后删除兼容转发，任何新文档不得继续引用旧路径。
-
-## 禁止
-
-- 不在一轮执行多个任务项，除非用户明确要求。
-- 不把完整日志、raw JSON、截图清单或产物正文写入任务表。
-- 不读取无关任务组和未来任务资料。
-- 不让当前项自行整理缺失的上游大型依赖；回到上游补专属 `deps_for`。
-- 不在未知根因时继续堆后续任务。
-- 不把子任务表只记录在 handoff、memo 或对话中。
+最终复核先重建交付索引，再运行 `completion-context`，保存首次返回的 snapshot ID，并随每个分页游标传回；快照变化时从第一页重新开始。遍历受保护基线中的全部 `REQ/AC/UDES`、全部 `CON` 和开放 `DCR` 后，由模型逐项核对直接证据。任务全部 `done`、结果带验证或中间阶段审核通过，都不能替代这一步，也不能单独得出整体完成。

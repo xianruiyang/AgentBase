@@ -1,6 +1,6 @@
 # AgentBase
 
-本项目集中维护候选全局 `AGENTS.md`、可移植 Codex 关键设置与自定义子代理、12 个关键 skill、对应开发工程以及实际依赖的 MCP/CLI。所有改动先进入本目录真源，通过静态合同、盲测和隔离发布验证后，再由用户明确决定是否发布到 Codex。
+本项目集中维护候选全局 `AGENTS.md`、可移植 Codex 关键设置与自定义子代理、关键 skill、对应开发工程以及实际依赖的 MCP/CLI。所有改动先进入本目录真源，通过静态合同、盲测和隔离发布验证后，再由用户明确决定是否发布到 Codex。
 
 ## 真源与安装副本
 
@@ -17,7 +17,7 @@
 
 `global/AGENTS.md` 只保留跨项目都成立的目标、证据、授权、工具路由、修改、验证、记录和交付规则。复杂根因、职责/入口迁移、共享门禁和跨契约审计细节由 `change-governance` 承担；C++、PowerShell、搜索、符号/AST、空间、任务表和动态推理协议由对应 skill 承担。
 
-当前候选为 18,197 字节、79 条规范规则，静态合同上限为 20 KiB。与上一候选 17,310 字节、78 条规则相比，新增一条 active Goal 内动态升降线程推理深度的全局规则，并把执行协议收敛到独立 skill。当前内核收敛为四项核心约束：
+当前候选受 20 KiB 静态合同约束。全局文件只承担跨项目目标、证据、授权、路由和交付内核，完整交付链与执行协议分别收敛到对应 skill。当前内核收敛为四项核心约束：
 
 - 规范来源用于确定目标契约，有效证据用于判断系统现状与实现结果；两者不得互相替代，用户目标也不得被系统现状静默改写。
 - 在用户目标和授权范围内按长期净收益与系统总成本选择方案；长期收益不得用于扩大范围或替用户裁决。
@@ -30,7 +30,8 @@
 | --- | --- | --- |
 | `codex-event-logger` | 历史独立 logger 工程 | 只在上下文缺失或用户要求追溯时读取项目级运行记录 |
 | `codex-qq-hook` | 历史 QQ bot 工程 | 按用户明确要求配置当前工作区 QQ 完成提醒 |
-| `task-table-manager` | 历史 UE 项目 skill | 管理跨轮、真实依赖和持久完成审计；新计划显式裁决语义预检适用性，大规模迁移绑定完整 identity 集合阻断结构假绿，CLI 与测试自包含在 skill 内 |
+| `delivery-workflow` | 项目内建立 | 组织受保护需求与用户设计、可修订模型设计、现状、方案、任务和执行反馈；最终只按当前范围用户基线复核 |
+| `task-table-manager` | 项目内建立 | 用低 Token 管理任务合同、三类依赖、多人状态、结果摘要、上下文包和最终复核候选证据，不签发执行或产品通过 |
 | `reasoning-governor` | 从 `task-table-manager` 的线程深度脚本拆分建源 | 读取和切换当前线程 next-turn 推理深度；模型自主切换只由 active Goal 续跑 |
 | `symbol-structure-workflow` | 历史 SymbolStructureWorkflow 工程 | 在文本、AST、LSP 和编辑工具间分层路由，并声明 `vscode-lsp-mcp` 依赖 |
 | `ast-grep-token-safe` | 历史 SymbolStructureWorkflow 工程 | 使用内置 `sgy` 做 Token-Safe AST 搜索与改写 |
@@ -49,9 +50,9 @@
 | `tools/sgy` | `ast-grep-token-safe` | 构建 skill 内置 `sgy` 的 Rust workspace、测试、fuzz、安装与发布工程 |
 | `development/codex-event-logger` | `codex-event-logger` | hook 设计资料；正式运行脚本仍在 skill 真源 |
 | `development/codex-qq-hook` | `codex-qq-hook` | Webhook 辅助程序和开发说明；正式运行脚本仍在 skill 真源 |
-| `development/skill-routing` | 全局规则与 12 个 skill | 静态触发合同、盲测输入生成与结果判定 |
-| `development/plugin-packaging` | 12 个 skill | 生成并校验 `agentbase-core` 本地插件包 |
-| `development/codex-deployment` | 全局规则、可移植设置、hooks、自定义子代理与 12 个 skill | 校验、可选设置安装、带备份发布和可验证回滚 |
+| `development/skill-routing` | 全局规则与全部关键 skill | 静态触发合同、盲测输入生成与结果判定 |
+| `development/plugin-packaging` | 合同声明的全部 skill | 生成并校验 `agentbase-core` 本地插件包 |
+| `development/codex-deployment` | 全局规则、可移植设置、hooks、自定义子代理与全部关键 skill | 校验、可选设置安装、带备份发布和可验证回滚 |
 
 `vscode-lsp-mcp` 保持独立发布真源：它已有 `release:build` 和 `release:verify`，且还包含 VS Code companion 与安装生命周期。插件包不复制 MCP，也不创建第二套安装入口；`symbol-structure-workflow/agents/openai.yaml` 只声明对 `vscode-lsp-mcp` 的工具依赖。旧的 `vscode-mcp` 与 `ast-mcp` 不属于当前权威依赖。
 
@@ -61,7 +62,7 @@ skill 内置的 Windows/Linux `sgy 0.1.0` 由同一个不含 `.git`、`target/` 
 
 ## 路由与行为验证
 
-`development/skill-routing/trigger-cases.json` 当前包含 37 个场景。全部 12 个 skill 都至少有一个正向触发和一个相近非触发场景，并额外覆盖事实冲突、只读授权、长期收益、禁止越权替代执行、active Goal 内动态推理切换、显式线程设置、QQ 只读状态与故障排查、旧任务资产迁移，以及三类架构边界：职责与入口已知时直接集成、未知时先治理裁决、一次性产物不得升级为架构工程。
+`development/skill-routing/trigger-cases.json` 中全部关键 skill 都至少有一个正向触发和一个相近非触发场景，并额外覆盖事实冲突、只读授权、长期收益、禁止越权替代执行、active Goal 内动态推理切换、显式线程设置、QQ 只读状态与故障排查、受保护用户基线、最终完成边界，以及三类架构边界：职责与入口已知时直接集成、未知时先治理裁决、一次性产物不得升级为架构工程。
 
 静态合同会检查全局文件大小与关键语义、规则标签、重复规则、skill frontmatter、`agents/openai.yaml`、MCP 依赖、Markdown 相对引用、场景集合和正/负覆盖：
 
@@ -85,7 +86,7 @@ skill 内置的 Windows/Linux `sgy 0.1.0` 由同一个不含 `.git`、`target/` 
 
 ## 本地插件打包
 
-`development/plugin-packaging/template/agentbase-core` 是由官方插件脚手架生成并审查后的模板。构建脚本从 `skills/` 真源复制 12 个 skill 到忽略的 `dist/agentbase-core`，生成逐文件哈希清单，并调用官方插件校验器：
+`development/plugin-packaging/template/agentbase-core` 是由官方插件脚手架生成并审查后的模板。构建脚本从 `skills/` 真源复制合同声明的 skill 到忽略的 `dist/agentbase-core`，生成逐文件哈希清单，并调用官方插件校验器：
 
 ```powershell
 & '.\development\plugin-packaging\build_plugin.ps1' -ProjectRoot (Get-Location).Path
@@ -109,13 +110,13 @@ PowerShell 7、支持 `--max-results` 的 `fd`、Python 3.11+、Node.js `>=22.9 
 
 仓库级持续验证入口是 [`.github/workflows/validate.yml`](.github/workflows/validate.yml)：Windows 项目合同 job 覆盖部署与 skill 回归测试，`vscode-lsp-mcp` job 执行完整 Windows 发布门禁，两个 `sgy` job 分别执行 Linux/Windows 原生构建、已签署运行时完整性检查、真实 ast-grep smoke 和 RustSec。CI 是持续门禁，不替代本地发布前对当前工作区执行的最小充分验证。
 
-部署入口默认校验全局规则、12 个 skill、可移植设置、hooks 模板、自定义子代理和 MCP 独立发布入口：
+部署入口默认校验全局规则、合同声明的全部 skill、可移植设置、hooks 模板、自定义子代理和 MCP 独立发布入口：
 
 ```powershell
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot (Get-Location).Path
 ```
 
-只有用户明确决定加载时，才对精确指定的 Codex 根目录执行发布。默认发布会先在目标目录内分阶段复制和校验，再把原 `AGENTS.md` 与 12 个同名 skill 移入带清单的备份；不会修改其他 skill、`config.toml`、`hooks.json`、`agents/`、插件 marketplace 或 MCP：
+只有用户明确决定加载时，才对精确指定的 Codex 根目录执行发布。默认发布会先在目标目录内分阶段复制和校验，再把原 `AGENTS.md` 与合同声明的同名 skill 移入带清单的备份；不会修改其他 skill、`config.toml`、`hooks.json`、`agents/`、插件 marketplace 或 MCP：
 
 ```powershell
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Publish -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex')

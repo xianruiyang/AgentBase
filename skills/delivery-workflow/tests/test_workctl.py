@@ -1,0 +1,435 @@
+from __future__ import annotations
+
+import json
+import importlib.util
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+from argparse import Namespace
+from pathlib import Path
+
+
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "workctl.py"
+
+
+def load_workctl_module():
+    spec = importlib.util.spec_from_file_location("workctl_under_test", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class WorkctlTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name) / "work"
+        result = self.run_cli(
+            "init",
+            "--work-dir",
+            str(self.root),
+            "--id",
+            "demo",
+            "--title",
+            "演示交付",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.write_valid_documents()
+
+    def tearDown(self) -> None:
+        self.temp.cleanup()
+
+    def run_cli(self, *args: str) -> subprocess.CompletedProcess[str]:
+        environment = dict(os.environ)
+        environment["PYTHONUTF8"] = "1"
+        return subprocess.run(
+            [sys.executable, "-X", "utf8", str(SCRIPT), *args],
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            env=environment,
+            check=False,
+        )
+
+    def payload(self, result: subprocess.CompletedProcess[str]) -> dict:
+        text = result.stdout if result.returncode == 0 else result.stderr
+        return json.loads(text)
+
+    def write_valid_documents(self) -> None:
+        (self.root / "requirements.md").write_text(
+            """# 演示：需求分析
+
+## REQ-001 导出当前结果
+
+- 状态: confirmed
+- 来源: 用户确认
+- 关联: AC-001
+
+用户能够从正式入口导出当前结果。
+
+## AC-001 导出内容可读回
+
+- 状态: confirmed
+- 来源: 用户确认
+- 关联: REQ-001
+
+导出后能够读回约定字段。
+
+## CON-001 保持现有认证
+
+- 状态: confirmed
+- 来源: 用户确认
+
+不得绕过现有认证。
+""",
+            encoding="utf-8",
+        )
+        (self.root / "user-design.md").write_text(
+            """# 演示：用户设计
+
+## UDES-001 使用现有公开入口
+
+- 状态: confirmed
+- 来源: 用户明确设计
+- 关联: REQ-001
+
+导出能力必须接入现有公开入口。
+""",
+            encoding="utf-8",
+        )
+        (self.root / "design.md").write_text(
+            """# 演示：模型设计
+
+## DES-001 导出职责
+
+- 状态: confirmed
+- 满足: REQ-001, AC-001, UDES-001
+
+现有公开入口调用独立导出职责。
+""",
+            encoding="utf-8",
+        )
+        (self.root / "current-state.md").write_text(
+            """# 演示：现状分析
+
+## OBS-001 当前入口没有导出能力
+
+- 状态: confirmed
+- 关联: DES-001
+
+直接检查未发现导出调用。
+
+## GAP-001 缺少导出职责
+
+- 状态: confirmed
+- 关联: DES-001, OBS-001
+
+当前行为未满足设计。
+""",
+            encoding="utf-8",
+        )
+        (self.root / "solution.md").write_text(
+            """# 演示：方案设计
+
+## SOL-001 实现并接入导出职责
+
+- 状态: confirmed
+- 解决: GAP-001
+- 满足: DES-001
+
+实现导出职责并从公开入口调用。
+""",
+            encoding="utf-8",
+        )
+        (self.root / "deferred-changes.md").write_text(
+            "# 演示：延后讨论项\n\n- 无\n", encoding="utf-8"
+        )
+
+    def protect(self) -> dict:
+        result = self.run_cli(
+            "protect",
+            "--work-dir",
+            str(self.root),
+            "--confirmed-by",
+            "user",
+            "--confirmation-ref",
+            "conversation:confirmed",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return self.payload(result)
+
+    def test_init_index_and_protected_drift(self) -> None:
+        before = self.run_cli("index", "--work-dir", str(self.root))
+        self.assertEqual(before.returncode, 0, before.stderr)
+        self.assertEqual(self.payload(before)["summary"]["section_count"], 8)
+        self.assertEqual(
+            json.loads((self.root / ".work-cache" / "index.json").read_text(encoding="utf-8"))[
+                "protected_baseline"
+            ]["status"],
+            "unprotected",
+        )
+
+        protected = self.protect()
+        self.assertEqual(protected["baseline"]["status"], "protected")
+        indexed = self.run_cli("index", "--work-dir", str(self.root))
+        self.assertEqual(indexed.returncode, 0, indexed.stderr)
+        self.assertEqual(self.payload(indexed)["summary"]["duplicate_count"], 0)
+
+        with (self.root / "requirements.md").open("a", encoding="utf-8") as handle:
+            handle.write("\n未经确认的改写。\n")
+        drifted = self.run_cli("index", "--work-dir", str(self.root))
+        self.assertEqual(drifted.returncode, 2)
+        self.assertIn("protected source changed", self.payload(drifted)["error"])
+
+    def test_protect_requires_confirmed_entries(self) -> None:
+        content = (self.root / "requirements.md").read_text(encoding="utf-8")
+        (self.root / "requirements.md").write_text(
+            content.replace("状态: confirmed", "状态: proposed", 1), encoding="utf-8"
+        )
+        result = self.run_cli(
+            "protect",
+            "--work-dir",
+            str(self.root),
+            "--confirmed-by",
+            "user",
+            "--confirmation-ref",
+            "conversation:confirmed",
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("not marked confirmed", self.payload(result)["error"])
+
+    def test_context_impact_and_bounded_output(self) -> None:
+        self.protect()
+        indexed = self.run_cli("index", "--work-dir", str(self.root))
+        self.assertEqual(indexed.returncode, 0, indexed.stderr)
+        context = self.run_cli(
+            "context",
+            "--work-dir",
+            str(self.root),
+            "--id",
+            "REQ-001",
+            "--depth",
+            "4",
+            "--budget",
+            "2200",
+        )
+        self.assertEqual(context.returncode, 0, context.stderr)
+        self.assertLessEqual(len(context.stdout), 2201)
+        self.assertEqual(self.payload(context)["id"], "REQ-001")
+
+        impact = self.run_cli(
+            "impact", "--work-dir", str(self.root), "--id", "REQ-001"
+        )
+        self.assertEqual(impact.returncode, 0, impact.stderr)
+        affected = {item["id"] for item in self.payload(impact)["affected"]}
+        self.assertTrue({"DES-001", "GAP-001", "SOL-001"}.issubset(affected))
+
+    def test_deferred_change_is_reported_separately(self) -> None:
+        self.protect()
+        (self.root / "deferred-changes.md").write_text(
+            """# 演示：延后讨论项
+
+## DCR-001 建议改变用户入口设计
+
+- 状态: deferred
+- 目标: UDES-001
+
+其余工作完成后再与用户讨论。
+""",
+            encoding="utf-8",
+        )
+        indexed = self.run_cli("index", "--work-dir", str(self.root))
+        self.assertEqual(indexed.returncode, 0, indexed.stderr)
+        payload = self.payload(indexed)
+        self.assertEqual(payload["summary"]["deferred_change_count"], 1)
+        self.assertIn("DCR-001", payload["unresolved_ids"])
+
+    def test_duplicate_identity_is_diagnostic_but_context_is_ambiguous(self) -> None:
+        content = (self.root / "design.md").read_text(encoding="utf-8")
+        (self.root / "design.md").write_text(
+            content
+            + """
+## DES-001 重复设计
+
+- 状态: confirmed
+""",
+            encoding="utf-8",
+        )
+        indexed = self.run_cli("index", "--work-dir", str(self.root))
+        self.assertEqual(indexed.returncode, 0, indexed.stderr)
+        self.assertEqual(self.payload(indexed)["summary"]["duplicate_count"], 1)
+        context = self.run_cli(
+            "context", "--work-dir", str(self.root), "--id", "DES-001"
+        )
+        self.assertEqual(context.returncode, 2)
+        self.assertIn("ambiguous semantic id", self.payload(context)["error"])
+
+    def test_generated_paths_cannot_be_redirected_to_workflow_truth(self) -> None:
+        manifest_path = self.root / "workflow.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["status_view"] = "requirements.md"
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        rendered = self.run_cli("render", "--work-dir", str(self.root))
+        self.assertEqual(rendered.returncode, 2)
+        self.assertIn("status_view must remain", self.payload(rendered)["error"])
+
+    def test_task_storage_cannot_contain_workflow_truth(self) -> None:
+        table_path = self.root / "task-table.json"
+        table = json.loads(table_path.read_text(encoding="utf-8"))
+        table["task_dir"] = "."
+        table_path.write_text(
+            json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        indexed = self.run_cli("index", "--work-dir", str(self.root))
+        self.assertEqual(indexed.returncode, 2)
+        self.assertIn("task_dir must remain tasks", self.payload(indexed)["error"])
+
+    def test_protect_rejects_model_decision_in_requirements(self) -> None:
+        with (self.root / "requirements.md").open("a", encoding="utf-8") as handle:
+            handle.write(
+                "\n## DEC-001 模型待决选择\n\n- 状态: confirmed\n\n不属于用户基线。\n"
+            )
+        protected = self.run_cli(
+            "protect",
+            "--work-dir",
+            str(self.root),
+            "--confirmed-by",
+            "user",
+            "--confirmation-ref",
+            "conversation:confirmed",
+        )
+        self.assertEqual(protected.returncode, 2)
+        self.assertIn("misplaced ids", self.payload(protected)["error"])
+
+    def test_tampered_baseline_ids_are_rejected(self) -> None:
+        self.protect()
+        baseline_path = self.root / "protected-baseline.json"
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        baseline["documents"]["requirements"]["ids"] = ["REQ-001"]
+        baseline_path.write_text(
+            json.dumps(baseline, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        indexed = self.run_cli("index", "--work-dir", str(self.root))
+        self.assertEqual(indexed.returncode, 2)
+        self.assertIn("ids do not match", self.payload(indexed)["error"])
+
+    def test_init_refuses_nonempty_managed_storage(self) -> None:
+        other = Path(self.temp.name) / "occupied"
+        (other / "tasks").mkdir(parents=True)
+        (other / "tasks" / "sentinel.json").write_text("{}", encoding="utf-8")
+        initialized = self.run_cli(
+            "init",
+            "--work-dir",
+            str(other),
+            "--id",
+            "occupied",
+            "--title",
+            "不可覆盖",
+        )
+        self.assertEqual(initialized.returncode, 2)
+        self.assertIn("refusing to overwrite", self.payload(initialized)["error"])
+
+    def test_protect_requires_at_least_one_final_target(self) -> None:
+        (self.root / "requirements.md").write_text(
+            """# 只有约束
+
+## CON-001 保持认证
+
+- 状态: confirmed
+
+不得绕过认证。
+""",
+            encoding="utf-8",
+        )
+        (self.root / "user-design.md").write_text("# 无用户设计\n", encoding="utf-8")
+        protected = self.run_cli(
+            "protect",
+            "--work-dir",
+            str(self.root),
+            "--confirmed-by",
+            "user",
+            "--confirmation-ref",
+            "conversation:confirmed",
+        )
+        self.assertEqual(protected.returncode, 2)
+        self.assertIn("without a REQ, AC, or UDES", self.payload(protected)["error"])
+
+    def test_protect_detects_source_change_during_snapshot(self) -> None:
+        module = load_workctl_module()
+        original = module.file_fingerprint
+        changed = False
+
+        def mutate_then_fingerprint(path: Path) -> str:
+            nonlocal changed
+            if path.name == "requirements.md" and not changed:
+                changed = True
+                with path.open("a", encoding="utf-8") as handle:
+                    handle.write("\n快照期间发生改变。\n")
+            return original(path)
+
+        module.file_fingerprint = mutate_then_fingerprint
+        with self.assertRaises(module.WorkctlError) as caught:
+            module.protect_workspace(
+                Namespace(
+                    work_dir=str(self.root),
+                    confirmed_by="user",
+                    confirmation_ref="conversation:confirmed",
+                )
+            )
+        self.assertIn("changed while creating baseline", str(caught.exception))
+        self.assertFalse((self.root / "protected-baseline.json").exists())
+
+    def test_concurrent_protect_has_one_winner_and_no_overwrite(self) -> None:
+        command = [
+            sys.executable,
+            "-X",
+            "utf8",
+            str(SCRIPT),
+            "protect",
+            "--work-dir",
+            str(self.root),
+            "--confirmed-by",
+            "user",
+            "--confirmation-ref",
+            "conversation:confirmed",
+        ]
+        environment = dict(os.environ)
+        environment["PYTHONUTF8"] = "1"
+        processes = [
+            subprocess.Popen(
+                command,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                encoding="utf-8",
+                env=environment,
+            )
+            for _ in range(2)
+        ]
+        completed = [process.communicate(timeout=20) for process in processes]
+        codes = sorted(process.returncode for process in processes)
+        self.assertEqual(codes, [0, 2], completed)
+        baseline = json.loads(
+            (self.root / "protected-baseline.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(baseline["schema"], "delivery.protected-baseline")
+
+    def test_context_preserves_collection_truncation(self) -> None:
+        module = load_workctl_module()
+        payload = {
+            "ok": True,
+            "command": "context",
+            "id": "REQ-001",
+            "sections": [],
+            "truncated": True,
+        }
+        fitted = module.fit_context(payload, 2000)
+        self.assertTrue(fitted["truncated"])
+
+
+if __name__ == "__main__":
+    unittest.main()

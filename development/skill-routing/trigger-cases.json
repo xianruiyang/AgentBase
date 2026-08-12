@@ -8,6 +8,7 @@
     "codex-event-logger",
     "codex-qq-hook",
     "cpp-engineering-rules",
+    "delivery-workflow",
     "fd-usage",
     "powershell-usage",
     "reasoning-governor",
@@ -24,7 +25,9 @@
     "no_alternative_execution",
     "long_term_total_cost",
     "architecture_integrated",
-    "no_scope_expansion"
+    "no_scope_expansion",
+    "protected_user_baseline",
+    "final_user_scope_only"
   ],
   "cases": [
     {
@@ -133,8 +136,7 @@
       "kind": "positive",
       "request": "修改 C++ 公共头的 include 和前置声明，保持公开 API 不变。",
       "expected_skills": [
-        "cpp-engineering-rules",
-        "symbol-structure-workflow"
+        "cpp-engineering-rules"
       ],
       "forbidden_skills": [
         "change-governance",
@@ -152,8 +154,7 @@
       "request": "诊断并修复两个 C++ 模块之间反复出现的循环依赖。",
       "expected_skills": [
         "cpp-engineering-rules",
-        "change-governance",
-        "symbol-structure-workflow"
+        "change-governance"
       ],
       "forbidden_skills": [],
       "expected_change_governance_references": [
@@ -331,20 +332,38 @@
       "forbidden_behavior_tags": []
     },
     {
-      "id": "legacy-plan-assets-migration",
+      "id": "full-delivery-chain",
       "kind": "positive",
-      "request": "这个长期计划已有旧 Markdown 任务表、测试和 Gate；我明确授权按既定 v1 协议重新建模并迁移可复用资产，不继承旧 done 状态。",
+      "request": "先和我商议并确认需求及我指定的设计，再完成模型设计、现状分析、方案、任务表和跨轮执行。执行中不得改需求或我的设计，模型产物可持续修订；最终只按全部需求和我的全部设计是否实现判断。",
       "expected_skills": [
         "change-governance",
+        "delivery-workflow",
         "task-table-manager"
       ],
       "forbidden_skills": [],
       "expected_change_governance_references": [
-        "lifecycle-and-entry.md",
         "verification-and-gates.md"
       ],
       "expected_behavior_tags": [
-        "modify_authorized_scope"
+        "modify_authorized_scope",
+        "protected_user_baseline",
+        "final_user_scope_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "protected-baseline-change-discovered",
+      "kind": "behavior",
+      "request": "执行现有任务表中的长期交付计划时发现，若改变一条已由我确认的设计会更容易实现。不要改它；继续完成任务表中其他不依赖该改变的内容，最后再把必要性和影响交给我讨论。",
+      "expected_skills": [
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "protected_user_baseline"
       ],
       "forbidden_behavior_tags": []
     },
@@ -553,6 +572,7 @@
       "expected_skills": [],
       "forbidden_skills": [
         "change-governance",
+        "delivery-workflow",
         "task-table-manager"
       ],
       "expected_change_governance_references": [],
@@ -598,11 +618,15 @@
       "id": "long-term-without-scope-expansion",
       "kind": "behavior",
       "request": "两个实现方案都在已授权范围内并能满足相同目标：一个少改两行但永久增加第二状态源，另一个收敛到现有唯一入口。请选择并实施，但不要顺带重构其他模块。",
-      "expected_skills": [],
+      "expected_skills": [
+        "change-governance"
+      ],
       "forbidden_skills": [
         "task-table-manager"
       ],
-      "expected_change_governance_references": [],
+      "expected_change_governance_references": [
+        "lifecycle-and-entry.md"
+      ],
       "expected_behavior_tags": [
         "modify_authorized_scope",
         "architecture_integrated",
@@ -615,12 +639,15 @@
       "id": "review-only-no-alternative-execution",
       "kind": "behavior",
       "request": "只评审这个临时方案的长期风险并提出建议，不要修改任何文件，也不要替我实施更好的方案。",
-      "expected_skills": [],
+      "expected_skills": [
+        "change-governance"
+      ],
       "forbidden_skills": [
-        "change-governance",
         "task-table-manager"
       ],
-      "expected_change_governance_references": [],
+      "expected_change_governance_references": [
+        "lifecycle-and-entry.md"
+      ],
       "expected_behavior_tags": [
         "read_only",
         "no_alternative_execution"

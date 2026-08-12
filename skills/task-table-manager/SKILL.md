@@ -1,38 +1,40 @@
 ---
 name: task-table-manager
-description: 管理有证据支撑的规划链和长期执行。用于工作必须跨轮持续、存在真实依赖、需要持久完成审计，或需要建立与修复需求—设计—分析—方案—任务追踪时；不用于单轮修改、简单清单、一次性诊断，也不因任务较复杂而自动创建任务表。
+description: 用低 Token 管理长期执行的任务合同、依赖图、状态、结果摘要和恢复上下文。用于工作必须跨轮持续、存在真实任务依赖、需要多人领取或需要快速查询当前任务及上下游产出时；不用于单轮修改、简单清单、一次性诊断，也不负责需求、设计、现状或方案的语义裁决。
 ---
 
 # Task Table Manager
 
-质量优先；等价时先降含返工的总 Token，再提速。
+任务表是执行投影，不是计划正确性的裁判。模型负责把已经形成的方案动作写成任务合同并判断何时推进；CLI 负责确定性的存储、查询、上下文压缩和可重建视图。
 
-## 路由
+## 路由与协同
 
-- 用于跨轮、真实依赖或持久完成审计；普通修改、一次性分析和简单清单不用。
-- 新计划放在 `docs/plan/<YYYYMMDD>_<NAME>/`；同计划文件以该目录为根。只有用户要求才移入 `old/`。
-- 有 `plan.json` 时走 v1；创建或修改完整读取 [create-plan.md](references/create-plan.md)。只有 Markdown 的旧计划按需完整读取 [writing.md](references/writing.md) 或 [execution.md](references/execution.md)，不得静默迁移。
-- 用户明确授权把旧任务表、测试、门禁或实现资产重建为 v1 计划时，完整读取 [extract-legacy-assets.md](references/extract-legacy-assets.md)；继续执行中的旧计划不因此迁移。
-- 工具入口是 `<SkillDir>/scripts/taskctl.py`。每次显式传绝对 `--task-dir`；源码范围另传 `--project-root`，状态和临时输出不得写入 skill 目录。
+- 需要需求分析、目标设计、现状分析或方案设计时使用 `$delivery-workflow`；本 skill 只消费其稳定 ID 和索引。
+- 根因、职责、权威入口或共享阻断门禁需要专项裁决时使用 `$change-governance`；其结论应进入上游阶段文档，不进入 CLI 规则。
+- 执行任务时继续按真实工作触发 C++、符号、搜索、PowerShell、空间等领域 skill。任务可记录建议 skill，但不能强制或替代运行时路由。
+- 推理深度使用 `$reasoning-governor`；任务可提供非权威初始建议，但不保存线程设置或限制执行中自由升降。
 
-## 质量边界
+## 真源与工具
 
-- CLI 只检查结构、指纹和证据新鲜度，不证明语义。新激活/修订的 `strict_v2` 按 [create-plan.md](references/create-plan.md) 选择 `semantic_preflight.mode`：普通用 `not_applicable`，批量迁移用 `required`。策略缺失、identity/回执不闭合即阻断；旧活动计划仅以 `legacy_*` 继续。
-- 计划前直接以用户要求、正式设计、完整实现差距和方案为真源，先正向检查上游是否全部覆盖，再反向检查每个动作是否有来源，并主动寻找反例。发现问题回到最早失效层；不得由任务、旧测试或现有代码反推上游，也不得用自动生成的追踪表自证。
-- 任务只表达未交付的用户结果、真实依赖和最小充分验收。大量 command/资产的逐项分配由任务目录内的定向脚本或清单检查，不把领域 inventory 逻辑塞入通用 CLI。
-- 测试先确认 requirement、oracle、baseline、negative path、真实 subject 和 readback；不为旧断言修改目标设计。outcome 只到证据实际穿过的最高入口，mock、recording、注册、编译或内部 runtime 不能冒充公开可用。
+- 完整读取 [task-contracts.md](references/task-contracts.md) 创建或修改任务；执行、恢复和并行领取时读取 [execution.md](references/execution.md)；使用 CLI 时读取 [tooling.md](references/tooling.md)。
+- 工具入口是 `<SkillDir>/scripts/taskctl.py`。每次显式传绝对 `--task-dir`；状态和结果只写入该工作区。
+- `task-table.json` 登记目录；`tasks/<ID>.json` 持有任务合同，`state/<ID>.json` 持有执行状态，`results/<ID>.r<state-revision>.json` 持有可追溯的结果摘要，状态文件只指向当前结果。
+- `TASK_TABLE.md` 是生成视图，`.work-cache/index.json` 是上游索引；两者都不是任务或语义真源。
 
-## v1 热路径
+## 使用方式
 
-- 执行、继续或完成计划前必须有对应 active goal；用户发出这类请求即授权创建。Goal 只保存交付结果、绝对任务目录、范围边界和最终条件。
-- Agent 层正常路径是 `resume → begin → close`。`resume` 是唯一恢复入口，不全文读取计划、状态或生成表；`begin` 只组合职责、生命周期、持久化、构建和回退边界已经确认相同的工作；`close` 导入机器证据并返回完成卡和剩余缺口。
-- `resume` 的 `ready_count` 与 `needs_review_count` 只统计依赖检查后可执行的任务，依赖阻断项单列在 `dependency_blocked_ids`；`render.status_counts` 与 `TASK_TABLE.md` totals 统计全部任务并固定包含零值，二者不得混作同一口径。
-- `evidence-context`、`seal-red`、`impact` 等只在当前 runner 或异常恢复确实需要时同轮调用，不创建任务、handoff 或额外对话轮次。依赖任务必须整体 `done`；依赖边 claims 只表示下游消费的证据与 freshness，不是提前开工许可。
-- 只有真实中断、阻塞或下一动作无法恢复时 `checkpoint`。合同变化先释放活动包、更新最早上游、审计候选并 `amend`；禁止直接改活动 `plan.json/state.json`。
-- 最终运行 `audit --all`。只有计划来源仍有效、必要任务和 flow 都有直接证据并返回 completion receipt，才可报告完成或结束 goal。
+1. 用 `taskctl draft` 生成候选合同，模型根据上游 `SOL/GAP/DES/AC/REQ` 和真实工作范围完成内容；CLI 不自动把文档变成任务。
+2. 用 `add` 或 `update` 保存任务。活动任务的合同只能由当前 owner 携带 task/state 两个期望 revision 更新；结构、ID、路径和 revision 冲突会拒绝写入。依赖未完成、上游未决、缺验证建议等只作为诊断。
+3. 用 `next`、`deps`、`dependents` 和 `context` 以有界输出选择工作。`hard` 依赖未完成时默认降低推荐度，但模型可用 `--include-blocked` 查看并继续分析或准备工作。
+4. 用 `claim/start/note/complete/reopen/release` 维护每项独立状态。可以并行领取不同任务；mutation scope 重叠只提示风险。
+5. `complete` 保存实际结果、验证与未决问题。后继任务读取前置结果摘要，不读取完整对话或原始日志。
+6. 上游改变时用 `$delivery-workflow` 的 `impact` 和本工具的 `dependents` 判断影响；CLI 不自动重置状态或宣布结果失效。
+7. 需要最终复核时用 `completion-context` 从受保护基线精确取得每个 `REQ/AC/UDES`，再汇总当前索引中的关联结果；模型逐项判断直接证据。CLI 会复算索引派生内容且不返回整体通过值；分页必须沿用同一个 snapshot ID，状态改变时从第一页重审。
 
-## Token 与推理深度
+## 硬错误与诊断
 
-- 成功证据只读摘要，失败才展开 raw artifact。普通 v1 不写 handoff、memo、`deps_for`、逐轮 Token 报告或重复 changelog；`TASK_TABLE.md` 仅按需生成，且只是只读投影，不代表执行校验通过。
-- 进度分开报告任务状态、`semantic_preflight.unresolved_count` 和 `audit --all` 的产品证据闭合度；未知或未决语义不得被任务完成率掩盖。
-- 推理深度不属于计划状态或完成证据。执行 active Goal 时遵守全局动态判断并使用 `$reasoning-governor`；任务行深度仅是开始当前项时的非权威建议，不限制后续根据真实工作变化升降。
+只对以下情况拒绝操作：无法解析或越界的文件、重复或不匹配的 ID、依赖环、同一任务的领取冲突、revision 并发覆盖、非法状态变换和破坏性覆盖。
+
+以下只报告诊断：未完成依赖、上游未决或缓存缺失、任务粒度可疑、mutation scope 重叠、验证或结果为空、引用覆盖不完整。诊断不会产生执行许可或产品完成结论。
+
+报告进度时分开给出任务状态、上游未决项和结果验证摘要，不把任一计数当成整体完成证明。最终完成标准只来自 `$delivery-workflow` 的受保护需求与用户设计。

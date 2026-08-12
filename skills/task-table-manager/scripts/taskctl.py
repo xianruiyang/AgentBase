@@ -1,6057 +1,2209 @@
 #!/usr/bin/env python3
-"""Deterministic, evidence-backed task state for long-running Codex plans."""
+"""Manage task contracts, dependency queries, execution state, and bounded context."""
 
 from __future__ import annotations
 
 import argparse
-import copy
-import datetime as dt
+import fnmatch
 import hashlib
+import importlib.util
 import json
 import os
 import re
 import sys
 import tempfile
-from pathlib import Path, PurePosixPath
-from typing import Any, Iterable
+from collections import Counter, deque
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Iterator
 
 
-PLAN_SCHEMA = "task.plan.v1"
-STATE_SCHEMA = "task.state.v1"
-EVIDENCE_SCHEMA = "task.evidence.v1"
-INDEX_SCHEMA = "task.evidence.index.v1"
-DECISION_SCHEMA = "task.decision.v1"
-COMPLETION_SCHEMA = "task.completion.v2"
-PLANNING_AUDIT_SCHEMA = "task.planning-audit.v3"
-SEMANTIC_PREFLIGHT_SCHEMA = "task.semantic-preflight.v2"
-LEGACY_SEMANTIC_PREFLIGHT_SCHEMA = "task.semantic-preflight.v1"
-
-TASK_STATUSES = {"todo", "ready", "active", "needs_review", "done", "blocked"}
-SOURCE_CLASSES = {"registered_machine", "derived_machine", "human_decision", "agent_context"}
-TRUST_STATES = {"qualified", "untrusted_legacy", "retired", "invalid"}
-TESTS_FIRST_MODES = {"required", "prequalified", "not_applicable"}
-VERIFICATION_MODES = {"task_evidence", "direct_flow"}
-SOURCE_INVENTORY_MODES = {"advisory", "exact"}
-SOURCE_FINGERPRINT_MODES = {"label", "file_sha256"}
-EVIDENCE_SHAPES = {"module", "vertical"}
-FLOW_EVIDENCE_MODES = {"single_receipt", "coverage_matrix"}
-ENFORCEMENT_PROFILES = {"legacy_compat", "strict_v1", "strict_v2"}
-STRICT_ENFORCEMENT_PROFILE = "strict_v1"
-PIPELINE_STRICT_ENFORCEMENT_PROFILE = "strict_v2"
-STRICT_ENFORCEMENT_PROFILES = {
-    STRICT_ENFORCEMENT_PROFILE,
-    PIPELINE_STRICT_ENFORCEMENT_PROFILE,
+MAX_JSON_BYTES = 2 * 1024 * 1024
+MAX_INDEX_BYTES = 16 * 1024 * 1024
+MAX_RECORDS = 20_000
+MAX_RESULT_RECORDS = 100_000
+MAX_LIST_ITEMS = 200
+MAX_STRING = 8_000
+DEFAULT_LIMIT = 50
+DEFAULT_BUDGET = 16_000
+TASK_ID_RE = re.compile(r"^T[A-Za-z0-9][A-Za-z0-9._-]*$")
+SOURCE_ID_RE = re.compile(
+    r"^(?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-[A-Za-z0-9][A-Za-z0-9._-]*$"
+)
+STATUSES = ("todo", "claimed", "in_progress", "review", "blocked", "done")
+ACTIVE_STATUSES = {"claimed", "in_progress", "review", "blocked"}
+ACTIVE_STATUS_CHOICES = ("claimed", "in_progress", "review", "blocked")
+DEPENDENCY_TYPES = ("hard", "ordering", "informational")
+REASONING_HINTS = ("low", "medium", "high", "xhigh", "max", "ultra")
+WORKFLOW_STAGES = (
+    "requirements",
+    "user_design",
+    "design",
+    "current_state",
+    "solution",
+    "deferred_changes",
+)
+PROTECTED_PREFIXES = {
+    "requirements": {"REQ", "AC", "CON"},
+    "user_design": {"UDES"},
 }
-LEGACY_ENFORCEMENT_PROFILE = "legacy_compat"
-TRACE_ORIGIN_KINDS = {"user_explicit", "confirmed_design", "derived_proposal"}
-GAP_STATUSES = {"satisfied", "partial", "missing", "unknown"}
-UNCERTAINTY_BOUNDARY_FIELDS = {
-    "owner",
-    "identity",
-    "lifecycle",
-    "persistence",
-    "build",
-}
-TRACE_SOURCE_INVENTORIES = {
-    "acceptance_clause": ("acceptance_clause_ids", "acceptance_clause_prefix"),
-    "design_clause": ("design_clause_ids", "design_clause_prefix"),
-    "solution_step": ("solution_step_ids", "solution_step_prefix"),
-    "gap_item": ("gap_ids", "gap_prefix"),
-}
-COMPLETION_LEVELS = {
-    "contract_ready": 0,
-    "scaffold_ready": 1,
-    "module_ready": 2,
-    "integration_ready": 3,
-    "production_ready": 4,
-    "domain_complete": 5,
-}
-EVIDENCE_RESULTS = {"pass", "expected_fail", "fail"}
-PHASES = {"tests", "implementation", "verification"}
-BASE_FRESHNESS_KEYS = {"contract", "production_scope", "test_scope"}
-SEMANTIC_PREFLIGHT_MODES = {"required", "not_applicable"}
-SEMANTIC_PREFLIGHT_CORE_DIMENSIONS = {
-    "owner",
-    "successor_contract",
-    "disposition",
-    "lifecycle",
-    "input_output",
-    "evidence_binding",
-}
-
-ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
-CLAIM_RE = re.compile(r"^[a-z][a-z0-9_.-]*$")
-WINDOWS_ABSOLUTE_RE = re.compile(r"^[A-Za-z]:[/\\]")
+HEADING_ID_RE = re.compile(
+    r"^##\s+(?P<id>(?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-"
+    r"[A-Za-z0-9][A-Za-z0-9._-]*)(?:\s+.*?)?\s*$"
+)
 
 
-class TaskCtlError(RuntimeError):
-    def __init__(self, message: str, *, code: str = "invalid") -> None:
-        super().__init__(message)
-        self.code = code
+class TaskctlError(RuntimeError):
+    pass
 
 
-def _require(condition: bool, message: str, *, code: str = "invalid") -> None:
-    if not condition:
-        raise TaskCtlError(message, code=code)
+def compact_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
-def _expect_object(value: Any, path: str) -> dict[str, Any]:
-    _require(isinstance(value, dict), f"{path} must be an object")
-    return value
+def emit(value: Any, *, pretty: bool = False, stream: Any = sys.stdout) -> None:
+    if pretty:
+        text = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
+    else:
+        text = compact_json(value)
+    stream.write(text + "\n")
 
 
-def _expect_list(value: Any, path: str) -> list[Any]:
-    _require(isinstance(value, list), f"{path} must be an array")
-    return value
-
-
-def _expect_string(value: Any, path: str, *, nonempty: bool = True) -> str:
-    _require(isinstance(value, str), f"{path} must be a string")
-    if nonempty:
-        _require(bool(value.strip()), f"{path} must not be empty")
-    return value
-
-
-def _expect_nonnegative_int(value: Any, path: str, *, positive: bool = False) -> int:
-    _require(
-        isinstance(value, int) and not isinstance(value, bool),
-        f"{path} must be an integer",
-    )
-    minimum = 1 if positive else 0
-    _require(value >= minimum, f"{path} must be >= {minimum}")
-    return value
-
-
-def _expect_id(value: Any, path: str) -> str:
-    text = _expect_string(value, path)
-    _require(bool(ID_RE.fullmatch(text)), f"{path} has an invalid id: {text!r}")
-    return text
-
-
-def _expect_claim(value: Any, path: str) -> str:
-    text = _expect_string(value, path)
-    _require(bool(CLAIM_RE.fullmatch(text)), f"{path} has an invalid claim id: {text!r}")
-    return text
-
-
-def _expect_sha256(value: Any, path: str) -> str:
-    text = _expect_string(value, path)
-    _require(
-        bool(re.fullmatch(r"sha256:[0-9a-f]{64}", text)),
-        f"{path} must be a lowercase sha256 identity",
-    )
-    return text
-
-
-def _enforcement_profile(plan: dict[str, Any]) -> str:
-    return plan.get("enforcement_profile", LEGACY_ENFORCEMENT_PROFILE)
-
-
-def _validate_uncertainty_boundary(value: Any, path: str) -> dict[str, str]:
-    boundary = _expect_object(value, path)
-    _expect_keys(
-        boundary,
-        required=UNCERTAINTY_BOUNDARY_FIELDS,
-        optional=set(),
-        path=path,
-    )
-    return {
-        field: _expect_string(boundary[field], f"{path}.{field}")
-        for field in sorted(UNCERTAINTY_BOUNDARY_FIELDS)
-    }
-
-
-def _expect_keys(
-    value: dict[str, Any],
-    *,
-    required: set[str],
-    optional: set[str],
-    path: str,
-) -> None:
-    missing = sorted(required - set(value))
-    unknown = sorted(set(value) - required - optional)
-    _require(not missing, f"{path} is missing fields: {', '.join(missing)}")
-    _require(not unknown, f"{path} has unknown fields: {', '.join(unknown)}")
-
-
-def _unique_strings(
-    value: Any,
-    path: str,
-    *,
-    ids: bool = False,
-    claims: bool = False,
-    allow_empty: bool = True,
-) -> list[str]:
-    items = _expect_list(value, path)
-    if not allow_empty:
-        _require(bool(items), f"{path} must not be empty")
-    result: list[str] = []
-    for index, item in enumerate(items):
-        item_path = f"{path}[{index}]"
-        if ids:
-            result.append(_expect_id(item, item_path))
-        elif claims:
-            result.append(_expect_claim(item, item_path))
-        else:
-            result.append(_expect_string(item, item_path))
-    _require(len(result) == len(set(result)), f"{path} contains duplicate values")
-    return result
-
-
-def _load_json(path: Path) -> dict[str, Any]:
-    _require(path.is_file(), f"missing JSON file: {path}", code="missing_file")
+def read_text_bounded(path: Path, limit: int) -> str:
     try:
-        with path.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise TaskCtlError(f"cannot read JSON {path}: {exc}", code="invalid_json") from exc
-    return _expect_object(data, str(path))
+        size = path.stat().st_size
+    except FileNotFoundError as exc:
+        raise TaskctlError(f"missing file: {path}") from exc
+    if size > limit:
+        raise TaskctlError(f"file exceeds {limit} bytes: {path}")
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise TaskctlError(f"file is not UTF-8: {path}") from exc
 
 
-def _canonical_bytes(value: Any) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+def read_json(path: Path, limit: int = MAX_JSON_BYTES) -> Any:
+    text = read_text_bounded(path, limit)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise TaskctlError(f"invalid JSON in {path}: {exc}") from exc
 
 
-def _pretty_bytes(value: Any) -> bytes:
-    return (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
-
-
-def _sha256_bytes(value: bytes) -> str:
-    return "sha256:" + hashlib.sha256(value).hexdigest()
-
-
-def _json_identity(value: Any) -> str:
-    return _sha256_bytes(_canonical_bytes(value))
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while True:
-            chunk = handle.read(1024 * 1024)
-            if not chunk:
-                break
-            digest.update(chunk)
-    return "sha256:" + digest.hexdigest()
-
-
-def _controller_identity() -> str:
-    script_path = Path(__file__).resolve()
-    skill_path = script_path.parents[1] / "SKILL.md"
-    inputs = []
-    for path in (script_path, skill_path):
-        _require(path.is_file(), f"controller identity input is missing: {path}")
-        inputs.append({"name": path.name, "sha256": _sha256_file(path)})
-    return _json_identity(inputs)
-
-
-def _write_bytes_atomic(path: Path, payload: bytes) -> None:
+def atomic_write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    file_descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
-    temporary_path = Path(temporary_name)
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    temp_path = Path(temp_name)
     try:
-        with os.fdopen(file_descriptor, "wb") as handle:
-            handle.write(payload)
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(str(temporary_path), str(path))
-    except Exception:
+        os.replace(temp_path, path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+
+def atomic_write_json(path: Path, value: Any) -> None:
+    atomic_write_text(path, json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+
+
+def resolve_root(raw: str) -> Path:
+    return Path(raw).expanduser().resolve()
+
+
+def resolve_inside(root: Path, relative: str) -> Path:
+    candidate = Path(relative)
+    if candidate.is_absolute():
+        raise TaskctlError(f"manifest path must be relative: {relative}")
+    resolved = (root / candidate).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise TaskctlError(f"path escapes task directory: {relative}") from exc
+    return resolved
+
+
+@contextmanager
+def workspace_lock(root: Path) -> Iterator[None]:
+    lock_path = resolve_inside(root, ".work-cache/workspace.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = resolve_inside(root, ".work-cache/workspace.lock")
+    try:
+        handle = lock_path.open("r+b")
+    except FileNotFoundError:
         try:
-            temporary_path.unlink(missing_ok=True)
+            handle = lock_path.open("x+b")
+        except FileExistsError:
+            handle = lock_path.open("r+b")
+    try:
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"0")
+            handle.flush()
+            os.fsync(handle.fileno())
+        handle.seek(0)
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            raise TaskctlError("task workspace is being updated by another process") from exc
+        yield
+    finally:
+        try:
+            handle.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
         except OSError:
             pass
-        raise
-
-
-def _write_bytes_immutable(path: Path, payload: bytes) -> None:
-    if path.exists():
-        _require(path.is_file(), f"immutable evidence path is not a file: {path}")
-        _require(path.read_bytes() == payload, f"immutable evidence snapshot conflict: {path}")
-        return
-    _write_bytes_atomic(path, payload)
-
-
-def _write_json_atomic(path: Path, value: Any) -> None:
-    _write_bytes_atomic(path, _pretty_bytes(value))
-
-
-def _write_state(plan_dir: Path, state: dict[str, Any]) -> None:
-    state_path = plan_dir / "state.json"
-    previous_path = plan_dir / "state.prev.json"
-    if state_path.is_file():
-        _write_bytes_atomic(previous_path, state_path.read_bytes())
-    _write_json_atomic(state_path, state)
-
-
-def _write_plan(plan_dir: Path, plan: dict[str, Any]) -> None:
-    plan_path = plan_dir / "plan.json"
-    previous_path = plan_dir / "plan.prev.json"
-    if plan_path.is_file():
-        _write_bytes_atomic(previous_path, plan_path.read_bytes())
-    _write_json_atomic(plan_path, plan)
-
-
-def _inside(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-        return True
-    except ValueError:
-        return False
-
-
-def _validate_relative_path(value: str, path: str) -> str:
-    text = value.replace("\\", "/")
-    pure = PurePosixPath(text)
-    _require(not pure.is_absolute(), f"{path} must be relative")
-    _require(not WINDOWS_ABSOLUTE_RE.match(text), f"{path} must be relative")
-    _require(".." not in pure.parts, f"{path} must not traverse outside its root")
-    _require(bool(pure.parts), f"{path} must not be empty")
-    return pure.as_posix()
-
-
-def _task_dir(args: argparse.Namespace) -> Path:
-    raw = Path(_expect_string(args.task_dir, "--task-dir")).expanduser()
-    _require(
-        raw.is_absolute(),
-        "--task-dir must be an absolute path",
-        code="task_dir_not_absolute",
-    )
-    task_dir = raw.resolve()
-    _require(
-        task_dir.is_dir(),
-        f"task directory does not exist: {task_dir}",
-        code="missing_task_dir",
-    )
-    return task_dir
-
-
-def _project_root(plan_dir: Path, explicit: str | None) -> Path:
-    if explicit:
-        raw = Path(explicit).expanduser()
-        _require(
-            raw.is_absolute(),
-            "--project-root must be an absolute path",
-            code="project_root_not_absolute",
-        )
-        root = raw.resolve()
-        _require(root.is_dir(), f"project root does not exist: {root}", code="missing_project_root")
-        _require(_inside(plan_dir, root), f"task directory is outside project root: {plan_dir}")
-        return root
-    if plan_dir.parent.name.lower() == "plan" and plan_dir.parent.parent.name.lower() == "docs":
-        return plan_dir.parent.parent.parent.resolve()
-    raise TaskCtlError("cannot infer project root; pass --project-root", code="missing_project_root")
-
-
-def _resolve_allowed_path(
-    value: str,
-    *,
-    root_kind: str,
-    project_root: Path,
-    plan_dir: Path,
-) -> Path:
-    relative = _validate_relative_path(value, "artifact path")
-    root = project_root if root_kind == "project" else plan_dir
-    resolved = (root / Path(relative)).resolve()
-    _require(_inside(resolved, root), f"artifact path escapes {root_kind} root: {value}")
-    return resolved
-
-
-def _expand_scope(project_root: Path, entries: Iterable[str]) -> tuple[str, int, list[str]]:
-    records: dict[str, str] = {}
-    missing: list[str] = []
-    for raw_entry in entries:
-        entry = _validate_relative_path(raw_entry, "scope path")
-        has_magic = any(character in entry for character in "*?[")
-        candidates: list[Path]
-        if has_magic:
-            candidates = [candidate for candidate in project_root.glob(entry) if candidate.is_file()]
-            if not candidates:
-                missing.append(entry)
-        else:
-            candidate = (project_root / Path(entry)).resolve()
-            _require(_inside(candidate, project_root), f"scope path escapes project root: {entry}")
-            if candidate.is_file():
-                candidates = [candidate]
-            elif candidate.is_dir():
-                candidates = [item for item in candidate.rglob("*") if item.is_file()]
-            else:
-                candidates = []
-                missing.append(entry)
-        for candidate in candidates:
-            resolved = candidate.resolve()
-            _require(_inside(resolved, project_root), f"scope file escapes project root: {candidate}")
-            relative = resolved.relative_to(project_root).as_posix()
-            records[relative] = _sha256_file(resolved)
-    digest_input = {
-        "files": [{"path": path, "sha256": records[path]} for path in sorted(records)],
-        "missing": sorted(set(missing)),
-    }
-    return _json_identity(digest_input), len(records), sorted(set(missing))
-
-
-def _plan_hash(plan: dict[str, Any]) -> str:
-    return _json_identity(plan)
-
-
-def _task_map(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return {task["id"]: task for task in plan["tasks"]}
-
-
-def _requirement_map(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return {requirement["id"]: requirement for requirement in plan["requirements"]}
-
-
-def _required_claims(plan: dict[str, Any], task: dict[str, Any]) -> list[str]:
-    overrides = task.get("claim_overrides", {})
-    claims = overrides.get("required_claims")
-    if claims:
-        return list(claims)
-    return list(plan["evidence_profiles"][task["claim_profile"]]["required_claims"])
-
-
-def _claim_rule(plan: dict[str, Any], task: dict[str, Any], claim: str) -> dict[str, Any]:
-    profile = plan["evidence_profiles"][task["claim_profile"]]
-    return profile["claim_rules"][claim]
-
-
-def _task_contract_identity(plan: dict[str, Any], task: dict[str, Any]) -> str:
-    requirements = _requirement_map(plan)
-    claims = _required_claims(plan, task)
-    profile = plan["evidence_profiles"][task["claim_profile"]]
-    producer_ids: set[str] = set()
-    for claim in claims:
-        producer_ids.update(profile["claim_rules"][claim]["producers"])
-    test_ids = task.get("claim_overrides", {}).get("automation_test_ids", [])
-    task_contract = {
-        key: task.get(key)
-        for key in (
-            "id",
-            "outcome",
-            "completion_level",
-            "claim_scope",
-            "requirement_ids",
-            "depends_on",
-            "mutation_scope",
-            "test_scope",
-            "freshness_scopes",
-            "build_profile",
-            "rollback_scope",
-            "claim_profile",
-            "claim_overrides",
-            "tests_first",
-        )
-    }
-    # Keep existing evidence compatible when the optional field is absent or
-    # empty. Only a real planned scope changes the task contract identity.
-    if task.get("planned_test_scope"):
-        task_contract["planned_test_scope"] = task["planned_test_scope"]
-    data = {
-        "task": task_contract,
-        "requirements": [requirements[requirement_id] for requirement_id in task["requirement_ids"]],
-        "profile": {
-            "required_claims": claims,
-            "claim_rules": {claim: profile["claim_rules"][claim] for claim in claims},
-        },
-        "producers": {producer_id: plan["producers"][producer_id] for producer_id in sorted(producer_ids)},
-        "test_qualifications": {
-            test_id: plan["test_qualifications"].get(test_id) for test_id in sorted(test_ids)
-        },
-    }
-    return _json_identity(data)
-
-
-def _task_identities(
-    plan: dict[str, Any],
-    task: dict[str, Any],
-    project_root: Path,
-) -> dict[str, Any]:
-    production, production_count, production_missing = _expand_scope(project_root, task["mutation_scope"])
-    planned_test_scope = task.get("planned_test_scope", [])
-    tests, test_count, all_test_missing = _expand_scope(
-        project_root, [*task["test_scope"], *planned_test_scope]
-    )
-    _, _, test_missing = _expand_scope(project_root, task["test_scope"])
-    _, _, planned_test_missing = _expand_scope(project_root, planned_test_scope)
-    result: dict[str, Any] = {
-        "contract": _task_contract_identity(plan, task),
-        "production_scope": production,
-        "test_scope": tests,
-        "scope_summary": {
-            "production_files": production_count,
-            "test_files": test_count,
-            "production_missing": production_missing,
-            "test_missing": test_missing,
-            "planned_test_missing": planned_test_missing,
-            "missing": production_missing + test_missing + planned_test_missing,
-            "custom": {},
-        },
-    }
-    for key, entries in sorted(task["freshness_scopes"].items()):
-        identity, count, missing = _expand_scope(project_root, entries)
-        result[key] = identity
-        result["scope_summary"]["custom"][key] = {"files": count, "missing": missing}
-    return result
-
-
-def _validate_plan(
-    plan: dict[str, Any],
-    *,
-    enforce_source_durability: bool = True,
-) -> None:
-    _expect_keys(
-        plan,
-        required={
-            "schema",
-            "plan_id",
-            "design_revision",
-            "scope_sources",
-            "requirements",
-            "producers",
-            "evidence_profiles",
-            "test_qualifications",
-            "groups",
-            "tasks",
-        },
-        optional={
-            "decision_refs",
-            "acceptance_flows",
-            "enforcement_profile",
-            "acceptance_clauses",
-            "design_clauses",
-            "solution_steps",
-            "gap_items",
-            "planning_audit",
-            "semantic_preflight",
-        },
-        path="plan",
-    )
-    _require(plan["schema"] == PLAN_SCHEMA, f"plan.schema must be {PLAN_SCHEMA}")
-    _expect_id(plan["plan_id"], "plan.plan_id")
-    _expect_string(plan["design_revision"], "plan.design_revision")
-    plan_decision_refs = set(
-        _unique_strings(plan.get("decision_refs", []), "plan.decision_refs")
-    )
-    enforcement_profile = _expect_string(
-        _enforcement_profile(plan), "plan.enforcement_profile"
-    )
-    _require(
-        enforcement_profile in ENFORCEMENT_PROFILES,
-        f"plan.enforcement_profile must be one of {', '.join(sorted(ENFORCEMENT_PROFILES))}",
-    )
-    strict = enforcement_profile in STRICT_ENFORCEMENT_PROFILES
-    pipeline_strict = enforcement_profile == PIPELINE_STRICT_ENFORCEMENT_PROFILE
-    if pipeline_strict:
-        for field in (
-            "acceptance_clauses",
-            "design_clauses",
-            "solution_steps",
-            "gap_items",
-            "planning_audit",
-        ):
-            _require(field in plan, f"strict_v2 plan must declare {field}")
-
-    source_ids: set[str] = set()
-    sources_by_id: dict[str, dict[str, Any]] = {}
-    scope_sources = _expect_list(plan["scope_sources"], "plan.scope_sources")
-    _require(bool(scope_sources), "plan.scope_sources must not be empty")
-    for index, source_value in enumerate(scope_sources):
-        source = _expect_object(source_value, f"plan.scope_sources[{index}]")
-        _expect_keys(
-            source,
-            required={"id", "ref"},
-            optional={
-                "fingerprint",
-                "inventory_mode",
-                "requirement_ids",
-                "fingerprint_mode",
-                "root",
-                "source_audit_ref",
-                "inventory_prefix",
-                "acceptance_clause_ids",
-                "acceptance_clause_prefix",
-                "design_clause_ids",
-                "design_clause_prefix",
-                "solution_step_ids",
-                "solution_step_prefix",
-                "gap_ids",
-                "gap_prefix",
-            },
-            path=f"plan.scope_sources[{index}]",
-        )
-        source_id = _expect_id(source["id"], f"plan.scope_sources[{index}].id")
-        _require(source_id not in source_ids, f"duplicate scope source id: {source_id}")
-        source_ids.add(source_id)
-        sources_by_id[source_id] = source
-        _expect_string(source["ref"], f"plan.scope_sources[{index}].ref")
-        if "fingerprint" in source:
-            _expect_string(source["fingerprint"], f"plan.scope_sources[{index}].fingerprint")
-        if strict:
-            _require("fingerprint" in source, f"strict source {source_id} must declare fingerprint")
-            _require(
-                "inventory_mode" in source,
-                f"strict source {source_id} must declare inventory_mode",
-            )
-            _require(
-                "fingerprint_mode" in source,
-                f"strict source {source_id} must declare fingerprint_mode",
-            )
-        inventory_mode = _expect_string(
-            source.get("inventory_mode", "advisory"),
-            f"plan.scope_sources[{index}].inventory_mode",
-        )
-        _require(inventory_mode in SOURCE_INVENTORY_MODES, f"source {source_id} has invalid inventory_mode")
-        declared_requirements = _unique_strings(
-            source.get("requirement_ids", []),
-            f"plan.scope_sources[{index}].requirement_ids",
-            ids=True,
-        )
-        inventory_prefix = source.get("inventory_prefix")
-        if inventory_prefix is not None:
-            inventory_prefix = _expect_string(
-                inventory_prefix,
-                f"plan.scope_sources[{index}].inventory_prefix",
-            )
-            _require(
-                all(requirement_id.startswith(inventory_prefix) for requirement_id in declared_requirements),
-                f"source {source_id} inventory contains ids outside prefix {inventory_prefix}",
-            )
-        fingerprint_mode = _expect_string(
-            source.get("fingerprint_mode", "label"),
-            f"plan.scope_sources[{index}].fingerprint_mode",
-        )
-        _require(
-            fingerprint_mode in SOURCE_FINGERPRINT_MODES,
-            f"source {source_id} has invalid fingerprint_mode",
-        )
-        if inventory_mode == "exact":
-            _require(bool(declared_requirements), f"source {source_id} exact inventory must not be empty")
-            _expect_string(source.get("source_audit_ref"), f"plan.scope_sources[{index}].source_audit_ref")
-            _require("fingerprint" in source, f"source {source_id} exact inventory requires fingerprint")
-            _expect_string(
-                source.get("inventory_prefix"),
-                f"plan.scope_sources[{index}].inventory_prefix",
-            )
-        if fingerprint_mode == "file_sha256":
-            _require("fingerprint" in source, f"source {source_id} file_sha256 requires fingerprint")
-            root_kind = _expect_string(source.get("root"), f"plan.scope_sources[{index}].root")
-            _require(root_kind in {"project", "task"}, f"source {source_id} has invalid root")
-        elif "root" in source:
-            _require(False, f"source {source_id}.root is only valid for file_sha256")
-        for kind, (ids_field, prefix_field) in TRACE_SOURCE_INVENTORIES.items():
-            declared_trace_ids = _unique_strings(
-                source.get(ids_field, []),
-                f"plan.scope_sources[{index}].{ids_field}",
-                ids=True,
-            )
-            prefix_value = source.get(prefix_field)
-            if declared_trace_ids:
-                prefix = _expect_string(
-                    prefix_value,
-                    f"plan.scope_sources[{index}].{prefix_field}",
-                )
-                _require(
-                    all(item_id.startswith(prefix) for item_id in declared_trace_ids),
-                    f"source {source_id} {kind} inventory contains ids outside prefix {prefix}",
-                )
-                _require(
-                    fingerprint_mode == "file_sha256",
-                    f"source {source_id} {kind} inventory requires file_sha256",
-                )
-            elif prefix_value is not None:
-                _require(
-                    False,
-                    f"source {source_id}.{prefix_field} requires a non-empty {ids_field}",
-                )
-
-    semantic_preflight_value = plan.get("semantic_preflight")
-    semantic_preflight: dict[str, Any] | None = None
-    legacy_semantic_preflight = False
-    if semantic_preflight_value is not None:
-        _require(
-            pipeline_strict,
-            "plan.semantic_preflight requires enforcement_profile=strict_v2",
-        )
-        semantic_preflight = _expect_object(
-            semantic_preflight_value, "plan.semantic_preflight"
-        )
-        if "mode" not in semantic_preflight:
-            legacy_semantic_preflight = True
-            _expect_keys(
-                semantic_preflight,
-                required={
-                    "receipt_ref",
-                    "producer_source_id",
-                    "scope_source_ids",
-                    "required_dimensions",
-                },
-                optional=set(),
-                path="plan.semantic_preflight",
-            )
-        else:
-            mode = _expect_string(
-                semantic_preflight.get("mode"), "plan.semantic_preflight.mode"
-            )
-            _require(
-                mode in SEMANTIC_PREFLIGHT_MODES,
-                "plan.semantic_preflight.mode must be required or not_applicable",
-            )
-            if mode == "not_applicable":
-                _expect_keys(
-                    semantic_preflight,
-                    required={"mode", "reason"},
-                    optional=set(),
-                    path="plan.semantic_preflight",
-                )
-                _expect_string(
-                    semantic_preflight["reason"], "plan.semantic_preflight.reason"
-                )
-                semantic_preflight = None
-            else:
-                _expect_keys(
-                    semantic_preflight,
-                    required={
-                        "mode",
-                        "reason",
-                        "receipt_ref",
-                        "identity_source_id",
-                        "producer_source_id",
-                        "scope_source_ids",
-                        "expected_total_count",
-                        "identity_set_fingerprint",
-                        "required_dimensions",
-                    },
-                    optional=set(),
-                    path="plan.semantic_preflight",
-                )
-                _expect_string(
-                    semantic_preflight["reason"], "plan.semantic_preflight.reason"
-                )
-    if semantic_preflight_value is not None and semantic_preflight is not None:
-        receipt_ref = _validate_relative_path(
-            _expect_string(
-                semantic_preflight["receipt_ref"],
-                "plan.semantic_preflight.receipt_ref",
-            ),
-            "plan.semantic_preflight.receipt_ref",
-        )
-        _require(
-            PurePosixPath(receipt_ref).suffix.lower() == ".json",
-            "plan.semantic_preflight.receipt_ref must point to JSON",
-        )
-        producer_source_id = _expect_id(
-            semantic_preflight["producer_source_id"],
-            "plan.semantic_preflight.producer_source_id",
-        )
-        semantic_source_ids = _unique_strings(
-            semantic_preflight["scope_source_ids"],
-            "plan.semantic_preflight.scope_source_ids",
-            ids=True,
-            allow_empty=False,
-        )
-        required_dimensions = _unique_strings(
-            semantic_preflight["required_dimensions"],
-            "plan.semantic_preflight.required_dimensions",
-            claims=True,
-            allow_empty=False,
-        )
-        identity_source_id: str | None = None
-        if not legacy_semantic_preflight:
-            identity_source_id = _expect_id(
-                semantic_preflight["identity_source_id"],
-                "plan.semantic_preflight.identity_source_id",
-            )
-            _require(
-                producer_source_id != identity_source_id,
-                "semantic preflight identity and verifier sources must be distinct",
-            )
-            missing_core_dimensions = (
-                SEMANTIC_PREFLIGHT_CORE_DIMENSIONS - set(required_dimensions)
-            )
-            _require(
-                not missing_core_dimensions,
-                "semantic preflight is missing core dimensions: "
-                + ",".join(sorted(missing_core_dimensions)),
-            )
-            _expect_nonnegative_int(
-                semantic_preflight["expected_total_count"],
-                "plan.semantic_preflight.expected_total_count",
-                positive=True,
-            )
-            _expect_sha256(
-                semantic_preflight["identity_set_fingerprint"],
-                "plan.semantic_preflight.identity_set_fingerprint",
-            )
-        unknown_sources = set(semantic_source_ids) - source_ids
-        _require(
-            not unknown_sources,
-            "semantic preflight references unknown scope sources: "
-            + ",".join(sorted(unknown_sources)),
-        )
-        _require(
-            producer_source_id in semantic_source_ids,
-            "semantic preflight producer_source_id must be included in scope_source_ids",
-        )
-        if identity_source_id is not None:
-            _require(
-                identity_source_id in semantic_source_ids,
-                "semantic preflight identity_source_id must be included in scope_source_ids",
-            )
-            identity_source = sources_by_id[identity_source_id]
-            producer_source = sources_by_id[producer_source_id]
-            _require(
-                (identity_source.get("root"), identity_source["ref"])
-                != (producer_source.get("root"), producer_source["ref"]),
-                "semantic preflight identity and verifier sources must reference different files",
-            )
-        for semantic_source_id in semantic_source_ids:
-            _require(
-                sources_by_id[semantic_source_id].get("fingerprint_mode")
-                == "file_sha256",
-                f"semantic preflight source {semantic_source_id} must use file_sha256",
-            )
-
-    requirement_ids: set[str] = set()
-    in_scope_requirements: set[str] = set()
-    direct_flow_requirements: set[str] = set()
-    acceptance_scope_by_requirement: dict[str, set[str]] = {}
-    observable_claims_by_requirement: dict[str, set[str]] = {}
-    for index, requirement_value in enumerate(_expect_list(plan["requirements"], "plan.requirements")):
-        path = f"plan.requirements[{index}]"
-        requirement = _expect_object(requirement_value, path)
-        _expect_keys(
-            requirement,
-            required={"id", "source_ref", "source_fingerprint", "status", "observable_claims"},
-            optional={
-                "out_of_scope_reason",
-                "user_decision_ref",
-                "verification_mode",
-                "acceptance_scope",
-            },
-            path=path,
-        )
-        requirement_id = _expect_id(requirement["id"], f"{path}.id")
-        _require(requirement_id not in requirement_ids, f"duplicate requirement id: {requirement_id}")
-        requirement_ids.add(requirement_id)
-        source_ref = _expect_string(requirement["source_ref"], f"{path}.source_ref")
-        _require(
-            any(source_ref == source_id or source_ref.startswith(source_id + ":") for source_id in source_ids),
-            f"{path}.source_ref must belong to a registered scope source",
-        )
-        _expect_string(requirement["source_fingerprint"], f"{path}.source_fingerprint")
-        status = _expect_string(requirement["status"], f"{path}.status")
-        _require(status in {"in_scope", "out_of_scope"}, f"{path}.status is invalid")
-        observable_claims = _unique_strings(
-            requirement["observable_claims"], f"{path}.observable_claims", claims=True
-        )
-        if status == "in_scope":
-            _require(bool(observable_claims), f"{path}.observable_claims must not be empty for in_scope")
-            in_scope_requirements.add(requirement_id)
-            _require("out_of_scope_reason" not in requirement, f"{path} cannot carry out_of_scope_reason")
-            if strict:
-                _require(
-                    "verification_mode" in requirement,
-                    f"strict in-scope requirement {requirement_id} must declare verification_mode",
-                )
-                _require(
-                    "acceptance_scope" in requirement,
-                    f"strict in-scope requirement {requirement_id} must declare acceptance_scope",
-                )
-            verification_mode = _expect_string(
-                requirement.get("verification_mode", "task_evidence"),
-                f"{path}.verification_mode",
-            )
-            _require(verification_mode in VERIFICATION_MODES, f"{path}.verification_mode is invalid")
-            acceptance_scope = set(
-                _unique_strings(requirement.get("acceptance_scope", []), f"{path}.acceptance_scope")
-            )
-            if verification_mode == "direct_flow":
-                _require(bool(acceptance_scope), f"{path}.acceptance_scope must not be empty for direct_flow")
-                direct_flow_requirements.add(requirement_id)
-            acceptance_scope_by_requirement[requirement_id] = acceptance_scope
-            observable_claims_by_requirement[requirement_id] = set(observable_claims)
-        else:
-            _expect_string(requirement.get("out_of_scope_reason"), f"{path}.out_of_scope_reason")
-            _expect_string(requirement.get("user_decision_ref"), f"{path}.user_decision_ref")
-
-    non_exact_requirement_sources: list[str] = []
-    non_file_requirement_sources: list[str] = []
-    for source_id, source in sources_by_id.items():
-        declared = set(source.get("requirement_ids", []))
-        actual = {
-            requirement["id"]
-            for requirement in plan["requirements"]
-            if requirement["source_ref"] == source_id
-            or requirement["source_ref"].startswith(source_id + ":")
-        }
-        if strict:
-            if actual:
-                if source.get("inventory_mode") != "exact":
-                    non_exact_requirement_sources.append(source_id)
-                if source.get("fingerprint_mode") != "file_sha256":
-                    non_file_requirement_sources.append(source_id)
-            _require(
-                "requirement_ids" in source,
-                f"strict source {source_id} must declare requirement_ids",
-            )
-            _require(
-                declared == actual,
-                f"strict source {source_id} requirement inventory mismatch; missing="
-                + ",".join(sorted(actual - declared))
-                + " extra="
-                + ",".join(sorted(declared - actual)),
-            )
-            for requirement in plan["requirements"]:
-                if requirement["id"] not in actual:
-                    continue
-                _require(
-                    requirement["source_fingerprint"] == source["fingerprint"],
-                    f"strict source requirement {requirement['id']} must use the source fingerprint",
-                )
-        if source.get("inventory_mode", "advisory") != "exact":
-            continue
-        _require(
-            declared == actual,
-            f"source {source_id} exact requirement inventory mismatch; missing="
-            + ",".join(sorted(actual - declared))
-            + " extra="
-            + ",".join(sorted(declared - actual)),
-        )
-        for requirement in plan["requirements"]:
-            if requirement["id"] not in actual or requirement["status"] != "in_scope":
-                continue
-            _require(
-                requirement["source_fingerprint"] == source["fingerprint"],
-                f"exact source requirement {requirement['id']} must use the source fingerprint",
-            )
-            _require(
-                "verification_mode" in requirement,
-                f"exact source requirement {requirement['id']} must declare verification_mode",
-            )
-            _require(
-                bool(requirement.get("acceptance_scope", [])),
-                f"exact source requirement {requirement['id']} must declare acceptance_scope",
-            )
-    if strict and enforce_source_durability:
-        _require(
-            not non_exact_requirement_sources and not non_file_requirement_sources,
-            "strict requirement sources must be durable; non_exact="
-            + ",".join(sorted(non_exact_requirement_sources))
-            + " non_file_sha256="
-            + ",".join(sorted(non_file_requirement_sources)),
-            code="strict_source_not_durable",
-        )
-
-    acceptance_clause_by_id: dict[str, dict[str, Any]] = {}
-    design_clause_by_id: dict[str, dict[str, Any]] = {}
-    solution_step_by_id: dict[str, dict[str, Any]] = {}
-    gap_item_by_id: dict[str, dict[str, Any]] = {}
-    acceptance_clauses_by_requirement: dict[str, set[str]] = {
-        requirement_id: set() for requirement_id in in_scope_requirements
-    }
-    acceptance_verification_scope_by_requirement: dict[str, set[str]] = {
-        requirement_id: set() for requirement_id in in_scope_requirements
-    }
-    acceptance_claims_by_requirement: dict[str, set[str]] = {
-        requirement_id: set() for requirement_id in in_scope_requirements
-    }
-
-    def trace_source_id(source_ref: str, path: str) -> str:
-        matches = [
-            source_id
-            for source_id in source_ids
-            if source_ref == source_id or source_ref.startswith(source_id + ":")
-        ]
-        _require(bool(matches), f"{path}.source_ref must belong to a registered scope source")
-        return max(matches, key=len)
-
-    def validate_trace_source(item: dict[str, Any], path: str) -> str:
-        source_ref = _expect_string(item["source_ref"], f"{path}.source_ref")
-        source_id = trace_source_id(source_ref, path)
-        fingerprint = _expect_string(
-            item["source_fingerprint"], f"{path}.source_fingerprint"
-        )
-        _require(
-            fingerprint == sources_by_id[source_id].get("fingerprint"),
-            f"{path} must use the registered source fingerprint",
-        )
-        return source_id
-
-    trace_actual_by_source: dict[str, dict[str, set[str]]] = {
-        source_id: {kind: set() for kind in TRACE_SOURCE_INVENTORIES}
-        for source_id in source_ids
-    }
-    if pipeline_strict:
-        for index, clause_value in enumerate(
-            _expect_list(plan["acceptance_clauses"], "plan.acceptance_clauses")
-        ):
-            path = f"plan.acceptance_clauses[{index}]"
-            clause = _expect_object(clause_value, path)
-            _expect_keys(
-                clause,
-                required={
-                    "id",
-                    "requirement_id",
-                    "statement",
-                    "verification_scope",
-                    "required_claims",
-                    "source_ref",
-                    "source_fingerprint",
-                    "origin_kind",
-                    "origin_ref",
-                },
-                optional={"decision_ref"},
-                path=path,
-            )
-            clause_id = _expect_id(clause["id"], f"{path}.id")
-            _require(
-                clause_id not in acceptance_clause_by_id,
-                f"duplicate acceptance clause id: {clause_id}",
-            )
-            requirement_id = _expect_id(
-                clause["requirement_id"], f"{path}.requirement_id"
-            )
-            _require(
-                requirement_id in in_scope_requirements,
-                f"acceptance clause {clause_id} references non-active requirement {requirement_id}",
-            )
-            origin_kind = _expect_string(clause["origin_kind"], f"{path}.origin_kind")
-            _require(
-                origin_kind in TRACE_ORIGIN_KINDS,
-                f"acceptance clause {clause_id} has invalid origin_kind",
-            )
-            _expect_string(clause["origin_ref"], f"{path}.origin_ref")
-            _expect_string(clause["statement"], f"{path}.statement")
-            verification_scope = set(
-                _unique_strings(
-                    clause["verification_scope"],
-                    f"{path}.verification_scope",
-                    allow_empty=False,
-                )
-            )
-            required_claims = set(
-                _unique_strings(
-                    clause["required_claims"],
-                    f"{path}.required_claims",
-                    claims=True,
-                    allow_empty=False,
-                )
-            )
-            if "decision_ref" in clause:
-                decision_ref = _expect_string(
-                    clause["decision_ref"], f"{path}.decision_ref"
-                )
-                _require(
-                    decision_ref in plan_decision_refs,
-                    f"acceptance clause {clause_id} decision_ref must be registered in plan.decision_refs",
-                    code="unconfirmed_acceptance_clause",
-                )
-            if origin_kind == "derived_proposal":
-                _require(
-                    "decision_ref" in clause,
-                    f"derived acceptance clause {clause_id} requires an explicit decision_ref",
-                    code="unconfirmed_acceptance_clause",
-                )
-            source_id = validate_trace_source(clause, path)
-            trace_actual_by_source[source_id]["acceptance_clause"].add(clause_id)
-            acceptance_clause_by_id[clause_id] = clause
-            acceptance_clauses_by_requirement[requirement_id].add(clause_id)
-            acceptance_verification_scope_by_requirement[requirement_id].update(
-                verification_scope
-            )
-            acceptance_claims_by_requirement[requirement_id].update(required_claims)
-        _require(
-            bool(acceptance_clause_by_id),
-            "strict_v2 plan.acceptance_clauses must not be empty",
-        )
-        for requirement_id in sorted(in_scope_requirements):
-            declared_scope = acceptance_scope_by_requirement[requirement_id]
-            source_scope = acceptance_verification_scope_by_requirement[requirement_id]
-            _require(
-                declared_scope == source_scope,
-                f"requirement {requirement_id} acceptance_scope must exactly equal source-owned clause verification scopes; missing="
-                + ",".join(sorted(source_scope - declared_scope))
-                + " extra="
-                + ",".join(sorted(declared_scope - source_scope)),
-                code="acceptance_scope_drift",
-            )
-            declared_claims = observable_claims_by_requirement[requirement_id]
-            source_claims = acceptance_claims_by_requirement[requirement_id]
-            _require(
-                declared_claims == source_claims,
-                f"requirement {requirement_id} observable_claims must exactly equal source-owned clause claims; missing="
-                + ",".join(sorted(source_claims - declared_claims))
-                + " extra="
-                + ",".join(sorted(declared_claims - source_claims)),
-                code="acceptance_claim_drift",
-            )
-
-        covered_acceptance_clauses: set[str] = set()
-        for index, clause_value in enumerate(
-            _expect_list(plan["design_clauses"], "plan.design_clauses")
-        ):
-            path = f"plan.design_clauses[{index}]"
-            clause = _expect_object(clause_value, path)
-            _expect_keys(
-                clause,
-                required={
-                    "id",
-                    "statement",
-                    "source_ref",
-                    "source_fingerprint",
-                    "acceptance_clause_ids",
-                },
-                optional=set(),
-                path=path,
-            )
-            clause_id = _expect_id(clause["id"], f"{path}.id")
-            _expect_string(clause["statement"], f"{path}.statement")
-            _require(
-                clause_id not in design_clause_by_id,
-                f"duplicate design clause id: {clause_id}",
-            )
-            acceptance_ids = set(
-                _unique_strings(
-                    clause["acceptance_clause_ids"],
-                    f"{path}.acceptance_clause_ids",
-                    ids=True,
-                    allow_empty=False,
-                )
-            )
-            _require(
-                acceptance_ids <= set(acceptance_clause_by_id),
-                f"design clause {clause_id} references unknown acceptance clauses: "
-                + ",".join(sorted(acceptance_ids - set(acceptance_clause_by_id))),
-            )
-            source_id = validate_trace_source(clause, path)
-            trace_actual_by_source[source_id]["design_clause"].add(clause_id)
-            covered_acceptance_clauses.update(acceptance_ids)
-            design_clause_by_id[clause_id] = clause
-        _require(
-            covered_acceptance_clauses == set(acceptance_clause_by_id),
-            "acceptance clauses without design coverage: "
-            + ",".join(sorted(set(acceptance_clause_by_id) - covered_acceptance_clauses)),
-            code="traceability_gap",
-        )
-
-        covered_design_clauses: set[str] = set()
-        for index, step_value in enumerate(
-            _expect_list(plan["solution_steps"], "plan.solution_steps")
-        ):
-            path = f"plan.solution_steps[{index}]"
-            step = _expect_object(step_value, path)
-            _expect_keys(
-                step,
-                required={
-                    "id",
-                    "action",
-                    "expected_result",
-                    "source_ref",
-                    "source_fingerprint",
-                    "design_clause_ids",
-                    "depends_on",
-                    "must_not_depend_on",
-                    "uncertainty_boundary",
-                },
-                optional=set(),
-                path=path,
-            )
-            step_id = _expect_id(step["id"], f"{path}.id")
-            _expect_string(step["action"], f"{path}.action")
-            _expect_string(step["expected_result"], f"{path}.expected_result")
-            _require(
-                step_id not in solution_step_by_id,
-                f"duplicate solution step id: {step_id}",
-            )
-            design_ids = set(
-                _unique_strings(
-                    step["design_clause_ids"],
-                    f"{path}.design_clause_ids",
-                    ids=True,
-                    allow_empty=False,
-                )
-            )
-            _require(
-                design_ids <= set(design_clause_by_id),
-                f"solution step {step_id} references unknown design clauses: "
-                + ",".join(sorted(design_ids - set(design_clause_by_id))),
-            )
-            _unique_strings(step["depends_on"], f"{path}.depends_on", ids=True)
-            _unique_strings(
-                step["must_not_depend_on"],
-                f"{path}.must_not_depend_on",
-                ids=True,
-            )
-            _validate_uncertainty_boundary(
-                step["uncertainty_boundary"], f"{path}.uncertainty_boundary"
-            )
-            source_id = validate_trace_source(step, path)
-            trace_actual_by_source[source_id]["solution_step"].add(step_id)
-            covered_design_clauses.update(design_ids)
-            solution_step_by_id[step_id] = step
-        _require(
-            covered_design_clauses == set(design_clause_by_id),
-            "design clauses without solution coverage: "
-            + ",".join(sorted(set(design_clause_by_id) - covered_design_clauses)),
-            code="traceability_gap",
-        )
-        for step_id, step in solution_step_by_id.items():
-            dependencies = set(step["depends_on"])
-            forbidden = set(step["must_not_depend_on"])
-            _require(
-                dependencies <= set(solution_step_by_id),
-                f"solution step {step_id} depends on unknown steps: "
-                + ",".join(sorted(dependencies - set(solution_step_by_id))),
-            )
-            _require(
-                forbidden <= set(solution_step_by_id),
-                f"solution step {step_id} forbids unknown steps: "
-                + ",".join(sorted(forbidden - set(solution_step_by_id))),
-            )
-            _require(
-                step_id not in dependencies | forbidden,
-                f"solution step {step_id} cannot reference itself",
-            )
-            _require(
-                not dependencies & forbidden,
-                f"solution step {step_id} both requires and forbids: "
-                + ",".join(sorted(dependencies & forbidden)),
-            )
-        visiting_steps: set[str] = set()
-        visited_steps: set[str] = set()
-
-        def visit_solution(step_id: str) -> None:
-            if step_id in visited_steps:
-                return
-            _require(
-                step_id not in visiting_steps,
-                f"solution dependency cycle includes {step_id}",
-            )
-            visiting_steps.add(step_id)
-            for upstream_id in solution_step_by_id[step_id]["depends_on"]:
-                visit_solution(upstream_id)
-            visiting_steps.remove(step_id)
-            visited_steps.add(step_id)
-
-        for step_id in sorted(solution_step_by_id):
-            visit_solution(step_id)
-
-        covered_solution_steps: set[str] = set()
-        solution_gap_owner: dict[str, str] = {}
-        for index, gap_value in enumerate(_expect_list(plan["gap_items"], "plan.gap_items")):
-            path = f"plan.gap_items[{index}]"
-            gap = _expect_object(gap_value, path)
-            _expect_keys(
-                gap,
-                required={
-                    "id",
-                    "finding",
-                    "source_ref",
-                    "source_fingerprint",
-                    "solution_step_ids",
-                    "status",
-                },
-                optional=set(),
-                path=path,
-            )
-            gap_id = _expect_id(gap["id"], f"{path}.id")
-            _expect_string(gap["finding"], f"{path}.finding")
-            _require(gap_id not in gap_item_by_id, f"duplicate gap id: {gap_id}")
-            solution_ids = set(
-                _unique_strings(
-                    gap["solution_step_ids"],
-                    f"{path}.solution_step_ids",
-                    ids=True,
-                    allow_empty=False,
-                )
-            )
-            _require(
-                solution_ids <= set(solution_step_by_id),
-                f"gap {gap_id} references unknown solution steps: "
-                + ",".join(sorted(solution_ids - set(solution_step_by_id))),
-            )
-            for solution_id in solution_ids:
-                _require(
-                    solution_id not in solution_gap_owner,
-                    f"solution step {solution_id} is assigned to multiple gap items: "
-                    f"{solution_gap_owner.get(solution_id)},{gap_id}",
-                    code="traceability_gap",
-                )
-                solution_gap_owner[solution_id] = gap_id
-            status = _expect_string(gap["status"], f"{path}.status")
-            _require(status in GAP_STATUSES, f"gap {gap_id} has invalid status")
-            source_id = validate_trace_source(gap, path)
-            trace_actual_by_source[source_id]["gap_item"].add(gap_id)
-            covered_solution_steps.update(solution_ids)
-            gap_item_by_id[gap_id] = gap
-        _require(
-            covered_solution_steps == set(solution_step_by_id),
-            "solution steps without current-state gap analysis: "
-            + ",".join(sorted(set(solution_step_by_id) - covered_solution_steps)),
-            code="traceability_gap",
-        )
-
-        for source_id, inventories in trace_actual_by_source.items():
-            source = sources_by_id[source_id]
-            for kind, (ids_field, _prefix_field) in TRACE_SOURCE_INVENTORIES.items():
-                actual_ids = inventories[kind]
-                declared_ids = set(source.get(ids_field, []))
-                _require(
-                    declared_ids == actual_ids,
-                    f"source {source_id} {kind} inventory mismatch; missing="
-                    + ",".join(sorted(actual_ids - declared_ids))
-                    + " extra="
-                    + ",".join(sorted(declared_ids - actual_ids)),
-                    code="traceability_inventory_drift",
-                )
-
-        planning_audit = _expect_object(plan["planning_audit"], "plan.planning_audit")
-        _expect_keys(
-            planning_audit,
-            required={"receipt_ref"},
-            optional=set(),
-            path="plan.planning_audit",
-        )
-        _validate_relative_path(
-            _expect_string(planning_audit["receipt_ref"], "plan.planning_audit.receipt_ref"),
-            "plan.planning_audit.receipt_ref",
-        )
-
-    producers = _expect_object(plan["producers"], "plan.producers")
-    for producer_id, producer_value in producers.items():
-        _expect_id(producer_id, f"plan.producers.{producer_id}")
-        producer = _expect_object(producer_value, f"plan.producers.{producer_id}")
-        _expect_keys(
-            producer,
-            required={
-                "version",
-                "source_class",
-                "source_ref",
-                "allowed_claims",
-                "envelope_schema",
-                "requires_raw_artifacts",
-            },
-            optional=set(),
-            path=f"plan.producers.{producer_id}",
-        )
-        _expect_string(producer["version"], f"plan.producers.{producer_id}.version")
-        source_class = _expect_string(producer["source_class"], f"plan.producers.{producer_id}.source_class")
-        _require(source_class in SOURCE_CLASSES, f"plan.producers.{producer_id}.source_class is invalid")
-        _expect_string(producer["source_ref"], f"plan.producers.{producer_id}.source_ref")
-        _unique_strings(
-            producer["allowed_claims"],
-            f"plan.producers.{producer_id}.allowed_claims",
-            claims=True,
-            allow_empty=False,
-        )
-        _require(
-            producer["envelope_schema"] == EVIDENCE_SCHEMA,
-            f"plan.producers.{producer_id}.envelope_schema must be {EVIDENCE_SCHEMA}",
-        )
-        _require(
-            isinstance(producer["requires_raw_artifacts"], bool),
-            f"plan.producers.{producer_id}.requires_raw_artifacts must be boolean",
-        )
-
-    profiles = _expect_object(plan["evidence_profiles"], "plan.evidence_profiles")
-    for profile_id, profile_value in profiles.items():
-        _expect_id(profile_id, f"plan.evidence_profiles.{profile_id}")
-        profile = _expect_object(profile_value, f"plan.evidence_profiles.{profile_id}")
-        _expect_keys(
-            profile,
-            required={"required_claims", "claim_rules"},
-            optional=set(),
-            path=f"plan.evidence_profiles.{profile_id}",
-        )
-        required_claims = _unique_strings(
-            profile["required_claims"],
-            f"plan.evidence_profiles.{profile_id}.required_claims",
-            claims=True,
-            allow_empty=False,
-        )
-        rules = _expect_object(profile["claim_rules"], f"plan.evidence_profiles.{profile_id}.claim_rules")
-        _require(set(required_claims) <= set(rules), f"profile {profile_id} lacks rules for required claims")
-        for claim, rule_value in rules.items():
-            _expect_claim(claim, f"plan.evidence_profiles.{profile_id}.claim_rules.{claim}")
-            rule = _expect_object(rule_value, f"plan.evidence_profiles.{profile_id}.claim_rules.{claim}")
-            _expect_keys(
-                rule,
-                required={"producers", "source_classes", "freshness_keys", "min_evidence"},
-                optional=set(),
-                path=f"plan.evidence_profiles.{profile_id}.claim_rules.{claim}",
-            )
-            producer_ids_for_claim = _unique_strings(
-                rule["producers"],
-                f"plan.evidence_profiles.{profile_id}.claim_rules.{claim}.producers",
-                ids=True,
-                allow_empty=False,
-            )
-            for producer_id in producer_ids_for_claim:
-                _require(producer_id in producers, f"profile {profile_id} references unknown producer {producer_id}")
-                _require(
-                    claim in producers[producer_id]["allowed_claims"],
-                    f"producer {producer_id} does not allow claim {claim}",
-                )
-            source_classes = _unique_strings(
-                rule["source_classes"],
-                f"plan.evidence_profiles.{profile_id}.claim_rules.{claim}.source_classes",
-                allow_empty=False,
-            )
-            _require(set(source_classes) <= SOURCE_CLASSES, f"claim {claim} has invalid source_classes")
-            _require(
-                "agent_context" not in source_classes,
-                f"claim {claim} cannot accept agent_context as completion evidence",
-            )
-            for producer_id in producer_ids_for_claim:
-                _require(
-                    producers[producer_id]["source_class"] in source_classes,
-                    f"producer {producer_id} source_class is not accepted by claim {claim}",
-                )
-            freshness = _unique_strings(
-                rule["freshness_keys"],
-                f"plan.evidence_profiles.{profile_id}.claim_rules.{claim}.freshness_keys",
-                claims=True,
-            )
-            _require("contract" in freshness, f"claim {claim} must require contract freshness")
-            _require(
-                isinstance(rule["min_evidence"], int) and not isinstance(rule["min_evidence"], bool),
-                f"claim {claim}.min_evidence must be an integer",
-            )
-            _require(rule["min_evidence"] >= 1, f"claim {claim}.min_evidence must be at least 1")
-
-    qualifications = _expect_object(plan["test_qualifications"], "plan.test_qualifications")
-    for test_id, qualification_value in qualifications.items():
-        _expect_string(test_id, f"plan.test_qualifications.{test_id}")
-        qualification = _expect_object(qualification_value, f"plan.test_qualifications.{test_id}")
-        _expect_keys(
-            qualification,
-            required={
-                "requirement_ids",
-                "subject",
-                "oracle_source",
-                "baseline",
-                "claim_dimensions",
-                "negative_paths",
-                "trust_state",
-                "source_fingerprint",
-            },
-            optional={"observed_scopes", "evidence_shape"},
-            path=f"plan.test_qualifications.{test_id}",
-        )
-        for requirement_id in _unique_strings(
-            qualification["requirement_ids"],
-            f"plan.test_qualifications.{test_id}.requirement_ids",
-            ids=True,
-            allow_empty=False,
-        ):
-            _require(requirement_id in requirement_ids, f"test {test_id} references unknown requirement {requirement_id}")
-        _expect_string(qualification["subject"], f"plan.test_qualifications.{test_id}.subject")
-        _expect_string(qualification["oracle_source"], f"plan.test_qualifications.{test_id}.oracle_source")
-        _expect_string(qualification["baseline"], f"plan.test_qualifications.{test_id}.baseline")
-        _unique_strings(
-            qualification["claim_dimensions"],
-            f"plan.test_qualifications.{test_id}.claim_dimensions",
-            claims=True,
-            allow_empty=False,
-        )
-        _unique_strings(qualification["negative_paths"], f"plan.test_qualifications.{test_id}.negative_paths")
-        trust_state = _expect_string(qualification["trust_state"], f"plan.test_qualifications.{test_id}.trust_state")
-        _require(trust_state in TRUST_STATES, f"test {test_id} has invalid trust_state")
-        _expect_string(qualification["source_fingerprint"], f"plan.test_qualifications.{test_id}.source_fingerprint")
-        evidence_shape = _expect_string(
-            qualification.get("evidence_shape", "module"),
-            f"plan.test_qualifications.{test_id}.evidence_shape",
-        )
-        _require(evidence_shape in EVIDENCE_SHAPES, f"test {test_id} has invalid evidence_shape")
-        observed_scopes = _unique_strings(
-            qualification.get("observed_scopes", []),
-            f"plan.test_qualifications.{test_id}.observed_scopes",
-        )
-        if evidence_shape == "vertical":
-            _require(bool(observed_scopes), f"vertical test {test_id} must declare observed_scopes")
-        else:
-            _require(
-                not observed_scopes,
-                f"module test {test_id} cannot declare observed_scopes",
-            )
-
-    tasks = _expect_list(plan["tasks"], "plan.tasks")
-    _require(bool(tasks), "plan.tasks must not be empty")
-    task_ids: set[str] = set()
-    task_by_id: dict[str, dict[str, Any]] = {}
-    requirement_consumers: set[str] = set()
-    acceptance_clause_consumers: set[str] = set()
-    gap_owner_task: dict[str, str] = {}
-    solution_owner_task: dict[str, str] = {}
-    for index, task_value in enumerate(tasks):
-        path = f"plan.tasks[{index}]"
-        task = _expect_object(task_value, path)
-        _expect_keys(
-            task,
-            required={
-                "id",
-                "outcome",
-                "requirement_ids",
-                "depends_on",
-                "context_refs",
-                "mutation_scope",
-                "test_scope",
-                "freshness_scopes",
-                "build_profile",
-                "rollback_scope",
-                "package_key",
-                "claim_profile",
-                "claim_overrides",
-                "tests_first",
-            },
-            optional={
-                "planned_test_scope",
-                "completion_level",
-                "claim_scope",
-                "scope_enforced",
-                "acceptance_clause_ids",
-                "solution_step_ids",
-                "gap_ids",
-                "uncertainty_boundary",
-            },
-            path=path,
-        )
-        task_id = _expect_id(task["id"], f"{path}.id")
-        _require(task_id not in task_ids, f"duplicate task id: {task_id}")
-        task_ids.add(task_id)
-        task_by_id[task_id] = task
-        _expect_string(task["outcome"], f"{path}.outcome")
-        if strict:
-            for field in ("completion_level", "claim_scope", "scope_enforced"):
-                _require(
-                    field in task,
-                    f"strict task {task_id} must declare {field}",
-                )
-        if pipeline_strict:
-            for field in (
-                "acceptance_clause_ids",
-                "solution_step_ids",
-                "gap_ids",
-                "uncertainty_boundary",
-            ):
-                _require(field in task, f"strict_v2 task {task_id} must declare {field}")
-        completion_level = _expect_string(
-            task.get("completion_level", "module_ready"), f"{path}.completion_level"
-        )
-        _require(completion_level in COMPLETION_LEVELS, f"{path}.completion_level is invalid")
-        claim_scope = set(_unique_strings(task.get("claim_scope", []), f"{path}.claim_scope"))
-        scope_enforced = task.get("scope_enforced", False)
-        _require(isinstance(scope_enforced, bool), f"{path}.scope_enforced must be boolean")
-        if strict:
-            if COMPLETION_LEVELS[completion_level] >= COMPLETION_LEVELS["integration_ready"]:
-                _require(bool(claim_scope), f"strict high-level task {task_id} must have claim_scope")
-                _require(
-                    scope_enforced,
-                    f"strict high-level task {task_id} must enable scope_enforced",
-                )
-        if scope_enforced and COMPLETION_LEVELS[completion_level] >= COMPLETION_LEVELS["integration_ready"]:
-            _require("completion_level" in task, f"scope-enforced task {task_id} must declare completion_level")
-            _require(bool(claim_scope), f"scope-enforced task {task_id} must declare claim_scope")
-        task_requirements = _unique_strings(
-            task["requirement_ids"], f"{path}.requirement_ids", ids=True, allow_empty=False
-        )
-        for requirement_id in task_requirements:
-            _require(requirement_id in in_scope_requirements, f"task {task_id} references non-active requirement {requirement_id}")
-            requirement_consumers.add(requirement_id)
-        if pipeline_strict:
-            task_acceptance_ids = set(
-                _unique_strings(
-                    task["acceptance_clause_ids"],
-                    f"{path}.acceptance_clause_ids",
-                    ids=True,
-                    allow_empty=False,
-                )
-            )
-            _require(
-                task_acceptance_ids <= set(acceptance_clause_by_id),
-                f"task {task_id} references unknown acceptance clauses: "
-                + ",".join(sorted(task_acceptance_ids - set(acceptance_clause_by_id))),
-            )
-            derived_requirements = {
-                acceptance_clause_by_id[clause_id]["requirement_id"]
-                for clause_id in task_acceptance_ids
-            }
-            _require(
-                set(task_requirements) == derived_requirements,
-                f"task {task_id} requirement_ids must exactly match its acceptance clauses; missing="
-                + ",".join(sorted(derived_requirements - set(task_requirements)))
-                + " extra="
-                + ",".join(sorted(set(task_requirements) - derived_requirements)),
-                code="task_traceability_drift",
-            )
-            acceptance_clause_consumers.update(task_acceptance_ids)
-            task_solution_ids = set(
-                _unique_strings(
-                    task["solution_step_ids"],
-                    f"{path}.solution_step_ids",
-                    ids=True,
-                    allow_empty=False,
-                )
-            )
-            _require(
-                task_solution_ids <= set(solution_step_by_id),
-                f"task {task_id} references unknown solution steps: "
-                + ",".join(sorted(task_solution_ids - set(solution_step_by_id))),
-            )
-            task_gap_ids = set(
-                _unique_strings(
-                    task["gap_ids"],
-                    f"{path}.gap_ids",
-                    ids=True,
-                    allow_empty=False,
-                )
-            )
-            _require(
-                task_gap_ids <= set(gap_item_by_id),
-                f"task {task_id} references unknown gaps: "
-                + ",".join(sorted(task_gap_ids - set(gap_item_by_id))),
-            )
-            gap_solution_ids = set().union(
-                *(set(gap_item_by_id[gap_id]["solution_step_ids"]) for gap_id in task_gap_ids)
-            )
-            _require(
-                task_solution_ids == gap_solution_ids,
-                f"task {task_id} solution_step_ids must exactly match its gaps; missing="
-                + ",".join(sorted(gap_solution_ids - task_solution_ids))
-                + " extra="
-                + ",".join(sorted(task_solution_ids - gap_solution_ids)),
-                code="task_traceability_drift",
-            )
-            for gap_id in task_gap_ids:
-                _require(
-                    gap_item_by_id[gap_id]["status"] != "satisfied",
-                    f"task {task_id} cannot implement satisfied gap {gap_id}",
-                )
-                _require(
-                    gap_id not in gap_owner_task,
-                    f"gap {gap_id} has multiple task owners: {gap_owner_task.get(gap_id)},{task_id}",
-                )
-                gap_owner_task[gap_id] = task_id
-            for solution_id in task_solution_ids:
-                _require(
-                    solution_id not in solution_owner_task,
-                    f"solution step {solution_id} has multiple task owners: "
-                    f"{solution_owner_task.get(solution_id)},{task_id}",
-                )
-                solution_owner_task[solution_id] = task_id
-            task_boundary = _validate_uncertainty_boundary(
-                task["uncertainty_boundary"], f"{path}.uncertainty_boundary"
-            )
-            for solution_id in task_solution_ids:
-                solution_boundary = _validate_uncertainty_boundary(
-                    solution_step_by_id[solution_id]["uncertainty_boundary"],
-                    f"solution step {solution_id}.uncertainty_boundary",
-                )
-                _require(
-                    task_boundary == solution_boundary,
-                    f"task {task_id} combines solution step {solution_id} from a different uncertainty boundary",
-                    code="heterogeneous_work_package",
-                )
-            solution_acceptance_ids: set[str] = set()
-            for solution_id in task_solution_ids:
-                for design_id in solution_step_by_id[solution_id]["design_clause_ids"]:
-                    solution_acceptance_ids.update(
-                        design_clause_by_id[design_id]["acceptance_clause_ids"]
-                    )
-            _require(
-                task_acceptance_ids <= solution_acceptance_ids,
-                f"task {task_id} acceptance clauses are not justified by its solution steps: "
-                + ",".join(sorted(task_acceptance_ids - solution_acceptance_ids)),
-                code="task_traceability_drift",
-            )
-        _expect_list(task["depends_on"], f"{path}.depends_on")
-        _unique_strings(task["context_refs"], f"{path}.context_refs")
-        for scope_name in ("mutation_scope", "test_scope", "planned_test_scope"):
-            for scope_index, scope_entry in enumerate(
-                _unique_strings(task.get(scope_name, []), f"{path}.{scope_name}")
-            ):
-                _validate_relative_path(scope_entry, f"{path}.{scope_name}[{scope_index}]")
-        freshness_scopes = _expect_object(task["freshness_scopes"], f"{path}.freshness_scopes")
-        for freshness_key, scope_value in freshness_scopes.items():
-            _expect_claim(freshness_key, f"{path}.freshness_scopes.{freshness_key}")
-            _require(
-                freshness_key not in BASE_FRESHNESS_KEYS,
-                f"task {task_id} cannot redefine built-in freshness key {freshness_key}",
-            )
-            scope_entries = _unique_strings(
-                scope_value,
-                f"{path}.freshness_scopes.{freshness_key}",
-                allow_empty=False,
-            )
-            for scope_index, scope_entry in enumerate(scope_entries):
-                _validate_relative_path(
-                    scope_entry,
-                    f"{path}.freshness_scopes.{freshness_key}[{scope_index}]",
-                )
-        _expect_string(task["build_profile"], f"{path}.build_profile", nonempty=False)
-        _expect_string(task["rollback_scope"], f"{path}.rollback_scope")
-        _expect_string(task["package_key"], f"{path}.package_key")
-        profile_id = _expect_id(task["claim_profile"], f"{path}.claim_profile")
-        _require(profile_id in profiles, f"task {task_id} references unknown claim_profile {profile_id}")
-        overrides = _expect_object(task["claim_overrides"], f"{path}.claim_overrides")
-        _expect_keys(
-            overrides,
-            required={"required_claims", "automation_test_ids", "readback_subjects"},
-            optional=set(),
-            path=f"{path}.claim_overrides",
-        )
-        override_claims = _unique_strings(
-            overrides["required_claims"], f"{path}.claim_overrides.required_claims", claims=True
-        )
-        if override_claims:
-            for claim in override_claims:
-                _require(
-                    claim in profiles[profile_id]["claim_rules"],
-                    f"task {task_id} requires claim {claim} without a profile rule",
-                )
-        automation_test_ids = _unique_strings(
-            overrides["automation_test_ids"], f"{path}.claim_overrides.automation_test_ids"
-        )
-        if automation_test_ids:
-            _require(
-                bool(task["test_scope"] or task.get("planned_test_scope", [])),
-                f"task {task_id} declares tests without test_scope or planned_test_scope",
-            )
-        readback_subjects = set(
-            _unique_strings(
-                overrides["readback_subjects"],
-                f"{path}.claim_overrides.readback_subjects",
-            )
-        )
-        if scope_enforced:
-            _require(
-                claim_scope <= readback_subjects,
-                f"scope-enforced task {task_id} claims subjects without required readback: "
-                + ", ".join(sorted(claim_scope - readback_subjects)),
-            )
-            if (
-                COMPLETION_LEVELS[completion_level] >= COMPLETION_LEVELS["production_ready"]
-                and "public_entry" in set(_required_claims(plan, task))
-            ):
-                _require(
-                    bool(set(task_requirements) & direct_flow_requirements),
-                    f"scope-enforced production task {task_id} with public_entry must own a direct_flow requirement",
-                )
-        tests_first = _expect_object(task["tests_first"], f"{path}.tests_first")
-        _expect_keys(
-            tests_first,
-            required={"mode", "reason", "expected_red_producer"},
-            optional=set(),
-            path=f"{path}.tests_first",
-        )
-        mode = _expect_string(tests_first["mode"], f"{path}.tests_first.mode")
-        _require(mode in TESTS_FIRST_MODES, f"task {task_id} has invalid tests_first.mode")
-        _expect_string(tests_first["reason"], f"{path}.tests_first.reason", nonempty=mode != "required")
-        producer_id = _expect_string(
-            tests_first["expected_red_producer"],
-            f"{path}.tests_first.expected_red_producer",
-            nonempty=mode == "required",
-        )
-        if mode == "required":
-            _require(producer_id in producers, f"task {task_id} has unknown expected-red producer {producer_id}")
-            _require(
-                bool(automation_test_ids),
-                f"task {task_id} requires tests-first but declares no automation_test_ids",
-            )
-            _require(
-                producers[producer_id]["source_class"] in {"registered_machine", "derived_machine"},
-                f"task {task_id} expected-red producer must be machine evidence",
-            )
-
-    _require(
-        requirement_consumers == in_scope_requirements,
-        "in-scope requirements without task consumers: "
-        + ", ".join(sorted(in_scope_requirements - requirement_consumers)),
-    )
-    if pipeline_strict:
-        _require(
-            acceptance_clause_consumers == set(acceptance_clause_by_id),
-            "acceptance clauses without task consumers: "
-            + ",".join(sorted(set(acceptance_clause_by_id) - acceptance_clause_consumers)),
-            code="traceability_gap",
-        )
-        incomplete_gap_ids = {
-            gap_id
-            for gap_id, gap in gap_item_by_id.items()
-            if gap["status"] != "satisfied"
-        }
-        _require(
-            set(gap_owner_task) == incomplete_gap_ids,
-            "unfinished gaps without exactly one task owner: "
-            + ",".join(sorted(incomplete_gap_ids - set(gap_owner_task))),
-            code="traceability_gap",
-        )
-    requirement_claim_coverage: dict[str, set[str]] = {
-        requirement_id: set() for requirement_id in in_scope_requirements
-    }
-    for task in task_by_id.values():
-        task_claims = set(_required_claims(plan, task))
-        for requirement_id in task["requirement_ids"]:
-            requirement_claim_coverage[requirement_id].update(task_claims)
-    requirements_by_id = _requirement_map(plan)
-    for requirement_id, covered_claims in requirement_claim_coverage.items():
-        observable = set(requirements_by_id[requirement_id]["observable_claims"])
-        _require(
-            observable <= covered_claims,
-            f"requirement {requirement_id} has unmapped claims: "
-            + ", ".join(sorted(observable - covered_claims)),
-        )
-
-    for task_id, task in task_by_id.items():
-        upstream_seen: set[str] = set()
-        for edge_index, edge_value in enumerate(task["depends_on"]):
-            path = f"task {task_id}.depends_on[{edge_index}]"
-            edge = _expect_object(edge_value, path)
-            _expect_keys(edge, required={"task_id", "claims"}, optional=set(), path=path)
-            upstream_id = _expect_id(edge["task_id"], f"{path}.task_id")
-            _require(upstream_id in task_by_id, f"task {task_id} depends on unknown task {upstream_id}")
-            _require(upstream_id != task_id, f"task {task_id} cannot depend on itself")
-            _require(upstream_id not in upstream_seen, f"task {task_id} repeats dependency {upstream_id}")
-            upstream_seen.add(upstream_id)
-            consumed_claims = _unique_strings(edge["claims"], f"{path}.claims", claims=True, allow_empty=False)
-            upstream_claims = set(_required_claims(plan, task_by_id[upstream_id]))
-            _require(
-                set(consumed_claims) <= upstream_claims,
-                f"task {task_id} consumes undeclared claims from {upstream_id}",
-            )
-        for test_id in task["claim_overrides"]["automation_test_ids"]:
-            _require(test_id in qualifications, f"task {task_id} references unknown test qualification {test_id}")
-        claims = _required_claims(plan, task)
-        _require(bool(claims), f"task {task_id} has no required claims")
-        for claim in claims:
-            rule = _claim_rule(plan, task, claim)
-            allowed_freshness = BASE_FRESHNESS_KEYS | set(task["freshness_scopes"])
-            for freshness_key in rule["freshness_keys"]:
-                _require(
-                    freshness_key in allowed_freshness,
-                    f"task {task_id} claim {claim} uses freshness key {freshness_key} "
-                    "without a recomputable freshness scope",
-                )
-
-    visiting: set[str] = set()
-    visited: set[str] = set()
-
-    def visit(task_id: str) -> None:
-        if task_id in visited:
-            return
-        _require(task_id not in visiting, f"task dependency cycle includes {task_id}")
-        visiting.add(task_id)
-        for edge in task_by_id[task_id]["depends_on"]:
-            visit(edge["task_id"])
-        visiting.remove(task_id)
-        visited.add(task_id)
-
-    for task_id in sorted(task_by_id):
-        visit(task_id)
-
-    if pipeline_strict:
-        dependency_closure_cache: dict[str, set[str]] = {}
-
-        def dependency_closure(task_id: str) -> set[str]:
-            if task_id in dependency_closure_cache:
-                return dependency_closure_cache[task_id]
-            result: set[str] = set()
-            for edge in task_by_id[task_id]["depends_on"]:
-                upstream_id = edge["task_id"]
-                result.add(upstream_id)
-                result.update(dependency_closure(upstream_id))
-            dependency_closure_cache[task_id] = result
-            return result
-
-        for task_id, task in task_by_id.items():
-            direct_task_dependencies = {edge["task_id"] for edge in task["depends_on"]}
-            transitive_task_dependencies = dependency_closure(task_id)
-            for solution_id in task["solution_step_ids"]:
-                solution_step = solution_step_by_id[solution_id]
-                for upstream_solution_id in solution_step["depends_on"]:
-                    upstream_task_id = solution_owner_task.get(upstream_solution_id)
-                    if upstream_task_id is None or upstream_task_id == task_id:
-                        continue
-                    _require(
-                        upstream_task_id in direct_task_dependencies,
-                        f"task {task_id} misses solution dependency {upstream_solution_id} owned by {upstream_task_id}",
-                        code="solution_dependency_drift",
-                    )
-                for forbidden_solution_id in solution_step["must_not_depend_on"]:
-                    forbidden_task_id = solution_owner_task.get(forbidden_solution_id)
-                    if forbidden_task_id is None:
-                        continue
-                    _require(
-                        forbidden_task_id not in transitive_task_dependencies,
-                        f"task {task_id} depends on forbidden solution {forbidden_solution_id} via {forbidden_task_id}",
-                        code="forbidden_solution_dependency",
-                    )
-
-    flow_ids: set[str] = set()
-    mapped_direct_flow_requirements: set[str] = set()
-    for index, flow_value in enumerate(
-        _expect_list(plan.get("acceptance_flows", []), "plan.acceptance_flows")
+        handle.close()
+
+
+def load_table(root: Path) -> dict[str, Any]:
+    path = root / "task-table.json"
+    table = read_json(path)
+    if not isinstance(table, dict) or table.get("schema") != "task.table":
+        raise TaskctlError(f"unsupported task table manifest: {path}")
+    resolved_paths: dict[str, Path] = {}
+    for field, default in (
+        ("task_dir", "tasks"),
+        ("state_dir", "state"),
+        ("result_dir", "results"),
+        ("table_view", "TASK_TABLE.md"),
     ):
-        path = f"plan.acceptance_flows[{index}]"
-        flow = _expect_object(flow_value, path)
-        _expect_keys(
-            flow,
-            required={
-                "id",
-                "title",
-                "scope",
-                "requirement_ids",
-                "verification_task_id",
-                "required_claims",
-                "direct_test_ids",
-            },
-            optional={"evidence_mode", "scope_coverage", "scope_claims"},
-            path=path,
-        )
-        flow_id = _expect_id(flow["id"], f"{path}.id")
-        _require(flow_id not in flow_ids, f"duplicate acceptance flow id: {flow_id}")
-        flow_ids.add(flow_id)
-        _expect_string(flow["title"], f"{path}.title")
-        _expect_string(flow["scope"], f"{path}.scope")
-        flow_requirements = set(
-            _unique_strings(flow["requirement_ids"], f"{path}.requirement_ids", ids=True, allow_empty=False)
-        )
-        _require(
-            flow_requirements <= direct_flow_requirements,
-            f"acceptance flow {flow_id} may only reference in-scope direct_flow requirements",
-        )
-        mapped_direct_flow_requirements.update(flow_requirements)
-        verification_task_id = _expect_id(flow["verification_task_id"], f"{path}.verification_task_id")
-        _require(
-            verification_task_id in task_by_id,
-            f"acceptance flow {flow_id} references unknown verification task {verification_task_id}",
-        )
-        verification_task = task_by_id[verification_task_id]
-        _require(
-            flow_requirements <= set(verification_task["requirement_ids"]),
-            f"acceptance flow {flow_id} verification task does not own all requirements",
-        )
-        level = verification_task.get("completion_level", "module_ready")
-        _require(
-            COMPLETION_LEVELS[level] >= COMPLETION_LEVELS["integration_ready"],
-            f"acceptance flow {flow_id} requires integration_ready or higher verification task",
-        )
-        required_scope = set().union(
-            *(acceptance_scope_by_requirement[requirement_id] for requirement_id in flow_requirements)
-        )
-        _require(
-            required_scope <= set(verification_task.get("claim_scope", [])),
-            f"acceptance flow {flow_id} verification task misses claim_scope: "
-            + ", ".join(sorted(required_scope - set(verification_task.get("claim_scope", [])))),
-        )
-        required_claims = set(
-            _unique_strings(flow["required_claims"], f"{path}.required_claims", claims=True, allow_empty=False)
-        )
-        _require(
-            required_claims <= set(_required_claims(plan, verification_task)),
-            f"acceptance flow {flow_id} requires claims not owned by verification task",
-        )
-        direct_test_ids = _unique_strings(
-            flow["direct_test_ids"], f"{path}.direct_test_ids", allow_empty=False
-        )
-        _require(
-            set(direct_test_ids) <= set(verification_task["claim_overrides"]["automation_test_ids"]),
-            f"acceptance flow {flow_id} direct tests must belong to its verification task",
-        )
-        covered_claims: set[str] = set()
-        for test_id in direct_test_ids:
-            _require(test_id in qualifications, f"acceptance flow {flow_id} references unknown test {test_id}")
-            qualification = qualifications[test_id]
-            _require(
-                flow_requirements <= set(qualification["requirement_ids"]),
-                f"acceptance flow {flow_id} test {test_id} does not bind all flow requirements",
-            )
-            covered_claims.update(qualification["claim_dimensions"])
-        _require(
-            required_claims <= covered_claims,
-            f"acceptance flow {flow_id} direct tests miss claims: "
-            + ", ".join(sorted(required_claims - covered_claims)),
-        )
-        if strict:
-            _require(
-                "evidence_mode" in flow and "scope_coverage" in flow,
-                f"strict acceptance flow {flow_id} must declare evidence_mode and scope_coverage",
-            )
-        if "evidence_mode" in flow or "scope_coverage" in flow:
-            _require(
-                "evidence_mode" in flow and "scope_coverage" in flow,
-                f"acceptance flow {flow_id} must declare evidence_mode and scope_coverage together",
-            )
-            evidence_mode = _expect_string(flow["evidence_mode"], f"{path}.evidence_mode")
-            _require(
-                evidence_mode in FLOW_EVIDENCE_MODES,
-                f"acceptance flow {flow_id} has invalid evidence_mode",
-            )
-            coverage_value = _expect_object(flow["scope_coverage"], f"{path}.scope_coverage")
-            _require(
-                set(coverage_value) == required_scope,
-                f"acceptance flow {flow_id} scope_coverage must exactly match acceptance scope; missing="
-                + ",".join(sorted(required_scope - set(coverage_value)))
-                + " extra="
-                + ",".join(sorted(set(coverage_value) - required_scope)),
-            )
-            scope_claims_by_scope: dict[str, set[str]] = {
-                scope_id: set(required_claims) for scope_id in required_scope
-            }
-            if "scope_claims" in flow:
-                scope_claims_value = _expect_object(
-                    flow["scope_claims"], f"{path}.scope_claims"
-                )
-                _require(
-                    set(scope_claims_value) == required_scope,
-                    f"acceptance flow {flow_id} scope_claims must exactly match acceptance scope",
-                )
-                scope_claims_by_scope = {}
-                for scope_id, claims_value in scope_claims_value.items():
-                    scoped_claims = set(
-                        _unique_strings(
-                            claims_value,
-                            f"{path}.scope_claims.{scope_id}",
-                            claims=True,
-                            allow_empty=False,
-                        )
-                    )
-                    _require(
-                        scoped_claims <= required_claims,
-                        f"acceptance flow {flow_id} scope_claims for {scope_id} exceed required_claims",
-                    )
-                    scope_claims_by_scope[scope_id] = scoped_claims
-                _require(
-                    set().union(*scope_claims_by_scope.values()) == required_claims,
-                    f"acceptance flow {flow_id} scope_claims must cover every required claim",
-                )
-            covered_test_ids: set[str] = set()
-            for scope_id, mapped_value in coverage_value.items():
-                _expect_string(scope_id, f"{path}.scope_coverage key")
-                mapped_tests = _unique_strings(
-                    mapped_value,
-                    f"{path}.scope_coverage.{scope_id}",
-                    allow_empty=False,
-                )
-                _require(
-                    set(mapped_tests) <= set(direct_test_ids),
-                    f"acceptance flow {flow_id} scope {scope_id} maps undeclared direct tests",
-                )
-                covered_test_ids.update(mapped_tests)
-                for test_id in mapped_tests:
-                    qualification = qualifications[test_id]
-                    _require(
-                        qualification.get("evidence_shape", "module") == "vertical",
-                        f"acceptance flow {flow_id} requires vertical test evidence for {test_id}",
-                    )
-                    _require(
-                        scope_id in qualification.get("observed_scopes", []),
-                        f"acceptance flow {flow_id} test {test_id} does not observe scope {scope_id}",
-                    )
-                    _require(
-                        scope_claims_by_scope[scope_id]
-                        <= set(qualification["claim_dimensions"]),
-                        f"acceptance flow {flow_id} scope_claims for {scope_id} are not proven by {test_id}",
-                    )
-            _require(
-                covered_test_ids == set(direct_test_ids),
-                f"acceptance flow {flow_id} has direct tests outside scope_coverage: "
-                + ", ".join(sorted(set(direct_test_ids) - covered_test_ids)),
-            )
-            if evidence_mode == "single_receipt":
-                _require(
-                    len(direct_test_ids) == 1,
-                    f"single_receipt flow {flow_id} must use exactly one direct test",
-                )
-                _require(
-                    all(set(mapped) == set(direct_test_ids) for mapped in coverage_value.values()),
-                    f"single_receipt flow {flow_id} must bind every scope to its one direct test",
-                )
-    _require(
-        mapped_direct_flow_requirements == direct_flow_requirements,
-        "direct_flow requirements without acceptance flow: "
-        + ", ".join(sorted(direct_flow_requirements - mapped_direct_flow_requirements)),
-    )
-    strict_flow_verification_tasks = {
-        flow["verification_task_id"]
-        for flow in plan.get("acceptance_flows", [])
-        if "evidence_mode" in flow and "scope_coverage" in flow
-    }
-    for task_id, task in task_by_id.items():
-        if (
-            task.get("completion_level") == "domain_complete"
-            and (strict or task.get("scope_enforced", False))
-        ):
-            _require(
-                task_id in strict_flow_verification_tasks,
-                f"scope-enforced domain_complete task {task_id} must verify a strict acceptance flow",
-            )
-    if strict:
-        high_level_tasks = {
-            task["id"]
-            for task in tasks
-            if COMPLETION_LEVELS[task["completion_level"]]
-            >= COMPLETION_LEVELS["integration_ready"]
-        }
-        if high_level_tasks:
-            _require(
-                any(
-                    source.get("inventory_mode") == "exact"
-                    for source in sources_by_id.values()
-                ),
-                "strict plan with high-level tasks requires at least one exact scope source",
-            )
-            _require(
-                bool(direct_flow_requirements),
-                "strict plan with high-level tasks requires at least one direct_flow requirement",
-            )
-
-    group_ids: set[str] = set()
-    grouped_tasks: set[str] = set()
-    for index, group_value in enumerate(_expect_list(plan["groups"], "plan.groups")):
-        path = f"plan.groups[{index}]"
-        group = _expect_object(group_value, path)
-        _expect_keys(group, required={"id", "title", "task_ids"}, optional=set(), path=path)
-        group_id = _expect_id(group["id"], f"{path}.id")
-        _require(group_id not in group_ids, f"duplicate group id: {group_id}")
-        group_ids.add(group_id)
-        _expect_string(group["title"], f"{path}.title")
-        for task_id in _unique_strings(group["task_ids"], f"{path}.task_ids", ids=True):
-            _require(task_id in task_by_id, f"group {group_id} references unknown task {task_id}")
-            _require(task_id not in grouped_tasks, f"task {task_id} appears in multiple groups")
-            grouped_tasks.add(task_id)
-
-
-def _new_task_state(status: str = "todo") -> dict[str, Any]:
-    return {"status": status, "evidence_refs": [], "unresolved": [], "baseline_identity": {}}
-
-
-def _validate_unresolved(value: Any, path: str) -> list[dict[str, Any]]:
-    items = _expect_list(value, path)
-    result: list[dict[str, Any]] = []
-    for index, item_value in enumerate(items):
-        item_path = f"{path}[{index}]"
-        item = _expect_object(item_value, item_path)
-        _expect_keys(
-            item,
-            required={"type", "subject", "next_action"},
-            optional={"details"},
-            path=item_path,
-        )
-        _expect_string(item["type"], f"{item_path}.type")
-        _expect_string(item["subject"], f"{item_path}.subject")
-        _expect_string(item["next_action"], f"{item_path}.next_action")
-        if "details" in item:
-            _expect_string(item["details"], f"{item_path}.details")
-        result.append(item)
-    return result
-
-
-def _validate_state(
-    state: dict[str, Any],
-    plan: dict[str, Any],
-    *,
-    enforce_plan_revision: bool = True,
-) -> None:
-    _expect_keys(
-        state,
-        required={"schema", "plan_id", "plan_revision", "revision", "active_package", "task_states"},
-        optional=set(),
-        path="state",
-    )
-    _require(state["schema"] == STATE_SCHEMA, f"state.schema must be {STATE_SCHEMA}")
-    _require(state["plan_id"] == plan["plan_id"], "state.plan_id does not match plan")
-    if enforce_plan_revision:
-        _require(
-            state["plan_revision"] == _plan_hash(plan),
-            "plan.json changed outside taskctl amend; state revision is bound to another plan",
-            code="plan_revision_mismatch",
-        )
-    _require(
-        isinstance(state["revision"], int) and not isinstance(state["revision"], bool) and state["revision"] >= 1,
-        "state.revision must be a positive integer",
-    )
-    task_by_id = _task_map(plan)
-    task_states = _expect_object(state["task_states"], "state.task_states")
-    _require(set(task_states) == set(task_by_id), "state.task_states must match plan task ids")
-    for task_id, task_state_value in task_states.items():
-        task_state = _expect_object(task_state_value, f"state.task_states.{task_id}")
-        _expect_keys(
-            task_state,
-            required={"status", "evidence_refs", "unresolved", "baseline_identity"},
-            optional=set(),
-            path=f"state.task_states.{task_id}",
-        )
-        status = _expect_string(task_state["status"], f"state.task_states.{task_id}.status")
-        _require(status in TASK_STATUSES, f"task {task_id} has invalid status {status}")
-        _unique_strings(task_state["evidence_refs"], f"state.task_states.{task_id}.evidence_refs")
-        _validate_unresolved(task_state["unresolved"], f"state.task_states.{task_id}.unresolved")
-        baseline = _expect_object(task_state["baseline_identity"], f"state.task_states.{task_id}.baseline_identity")
-        if baseline:
-            identity_keys = BASE_FRESHNESS_KEYS | set(task_by_id[task_id]["freshness_scopes"])
-            _expect_keys(
-                baseline,
-                required=identity_keys | {"scope_summary"},
-                optional=set(),
-                path=f"state.task_states.{task_id}.baseline_identity",
-            )
-            for identity_key in identity_keys:
-                _expect_string(
-                    baseline[identity_key],
-                    f"state.task_states.{task_id}.baseline_identity.{identity_key}",
-                )
-            _expect_object(
-                baseline["scope_summary"],
-                f"state.task_states.{task_id}.baseline_identity.scope_summary",
-            )
-    active = state["active_package"]
-    if active is None:
-        _require(
-            all(task_state["status"] != "active" for task_state in task_states.values()),
-            "active task exists without active_package",
-        )
-        return
-    active = _expect_object(active, "state.active_package")
-    _expect_keys(
-        active,
-        required={
-            "task_ids",
-            "phase",
-            "baseline_identity",
-            "changed_paths",
-            "evidence_refs",
-            "unresolved",
-            "next_action",
-        },
-        optional={"revalidation_task_ids", "controller_identity"},
-        path="state.active_package",
-    )
-    if "controller_identity" in active:
-        _expect_string(active["controller_identity"], "state.active_package.controller_identity")
-    active_ids = _unique_strings(active["task_ids"], "state.active_package.task_ids", ids=True, allow_empty=False)
-    revalidation_ids = _unique_strings(
-        active.get("revalidation_task_ids", []),
-        "state.active_package.revalidation_task_ids",
-        ids=True,
-    )
-    _require(
-        set(revalidation_ids) <= set(active_ids),
-        "active revalidation task ids must be active package task ids",
-    )
-    for task_id in active_ids:
-        _require(task_id in task_by_id, f"active_package references unknown task {task_id}")
-        _require(task_states[task_id]["status"] == "active", f"active task {task_id} is not active in task_states")
-    phase = _expect_string(active["phase"], "state.active_package.phase")
-    _require(phase in PHASES, f"state.active_package.phase is invalid: {phase}")
-    baselines = _expect_object(active["baseline_identity"], "state.active_package.baseline_identity")
-    _require(set(baselines) == set(active_ids), "active baseline identities must match active task ids")
-    _unique_strings(active["changed_paths"], "state.active_package.changed_paths")
-    _unique_strings(active["evidence_refs"], "state.active_package.evidence_refs")
-    _validate_unresolved(active["unresolved"], "state.active_package.unresolved")
-    _expect_string(active["next_action"], "state.active_package.next_action")
-
-
-def _dependencies_done(plan: dict[str, Any], state: dict[str, Any], task: dict[str, Any]) -> bool:
-    return all(state["task_states"][edge["task_id"]]["status"] == "done" for edge in task["depends_on"])
-
-
-def _dependency_closure(plan: dict[str, Any], seeds: set[str]) -> set[str]:
-    tasks = _task_map(plan)
-    result = set(seeds)
-    queue = list(seeds)
-    while queue:
-        current = queue.pop()
-        for edge in tasks[current]["depends_on"]:
-            dependency = edge["task_id"]
-            if dependency not in result:
-                result.add(dependency)
-                queue.append(dependency)
-    return result
-
-
-def _active_evidence_task_ids(plan: dict[str, Any], state: dict[str, Any]) -> set[str]:
-    active = state["active_package"]
-    _require(active is not None, "cannot ingest evidence without an active package")
-    return _dependency_closure(plan, set(active["task_ids"]))
-
-
-def _active_controller_status(state: dict[str, Any]) -> str:
-    active = state.get("active_package")
-    if active is None:
-        return "not_active"
-    expected = active.get("controller_identity")
-    if not expected:
-        return "unbound"
-    return "verified" if expected == _controller_identity() else "drifted"
-
-
-def _require_active_controller(state: dict[str, Any]) -> None:
-    status = _active_controller_status(state)
-    _require(
-        status == "verified",
-        "active work package controller changed or predates controller binding; "
-        "use checkpoint --release, review the change, then begin again",
-        code="controller_drift",
-    )
-
-
-def _recompute_ready(plan: dict[str, Any], state: dict[str, Any]) -> None:
-    for task in plan["tasks"]:
-        task_state = state["task_states"][task["id"]]
-        if task_state["status"] not in {"todo", "ready"}:
-            continue
-        task_state["status"] = "ready" if _dependencies_done(plan, state, task) else "todo"
-
-
-def _verify_scope_sources(plan: dict[str, Any], plan_dir: Path) -> None:
-    project_root: Path | None = None
-    for source in plan["scope_sources"]:
-        if source.get("fingerprint_mode", "label") != "file_sha256":
-            continue
-        relative = _validate_relative_path(source["ref"], f"scope source {source['id']}.ref")
-        if source["root"] == "task":
-            root = plan_dir
-        else:
-            if project_root is None:
-                project_root = _project_root(plan_dir, None)
-            root = project_root
-        source_path = (root / Path(relative)).resolve()
-        _require(
-            _inside(source_path, root),
-            f"scope source {source['id']} escapes its {source['root']} root",
-            code="source_drift",
-        )
-        _require(
-            source_path.is_file(),
-            f"scope source {source['id']} is missing: {source_path}",
-            code="source_drift",
-        )
-        actual = _sha256_file(source_path)
-        _require(
-            actual == source["fingerprint"],
-            f"scope source {source['id']} changed; expected {source['fingerprint']}, got {actual}; amend the requirement inventory before continuing",
-            code="source_drift",
-        )
-        inventory_specs: list[tuple[str, str, set[str]]] = []
-        inventory_prefix = source.get("inventory_prefix")
-        if inventory_prefix:
-            inventory_specs.append(
-                ("requirement", inventory_prefix, set(source.get("requirement_ids", [])))
-            )
-        for kind, (ids_field, prefix_field) in TRACE_SOURCE_INVENTORIES.items():
-            prefix = source.get(prefix_field)
-            if prefix:
-                inventory_specs.append((kind, prefix, set(source.get(ids_field, []))))
-        if inventory_specs:
-            try:
-                source_text = source_path.read_text(encoding="utf-8")
-            except UnicodeDecodeError as exc:
-                raise TaskCtlError(
-                    f"scope source {source['id']} exact inventory must be UTF-8 text: {source_path}",
-                    code="source_inventory_drift",
-                ) from exc
-        for kind, prefix, declared_ids in inventory_specs:
-            token_pattern = re.compile(
-                rf"(?<![A-Za-z0-9_.:-]){re.escape(prefix)}[A-Za-z0-9_.:-]*(?![A-Za-z0-9_.:-])"
-            )
-            observed_ids = set(token_pattern.findall(source_text))
-            _require(
-                observed_ids == declared_ids,
-                f"scope source {source['id']} {kind} ids differ from the file; missing="
-                + ",".join(sorted(observed_ids - declared_ids))
-                + " extra="
-                + ",".join(sorted(declared_ids - observed_ids)),
-                code="source_inventory_drift",
-            )
-
-
-def _load_plan_state(
-    plan_dir: Path,
-    *,
-    require_state: bool = True,
-    enforce_plan_revision: bool = True,
-    verify_sources: bool = True,
-    enforce_source_durability: bool = True,
-) -> tuple[dict[str, Any], dict[str, Any] | None]:
-    plan = _load_json(plan_dir / "plan.json")
-    _validate_plan(plan, enforce_source_durability=enforce_source_durability)
-    if verify_sources:
-        _verify_scope_sources(plan, plan_dir)
-    state_path = plan_dir / "state.json"
-    if not state_path.is_file():
-        _require(not require_state, f"missing state.json in {plan_dir}", code="missing_state")
-        return plan, None
-    state = _load_json(state_path)
-    _validate_state(state, plan, enforce_plan_revision=enforce_plan_revision)
-    return plan, state
-
-
-def _evidence_filename(evidence_id: str) -> str:
-    slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", evidence_id).strip("-.") or "evidence"
-    digest = hashlib.sha256(evidence_id.encode("utf-8")).hexdigest()[:10]
-    return f"{slug[:80]}-{digest}.json"
-
-
-def _artifact_snapshot_path(artifact_path: Path, artifact_hash: str) -> str:
-    digest = artifact_hash.removeprefix("sha256:")
-    suffix = artifact_path.suffix.lower()
-    if not re.fullmatch(r"\.[a-z0-9]{1,12}", suffix):
-        suffix = ".bin"
-    return f"evidence/artifacts/{digest}{suffix}"
-
-
-def _prepare_evidence_snapshots(
-    report_path: Path,
-    envelope: dict[str, Any],
-    *,
-    project_root: Path,
-    plan_dir: Path,
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, bytes]]:
-    normalized = copy.deepcopy(envelope)
-    pending_files: dict[str, bytes] = {}
-    for artifact in normalized["raw_artifacts"]:
-        artifact_path = _resolve_allowed_path(
-            artifact["path"],
-            root_kind=artifact["root"],
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        payload = artifact_path.read_bytes()
-        _require(
-            _sha256_bytes(payload) == artifact["sha256"],
-            f"raw artifact changed while importing evidence: {artifact_path}",
-        )
-        relative = _artifact_snapshot_path(artifact_path, artifact["sha256"])
-        pending_files[relative] = payload
-        artifact["root"] = "plan"
-        artifact["path"] = relative
-
-    source_relative = f"evidence/sources/{_evidence_filename(envelope['evidence_id'])}"
-    source_payload = report_path.read_bytes()
-    pending_files[source_relative] = source_payload
-    source = {
-        "root": "plan",
-        "path": source_relative,
-        "sha256": _sha256_bytes(source_payload),
-    }
-    return normalized, source, pending_files
-
-
-def _resolve_input_report(path_text: str, project_root: Path, plan_dir: Path) -> Path:
-    path = Path(path_text).expanduser()
-    if not path.is_absolute():
-        path = plan_dir / path
-    resolved = path.resolve()
-    _require(
-        _inside(resolved, project_root) or _inside(resolved, plan_dir),
-        f"evidence report is outside allowed roots: {resolved}",
-    )
-    _require(resolved.is_file(), f"evidence report does not exist: {resolved}", code="missing_evidence")
-    return resolved
-
-
-def _resolve_task_input(path_text: str, plan_dir: Path, label: str) -> Path:
-    path = Path(path_text).expanduser()
-    if not path.is_absolute():
-        path = plan_dir / path
-    resolved = path.resolve()
-    _require(
-        _inside(resolved, plan_dir),
-        f"{label} is outside task directory: {resolved}",
-        code="task_input_outside_root",
-    )
-    _require(
-        resolved.is_file(),
-        f"{label} does not exist: {resolved}",
-        code="missing_task_input",
-    )
-    return resolved
-
-
-def _resolve_context_output_dir(
-    path_text: str, project_root: Path, plan_dir: Path
-) -> Path:
-    path = Path(path_text).expanduser()
-    if not path.is_absolute():
-        path = plan_dir / path
-    resolved = path.resolve()
-    _require(
-        _inside(resolved, project_root) or _inside(resolved, plan_dir),
-        f"context output directory is outside allowed roots: {resolved}",
-        code="context_output_outside_root",
-    )
-    _require(
-        resolved not in {project_root, plan_dir},
-        "context output directory must be a dedicated subdirectory",
-        code="context_output_too_broad",
-    )
-    resolved.mkdir(parents=True, exist_ok=True)
-    _require(resolved.is_dir(), f"context output path is not a directory: {resolved}")
-    return resolved
-
-
-def _validate_evidence_envelope(
-    envelope: dict[str, Any],
-    *,
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    project_root: Path,
-    plan_dir: Path,
-    active_only: bool,
-) -> None:
-    _expect_keys(
-        envelope,
-        required={
-            "schema",
-            "evidence_id",
-            "plan_id",
-            "plan_revision",
-            "task_ids",
-            "type",
-            "phase",
-            "source_class",
-            "producer",
-            "result",
-            "claims",
-            "subjects",
-            "test_ids",
-            "freshness_identity",
-            "raw_artifacts",
-            "started_at",
-            "completed_at",
-            "summary",
-        },
-        optional={"decision_ref"},
-        path="evidence",
-    )
-    _require(envelope["schema"] == EVIDENCE_SCHEMA, f"evidence.schema must be {EVIDENCE_SCHEMA}")
-    _expect_id(envelope["evidence_id"], "evidence.evidence_id")
-    _require(envelope["plan_id"] == plan["plan_id"], "evidence.plan_id does not match plan")
-    if active_only:
-        _require(envelope["plan_revision"] == state["plan_revision"], "new evidence uses a stale plan revision")
-    task_ids = _unique_strings(envelope["task_ids"], "evidence.task_ids", ids=True, allow_empty=False)
-    _require(len(task_ids) == 1, "evidence envelope must bind claims to exactly one task")
-    task_by_id = _task_map(plan)
-    for task_id in task_ids:
-        _require(task_id in task_by_id, f"evidence references unknown task {task_id}")
-    if active_only:
-        _require(
-            set(task_ids) <= _active_evidence_task_ids(plan, state),
-            "evidence references a task outside the active package dependency closure",
-        )
-    _expect_string(envelope["type"], "evidence.type")
-    phase = _expect_string(envelope["phase"], "evidence.phase")
-    _require(phase in {"expected_red", "verification", "decision"}, "evidence.phase is invalid")
-    source_class = _expect_string(envelope["source_class"], "evidence.source_class")
-    _require(source_class in SOURCE_CLASSES, "evidence.source_class is invalid")
-    producer_ref = _expect_object(envelope["producer"], "evidence.producer")
-    _expect_keys(producer_ref, required={"id", "version"}, optional=set(), path="evidence.producer")
-    producer_id = _expect_id(producer_ref["id"], "evidence.producer.id")
-    _require(producer_id in plan["producers"], f"evidence uses unregistered producer {producer_id}")
-    producer = plan["producers"][producer_id]
-    _require(producer_ref["version"] == producer["version"], f"producer {producer_id} version does not match plan")
-    _require(source_class == producer["source_class"], f"producer {producer_id} source_class does not match plan")
-    result = _expect_string(envelope["result"], "evidence.result")
-    _require(result in EVIDENCE_RESULTS, "evidence.result is invalid")
-    claims = _unique_strings(envelope["claims"], "evidence.claims", claims=True)
-    _require(set(claims) <= set(producer["allowed_claims"]), f"producer {producer_id} emitted disallowed claims")
-    if result == "expected_fail":
-        _require(phase == "expected_red", "expected_fail evidence must use expected_red phase")
-    if phase == "expected_red":
-        _require(result == "expected_fail", "expected_red phase must use expected_fail result")
-    if phase == "decision":
-        _require(source_class == "human_decision", "decision evidence must use human_decision source")
-        _expect_string(envelope.get("decision_ref"), "evidence.decision_ref")
-    _unique_strings(envelope["subjects"], "evidence.subjects")
-    _unique_strings(envelope["test_ids"], "evidence.test_ids")
-    freshness = _expect_object(envelope["freshness_identity"], "evidence.freshness_identity")
-    for key, value in freshness.items():
-        _expect_string(key, f"evidence.freshness_identity.{key}")
-        _expect_string(value, f"evidence.freshness_identity.{key}")
-    raw_artifacts = _expect_list(envelope["raw_artifacts"], "evidence.raw_artifacts")
-    if producer["requires_raw_artifacts"]:
-        _require(bool(raw_artifacts), f"producer {producer_id} requires raw_artifacts")
-    for index, artifact_value in enumerate(raw_artifacts):
-        path = f"evidence.raw_artifacts[{index}]"
-        artifact = _expect_object(artifact_value, path)
-        _expect_keys(artifact, required={"root", "path", "sha256"}, optional=set(), path=path)
-        root_kind = _expect_string(artifact["root"], f"{path}.root")
-        _require(root_kind in {"project", "plan"}, f"{path}.root is invalid")
-        artifact_path = _resolve_allowed_path(
-            _expect_string(artifact["path"], f"{path}.path"),
-            root_kind=root_kind,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        _require(artifact_path.is_file(), f"raw artifact does not exist: {artifact_path}")
-        _require(_sha256_file(artifact_path) == artifact["sha256"], f"raw artifact hash mismatch: {artifact_path}")
-    started_text = _expect_string(envelope["started_at"], "evidence.started_at")
-    completed_text = _expect_string(envelope["completed_at"], "evidence.completed_at")
-    started_at = _parse_timestamp(started_text)
-    completed_at = _parse_timestamp(completed_text)
-    _require(started_at is not None, "evidence.started_at must be an ISO-8601 timestamp")
-    _require(completed_at is not None, "evidence.completed_at must be an ISO-8601 timestamp")
-    _require(completed_at >= started_at, "evidence.completed_at must not precede started_at")
-    _expect_object(envelope["summary"], "evidence.summary")
-
-
-def _index_report(
-    report_path: Path,
-    *,
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    project_root: Path,
-    plan_dir: Path,
-) -> tuple[str, dict[str, Any], dict[str, Any], dict[str, bytes]]:
-    envelope = _load_json(report_path)
-    _validate_evidence_envelope(
-        envelope,
-        plan=plan,
-        state=state,
-        project_root=project_root,
-        plan_dir=plan_dir,
-        active_only=True,
-    )
-    normalized, source, pending_files = _prepare_evidence_snapshots(
-        report_path,
-        envelope,
-        project_root=project_root,
-        plan_dir=plan_dir,
-    )
-    index = {
-        "schema": INDEX_SCHEMA,
-        "evidence_id": normalized["evidence_id"],
-        "source_envelope": source,
-        "envelope": normalized,
-    }
-    relative = f"evidence/index/{_evidence_filename(normalized['evidence_id'])}"
-    destination = plan_dir / Path(relative)
-    if destination.is_file():
-        existing = _load_json(destination)
-        _require(existing == index, f"evidence id {normalized['evidence_id']} already exists with different content")
-    return relative, index, normalized, pending_files
-
-
-def _prepare_evidence_reports(
-    paths: Iterable[str],
-    *,
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    project_root: Path,
-    plan_dir: Path,
-) -> tuple[
-    dict[str, dict[str, Any]],
-    dict[str, bytes],
-    dict[str, list[str]],
-    list[dict[str, Any]],
-]:
-    pending_indexes: dict[str, dict[str, Any]] = {}
-    pending_snapshots: dict[str, bytes] = {}
-    new_refs_by_task: dict[str, list[str]] = {
-        task_id: [] for task_id in _active_evidence_task_ids(plan, state)
-    }
-    envelopes: list[dict[str, Any]] = []
-    for path_text in paths:
-        report_path = _resolve_input_report(path_text, project_root, plan_dir)
-        relative, index, envelope, snapshots = _index_report(
-            report_path,
-            plan=plan,
-            state=state,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        if relative in pending_indexes:
-            _require(
-                pending_indexes[relative] == index,
-                f"evidence index collision: {relative}",
-            )
-        pending_indexes[relative] = index
-        for snapshot_relative, payload in snapshots.items():
-            if snapshot_relative in pending_snapshots:
-                _require(
-                    pending_snapshots[snapshot_relative] == payload,
-                    f"evidence snapshot collision: {snapshot_relative}",
-                )
-            pending_snapshots[snapshot_relative] = payload
-        for task_id in envelope["task_ids"]:
-            new_refs_by_task[task_id].append(relative)
-        envelopes.append(envelope)
-    return pending_indexes, pending_snapshots, new_refs_by_task, envelopes
-
-
-def _commit_evidence_reports(
-    *,
-    plan_dir: Path,
-    state: dict[str, Any],
-    pending_indexes: dict[str, dict[str, Any]],
-    pending_snapshots: dict[str, bytes],
-    new_refs_by_task: dict[str, list[str]],
-) -> None:
-    for task_id, references in new_refs_by_task.items():
-        task_state = state["task_states"][task_id]
-        task_state["evidence_refs"] = list(
-            dict.fromkeys(task_state["evidence_refs"] + references)
-        )
-    for relative, payload in pending_snapshots.items():
-        _write_bytes_immutable(plan_dir / Path(relative), payload)
-    for relative, index in pending_indexes.items():
-        _write_json_atomic(plan_dir / Path(relative), index)
-
-
-def _load_index(
-    relative: str,
-    *,
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    project_root: Path,
-    plan_dir: Path,
-) -> dict[str, Any]:
-    normalized = _validate_relative_path(relative, "evidence reference")
-    index_path = (plan_dir / Path(normalized)).resolve()
-    _require(_inside(index_path, plan_dir), f"evidence reference escapes plan root: {relative}")
-    index = _load_json(index_path)
-    _expect_keys(
-        index,
-        required={"schema", "evidence_id", "source_envelope", "envelope"},
-        optional=set(),
-        path=f"index {relative}",
-    )
-    _require(index["schema"] == INDEX_SCHEMA, f"index {relative} has unsupported schema")
-    source = _expect_object(index["source_envelope"], f"index {relative}.source_envelope")
-    _expect_keys(source, required={"root", "path", "sha256"}, optional=set(), path=f"index {relative}.source_envelope")
-    source_root = _expect_string(source["root"], f"index {relative}.source_envelope.root")
-    _require(source_root in {"project", "plan"}, f"index {relative}.source_envelope.root is invalid")
-    source_path = _resolve_allowed_path(
-        _expect_string(source["path"], f"index {relative}.source_envelope.path"),
-        root_kind=source_root,
-        project_root=project_root,
-        plan_dir=plan_dir,
-    )
-    _expect_string(source["sha256"], f"index {relative}.source_envelope.sha256")
-    _require(source_path.is_file(), f"source evidence report is missing: {source_path}")
-    _require(_sha256_file(source_path) == source["sha256"], f"source evidence report hash mismatch: {source_path}")
-    envelope = _expect_object(index["envelope"], f"index {relative}.envelope")
-    _require(index["evidence_id"] == envelope.get("evidence_id"), f"index {relative} evidence id mismatch")
-    _validate_evidence_envelope(
-        envelope,
-        plan=plan,
-        state=state,
-        project_root=project_root,
-        plan_dir=plan_dir,
-        active_only=False,
-    )
-    return envelope
-
-
-def _load_task_evidence(
-    task_state: dict[str, Any],
-    *,
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    project_root: Path,
-    plan_dir: Path,
-) -> list[dict[str, Any]]:
-    return [
-        _load_index(
-            reference,
-            plan=plan,
-            state=state,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        for reference in task_state["evidence_refs"]
+        value = table.get(field, default)
+        if not isinstance(value, str) or not value.strip():
+            raise TaskctlError(f"task-table.json {field} must be a non-empty string")
+        if value != default:
+            raise TaskctlError(f"task-table.json {field} must remain {default}")
+        resolved_paths[field] = resolve_inside(root, value)
+    source_index = table.get("source_index")
+    if source_index is not None:
+        if not isinstance(source_index, str) or not source_index.strip():
+            raise TaskctlError("task-table.json source_index must be a non-empty string")
+        if source_index != ".work-cache/index.json":
+            raise TaskctlError("task-table.json source_index must remain .work-cache/index.json")
+        resolved_paths["source_index"] = resolve_inside(root, source_index)
+    storage_paths = [
+        resolved_paths["task_dir"],
+        resolved_paths["state_dir"],
+        resolved_paths["result_dir"],
     ]
+    if any(path == root for path in storage_paths):
+        raise TaskctlError("task, state, and result storage must not use the workspace root")
+    if len(set(storage_paths)) != len(storage_paths):
+        raise TaskctlError("task, state, and result storage must use distinct directories")
+    for index, left in enumerate(storage_paths):
+        for right in storage_paths[index + 1 :]:
+            if left in right.parents or right in left.parents:
+                raise TaskctlError("task, state, and result storage directories must not overlap")
+    reserved_files = {(root / "task-table.json").resolve(), (root / "workflow.json").resolve()}
+    workflow = load_workflow(root)
+    if workflow is not None:
+        for relative in workflow["documents"].values():
+            reserved_files.add(resolve_inside(root, relative))
+        reserved_files.add((root / "protected-baseline.json").resolve())
+    if "source_index" in resolved_paths:
+        reserved_files.add(resolved_paths["source_index"])
+    if resolved_paths["table_view"] in reserved_files:
+        raise TaskctlError("generated task view must not overwrite workflow truth")
+    if "source_index" in resolved_paths and resolved_paths["table_view"] == resolved_paths["source_index"]:
+        raise TaskctlError("generated task view must not overwrite the semantic index")
+    if any(
+        resolved_paths["table_view"] == storage or storage in resolved_paths["table_view"].parents
+        for storage in storage_paths
+    ):
+        raise TaskctlError("generated task view must not overwrite task storage")
+    for storage_path in storage_paths:
+        if any(storage_path == reserved.parent or storage_path in reserved.parents for reserved in reserved_files):
+            raise TaskctlError("task storage must not contain workflow truth")
+    verify_protected_sources(root, workflow)
+    return table
 
 
-def _current_freshness(
-    plan: dict[str, Any],
-    task: dict[str, Any],
-    project_root: Path,
-    *,
-    require_planned_tests: bool = False,
-) -> dict[str, str]:
-    identities = _task_identities(plan, task, project_root)
-    summary = identities["scope_summary"]
-    if task["claim_overrides"]["automation_test_ids"]:
-        _require(
-            not summary["test_missing"],
-            "test_scope identity inputs are missing: " + ", ".join(summary["test_missing"]),
-            code="freshness_input_missing",
-        )
-        if require_planned_tests:
-            _require(
-                not summary["planned_test_missing"],
-                "planned_test_scope identity inputs are missing: "
-                + ", ".join(summary["planned_test_missing"]),
-                code="freshness_input_missing",
-            )
-    for key, custom_summary in summary["custom"].items():
-        _require(
-            not custom_summary["missing"],
-            f"freshness scope {key} inputs are missing: "
-            + ", ".join(custom_summary["missing"]),
-            code="freshness_input_missing",
-        )
-    return {key: value for key, value in identities.items() if key != "scope_summary"}
-
-
-def _parse_timestamp(value: str) -> dt.datetime | None:
-    try:
-        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=dt.timezone.utc)
-        return parsed
-    except ValueError:
-        return None
-
-
-def _evidence_fact_identity(record: dict[str, Any]) -> str:
-    """Ignore labels and timestamps so duplicated facts cannot inflate evidence counts."""
-    return _json_identity(
-        {
-            "type": record["type"],
-            "phase": record["phase"],
-            "producer": record["producer"],
-            "result": record["result"],
-            "claims": sorted(record["claims"]),
-            "subjects": sorted(record["subjects"]),
-            "test_ids": sorted(record["test_ids"]),
-            "freshness_identity": record["freshness_identity"],
-            "raw_artifacts": sorted(
-                record["raw_artifacts"],
-                key=lambda item: (item["root"], item["path"], item["sha256"]),
-            ),
-        }
+def table_paths(root: Path, table: dict[str, Any]) -> tuple[Path, Path, Path]:
+    return (
+        resolve_inside(root, str(table.get("task_dir", "tasks"))),
+        resolve_inside(root, str(table.get("state_dir", "state"))),
+        resolve_inside(root, str(table.get("result_dir", "results"))),
     )
 
 
-def _freshness_value_matches(
-    plan: dict[str, Any],
-    record: dict[str, Any],
-    key: str,
-    expected: str,
-) -> bool:
-    observed = record["freshness_identity"].get(key)
-    if observed == expected:
-        return True
-    if key != "runner" or observed is None:
-        return False
-    producer_ref = record.get("producer", {})
-    producer = plan["producers"].get(producer_ref.get("id"))
-    return bool(
-        producer
-        and producer_ref.get("version") == producer.get("version")
-    )
+def require_string(value: Any, field: str, *, allow_empty: bool = False) -> str:
+    if not isinstance(value, str):
+        raise TaskctlError(f"{field} must be a string")
+    cleaned = value.strip()
+    if not allow_empty and not cleaned:
+        raise TaskctlError(f"{field} must not be empty")
+    if len(cleaned) > MAX_STRING:
+        raise TaskctlError(f"{field} exceeds {MAX_STRING} characters")
+    return cleaned
 
 
-def _expected_red_records(
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    task: dict[str, Any],
-    records: list[dict[str, Any]],
-    project_root: Path,
-    *,
-    require_planned_tests: bool = False,
-) -> list[dict[str, Any]]:
-    task_id = task["id"]
-    required_claims = _required_claims(plan, task)
-    current = _current_freshness(
-        plan,
-        task,
-        project_root,
-        require_planned_tests=require_planned_tests,
-    )
-    baseline = state["task_states"][task_id]["baseline_identity"]
-    task_is_done = state["task_states"][task_id].get("status") == "done"
-    active = state.get("active_package") or {}
-    task_is_revalidation = task_id in active.get("revalidation_task_ids", [])
-    red_freshness_keys = {
-        key
-        for claim in required_claims
-        for key in _claim_rule(plan, task, claim)["freshness_keys"]
-    }
-
-    def matches(record: dict[str, Any]) -> bool:
-        for key in red_freshness_keys:
-            if task_is_done and key in {
-                "contract",
-                "production_scope",
-                "runner",
-                "test_scope",
-            }:
-                # Expected-red is a historical ordering fact once the task is
-                # complete. Later implementation or consumer work may update
-                # its amended contract, production, shared tests, or runners;
-                # the task can only return to done after current verification
-                # proves that contract. A rewritten red receipt against green
-                # code would destroy the historical ordering evidence.
-                continue
-            if task_is_revalidation and key in {
-                "contract",
-                "production_scope",
-                "runner",
-                "test_scope",
-            }:
-                # audit --apply reopens a previously completed task as
-                # needs_review, and begin then refreshes its production
-                # baseline to the current implementation. A fresh passing
-                # verification revalidates that implementation against the
-                # amended contract; the sealed red remains the historical
-                # ordering proof and must not be recreated against green
-                # code. New tasks and first implementations never enter this
-                # branch, so they still require a red sealed against their
-                # current contract and begin baseline.
-                continue
-            expected = (
-                baseline.get("production_scope")
-                if key == "production_scope"
-                else current.get(key)
-            )
-            if expected is None or not _freshness_value_matches(
-                plan, record, key, expected
-            ):
-                return False
-        return True
-
-    required_tests = task["claim_overrides"]["automation_test_ids"]
-    producer_id = task["tests_first"]["expected_red_producer"]
-    return [
-        record
-        for record in records
-        if task_id in record["task_ids"]
-        and record["phase"] == "expected_red"
-        and record["result"] == "expected_fail"
-        and record["producer"]["id"] == producer_id
-        and matches(record)
-        and (not required_tests or set(required_tests) <= set(record["test_ids"]))
-    ]
-
-
-def _require_sealed_red_identity(
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    task: dict[str, Any],
-    records: list[dict[str, Any]],
-    project_root: Path,
-) -> list[dict[str, Any]]:
-    if task["tests_first"]["mode"] != "required":
+def string_list(value: Any, field: str, *, maximum: int = MAX_LIST_ITEMS) -> list[str]:
+    if value is None:
         return []
-    matching = _expected_red_records(
-        plan,
-        state,
-        task,
-        records,
-        project_root,
-        require_planned_tests=True,
-    )
-    if matching:
-        return matching
-    has_red = any(
-        task["id"] in record["task_ids"] and record["phase"] == "expected_red"
-        for record in records
-    )
-    _require(
-        not has_red,
-        f"sealed expected-red identity changed for task {task['id']}; restore the sealed test/contract/runner identity",
-        code="red_identity_changed",
-    )
-    raise TaskCtlError(
-        f"task {task['id']} has no sealed expected-red evidence",
-        code="expected_red_not_sealed",
-    )
+    if not isinstance(value, list):
+        raise TaskctlError(f"{field} must be an array")
+    if len(value) > maximum:
+        raise TaskctlError(f"{field} contains more than {maximum} items")
+    result = [require_string(item, f"{field}[]") for item in value]
+    if len(set(result)) != len(result):
+        raise TaskctlError(f"{field} contains duplicate values")
+    return result
 
 
-def _evaluate_task(
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    task: dict[str, Any],
-    records: list[dict[str, Any]],
-    project_root: Path,
-) -> dict[str, Any]:
-    task_id = task["id"]
-    required_claims = _required_claims(plan, task)
-    current = _current_freshness(plan, task, project_root)
-    missing: list[dict[str, Any]] = []
-    claim_status: dict[str, str] = {}
-    valid_records_by_claim: dict[str, list[dict[str, Any]]] = {}
-    stale_count = 0
-    for claim in required_claims:
-        rule = _claim_rule(plan, task, claim)
-        valid: list[dict[str, Any]] = []
-        seen_facts: set[str] = set()
-        for record in records:
-            if task_id not in record["task_ids"] or record["result"] != "pass" or claim not in record["claims"]:
-                continue
-            producer_id = record["producer"]["id"]
-            if producer_id not in rule["producers"] or record["source_class"] not in rule["source_classes"]:
-                continue
-            freshness = record["freshness_identity"]
-            stale_reasons: list[str] = []
-            for key in rule["freshness_keys"]:
-                if key not in freshness:
-                    stale_reasons.append(f"missing:{key}")
-                elif key in current and not _freshness_value_matches(
-                    plan, record, key, current[key]
-                ):
-                    stale_reasons.append(f"stale:{key}")
-            if stale_reasons:
-                stale_count += 1
-                continue
-            fact_identity = _evidence_fact_identity(record)
-            if fact_identity in seen_facts:
-                continue
-            seen_facts.add(fact_identity)
-            valid.append(record)
-        valid_records_by_claim[claim] = valid
-        required_count = rule["min_evidence"]
-        if len(valid) < required_count:
-            claim_status[claim] = "missing"
-            missing.append(
-                {
-                    "type": "missing_evidence",
-                    "subject": claim,
-                    "next_action": f"provide {required_count} valid evidence item(s) for {claim}",
-                }
-            )
-        else:
-            claim_status[claim] = "pass"
+def validate_relative(value: str, field: str, *, allow_glob: bool = True) -> str:
+    cleaned = require_string(value, field).replace("\\", "/")
+    if Path(cleaned).is_absolute() or re.match(r"^[A-Za-z]:", cleaned):
+        raise TaskctlError(f"{field} must be project-relative: {value}")
+    pieces = [piece for piece in cleaned.split("/") if piece not in ("", ".")]
+    if ".." in pieces:
+        raise TaskctlError(f"{field} escapes the project: {value}")
+    if not allow_glob and any(token in cleaned for token in ("*", "?", "[", "]")):
+        raise TaskctlError(f"{field} must not contain glob syntax: {value}")
+    return cleaned
 
-    overrides = task["claim_overrides"]
-    required_tests = overrides["automation_test_ids"]
-    observed_tests: set[str] = set()
-    for test_id in required_tests:
-        qualification = plan["test_qualifications"].get(test_id)
-        if not qualification or qualification["trust_state"] != "qualified":
-            missing.append(
-                {
-                    "type": "test_invalid",
-                    "subject": test_id,
-                    "next_action": "qualify, replace, or remove the invalid legacy test before implementation completion",
-                }
+
+def validate_task(raw: Any, *, expected_id: str | None = None) -> dict[str, Any]:
+    if not isinstance(raw, dict) or raw.get("schema") != "task.record":
+        raise TaskctlError("task file must use schema task.record")
+    task_id = require_string(raw.get("id"), "task.id")
+    if not TASK_ID_RE.fullmatch(task_id):
+        raise TaskctlError(f"invalid task id: {task_id}")
+    if expected_id is not None and task_id != expected_id:
+        raise TaskctlError(f"task id mismatch: expected {expected_id}, got {task_id}")
+    revision = raw.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+        raise TaskctlError("task.revision must be a positive integer")
+    source_ids = string_list(raw.get("source_ids"), "task.source_ids")
+    for source_id in source_ids:
+        if not SOURCE_ID_RE.fullmatch(source_id):
+            raise TaskctlError(f"invalid source id: {source_id}")
+
+    raw_dependencies = raw.get("dependencies", [])
+    if not isinstance(raw_dependencies, list) or len(raw_dependencies) > MAX_LIST_ITEMS:
+        raise TaskctlError(f"task.dependencies must contain at most {MAX_LIST_ITEMS} items")
+    dependencies: list[dict[str, Any]] = []
+    seen_dependencies: set[str] = set()
+    for index, dependency in enumerate(raw_dependencies):
+        if not isinstance(dependency, dict):
+            raise TaskctlError(f"task.dependencies[{index}] must be an object")
+        dependency_id = require_string(dependency.get("id"), f"task.dependencies[{index}].id")
+        if not TASK_ID_RE.fullmatch(dependency_id):
+            raise TaskctlError(f"invalid dependency id: {dependency_id}")
+        if dependency_id == task_id:
+            raise TaskctlError(f"task {task_id} depends on itself")
+        if dependency_id in seen_dependencies:
+            raise TaskctlError(f"task {task_id} repeats dependency {dependency_id}")
+        dependency_type = dependency.get("type")
+        if dependency_type not in DEPENDENCY_TYPES:
+            raise TaskctlError(
+                f"task.dependencies[{index}].type must be one of {', '.join(DEPENDENCY_TYPES)}"
             )
-            continue
-        if not set(qualification["requirement_ids"]) & set(task["requirement_ids"]):
-            missing.append(
-                {
-                    "type": "test_invalid",
-                    "subject": test_id,
-                    "next_action": "map the test to a requirement consumed by this task",
-                }
-            )
-            continue
-        applicable_claims = set(qualification["claim_dimensions"]) & set(required_claims)
-        if not applicable_claims:
-            missing.append(
-                {
-                    "type": "test_invalid",
-                    "subject": test_id,
-                    "next_action": "correct the test claim dimensions",
-                }
-            )
-            continue
-        test_observed = any(
-            test_id in record["test_ids"]
-            for claim in applicable_claims
-            for record in valid_records_by_claim[claim]
+        dependencies.append(
+            {
+                "id": dependency_id,
+                "type": dependency_type,
+                "consumes": string_list(
+                    dependency.get("consumes"), f"task.dependencies[{index}].consumes"
+                ),
+            }
         )
-        if test_observed:
-            observed_tests.add(test_id)
-        else:
-            missing.append(
-                {"type": "missing_test", "subject": test_id, "next_action": "run the qualified test"}
-            )
+        seen_dependencies.add(dependency_id)
 
-    observed_subjects: set[str] = set()
-    for claim_records in valid_records_by_claim.values():
-        for record in claim_records:
-            observed_subjects.update(record["subjects"])
-    for subject in overrides["readback_subjects"]:
-        if subject not in observed_subjects:
-            missing.append(
-                {"type": "missing_readback", "subject": subject, "next_action": "provide independent readback"}
-            )
+    mutation_scope = [
+        validate_relative(value, "task.mutation_scope[]")
+        for value in string_list(raw.get("mutation_scope"), "task.mutation_scope")
+    ]
+    reasoning_hint = raw.get("reasoning_hint")
+    if reasoning_hint is not None and reasoning_hint not in REASONING_HINTS:
+        raise TaskctlError(f"task.reasoning_hint must be one of {', '.join(REASONING_HINTS)}")
+    metadata = raw.get("metadata", {})
+    if not isinstance(metadata, dict):
+        raise TaskctlError("task.metadata must be an object")
+    normalized = {
+        "schema": "task.record",
+        "id": task_id,
+        "title": require_string(raw.get("title"), "task.title"),
+        "outcome": require_string(raw.get("outcome"), "task.outcome"),
+        "source_ids": source_ids,
+        "dependencies": dependencies,
+        "mutation_scope": mutation_scope,
+        "outputs": string_list(raw.get("outputs"), "task.outputs"),
+        "verification": string_list(raw.get("verification"), "task.verification"),
+        "suggested_skills": string_list(
+            raw.get("suggested_skills"), "task.suggested_skills"
+        ),
+        "reasoning_hint": reasoning_hint,
+        "revision": revision,
+    }
+    if metadata:
+        normalized["metadata"] = metadata
+    return normalized
 
-    tests_first = task["tests_first"]
-    if tests_first["mode"] == "required":
-        expected_red = _expected_red_records(
-            plan, state, task, records, project_root
+
+def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
+    if not isinstance(raw, dict) or raw.get("schema") != "task.state":
+        raise TaskctlError(f"state for {task_id} must use schema task.state")
+    if raw.get("task_id") != task_id:
+        raise TaskctlError(f"state identity mismatch for {task_id}")
+    status = raw.get("status")
+    if status not in STATUSES:
+        raise TaskctlError(f"invalid state status for {task_id}: {status}")
+    revision = raw.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+        raise TaskctlError(f"state revision for {task_id} must be a positive integer")
+    owner = raw.get("owner")
+    if owner is not None:
+        owner = require_string(owner, f"state.owner[{task_id}]")
+    if status == "todo" and owner is not None:
+        raise TaskctlError(f"todo state for {task_id} must not have an owner")
+    if status != "todo" and owner is None:
+        raise TaskctlError(f"active or completed state for {task_id} must have an owner")
+    result_ref = raw.get("result_ref")
+    if result_ref is not None:
+        result_ref = validate_relative(
+            require_string(result_ref, f"state.result_ref[{task_id}]"),
+            f"state.result_ref[{task_id}]",
+            allow_glob=False,
         )
-        verification_times = [
-            timestamp
-            for record in records
-            if record["result"] == "pass"
-            for timestamp in [_parse_timestamp(record["started_at"])]
-            if timestamp is not None
-        ]
-        red_times = [
-            timestamp
-            for record in expected_red
-            for timestamp in [_parse_timestamp(record["completed_at"])]
-            if timestamp is not None
-        ]
-        if not expected_red:
-            missing.append(
-                {
-                    "type": "tests_first",
-                    "subject": task_id,
-                    "next_action": "provide expected-red evidence captured against the begin production baseline",
-                }
-            )
-        elif verification_times and red_times and not any(
-            verification_time >= red_time
-            for verification_time in verification_times
-            for red_time in red_times
-        ):
-            missing.append(
-                {
-                    "type": "tests_first",
-                    "subject": task_id,
-                    "next_action": "expected-red evidence must precede verification evidence",
-                }
-            )
-
-    deduplicated: list[dict[str, Any]] = []
-    seen_missing: set[tuple[str, str, str]] = set()
-    for item in missing:
-        key = (item["type"], item["subject"], item["next_action"])
-        if key not in seen_missing:
-            seen_missing.add(key)
-            deduplicated.append(item)
+    if status == "done" and result_ref is None:
+        raise TaskctlError(f"completed state for {task_id} must reference a result")
+    if status != "done" and result_ref is not None:
+        raise TaskctlError(f"non-completed state for {task_id} must not reference a result")
     return {
+        "schema": "task.state",
         "task_id": task_id,
-        "outcome": task["outcome"],
-        "claims": claim_status,
-        "required_tests": len(required_tests),
-        "observed_tests": len(set(required_tests) & observed_tests),
-        "required_subjects": len(overrides["readback_subjects"]),
-        "observed_subjects": len(set(overrides["readback_subjects"]) & observed_subjects),
-        "evidence_count": len(records),
-        "stale_evidence": stale_count,
-        "missing": deduplicated,
-        "complete": not deduplicated,
+        "status": status,
+        "owner": owner,
+        "revision": revision,
+        "note": require_string(raw.get("note", ""), f"state.note[{task_id}]", allow_empty=True),
+        "blocked_reason": require_string(
+            raw.get("blocked_reason", ""),
+            f"state.blocked_reason[{task_id}]",
+            allow_empty=True,
+        ),
+        "next_action": require_string(
+            raw.get("next_action", ""),
+            f"state.next_action[{task_id}]",
+            allow_empty=True,
+        ),
+        "result_ref": result_ref,
     }
 
 
-def _dependency_issues(
-    plan: dict[str, Any],
-    state: dict[str, Any],
+def validate_result(raw: Any, task: dict[str, Any]) -> dict[str, Any]:
+    return validate_result_for_task(raw, task, require_current_revision=True)
+
+
+def validate_result_for_task(
+    raw: Any, task: dict[str, Any], *, require_current_revision: bool
+) -> dict[str, Any]:
+    if not isinstance(raw, dict) or raw.get("schema") != "task.result":
+        raise TaskctlError("result file must use schema task.result")
+    if raw.get("task_id") != task["id"]:
+        raise TaskctlError("result.task_id does not match the task")
+    result_revision = raw.get("task_revision")
+    if (
+        not isinstance(result_revision, int)
+        or isinstance(result_revision, bool)
+        or result_revision < 1
+        or result_revision > task["revision"]
+    ):
+        raise TaskctlError("result.task_revision is invalid for the task")
+    if require_current_revision and result_revision != task["revision"]:
+        raise TaskctlError("result.task_revision does not match the current task contract")
+    changed_files = [
+        validate_relative(value, "result.changed_files[]", allow_glob=False)
+        for value in string_list(raw.get("changed_files"), "result.changed_files")
+    ]
+    invalidated_ids = string_list(
+        raw.get("invalidated_source_ids"), "result.invalidated_source_ids"
+    )
+    for source_id in invalidated_ids:
+        if not SOURCE_ID_RE.fullmatch(source_id):
+            raise TaskctlError(f"invalid source id in result: {source_id}")
+    metadata = raw.get("metadata", {})
+    if not isinstance(metadata, dict):
+        raise TaskctlError("result.metadata must be an object")
+    result = {
+        "schema": "task.result",
+        "task_id": task["id"],
+        "task_revision": result_revision,
+        "outcome": require_string(raw.get("outcome"), "result.outcome"),
+        "outputs": string_list(raw.get("outputs"), "result.outputs"),
+        "changed_files": changed_files,
+        "verification": string_list(raw.get("verification"), "result.verification"),
+        "unresolved": string_list(raw.get("unresolved"), "result.unresolved"),
+        "invalidated_source_ids": invalidated_ids,
+    }
+    if metadata:
+        result["metadata"] = metadata
+    return result
+
+
+def load_tasks(root: Path, table: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    task_dir, _, _ = table_paths(root, table)
+    if not task_dir.exists():
+        raise TaskctlError(f"missing task directory: {task_dir}")
+    paths = sorted(task_dir.glob("*.json"))
+    if len(paths) > MAX_RECORDS:
+        raise TaskctlError(f"task directory contains more than {MAX_RECORDS} records")
+    tasks: dict[str, dict[str, Any]] = {}
+    for path in paths:
+        resolved_path = path.resolve()
+        if resolved_path.parent != task_dir:
+            raise TaskctlError(f"task record escapes task storage: {path}")
+        path = resolved_path
+        task = validate_task(read_json(path), expected_id=path.stem)
+        if task["id"] in tasks:
+            raise TaskctlError(f"duplicate task id: {task['id']}")
+        tasks[task["id"]] = task
+    ensure_acyclic(tasks)
+    return tasks
+
+
+def load_state(root: Path, table: dict[str, Any], task_id: str) -> dict[str, Any]:
+    _, state_dir, _ = table_paths(root, table)
+    path = (state_dir / f"{task_id}.json").resolve()
+    if path.parent != state_dir:
+        raise TaskctlError(f"task state escapes state storage: {path}")
+    return validate_state(read_json(path), task_id)
+
+
+def load_states(
+    root: Path, table: dict[str, Any], tasks: dict[str, dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    _, state_dir, _ = table_paths(root, table)
+    state_paths = sorted(state_dir.glob("*.json"))
+    if len(state_paths) > MAX_RECORDS:
+        raise TaskctlError(f"state directory contains more than {MAX_RECORDS} records")
+    state_ids = {path.stem for path in state_paths}
+    task_ids = set(tasks)
+    if state_ids != task_ids:
+        missing = sorted(task_ids - state_ids)
+        extra = sorted(state_ids - task_ids)
+        raise TaskctlError(
+            "task/state storage mismatch: "
+            f"missing={','.join(missing[:10]) or '-'}; extra={','.join(extra[:10]) or '-'}"
+        )
+    return {task_id: load_state(root, table, task_id) for task_id in tasks}
+
+
+def validate_result_history(
+    root: Path,
+    table: dict[str, Any],
     task: dict[str, Any],
-    project_root: Path,
-    plan_dir: Path,
-    *,
-    evaluation_cache: dict[str, dict[str, Any]] | None = None,
-) -> list[dict[str, Any]]:
-    """Validate only the upstream claims explicitly consumed by this task."""
-    cache = evaluation_cache if evaluation_cache is not None else {}
-    tasks = _task_map(plan)
-    issues: list[dict[str, Any]] = []
-    for edge in task["depends_on"]:
-        upstream_id = edge["task_id"]
-        upstream_state = state["task_states"][upstream_id]
-        if upstream_state["status"] != "done":
-            issues.append(
+    state: dict[str, Any],
+) -> None:
+    _, _, result_dir = table_paths(root, table)
+    paths = sorted(result_dir.glob(f"{task['id']}.r*.json"))
+    if len(paths) > MAX_RESULT_RECORDS:
+        raise TaskctlError(
+            f"task {task['id']} has more than {MAX_RESULT_RECORDS} result records"
+        )
+    for path in paths:
+        path = path.resolve()
+        if path.parent != result_dir:
+            raise TaskctlError(f"task result history escapes result storage: {path}")
+        match = re.fullmatch(rf"{re.escape(task['id'])}\.r(?P<revision>[1-9][0-9]*)\.json", path.name)
+        if match is None:
+            raise TaskctlError(f"invalid task result history name: {path}")
+        historical = validate_result_for_task(
+            read_json(path), task, require_current_revision=False
+        )
+        if historical["task_id"] != task["id"]:
+            raise TaskctlError(f"task result history identity mismatch: {path}")
+
+
+def load_workflow(root: Path) -> dict[str, Any] | None:
+    path = root / "workflow.json"
+    if not path.exists():
+        return None
+    workflow = read_json(path)
+    if not isinstance(workflow, dict) or workflow.get("schema") != "delivery.workflow":
+        raise TaskctlError(f"unsupported workflow manifest: {path}")
+    fixed_fields = {
+        "task_table": "task-table.json",
+        "protected_baseline": "protected-baseline.json",
+        "semantic_index": ".work-cache/index.json",
+        "status_view": "WORK_STATUS.md",
+    }
+    for field, expected in fixed_fields.items():
+        if workflow.get(field, expected) != expected:
+            raise TaskctlError(f"workflow.json {field} must remain {expected}")
+    documents = workflow.get("documents")
+    if not isinstance(documents, dict):
+        raise TaskctlError("workflow.json documents must be an object")
+    resolved: list[Path] = []
+    for stage in WORKFLOW_STAGES:
+        relative = documents.get(stage)
+        if not isinstance(relative, str) or not relative.strip():
+            raise TaskctlError(f"workflow.json is missing documents.{stage}")
+        resolved.append(resolve_inside(root, relative))
+    if len(set(resolved)) != len(resolved):
+        raise TaskctlError("workflow documents must use distinct paths")
+    return workflow
+
+
+def document_semantic_ids(text: str) -> list[str]:
+    return sorted(
+        match.group("id")
+        for line in text.splitlines()
+        if (match := HEADING_ID_RE.match(line)) is not None
+    )
+
+
+def verify_protected_sources(
+    root: Path, workflow: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
+    workflow = workflow if workflow is not None else load_workflow(root)
+    baseline_path = root / "protected-baseline.json"
+    if not baseline_path.exists():
+        return None
+    if workflow is None:
+        raise TaskctlError("protected baseline requires workflow.json")
+    baseline = read_json(baseline_path)
+    if not isinstance(baseline, dict) or baseline.get("schema") != "delivery.protected-baseline":
+        raise TaskctlError(f"unsupported protected baseline: {baseline_path}")
+    if baseline.get("workflow_id") != workflow.get("id"):
+        raise TaskctlError("protected baseline belongs to a different workflow")
+    documents = baseline.get("documents")
+    if not isinstance(documents, dict):
+        raise TaskctlError("protected baseline documents must be an object")
+    for stage, allowed_prefixes in PROTECTED_PREFIXES.items():
+        record = documents.get(stage)
+        if not isinstance(record, dict) or not isinstance(record.get("path"), str):
+            raise TaskctlError(f"protected baseline is missing {stage}")
+        expected_path = workflow["documents"][stage]
+        if record["path"] != expected_path:
+            raise TaskctlError(f"protected baseline path mismatch for {stage}")
+        source_path = resolve_inside(root, expected_path)
+        source_text = read_text_bounded(source_path, MAX_INDEX_BYTES)
+        fingerprint = f"sha256:{hashlib.sha256(source_text.encode('utf-8')).hexdigest()}"
+        if record.get("fingerprint") != fingerprint:
+            raise TaskctlError(
+                f"protected source changed: {record['path']}; restore it and record a deferred change"
+            )
+        ids = record.get("ids")
+        if (
+            not isinstance(ids, list)
+            or any(not isinstance(value, str) for value in ids)
+            or len(ids) != len(set(ids))
+        ):
+            raise TaskctlError(f"protected baseline ids are invalid for {stage}")
+        actual_ids = document_semantic_ids(source_text)
+        if sorted(ids) != actual_ids:
+            raise TaskctlError(f"protected baseline ids do not match {expected_path}")
+        if any(value.split("-", 1)[0] not in allowed_prefixes for value in ids):
+            raise TaskctlError(f"protected baseline contains an invalid {stage} id")
+    return baseline
+
+
+def ensure_acyclic(tasks: dict[str, dict[str, Any]]) -> None:
+    indegree = {task_id: 0 for task_id in tasks}
+    dependents: dict[str, list[str]] = {task_id: [] for task_id in tasks}
+    for task_id, task in tasks.items():
+        for dependency in task["dependencies"]:
+            dependency_id = dependency["id"]
+            if dependency_id not in tasks:
+                continue
+            indegree[task_id] += 1
+            dependents[dependency_id].append(task_id)
+    ready = deque(sorted(task_id for task_id, degree in indegree.items() if degree == 0))
+    processed = 0
+    while ready:
+        task_id = ready.popleft()
+        processed += 1
+        for dependent_id in sorted(dependents[task_id]):
+            indegree[dependent_id] -= 1
+            if indegree[dependent_id] == 0:
+                ready.append(dependent_id)
+    if processed != len(tasks):
+        cycle_ids = sorted(task_id for task_id, degree in indegree.items() if degree > 0)
+        raise TaskctlError(
+            f"task dependency cycle involving: {', '.join(cycle_ids[:20])}"
+        )
+
+
+def rebuild_delivery_index(root: Path) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    script_path = (
+        Path(__file__).resolve().parents[2]
+        / "delivery-workflow"
+        / "scripts"
+        / "workctl.py"
+    )
+    if not script_path.is_file():
+        return None, {
+            "kind": "delivery_index_builder_missing",
+            "path": str(script_path),
+        }
+    spec = importlib.util.spec_from_file_location("_agentbase_delivery_workctl", script_path)
+    if spec is None or spec.loader is None:
+        return None, {"kind": "delivery_index_builder_unreadable"}
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+        rebuilt = module.build_index(root)
+    except Exception as exc:
+        return None, {
+            "kind": "delivery_index_rebuild_failed",
+            "message": str(exc),
+        }
+    if not isinstance(rebuilt, dict) or rebuilt.get("schema") != "delivery.index":
+        return None, {"kind": "delivery_index_rebuild_unsupported"}
+    return rebuilt, None
+
+
+def maybe_load_index(root: Path, table: dict[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    source_index = table.get("source_index")
+    if not source_index:
+        return None, [{"kind": "upstream_index_not_configured"}]
+    path = resolve_inside(root, str(source_index))
+    if not path.exists():
+        return None, [{"kind": "upstream_index_missing", "path": str(source_index)}]
+    try:
+        index = read_json(path, MAX_INDEX_BYTES)
+    except TaskctlError as exc:
+        return None, [{"kind": "upstream_index_unreadable", "message": str(exc)}]
+    if not isinstance(index, dict) or index.get("schema") != "delivery.index":
+        return None, [{"kind": "upstream_index_unsupported", "path": str(source_index)}]
+    workflow = load_workflow(root)
+    if workflow is None:
+        return None, [{"kind": "upstream_workflow_missing"}]
+    if index.get("workflow_id") != workflow.get("id"):
+        return None, [{"kind": "upstream_index_workflow_mismatch"}]
+    if index.get("documents") != workflow.get("documents"):
+        return None, [{"kind": "upstream_index_document_map_stale"}]
+    hashes = index.get("document_hashes")
+    if not isinstance(hashes, dict):
+        return None, [{"kind": "upstream_index_hashes_missing"}]
+    for stage in WORKFLOW_STAGES:
+        relative = workflow["documents"][stage]
+        text = read_text_bounded(resolve_inside(root, relative), MAX_INDEX_BYTES)
+        current = f"sha256:{hashlib.sha256(text.encode('utf-8')).hexdigest()}"
+        if hashes.get(stage) != current:
+            return None, [
                 {
-                    "type": "dependency_status",
-                    "subject": upstream_id,
-                    "next_action": f"complete or revalidate dependency {upstream_id}",
+                    "kind": "upstream_index_stale",
+                    "stage": stage,
+                    "path": relative,
+                }
+            ]
+    baseline = verify_protected_sources(root, workflow)
+    indexed_baseline = index.get("protected_baseline")
+    expected_status = "protected" if baseline is not None else "unprotected"
+    if not isinstance(indexed_baseline, dict) or indexed_baseline.get("status") != expected_status:
+        return None, [{"kind": "upstream_index_baseline_stale"}]
+    if baseline is not None:
+        expected_count = sum(
+            len(baseline["documents"][stage]["ids"])
+            for stage in PROTECTED_PREFIXES
+        )
+        if indexed_baseline.get("protected_ids") != expected_count:
+            return None, [{"kind": "upstream_index_baseline_stale"}]
+    rebuilt, rebuild_diagnostic = rebuild_delivery_index(root)
+    if rebuilt is None:
+        return None, [rebuild_diagnostic or {"kind": "delivery_index_rebuild_failed"}]
+    if compact_json(index) != compact_json(rebuilt):
+        return None, [{"kind": "upstream_index_derived_content_mismatch"}]
+    return rebuilt, []
+
+
+def current_result(
+    root: Path,
+    table: dict[str, Any],
+    task: dict[str, Any],
+    state: dict[str, Any],
+) -> dict[str, Any] | None:
+    validate_result_history(root, table, task, state)
+    result_ref = state.get("result_ref")
+    if not result_ref:
+        return None
+    path = resolve_inside(root, result_ref)
+    _, _, result_dir = table_paths(root, table)
+    if path.parent != result_dir:
+        raise TaskctlError(f"current task result must be stored in {result_dir}: {path}")
+    expected_name = f"{task['id']}.r{state['revision']}.json"
+    if path.name != expected_name:
+        raise TaskctlError(f"current task result must be named {expected_name}: {path}")
+    return validate_result(read_json(path), task)
+
+
+def task_diagnostics(
+    task: dict[str, Any],
+    tasks: dict[str, dict[str, Any]],
+    states: dict[str, dict[str, Any]],
+    index: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    diagnostics: list[dict[str, Any]] = []
+    if not task["source_ids"]:
+        diagnostics.append({"kind": "source_ids_empty"})
+    if not task["outputs"]:
+        diagnostics.append({"kind": "outputs_empty"})
+    if not task["verification"]:
+        diagnostics.append({"kind": "verification_empty"})
+    for dependency in task["dependencies"]:
+        dependency_id = dependency["id"]
+        if dependency_id not in tasks:
+            diagnostics.append(
+                {
+                    "kind": "unknown_dependency",
+                    "dependency_id": dependency_id,
+                    "dependency_type": dependency["type"],
                 }
             )
             continue
-        if upstream_id not in cache:
-            try:
-                records = _load_task_evidence(
-                    upstream_state,
-                    plan=plan,
-                    state=state,
-                    project_root=project_root,
-                    plan_dir=plan_dir,
-                )
-                cache[upstream_id] = _evaluate_task(
-                    plan, state, tasks[upstream_id], records, project_root
-                )
-            except TaskCtlError as exc:
-                cache[upstream_id] = {
-                    "claims": {},
-                    "missing": [
-                        {
-                            "type": "evidence_invalid",
-                            "subject": upstream_id,
-                            "next_action": str(exc),
-                        }
-                    ],
-                    "complete": False,
+        if states[dependency_id]["status"] != "done":
+            diagnostics.append(
+                {
+                    "kind": f"{dependency['type']}_dependency_incomplete",
+                    "dependency_id": dependency_id,
+                    "status": states[dependency_id]["status"],
                 }
-        upstream_evaluation = cache[upstream_id]
-        for claim in edge["claims"]:
-            if upstream_evaluation.get("claims", {}).get(claim) != "pass":
-                issues.append(
-                    {
-                        "type": "dependency_claim",
-                        "subject": f"{upstream_id}:{claim}",
-                        "next_action": f"revalidate consumed claim {claim} on {upstream_id}",
-                    }
-                )
-    return issues
+            )
+    if index is not None:
+        sections: dict[str, list[dict[str, Any]]] = {}
+        for section in index.get("sections", []):
+            if isinstance(section, dict) and isinstance(section.get("id"), str):
+                sections.setdefault(section["id"], []).append(section)
+        unresolved = set(index.get("unresolved_ids", []))
+        for source_id in task["source_ids"]:
+            if source_id not in sections:
+                diagnostics.append({"kind": "unknown_source_id", "source_id": source_id})
+            elif len(sections[source_id]) > 1:
+                diagnostics.append({"kind": "ambiguous_source_id", "source_id": source_id})
+            if source_id in unresolved:
+                diagnostics.append({"kind": "upstream_unresolved", "source_id": source_id})
+        baseline = index.get("protected_baseline", {})
+        if baseline.get("status") != "protected":
+            diagnostics.append({"kind": "protected_baseline_unconfirmed"})
+    return diagnostics
 
 
-def _blocking_dependency_issues(issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return dependency failures that cannot be repaired by the next package.
-
-    A completed dependency whose consumed claim is stale can be revalidated through
-    the active package evidence closure.  An unfinished dependency still blocks the
-    package from starting.
-    """
-    return [item for item in issues if item["type"] != "dependency_claim"]
-
-
-def _evaluate_task_with_dependencies(
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    task: dict[str, Any],
-    records: list[dict[str, Any]],
-    project_root: Path,
-    plan_dir: Path,
-    *,
-    evaluation_cache: dict[str, dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    evaluation = _evaluate_task(plan, state, task, records, project_root)
-    dependency_issues = _dependency_issues(
-        plan,
-        state,
-        task,
-        project_root,
-        plan_dir,
-        evaluation_cache=evaluation_cache,
-    )
-    if dependency_issues:
-        existing = {
-            (item["type"], item["subject"], item["next_action"])
-            for item in evaluation["missing"]
-        }
-        evaluation["missing"].extend(
-            item
-            for item in dependency_issues
-            if (item["type"], item["subject"], item["next_action"]) not in existing
-        )
-        evaluation["complete"] = False
-    return evaluation
-
-
-def _compact_markdown_cell(value: str, *, limit: int = 72) -> str:
-    text = " ".join(value.split()).replace("|", "\\|")
-    if len(text) <= limit:
-        return text
-    return text[: max(1, limit - 1)].rstrip() + "…"
-
-
-def _task_status_counts(state: dict[str, Any]) -> dict[str, int]:
-    counts = {status: 0 for status in sorted(TASK_STATUSES)}
-    for task_state in state["task_states"].values():
-        counts[task_state["status"]] += 1
+def counts_for(states: dict[str, dict[str, Any]]) -> dict[str, int]:
+    counts = {status: 0 for status in STATUSES}
+    for state in states.values():
+        counts[state["status"]] += 1
     return counts
 
 
-def _render_markdown(
-    plan_dir: Path,
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    *,
-    include_details: bool = False,
-) -> dict[str, int]:
-    generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    rows: list[str] = []
-    details: list[str] = []
-    for task in plan["tasks"]:
-        task_id = task["id"]
-        task_state = state["task_states"][task_id]
-        dependency_detail = ", ".join(
-            f"{edge['task_id']}[{'+'.join(edge['claims'])}]" for edge in task["depends_on"]
-        ) or "—"
-        dependencies = _compact_markdown_cell(dependency_detail)
-        evidence_count = len(task_state["evidence_refs"])
-        evidence = (
-            f"[{evidence_count}](evidence/index/) evidence" if evidence_count else "0 evidence"
-        )
-        if task_state["unresolved"]:
-            evidence += f" / {len(task_state['unresolved'])} missing"
-        outcome = _compact_markdown_cell(task["outcome"])
-        rows.append(f"| `{task_id}` | {outcome} | {dependencies} | {evidence} | `{task_state['status']}` |")
-        if include_details:
-            details.extend(
-                [
-                f"### `{task_id}`",
-                "",
-                f"- 交付结果：{' '.join(task['outcome'].split())}",
-                f"- 完成级别：{task.get('completion_level', 'module_ready')}",
-                f"- Claim scope：{', '.join(task.get('claim_scope', [])) or '—'}",
-                f"- Requirements：{', '.join(task['requirement_ids'])}",
-                f"- Acceptance clauses：{', '.join(task.get('acceptance_clause_ids', [])) or '—'}",
-                f"- Solution steps：{', '.join(task.get('solution_step_ids', [])) or '—'}",
-                f"- Gap items：{', '.join(task.get('gap_ids', [])) or '—'}",
-                "- Uncertainty boundary："
-                + (
-                    "; ".join(
-                        f"{key}={value}"
-                        for key, value in sorted(
-                            task.get("uncertainty_boundary", {}).items()
-                        )
-                    )
-                    or "—"
-                ),
-                f"- 必需 claims：{', '.join(_required_claims(plan, task))}",
-                f"- 必要依赖：{dependency_detail}",
-                f"- Mutation scope：{', '.join(task['mutation_scope']) or '—'}",
-                f"- Test scope：{', '.join(task['test_scope']) or '—'}",
-                (
-                    "- Planned test scope："
-                    + (", ".join(task.get("planned_test_scope", [])) or "—")
-                ),
-                "- Freshness scopes："
-                + (
-                    "; ".join(
-                        f"{key}={','.join(entries)}"
-                        for key, entries in sorted(task["freshness_scopes"].items())
-                    )
-                    or "—"
-                ),
-                    "",
-                ]
-            )
-    active = state["active_package"]
-    active_text = "none"
-    if active:
-        active_text = f"{', '.join(active['task_ids'])} / {active['phase']} / {active['next_action']}"
-    status_counts = _task_status_counts(state)
-    totals_text = ", ".join(
-        f"{status}={count}" for status, count in status_counts.items()
+def parse_dependency(raw: str) -> dict[str, Any]:
+    parts = raw.split(":", 2)
+    if len(parts) < 2:
+        raise TaskctlError("--dependency must use TASK_ID:type[:consumed-output]")
+    dependency_id, dependency_type = parts[0], parts[1]
+    consumes = [parts[2]] if len(parts) == 3 and parts[2].strip() else []
+    return {"id": dependency_id, "type": dependency_type, "consumes": consumes}
+
+
+def command_init(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    conflicts = [
+        relative
+        for relative in ("task-table.json", "TASK_TABLE.md")
+        if (root / relative).exists()
+    ]
+    conflicts.extend(
+        directory
+        for directory in ("tasks", "state", "results")
+        if (root / directory).is_dir() and any((root / directory).iterdir())
     )
-    semantic_progress = _semantic_preflight_progress(plan_dir, plan)
-    semantic_unresolved = semantic_progress["unresolved_count"]
-    semantic_placeholders = semantic_progress["placeholder_count"]
-    semantic_duplicates = semantic_progress["duplicate_count"]
-    semantic_text = (
-        f"mode={semantic_progress['policy_mode']}, "
-        f"status={semantic_progress['status']}, "
-        f"total={'unknown' if semantic_progress['total_count'] is None else semantic_progress['total_count']}, "
-        f"unresolved={'unknown' if semantic_unresolved is None else semantic_unresolved}, "
-        f"placeholders={'unknown' if semantic_placeholders is None else semantic_placeholders}, "
-        f"duplicates={'unknown' if semantic_duplicates is None else semantic_duplicates}"
-    )
-    flow_rows: list[str] = []
-    flow_details: list[str] = []
-    for flow in plan.get("acceptance_flows", []):
-        flow_rows.append(
-            f"| `{flow['id']}` | {_compact_markdown_cell(flow['title'])} | "
-            f"`{flow['verification_task_id']}` |"
-        )
-        if include_details:
-            flow_details.extend(
-                [
-                    f"### `{flow['id']}`",
-                    "",
-                    f"- 验收结果：{flow['title']}",
-                    f"- 精确范围：{' '.join(flow['scope'].split())}",
-                    f"- Requirements：{', '.join(flow['requirement_ids'])}",
-                    f"- 验收任务：{flow['verification_task_id']}",
-                    f"- 证据绑定：{flow.get('evidence_mode', '未声明（审计失败）')}",
-                    f"- 覆盖范围数：{len(flow.get('scope_coverage', {}))}",
-                    f"- 必需 claims：{', '.join(flow['required_claims'])}",
-                    f"- 直接测试：{', '.join(flow['direct_test_ids'])}",
-                    "",
-                ]
-            )
-    markdown = "\n".join(
-        [
-            "# TASK TABLE (generated)",
-            "",
-            "> Generated view only. `plan.json` and `state.json` are authoritative; manual edits are overwritten.",
-            "",
-            f"- plan: `{plan['plan_id']}`",
-            f"- plan_revision: `{state['plan_revision']}`",
-            f"- state_revision: `{state['revision']}`",
-            f"- generated_at: `{generated_at}`",
-            f"- active_package: {active_text}",
-            f"- totals: {totals_text}",
-            f"- semantic_preflight: {semantic_text}",
-            "",
-            "| ID | 交付结果 | 必要依赖 | 完成证据 | 状态 |",
-            "| --- | --- | --- | --- | --- |",
-            *rows,
-            "",
-            "## 验收流程",
-            "",
-            *(
-                [
-                    "| ID | 验收结果 | 验收任务 |",
-                    "| --- | --- | --- |",
-                    *flow_rows,
-                    "",
-                ]
-                if flow_rows
-                else ["—", ""]
-            ),
-            *(
-                [
-                    "## 验收流程详情",
-                    "",
-                    *flow_details,
-                    "## 任务详情",
-                    "",
-                    *details,
-                ]
-                if include_details
-                else []
-            ),
-        ]
-    )
-    _write_bytes_atomic(plan_dir / "TASK_TABLE.md", markdown.encode("utf-8"))
-    return status_counts
-
-
-def _render_after_state_change(plan_dir: Path, plan: dict[str, Any], state: dict[str, Any]) -> list[str]:
-    try:
-        _render_markdown(plan_dir, plan, state)
-    except OSError as exc:
-        return [f"TASK_TABLE.md render failed after state update: {exc}"]
-    return []
-
-
-def _emit(payload: dict[str, Any], *, stream: Any = sys.stdout) -> None:
-    stream.write(
-        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
-    )
-
-
-def _make_strict_candidate(plan: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
-    candidate = copy.deepcopy(plan)
-    candidate["enforcement_profile"] = STRICT_ENFORCEMENT_PROFILE
-    inferred_fields: list[str] = []
-    source_ids = [source["id"] for source in candidate["scope_sources"]]
-    requirements_by_source: dict[str, list[str]] = {source_id: [] for source_id in source_ids}
-    source_by_id = {source["id"]: source for source in candidate["scope_sources"]}
-    task_scopes_by_requirement: dict[str, set[str]] = {}
-    for task in candidate["tasks"]:
-        task_scope = set(
-            task.get("claim_scope")
-            or task["claim_overrides"].get("readback_subjects", [])
-        )
-        for requirement_id in task["requirement_ids"]:
-            task_scopes_by_requirement.setdefault(requirement_id, set()).update(task_scope)
-    for requirement in candidate["requirements"]:
-        matching_sources = [
-            source_id
-            for source_id in source_ids
-            if requirement["source_ref"] == source_id
-            or requirement["source_ref"].startswith(source_id + ":")
-        ]
-        _require(
-            bool(matching_sources),
-            f"requirement {requirement['id']} has no source for strict migration",
-        )
-        source_id = max(matching_sources, key=len)
-        source = source_by_id[source_id]
-        _require(
-            bool(source.get("fingerprint")),
-            f"source {source_id} needs a fingerprint before strict migration",
-        )
-        requirements_by_source[source_id].append(requirement["id"])
-        requirement["source_fingerprint"] = source["fingerprint"]
-        if requirement["status"] == "in_scope":
-            if "verification_mode" not in requirement:
-                requirement["verification_mode"] = "task_evidence"
-                inferred_fields.append(f"requirement:{requirement['id']}:verification_mode")
-            if "acceptance_scope" not in requirement:
-                inferred_scope = sorted(
-                    task_scopes_by_requirement.get(requirement["id"], set())
-                )
-                requirement["acceptance_scope"] = inferred_scope
-                inferred_fields.append(f"requirement:{requirement['id']}:acceptance_scope")
-    for source in candidate["scope_sources"]:
-        if "inventory_mode" not in source:
-            source["inventory_mode"] = "advisory"
-            inferred_fields.append(f"source:{source['id']}:inventory_mode")
-        if "fingerprint_mode" not in source:
-            source["fingerprint_mode"] = "label"
-            inferred_fields.append(f"source:{source['id']}:fingerprint_mode")
-        source["requirement_ids"] = sorted(requirements_by_source[source["id"]])
-    for task in candidate["tasks"]:
-        if "completion_level" not in task:
-            task["completion_level"] = "module_ready"
-            inferred_fields.append(f"task:{task['id']}:completion_level")
-        if "claim_scope" not in task:
-            task["claim_scope"] = list(
-                task["claim_overrides"].get("readback_subjects", [])
-            )
-            inferred_fields.append(f"task:{task['id']}:claim_scope")
-        if "scope_enforced" not in task:
-            task["scope_enforced"] = (
-                COMPLETION_LEVELS[task["completion_level"]]
-                >= COMPLETION_LEVELS["integration_ready"]
-            )
-            inferred_fields.append(f"task:{task['id']}:scope_enforced")
-    _validate_plan(candidate)
-    return candidate, inferred_fields
-
-
-def _command_migrate_strict(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir, require_state=False)
-    if state is not None:
-        _require(
-            state["active_package"] is None,
-            "cannot prepare strict migration while a work package is active",
-            code="active_package",
-        )
-    candidate, inferred_fields = _make_strict_candidate(plan)
-    _verify_scope_sources(candidate, plan_dir)
-    output_path = plan_dir / "strict-plan.candidate.json"
-    _write_json_atomic(output_path, candidate)
-    return {
-        "ok": True,
-        "candidate": str(output_path),
-        "enforcement_profile": STRICT_ENFORCEMENT_PROFILE,
-        "plan_revision": _plan_hash(candidate),
-        "inferred_field_count": len(inferred_fields),
+    if conflicts:
+        raise TaskctlError(f"refusing to overwrite existing task workspace: {', '.join(conflicts)}")
+    for directory in ("tasks", "state", "results"):
+        (root / directory).mkdir(parents=True, exist_ok=True)
+    table = {
+        "schema": "task.table",
+        "id": args.id,
+        "title": args.title,
+        "task_dir": "tasks",
+        "state_dir": "state",
+        "result_dir": "results",
+        "source_index": ".work-cache/index.json",
+        "table_view": "TASK_TABLE.md",
     }
+    atomic_write_json(root / "task-table.json", table)
+    return {"ok": True, "command": "init", "task_dir": str(root)}
 
 
-def _planning_audit_path(plan_dir: Path, plan: dict[str, Any]) -> Path:
-    planning = _expect_object(plan.get("planning_audit"), "plan.planning_audit")
-    relative = _validate_relative_path(
-        planning["receipt_ref"], "plan.planning_audit.receipt_ref"
-    )
-    base = Path(relative)
-    revision_suffix = _plan_hash(plan).split(":", 1)[-1][:16]
-    if base.suffix:
-        receipt_name = f"{base.stem}.{revision_suffix}{base.suffix}"
-        versioned = base.with_name(receipt_name)
-    else:
-        versioned = base / f"{revision_suffix}.json"
-    path = (plan_dir / versioned).resolve()
-    _require(
-        _inside(path, plan_dir),
-        f"planning audit receipt is outside task directory: {path}",
-        code="task_input_outside_root",
-    )
-    return path
-
-
-def _empty_semantic_preflight_progress(
-    *,
-    policy_mode: str,
-    reason: str | None,
-    status: str,
-    receipt_ref: str | None,
-    identity_set_fingerprint: str | None,
-    error_code: str | None,
-) -> dict[str, Any]:
-    return {
-        "policy_mode": policy_mode,
-        "required": policy_mode == "required",
-        "reason": reason,
-        "status": status,
-        "receipt_ref": receipt_ref,
-        "identity_set_fingerprint": identity_set_fingerprint,
-        "total_count": None,
-        "resolved_count": None,
-        "unresolved_count": None,
-        "placeholder_count": None,
-        "duplicate_count": None,
-        "dimension_unresolved_counts": {},
-        "error_code": error_code,
-    }
-
-
-def _semantic_preflight_receipt_path(plan_dir: Path, plan: dict[str, Any]) -> Path:
-    semantic = _expect_object(plan["semantic_preflight"], "plan.semantic_preflight")
-    relative = _validate_relative_path(
-        semantic["receipt_ref"], "plan.semantic_preflight.receipt_ref"
-    )
-    path = (plan_dir / Path(relative)).resolve()
-    _require(
-        _inside(path, plan_dir),
-        f"semantic preflight receipt is outside task directory: {path}",
-        code="task_input_outside_root",
-    )
-    return path
-
-
-def _read_semantic_preflight_progress(
-    plan_dir: Path, plan: dict[str, Any]
-) -> dict[str, Any]:
-    semantic = _expect_object(plan["semantic_preflight"], "plan.semantic_preflight")
-    legacy_policy = "mode" not in semantic
-    if not legacy_policy:
-        _require(
-            semantic["mode"] == "required",
-            "semantic preflight receipt is only valid in required mode",
-            code="semantic_preflight_invalid",
-        )
-    path = _semantic_preflight_receipt_path(plan_dir, plan)
-    _require(
-        path.is_file(),
-        f"semantic preflight receipt is missing: {path}",
-        code="semantic_preflight_missing",
-    )
-    receipt = _load_json(path)
-    required_receipt_fields = {
-        "schema",
-        "plan_id",
-        "design_revision",
-        "producer_source_id",
-        "source_fingerprints",
-        "status",
-        "counts",
-    }
-    if not legacy_policy:
-        required_receipt_fields.update(
-            {"identity_set_fingerprint", "identities"}
-        )
-    _expect_keys(
-        receipt,
-        required=required_receipt_fields,
-        optional=set(),
-        path="semantic_preflight_receipt",
-    )
-    expected_schema = (
-        LEGACY_SEMANTIC_PREFLIGHT_SCHEMA
-        if legacy_policy
-        else SEMANTIC_PREFLIGHT_SCHEMA
-    )
-    _require(
-        receipt["schema"] == expected_schema,
-        f"semantic preflight schema must be {expected_schema}",
-        code="semantic_preflight_invalid",
-    )
-    _require(
-        receipt["plan_id"] == plan["plan_id"]
-        and receipt["design_revision"] == plan["design_revision"]
-        and receipt["producer_source_id"] == semantic["producer_source_id"],
-        "semantic preflight receipt does not match the plan or producer",
-        code="semantic_preflight_invalid",
-    )
-    sources_by_id = {source["id"]: source for source in plan["scope_sources"]}
-    semantic_source_ids = semantic["scope_source_ids"]
-    fingerprints = _expect_object(
-        receipt["source_fingerprints"],
-        "semantic_preflight_receipt.source_fingerprints",
-    )
-    _expect_keys(
-        fingerprints,
-        required=set(semantic_source_ids),
-        optional=set(),
-        path="semantic_preflight_receipt.source_fingerprints",
-    )
-    for source_id in semantic_source_ids:
-        _require(
-            fingerprints[source_id] == sources_by_id[source_id]["fingerprint"],
-            f"semantic preflight source fingerprint mismatch: {source_id}",
-            code="semantic_preflight_invalid",
-        )
-
-    identities: list[str] | None = None
-    identity_set_fingerprint: str | None = None
-    if not legacy_policy:
-        identities = _unique_strings(
-            receipt["identities"],
-            "semantic_preflight_receipt.identities",
-            allow_empty=False,
-        )
-        _require(
-            identities == sorted(identities),
-            "semantic preflight identities must use stable sorted order",
-            code="semantic_preflight_invalid",
-        )
-        identity_set_fingerprint = _expect_sha256(
-            receipt["identity_set_fingerprint"],
-            "semantic_preflight_receipt.identity_set_fingerprint",
-        )
-        computed_identity_set_fingerprint = _json_identity(identities)
-        _require(
-            identity_set_fingerprint == computed_identity_set_fingerprint
-            and identity_set_fingerprint == semantic["identity_set_fingerprint"],
-            "semantic preflight identity set does not match the declared plan scope",
-            code="semantic_preflight_invalid",
-        )
-    counts = _expect_object(receipt["counts"], "semantic_preflight_receipt.counts")
-    _expect_keys(
-        counts,
-        required={
-            "total_count",
-            "resolved_count",
-            "unresolved_count",
-            "placeholder_count",
-            "duplicate_count",
-            "dimension_unresolved_counts",
-        },
-        optional=set(),
-        path="semantic_preflight_receipt.counts",
-    )
-    total_count = _expect_nonnegative_int(
-        counts["total_count"],
-        "semantic_preflight_receipt.counts.total_count",
-        positive=True,
-    )
-    resolved_count = _expect_nonnegative_int(
-        counts["resolved_count"],
-        "semantic_preflight_receipt.counts.resolved_count",
-    )
-    unresolved_count = _expect_nonnegative_int(
-        counts["unresolved_count"],
-        "semantic_preflight_receipt.counts.unresolved_count",
-    )
-    placeholder_count = _expect_nonnegative_int(
-        counts["placeholder_count"],
-        "semantic_preflight_receipt.counts.placeholder_count",
-    )
-    duplicate_count = _expect_nonnegative_int(
-        counts["duplicate_count"],
-        "semantic_preflight_receipt.counts.duplicate_count",
-    )
-    if identities is not None:
-        _require(
-            total_count == semantic["expected_total_count"]
-            and total_count == len(identities),
-            "semantic preflight total_count must match the plan and identity set",
-            code="semantic_preflight_invalid",
-        )
-    _require(
-        resolved_count + unresolved_count == total_count,
-        "semantic preflight resolved_count + unresolved_count must equal total_count",
-        code="semantic_preflight_invalid",
-    )
-    _require(
-        placeholder_count <= unresolved_count,
-        "semantic preflight placeholders must be counted as unresolved",
-        code="semantic_preflight_invalid",
-    )
-    required_dimensions = semantic["required_dimensions"]
-    dimension_counts = _expect_object(
-        counts["dimension_unresolved_counts"],
-        "semantic_preflight_receipt.counts.dimension_unresolved_counts",
-    )
-    _expect_keys(
-        dimension_counts,
-        required=set(required_dimensions),
-        optional=set(),
-        path="semantic_preflight_receipt.counts.dimension_unresolved_counts",
-    )
-    normalized_dimension_counts: dict[str, int] = {}
-    for dimension in required_dimensions:
-        count = _expect_nonnegative_int(
-            dimension_counts[dimension],
-            "semantic_preflight_receipt.counts."
-            f"dimension_unresolved_counts.{dimension}",
-        )
-        _require(
-            count <= unresolved_count,
-            f"semantic preflight dimension count exceeds unresolved items: {dimension}",
-            code="semantic_preflight_invalid",
-        )
-        normalized_dimension_counts[dimension] = count
-    derived_status = (
-        "pass"
-        if unresolved_count == 0
-        and placeholder_count == 0
-        and duplicate_count == 0
-        and all(count == 0 for count in normalized_dimension_counts.values())
-        else "blocked"
-    )
-    receipt_status = _expect_string(
-        receipt["status"], "semantic_preflight_receipt.status"
-    )
-    _require(
-        receipt_status in {"pass", "blocked"} and receipt_status == derived_status,
-        "semantic preflight status does not match its counts",
-        code="semantic_preflight_invalid",
-    )
-    return {
-        "policy_mode": "legacy_required_v1" if legacy_policy else "required",
-        "required": True,
-        "reason": None if legacy_policy else semantic["reason"],
-        "status": receipt_status,
-        "receipt_ref": semantic["receipt_ref"],
-        "identity_set_fingerprint": identity_set_fingerprint,
-        "total_count": total_count,
-        "resolved_count": resolved_count,
-        "unresolved_count": unresolved_count,
-        "placeholder_count": placeholder_count,
-        "duplicate_count": duplicate_count,
-        "dimension_unresolved_counts": normalized_dimension_counts,
-        "error_code": (
-            None if receipt_status == "pass" else "semantic_preflight_unresolved"
-        ),
-    }
-
-
-def _semantic_preflight_progress(
-    plan_dir: Path, plan: dict[str, Any]
-) -> dict[str, Any]:
-    if "semantic_preflight" not in plan:
-        return _empty_semantic_preflight_progress(
-            policy_mode="missing",
-            reason=None,
-            status="not_declared",
-            receipt_ref=None,
-            identity_set_fingerprint=None,
-            error_code="semantic_preflight_policy_required",
-        )
-    semantic = _expect_object(plan["semantic_preflight"], "plan.semantic_preflight")
-    legacy_policy = "mode" not in semantic
-    if not legacy_policy and semantic["mode"] == "not_applicable":
-        return _empty_semantic_preflight_progress(
-            policy_mode="not_applicable",
-            reason=semantic["reason"],
-            status="not_applicable",
-            receipt_ref=None,
-            identity_set_fingerprint=None,
-            error_code=None,
-        )
-    receipt_ref = semantic.get("receipt_ref")
-    identity_set_fingerprint = semantic.get("identity_set_fingerprint")
-    try:
-        return _read_semantic_preflight_progress(plan_dir, plan)
-    except TaskCtlError as exc:
-        missing = exc.code == "semantic_preflight_missing"
-        return _empty_semantic_preflight_progress(
-            policy_mode="legacy_required_v1" if legacy_policy else "required",
-            reason=None if legacy_policy else semantic.get("reason"),
-            status="missing" if missing else "invalid",
-            receipt_ref=receipt_ref,
-            identity_set_fingerprint=identity_set_fingerprint,
-            error_code=(
-                "semantic_preflight_missing"
-                if missing
-                else "semantic_preflight_invalid"
-            ),
-        )
-
-
-def _semantic_execution_readiness(
-    progress: dict[str, Any], *, allow_legacy_missing: bool
-) -> str:
-    if progress["policy_mode"] == "missing":
-        return "legacy_structural_only" if allow_legacy_missing else "blocked"
-    if progress["policy_mode"] == "legacy_required_v1":
-        if not allow_legacy_missing or progress["status"] != "pass":
-            return "blocked"
-        return "legacy_semantic_v1"
-    if progress["policy_mode"] == "not_applicable":
-        return "ready"
-    return "ready" if progress["status"] == "pass" else "blocked"
-
-
-def _require_explicit_semantic_preflight_policy(plan: dict[str, Any]) -> None:
-    semantic_preflight = plan.get("semantic_preflight")
-    _require(
-        isinstance(semantic_preflight, dict) and "mode" in semantic_preflight,
-        "new and amended strict_v2 plans must explicitly declare semantic_preflight.mode",
-        code="semantic_preflight_policy_required",
-    )
-
-
-def _require_semantic_preflight_ready(
-    plan_dir: Path,
-    plan: dict[str, Any],
-    *,
-    allow_legacy_missing: bool,
-) -> dict[str, Any]:
-    progress = _semantic_preflight_progress(plan_dir, plan)
-    readiness = _semantic_execution_readiness(
-        progress, allow_legacy_missing=allow_legacy_missing
-    )
-    _require(
-        readiness != "blocked",
-        "project semantic preflight is not ready; "
-        f"mode={progress['policy_mode']} status={progress['status']} "
-        f"unresolved={progress['unresolved_count']}",
-        code=progress["error_code"] or "semantic_preflight_blocked",
-    )
-    return progress
-
-
-def _planning_audit_payload(
-    plan: dict[str, Any],
-    semantic_progress: dict[str, Any],
-    execution_readiness: str,
-) -> dict[str, Any]:
-    return {
-        "schema": PLANNING_AUDIT_SCHEMA,
-        "plan_id": plan["plan_id"],
-        "plan_revision": _plan_hash(plan),
-        "enforcement_profile": _enforcement_profile(plan),
-        "controller_identity": _controller_identity(),
-        "audit_scope": "machine_structural_traceability",
-        "structural_status": "pass",
-        "execution_readiness": execution_readiness,
-        "semantic_preflight": semantic_progress,
-        "counts": {
-            "requirements": len(plan["requirements"]),
-            "acceptance_clauses": len(plan["acceptance_clauses"]),
-            "design_clauses": len(plan["design_clauses"]),
-            "solution_steps": len(plan["solution_steps"]),
-            "gap_items": len(plan["gap_items"]),
-            "tasks": len(plan["tasks"]),
-            "acceptance_flows": len(plan.get("acceptance_flows", [])),
-        },
-    }
-
-
-def _verify_planning_audit(
-    plan_dir: Path,
-    plan: dict[str, Any],
-    *,
-    allow_legacy_missing: bool,
-) -> dict[str, Any]:
-    _require(
-        _enforcement_profile(plan) == PIPELINE_STRICT_ENFORCEMENT_PROFILE,
-        "plan activation/completion requires enforcement_profile=strict_v2",
-        code="pipeline_profile_required",
-    )
-    path = _planning_audit_path(plan_dir, plan)
-    _require(
-        path.is_file(),
-        f"planning audit receipt is missing: {path}; run taskctl audit-plan first",
-        code="planning_audit_required",
-    )
-    receipt = _load_json(path)
-    _expect_keys(
-        receipt,
-        required={
-            "schema",
-            "plan_id",
-            "plan_revision",
-            "enforcement_profile",
-            "controller_identity",
-            "audit_scope",
-            "structural_status",
-            "execution_readiness",
-            "semantic_preflight",
-            "counts",
-        },
-        optional=set(),
-        path="planning_audit_receipt",
-    )
-    _require(
-        receipt["schema"] == PLANNING_AUDIT_SCHEMA,
-        f"planning audit schema must be {PLANNING_AUDIT_SCHEMA}",
-        code="planning_audit_stale",
-    )
-    _require(
-        receipt["plan_id"] == plan["plan_id"]
-        and receipt["plan_revision"] == _plan_hash(plan)
-        and receipt["enforcement_profile"] == PIPELINE_STRICT_ENFORCEMENT_PROFILE
-        and receipt["controller_identity"] == _controller_identity()
-        and receipt["audit_scope"] == "machine_structural_traceability"
-        and receipt["structural_status"] == "pass",
-        "planning audit receipt does not match the current plan/controller; run taskctl audit-plan again",
-        code="planning_audit_stale",
-    )
-    semantic_progress = _semantic_preflight_progress(plan_dir, plan)
-    execution_readiness = _semantic_execution_readiness(
-        semantic_progress, allow_legacy_missing=allow_legacy_missing
-    )
-    _require(
-        receipt["semantic_preflight"] == semantic_progress
-        and receipt["execution_readiness"] == execution_readiness,
-        "planning audit semantic readiness is stale; run taskctl audit-plan again",
-        code="planning_audit_stale",
-    )
-    _require_semantic_preflight_ready(
-        plan_dir,
-        plan,
-        allow_legacy_missing=allow_legacy_missing,
-    )
-    _expect_object(receipt["counts"], "planning_audit_receipt.counts")
-    return receipt
-
-
-def _command_audit_plan(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    state: dict[str, Any] | None = None
-    if args.candidate:
-        plan_path = _resolve_task_input(args.candidate, plan_dir, "candidate plan")
-        plan = _load_json(plan_path)
-        _validate_plan(plan)
-        _verify_scope_sources(plan, plan_dir)
-    else:
-        plan, state = _load_plan_state(plan_dir, require_state=False)
-    _require(
-        _enforcement_profile(plan) == PIPELINE_STRICT_ENFORCEMENT_PROFILE,
-        "planning audit requires enforcement_profile=strict_v2",
-        code="pipeline_profile_required",
-    )
-    allow_legacy_missing = state is not None and not args.candidate
-    semantic_progress = _semantic_preflight_progress(plan_dir, plan)
-    execution_readiness = _semantic_execution_readiness(
-        semantic_progress, allow_legacy_missing=allow_legacy_missing
-    )
-    receipt = _planning_audit_payload(
-        plan, semantic_progress, execution_readiness
-    )
-    path = _planning_audit_path(plan_dir, plan)
-    _write_json_atomic(path, receipt)
-    blocked = receipt["execution_readiness"] == "blocked"
-    payload = {
-        "ok": not blocked,
-        "plan_id": plan["plan_id"],
-        "plan_revision": receipt["plan_revision"],
-        "enforcement_profile": receipt["enforcement_profile"],
-        "audit_scope": receipt["audit_scope"],
-        "structural_status": receipt["structural_status"],
-        "execution_readiness": receipt["execution_readiness"],
-        "ready_for_execution": receipt["execution_readiness"] == "ready",
-        "activation_allowed": receipt["execution_readiness"] == "ready",
-        "legacy_continuation_allowed": (
-            receipt["execution_readiness"]
-            in {"legacy_structural_only", "legacy_semantic_v1"}
-        ),
-        "semantic_preflight": semantic_progress,
-        "receipt": path.relative_to(plan_dir).as_posix(),
-        "counts": receipt["counts"],
-    }
-    if blocked:
-        payload["error"] = {
-            "code": semantic_progress["error_code"]
-            or "semantic_preflight_blocked",
-            "message": "project semantic preflight blocks execution readiness",
-        }
-    return payload
-
-
-def _command_validate(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir, require_state=False)
-    if state is None:
-        _require(
-            _enforcement_profile(plan) in STRICT_ENFORCEMENT_PROFILES,
-            "new plan must declare a strict enforcement profile",
-            code="strict_profile_required",
-        )
-    semantic_progress = _semantic_preflight_progress(plan_dir, plan)
-    execution_readiness = _semantic_execution_readiness(
-        semantic_progress, allow_legacy_missing=state is not None
-    )
-    return {
-        "ok": True,
-        "plan_id": plan["plan_id"],
-        "plan_revision": _plan_hash(plan),
-        "enforcement_profile": _enforcement_profile(plan),
-        "state": "valid" if state else "not_activated",
-        "activation_allowed": (
-            _enforcement_profile(plan) == PIPELINE_STRICT_ENFORCEMENT_PROFILE
-            and execution_readiness == "ready"
-        ),
-        "legacy_continuation_allowed": execution_readiness
-        in {"legacy_structural_only", "legacy_semantic_v1"},
-        "execution_readiness": execution_readiness,
-        "ready_for_execution": execution_readiness == "ready",
-        "semantic_preflight": semantic_progress,
-        "task_count": len(plan["tasks"]),
-        "requirement_count": len(plan["requirements"]),
-    }
-
-
-def _command_activate(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir, require_state=False)
-    _require(state is None, f"state.json already exists in {plan_dir}", code="already_activated")
-    _require(
-        _enforcement_profile(plan) == PIPELINE_STRICT_ENFORCEMENT_PROFILE,
-        "new plan must declare enforcement_profile=strict_v2 before activation",
-        code="pipeline_profile_required",
-    )
-    _require_explicit_semantic_preflight_policy(plan)
-    planning_audit = _verify_planning_audit(
-        plan_dir, plan, allow_legacy_missing=False
-    )
-    task_states = {task["id"]: _new_task_state() for task in plan["tasks"]}
-    state = {
-        "schema": STATE_SCHEMA,
-        "plan_id": plan["plan_id"],
-        "plan_revision": _plan_hash(plan),
+def command_draft(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    load_table(root)
+    task = {
+        "schema": "task.record",
+        "id": args.id,
+        "title": args.title,
+        "outcome": args.outcome,
+        "source_ids": args.source_id,
+        "dependencies": [parse_dependency(value) for value in args.dependency],
+        "mutation_scope": args.mutation_scope,
+        "outputs": args.output,
+        "verification": args.verification,
+        "suggested_skills": args.suggested_skill,
+        "reasoning_hint": args.reasoning_hint,
         "revision": 1,
-        "active_package": None,
-        "task_states": task_states,
     }
-    _recompute_ready(plan, state)
-    _validate_state(state, plan)
-    _write_state(plan_dir, state)
-    warnings = _render_after_state_change(plan_dir, plan, state)
-    return {
-        "ok": True,
-        "plan_id": plan["plan_id"],
-        "enforcement_profile": _enforcement_profile(plan),
-        "planning_audit_revision": planning_audit["plan_revision"],
-        "execution_readiness": planning_audit["execution_readiness"],
-        "semantic_preflight": planning_audit["semantic_preflight"],
-        "revision": 1,
-        "warnings": warnings,
-    }
+    normalized = validate_task(task)
+    return normalized
 
 
-def _task_projection(
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    task: dict[str, Any],
-    project_root: Path,
-    plan_dir: Path,
-    *,
-    evaluation_cache: dict[str, dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    task_state = state["task_states"][task["id"]]
-    try:
-        records = _load_task_evidence(
-            task_state,
-            plan=plan,
-            state=state,
-            project_root=project_root,
-            plan_dir=plan_dir,
+def command_add(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    candidate = validate_task(read_json(Path(args.file).expanduser().resolve()))
+    if candidate["revision"] != 1:
+        raise TaskctlError("a new task must start at revision 1")
+    with workspace_lock(root):
+        table = load_table(root)
+        task_dir, state_dir, _ = table_paths(root, table)
+        task_path = task_dir / f"{candidate['id']}.json"
+        state_path = state_dir / f"{candidate['id']}.json"
+        existing_task = (
+            validate_task(read_json(task_path), expected_id=candidate["id"])
+            if task_path.exists()
+            else None
         )
-        evaluation = _evaluate_task_with_dependencies(
-            plan,
-            state,
-            task,
-            records,
-            project_root,
-            plan_dir,
-            evaluation_cache=evaluation_cache,
-        )
-    except TaskCtlError as exc:
-        evaluation = {
-            "complete": False,
-            "claims": {},
-            "missing": [
-                {"type": "evidence_invalid", "subject": task["id"], "next_action": str(exc)}
-            ],
-            "stale_evidence": 0,
-        }
-    return {
-        "id": task["id"],
-        "outcome": task["outcome"],
-        "requirement_ids": task["requirement_ids"],
-        "depends_on": task["depends_on"],
-        "context_refs": task["context_refs"],
-        "mutation_scope": task["mutation_scope"],
-        "test_scope": task["test_scope"],
-        "planned_test_scope": task.get("planned_test_scope", []),
-        "freshness_scopes": task["freshness_scopes"],
-        "required_claims": _required_claims(plan, task),
-        "status": task_state["status"],
-        "claims": evaluation.get("claims", {}),
-        "missing": evaluation.get("missing", []),
-        "unresolved": task_state["unresolved"],
-    }
-
-
-def _command_resume(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir)
-    assert state is not None
-    project_root = _project_root(plan_dir, args.project_root)
-    semantic_progress = _semantic_preflight_progress(plan_dir, plan)
-    semantic_readiness = _semantic_execution_readiness(
-        semantic_progress, allow_legacy_missing=True
-    )
-    semantic_blocks_new_work = semantic_readiness == "blocked"
-    tasks = _task_map(plan)
-    evaluation_cache: dict[str, dict[str, Any]] = {}
-    if state["active_package"]:
-        active = state["active_package"]
-        projections = [
-            _task_projection(
-                plan,
-                state,
-                tasks[task_id],
-                project_root,
-                plan_dir,
-                evaluation_cache=evaluation_cache,
-            )
-            for task_id in active["task_ids"]
-        ]
-        return {
-            "ok": True,
-            "plan_id": plan["plan_id"],
-            "plan_revision": state["plan_revision"],
-            "state_revision": state["revision"],
-            "enforcement_profile": _enforcement_profile(plan),
-            "completion_allowed": _enforcement_profile(plan)
-            == PIPELINE_STRICT_ENFORCEMENT_PROFILE,
-            "execution_readiness": semantic_readiness,
-            "semantic_preflight": semantic_progress,
-            "new_work_blocked_by_semantic_preflight": semantic_blocks_new_work,
-            "active_package": {
-                "task_ids": active["task_ids"],
-                "phase": active["phase"],
-                "next_action": active["next_action"],
-                "unresolved": active["unresolved"],
-                "controller_status": _active_controller_status(state),
+        initial_state = validate_state(
+            {
+                "schema": "task.state",
+                "task_id": candidate["id"],
+                "status": "todo",
+                "owner": None,
+                "revision": 1,
+                "note": "",
+                "blocked_reason": "",
+                "next_action": "",
+                "result_ref": None,
             },
-            "tasks": projections,
-        }
-    candidate_tasks = [
-        task
-        for task in plan["tasks"]
-        if state["task_states"][task["id"]]["status"] in {"ready", "needs_review"}
-    ]
-    actionable_tasks: list[dict[str, Any]] = []
-    dependency_blocked: list[str] = []
-    semantic_blocked = (
-        [task["id"] for task in candidate_tasks]
-        if semantic_blocks_new_work
-        else []
-    )
-    if not semantic_blocks_new_work:
-        for task in candidate_tasks:
-            issues = _dependency_issues(
-                plan,
-                state,
-                task,
-                project_root,
-                plan_dir,
-                evaluation_cache=evaluation_cache,
-            )
-            if _blocking_dependency_issues(issues):
-                dependency_blocked.append(task["id"])
-            else:
-                actionable_tasks.append(task)
-    packages: dict[tuple[str, str, str], list[str]] = {}
-    for task in actionable_tasks:
-        key = (task["package_key"], task["build_profile"], task["rollback_scope"])
-        packages.setdefault(key, []).append(task["id"])
-    suggestions = [
-        {
-            "task_ids": task_ids,
-            "package_key": key[0],
-            "build_profile": key[1],
-            "rollback_scope": key[2],
-        }
-        for key, task_ids in packages.items()
-    ]
-    ready_ids = [
-        task["id"]
-        for task in actionable_tasks
-        if state["task_states"][task["id"]]["status"] == "ready"
-    ]
-    review_ids = [
-        task["id"]
-        for task in actionable_tasks
-        if state["task_states"][task["id"]]["status"] == "needs_review"
-    ]
-    recommended_package: dict[str, Any] | None = None
-    if suggestions:
-        recommended_package = copy.deepcopy(suggestions[0])
-        recommended_ids = set(recommended_package["task_ids"])
-        recommended_package["tasks"] = [
-            _task_projection(
-                plan,
-                state,
-                task,
-                project_root,
-                plan_dir,
-                evaluation_cache=evaluation_cache,
-            )
-            for task in actionable_tasks
-            if task["id"] in recommended_ids
-        ]
-    payload: dict[str, Any] = {
+            candidate["id"],
+        )
+        existing_state = (
+            validate_state(read_json(state_path), candidate["id"])
+            if state_path.exists()
+            else None
+        )
+        if existing_task is not None and existing_state is not None:
+            raise TaskctlError(f"task already exists: {candidate['id']}")
+        if existing_task is not None and existing_task != candidate:
+            raise TaskctlError(f"conflicting partial task record: {candidate['id']}")
+        if existing_state is not None and existing_state != initial_state:
+            raise TaskctlError(f"conflicting partial task state: {candidate['id']}")
+        tasks = load_tasks(root, table)
+        proposed = dict(tasks)
+        proposed[candidate["id"]] = candidate
+        ensure_acyclic(proposed)
+        if existing_task is None:
+            atomic_write_json(task_path, candidate)
+        if existing_state is None:
+            atomic_write_json(state_path, initial_state)
+    return {
         "ok": True,
-        "plan_id": plan["plan_id"],
-        "plan_revision": state["plan_revision"],
-        "state_revision": state["revision"],
-        "enforcement_profile": _enforcement_profile(plan),
-        "completion_allowed": (
-            _enforcement_profile(plan) == PIPELINE_STRICT_ENFORCEMENT_PROFILE
-            and not semantic_blocks_new_work
-        ),
-        "execution_readiness": semantic_readiness,
-        "semantic_preflight": semantic_progress,
-        "new_work_blocked_by_semantic_preflight": semantic_blocks_new_work,
-        "active_package": None,
-        "ready_count": len(ready_ids),
-        "ready_ids": ready_ids,
-        "needs_review_count": len(review_ids),
-        "needs_review_ids": review_ids,
-        "dependency_blocked_ids": dependency_blocked,
-        "semantic_blocked_ids": semantic_blocked,
-        "recommended_package": recommended_package,
+        "command": "add",
+        "task_id": candidate["id"],
+        "task_revision": 1,
+        "state_revision": 1,
+        "recovered_partial_write": existing_task is not None or existing_state is not None,
     }
-    if args.all_ready:
-        payload["actionable"] = [
-            _task_projection(
-                plan,
-                state,
-                task,
-                project_root,
-                plan_dir,
-                evaluation_cache=evaluation_cache,
+
+
+def command_update(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    candidate = validate_task(read_json(Path(args.file).expanduser().resolve()))
+    with workspace_lock(root):
+        table = load_table(root)
+        tasks = load_tasks(root, table)
+        task_id = candidate["id"]
+        if task_id not in tasks:
+            raise TaskctlError(f"unknown task: {task_id}")
+        current = tasks[task_id]
+        if current["revision"] != args.expected_task_revision:
+            raise TaskctlError(
+                f"task revision conflict: expected {args.expected_task_revision}, "
+                f"current {current['revision']}"
             )
-            for task in actionable_tasks
-        ]
-        payload["package_suggestions"] = suggestions
-    return payload
-
-
-def _require_revision(state: dict[str, Any], expected_revision: int) -> None:
-    _require(
-        state["revision"] == expected_revision,
-        f"state revision mismatch: expected {expected_revision}, actual {state['revision']}",
-        code="revision_conflict",
-    )
-
-
-def _command_begin(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir)
-    assert state is not None
-    _require_semantic_preflight_ready(
-        plan_dir, plan, allow_legacy_missing=True
-    )
-    _require_revision(state, args.expected_revision)
-    _require(state["active_package"] is None, "another work package is already active")
-    selected = list(dict.fromkeys(args.task))
-    _require(bool(selected), "begin requires at least one --task")
-    tasks = _task_map(plan)
-    project_root = _project_root(plan_dir, args.project_root)
-    evaluation_cache: dict[str, dict[str, Any]] = {}
-    for task_id in selected:
-        _require(task_id in tasks, f"unknown task: {task_id}")
-        _require(
-            state["task_states"][task_id]["status"] in {"ready", "needs_review"},
-            f"task {task_id} is not ready or awaiting review",
-        )
-        dependency_issues = _dependency_issues(
-            plan,
-            state,
-            tasks[task_id],
-            project_root,
-            plan_dir,
-            evaluation_cache=evaluation_cache,
-        )
-        blocking_dependency_issues = _blocking_dependency_issues(dependency_issues)
-        _require(
-            not blocking_dependency_issues,
-            f"task {task_id} has invalid dependency evidence: "
-            + "; ".join(item["subject"] for item in blocking_dependency_issues),
-            code="dependency_invalid",
-        )
-    compatibility = {
-        (tasks[task_id]["package_key"], tasks[task_id]["build_profile"], tasks[task_id]["rollback_scope"])
-        for task_id in selected
-    }
-    _require(len(compatibility) == 1, "selected tasks cross package/build/rollback boundaries")
-    def is_preserved_revalidation(task_id: str) -> bool:
-        task_state = state["task_states"][task_id]
-        if task_state["status"] != "ready" or not any(
-            item.get("type") == "plan_changed"
-            for item in task_state.get("unresolved", [])
-        ):
-            return False
-        records = _load_task_evidence(
-            task_state,
-            plan=plan,
-            state=state,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        has_expected_red = any(
-            task_id in record["task_ids"]
-            and record["phase"] == "expected_red"
-            and record["result"] == "expected_fail"
-            for record in records
-        )
-        has_verification = any(
-            task_id in record["task_ids"]
-            and record["phase"] == "verification"
-            and record["result"] == "pass"
-            for record in records
-        )
-        return has_expected_red and has_verification
-
-    preserved_revalidation_ids = {
-        task_id for task_id in selected if is_preserved_revalidation(task_id)
-    }
-
-    def begin_baseline(task_id: str) -> dict[str, Any]:
-        task = tasks[task_id]
-        current = _task_identities(plan, task, project_root)
-        task_state = state["task_states"][task_id]
-        if (
-            task_state["status"] == "needs_review"
-            or task_id in preserved_revalidation_ids
-            or task["tests_first"]["mode"] != "required"
-        ):
-            return current
-
-        records = _load_task_evidence(
-            task_state,
-            plan=plan,
-            state=state,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        required_tests = set(
-            task["claim_overrides"]["automation_test_ids"]
-        )
-        producer_id = task["tests_first"]["expected_red_producer"]
-        red_freshness_keys = {
-            key
-            for claim in _required_claims(plan, task)
-            for key in _claim_rule(plan, task, claim)["freshness_keys"]
-        }
-        for record in reversed(records):
-            if (
-                task_id not in record["task_ids"]
-                or record["phase"] != "expected_red"
-                or record["result"] != "expected_fail"
-                or record["producer"]["id"] != producer_id
-                or not required_tests <= set(record["test_ids"])
-            ):
-                continue
-            if any(
-                key != "production_scope"
-                and (
-                    key not in current
-                    or not _freshness_value_matches(
-                        plan, record, key, current[key]
-                    )
+        state = load_state(root, table, task_id)
+        if state["status"] == "done" or state["result_ref"] is not None:
+            raise TaskctlError(
+                "reopen the completed task before changing its execution contract"
+            )
+        if state["owner"] is not None:
+            if args.owner is None:
+                raise TaskctlError("updating an owned task requires --owner")
+            check_owner(state, args.owner)
+            if args.expected_state_revision is None:
+                raise TaskctlError(
+                    "updating an owned task requires --expected-state-revision"
                 )
-                for key in red_freshness_keys
-            ):
-                continue
-            red_production = record["freshness_identity"].get(
-                "production_scope"
-            )
-            if red_production:
-                # A released, unfinished tests-first task keeps the production
-                # identity observed by its still-current sealed red. This
-                # permits controller upgrades or checkpoints without treating
-                # the already implemented green state as the original begin
-                # baseline. Contract, test, and runner identities still have
-                # to match the current plan before this recovery is allowed.
-                current["production_scope"] = red_production
-                return current
-        return current
-
-    baselines = {task_id: begin_baseline(task_id) for task_id in selected}
-    revalidation_task_ids = [
-        task_id
-        for task_id in selected
-        if state["task_states"][task_id]["status"] == "needs_review"
-        or task_id in preserved_revalidation_ids
-    ]
-    for task_id in selected:
-        state["task_states"][task_id]["status"] = "active"
-        state["task_states"][task_id]["baseline_identity"] = baselines[task_id]
-        state["task_states"][task_id]["unresolved"] = []
-    state["active_package"] = {
-        "task_ids": selected,
-        "phase": "tests",
-        "baseline_identity": baselines,
-        "controller_identity": _controller_identity(),
-        "changed_paths": [],
-        "evidence_refs": [],
-        "unresolved": [],
-        "next_action": "qualify or update tests before production implementation",
-        "revalidation_task_ids": revalidation_task_ids,
-    }
-    state["revision"] += 1
-    _validate_state(state, plan)
-    _write_state(plan_dir, state)
-    warnings = _render_after_state_change(plan_dir, plan, state)
+            check_expected_state(state, args.expected_state_revision)
+        candidate["revision"] = current["revision"] + 1
+        proposed = dict(tasks)
+        proposed[task_id] = candidate
+        ensure_acyclic(proposed)
+        task_dir, _, _ = table_paths(root, table)
+        atomic_write_json(task_dir / f"{task_id}.json", candidate)
     return {
         "ok": True,
-        "plan_id": plan["plan_id"],
-        "state_revision": state["revision"],
-        "active_package": selected,
-        "baseline_identity": baselines,
-        "warnings": warnings,
+        "command": "update",
+        "task_id": task_id,
+        "task_revision": candidate["revision"],
     }
 
 
-def _build_evidence_context(
-    *,
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    task: dict[str, Any],
-    phase: str,
-    project_root: Path,
-    plan_dir: Path,
-) -> dict[str, Any]:
-    freshness = _current_freshness(
-        plan, task, project_root, require_planned_tests=True
-    )
-    if phase == "expected_red":
-        _require(
-            task["tests_first"]["mode"] == "required",
-            f"task {task['id']} does not require expected-red evidence",
-        )
-        baseline = state["task_states"][task["id"]]["baseline_identity"]
-        _require(
-            freshness["production_scope"] == baseline.get("production_scope"),
-            "production scope changed after begin; expected-red evidence can no longer be created",
-            code="tests_first_order",
-        )
-        producer_ids = [task["tests_first"]["expected_red_producer"]]
-    else:
-        records = _load_task_evidence(
-            state["task_states"][task["id"]],
-            plan=plan,
-            state=state,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        _require_sealed_red_identity(
-            plan, state, task, records, project_root
-        )
-        producer_ids = sorted(
-            {
-                producer_id
-                for claim in _required_claims(plan, task)
-                for producer_id in _claim_rule(plan, task, claim)["producers"]
-            }
-        )
-    claim_contracts = {
-        claim: copy.deepcopy(_claim_rule(plan, task, claim))
-        for claim in _required_claims(plan, task)
-    }
-    return {
-        "ok": True,
-        "plan_id": plan["plan_id"],
-        "plan_revision": state["plan_revision"],
-        "state_revision": state["revision"],
-        "task_id": task["id"],
-        "phase": phase,
-        "freshness_identity": freshness,
-        "producer_ids": producer_ids,
-        "required_claims": _required_claims(plan, task),
-        "claim_contracts": claim_contracts,
-        "test_ids": task["claim_overrides"]["automation_test_ids"],
-        "readback_subjects": task["claim_overrides"]["readback_subjects"],
-    }
-
-
-def _write_evidence_context_files(
-    contexts: list[dict[str, Any]], output_dir: Path
-) -> list[str]:
-    paths: list[str] = []
-    for context in contexts:
-        identity = _json_identity(context).removeprefix("sha256:")[:12]
-        filename = _evidence_filename(
-            f"{context['phase']}:{context['task_id']}:r{context['state_revision']}:{identity}:context"
-        )
-        output_path = output_dir / filename
-        _write_bytes_immutable(output_path, _pretty_bytes(context))
-        paths.append(str(output_path))
-    return paths
-
-
-def _active_dependency_issues(
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    project_root: Path,
-    plan_dir: Path,
-) -> list[dict[str, Any]]:
-    active = state["active_package"]
-    _require(active is not None, "impact requires an active package")
-    tasks = _task_map(plan)
-    evaluation_cache: dict[str, dict[str, Any]] = {}
-    issues: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str]] = set()
-    for task_id in active["task_ids"]:
-        for item in _dependency_issues(
-            plan,
-            state,
-            tasks[task_id],
-            project_root,
-            plan_dir,
-            evaluation_cache=evaluation_cache,
-        ):
-            key = (item["type"], item["subject"], item["next_action"])
-            if key not in seen:
-                seen.add(key)
-                issues.append(item)
-    return issues
-
-
-def _revalidation_task_ids(issues: list[dict[str, Any]]) -> list[str]:
-    return sorted(
-        {
-            item["subject"].split(":", 1)[0]
-            for item in issues
-            if item["type"] == "dependency_claim"
-        }
-    )
-
-
-def _command_evidence_context(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir)
-    assert state is not None
-    active = state["active_package"]
-    _require(active is not None, "evidence context requires an active package")
-    _require_active_controller(state)
-    tasks = _task_map(plan)
-    project_root = _project_root(plan_dir, args.project_root)
-    if not args.package:
-        _require(
-            args.task in _active_evidence_task_ids(plan, state),
-            f"task {args.task} is outside the active package dependency closure",
-        )
-        context = _build_evidence_context(
-            plan=plan,
-            state=state,
-            task=tasks[args.task],
-            phase=args.phase,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        if not args.output_dir:
-            return context
-        output_dir = _resolve_context_output_dir(
-            args.output_dir, project_root, plan_dir
-        )
-        context_files = _write_evidence_context_files([context], output_dir)
-        return {
-            "ok": True,
-            "plan_id": plan["plan_id"],
-            "plan_revision": state["plan_revision"],
-            "state_revision": state["revision"],
-            "phase": args.phase,
-            "task_ids": [args.task],
-            "context_files": context_files,
-        }
-
-    dependency_issues = _active_dependency_issues(
-        plan, state, project_root, plan_dir
-    )
-    revalidation_ids = _revalidation_task_ids(dependency_issues)
-    if args.phase == "expected_red":
-        task_ids = [
-            task_id
-            for task_id in active["task_ids"]
-            if tasks[task_id]["tests_first"]["mode"] == "required"
-        ]
-        _require(bool(task_ids), "active package has no required expected-red tasks")
-        revalidation_ids = []
-    else:
-        task_ids = sorted(set(active["task_ids"]) | set(revalidation_ids))
-    contexts = [
-        _build_evidence_context(
-            plan=plan,
-            state=state,
-            task=tasks[task_id],
-            phase=args.phase,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        for task_id in task_ids
-    ]
-    package_test_ids = sorted(
-        {
-            test_id
-            for context in contexts
-            for test_id in context["test_ids"]
-        }
-    )
-    for context in contexts:
-        context["package_test_ids"] = package_test_ids
-    payload = {
-        "ok": True,
-        "plan_id": plan["plan_id"],
-        "plan_revision": state["plan_revision"],
-        "state_revision": state["revision"],
-        "phase": args.phase,
-        "package": True,
-        "task_ids": task_ids,
-        "revalidation_task_ids": revalidation_ids,
-        "contexts": contexts,
-    }
-    if args.output_dir:
-        output_dir = _resolve_context_output_dir(
-            args.output_dir, project_root, plan_dir
-        )
-        context_files = _write_evidence_context_files(contexts, output_dir)
-        payload.pop("contexts")
-        payload["context_files"] = context_files
-    return payload
-
-
-def _command_impact(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir)
-    assert state is not None
-    active = state["active_package"]
-    _require(active is not None, "impact requires an active package")
-    _require_active_controller(state)
-    project_root = _project_root(plan_dir, args.project_root)
-    tasks = _task_map(plan)
-    dependency_issues = _active_dependency_issues(
-        plan, state, project_root, plan_dir
-    )
-    active_changes: dict[str, list[str]] = {}
-    red_status: dict[str, str] = {}
-    for task_id in active["task_ids"]:
-        task = tasks[task_id]
-        current = _current_freshness(
-            plan, task, project_root, require_planned_tests=True
-        )
-        baseline = state["task_states"][task_id]["baseline_identity"]
-        active_changes[task_id] = sorted(
-            key
-            for key, value in current.items()
-            if baseline.get(key) != value
-        )
-        if task["tests_first"]["mode"] != "required":
-            red_status[task_id] = "not_required"
-            continue
-        records = _load_task_evidence(
-            state["task_states"][task_id],
-            plan=plan,
-            state=state,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        if _expected_red_records(plan, state, task, records, project_root):
-            red_status[task_id] = "sealed"
-        elif any(record["phase"] == "expected_red" for record in records):
-            red_status[task_id] = "identity_changed"
-        else:
-            red_status[task_id] = "unsealed"
-    revalidation_task_ids = _revalidation_task_ids(dependency_issues)
-    regression_task_ids = list(
-        dict.fromkeys([*active["task_ids"], *revalidation_task_ids])
-    )
-    test_ids_by_task = {
-        task_id: list(tasks[task_id]["claim_overrides"]["automation_test_ids"])
-        for task_id in regression_task_ids
-    }
-    return {
-        "ok": True,
-        "plan_id": plan["plan_id"],
-        "state_revision": state["revision"],
-        "active_task_ids": active["task_ids"],
-        "changed_freshness_keys": active_changes,
-        "red_status": red_status,
-        "revalidation_task_ids": revalidation_task_ids,
-        "test_ids_by_task": test_ids_by_task,
-        "selected_test_ids": sorted(
-            {
-                test_id
-                for test_ids in test_ids_by_task.values()
-                for test_id in test_ids
-            }
-        ),
-        "dependency_issues": dependency_issues,
-    }
-
-
-def _command_checkpoint(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    # Release is the recovery edge that makes an active package amendable after
-    # an upstream source changed.  Requiring the obsolete source fingerprint on
-    # that one edge creates a deadlock: amend rejects an active package while
-    # release rejects the drift that requires amendment.  Plan/state structure,
-    # revision and active-package ownership remain enforced below.
-    plan, state = _load_plan_state(plan_dir, verify_sources=not args.release)
-    assert state is not None
-    _require_revision(state, args.expected_revision)
-    _require(state["active_package"] is not None, "no active package to checkpoint")
-    active = state["active_package"]
-    if args.phase:
-        _require(args.phase in PHASES, f"invalid phase: {args.phase}")
-        active["phase"] = args.phase
-    active["next_action"] = args.next_action
-    if args.changed_path:
-        active["changed_paths"] = list(dict.fromkeys(args.changed_path))
-    if args.unresolved:
-        unresolved_data = _load_json(
-            _resolve_task_input(args.unresolved, plan_dir, "checkpoint input")
-        )
-        _expect_keys(unresolved_data, required={"items"}, optional=set(), path="checkpoint input")
-        active["unresolved"] = _validate_unresolved(unresolved_data["items"], "checkpoint input.items")
-        for task_id in active["task_ids"]:
-            state["task_states"][task_id]["unresolved"] = copy.deepcopy(active["unresolved"])
-    if args.release:
-        for task_id in active["task_ids"]:
-            task_state = state["task_states"][task_id]
-            has_prior_verification = any(
-                "-verification-" in reference
-                for reference in task_state["evidence_refs"]
-            )
-            has_expected_red = any(
-                "-expected_red-" in reference
-                for reference in task_state["evidence_refs"]
-            )
-            task_state["status"] = (
-                "needs_review" if has_prior_verification else "todo"
-            )
-            if has_prior_verification or not has_expected_red:
-                task_state["baseline_identity"] = {}
-        state["active_package"] = None
-        _recompute_ready(plan, state)
-    state["revision"] += 1
-    _validate_state(state, plan)
-    _write_state(plan_dir, state)
-    warnings = _render_after_state_change(plan_dir, plan, state)
-    return {"ok": True, "state_revision": state["revision"], "warnings": warnings}
-
-
-def _command_invalidate_red(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir)
-    assert state is not None
-    _require_revision(state, args.expected_revision)
-    active = state["active_package"]
-    _require(active is not None, "no active package to reopen for test correction")
-    _require_active_controller(state)
-    _require(
-        active["phase"] in {"implementation", "verification"},
-        "expected-red can be invalidated only after it has been sealed",
-        code="red_not_sealed",
-    )
-    project_root = _project_root(plan_dir, args.project_root)
-    tasks = _task_map(plan)
-    invalidated: list[str] = []
-    for task_id in active["task_ids"]:
-        task = tasks[task_id]
-        if task["tests_first"]["mode"] != "required":
-            continue
-        records = _load_task_evidence(
-            state["task_states"][task_id],
-            plan=plan,
-            state=state,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        _require_sealed_red_identity(plan, state, task, records, project_root)
-        invalidated.append(task_id)
-    _require(bool(invalidated), "active package has no sealed expected-red tasks")
-
-    active["phase"] = "tests"
-    active["next_action"] = (
-        "review the full selected test harness, restore production to the begin "
-        "baseline, then create and seal new expected-red evidence"
-    )
-    if args.changed_path:
-        active["changed_paths"] = list(dict.fromkeys(args.changed_path))
-    active["unresolved"] = [
-        {
-            "type": "test_identity_invalidated",
-            "subject": task_id,
-            "next_action": args.reason,
-        }
-        for task_id in invalidated
-    ]
-    for task_id in invalidated:
-        state["task_states"][task_id]["unresolved"] = [
-            copy.deepcopy(
-                next(
-                    item
-                    for item in active["unresolved"]
-                    if item["subject"] == task_id
-                )
-            )
-        ]
-    state["revision"] += 1
-    _validate_state(state, plan)
-    _write_state(plan_dir, state)
-    warnings = _render_after_state_change(plan_dir, plan, state)
-    return {
-        "ok": True,
-        "state_revision": state["revision"],
-        "invalidated_task_ids": invalidated,
-        "next_action": active["next_action"],
-        "warnings": warnings,
-    }
-
-
-def _command_seal_red(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir)
-    assert state is not None
-    _require_revision(state, args.expected_revision)
-    active = state["active_package"]
-    _require(active is not None, "no active package to seal")
-    _require_active_controller(state)
-    _require(bool(args.evidence), "seal-red requires at least one --evidence")
-    project_root = _project_root(plan_dir, args.project_root)
-    prepared = _prepare_evidence_reports(
-        args.evidence,
-        plan=plan,
-        state=state,
-        project_root=project_root,
-        plan_dir=plan_dir,
-    )
-    pending_indexes, pending_snapshots, new_refs_by_task, envelopes = prepared
-    active_ids = set(active["task_ids"])
-    for envelope in envelopes:
-        _require(
-            envelope["phase"] == "expected_red"
-            and envelope["result"] == "expected_fail",
-            "seal-red accepts only expected_red/expected_fail evidence",
-            code="seal_red_evidence_invalid",
-        )
-        _require(
-            set(envelope["task_ids"]) <= active_ids,
-            "seal-red evidence must belong to an active package task",
-            code="seal_red_task_invalid",
-        )
-
-    tasks = _task_map(plan)
-    sealed_task_ids: list[str] = []
-    for task_id in active["task_ids"]:
-        task = tasks[task_id]
-        if task["tests_first"]["mode"] != "required":
-            continue
-        records = _load_task_evidence(
-            state["task_states"][task_id],
-            plan=plan,
-            state=state,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        ) + [
-            envelope
-            for envelope in envelopes
-            if task_id in envelope["task_ids"]
-        ]
-        _require_sealed_red_identity(
-            plan, state, task, records, project_root
-        )
-        sealed_task_ids.append(task_id)
-    _require(bool(sealed_task_ids), "active package has no required expected-red tasks")
-
-    _commit_evidence_reports(
-        plan_dir=plan_dir,
-        state=state,
-        pending_indexes=pending_indexes,
-        pending_snapshots=pending_snapshots,
-        new_refs_by_task=new_refs_by_task,
-    )
-    active["phase"] = "implementation"
-    active["evidence_refs"] = list(
-        dict.fromkeys(
-            reference
-            for task_id in active["task_ids"]
-            for reference in state["task_states"][task_id]["evidence_refs"]
-        )
-    )
-    active["unresolved"] = []
-    for task_id in sealed_task_ids:
-        state["task_states"][task_id]["unresolved"] = []
-    active["next_action"] = (
-        "implement the production scope without changing the sealed test identity"
-    )
-    state["revision"] += 1
-    _validate_state(state, plan)
-    _write_state(plan_dir, state)
-    warnings = _render_after_state_change(plan_dir, plan, state)
-    return {
-        "ok": True,
-        "state_revision": state["revision"],
-        "sealed_task_ids": sealed_task_ids,
-        "evidence_ids": [envelope["evidence_id"] for envelope in envelopes],
-        "next_action": active["next_action"],
-        "warnings": warnings,
-    }
-
-
-def _command_close(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir)
-    assert state is not None
-    _require_revision(state, args.expected_revision)
-    active = state["active_package"]
-    _require(active is not None, "no active package to close")
-    _require_active_controller(state)
-    project_root = _project_root(plan_dir, args.project_root)
-    prepared = _prepare_evidence_reports(
-        args.evidence,
-        plan=plan,
-        state=state,
-        project_root=project_root,
-        plan_dir=plan_dir,
-    )
-    pending_indexes, pending_snapshots, new_refs_by_task, _ = prepared
-    _commit_evidence_reports(
-        plan_dir=plan_dir,
-        state=state,
-        pending_indexes=pending_indexes,
-        pending_snapshots=pending_snapshots,
-        new_refs_by_task=new_refs_by_task,
-    )
-
-    tasks = _task_map(plan)
-    cards: list[dict[str, Any]] = []
-    completed: list[str] = []
-    remaining: list[str] = []
-    combined_unresolved: list[dict[str, Any]] = []
-    evaluation_cache: dict[str, dict[str, Any]] = {}
-    for task_id in active["task_ids"]:
-        task_state = state["task_states"][task_id]
-        records = _load_task_evidence(
-            task_state,
-            plan=plan,
-            state=state,
-            project_root=project_root,
-            plan_dir=plan_dir,
-        )
-        evaluation = _evaluate_task_with_dependencies(
-            plan,
-            state,
-            tasks[task_id],
-            records,
-            project_root,
-            plan_dir,
-            evaluation_cache=evaluation_cache,
-        )
-        task_state["unresolved"] = copy.deepcopy(evaluation["missing"])
-        if evaluation["complete"]:
-            task_state["status"] = "done"
-            completed.append(task_id)
-        else:
-            task_state["status"] = "active"
-            remaining.append(task_id)
-            combined_unresolved.extend(evaluation["missing"])
-        cards.append(evaluation)
-    if remaining:
-        active["task_ids"] = remaining
-        active["revalidation_task_ids"] = [
-            task_id
-            for task_id in active.get("revalidation_task_ids", [])
-            if task_id in remaining
-        ]
-        active["baseline_identity"] = {
-            task_id: active["baseline_identity"][task_id] for task_id in remaining
-        }
-        active["evidence_refs"] = list(
-            dict.fromkeys(
-                reference
-                for task_id in remaining
-                for reference in state["task_states"][task_id]["evidence_refs"]
-            )
-        )
-        active["unresolved"] = combined_unresolved
-        active["phase"] = "verification"
-        active["next_action"] = "satisfy the listed missing or stale evidence"
-    else:
-        state["active_package"] = None
-    _recompute_ready(plan, state)
-    state["revision"] += 1
-    _validate_state(state, plan)
-    _write_state(plan_dir, state)
-    warnings = _render_after_state_change(plan_dir, plan, state)
-    return {
-        "ok": True,
-        "state_revision": state["revision"],
-        "completed": completed,
-        "remaining": remaining,
-        "completion_cards": cards,
-        "warnings": warnings,
-    }
-
-
-def _audit_task_ids(plan: dict[str, Any], state: dict[str, Any], all_tasks: bool) -> list[str]:
-    if all_tasks:
-        return [task["id"] for task in plan["tasks"]]
-    if state["active_package"]:
-        return list(state["active_package"]["task_ids"])
-    ready = [task for task in plan["tasks"] if state["task_states"][task["id"]]["status"] == "ready"]
-    dependencies: set[str] = set()
-    for task in ready:
-        dependencies.update(edge["task_id"] for edge in task["depends_on"])
-    return sorted(dependencies)
-
-
-def _dependent_closure(plan: dict[str, Any], seeds: set[str]) -> set[str]:
-    reverse: dict[str, set[str]] = {task["id"]: set() for task in plan["tasks"]}
-    for task in plan["tasks"]:
-        for edge in task["depends_on"]:
-            reverse.setdefault(edge["task_id"], set()).add(task["id"])
-    result = set(seeds)
-    queue = list(seeds)
-    while queue:
-        current = queue.pop()
-        for dependent in reverse.get(current, set()):
-            if dependent not in result:
-                result.add(dependent)
-                queue.append(dependent)
-    return result
-
-
-def _record_satisfies_flow_receipt(
-    plan: dict[str, Any],
-    task: dict[str, Any],
-    record: dict[str, Any],
-    project_root: Path,
-    *,
-    required_claims: set[str],
-    required_tests: set[str],
-    required_subjects: set[str],
-) -> bool:
-    if (
-        task["id"] not in record["task_ids"]
-        or record["phase"] != "verification"
-        or record["result"] != "pass"
-        or not required_claims <= set(record["claims"])
-        or not required_tests <= set(record["test_ids"])
-        or not required_subjects <= set(record["subjects"])
-    ):
-        return False
-    current = _current_freshness(plan, task, project_root)
-    producer_id = record["producer"]["id"]
-    for claim in required_claims:
-        rule = _claim_rule(plan, task, claim)
-        if producer_id not in rule["producers"] or record["source_class"] not in rule["source_classes"]:
-            return False
-        for key in rule["freshness_keys"]:
-            if key not in record["freshness_identity"]:
-                return False
-            if key in current and not _freshness_value_matches(
-                plan, record, key, current[key]
-            ):
-                return False
-    return True
-
-
-def _evaluate_acceptance_flow(
-    plan: dict[str, Any],
-    flow: dict[str, Any],
-    task: dict[str, Any],
-    records: list[dict[str, Any]],
-    project_root: Path,
-) -> dict[str, Any]:
-    missing: list[dict[str, Any]] = []
-    if "evidence_mode" not in flow or "scope_coverage" not in flow:
-        missing.append(
-            {
-                "type": "flow_contract_incomplete",
-                "subject": flow["id"],
-                "next_action": "declare evidence_mode and exact scope_coverage before claiming the flow",
-            }
-        )
-    else:
-        required_claims = set(flow["required_claims"])
-        scope_claims = {
-            scope_id: set(claims)
-            for scope_id, claims in flow.get("scope_claims", {}).items()
-        }
-        if flow["evidence_mode"] == "single_receipt":
-            subjects = set(flow["scope_coverage"])
-            tests = set(flow["direct_test_ids"])
-            receipt_claims = set().union(
-                *(scope_claims.get(scope_id, required_claims) for scope_id in subjects)
-            )
-            if not any(
-                _record_satisfies_flow_receipt(
-                    plan,
-                    task,
-                    record,
-                    project_root,
-                    required_claims=receipt_claims,
-                    required_tests=tests,
-                    required_subjects=subjects,
-                )
-                for record in records
-            ):
-                missing.append(
-                    {
-                        "type": "missing_vertical_receipt",
-                        "subject": flow["id"],
-                        "next_action": "produce one fresh receipt containing every required claim, direct test, and readback scope",
-                    }
-                )
-        else:
-            for scope_id, mapped_tests in flow["scope_coverage"].items():
-                receipt_claims = scope_claims.get(scope_id, required_claims)
-                if any(
-                    _record_satisfies_flow_receipt(
-                        plan,
-                        task,
-                        record,
-                        project_root,
-                        required_claims=receipt_claims,
-                        required_tests=set(mapped_tests),
-                        required_subjects={scope_id},
-                    )
-                    for record in records
-                ):
-                    continue
-                missing.append(
-                    {
-                        "type": "missing_scope_receipt",
-                        "subject": scope_id,
-                        "next_action": "produce one fresh vertical receipt for this exact scope and its mapped direct test(s)",
-                    }
-                )
-    return {
-        "flow_id": flow["id"],
-        "verification_task_id": flow["verification_task_id"],
-        "complete": not missing,
-        "scope": flow["scope"],
-        "evidence_mode": flow.get("evidence_mode", "unbound"),
-        "missing": missing,
-    }
-
-
-def _write_completion_receipt(
-    plan_dir: Path,
-    plan: dict[str, Any],
-    state: dict[str, Any],
-    audited_task_ids: list[str],
-    audited_flow_ids: list[str],
-    records_by_task_id: dict[str, list[dict[str, Any]]],
-) -> dict[str, str]:
-    receipt_core = {
-        "schema": COMPLETION_SCHEMA,
-        "plan_id": plan["plan_id"],
-        "plan_revision": state["plan_revision"],
-        "state_revision": state["revision"],
-        "enforcement_profile": _enforcement_profile(plan),
-        "semantic_preflight": _semantic_preflight_progress(plan_dir, plan),
-        "audited_task_ids": sorted(audited_task_ids),
-        "audited_flow_ids": sorted(audited_flow_ids),
-        "state_identity": _json_identity(state),
-        "evidence_identity": _json_identity(records_by_task_id),
-    }
-    receipt_id = _json_identity(receipt_core)
-    receipt = {**receipt_core, "receipt_id": receipt_id}
-    receipt_path = (
-        plan_dir
-        / "evidence"
-        / "completion"
-        / f"{receipt_id.removeprefix('sha256:')}.json"
-    )
-    _write_json_atomic(receipt_path, receipt)
-    return {
-        "id": receipt_id,
-        "path": receipt_path.relative_to(plan_dir).as_posix(),
-    }
-
-
-def _command_audit(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    plan, state = _load_plan_state(plan_dir)
-    assert state is not None
-    enforcement_profile = _enforcement_profile(plan)
-    semantic_progress = _semantic_preflight_progress(plan_dir, plan)
-    plan_failures: list[dict[str, str]] = []
-    if args.all and enforcement_profile != PIPELINE_STRICT_ENFORCEMENT_PROFILE:
-        plan_failures.append(
-            {
-                "type": "pipeline_profile_required",
-                "subject": plan["plan_id"],
-                "next_action": "amend the active plan to enforcement_profile=strict_v2 with a fresh planning audit",
-            }
-        )
-    elif args.all:
-        try:
-            _verify_planning_audit(
-                plan_dir, plan, allow_legacy_missing=True
-            )
-        except TaskCtlError as exc:
-            plan_failures.append(
-                {
-                    "type": exc.code,
-                    "subject": plan["plan_id"],
-                    "next_action": str(exc),
-                }
-            )
-    project_root = _project_root(plan_dir, args.project_root)
-    tasks = _task_map(plan)
-    audited = _audit_task_ids(plan, state, args.all)
-    failures: list[dict[str, Any]] = []
-    cards: list[dict[str, Any]] = []
-    records_by_task_id: dict[str, list[dict[str, Any]]] = {}
-    evaluation_cache: dict[str, dict[str, Any]] = {}
-    for task_id in audited:
-        task_state = state["task_states"][task_id]
-        try:
-            records = _load_task_evidence(
-                task_state,
-                plan=plan,
-                state=state,
-                project_root=project_root,
-                plan_dir=plan_dir,
-            )
-            records_by_task_id[task_id] = records
-            card = _evaluate_task_with_dependencies(
-                plan,
-                state,
-                tasks[task_id],
-                records,
-                project_root,
-                plan_dir,
-                evaluation_cache=evaluation_cache,
-            )
-        except TaskCtlError as exc:
-            records_by_task_id[task_id] = []
-            card = {
-                "task_id": task_id,
-                "complete": False,
-                "claims": {},
-                "missing": [
-                    {"type": "evidence_invalid", "subject": task_id, "next_action": str(exc)}
-                ],
-                "stale_evidence": 0,
-            }
-        if args.all and task_state["status"] != "done":
-            card["missing"].append(
-                {
-                    "type": "task_not_done",
-                    "subject": task_id,
-                    "next_action": f"finish task currently marked {task_state['status']}",
-                }
-            )
-            card["complete"] = False
-        cards.append(card)
-        if not card["complete"]:
-            failures.append(card)
-    card_by_task_id = {card["task_id"]: card for card in cards}
-    flow_cards: list[dict[str, Any]] = []
-    if args.all:
-        for flow in plan.get("acceptance_flows", []):
-            verification_task_id = flow["verification_task_id"]
-            task_card = card_by_task_id[verification_task_id]
-            flow_card = _evaluate_acceptance_flow(
-                plan,
-                flow,
-                tasks[verification_task_id],
-                records_by_task_id.get(verification_task_id, []),
-                project_root,
-            )
-            if not task_card["complete"]:
-                flow_card["complete"] = False
-                flow_card["missing"].append(
-                    {
-                        "type": "verification_task_incomplete",
-                        "subject": verification_task_id,
-                        "next_action": "complete the verification task and its vertical receipt contract",
-                    }
-                )
-            flow_cards.append(flow_card)
-    failed_flow_ids = [card["flow_id"] for card in flow_cards if not card["complete"]]
-    changed: list[str] = []
-    if args.apply and (failures or failed_flow_ids):
-        _require_revision(state, args.expected_revision)
-        seeds = {card["task_id"] for card in failures}
-        seeds.update(
-            card["verification_task_id"] for card in flow_cards if not card["complete"]
-        )
-        affected = _dependent_closure(plan, seeds)
-        for task_id in affected:
-            task_state = state["task_states"][task_id]
-            if task_state["status"] == "done":
-                task_state["status"] = "needs_review"
-                changed.append(task_id)
-            elif task_state["status"] in {"ready", "todo"}:
-                task_state["status"] = "todo"
-        if state["active_package"] and set(state["active_package"]["task_ids"]) & affected:
-            state["active_package"]["unresolved"].append(
-                {
-                    "type": "evidence_stale",
-                    "subject": ",".join(sorted(affected)),
-                    "next_action": "review invalidated upstream evidence before continuing",
-                }
-            )
-        _recompute_ready(plan, state)
-        state["revision"] += 1
-        _validate_state(state, plan)
-        _write_state(plan_dir, state)
-        _render_after_state_change(plan_dir, plan, state)
-    audit_ok = not failures and not failed_flow_ids and not plan_failures
-    completion_receipt = None
-    if args.all and audit_ok:
-        completion_receipt = _write_completion_receipt(
-            plan_dir,
-            plan,
-            state,
-            audited,
-            [flow["id"] for flow in plan.get("acceptance_flows", [])],
-            records_by_task_id,
-        )
-    return {
-        "ok": audit_ok,
-        "enforcement_profile": enforcement_profile,
-        "task_status_counts": _task_status_counts(state),
-        "semantic_preflight": semantic_progress,
-        "product_evidence": {
-            "scope": "all" if args.all else "selected",
-            "audited_task_count": len(audited),
-            "closed_task_count": len(audited) - len(failures),
-            "unresolved_task_count": len(failures),
-            "audited_flow_count": len(flow_cards),
-            "unresolved_flow_count": len(failed_flow_ids),
-            "completion_receipt_issued": completion_receipt is not None,
-        },
-        "audited": len(audited),
-        "audited_flows": len(flow_cards),
-        "failed": len(failures),
-        "failed_task_ids": [card["task_id"] for card in failures],
-        "failed_flow_ids": failed_flow_ids,
-        "plan_failures": plan_failures,
-        "completion_receipt": completion_receipt,
-        "changed_to_needs_review": sorted(changed),
-        "state_revision": state["revision"],
-        "cards": cards if args.details else [],
-        "flow_cards": flow_cards if args.details else [],
-    }
-
-
-def _without_source_fingerprints(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            key: _without_source_fingerprints(child)
-            for key, child in value.items()
-            if key != "source_fingerprint"
-        }
+def shrink_value(value: Any, max_string: int) -> Any:
+    if isinstance(value, str):
+        return value if len(value) <= max_string else value[:max_string] + "…"
     if isinstance(value, list):
-        return [_without_source_fingerprints(child) for child in value]
+        return [shrink_value(item, max_string) for item in value]
+    if isinstance(value, dict):
+        return {key: shrink_value(item, max_string) for key, item in value.items()}
     return value
 
 
-def _semantic_amendment_changed(old_value: Any, new_value: Any) -> bool:
-    return _without_source_fingerprints(old_value) != _without_source_fingerprints(
-        new_value
+def fit_payload(payload: dict[str, Any], budget: int) -> dict[str, Any]:
+    for maximum in (2_000, 1_000, 500, 240, 120):
+        candidate = shrink_value(payload, maximum)
+        was_shrunk = candidate != payload
+        candidate["truncated"] = bool(payload.get("truncated")) or was_shrunk
+        if len(compact_json(candidate)) <= budget:
+            return candidate
+    minimal = {
+        "ok": True,
+        "command": payload.get("command"),
+        "id": payload.get("id") or payload.get("task_id"),
+        "snapshot_id": payload.get("snapshot_id"),
+        "pagination": payload.get("pagination"),
+        "truncated": True,
+        "hint": "increase --budget or use show/deps/context with a narrower target",
+    }
+    if len(compact_json(minimal)) > budget:
+        raise TaskctlError("--budget is too small for a minimal response")
+    return minimal
+
+
+def command_show(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    table = load_table(root)
+    tasks = load_tasks(root, table)
+    if args.id not in tasks:
+        raise TaskctlError(f"unknown task: {args.id}")
+    state = load_state(root, table, args.id)
+    result = current_result(root, table, tasks[args.id], state)
+    return fit_payload(
+        {
+            "ok": True,
+            "command": "show",
+            "id": args.id,
+            "task": tasks[args.id],
+            "state": state,
+            "result": result,
+        },
+        args.budget,
     )
 
 
-def _amendment_impact(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
-    old_tasks = _task_map(old)
-    new_tasks = _task_map(new)
-    old_requirements = _requirement_map(old)
-    new_requirements = _requirement_map(new)
-    old_sources = {source["id"]: source for source in old["scope_sources"]}
-    new_sources = {source["id"]: source for source in new["scope_sources"]}
-    changed_sources = {
-        key
-        for key in set(old_sources) | set(new_sources)
-        if old_sources.get(key) != new_sources.get(key)
-    }
-    old_semantic_preflight = old.get("semantic_preflight")
-    new_semantic_preflight = new.get("semantic_preflight")
-    changed_semantic_preflight = (
-        old_semantic_preflight != new_semantic_preflight
-    )
-    changed_requirements = {
-        key
-        for key in set(old_requirements) | set(new_requirements)
-        if _semantic_amendment_changed(
-            old_requirements.get(key), new_requirements.get(key)
-        )
-    }
-    changed_producers = {
-        key
-        for key in set(old["producers"]) | set(new["producers"])
-        if _semantic_amendment_changed(
-            old["producers"].get(key), new["producers"].get(key)
-        )
-    }
-    changed_profiles = {
-        key
-        for key in set(old["evidence_profiles"]) | set(new["evidence_profiles"])
-        if _semantic_amendment_changed(
-            old["evidence_profiles"].get(key), new["evidence_profiles"].get(key)
-        )
-    }
-    changed_tests = {
-        key
-        for key in set(old["test_qualifications"]) | set(new["test_qualifications"])
-        if _semantic_amendment_changed(
-            old["test_qualifications"].get(key),
-            new["test_qualifications"].get(key),
-        )
-    }
-    old_flow_map = {flow["id"]: flow for flow in old.get("acceptance_flows", [])}
-    new_flow_map = {flow["id"]: flow for flow in new.get("acceptance_flows", [])}
-    changed_flows = {
-        key
-        for key in set(old_flow_map) | set(new_flow_map)
-        if _semantic_amendment_changed(old_flow_map.get(key), new_flow_map.get(key))
-    }
-    changed_tasks = {
-        key
-        for key in set(old_tasks) | set(new_tasks)
-        if _semantic_amendment_changed(old_tasks.get(key), new_tasks.get(key))
-    }
-    direct: set[str] = set(changed_tasks)
-    for task_id, task in new_tasks.items():
-        if set(task["requirement_ids"]) & changed_requirements:
-            direct.add(task_id)
-        if task["claim_profile"] in changed_profiles:
-            direct.add(task_id)
-        if set(task["claim_overrides"]["automation_test_ids"]) & changed_tests:
-            direct.add(task_id)
-        for claim in _required_claims(new, task):
-            if set(_claim_rule(new, task, claim)["producers"]) & changed_producers:
-                direct.add(task_id)
-    for flow_id in changed_flows:
-        old_flow = old_flow_map.get(flow_id)
-        new_flow = new_flow_map.get(flow_id)
-        if old_flow and old_flow["verification_task_id"] in old_tasks:
-            direct.add(old_flow["verification_task_id"])
-        if new_flow and new_flow["verification_task_id"] in new_tasks:
-            direct.add(new_flow["verification_task_id"])
-    affected = _dependent_closure(new, direct & set(new_tasks)) | (direct - set(new_tasks))
-    lowerings: list[str] = []
-    if (
-        _enforcement_profile(old) == PIPELINE_STRICT_ENFORCEMENT_PROFILE
-        and _enforcement_profile(new) != PIPELINE_STRICT_ENFORCEMENT_PROFILE
-    ):
-        lowerings.append("weakened enforcement_profile from strict_v2")
-    removed_decision_refs = set(old.get("decision_refs", [])) - set(new.get("decision_refs", []))
-    if removed_decision_refs:
-        lowerings.append(
-            "removed decision refs " + ",".join(sorted(removed_decision_refs))
-        )
-    old_semantic_mode = (
-        old_semantic_preflight.get("mode") if old_semantic_preflight else None
-    )
-    new_semantic_mode = (
-        new_semantic_preflight.get("mode") if new_semantic_preflight else None
-    )
-    if old_semantic_mode == "required" and new_semantic_mode != "required":
-        lowerings.append("semantic preflight changed from required")
-    elif old_semantic_mode == "required" and new_semantic_mode == "required":
-        removed_semantic_sources = set(
-            old_semantic_preflight["scope_source_ids"]
-        ) - set(new_semantic_preflight["scope_source_ids"])
-        if removed_semantic_sources:
-            lowerings.append(
-                "semantic preflight removed scope sources "
-                + ",".join(sorted(removed_semantic_sources))
-            )
-        removed_dimensions = set(
-            old_semantic_preflight["required_dimensions"]
-        ) - set(new_semantic_preflight["required_dimensions"])
-        if removed_dimensions:
-            lowerings.append(
-                "semantic preflight removed dimensions "
-                + ",".join(sorted(removed_dimensions))
-            )
-        if (
-            new_semantic_preflight["expected_total_count"]
-            < old_semantic_preflight["expected_total_count"]
-        ):
-            lowerings.append(
-                "semantic preflight reduced expected identity count "
-                f"{old_semantic_preflight['expected_total_count']}->"
-                f"{new_semantic_preflight['expected_total_count']}"
-            )
-    for source_id, old_source in old_sources.items():
-        new_source = new_sources.get(source_id)
-        if new_source is None:
-            lowerings.append(f"removed scope source {source_id}")
+def command_list(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    table = load_table(root)
+    tasks = load_tasks(root, table)
+    states = load_states(root, table, tasks)
+    rows = []
+    for task_id in sorted(tasks):
+        state = states[task_id]
+        if args.status and state["status"] not in args.status:
             continue
-        if (
-            old_source.get("inventory_mode", "advisory") == "exact"
-            and new_source.get("inventory_mode", "advisory") != "exact"
-        ):
-            lowerings.append(f"scope source {source_id} weakened exact inventory")
-        removed_inventory = set(old_source.get("requirement_ids", [])) - set(
-            new_source.get("requirement_ids", [])
+        rows.append(
+            {
+                "id": task_id,
+                "title": tasks[task_id]["title"],
+                "status": state["status"],
+                "owner": state["owner"],
+                "task_revision": tasks[task_id]["revision"],
+                "state_revision": state["revision"],
+            }
         )
-        if removed_inventory:
-            lowerings.append(
-                f"scope source {source_id} removed requirement inventory "
-                + ",".join(sorted(removed_inventory))
-            )
-        if (
-            old_source.get("fingerprint_mode", "label") == "file_sha256"
-            and new_source.get("fingerprint_mode", "label") != "file_sha256"
-        ):
-            lowerings.append(f"scope source {source_id} weakened file fingerprint verification")
-        if old_source.get("source_audit_ref") and not new_source.get("source_audit_ref"):
-            lowerings.append(f"scope source {source_id} removed source audit reference")
-        if old_source.get("inventory_prefix") and (
-            old_source.get("inventory_prefix") != new_source.get("inventory_prefix")
-        ):
-            lowerings.append(f"scope source {source_id} changed inventory prefix")
-        for field in ("ref", "root"):
-            if field in old_source and old_source.get(field) != new_source.get(field):
-                lowerings.append(f"scope source {source_id} changed {field}")
-
-    def record_rule_lowering(prefix: str, old_rule: dict[str, Any], new_rule: dict[str, Any]) -> None:
-        removed_freshness = set(old_rule["freshness_keys"]) - set(new_rule["freshness_keys"])
-        if removed_freshness:
-            lowerings.append(f"{prefix} removed freshness {','.join(sorted(removed_freshness))}")
-        if new_rule["min_evidence"] < old_rule["min_evidence"]:
-            lowerings.append(
-                f"{prefix} reduced min_evidence {old_rule['min_evidence']}->{new_rule['min_evidence']}"
-            )
-        added_sources = set(new_rule["source_classes"]) - set(old_rule["source_classes"])
-        if added_sources:
-            lowerings.append(f"{prefix} broadened source_classes {','.join(sorted(added_sources))}")
-        added_producers = set(new_rule["producers"]) - set(old_rule["producers"])
-        if added_producers:
-            lowerings.append(f"{prefix} broadened producers {','.join(sorted(added_producers))}")
-
-    for requirement_id, old_requirement in old_requirements.items():
-        new_requirement = new_requirements.get(requirement_id)
-        if new_requirement is None:
-            lowerings.append(f"removed requirement {requirement_id}")
-        elif old_requirement["status"] == "in_scope" and new_requirement["status"] == "out_of_scope":
-            lowerings.append(f"requirement {requirement_id} moved out_of_scope")
-        elif new_requirement:
-            if (
-                old_requirement.get("verification_mode", "task_evidence") == "direct_flow"
-                and new_requirement.get("verification_mode", "task_evidence") != "direct_flow"
-            ):
-                lowerings.append(f"requirement {requirement_id} weakened direct_flow verification")
-            removed_scope = set(old_requirement.get("acceptance_scope", [])) - set(
-                new_requirement.get("acceptance_scope", [])
-            )
-            if removed_scope:
-                lowerings.append(
-                    f"requirement {requirement_id} narrowed acceptance_scope "
-                    + ",".join(sorted(removed_scope))
-                )
-            removed_observables = set(old_requirement["observable_claims"]) - set(
-                new_requirement["observable_claims"]
-            )
-            if removed_observables:
-                lowerings.append(
-                    f"requirement {requirement_id} removed observable claims "
-                    + ",".join(sorted(removed_observables))
-                )
-
-    for producer_id, old_producer in old["producers"].items():
-        new_producer = new["producers"].get(producer_id)
-        if new_producer is None:
-            continue
-        if old_producer["source_class"] != new_producer["source_class"]:
-            lowerings.append(
-                f"producer {producer_id} changed source_class "
-                f"{old_producer['source_class']}->{new_producer['source_class']}"
-            )
-        added_claims = set(new_producer["allowed_claims"]) - set(old_producer["allowed_claims"])
-        if added_claims:
-            lowerings.append(
-                f"producer {producer_id} broadened allowed claims {','.join(sorted(added_claims))}"
-            )
-        if old_producer["requires_raw_artifacts"] and not new_producer["requires_raw_artifacts"]:
-            lowerings.append(f"producer {producer_id} stopped requiring raw artifacts")
-
-    for profile_id, old_profile in old["evidence_profiles"].items():
-        new_profile = new["evidence_profiles"].get(profile_id)
-        if new_profile is None:
-            continue
-        removed_profile_claims = set(old_profile["required_claims"]) - set(
-            new_profile["required_claims"]
-        )
-        if removed_profile_claims:
-            lowerings.append(
-                f"profile {profile_id} removed required claims "
-                + ",".join(sorted(removed_profile_claims))
-            )
-        for claim in set(old_profile["claim_rules"]) & set(new_profile["claim_rules"]):
-            record_rule_lowering(
-                f"profile {profile_id} claim {claim}",
-                old_profile["claim_rules"][claim],
-                new_profile["claim_rules"][claim],
-            )
-
-    for test_id, old_test in old["test_qualifications"].items():
-        new_test = new["test_qualifications"].get(test_id)
-        if new_test is None:
-            continue
-        if old_test["trust_state"] != "qualified" and new_test["trust_state"] == "qualified":
-            lowerings.append(f"test {test_id} promoted to qualified")
-        for field in ("oracle_source", "baseline", "subject"):
-            if old_test[field] != new_test[field]:
-                lowerings.append(f"test {test_id} changed {field}")
-        for field in ("requirement_ids", "claim_dimensions", "negative_paths"):
-            removed = set(old_test[field]) - set(new_test[field])
-            if removed:
-                lowerings.append(f"test {test_id} removed {field} {','.join(sorted(removed))}")
-        if old_test.get("evidence_shape", "module") != new_test.get("evidence_shape", "module"):
-            lowerings.append(f"test {test_id} changed evidence_shape")
-        if set(old_test.get("observed_scopes", [])) != set(new_test.get("observed_scopes", [])):
-            lowerings.append(f"test {test_id} changed observed_scopes")
-
-    tests_first_strength = {"not_applicable": 0, "prequalified": 1, "required": 2}
-    for task_id, old_task in old_tasks.items():
-        new_task = new_tasks.get(task_id)
-        if new_task is None:
-            lowerings.append(f"removed task {task_id}")
-            continue
-        if old_task["outcome"] != new_task["outcome"]:
-            lowerings.append(f"task {task_id} changed outcome")
-        old_level = old_task.get("completion_level", "module_ready")
-        new_level = new_task.get("completion_level", "module_ready")
-        if COMPLETION_LEVELS[new_level] < COMPLETION_LEVELS[old_level]:
-            lowerings.append(f"task {task_id} lowered completion_level {old_level}->{new_level}")
-        if old_task.get("scope_enforced", False) and not new_task.get("scope_enforced", False):
-            lowerings.append(f"task {task_id} disabled scope enforcement")
-        removed_claim_scope = set(old_task.get("claim_scope", [])) - set(
-            new_task.get("claim_scope", [])
-        )
-        if removed_claim_scope:
-            lowerings.append(
-                f"task {task_id} narrowed claim_scope {','.join(sorted(removed_claim_scope))}"
-            )
-        removed_requirements = set(old_task["requirement_ids"]) - set(new_task["requirement_ids"])
-        if removed_requirements:
-            lowerings.append(
-                f"task {task_id} removed requirements {','.join(sorted(removed_requirements))}"
-            )
-        removed_claims = set(_required_claims(old, old_task)) - set(_required_claims(new, new_task))
-        if removed_claims:
-            lowerings.append(f"task {task_id} removed claims {','.join(sorted(removed_claims))}")
-        old_dependencies = {edge["task_id"]: set(edge["claims"]) for edge in old_task["depends_on"]}
-        new_dependencies = {edge["task_id"]: set(edge["claims"]) for edge in new_task["depends_on"]}
-        for upstream_id, old_claims in old_dependencies.items():
-            if upstream_id not in new_dependencies:
-                lowerings.append(f"task {task_id} removed dependency {upstream_id}")
-                continue
-            removed_dependency_claims = old_claims - new_dependencies[upstream_id]
-            if removed_dependency_claims:
-                lowerings.append(
-                    f"task {task_id} removed dependency claims from {upstream_id}: "
-                    + ",".join(sorted(removed_dependency_claims))
-                )
-        for field in ("automation_test_ids", "readback_subjects"):
-            removed = set(old_task["claim_overrides"][field]) - set(
-                new_task["claim_overrides"][field]
-            )
-            if removed:
-                lowerings.append(f"task {task_id} removed {field} {','.join(sorted(removed))}")
-        old_mode = old_task["tests_first"]["mode"]
-        new_mode = new_task["tests_first"]["mode"]
-        if tests_first_strength[new_mode] < tests_first_strength[old_mode]:
-            lowerings.append(f"task {task_id} weakened tests_first {old_mode}->{new_mode}")
-        if (
-            old_mode == "required"
-            and new_mode == "required"
-            and old_task["tests_first"]["expected_red_producer"]
-            != new_task["tests_first"]["expected_red_producer"]
-        ):
-            lowerings.append(f"task {task_id} changed expected-red producer")
-        for field in ("mutation_scope",):
-            removed = set(old_task.get(field, [])) - set(new_task.get(field, []))
-            if removed:
-                lowerings.append(f"task {task_id} narrowed {field} {','.join(sorted(removed))}")
-        old_test_contract = set(old_task.get("test_scope", [])) | set(
-            old_task.get("planned_test_scope", [])
-        )
-        new_test_contract = set(new_task.get("test_scope", [])) | set(
-            new_task.get("planned_test_scope", [])
-        )
-        removed_test_contract = old_test_contract - new_test_contract
-        if removed_test_contract:
-            lowerings.append(
-                f"task {task_id} narrowed test contract "
-                + ",".join(sorted(removed_test_contract))
-            )
-        for freshness_key, old_scope in old_task["freshness_scopes"].items():
-            new_scope = new_task["freshness_scopes"].get(freshness_key)
-            if new_scope is None:
-                lowerings.append(f"task {task_id} removed freshness scope {freshness_key}")
-                continue
-            removed = set(old_scope) - set(new_scope)
-            if removed:
-                lowerings.append(
-                    f"task {task_id} narrowed freshness scope {freshness_key} "
-                    + ",".join(sorted(removed))
-                )
-        common_claims = set(_required_claims(old, old_task)) & set(
-            _required_claims(new, new_task)
-        )
-        for claim in common_claims:
-            record_rule_lowering(
-                f"task {task_id} claim {claim}",
-                _claim_rule(old, old_task, claim),
-                _claim_rule(new, new_task, claim),
-            )
-    old_flows = {flow["id"]: flow for flow in old.get("acceptance_flows", [])}
-    new_flows = {flow["id"]: flow for flow in new.get("acceptance_flows", [])}
-    for flow_id, old_flow in old_flows.items():
-        new_flow = new_flows.get(flow_id)
-        if new_flow is None:
-            lowerings.append(f"removed acceptance flow {flow_id}")
-            continue
-        for field in ("requirement_ids", "required_claims", "direct_test_ids"):
-            removed = set(old_flow[field]) - set(new_flow[field])
-            if removed:
-                lowerings.append(
-                    f"acceptance flow {flow_id} removed {field} {','.join(sorted(removed))}"
-                )
-        if old_flow["verification_task_id"] != new_flow["verification_task_id"]:
-            lowerings.append(f"acceptance flow {flow_id} changed verification task")
-        if old_flow["scope"] != new_flow["scope"]:
-            lowerings.append(f"acceptance flow {flow_id} changed scope")
-        if old_flow.get("evidence_mode") != new_flow.get("evidence_mode"):
-            lowerings.append(f"acceptance flow {flow_id} changed evidence_mode")
-        if old_flow.get("scope_coverage") != new_flow.get("scope_coverage"):
-            lowerings.append(f"acceptance flow {flow_id} changed scope_coverage")
-        if old_flow.get("scope_claims") != new_flow.get("scope_claims"):
-            lowerings.append(f"acceptance flow {flow_id} changed scope_claims")
-    return {
-        "changed_scope_sources": sorted(changed_sources),
-        "changed_semantic_preflight": changed_semantic_preflight,
-        "changed_requirements": sorted(changed_requirements),
-        "changed_producers": sorted(changed_producers),
-        "changed_profiles": sorted(changed_profiles),
-        "changed_test_qualifications": sorted(changed_tests),
-        "changed_acceptance_flows": sorted(changed_flows),
-        "changed_tasks": sorted(changed_tasks),
-        "affected_tasks": sorted(affected),
-        "lowered_contracts": sorted(set(lowerings)),
-    }
-
-
-def _command_amend(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    old_plan, state = _load_plan_state(plan_dir, verify_sources=False)
-    assert state is not None
-    candidate = _load_json(_resolve_task_input(args.candidate, plan_dir, "candidate plan"))
-    _validate_plan(candidate)
-    _require_explicit_semantic_preflight_policy(candidate)
-    _require(
-        _enforcement_profile(candidate) == PIPELINE_STRICT_ENFORCEMENT_PROFILE,
-        "amended plan must declare enforcement_profile=strict_v2",
-        code="pipeline_profile_required",
-    )
-    _verify_scope_sources(candidate, plan_dir)
-    _require(candidate["plan_id"] == old_plan["plan_id"], "candidate plan_id must match active plan")
-    impact = _amendment_impact(old_plan, candidate)
-    if impact["changed_scope_sources"]:
-        _require(
-            candidate["design_revision"] != old_plan["design_revision"],
-            "scope source changes require a new design_revision",
-            code="design_revision_required",
-        )
-    if not args.apply:
-        return {"ok": True, "preview": True, "impact": impact, "candidate_revision": _plan_hash(candidate)}
-    _require_revision(state, args.expected_revision)
-    _require(state["active_package"] is None, "cannot amend while a work package is active")
-    if impact["lowered_contracts"]:
-        _expect_string(args.decision_ref, "--decision-ref")
-        _require(
-            args.decision_ref in candidate.get("decision_refs", []),
-            "a lowering decision must already be recorded in the audited candidate plan",
-            code="decision_ref_not_audited",
-        )
-    _verify_planning_audit(
-        plan_dir, candidate, allow_legacy_missing=False
-    )
-    new_tasks = _task_map(candidate)
-    old_task_states = state["task_states"]
-    affected = set(impact["affected_tasks"])
-    new_task_states: dict[str, dict[str, Any]] = {}
-    for task_id in new_tasks:
-        if task_id not in old_task_states:
-            new_task_states[task_id] = _new_task_state()
-            continue
-        task_state = copy.deepcopy(old_task_states[task_id])
-        if task_id in affected:
-            if task_state["status"] == "done":
-                task_state["status"] = "needs_review"
-            else:
-                task_state["status"] = "todo"
-            task_state["unresolved"] = [
-                {
-                    "type": "plan_changed",
-                    "subject": task_id,
-                    "next_action": "review changed requirements, producer, profile, or task contract",
-                }
-            ]
-            task_state["baseline_identity"] = {}
-        new_task_states[task_id] = task_state
-    new_plan_revision = _plan_hash(candidate)
-    new_state = {
-        "schema": STATE_SCHEMA,
-        "plan_id": candidate["plan_id"],
-        "plan_revision": new_plan_revision,
-        "revision": state["revision"] + 1,
-        "active_package": None,
-        "task_states": new_task_states,
-    }
-    _recompute_ready(candidate, new_state)
-    _validate_state(new_state, candidate)
-    _write_plan(plan_dir, candidate)
-    _write_state(plan_dir, new_state)
-    warnings = _render_after_state_change(plan_dir, candidate, new_state)
-    if impact["lowered_contracts"]:
-        decision = {
-            "schema": DECISION_SCHEMA,
-            "decision_ref": args.decision_ref,
-            "plan_id": candidate["plan_id"],
-            "lowered_contracts": impact["lowered_contracts"],
-        }
-        decision_name = hashlib.sha256(args.decision_ref.encode("utf-8")).hexdigest()[:16] + ".json"
-        _write_json_atomic(plan_dir / "evidence" / "decisions" / decision_name, decision)
     return {
         "ok": True,
-        "preview": False,
-        "impact": impact,
-        "plan_revision": new_plan_revision,
-        "state_revision": new_state["revision"],
+        "command": "list",
+        "counts": counts_for(states),
+        "items": rows[: args.limit],
+        "matched_count": len(rows),
+        "truncated": len(rows) > args.limit,
+    }
+
+
+def dependency_ids(
+    tasks: dict[str, dict[str, Any]], task_id: str, recursive: bool
+) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    queue = deque(dependency["id"] for dependency in tasks[task_id]["dependencies"])
+    while queue:
+        current = queue.popleft()
+        if current in seen:
+            continue
+        seen.add(current)
+        result.append(current)
+        if recursive and current in tasks:
+            queue.extend(dependency["id"] for dependency in tasks[current]["dependencies"])
+    return result
+
+
+def reverse_graph(tasks: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
+    reverse = {task_id: [] for task_id in tasks}
+    for task_id, task in tasks.items():
+        for dependency in task["dependencies"]:
+            if dependency["id"] in reverse:
+                reverse[dependency["id"]].append(task_id)
+    for values in reverse.values():
+        values.sort()
+    return reverse
+
+
+def dependent_ids(
+    tasks: dict[str, dict[str, Any]], task_id: str, recursive: bool
+) -> list[str]:
+    reverse = reverse_graph(tasks)
+    result: list[str] = []
+    seen: set[str] = set()
+    queue = deque(reverse[task_id])
+    while queue:
+        current = queue.popleft()
+        if current in seen:
+            continue
+        seen.add(current)
+        result.append(current)
+        if recursive:
+            queue.extend(reverse[current])
+    return result
+
+
+def command_deps(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    table = load_table(root)
+    tasks = load_tasks(root, table)
+    if args.id not in tasks:
+        raise TaskctlError(f"unknown task: {args.id}")
+    states = load_states(root, table, tasks)
+    ids = dependency_ids(tasks, args.id, args.recursive)
+    items = []
+    direct_types = {
+        dependency["id"]: dependency["type"] for dependency in tasks[args.id]["dependencies"]
+    }
+    for dependency_id in ids[: args.limit]:
+        if dependency_id in tasks:
+            items.append(
+                {
+                    "id": dependency_id,
+                    "title": tasks[dependency_id]["title"],
+                    "status": states[dependency_id]["status"],
+                    "type": direct_types.get(dependency_id, "transitive"),
+                    "result_ref": states[dependency_id]["result_ref"],
+                }
+            )
+        else:
+            items.append(
+                {
+                    "id": dependency_id,
+                    "status": "unknown",
+                    "type": direct_types.get(dependency_id, "transitive"),
+                }
+            )
+    return {
+        "ok": True,
+        "command": "deps",
+        "id": args.id,
+        "items": items,
+        "dependency_count": len(ids),
+        "truncated": len(ids) > args.limit,
+    }
+
+
+def command_dependents(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    table = load_table(root)
+    tasks = load_tasks(root, table)
+    if args.id not in tasks:
+        raise TaskctlError(f"unknown task: {args.id}")
+    states = load_states(root, table, tasks)
+    ids = dependent_ids(tasks, args.id, args.recursive)
+    return {
+        "ok": True,
+        "command": "dependents",
+        "id": args.id,
+        "items": [
+            {
+                "id": dependent_id,
+                "title": tasks[dependent_id]["title"],
+                "status": states[dependent_id]["status"],
+            }
+            for dependent_id in ids[: args.limit]
+        ],
+        "dependent_count": len(ids),
+        "truncated": len(ids) > args.limit,
+    }
+
+
+def command_next(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    table = load_table(root)
+    tasks = load_tasks(root, table)
+    states = load_states(root, table, tasks)
+    index, index_diagnostics = maybe_load_index(root, table)
+    rows = []
+    for task_id, task in tasks.items():
+        state = states[task_id]
+        if state["status"] == "done":
+            continue
+        diagnostics = list(index_diagnostics)
+        diagnostics.extend(task_diagnostics(task, tasks, states, index))
+        if state["owner"] and state["owner"] != args.owner:
+            diagnostics.append({"kind": "owned_by_other", "owner": state["owner"]})
+        hard_blocked = any(
+            item["kind"] in {"hard_dependency_incomplete", "unknown_dependency"}
+            and item.get("dependency_type", "hard") == "hard"
+            for item in diagnostics
+        )
+        owned_by_other = any(item["kind"] == "owned_by_other" for item in diagnostics)
+        status_blocked = state["status"] == "blocked"
+        recommended = not hard_blocked and not owned_by_other and not status_blocked
+        if not recommended and not args.include_blocked:
+            continue
+        status_rank = {
+            "in_progress": 0,
+            "review": 1,
+            "claimed": 2,
+            "todo": 3,
+            "blocked": 4,
+        }[state["status"]]
+        owner_rank = 0 if args.owner and state["owner"] == args.owner else 1
+        rows.append(
+            (
+                (0 if recommended else 1, owner_rank, status_rank, task_id),
+                {
+                    "id": task_id,
+                    "title": task["title"],
+                    "status": state["status"],
+                    "owner": state["owner"],
+                    "recommended": recommended,
+                    "diagnostics": diagnostics[: args.diagnostic_limit],
+                },
+            )
+        )
+    rows.sort(key=lambda row: row[0])
+    items = [row[1] for row in rows[: args.limit]]
+    return {
+        "ok": True,
+        "command": "next",
+        "items": items,
+        "candidate_count": len(rows),
+        "recommended_count": sum(row[1]["recommended"] for row in rows),
+        "truncated": len(rows) > args.limit,
+        "note": "recommendation is advisory and does not grant or deny execution",
+    }
+
+
+def select_upstream_context(
+    index: dict[str, Any] | None, source_ids: list[str], maximum: int
+) -> tuple[list[dict[str, Any]], bool]:
+    if index is None:
+        return [], False
+    by_id: dict[str, dict[str, Any]] = {}
+    for section in index.get("sections", []):
+        if isinstance(section, dict) and isinstance(section.get("id"), str):
+            by_id.setdefault(section["id"], section)
+    selected: list[str] = []
+    seen: set[str] = set()
+    queue = deque(source_ids)
+    while queue and len(selected) < maximum:
+        current = queue.popleft()
+        if current in seen or current not in by_id:
+            continue
+        seen.add(current)
+        selected.append(current)
+        queue.extend(by_id[current].get("references", []))
+    rows = [
+        {
+            "id": by_id[section_id].get("id"),
+            "title": by_id[section_id].get("title"),
+            "stage": by_id[section_id].get("stage"),
+            "document": by_id[section_id].get("document"),
+            "line": by_id[section_id].get("line"),
+            "status": by_id[section_id].get("status"),
+            "references": by_id[section_id].get("references", []),
+            "body": by_id[section_id].get("body", ""),
+        }
+        for section_id in selected
+    ]
+    return rows, bool(queue)
+
+
+def command_context(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    table = load_table(root)
+    tasks = load_tasks(root, table)
+    if args.id not in tasks:
+        raise TaskctlError(f"unknown task: {args.id}")
+    states = load_states(root, table, tasks)
+    index, index_diagnostics = maybe_load_index(root, table)
+    task = tasks[args.id]
+    dependency_context = []
+    for dependency in task["dependencies"]:
+        dependency_id = dependency["id"]
+        if dependency_id not in tasks:
+            dependency_context.append(
+                {
+                    "id": dependency_id,
+                    "type": dependency["type"],
+                    "status": "unknown",
+                    "consumes": dependency["consumes"],
+                }
+            )
+            continue
+        dependency_state = states[dependency_id]
+        dependency_context.append(
+            {
+                "id": dependency_id,
+                "type": dependency["type"],
+                "status": dependency_state["status"],
+                "consumes": dependency["consumes"],
+                "result": current_result(
+                    root, table, tasks[dependency_id], dependency_state
+                ),
+            }
+        )
+    reverse = reverse_graph(tasks)
+    all_dependents = reverse[args.id]
+    dependents = [
+        {
+            "id": dependent_id,
+            "title": tasks[dependent_id]["title"],
+            "status": states[dependent_id]["status"],
+        }
+        for dependent_id in all_dependents[: args.max_items]
+    ]
+    all_diagnostics = index_diagnostics + task_diagnostics(task, tasks, states, index)
+    upstream, upstream_truncated = select_upstream_context(
+        index, task["source_ids"], args.max_items
+    )
+    truncation = {
+        "diagnostics": len(all_diagnostics) > args.max_items,
+        "upstream": upstream_truncated,
+        "dependents": len(all_dependents) > args.max_items,
+    }
+    payload = {
+        "ok": True,
+        "command": "context",
+        "id": args.id,
+        "task": task,
+        "state": states[args.id],
+        "diagnostics": all_diagnostics[: args.max_items],
+        "protected_baseline": index.get("protected_baseline") if index else None,
+        "upstream": upstream,
+        "dependencies": dependency_context,
+        "dependents": dependents,
+        "truncation": truncation,
+        "truncated": any(truncation.values()),
+    }
+    return fit_payload(payload, args.budget)
+
+
+def semantic_downstream_ids(index: dict[str, Any], source_id: str) -> set[str]:
+    reverse = index.get("reverse_references", {})
+    seen = {source_id}
+    queue = deque([source_id])
+    while queue:
+        current = queue.popleft()
+        for dependent in reverse.get(current, []):
+            if (
+                isinstance(dependent, str)
+                and not dependent.startswith("DCR-")
+                and dependent not in seen
+            ):
+                seen.add(dependent)
+                queue.append(dependent)
+    return seen
+
+
+def command_completion_context(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    with workspace_lock(root):
+        return completion_context_locked(args, root)
+
+
+def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str, Any]:
+    table = load_table(root)
+    tasks = load_tasks(root, table)
+    states = load_states(root, table, tasks)
+    baseline = verify_protected_sources(root)
+    index, index_diagnostics = maybe_load_index(root, table)
+    if baseline is None or index is None:
+        diagnostics = list(index_diagnostics)
+        if baseline is None:
+            diagnostics.append({"kind": "protected_baseline_unconfirmed"})
+        return {
+            "ok": True,
+            "command": "completion-context",
+            "protected_baseline": (
+                None
+                if baseline is None
+                else {
+                    "status": "protected",
+                    "protected_ids": sum(
+                        len(baseline["documents"][stage]["ids"])
+                        for stage in PROTECTED_PREFIXES
+                    ),
+                }
+            ),
+            "targets": [],
+            "diagnostics": diagnostics,
+            "note": "no final judgment is produced",
+        }
+    current_results = {
+        task_id: current_result(root, table, tasks[task_id], states[task_id])
+        for task_id in sorted(tasks)
+    }
+    snapshot_id = "sha256:" + hashlib.sha256(
+        compact_json(
+            {
+                "workflow_id": index.get("workflow_id"),
+                "index": index,
+                "tasks": tasks,
+                "states": states,
+                "current_results": current_results,
+            }
+        ).encode("utf-8")
+    ).hexdigest()
+    if args.snapshot_id is not None and args.snapshot_id != snapshot_id:
+        raise TaskctlError(
+            "completion snapshot changed; restart final review from the first page"
+        )
+    sections = [section for section in index.get("sections", []) if isinstance(section, dict)]
+    section_rows: dict[str, list[dict[str, Any]]] = {}
+    for section in sections:
+        section_id = section.get("id")
+        if isinstance(section_id, str):
+            section_rows.setdefault(section_id, []).append(section)
+    baseline_requirement_ids = baseline["documents"]["requirements"]["ids"]
+    baseline_user_design_ids = baseline["documents"]["user_design"]["ids"]
+    all_target_ids = sorted(
+        value
+        for value in [*baseline_requirement_ids, *baseline_user_design_ids]
+        if value.split("-", 1)[0] in {"REQ", "AC", "UDES"}
+    )
+    constraint_ids = sorted(
+        value
+        for value in baseline_requirement_ids
+        if value.split("-", 1)[0] == "CON"
+    )
+    if args.target_id:
+        if args.target_id not in all_target_ids:
+            raise TaskctlError(f"unknown protected completion target: {args.target_id}")
+        filtered_target_ids = [args.target_id]
+    else:
+        filtered_target_ids = all_target_ids
+        if args.after_id:
+            filtered_target_ids = [
+                target_id for target_id in filtered_target_ids if target_id > args.after_id
+            ]
+    page_ids = filtered_target_ids[: args.limit]
+    diagnostics = list(index_diagnostics)
+    target_rows: list[dict[str, Any]] = []
+    candidate_next_after_ids: dict[str, str | None] = {}
+    for target_id in page_ids:
+        definitions = section_rows.get(target_id, [])
+        section = definitions[0] if len(definitions) == 1 else {}
+        if not definitions:
+            diagnostics.append({"kind": "protected_target_missing_from_index", "id": target_id})
+        elif len(definitions) > 1:
+            diagnostics.append({"kind": "protected_target_ambiguous", "id": target_id})
+        semantic_ids = semantic_downstream_ids(index, target_id)
+        all_linked_tasks = []
+        for task_id in sorted(tasks):
+            task = tasks[task_id]
+            if not semantic_ids.intersection(task["source_ids"]):
+                continue
+            state = states[task_id]
+            result = current_results[task_id]
+            all_linked_tasks.append(
+                {
+                    "id": task_id,
+                    "status": state["status"],
+                    "task_revision": task["revision"],
+                    "result_ref": state["result_ref"],
+                    "result_outcome": result.get("outcome") if result else None,
+                    "outputs": result.get("outputs", []) if result else [],
+                    "verification": result.get("verification", []) if result else [],
+                    "unresolved": result.get("unresolved", []) if result else [],
+                    "invalidated_source_ids": (
+                        result.get("invalidated_source_ids", []) if result else []
+                    ),
+                }
+            )
+        candidate_page = all_linked_tasks
+        if args.candidate_after_id:
+            candidate_page = [
+                row for row in candidate_page if row["id"] > args.candidate_after_id
+            ]
+        linked_tasks = candidate_page[: args.max_items]
+        candidate_more = len(candidate_page) > len(linked_tasks)
+        candidate_next_after_ids[target_id] = (
+            linked_tasks[-1]["id"] if candidate_more and linked_tasks else None
+        )
+        target_rows.append(
+            {
+                "id": target_id,
+                "title": section.get("title"),
+                "document": section.get("document"),
+                "line": section.get("line"),
+                "status": section.get("status"),
+                "body": section.get("body", ""),
+                "candidate_tasks": linked_tasks,
+                "candidate_task_count": len(all_linked_tasks),
+                "returned_candidate_task_count": len(linked_tasks),
+                "candidate_tasks_truncated": candidate_more,
+                "candidate_next_after_id": candidate_next_after_ids[target_id],
+                "candidate_result_count": sum(
+                    linked_task["result_ref"] is not None
+                    for linked_task in all_linked_tasks
+                ),
+                "candidate_result_with_verification_count": sum(
+                    bool(linked_task["verification"])
+                    for linked_task in all_linked_tasks
+                ),
+            }
+        )
+    deferred_ids = sorted(
+        value
+        for value in index.get("deferred_change_ids", [])
+        if isinstance(value, str)
+    )
+    constraint_page_ids = [
+        value for value in constraint_ids if not args.constraint_after_id or value > args.constraint_after_id
+    ]
+    constraint_page_ids = constraint_page_ids[: args.max_items]
+    deferred_page_ids = [
+        value for value in deferred_ids if not args.deferred_after_id or value > args.deferred_after_id
+    ]
+    deferred_page_ids = deferred_page_ids[: args.max_items]
+
+    def section_summary(section_id: str) -> dict[str, Any]:
+        definitions = section_rows.get(section_id, [])
+        section = definitions[0] if len(definitions) == 1 else {}
+        if not definitions:
+            diagnostics.append({"kind": "semantic_section_missing", "id": section_id})
+        elif len(definitions) > 1:
+            diagnostics.append({"kind": "semantic_section_ambiguous", "id": section_id})
+        return {
+            "id": section_id,
+            "title": section.get("title"),
+            "document": section.get("document"),
+            "line": section.get("line"),
+            "body": section.get("body", ""),
+        }
+
+    target_more = len(filtered_target_ids) > len(target_rows)
+    constraint_remaining = [
+        value for value in constraint_ids if not args.constraint_after_id or value > args.constraint_after_id
+    ]
+    deferred_remaining = [
+        value for value in deferred_ids if not args.deferred_after_id or value > args.deferred_after_id
+    ]
+    pagination = {
+        "target_next_after_id": (
+            target_rows[-1]["id"] if target_more and target_rows else None
+        ),
+        "constraint_next_after_id": (
+            constraint_page_ids[-1]
+            if len(constraint_remaining) > len(constraint_page_ids) and constraint_page_ids
+            else None
+        ),
+        "deferred_next_after_id": (
+            deferred_page_ids[-1]
+            if len(deferred_remaining) > len(deferred_page_ids) and deferred_page_ids
+            else None
+        ),
+        "candidate_next_after_ids": candidate_next_after_ids,
+    }
+    payload = {
+        "ok": True,
+        "command": "completion-context",
+        "snapshot_id": snapshot_id,
+        "protected_baseline": index.get("protected_baseline"),
+        "target_count": len(all_target_ids),
+        "returned_target_count": len(target_rows),
+        "targets": target_rows,
+        "constraint_count": len(constraint_ids),
+        "returned_constraint_count": len(constraint_page_ids),
+        "constraints": [section_summary(value) for value in constraint_page_ids],
+        "open_deferred_change_count": len(deferred_ids),
+        "returned_open_deferred_change_count": len(deferred_page_ids),
+        "open_deferred_changes": [section_summary(value) for value in deferred_page_ids],
+        "pagination": pagination,
+        "diagnostics": diagnostics,
+        "note": (
+            "candidate links and results are inputs to model review; no final pass or fail is produced"
+        ),
+    }
+    while len(compact_json(shrink_value(payload, 500))) > args.budget and len(target_rows) > 1:
+        target_rows.pop()
+        payload["returned_target_count"] = len(target_rows)
+        payload["pagination"]["target_next_after_id"] = (
+            target_rows[-1]["id"] if target_rows else args.after_id
+        )
+        payload["pagination"]["candidate_next_after_ids"] = {
+            row["id"]: row["candidate_next_after_id"] for row in target_rows
+        }
+    return fit_payload(payload, args.budget)
+
+
+def command_status(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    table = load_table(root)
+    tasks = load_tasks(root, table)
+    states = load_states(root, table, tasks)
+    index, index_diagnostics = maybe_load_index(root, table)
+    result_count = 0
+    result_with_verification_count = 0
+    result_with_unresolved_count = 0
+    invalidated_source_ids: set[str] = set()
+    dependency_blocked_count = 0
+    diagnostic_count = len(index_diagnostics)
+    for task_id, task in tasks.items():
+        diagnostics = task_diagnostics(task, tasks, states, index)
+        diagnostic_count += len(diagnostics)
+        if any(
+            item["kind"] == "hard_dependency_incomplete"
+            or (
+                item["kind"] == "unknown_dependency"
+                and item.get("dependency_type") == "hard"
+            )
+            for item in diagnostics
+        ):
+            dependency_blocked_count += 1
+        result = current_result(root, table, task, states[task_id])
+        if result is None:
+            continue
+        result_count += 1
+        if result.get("verification"):
+            result_with_verification_count += 1
+        if result.get("unresolved"):
+            result_with_unresolved_count += 1
+        invalidated_source_ids.update(result.get("invalidated_source_ids", []))
+    semantic_summary = index.get("summary", {}) if index else {}
+    return {
+        "ok": True,
+        "command": "status",
+        "task_count": len(tasks),
+        "status_counts": counts_for(states),
+        "needs_review_count": counts_for(states)["review"],
+        "dependency_attention_count": dependency_blocked_count,
+        "upstream": {
+            "protected_baseline": index.get("protected_baseline") if index else None,
+            "unresolved_count": semantic_summary.get("unresolved_count"),
+            "deferred_change_count": semantic_summary.get("deferred_change_count", 0),
+            "invalidated_source_ids": sorted(invalidated_source_ids)[: args.limit],
+        },
+        "results": {
+            "current_result_count": result_count,
+            "result_with_verification_count": result_with_verification_count,
+            "result_with_unresolved_count": result_with_unresolved_count,
+        },
+        "diagnostic_count": diagnostic_count,
+        "index_diagnostics": index_diagnostics,
+    }
+
+
+def scope_descriptor(scope: str) -> tuple[str, str, bool]:
+    normalized = scope.replace("\\", "/").strip("/")
+    positions = [normalized.find(token) for token in ("*", "?", "[") if token in normalized]
+    has_glob = bool(positions)
+    prefix = normalized[: min(positions)] if positions else normalized
+    return normalized, prefix.rstrip("/"), has_glob
+
+
+def scopes_overlap(left: list[str], right: list[str]) -> bool:
+    for left_scope in left:
+        left_value, left_prefix, left_glob = scope_descriptor(left_scope)
+        for right_scope in right:
+            right_value, right_prefix, right_glob = scope_descriptor(right_scope)
+            if not left_prefix or not right_prefix:
+                return True
+            if not left_glob and not right_glob:
+                if (
+                    left_prefix == right_prefix
+                    or left_prefix.startswith(right_prefix + "/")
+                    or right_prefix.startswith(left_prefix + "/")
+                ):
+                    return True
+                continue
+            if left_glob and fnmatch.fnmatchcase(right_value, left_value):
+                return True
+            if right_glob and fnmatch.fnmatchcase(left_value, right_value):
+                return True
+            if (
+                left_prefix.startswith(right_prefix)
+                or right_prefix.startswith(left_prefix)
+            ):
+                return True
+    return False
+
+
+def mutation_overlap_warnings(
+    task_id: str,
+    tasks: dict[str, dict[str, Any]],
+    states: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    warnings = []
+    for other_id, other_state in states.items():
+        if other_id == task_id or other_state["status"] not in ACTIVE_STATUSES:
+            continue
+        if scopes_overlap(tasks[task_id]["mutation_scope"], tasks[other_id]["mutation_scope"]):
+            warnings.append(
+                {
+                    "kind": "mutation_overlap",
+                    "task_id": other_id,
+                    "owner": other_state["owner"],
+                    "status": other_state["status"],
+                }
+            )
+    return warnings
+
+
+def check_expected_state(state: dict[str, Any], expected: int | None) -> None:
+    if expected is not None and state["revision"] != expected:
+        raise TaskctlError(
+            f"state revision conflict: expected {expected}, current {state['revision']}"
+        )
+
+
+def check_owner(state: dict[str, Any], owner: str) -> None:
+    if state["owner"] is not None and state["owner"] != owner:
+        raise TaskctlError(f"task is owned by {state['owner']}")
+
+
+def write_state(
+    root: Path, table: dict[str, Any], state: dict[str, Any]
+) -> dict[str, Any]:
+    _, state_dir, _ = table_paths(root, table)
+    state["revision"] += 1
+    normalized = validate_state(state, state["task_id"])
+    atomic_write_json(state_dir / f"{state['task_id']}.json", normalized)
+    return normalized
+
+
+def command_claim(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    with workspace_lock(root):
+        table = load_table(root)
+        tasks = load_tasks(root, table)
+        if args.id not in tasks:
+            raise TaskctlError(f"unknown task: {args.id}")
+        states = load_states(root, table, tasks)
+        state = states[args.id]
+        check_expected_state(state, args.expected_state_revision)
+        if state["status"] == "done":
+            raise TaskctlError("a completed task must be reopened before it can be claimed")
+        check_owner(state, args.owner)
+        state["owner"] = args.owner
+        if state["status"] == "todo":
+            state["status"] = "claimed"
+        state = write_state(root, table, state)
+        warnings = mutation_overlap_warnings(args.id, tasks, {**states, args.id: state})
+    return {
+        "ok": True,
+        "command": "claim",
+        "id": args.id,
+        "state": state,
         "warnings": warnings,
     }
 
 
-def _command_render(args: argparse.Namespace) -> dict[str, Any]:
-    plan_dir = _task_dir(args)
-    # Rendering is a read-only recovery/view operation. It still validates the
-    # schema and state relationship, but source durability and live hashes are
-    # execution preconditions and must not make an existing plan unreadable.
-    plan, state = _load_plan_state(
-        plan_dir,
-        verify_sources=False,
-        enforce_source_durability=False,
-    )
-    assert state is not None
-    status_counts = _render_markdown(
-        plan_dir,
-        plan,
-        state,
-        include_details=args.details,
-    )
-    semantic_progress = _semantic_preflight_progress(plan_dir, plan)
+def command_start(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    with workspace_lock(root):
+        table = load_table(root)
+        tasks = load_tasks(root, table)
+        if args.id not in tasks:
+            raise TaskctlError(f"unknown task: {args.id}")
+        states = load_states(root, table, tasks)
+        state = states[args.id]
+        check_expected_state(state, args.expected_state_revision)
+        if state["status"] == "done":
+            raise TaskctlError("a completed task must be reopened before it can start")
+        check_owner(state, args.owner)
+        state["owner"] = args.owner
+        state["status"] = "in_progress"
+        state["blocked_reason"] = ""
+        state = write_state(root, table, state)
+        warnings = mutation_overlap_warnings(args.id, tasks, {**states, args.id: state})
     return {
         "ok": True,
-        "path": str(plan_dir / "TASK_TABLE.md"),
-        "state_revision": state["revision"],
-        "status_counts": status_counts,
-        "semantic_preflight": semantic_progress,
-        "view_scope": "read_only_projection",
-        "execution_validity": "not_checked",
+        "command": "start",
+        "id": args.id,
+        "state": state,
+        "warnings": warnings,
     }
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Evidence-backed long-running task state")
+def command_note(args: argparse.Namespace) -> dict[str, Any]:
+    if not any((args.message, args.status, args.blocked_reason, args.next_action)):
+        raise TaskctlError("note requires a message, status, blocked reason, or next action")
+    root = resolve_root(args.task_dir)
+    with workspace_lock(root):
+        table = load_table(root)
+        tasks = load_tasks(root, table)
+        if args.id not in tasks:
+            raise TaskctlError(f"unknown task: {args.id}")
+        state = load_state(root, table, args.id)
+        check_expected_state(state, args.expected_state_revision)
+        if state["status"] == "done":
+            raise TaskctlError("a completed task must be reopened before adding execution notes")
+        check_owner(state, args.owner)
+        if state["owner"] is None:
+            state["owner"] = args.owner
+        if state["status"] == "todo" and args.status is None:
+            state["status"] = "claimed"
+        if args.status:
+            state["status"] = args.status
+        if args.message is not None:
+            state["note"] = require_string(args.message, "note.message", allow_empty=True)
+        if args.blocked_reason is not None:
+            state["blocked_reason"] = require_string(
+                args.blocked_reason, "note.blocked_reason", allow_empty=True
+            )
+        if args.next_action is not None:
+            state["next_action"] = require_string(
+                args.next_action, "note.next_action", allow_empty=True
+            )
+        if state["status"] != "blocked" and args.blocked_reason is None:
+            state["blocked_reason"] = ""
+        state = write_state(root, table, state)
+    return {"ok": True, "command": "note", "id": args.id, "state": state}
+
+
+def command_complete(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    raw_result = read_json(Path(args.result_file).expanduser().resolve())
+    with workspace_lock(root):
+        table = load_table(root)
+        tasks = load_tasks(root, table)
+        if args.id not in tasks:
+            raise TaskctlError(f"unknown task: {args.id}")
+        states = load_states(root, table, tasks)
+        task = tasks[args.id]
+        result = validate_result(raw_result, task)
+        state = states[args.id]
+        check_expected_state(state, args.expected_state_revision)
+        if state["status"] == "done":
+            raise TaskctlError("task is already complete")
+        check_owner(state, args.owner)
+        state["owner"] = args.owner
+        _, _, result_dir = table_paths(root, table)
+        next_state_revision = state["revision"] + 1
+        filename = f"{args.id}.r{next_state_revision}.json"
+        result_path = result_dir / filename
+        relative_ref = result_path.relative_to(root).as_posix()
+        next_state = dict(state)
+        next_state["revision"] = next_state_revision
+        next_state["status"] = "done"
+        next_state["result_ref"] = relative_ref
+        next_state["blocked_reason"] = ""
+        next_state["next_action"] = ""
+        next_state = validate_state(next_state, args.id)
+        recovered_partial_write = result_path.exists()
+        if recovered_partial_write:
+            existing_result = validate_result(read_json(result_path), task)
+            if existing_result != result:
+                raise TaskctlError(f"conflicting partial result: {result_path}")
+        else:
+            atomic_write_json(result_path, result)
+        _, state_dir, _ = table_paths(root, table)
+        atomic_write_json(state_dir / f"{args.id}.json", next_state)
+        state = next_state
+        states = {**states, args.id: state}
+        index, _ = maybe_load_index(root, table)
+        diagnostics = task_diagnostics(task, tasks, states, index)
+        if not result["verification"]:
+            diagnostics.append({"kind": "result_verification_empty"})
+        if result["unresolved"]:
+            diagnostics.append(
+                {"kind": "result_has_unresolved", "count": len(result["unresolved"])}
+            )
+    return {
+        "ok": True,
+        "command": "complete",
+        "id": args.id,
+        "state": state,
+        "result_ref": relative_ref,
+        "recovered_partial_write": recovered_partial_write,
+        "diagnostics": diagnostics[: args.diagnostic_limit],
+        "note": "completion records the model-provided result; it is not a product audit",
+    }
+
+
+def command_reopen(args: argparse.Namespace) -> dict[str, Any]:
+    reason = require_string(args.reason, "reopen.reason")
+    root = resolve_root(args.task_dir)
+    with workspace_lock(root):
+        table = load_table(root)
+        tasks = load_tasks(root, table)
+        if args.id not in tasks:
+            raise TaskctlError(f"unknown task: {args.id}")
+        state = load_state(root, table, args.id)
+        check_expected_state(state, args.expected_state_revision)
+        if state["status"] != "done":
+            raise TaskctlError("only a completed task can be reopened")
+        check_owner(state, args.owner)
+        state["status"] = "todo"
+        state["owner"] = None
+        state["note"] = f"reopened: {reason}"
+        state["blocked_reason"] = ""
+        state["next_action"] = ""
+        state["result_ref"] = None
+        state = write_state(root, table, state)
+    return {"ok": True, "command": "reopen", "id": args.id, "state": state}
+
+
+def command_release(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    with workspace_lock(root):
+        table = load_table(root)
+        tasks = load_tasks(root, table)
+        if args.id not in tasks:
+            raise TaskctlError(f"unknown task: {args.id}")
+        state = load_state(root, table, args.id)
+        check_expected_state(state, args.expected_state_revision)
+        if state["status"] == "done":
+            raise TaskctlError("a completed task cannot be released")
+        check_owner(state, args.owner)
+        state["status"] = "todo"
+        state["owner"] = None
+        state["blocked_reason"] = ""
+        state = write_state(root, table, state)
+    return {"ok": True, "command": "release", "id": args.id, "state": state}
+
+
+def command_impact(args: argparse.Namespace) -> dict[str, Any]:
+    args.recursive = True
+    result = command_dependents(args)
+    result["command"] = "impact"
+    result["note"] = "dependents require model review and are not automatically invalid"
+    return result
+
+
+def markdown_cell(value: Any, maximum: int = 120) -> str:
+    text = str(value).replace("|", "\\|").replace("\n", " ")
+    return text if len(text) <= maximum else text[:maximum] + "…"
+
+
+def command_render(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    table = load_table(root)
+    tasks = load_tasks(root, table)
+    states = load_states(root, table, tasks)
+    index, _ = maybe_load_index(root, table)
+    output_path = resolve_inside(root, str(table.get("table_view", "TASK_TABLE.md")))
+    counts = counts_for(states)
+    lines = [
+        f"# {table.get('title') or table.get('id') or 'Tasks'}",
+        "",
+        "> 本文件由 taskctl 生成，只是任务合同与状态的可重建视图，不表示允许执行或产品完成。",
+        "",
+        "## 状态统计",
+        "",
+        "| 状态 | 数量 |",
+        "| --- | ---: |",
+    ]
+    for status in STATUSES:
+        lines.append(f"| {status} | {counts[status]} |")
+    if index is not None:
+        summary = index.get("summary", {})
+        lines.extend(
+            [
+                "",
+                "## 上游状态",
+                "",
+                f"- 受保护基线：{index.get('protected_baseline', {}).get('status')}",
+                f"- 可修订上游未决：{summary.get('unresolved_count')}",
+                f"- 未解决延后讨论项：{summary.get('deferred_change_count', 0)}",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## 任务",
+            "",
+            "| ID | 状态 | Owner | 标题 | 依赖 | 结果 | 合同修订 |",
+            "| --- | --- | --- | --- | --- | --- | ---: |",
+        ]
+    )
+    for task_id in sorted(tasks):
+        task = tasks[task_id]
+        state = states[task_id]
+        dependencies = ", ".join(
+            f"{dependency['id']}:{dependency['type']}" for dependency in task["dependencies"]
+        )
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    markdown_cell(task_id),
+                    markdown_cell(state["status"]),
+                    markdown_cell(state["owner"] or ""),
+                    markdown_cell(task["title"]),
+                    markdown_cell(dependencies),
+                    markdown_cell(state["result_ref"] or ""),
+                    str(task["revision"]),
+                ]
+            )
+            + " |"
+        )
+    atomic_write_text(output_path, "\n".join(lines) + "\n")
+    return {
+        "ok": True,
+        "command": "render",
+        "output": str(output_path),
+        "task_count": len(tasks),
+        "status_counts": counts,
+    }
+
+
+def add_common(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--task-dir", required=True)
+    parser.add_argument("--pretty", action="store_true")
+
+
+def add_limit(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT)
+
+
+def add_state_revision(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--expected-state-revision", type=int)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    def add_common(command: argparse.ArgumentParser, *, project_root: bool = False) -> None:
-        command.add_argument(
-            "--task-dir",
-            "--plan-dir",
-            dest="task_dir",
-            required=True,
-            help="absolute task working directory; --plan-dir is a compatibility alias",
-        )
-        if project_root:
-            command.add_argument("--project-root")
+    init_parser = subparsers.add_parser("init")
+    add_common(init_parser)
+    init_parser.add_argument("--id", required=True)
+    init_parser.add_argument("--title", required=True)
+    init_parser.set_defaults(handler=command_init)
 
-    validate_parser = subparsers.add_parser("validate")
-    add_common(validate_parser)
-    validate_parser.set_defaults(handler=_command_validate)
+    draft_parser = subparsers.add_parser("draft")
+    add_common(draft_parser)
+    draft_parser.add_argument("--id", required=True)
+    draft_parser.add_argument("--title", required=True)
+    draft_parser.add_argument("--outcome", required=True)
+    draft_parser.add_argument("--source-id", action="append", default=[])
+    draft_parser.add_argument("--dependency", action="append", default=[])
+    draft_parser.add_argument("--mutation-scope", action="append", default=[])
+    draft_parser.add_argument("--output", action="append", default=[])
+    draft_parser.add_argument("--verification", action="append", default=[])
+    draft_parser.add_argument("--suggested-skill", action="append", default=[])
+    draft_parser.add_argument("--reasoning-hint", choices=REASONING_HINTS)
+    draft_parser.set_defaults(handler=command_draft)
 
-    audit_plan_parser = subparsers.add_parser("audit-plan")
-    add_common(audit_plan_parser)
-    audit_plan_parser.add_argument("--candidate")
-    audit_plan_parser.set_defaults(handler=_command_audit_plan)
+    add_parser = subparsers.add_parser("add")
+    add_common(add_parser)
+    add_parser.add_argument("--file", required=True)
+    add_parser.set_defaults(handler=command_add)
 
-    migrate_strict_parser = subparsers.add_parser("migrate-strict")
-    add_common(migrate_strict_parser)
-    migrate_strict_parser.set_defaults(handler=_command_migrate_strict)
+    update_parser = subparsers.add_parser("update")
+    add_common(update_parser)
+    update_parser.add_argument("--file", required=True)
+    update_parser.add_argument("--owner")
+    update_parser.add_argument("--expected-task-revision", type=int, required=True)
+    add_state_revision(update_parser)
+    update_parser.set_defaults(handler=command_update)
 
-    activate_parser = subparsers.add_parser("activate")
-    add_common(activate_parser)
-    activate_parser.set_defaults(handler=_command_activate)
+    show_parser = subparsers.add_parser("show")
+    add_common(show_parser)
+    show_parser.add_argument("--id", required=True)
+    show_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET)
+    show_parser.set_defaults(handler=command_show)
 
-    resume_parser = subparsers.add_parser("resume")
-    add_common(resume_parser, project_root=True)
-    resume_parser.add_argument("--all-ready", action="store_true")
-    resume_parser.set_defaults(handler=_command_resume)
+    list_parser = subparsers.add_parser("list")
+    add_common(list_parser)
+    add_limit(list_parser)
+    list_parser.add_argument("--status", action="append", choices=STATUSES)
+    list_parser.set_defaults(handler=command_list)
 
-    begin_parser = subparsers.add_parser("begin")
-    add_common(begin_parser, project_root=True)
-    begin_parser.add_argument("--task", action="append", required=True)
-    begin_parser.add_argument("--expected-revision", type=int, required=True)
-    begin_parser.set_defaults(handler=_command_begin)
+    deps_parser = subparsers.add_parser("deps")
+    add_common(deps_parser)
+    add_limit(deps_parser)
+    deps_parser.add_argument("--id", required=True)
+    deps_parser.add_argument("--recursive", action="store_true")
+    deps_parser.set_defaults(handler=command_deps)
 
-    evidence_context_parser = subparsers.add_parser("evidence-context")
-    add_common(evidence_context_parser, project_root=True)
-    evidence_context_target = evidence_context_parser.add_mutually_exclusive_group(
-        required=True
-    )
-    evidence_context_target.add_argument("--task")
-    evidence_context_target.add_argument("--package", action="store_true")
-    evidence_context_parser.add_argument(
-        "--phase", choices=("expected_red", "verification"), required=True
-    )
-    evidence_context_parser.add_argument(
-        "--output-dir",
-        help="write context JSON files to this explicit project/task subdirectory and return only paths",
-    )
-    evidence_context_parser.set_defaults(handler=_command_evidence_context)
+    dependents_parser = subparsers.add_parser("dependents")
+    add_common(dependents_parser)
+    add_limit(dependents_parser)
+    dependents_parser.add_argument("--id", required=True)
+    dependents_parser.add_argument("--recursive", action="store_true")
+    dependents_parser.set_defaults(handler=command_dependents)
+
+    next_parser = subparsers.add_parser("next")
+    add_common(next_parser)
+    add_limit(next_parser)
+    next_parser.add_argument("--owner")
+    next_parser.add_argument("--include-blocked", action="store_true")
+    next_parser.add_argument("--diagnostic-limit", type=int, default=10)
+    next_parser.set_defaults(handler=command_next)
+
+    context_parser = subparsers.add_parser("context")
+    add_common(context_parser)
+    context_parser.add_argument("--id", required=True)
+    context_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET)
+    context_parser.add_argument("--max-items", type=int, default=DEFAULT_LIMIT)
+    context_parser.set_defaults(handler=command_context)
+
+    completion_parser = subparsers.add_parser("completion-context")
+    add_common(completion_parser)
+    add_limit(completion_parser)
+    completion_parser.add_argument("--after-id")
+    completion_parser.add_argument("--target-id")
+    completion_parser.add_argument("--candidate-after-id")
+    completion_parser.add_argument("--constraint-after-id")
+    completion_parser.add_argument("--deferred-after-id")
+    completion_parser.add_argument("--snapshot-id")
+    completion_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET)
+    completion_parser.add_argument("--max-items", type=int, default=DEFAULT_LIMIT)
+    completion_parser.set_defaults(handler=command_completion_context)
+
+    status_parser = subparsers.add_parser("status")
+    add_common(status_parser)
+    add_limit(status_parser)
+    status_parser.set_defaults(handler=command_status)
+
+    claim_parser = subparsers.add_parser("claim")
+    add_common(claim_parser)
+    claim_parser.add_argument("--id", required=True)
+    claim_parser.add_argument("--owner", required=True)
+    add_state_revision(claim_parser)
+    claim_parser.set_defaults(handler=command_claim)
+
+    start_parser = subparsers.add_parser("start")
+    add_common(start_parser)
+    start_parser.add_argument("--id", required=True)
+    start_parser.add_argument("--owner", required=True)
+    add_state_revision(start_parser)
+    start_parser.set_defaults(handler=command_start)
+
+    note_parser = subparsers.add_parser("note")
+    add_common(note_parser)
+    note_parser.add_argument("--id", required=True)
+    note_parser.add_argument("--owner", required=True)
+    note_parser.add_argument("--message")
+    note_parser.add_argument("--status", choices=ACTIVE_STATUS_CHOICES)
+    note_parser.add_argument("--blocked-reason")
+    note_parser.add_argument("--next-action")
+    add_state_revision(note_parser)
+    note_parser.set_defaults(handler=command_note)
+
+    complete_parser = subparsers.add_parser("complete")
+    add_common(complete_parser)
+    complete_parser.add_argument("--id", required=True)
+    complete_parser.add_argument("--owner", required=True)
+    complete_parser.add_argument("--result-file", required=True)
+    complete_parser.add_argument("--diagnostic-limit", type=int, default=20)
+    add_state_revision(complete_parser)
+    complete_parser.set_defaults(handler=command_complete)
+
+    reopen_parser = subparsers.add_parser("reopen")
+    add_common(reopen_parser)
+    reopen_parser.add_argument("--id", required=True)
+    reopen_parser.add_argument("--owner", required=True)
+    reopen_parser.add_argument("--reason", required=True)
+    add_state_revision(reopen_parser)
+    reopen_parser.set_defaults(handler=command_reopen)
+
+    release_parser = subparsers.add_parser("release")
+    add_common(release_parser)
+    release_parser.add_argument("--id", required=True)
+    release_parser.add_argument("--owner", required=True)
+    add_state_revision(release_parser)
+    release_parser.set_defaults(handler=command_release)
 
     impact_parser = subparsers.add_parser("impact")
-    add_common(impact_parser, project_root=True)
-    impact_parser.set_defaults(handler=_command_impact)
-
-    seal_red_parser = subparsers.add_parser("seal-red")
-    add_common(seal_red_parser, project_root=True)
-    seal_red_parser.add_argument("--expected-revision", type=int, required=True)
-    seal_red_parser.add_argument("--evidence", action="append", required=True)
-    seal_red_parser.set_defaults(handler=_command_seal_red)
-
-    invalidate_red_parser = subparsers.add_parser("invalidate-red")
-    add_common(invalidate_red_parser, project_root=True)
-    invalidate_red_parser.add_argument("--expected-revision", type=int, required=True)
-    invalidate_red_parser.add_argument("--reason", required=True)
-    invalidate_red_parser.add_argument("--changed-path", action="append")
-    invalidate_red_parser.set_defaults(handler=_command_invalidate_red)
-
-    checkpoint_parser = subparsers.add_parser("checkpoint")
-    add_common(checkpoint_parser)
-    checkpoint_parser.add_argument("--expected-revision", type=int, required=True)
-    checkpoint_parser.add_argument("--phase", choices=sorted(PHASES))
-    checkpoint_parser.add_argument("--next-action", required=True)
-    checkpoint_parser.add_argument("--changed-path", action="append")
-    checkpoint_parser.add_argument(
-        "--unresolved",
-        help="task-directory-relative JSON file with an items array",
-    )
-    checkpoint_parser.add_argument("--release", action="store_true")
-    checkpoint_parser.set_defaults(handler=_command_checkpoint)
-
-    close_parser = subparsers.add_parser("close")
-    add_common(close_parser, project_root=True)
-    close_parser.add_argument("--expected-revision", type=int, required=True)
-    close_parser.add_argument("--evidence", action="append", default=[])
-    close_parser.set_defaults(handler=_command_close)
-
-    audit_parser = subparsers.add_parser("audit")
-    add_common(audit_parser, project_root=True)
-    audit_parser.add_argument("--all", action="store_true")
-    audit_parser.add_argument("--apply", action="store_true")
-    audit_parser.add_argument("--expected-revision", type=int)
-    audit_parser.add_argument("--details", action="store_true")
-    audit_parser.set_defaults(handler=_command_audit)
-
-    amend_parser = subparsers.add_parser("amend")
-    add_common(amend_parser)
-    amend_parser.add_argument("--candidate", required=True)
-    amend_parser.add_argument("--apply", action="store_true")
-    amend_parser.add_argument("--expected-revision", type=int)
-    amend_parser.add_argument("--decision-ref")
-    amend_parser.set_defaults(handler=_command_amend)
+    add_common(impact_parser)
+    add_limit(impact_parser)
+    impact_parser.add_argument("--id", required=True)
+    impact_parser.set_defaults(handler=command_impact)
 
     render_parser = subparsers.add_parser("render")
     add_common(render_parser)
-    render_parser.add_argument("--details", action="store_true")
-    render_parser.set_defaults(handler=_command_render)
+    render_parser.set_defaults(handler=command_render)
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = _build_parser()
-    args = parser.parse_args(argv)
+def validate_args(args: argparse.Namespace) -> None:
+    for name in ("limit", "max_items", "diagnostic_limit"):
+        if hasattr(args, name):
+            value = getattr(args, name)
+            if value is not None and not 1 <= value <= 1_000:
+                raise TaskctlError(f"--{name.replace('_', '-')} must be between 1 and 1000")
+    if hasattr(args, "budget") and not 1_000 <= args.budget <= 100_000:
+        raise TaskctlError("--budget must be between 1000 and 100000")
+    if hasattr(args, "expected_state_revision"):
+        value = args.expected_state_revision
+        if value is not None and value < 1:
+            raise TaskctlError("--expected-state-revision must be positive")
+    if (
+        getattr(args, "command", None) == "completion-context"
+        and args.target_id
+        and args.after_id
+    ):
+        raise TaskctlError("--target-id and --after-id cannot be combined")
+    if (
+        getattr(args, "command", None) == "completion-context"
+        and args.candidate_after_id
+        and not args.target_id
+    ):
+        raise TaskctlError("--candidate-after-id requires --target-id")
+    if getattr(args, "command", None) == "completion-context":
+        has_cursor = any(
+            value
+            for value in (
+                args.after_id,
+                args.candidate_after_id,
+                args.constraint_after_id,
+                args.deferred_after_id,
+            )
+        )
+        if has_cursor and not args.snapshot_id:
+            raise TaskctlError("completion pagination requires --snapshot-id")
+    if hasattr(args, "expected_task_revision") and args.expected_task_revision < 1:
+        raise TaskctlError("--expected-task-revision must be positive")
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
     try:
-        if getattr(args, "apply", False) and args.command in {"audit", "amend"}:
-            _require(args.expected_revision is not None, "--apply requires --expected-revision")
-        payload = args.handler(args)
-        _emit(payload)
-        return 0 if payload.get("ok", False) else 2
-    except TaskCtlError as exc:
-        _emit({"ok": False, "error": {"code": exc.code, "message": str(exc)}}, stream=sys.stderr)
+        validate_args(args)
+        result = args.handler(args)
+        emit(result, pretty=args.pretty)
+        return 0
+    except TaskctlError as exc:
+        emit({"ok": False, "error": str(exc)}, stream=sys.stderr)
         return 2
-    except KeyboardInterrupt:
-        _emit({"ok": False, "error": {"code": "interrupted", "message": "interrupted"}}, stream=sys.stderr)
-        return 130
 
 
 if __name__ == "__main__":

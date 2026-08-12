@@ -89,7 +89,8 @@ must: 以下触发条件命中时使用对应 skill；括号内的不触发条�
 - 使用 PowerShell：`$powershell-usage`
 - 正确性依赖空间语义、空间关系、布局或坐标转换：`$understand-space`（正文偶然出现空间词不触发）
 - 用户明确查看或修改当前线程推理深度，或 active goal 中下一段工作的真实不确定性、后果、可逆性或验证负担发生实质变化并需要在继续前升降：`$reasoning-governor`（用户已固定且本次未要求改动、没有 active goal 的模型自主切换和只讨论通用推理参数不触发）
-- 跨轮保存依赖、认识状态、验收范围或完成审计：`$task-table-manager`（普通单轮任务不得为形式完整创建任务表）
+- 编写或修正需求分析、用户设计、模型设计、现状分析、方案设计、任务设计和执行反馈之间的完整交付链，或复杂执行需要保持这些阶段的可追溯迭代：`$delivery-workflow`（规格已完整的单轮实现、简单清单、纯任务状态查询和独立专项技术执行不触发）
+- 跨轮保存任务合同、真实任务依赖、多人领取、执行状态、结果摘要或恢复上下文：`$task-table-manager`（需求、设计、现状和方案语义由 `$delivery-workflow` 承担；普通单轮任务不得为形式完整创建任务表）
 - 上下文压缩后恢复当前轮、用户要求追溯历史对话，或初次了解项目历史脉络：`$codex-event-logger`（当前上下文充分时不得为形式完整读取运行记录）
 - 维护 `project-metadata.md`、`file-metadata.md` 或同类长期状态摘要与关键入口索引：`$change-governance`
 
@@ -173,7 +174,7 @@ must not: 为形式化验收或每轮固定步骤高频运行全仓库 `git stat
 
 must: 记录只服务于以更低读取成本恢复当前目标、有效判断、正式入口、活动计划和关键限制；当前上下文仍充分时直接使用，不能降低后续重建成本的信息不持久化
 
-must: 跨轮计划和审计状态使用 `$task-table-manager`，对话与文件操作历史使用 `$codex-event-logger`，项目状态摘要和关键入口索引的维护使用 `$change-governance`
+must: 跨阶段需求、设计、现状、方案和执行反馈使用 `$delivery-workflow`，跨轮任务合同与执行状态使用 `$task-table-manager`，对话与文件操作历史使用 `$codex-event-logger`，项目状态摘要和关键入口索引的维护使用 `$change-governance`
 
 must: 最终回复是普通单轮任务的默认记录；环境已自动记录的对话、goal 和文件操作不得再手动复制到 runtime、tasklog、runlog、任务表或 metadata
 

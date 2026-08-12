@@ -12,7 +12,7 @@ description: 为复杂变更裁决根因证据、职责或权威入口归属、�
 - 根因、系统机制、反复失效、差距或上游判断会改变动作时，完整读取 [causal-analysis.md](references/causal-analysis.md)。
 - 职责或权威入口变化、迁移兼容、原型转正或临时绕行时，完整读取 [lifecycle-and-entry.md](references/lifecycle-and-entry.md)。
 - 维护 `project-metadata.md`、`file-metadata.md` 或重构同类长期状态记录时，完整读取 [records-and-metadata.md](references/records-and-metadata.md)。
-- 需要验证因果机制、裁决测试 oracle、设计共享阻断门禁或执行跨契约完成审计时，完整读取 [verification-and-gates.md](references/verification-and-gates.md)。
+- 需要证明反复失效、循环依赖或其他已修复机制确实改变，裁决测试 oracle，设计共享阻断门禁，或执行跨契约完成审计时，完整读取 [verification-and-gates.md](references/verification-and-gates.md)。
 - 同一任务跨越多个边界时读取所有对应文件；不要加载无关参考。
 
 ## 工作流

@@ -103,6 +103,7 @@ $descriptionBoundaryFragments = @{
     "change-governance" = "不用于规格已完整"
     "codex-event-logger" = "当前上下文充分"
     "codex-qq-hook" = "状态查询不得创建或改写配置"
+    "delivery-workflow" = "不用于规格已完整的单轮实现"
     "powershell-usage" = "不用于没有 PowerShell 命令"
     "reasoning-governor" = "没有 active Goal 时不用于模型自主切换"
     "symbol-structure-workflow" = "普通字符串"
@@ -177,13 +178,39 @@ Assert-True ($governorScriptContent.Contains('operation: "set"')) "reasoning-gov
 
 $taskTableSkillPath = Join-Path $ProjectRoot "skills\task-table-manager\SKILL.md"
 $taskTableSkillContent = Get-Content -LiteralPath $taskTableSkillPath -Raw -Encoding UTF8
-$legacyNodePath = Join-Path $ProjectRoot "skills\task-table-manager\scripts\set-current-thread-reasoning-depth.mjs"
-$legacyPowerShellPath = Join-Path $ProjectRoot "skills\task-table-manager\scripts\set-current-thread-reasoning-depth.ps1"
-$legacyNodeContent = Get-Content -LiteralPath $legacyNodePath -Raw -Encoding UTF8
-$legacyPowerShellContent = Get-Content -LiteralPath $legacyPowerShellPath -Raw -Encoding UTF8
 Assert-True ($taskTableSkillContent.Contains('`$reasoning-governor`')) "task-table-manager must delegate reasoning depth to reasoning-governor"
-Assert-True ($legacyNodeContent.Contains('../../reasoning-governor/scripts/reasoning-governor.mjs')) "Legacy Node reasoning entry must forward to reasoning-governor"
-Assert-True ($legacyPowerShellContent.Contains('reasoning-governor\scripts\reasoning-governor.ps1')) "Legacy PowerShell reasoning entry must forward to reasoning-governor"
+$taskTableScriptPath = Join-Path $ProjectRoot "skills\task-table-manager\scripts\taskctl.py"
+$taskTableScriptContent = Get-Content -LiteralPath $taskTableScriptPath -Raw -Encoding UTF8
+Assert-True ($taskTableSkillContent.Contains('任务表是执行投影，不是计划正确性的裁判')) "task-table-manager does not declare its assistive responsibility"
+Assert-True ($taskTableSkillContent.Contains('最终完成标准只来自 `$delivery-workflow` 的受保护需求与用户设计')) "task-table-manager does not delegate final completion to the protected user scope"
+Assert-True ($taskTableScriptContent.Contains('command_completion_context')) "taskctl is missing its bounded final-review context"
+Assert-True ($taskTableScriptContent.Contains('needs_review_count')) "taskctl status does not expose the review count"
+Assert-True ($taskTableScriptContent.Contains('upstream_index_derived_content_mismatch')) "taskctl does not bind cached index content to current workflow documents"
+Assert-True ($taskTableScriptContent.Contains('completion snapshot changed')) "taskctl completion pagination is missing snapshot consistency"
+Assert-True ($taskTableScriptContent.Contains('updating an owned task requires --owner')) "taskctl does not protect active task contracts by owner"
+Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot "skills\task-table-manager\tests\test_taskctl.py") -PathType Leaf) "task-table-manager is missing its CLI regression tests"
+
+$deliveryRoot = Join-Path $ProjectRoot "skills\delivery-workflow"
+$deliverySkillContent = Get-Content -LiteralPath (Join-Path $deliveryRoot "SKILL.md") -Raw -Encoding UTF8
+$deliveryScriptContent = Get-Content -LiteralPath (Join-Path $deliveryRoot "scripts\workctl.py") -Raw -Encoding UTF8
+Assert-True ($deliverySkillContent.Contains('requirements.md') -and $deliverySkillContent.Contains('user-design.md')) "delivery-workflow does not separate protected user sources"
+Assert-True ($deliverySkillContent.Contains('模型设计、分析、方案、任务状态、索引、结构检查和各阶段审核都只是中间结果')) "delivery-workflow does not limit intermediate reviews"
+Assert-True ($deliveryScriptContent.Contains('delivery.protected-baseline')) "workctl is missing protected baseline support"
+Assert-True ($deliveryScriptContent.Contains('protected source changed')) "workctl does not reject protected source drift"
+Assert-True ($deliveryScriptContent.Contains('exclusive_write_json')) "workctl protected baseline is not created exclusively"
+Assert-True ($deliveryScriptContent.Contains('without a REQ, AC, or UDES target')) "workctl allows a protected baseline without a final target"
+Assert-True (Test-Path -LiteralPath (Join-Path $deliveryRoot "tests\test_workctl.py") -PathType Leaf) "delivery-workflow is missing its CLI regression tests"
+
+$taskDeliveryMarkdown = @(
+    Get-ChildItem -LiteralPath (Join-Path $ProjectRoot "skills\task-table-manager") -Recurse -File -Filter "*.md"
+    Get-ChildItem -LiteralPath $deliveryRoot -Recurse -File -Filter "*.md"
+)
+foreach ($formalFile in $taskDeliveryMarkdown) {
+    $formalContent = Get-Content -LiteralPath $formalFile.FullName -Raw -Encoding UTF8
+    foreach ($removedConcept in @('strict_v2', 'semantic_preflight', 'legacy_', 'Legacy：', '旧版兼容', 'v1 计划')) {
+        Assert-True (-not $formalContent.Contains($removedConcept)) "Removed task mechanism appears in formal content: $($formalFile.FullName): $removedConcept"
+    }
+}
 
 $qqSwitchPath = Join-Path $ProjectRoot "skills\codex-qq-hook\scripts\qq_hook_switch.ps1"
 $qqSwitchContent = Get-Content -LiteralPath $qqSwitchPath -Raw -Encoding UTF8
@@ -329,7 +356,8 @@ $requiredCases = @(
     "qq-hook-status-read-only"
     "qq-hook-troubleshooting"
     "cross-turn-dependent-plan"
-    "legacy-plan-assets-migration"
+    "full-delivery-chain"
+    "protected-baseline-change-discovered"
     "active-goal-reasoning-shift"
     "explicit-thread-reasoning-setting"
     "reasoning-depth-discussion-only"

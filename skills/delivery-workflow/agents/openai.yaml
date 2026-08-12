@@ -1,0 +1,4 @@
+interface:
+  display_name: "Delivery Workflow"
+  short_description: "组织受保护用户基线、可迭代设计分析和执行反馈的完整交付链"
+  default_prompt: "使用 $delivery-workflow 建立受保护用户基线并持续迭代设计、分析、方案、任务与执行反馈。"
