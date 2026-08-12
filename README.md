@@ -30,7 +30,7 @@
 | --- | --- | --- |
 | `codex-event-logger` | 历史独立 logger 工程 | 只在上下文缺失或用户要求追溯时读取项目级运行记录 |
 | `codex-qq-hook` | 历史 QQ bot 工程 | 按用户明确要求配置当前工作区 QQ 完成提醒 |
-| `task-table-manager` | 历史 UE 项目 skill | 管理跨轮、真实依赖和持久完成审计；CLI 与测试自包含在 skill 内 |
+| `task-table-manager` | 历史 UE 项目 skill | 管理跨轮、真实依赖和持久完成审计；大规模迁移以项目语义预检阻断结构假绿，CLI 与测试自包含在 skill 内 |
 | `reasoning-governor` | 从 `task-table-manager` 的线程深度脚本拆分建源 | 读取和切换当前线程 next-turn 推理深度；模型自主切换只由 active Goal 续跑 |
 | `symbol-structure-workflow` | 历史 SymbolStructureWorkflow 工程 | 在文本、AST、LSP 和编辑工具间分层路由，并声明 `vscode-lsp-mcp` 依赖 |
 | `ast-grep-token-safe` | 历史 SymbolStructureWorkflow 工程 | 使用内置 `sgy` 做 Token-Safe AST 搜索与改写 |

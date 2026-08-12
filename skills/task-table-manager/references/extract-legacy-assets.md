@@ -8,4 +8,4 @@
 4. 旧测试全部先按 `untrusted_legacy` 处理。重新确认 requirement、oracle、baseline、negative path、作用范围和公开用户流程后，才能成为 `qualified`。
 5. 不导入旧 `done`、百分比、handoff、memo、Gate 结论或任务 ID 作为新状态。旧材料只可作为候选场景和审计证据；v1 从 `activate` 生成全新状态。
 6. 比较新计划的 requirement/claim 覆盖与正式设计，确认没有静默漏项后再激活。当前仍在执行的旧计划默认继续 legacy 模式，不因 skill 更新而迁移。
-
+7. 迁移包含大量历史身份、入口或资产逐项处置时，按 [create-plan.md](create-plan.md) 的项目级 `semantic_preflight` 冻结 owner、精确 successor/gap、处置、生命周期、输入输出和证据绑定；结构追踪通过不能替代该回执。

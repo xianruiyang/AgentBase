@@ -17,7 +17,7 @@ description: 管理有证据支撑的规划链和长期执行。用于工作必�
 
 ## 质量边界
 
-- CLI 只判断它能确定的结构、依赖、revision、来源指纹和证据新鲜度；不得把这些结果解释为需求正确、方案无偏移、测试 oracle 正确或业务已经可用。`audit-plan` 只是结构审计。
+- CLI 只判断结构、依赖、revision、来源指纹和证据新鲜度，不证明需求、方案、oracle 或业务。`audit-plan` 只做结构审计；未登记预检时返回 `structural_only`。大规模迁移或历史身份重映射按 [create-plan.md](references/create-plan.md) 登记 `semantic_preflight` 回执；缺失、无效或任一债务非零时阻断。
 - 计划前直接以用户要求、正式设计、完整实现差距和方案为真源，先正向检查上游是否全部覆盖，再反向检查每个动作是否有来源，并主动寻找反例。发现问题回到最早失效层；不得由任务、旧测试或现有代码反推上游，也不得用自动生成的追踪表自证。
 - 任务只表达未交付的用户结果、真实依赖和最小充分验收。大量 command/资产的逐项分配由任务目录内的定向脚本或清单检查，不把领域 inventory 逻辑塞入通用 CLI。
 - 测试先确认 requirement、oracle、baseline、negative path、真实 subject 和 readback；不为旧断言修改目标设计。outcome 只到证据实际穿过的最高入口，mock、recording、注册、编译或内部 runtime 不能冒充公开可用。
@@ -34,4 +34,5 @@ description: 管理有证据支撑的规划链和长期执行。用于工作必�
 ## Token 与推理深度
 
 - 成功证据只读摘要，失败才展开 raw artifact。普通 v1 不写 handoff、memo、`deps_for`、逐轮 Token 报告或重复 changelog；`TASK_TABLE.md` 仅按需生成，且只是只读投影，不代表执行校验通过。
+- 进度分开报告任务状态、`semantic_preflight.unresolved_count` 和 `audit --all` 的产品证据闭合度；未知或未决语义不得被任务完成率掩盖。
 - 推理深度不属于计划状态或完成证据。执行 active Goal 时遵守全局动态判断并使用 `$reasoning-governor`；任务行深度仅是开始当前项时的非权威建议，不限制后续根据真实工作变化升降。

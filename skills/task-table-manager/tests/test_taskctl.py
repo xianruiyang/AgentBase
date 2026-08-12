@@ -261,6 +261,26 @@ def make_plan(
     }
 
 
+def declare_semantic_preflight(
+    plan: dict[str, object],
+    *,
+    receipt_ref: str = "semantic-preflight.design-v1.json",
+    dimensions: list[str] | None = None,
+) -> None:
+    plan["semantic_preflight"] = {
+        "receipt_ref": receipt_ref,
+        "producer_source_id": "design",
+        "scope_source_ids": ["design"],
+        "required_dimensions": dimensions
+        or [
+            "coverage",
+            "evidence_binding",
+            "owner",
+            "successor_contract",
+        ],
+    }
+
+
 class TaskCtlTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
@@ -420,6 +440,66 @@ class TaskCtlTestCase(unittest.TestCase):
 
     def read_json(self, path: Path) -> dict[str, object]:
         return json.loads(path.read_text(encoding="utf-8"))
+
+    def write_semantic_receipt(
+        self,
+        plan: dict[str, object] | None = None,
+        *,
+        count_overrides: dict[str, object] | None = None,
+        status: str | None = None,
+        source_fingerprints: dict[str, str] | None = None,
+    ) -> Path:
+        plan = plan or self.read_json(self.plan_dir / "plan.json")
+        semantic = plan["semantic_preflight"]
+        sources = {source["id"]: source for source in plan["scope_sources"]}
+        dimensions = semantic["required_dimensions"]
+        counts: dict[str, object] = {
+            "total_count": 4,
+            "resolved_count": 4,
+            "unresolved_count": 0,
+            "placeholder_count": 0,
+            "duplicate_count": 0,
+            "dimension_unresolved_counts": {
+                dimension: 0 for dimension in dimensions
+            },
+        }
+        if count_overrides:
+            dimension_overrides = count_overrides.get(
+                "dimension_unresolved_counts"
+            )
+            counts.update(
+                {
+                    key: value
+                    for key, value in count_overrides.items()
+                    if key != "dimension_unresolved_counts"
+                }
+            )
+            if dimension_overrides is not None:
+                counts["dimension_unresolved_counts"].update(
+                    dimension_overrides
+                )
+        blocked = (
+            counts["unresolved_count"] != 0
+            or counts["placeholder_count"] != 0
+            or counts["duplicate_count"] != 0
+            or any(counts["dimension_unresolved_counts"].values())
+        )
+        receipt = {
+            "schema": "task.semantic-preflight.v1",
+            "plan_id": plan["plan_id"],
+            "design_revision": plan["design_revision"],
+            "producer_source_id": semantic["producer_source_id"],
+            "source_fingerprints": source_fingerprints
+            or {
+                source_id: sources[source_id]["fingerprint"]
+                for source_id in semantic["scope_source_ids"]
+            },
+            "status": status or ("blocked" if blocked else "pass"),
+            "counts": counts,
+        }
+        path = self.plan_dir / semantic["receipt_ref"]
+        self.write_json(path, receipt)
+        return path
 
     def command(self, *arguments: str, ok: bool = True) -> dict[str, object]:
         result = subprocess.run(
@@ -1000,6 +1080,202 @@ class TaskCtlTestCase(unittest.TestCase):
             self.plan_dir, self.read_json(self.plan_dir / "plan.json")
         )
 
+    def test_structural_audit_does_not_claim_execution_readiness(self) -> None:
+        plan = make_plan()
+        self.write_plan(plan)
+
+        audit = self.command("audit-plan", "--task-dir", str(self.plan_dir))
+
+        self.assertEqual(audit["structural_status"], "pass")
+        self.assertEqual(audit["execution_readiness"], "structural_only")
+        self.assertFalse(audit["ready_for_execution"])
+        self.assertEqual(
+            audit["semantic_preflight"]["status"], "not_declared"
+        )
+        self.command("activate", "--task-dir", str(self.plan_dir))
+
+    def test_declared_semantic_preflight_blocks_when_receipt_is_missing(self) -> None:
+        plan = make_plan()
+        declare_semantic_preflight(plan)
+        self.write_plan(plan)
+
+        audit = self.command(
+            "audit-plan", "--task-dir", str(self.plan_dir), ok=False
+        )
+
+        self.assertEqual(audit["structural_status"], "pass")
+        self.assertEqual(audit["execution_readiness"], "blocked")
+        self.assertIsNone(audit["semantic_preflight"]["unresolved_count"])
+        self.assertEqual(
+            audit["error"]["code"], "semantic_preflight_missing"
+        )
+        rejected = self.command(
+            "activate", "--task-dir", str(self.plan_dir), ok=False
+        )
+        self.assertEqual(
+            rejected["error"]["code"], "semantic_preflight_missing"
+        )
+
+    def test_semantic_preflight_negative_dimensions_block_readiness(self) -> None:
+        plan = make_plan()
+        declare_semantic_preflight(plan)
+        self.write_plan(plan)
+        cases = {
+            "placeholder": {
+                "resolved_count": 3,
+                "unresolved_count": 1,
+                "placeholder_count": 1,
+            },
+            "wrong_owner": {
+                "resolved_count": 3,
+                "unresolved_count": 1,
+                "dimension_unresolved_counts": {"owner": 1},
+            },
+            "unknown_successor": {
+                "resolved_count": 3,
+                "unresolved_count": 1,
+                "dimension_unresolved_counts": {"successor_contract": 1},
+            },
+            "missing_row": {
+                "resolved_count": 3,
+                "unresolved_count": 1,
+                "dimension_unresolved_counts": {"coverage": 1},
+            },
+            "duplicate_row": {"duplicate_count": 1},
+            "irrelevant_evidence": {
+                "resolved_count": 3,
+                "unresolved_count": 1,
+                "dimension_unresolved_counts": {"evidence_binding": 1},
+            },
+        }
+        for label, overrides in cases.items():
+            with self.subTest(label=label):
+                self.write_semantic_receipt(plan, count_overrides=overrides)
+                audit = self.command(
+                    "audit-plan", "--task-dir", str(self.plan_dir), ok=False
+                )
+                self.assertEqual(audit["execution_readiness"], "blocked")
+                self.assertEqual(
+                    audit["semantic_preflight"]["status"], "blocked"
+                )
+                self.assertEqual(
+                    audit["semantic_preflight"]["error_code"],
+                    "semantic_preflight_unresolved",
+                )
+
+    def test_semantic_preflight_rejects_a_false_pass(self) -> None:
+        plan = make_plan()
+        declare_semantic_preflight(plan)
+        self.write_plan(plan)
+        self.write_semantic_receipt(
+            plan,
+            count_overrides={
+                "resolved_count": 3,
+                "unresolved_count": 1,
+                "placeholder_count": 1,
+            },
+            status="pass",
+        )
+
+        audit = self.command(
+            "audit-plan", "--task-dir", str(self.plan_dir), ok=False
+        )
+
+        self.assertEqual(audit["semantic_preflight"]["status"], "invalid")
+        self.assertEqual(
+            audit["error"]["code"], "semantic_preflight_invalid"
+        )
+
+    def test_semantic_preflight_rejects_source_fingerprint_mismatch(self) -> None:
+        plan = make_plan()
+        declare_semantic_preflight(plan)
+        self.write_plan(plan)
+        self.write_semantic_receipt(
+            plan,
+            source_fingerprints={"design": "sha256:" + "0" * 64},
+        )
+
+        audit = self.command(
+            "audit-plan", "--task-dir", str(self.plan_dir), ok=False
+        )
+
+        self.assertEqual(audit["semantic_preflight"]["status"], "invalid")
+        self.assertEqual(
+            audit["error"]["code"], "semantic_preflight_invalid"
+        )
+
+    def test_semantic_preflight_pass_is_reported_and_rechecked_before_begin(self) -> None:
+        plan = make_plan()
+        declare_semantic_preflight(plan)
+        self.write_plan(plan)
+        self.write_semantic_receipt(plan)
+
+        audit = self.command("audit-plan", "--task-dir", str(self.plan_dir))
+        self.assertEqual(audit["execution_readiness"], "ready")
+        self.assertTrue(audit["ready_for_execution"])
+        self.command("activate", "--task-dir", str(self.plan_dir))
+
+        resumed = self.command("resume", "--task-dir", str(self.plan_dir))
+        self.assertEqual(
+            resumed["semantic_preflight"]["unresolved_count"], 0
+        )
+        rendered = self.command("render", "--task-dir", str(self.plan_dir))
+        self.assertEqual(
+            rendered["semantic_preflight"]["unresolved_count"], 0
+        )
+        markdown = (self.plan_dir / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn("semantic_preflight: status=pass, unresolved=0", markdown)
+
+        self.write_semantic_receipt(
+            plan,
+            count_overrides={
+                "resolved_count": 3,
+                "unresolved_count": 1,
+                "dimension_unresolved_counts": {"owner": 1},
+            },
+        )
+        blocked_resume = self.command(
+            "resume", "--task-dir", str(self.plan_dir)
+        )
+        self.assertFalse(blocked_resume["completion_allowed"])
+        self.assertEqual(blocked_resume["ready_count"], 0)
+        self.assertEqual(blocked_resume["semantic_blocked_ids"], ["T1"])
+        rejected = self.command(
+            "begin",
+            "--task-dir",
+            str(self.plan_dir),
+            "--task",
+            "T1",
+            "--expected-revision",
+            str(self.state()["revision"]),
+            ok=False,
+        )
+        self.assertEqual(
+            rejected["error"]["code"], "semantic_preflight_unresolved"
+        )
+
+    def test_semantic_preflight_debt_does_not_orphan_an_active_package(self) -> None:
+        plan = make_plan()
+        declare_semantic_preflight(plan)
+        self.write_plan(plan)
+        self.write_semantic_receipt(plan)
+        self.activate()
+        self.begin("T1")
+        self.write_semantic_receipt(
+            plan,
+            count_overrides={
+                "resolved_count": 3,
+                "unresolved_count": 1,
+                "dimension_unresolved_counts": {"owner": 1},
+            },
+        )
+
+        resumed = self.command("resume", "--task-dir", str(self.plan_dir))
+
+        self.assertEqual(resumed["active_package"]["task_ids"], ["T1"])
+        self.assertTrue(resumed["completion_allowed"])
+        self.assertTrue(resumed["new_work_blocked_by_semantic_preflight"])
+
     def test_direct_flow_requires_exact_scope_task_and_qualified_tests(self) -> None:
         plan = make_plan()
         scope_id = "public:fixture:create-readback"
@@ -1349,6 +1625,13 @@ class TaskCtlTestCase(unittest.TestCase):
         self.close(receipt)
         audit = self.command("audit", "--task-dir", str(self.plan_dir), "--all")
         self.assertEqual(audit["failed_flow_ids"], [])
+        self.assertEqual(audit["task_status_counts"]["done"], 1)
+        self.assertEqual(audit["semantic_preflight"]["status"], "not_declared")
+        self.assertEqual(audit["product_evidence"]["closed_task_count"], 1)
+        self.assertEqual(audit["product_evidence"]["unresolved_task_count"], 0)
+        self.assertTrue(
+            audit["product_evidence"]["completion_receipt_issued"]
+        )
         completion = audit["completion_receipt"]
         self.assertTrue(completion["id"].startswith("sha256:"))
         completion_path = self.plan_dir / completion["path"]
@@ -1563,6 +1846,7 @@ class TaskCtlTestCase(unittest.TestCase):
 
         self.assertLessEqual(len(skill_text), 2400)
         self.assertIn("resume → begin → close", skill_text)
+        self.assertIn("semantic_preflight", skill_text)
 
     def test_active_package_freezes_controller_and_can_release_after_drift(self) -> None:
         self.write_plan(make_plan())
@@ -1652,6 +1936,11 @@ class TaskCtlTestCase(unittest.TestCase):
         self.activate()
         audit = self.command("audit", "--plan-dir", str(self.plan_dir), "--all", ok=False)
         self.assertEqual(audit["failed_task_ids"], ["T1", "T2"])
+        self.assertEqual(audit["product_evidence"]["audited_task_count"], 2)
+        self.assertEqual(audit["product_evidence"]["unresolved_task_count"], 2)
+        self.assertFalse(
+            audit["product_evidence"]["completion_receipt_issued"]
+        )
         self.assertIsNone(audit["completion_receipt"])
 
     def test_packaged_plan_template_is_schema_valid(self) -> None:
@@ -1659,6 +1948,54 @@ class TaskCtlTestCase(unittest.TestCase):
             (SKILL_ROOT / "assets" / "templates" / "plan.json").read_text(encoding="utf-8")
         )
         TASKCTL._validate_plan(template)
+
+    def test_packaged_semantic_preflight_template_matches_the_cli_contract(self) -> None:
+        template = json.loads(
+            (
+                SKILL_ROOT
+                / "assets"
+                / "templates"
+                / "semantic-preflight.json"
+            ).read_text(encoding="utf-8")
+        )
+        dimensions = sorted(
+            template["counts"]["dimension_unresolved_counts"]
+        )
+        plan = make_plan()
+        declare_semantic_preflight(plan, dimensions=dimensions)
+        self.write_plan(plan)
+        design_source = plan["scope_sources"][0]
+        template.update(
+            {
+                "plan_id": plan["plan_id"],
+                "design_revision": plan["design_revision"],
+                "producer_source_id": "design",
+                "source_fingerprints": {
+                    "design": design_source["fingerprint"]
+                },
+                "status": "pass",
+            }
+        )
+        template["counts"].update(
+            {
+                "total_count": 1,
+                "resolved_count": 1,
+                "unresolved_count": 0,
+                "placeholder_count": 0,
+                "duplicate_count": 0,
+                "dimension_unresolved_counts": {
+                    dimension: 0 for dimension in dimensions
+                },
+            }
+        )
+        self.write_json(
+            self.plan_dir / plan["semantic_preflight"]["receipt_ref"],
+            template,
+        )
+
+        audit = self.command("audit-plan", "--task-dir", str(self.plan_dir))
+
+        self.assertEqual(audit["execution_readiness"], "ready")
 
     def test_scope_and_build_profile_are_part_of_task_contract_identity(self) -> None:
         base = make_plan()
