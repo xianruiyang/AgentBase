@@ -306,6 +306,68 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(noted["state"]["status"], "claimed")
         self.assertEqual(noted["state"]["owner"], "agent-a")
 
+    def test_note_can_explicitly_clear_a_message(self) -> None:
+        noted = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--message",
+            "临时说明",
+        )
+        cleared = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--message",
+            "",
+            "--expected-state-revision",
+            str(noted["state"]["revision"]),
+        )
+        self.assertEqual(cleared["state"]["note"], "")
+
+    def test_release_requires_an_owner_and_clears_the_previous_next_action(self) -> None:
+        unowned = self.run_cli(
+            TASKCTL,
+            "release",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+        )
+        self.assertEqual(unowned.returncode, 2)
+        self.assertIn("unowned task", json.loads(unowned.stderr)["error"])
+
+        claimed = self.run_task("claim", "--id", "T001", "--owner", "agent-a")
+        noted = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--next-action",
+            "继续修改",
+            "--expected-state-revision",
+            str(claimed["state"]["revision"]),
+        )
+        released = self.run_task(
+            "release",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--expected-state-revision",
+            str(noted["state"]["revision"]),
+        )
+        self.assertEqual(released["state"]["status"], "todo")
+        self.assertIsNone(released["state"]["owner"])
+        self.assertEqual(released["state"]["next_action"], "")
+
     def test_context_is_bounded_and_completion_context_has_no_pass_value(self) -> None:
         self.complete_t001()
         context_result = self.run_cli(
@@ -478,6 +540,117 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(drafted["schema"], "task.record")
         self.assertEqual(drafted["id"], "T010")
         self.assertNotIn("task", drafted)
+
+    def test_add_and_update_return_advisory_contract_diagnostics(self) -> None:
+        candidate = self.task("T010", "带诊断的候选任务", ["SOL-999"])
+        candidate["outputs"] = []
+        candidate["verification"] = []
+        added = self.add_task(candidate)
+        added_kinds = {item["kind"] for item in added["diagnostics"]}
+        self.assertIn("unknown_source_id", added_kinds)
+        self.assertIn("outputs_empty", added_kinds)
+        self.assertIn("verification_empty", added_kinds)
+        self.assertIn("advisory", added["note"])
+
+        candidate["title"] = "更新后的候选任务"
+        update_file = Path(self.temp.name) / "T010-update.json"
+        update_file.write_text(
+            json.dumps(candidate, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        updated = self.run_task(
+            "update",
+            "--file",
+            str(update_file),
+            "--expected-task-revision",
+            "1",
+        )
+        updated_kinds = {item["kind"] for item in updated["diagnostics"]}
+        self.assertIn("unknown_source_id", updated_kinds)
+        self.assertIn("outputs_empty", updated_kinds)
+        self.assertIn("verification_empty", updated_kinds)
+
+    def test_add_validates_existing_state_storage_before_writing(self) -> None:
+        orphan = {
+            "schema": "task.state",
+            "task_id": "T999",
+            "status": "todo",
+            "owner": None,
+            "revision": 1,
+            "note": "",
+            "blocked_reason": "",
+            "next_action": "",
+            "result_ref": None,
+        }
+        (self.root / "state" / "T999.json").write_text(
+            json.dumps(orphan, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        candidate = self.task("T010", "不得部分写入", ["SOL-001"])
+        candidate_file = Path(self.temp.name) / "T010-invalid-storage.json"
+        candidate_file.write_text(
+            json.dumps(candidate, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        added = self.run_cli(
+            TASKCTL,
+            "add",
+            "--task-dir",
+            str(self.root),
+            "--file",
+            str(candidate_file),
+        )
+        self.assertEqual(added.returncode, 2)
+        self.assertIn("task/state storage mismatch", json.loads(added.stderr)["error"])
+        self.assertFalse((self.root / "tasks" / "T010.json").exists())
+        self.assertFalse((self.root / "state" / "T010.json").exists())
+
+    def test_update_validates_existing_state_storage_before_writing(self) -> None:
+        original = json.loads((self.root / "tasks" / "T001.json").read_text(encoding="utf-8"))
+        orphan = {
+            "schema": "task.state",
+            "task_id": "T999",
+            "status": "todo",
+            "owner": None,
+            "revision": 1,
+            "note": "",
+            "blocked_reason": "",
+            "next_action": "",
+            "result_ref": None,
+        }
+        (self.root / "state" / "T999.json").write_text(
+            json.dumps(orphan, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        candidate = dict(original)
+        candidate["title"] = "不得在失败时改写"
+        candidate_file = Path(self.temp.name) / "T001-invalid-storage.json"
+        candidate_file.write_text(
+            json.dumps(candidate, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        updated = self.run_cli(
+            TASKCTL,
+            "update",
+            "--task-dir",
+            str(self.root),
+            "--file",
+            str(candidate_file),
+            "--expected-task-revision",
+            "1",
+        )
+        self.assertEqual(updated.returncode, 2)
+        self.assertIn("task/state storage mismatch", json.loads(updated.stderr)["error"])
+        after = json.loads((self.root / "tasks" / "T001.json").read_text(encoding="utf-8"))
+        self.assertEqual(after, original)
+
+    def test_task_table_identity_must_match_the_delivery_workflow(self) -> None:
+        table_path = self.root / "task-table.json"
+        table = json.loads(table_path.read_text(encoding="utf-8"))
+        table["id"] = "another-workflow"
+        table_path.write_text(
+            json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        listed = self.run_cli(
+            TASKCTL, "list", "--task-dir", str(self.root)
+        )
+        self.assertEqual(listed.returncode, 2)
+        self.assertIn("different workflow", json.loads(listed.stderr)["error"])
 
     def test_generated_task_view_cannot_be_redirected_to_requirements(self) -> None:
         table_path = self.root / "task-table.json"
@@ -785,6 +958,12 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(updated["task_revision"], 2)
 
     def test_result_history_is_derived_and_not_limited_to_200_entries(self) -> None:
+        state_path = self.root / "state" / "T001.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["revision"] = 203
+        state_path.write_text(
+            json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         for revision in range(2, 203):
             path = self.root / "results" / f"T001.r{revision}.json"
             path.write_text(
@@ -792,6 +971,17 @@ class TaskctlTests(unittest.TestCase):
             )
         shown = self.run_task("show", "--id", "T001", "--budget", "5000")
         self.assertIsNone(shown["result"])
+
+    def test_result_history_revision_cannot_be_far_ahead_of_task_state(self) -> None:
+        invalid = self.root / "results" / "T001.r999.json"
+        invalid.write_text(
+            json.dumps(self.result_payload(), ensure_ascii=False), encoding="utf-8"
+        )
+        shown = self.run_cli(
+            TASKCTL, "show", "--task-dir", str(self.root), "--id", "T001"
+        )
+        self.assertEqual(shown.returncode, 2)
+        self.assertIn("ahead of task state", json.loads(shown.stderr)["error"])
 
     def test_invalid_result_history_record_is_rejected(self) -> None:
         invalid = self.root / "results" / "T001.rbad.json"

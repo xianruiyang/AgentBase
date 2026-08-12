@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "reopened: 即时诊断写入顺序使事务结论失效",
+  "owner": "codex-root",
+  "result_ref": "results/T001.r8.json",
+  "revision": 8,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T001"
+}

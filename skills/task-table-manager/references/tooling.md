@@ -11,8 +11,8 @@ python <SkillDir>/scripts/taskctl.py <command> --task-dir <AbsoluteTaskDir>
 ```text
 init        建立固定 tasks/state/results 目录和 task-table.json
 draft       将最小候选任务 JSON 输出到 stdout，不写文件
-add         新增一项任务并建立 todo 状态
-update      按 expected revision 更新任务合同
+add         新增一项任务、建立 todo 状态并返回即时软诊断
+update      按 expected revision 更新任务合同并返回即时软诊断
 show        返回任务合同、状态和结果摘要
 list        有界列出任务
 deps        返回直接或递归前置任务
@@ -37,6 +37,8 @@ release     释放未完成任务
 ```
 
 写命令返回新的 state revision；后续写入用 `--expected-state-revision` 防止覆盖。`update` 始终使用 `--expected-task-revision`，任务已有 owner 时还必须传相同 `--owner` 和当前 state revision。`reopen` 必须传当前 `--owner`。查询默认使用紧凑 JSON 并限制条目数量，人工阅读时使用 `--pretty`。
+
+`add` 和 `update` 先验证生成诊断所依赖的 task/state 存储集合，再写入并返回当前上游索引能够确定的合同诊断，例如未知 source ID、上游未决、缺少产出或验证。存储损坏会在本次候选落盘前失败；语义诊断帮助模型立即修订任务，但不会回滚成功写入、签发执行许可或判断任务语义正确。
 
 `task-table.json` 的 `tasks/`、`state/`、`results/`、`.work-cache/index.json` 和 `TASK_TABLE.md` 路径是固定存储合同，避免生成物被重定向到语义真源或结果记录。
 

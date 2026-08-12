@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -20,7 +21,6 @@ MAX_JSON_BYTES = 2 * 1024 * 1024
 MAX_DOCUMENT_BYTES = 4 * 1024 * 1024
 MAX_RECORDS = 20_000
 DEFAULT_MAX_ITEMS = 50
-TASK_STATUSES = ("todo", "claimed", "in_progress", "review", "blocked", "done")
 ID_PATTERN = r"(?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-[A-Za-z0-9][A-Za-z0-9._-]*"
 ID_RE = re.compile(rf"\b({ID_PATTERN})\b")
 HEADING_RE = re.compile(rf"^##\s+(?P<id>{ID_PATTERN})(?:\s+(?P<title>.*?))?\s*$")
@@ -43,6 +43,7 @@ DEFAULT_DOCUMENTS = {
     "solution": "solution.md",
     "deferred_changes": "deferred-changes.md",
 }
+PUBLIC_STAGES = {stage.replace("_", "-"): stage for stage in STAGE_PREFIXES}
 PROTECTED_STAGES = ("requirements", "user_design")
 
 
@@ -232,6 +233,8 @@ def load_manifest(root: Path) -> dict[str, Any]:
         task_table = read_json(task_table_path)
         if not isinstance(task_table, dict) or task_table.get("schema") != "task.table":
             raise WorkctlError(f"unsupported task table manifest: {task_table_path}")
+        if task_table.get("id") != manifest.get("id"):
+            raise WorkctlError("task table belongs to a different workflow")
         storage_paths = []
         for field, default in (
             ("task_dir", "tasks"),
@@ -464,61 +467,47 @@ def limit_items(items: list[Any], maximum: int) -> tuple[list[Any], bool]:
 
 
 def task_status_summary(root: Path) -> dict[str, Any]:
-    counts = {status: 0 for status in TASK_STATUSES}
-    result = {
-        "counts": counts,
-        "task_count": 0,
-        "result_count": 0,
-        "result_with_verification_count": 0,
-        "result_with_unresolved_count": 0,
-    }
-    table_path = root / "task-table.json"
-    if not table_path.exists():
-        return result
-    table = read_json(table_path)
-    if not isinstance(table, dict) or table.get("schema") != "task.table":
-        raise WorkctlError(f"unsupported task table manifest: {table_path}")
-    state_dir = resolve_inside(root, str(table.get("state_dir", "state")))
-    if state_dir.exists():
-        state_files = sorted(state_dir.glob("*.json"))
-        if len(state_files) > MAX_RECORDS:
-            raise WorkctlError(f"task state contains more than {MAX_RECORDS} records")
-        for state_path in state_files:
-            state = read_json(state_path)
-            status = state.get("status") if isinstance(state, dict) else None
-            if status in counts:
-                counts[status] += 1
-            result["task_count"] += 1
-    if state_dir.exists():
-        for state_path in sorted(state_dir.glob("*.json")):
-            state = read_json(state_path)
-            if not isinstance(state, dict) or not state.get("result_ref"):
-                continue
-            result_path = resolve_inside(root, str(state["result_ref"]))
-            task_result = read_json(result_path)
-            if not isinstance(task_result, dict) or task_result.get("schema") != "task.result":
-                raise WorkctlError(f"unsupported task result: {result_path}")
-            result["result_count"] += 1
-            if task_result.get("verification"):
-                result["result_with_verification_count"] += 1
-            if task_result.get("unresolved"):
-                result["result_with_unresolved_count"] += 1
-    return result
+    script_path = (
+        Path(__file__).resolve().parents[2]
+        / "task-table-manager"
+        / "scripts"
+        / "taskctl.py"
+    )
+    if not script_path.is_file():
+        raise WorkctlError(f"task table manager is unavailable: {script_path}")
+    spec = importlib.util.spec_from_file_location("_agentbase_taskctl", script_path)
+    if spec is None or spec.loader is None:
+        raise WorkctlError(f"task table manager is unreadable: {script_path}")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+        summary = module.task_storage_summary(root)
+    except Exception as exc:
+        taskctl_error = getattr(module, "TaskctlError", None)
+        if taskctl_error is not None and isinstance(exc, taskctl_error):
+            raise WorkctlError(f"task storage is invalid: {exc}") from exc
+        raise WorkctlError(f"task table manager failed: {exc}") from exc
+    if not isinstance(summary, dict):
+        raise WorkctlError("task table manager returned an invalid storage summary")
+    return summary
 
 
 def init_workspace(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.work_dir)
     root.mkdir(parents=True, exist_ok=True)
-    target_names = [
+    created_files = [
         "workflow.json",
         "task-table.json",
+        *DEFAULT_DOCUMENTS.values(),
+    ]
+    pending_files = [
         "protected-baseline.json",
         ".work-cache/index.json",
         "WORK_STATUS.md",
         "TASK_TABLE.md",
-        *DEFAULT_DOCUMENTS.values(),
     ]
-    conflicts = [name for name in target_names if (root / name).exists()]
+    managed_files = [*created_files, *pending_files]
+    conflicts = [name for name in managed_files if (root / name).exists()]
     conflicts.extend(
         directory
         for directory in ("tasks", "state", "results")
@@ -560,7 +549,8 @@ def init_workspace(args: argparse.Namespace) -> dict[str, Any]:
         "ok": True,
         "command": "init",
         "work_dir": str(root),
-        "created": target_names + ["tasks/", "state/", "results/"],
+        "created": created_files + ["tasks/", "state/", "results/"],
+        "pending": pending_files,
     }
 
 
@@ -648,6 +638,8 @@ def protect_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, 
 
 
 def outline_stage(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.work_dir)
+    stage = PUBLIC_STAGES[args.stage]
     outlines = {
         "requirements": {
             "ids": ["REQ", "AC", "CON"],
@@ -677,9 +669,11 @@ def outline_stage(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "ok": True,
         "command": "outline",
+        "work_dir": str(root),
         "stage": args.stage,
+        "document": DEFAULT_DOCUMENTS[stage],
         "heading": "## <ID> <title>",
-        **outlines[args.stage],
+        **outlines[stage],
     }
 
 
@@ -920,8 +914,8 @@ def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
             "| --- | ---: |",
         ]
     )
-    for status in TASK_STATUSES:
-        lines.append(f"| {status} | {task_summary['counts'][status]} |")
+    for status, count in task_summary["counts"].items():
+        lines.append(f"| {status} | {count} |")
     lines.extend(["", "## 未决 ID", ""])
     if index["unresolved_ids"]:
         lines.extend(f"- {markdown_escape(section_id)}" for section_id in index["unresolved_ids"])
@@ -955,8 +949,8 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.set_defaults(handler=init_workspace)
 
     outline_parser = subparsers.add_parser("outline", help="show one stage's compact contract")
-    add_common(outline_parser, include_work_dir=False)
-    outline_parser.add_argument("--stage", choices=tuple(STAGE_PREFIXES), required=True)
+    add_common(outline_parser)
+    outline_parser.add_argument("--stage", choices=tuple(PUBLIC_STAGES), required=True)
     outline_parser.set_defaults(handler=outline_stage)
 
     protect_parser = subparsers.add_parser(

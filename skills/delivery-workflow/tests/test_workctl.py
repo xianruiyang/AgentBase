@@ -36,6 +36,7 @@ class WorkctlTests(unittest.TestCase):
             "演示交付",
         )
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.initialized = self.payload(result)
         self.write_valid_documents()
 
     def tearDown(self) -> None:
@@ -183,6 +184,37 @@ class WorkctlTests(unittest.TestCase):
         self.assertEqual(drifted.returncode, 2)
         self.assertIn("protected source changed", self.payload(drifted)["error"])
 
+    def test_init_distinguishes_created_and_pending_artifacts(self) -> None:
+        self.assertIn("workflow.json", self.initialized["created"])
+        self.assertIn("requirements.md", self.initialized["created"])
+        self.assertNotIn("protected-baseline.json", self.initialized["created"])
+        self.assertNotIn(".work-cache/index.json", self.initialized["created"])
+        self.assertEqual(
+            self.initialized["pending"],
+            [
+                "protected-baseline.json",
+                ".work-cache/index.json",
+                "WORK_STATUS.md",
+                "TASK_TABLE.md",
+            ],
+        )
+        for relative in self.initialized["pending"]:
+            self.assertFalse((self.root / relative).exists())
+
+    def test_outline_uses_public_stage_names_and_the_workspace_argument(self) -> None:
+        outlined = self.run_cli(
+            "outline",
+            "--work-dir",
+            str(self.root),
+            "--stage",
+            "current-state",
+        )
+        self.assertEqual(outlined.returncode, 0, outlined.stderr)
+        payload = self.payload(outlined)
+        self.assertEqual(payload["stage"], "current-state")
+        self.assertEqual(payload["document"], "current-state.md")
+        self.assertEqual(payload["ids"], ["OBS", "GAP", "DEC"])
+
     def test_protect_requires_confirmed_entries(self) -> None:
         content = (self.root / "requirements.md").read_text(encoding="utf-8")
         (self.root / "requirements.md").write_text(
@@ -287,6 +319,36 @@ class WorkctlTests(unittest.TestCase):
         indexed = self.run_cli("index", "--work-dir", str(self.root))
         self.assertEqual(indexed.returncode, 2)
         self.assertIn("task_dir must remain tasks", self.payload(indexed)["error"])
+
+    def test_task_table_identity_must_match_the_workflow(self) -> None:
+        table_path = self.root / "task-table.json"
+        table = json.loads(table_path.read_text(encoding="utf-8"))
+        table["id"] = "another-workflow"
+        table_path.write_text(
+            json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        status = self.run_cli("status", "--work-dir", str(self.root))
+        self.assertEqual(status.returncode, 2)
+        self.assertIn("different workflow", self.payload(status)["error"])
+
+    def test_task_summary_reuses_strict_task_storage_validation(self) -> None:
+        orphan = {
+            "schema": "task.state",
+            "task_id": "T999",
+            "status": "todo",
+            "owner": None,
+            "revision": 1,
+            "note": "",
+            "blocked_reason": "",
+            "next_action": "",
+            "result_ref": None,
+        }
+        (self.root / "state" / "T999.json").write_text(
+            json.dumps(orphan, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        status = self.run_cli("status", "--work-dir", str(self.root))
+        self.assertEqual(status.returncode, 2)
+        self.assertIn("task/state storage mismatch", self.payload(status)["error"])
 
     def test_protect_rejects_model_decision_in_requirements(self) -> None:
         with (self.root / "requirements.md").open("a", encoding="utf-8") as handle:

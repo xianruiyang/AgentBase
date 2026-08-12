@@ -1,0 +1,25 @@
+{
+  "changed_files": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/tooling.md",
+    "skills/task-table-manager/references/execution.md",
+    "skills/task-table-manager/references/task-contracts.md"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "taskctl 已形成唯一严格任务存储摘要，写入动作即时返回软诊断，并修正工作流身份、状态变换和结果历史边界",
+  "outputs": [
+    "task_storage_summary 严格摘要接口",
+    "add/update 即时 advisory diagnostics",
+    "可清空 note、只能释放已领取任务、清除旧 next_action 的状态合同",
+    "结果历史 revision 上界验证"
+  ],
+  "schema": "task.result",
+  "task_id": "T001",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "python -m py_compile skills/task-table-manager/scripts/taskctl.py - passed",
+    "python -X utf8 skills/task-table-manager/tests/test_taskctl.py - 34/34 passed"
+  ]
+}

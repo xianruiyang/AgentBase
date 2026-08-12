@@ -19,7 +19,7 @@ todo → claimed → in_progress → review → done
 - `note` 更新简短进度、阻塞原因或下一动作，不保存运行日志。
 - `complete` 写结果并设为 `done`；模型必须保证结果与有效证据一致。
 - `reopen` 用于已完成任务的合同或完成结论实际失效；必须由当前 owner 操作并写明原因。活动任务的改派使用 `release`，不能用重开清除他人领取。
-- `release` 释放未完成任务的 owner，状态回到 `todo`。
+- `release` 只释放已经有 owner 的未完成任务，清除旧 owner 的阻塞原因和下一动作，并把状态恢复为 `todo`。
 
 CLI 会拒绝同一任务被另一 owner 覆盖和 revision 冲突。不同任务的 mutation scope 重叠会返回警告，由执行者协调；这不是自动门禁。
 

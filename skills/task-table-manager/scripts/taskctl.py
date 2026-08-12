@@ -177,6 +177,9 @@ def load_table(root: Path) -> dict[str, Any]:
     table = read_json(path)
     if not isinstance(table, dict) or table.get("schema") != "task.table":
         raise TaskctlError(f"unsupported task table manifest: {path}")
+    table_id = table.get("id")
+    if not isinstance(table_id, str) or not table_id.strip():
+        raise TaskctlError("task-table.json id must be a non-empty string")
     resolved_paths: dict[str, Path] = {}
     for field, default in (
         ("task_dir", "tasks"),
@@ -213,6 +216,8 @@ def load_table(root: Path) -> dict[str, Any]:
     reserved_files = {(root / "task-table.json").resolve(), (root / "workflow.json").resolve()}
     workflow = load_workflow(root)
     if workflow is not None:
+        if table_id != workflow.get("id"):
+            raise TaskctlError("task table belongs to a different workflow")
         for relative in workflow["documents"].values():
             reserved_files.add(resolve_inside(root, relative))
         reserved_files.add((root / "protected-baseline.json").resolve())
@@ -504,6 +509,35 @@ def load_states(
     return {task_id: load_state(root, table, task_id) for task_id in tasks}
 
 
+def load_states_for_add(
+    root: Path,
+    table: dict[str, Any],
+    tasks: dict[str, dict[str, Any]],
+    candidate_id: str,
+    existing_state: dict[str, Any] | None,
+) -> dict[str, dict[str, Any]]:
+    _, state_dir, _ = table_paths(root, table)
+    state_paths = sorted(state_dir.glob("*.json"))
+    if len(state_paths) > MAX_RECORDS:
+        raise TaskctlError(f"state directory contains more than {MAX_RECORDS} records")
+    state_ids = {path.stem for path in state_paths}
+    base_task_ids = set(tasks) - {candidate_id}
+    expected_state_ids = set(base_task_ids)
+    if existing_state is not None:
+        expected_state_ids.add(candidate_id)
+    if state_ids != expected_state_ids:
+        missing = sorted(expected_state_ids - state_ids)
+        extra = sorted(state_ids - expected_state_ids)
+        raise TaskctlError(
+            "task/state storage mismatch: "
+            f"missing={','.join(missing[:10]) or '-'}; extra={','.join(extra[:10]) or '-'}"
+        )
+    states = {task_id: load_state(root, table, task_id) for task_id in base_task_ids}
+    if existing_state is not None:
+        states[candidate_id] = existing_state
+    return states
+
+
 def validate_result_history(
     root: Path,
     table: dict[str, Any],
@@ -523,6 +557,12 @@ def validate_result_history(
         match = re.fullmatch(rf"{re.escape(task['id'])}\.r(?P<revision>[1-9][0-9]*)\.json", path.name)
         if match is None:
             raise TaskctlError(f"invalid task result history name: {path}")
+        storage_revision = int(match.group("revision"))
+        maximum_revision = state["revision"] + (1 if state["result_ref"] is None else 0)
+        if storage_revision > maximum_revision:
+            raise TaskctlError(
+                f"task result history revision is ahead of task state: {path}"
+            )
         historical = validate_result_for_task(
             read_json(path), task, require_current_revision=False
         )
@@ -537,6 +577,9 @@ def load_workflow(root: Path) -> dict[str, Any] | None:
     workflow = read_json(path)
     if not isinstance(workflow, dict) or workflow.get("schema") != "delivery.workflow":
         raise TaskctlError(f"unsupported workflow manifest: {path}")
+    workflow_id = workflow.get("id")
+    if not isinstance(workflow_id, str) or not workflow_id.strip():
+        raise TaskctlError("workflow.json id must be a non-empty string")
     fixed_fields = {
         "task_table": "task-table.json",
         "protected_baseline": "protected-baseline.json",
@@ -744,6 +787,44 @@ def current_result(
     return validate_result(read_json(path), task)
 
 
+def summarize_loaded_task_storage(
+    root: Path,
+    table: dict[str, Any],
+    tasks: dict[str, dict[str, Any]],
+    states: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    result_count = 0
+    result_with_verification_count = 0
+    result_with_unresolved_count = 0
+    invalidated_source_ids: set[str] = set()
+    for task_id, task in tasks.items():
+        result = current_result(root, table, task, states[task_id])
+        if result is None:
+            continue
+        result_count += 1
+        if result["verification"]:
+            result_with_verification_count += 1
+        if result["unresolved"]:
+            result_with_unresolved_count += 1
+        invalidated_source_ids.update(result["invalidated_source_ids"])
+    return {
+        "counts": counts_for(states),
+        "task_count": len(tasks),
+        "result_count": result_count,
+        "result_with_verification_count": result_with_verification_count,
+        "result_with_unresolved_count": result_with_unresolved_count,
+        "invalidated_source_ids": sorted(invalidated_source_ids),
+    }
+
+
+def task_storage_summary(root: Path) -> dict[str, Any]:
+    root = root.resolve()
+    table = load_table(root)
+    tasks = load_tasks(root, table)
+    states = load_states(root, table, tasks)
+    return summarize_loaded_task_storage(root, table, tasks, states)
+
+
 def task_diagnostics(
     task: dict[str, Any],
     tasks: dict[str, dict[str, Any]],
@@ -904,9 +985,19 @@ def command_add(args: argparse.Namespace) -> dict[str, Any]:
         if existing_state is not None and existing_state != initial_state:
             raise TaskctlError(f"conflicting partial task state: {candidate['id']}")
         tasks = load_tasks(root, table)
+        states = load_states_for_add(
+            root, table, tasks, candidate["id"], existing_state
+        )
         proposed = dict(tasks)
         proposed[candidate["id"]] = candidate
+        proposed_states = dict(states)
+        proposed_states[candidate["id"]] = initial_state
         ensure_acyclic(proposed)
+        index, index_diagnostics = maybe_load_index(root, table)
+        diagnostics = [
+            *index_diagnostics,
+            *task_diagnostics(candidate, proposed, proposed_states, index),
+        ]
         if existing_task is None:
             atomic_write_json(task_path, candidate)
         if existing_state is None:
@@ -918,6 +1009,8 @@ def command_add(args: argparse.Namespace) -> dict[str, Any]:
         "task_revision": 1,
         "state_revision": 1,
         "recovered_partial_write": existing_task is not None or existing_state is not None,
+        "diagnostics": diagnostics,
+        "note": "diagnostics are advisory and do not accept or reject task semantics",
     }
 
 
@@ -936,7 +1029,8 @@ def command_update(args: argparse.Namespace) -> dict[str, Any]:
                 f"task revision conflict: expected {args.expected_task_revision}, "
                 f"current {current['revision']}"
             )
-        state = load_state(root, table, task_id)
+        states = load_states(root, table, tasks)
+        state = states[task_id]
         if state["status"] == "done" or state["result_ref"] is not None:
             raise TaskctlError(
                 "reopen the completed task before changing its execution contract"
@@ -954,6 +1048,11 @@ def command_update(args: argparse.Namespace) -> dict[str, Any]:
         proposed = dict(tasks)
         proposed[task_id] = candidate
         ensure_acyclic(proposed)
+        index, index_diagnostics = maybe_load_index(root, table)
+        diagnostics = [
+            *index_diagnostics,
+            *task_diagnostics(candidate, proposed, states, index),
+        ]
         task_dir, _, _ = table_paths(root, table)
         atomic_write_json(task_dir / f"{task_id}.json", candidate)
     return {
@@ -961,6 +1060,8 @@ def command_update(args: argparse.Namespace) -> dict[str, Any]:
         "command": "update",
         "task_id": task_id,
         "task_revision": candidate["revision"],
+        "diagnostics": diagnostics,
+        "note": "diagnostics are advisory and do not accept or reject task semantics",
     }
 
 
@@ -1577,10 +1678,7 @@ def command_status(args: argparse.Namespace) -> dict[str, Any]:
     tasks = load_tasks(root, table)
     states = load_states(root, table, tasks)
     index, index_diagnostics = maybe_load_index(root, table)
-    result_count = 0
-    result_with_verification_count = 0
-    result_with_unresolved_count = 0
-    invalidated_source_ids: set[str] = set()
+    storage = summarize_loaded_task_storage(root, table, tasks, states)
     dependency_blocked_count = 0
     diagnostic_count = len(index_diagnostics)
     for task_id, task in tasks.items():
@@ -1595,33 +1693,24 @@ def command_status(args: argparse.Namespace) -> dict[str, Any]:
             for item in diagnostics
         ):
             dependency_blocked_count += 1
-        result = current_result(root, table, task, states[task_id])
-        if result is None:
-            continue
-        result_count += 1
-        if result.get("verification"):
-            result_with_verification_count += 1
-        if result.get("unresolved"):
-            result_with_unresolved_count += 1
-        invalidated_source_ids.update(result.get("invalidated_source_ids", []))
     semantic_summary = index.get("summary", {}) if index else {}
     return {
         "ok": True,
         "command": "status",
-        "task_count": len(tasks),
-        "status_counts": counts_for(states),
-        "needs_review_count": counts_for(states)["review"],
+        "task_count": storage["task_count"],
+        "status_counts": storage["counts"],
+        "needs_review_count": storage["counts"]["review"],
         "dependency_attention_count": dependency_blocked_count,
         "upstream": {
             "protected_baseline": index.get("protected_baseline") if index else None,
             "unresolved_count": semantic_summary.get("unresolved_count"),
             "deferred_change_count": semantic_summary.get("deferred_change_count", 0),
-            "invalidated_source_ids": sorted(invalidated_source_ids)[: args.limit],
+            "invalidated_source_ids": storage["invalidated_source_ids"][: args.limit],
         },
         "results": {
-            "current_result_count": result_count,
-            "result_with_verification_count": result_with_verification_count,
-            "result_with_unresolved_count": result_with_unresolved_count,
+            "current_result_count": storage["result_count"],
+            "result_with_verification_count": storage["result_with_verification_count"],
+            "result_with_unresolved_count": storage["result_with_unresolved_count"],
         },
         "diagnostic_count": diagnostic_count,
         "index_diagnostics": index_diagnostics,
@@ -1761,7 +1850,10 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def command_note(args: argparse.Namespace) -> dict[str, Any]:
-    if not any((args.message, args.status, args.blocked_reason, args.next_action)):
+    if all(
+        value is None
+        for value in (args.message, args.status, args.blocked_reason, args.next_action)
+    ):
         raise TaskctlError("note requires a message, status, blocked reason, or next action")
     root = resolve_root(args.task_dir)
     with workspace_lock(root):
@@ -1890,10 +1982,13 @@ def command_release(args: argparse.Namespace) -> dict[str, Any]:
         check_expected_state(state, args.expected_state_revision)
         if state["status"] == "done":
             raise TaskctlError("a completed task cannot be released")
+        if state["owner"] is None:
+            raise TaskctlError("an unowned task cannot be released")
         check_owner(state, args.owner)
         state["status"] = "todo"
         state["owner"] = None
         state["blocked_reason"] = ""
+        state["next_action"] = ""
         state = write_state(root, table, state)
     return {"ok": True, "command": "release", "id": args.id, "state": state}
 

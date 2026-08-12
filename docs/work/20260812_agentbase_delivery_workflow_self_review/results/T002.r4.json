@@ -1,0 +1,24 @@
+{
+  "changed_files": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/delivery-workflow/references/tooling.md"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "workctl 的初始化与阶段查询返回合同已与真实动作一致，组合任务进度由 taskctl 严格摘要唯一提供",
+  "outputs": [
+    "init created/pending 精确返回",
+    "带绝对 work-dir 的连字符公开阶段名 outline",
+    "taskctl task_storage_summary 驱动的 status/render",
+    "workflow/task-table 身份一致性校验"
+  ],
+  "schema": "task.result",
+  "task_id": "T002",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "python -m py_compile skills/delivery-workflow/scripts/workctl.py - passed",
+    "python -X utf8 skills/delivery-workflow/tests/test_workctl.py - 18/18 passed",
+    "真实工作区 outline current-state、status 与 render 读回通过，计数为 done=1/in_progress=1/todo=1"
+  ]
+}

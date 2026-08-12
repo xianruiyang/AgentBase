@@ -1,0 +1,26 @@
+{
+  "confirmation_ref": "user-request-2026-08-12-recheck-with-current-workflow",
+  "confirmed_by": "user",
+  "documents": {
+    "requirements": {
+      "fingerprint": "sha256:db4f79e7e9023c9e810c94918b1e2492180f5070eb02a83af6089f66c9d2e099",
+      "ids": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "CON-001",
+        "REQ-001"
+      ],
+      "path": "requirements.md"
+    },
+    "user_design": {
+      "fingerprint": "sha256:e64438ca9804d2896810bf9bbeccdec903fbf7ffc13d92766a66955c0bfdd3c3",
+      "ids": [
+        "UDES-001"
+      ],
+      "path": "user-design.md"
+    }
+  },
+  "schema": "delivery.protected-baseline",
+  "workflow_id": "agentbase-delivery-workflow-self-review"
+}

@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "reopened: T001 新事务边界需要重新实现并复跑项目验证",
+  "owner": "codex-root",
+  "result_ref": "results/T003.r9.json",
+  "revision": 9,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T003"
+}

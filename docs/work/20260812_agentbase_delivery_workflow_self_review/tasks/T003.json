@@ -1,0 +1,55 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "taskctl 改进及回归结果"
+      ],
+      "id": "T001",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "workctl 改进及回归结果"
+      ],
+      "id": "T002",
+      "type": "hard"
+    }
+  ],
+  "id": "T003",
+  "mutation_scope": [
+    "docs/work/20260812_agentbase_delivery_workflow_self_review/**",
+    ".gitignore",
+    "development/**",
+    "README.md"
+  ],
+  "outcome": "本轮全部受保护目标具有可供最终复核的直接证据，工作区缓存不污染提交，项目差异已满足提交条件",
+  "outputs": [
+    "全链路验证证据",
+    "缓存与真源分离的工作区",
+    "最终完成审计输入",
+    "可提交项目差异"
+  ],
+  "reasoning_hint": "high",
+  "revision": 3,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-003",
+    "SOL-004",
+    "GAP-007",
+    "REQ-001",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "UDES-001",
+    "DES-001",
+    "DES-004",
+    "DES-005"
+  ],
+  "suggested_skills": [
+    "change-governance"
+  ],
+  "title": "完成自举验证并形成可交付差异",
+  "verification": [
+    "运行路由、部署、插件、缓存忽略、差异与全链路验证；最终完成审计和远端同步由任务结果之后的交付步骤完成"
+  ]
+}

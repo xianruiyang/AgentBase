@@ -1,0 +1,39 @@
+{
+  "dependencies": [],
+  "id": "T001",
+  "mutation_scope": [
+    "skills/task-table-manager/**"
+  ],
+  "outcome": "taskctl 对任务存储给出唯一严格摘要，写入前验证诊断依赖的存储集合，任务写入即时返回软诊断且失败不残留本次候选，状态与结果历史边界一致",
+  "outputs": [
+    "严格任务存储摘要接口",
+    "add/update 即时软诊断",
+    "写入前完整存储验证",
+    "状态与结果历史边界修正"
+  ],
+  "reasoning_hint": "high",
+  "revision": 2,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-001",
+    "GAP-003",
+    "GAP-004",
+    "GAP-005",
+    "GAP-006",
+    "GAP-008",
+    "OBS-011",
+    "DES-003",
+    "DES-004",
+    "DES-005",
+    "AC-002",
+    "AC-003"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "收敛 taskctl 存储、诊断与写入事务",
+  "verification": [
+    "运行 taskctl 全部回归，覆盖新增/更新在既有存储损坏时不写入候选的反例"
+  ]
+}

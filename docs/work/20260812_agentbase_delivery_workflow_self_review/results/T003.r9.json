@@ -1,0 +1,33 @@
+{
+  "changed_files": [
+    ".gitignore",
+    "skills/task-table-manager/",
+    "skills/delivery-workflow/",
+    "docs/work/20260812_agentbase_delivery_workflow_self_review/"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "受影响 CLI、skill、路由、可移植部署、沙箱发布回滚和插件打包均通过验证；运行缓存与提交真源已分离，当前项目差异具备最终审计和提交条件",
+  "outputs": [
+    "taskctl 36 项回归与 workctl 18 项回归证据",
+    "两份 skill 结构校验与 38 项盲路由行为验证",
+    "可移植部署合同、沙箱发布回滚和插件打包验证",
+    ".work-cache 忽略边界与项目真源保留检查",
+    "外部 UE 项目标识污染扫描与差异格式检查"
+  ],
+  "schema": "task.result",
+  "task_id": "T003",
+  "task_revision": 3,
+  "unresolved": [],
+  "verification": [
+    "python -X utf8 skills/task-table-manager/tests/test_taskctl.py - 36/36 passed",
+    "python -X utf8 skills/delivery-workflow/tests/test_workctl.py - 18/18 passed",
+    "quick_validate.py skills/task-table-manager and skills/delivery-workflow - passed",
+    "development/skill-routing/validate_contract.ps1 - 38 cases and 13/13 skills passed",
+    "development/skill-routing/validate_behavior_results.ps1 - 38/38 passed",
+    "development/codex-deployment/manage_agentbase.ps1 -Action Validate - passed",
+    "development/codex-deployment/test_manage_agentbase.ps1 - all publish and rollback assertions true",
+    "development/plugin-packaging/build_plugin.ps1 - validation passed",
+    "git check-ignore confirms .work-cache ignored and protected baseline/tasks/state/results not ignored",
+    "project-specific pollution scan returned no matches; git diff --check passed"
+  ]
+}

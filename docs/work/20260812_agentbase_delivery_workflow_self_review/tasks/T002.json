@@ -1,0 +1,43 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "严格任务存储摘要接口"
+      ],
+      "id": "T001",
+      "type": "hard"
+    }
+  ],
+  "id": "T002",
+  "mutation_scope": [
+    "skills/delivery-workflow/**"
+  ],
+  "outcome": "workctl 返回准确的初始化和阶段查询合同，并通过 taskctl 真源生成一致任务摘要",
+  "outputs": [
+    "准确的 init/outline 返回合同",
+    "由 taskctl 验证的组合状态摘要"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-002",
+    "GAP-001",
+    "GAP-002",
+    "GAP-003",
+    "GAP-004",
+    "DES-002",
+    "DES-003",
+    "DES-005",
+    "AC-001",
+    "AC-002"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "修正 workctl 公开合同并复用任务摘要",
+  "verification": [
+    "运行 workctl 全部回归并覆盖初始化、参数、身份和孤立状态反例"
+  ]
+}
