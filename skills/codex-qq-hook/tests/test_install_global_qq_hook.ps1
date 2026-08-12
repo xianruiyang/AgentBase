@@ -32,7 +32,7 @@ if (-not $resolvedTestRoot.StartsWith($tempBase, [StringComparison]::OrdinalIgno
 
 $sourceSkillRoot = Split-Path -Parent $PSScriptRoot
 $codexRoot = Join-Path $resolvedTestRoot "codex"
-$installedSkillRoot = Join-Path $codexRoot "skills\codex-qq-hook"
+$installedSkillRoot = Join-Path $resolvedTestRoot "plugin-cache\agentbase-core\skills\codex-qq-hook"
 $workspaceRoot = Join-Path $resolvedTestRoot "workspace"
 $hooksPath = Join-Path $codexRoot "hooks.json"
 $configPath = Join-Path $codexRoot "config.toml"
@@ -42,7 +42,7 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $installedSkillRoot "scripts") | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $installedSkillRoot "templates") | Out-Null
     New-Item -ItemType Directory -Force -Path $workspaceRoot | Out-Null
-    foreach ($name in @("install_global_qq_hook.ps1", "codex_stop_qq_notify.ps1")) {
+    foreach ($name in @("install_global_qq_hook.ps1", "codex_stop_qq_notify.ps1", "resolve_codex_home.ps1")) {
         Copy-Item -LiteralPath (Join-Path $sourceSkillRoot "scripts\$name") -Destination (Join-Path $installedSkillRoot "scripts\$name")
     }
     foreach ($name in @("qq-hook-settings.template.json", "qq-hook-global-settings.template.json")) {
@@ -91,7 +91,7 @@ try {
     Write-FixtureText -Path $globalSettingsPath -Text (($settingsFixture | ConvertTo-Json -Depth 20) + [Environment]::NewLine)
 
     $installer = Join-Path $installedSkillRoot "scripts\install_global_qq_hook.ps1"
-    & $installer -ProjectRoot $workspaceRoot | Out-Null
+    & $installer -ProjectRoot $workspaceRoot -CodexRoot $codexRoot | Out-Null
 
     $installedHooks = Get-Content -LiteralPath $hooksPath -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ([string]$installedHooks.description -eq "preserve" -and [bool]$installedHooks.custom_root.keep) "installer changed unrelated top-level hook fields"
@@ -101,6 +101,7 @@ try {
     $qqHandlers = @($allStopHandlers | Where-Object { ([string]$_.command) -match 'codex_stop_qq_notify\.ps1' })
     Assert-True ($qqHandlers.Count -eq 1) "installer did not converge old QQ handlers to one handler"
     Assert-True (([string]$qqHandlers[0].command).StartsWith("pwsh.exe -NoLogo -NoProfile -NonInteractive", [StringComparison]::Ordinal)) "installer did not use the PowerShell 7 hook command"
+    Assert-True (([string]$qqHandlers[0].command).Contains("-CodexRoot `"$codexRoot`"")) "installer did not bind the hook to the explicit Codex root"
     Assert-True (@($allStopHandlers | Where-Object { [string]$_.command -eq "custom-stop" }).Count -eq 1) "installer removed an unrelated Stop handler"
     Assert-True (@($stopGroups | Where-Object { [string]$_.matcher -eq "keep-matcher" }).Count -eq 1) "installer removed an unrelated Stop matcher"
 
@@ -111,11 +112,11 @@ try {
     Assert-True ([string]$globalSettings.custom_root -eq "keep" -and [string]$globalSettings.bot.target_type -eq "group") "installer changed unrelated global QQ settings"
 
     $firstHooksHash = (Get-FileHash -LiteralPath $hooksPath -Algorithm SHA256).Hash
-    & $installer -ProjectRoot $workspaceRoot | Out-Null
+    & $installer -ProjectRoot $workspaceRoot -CodexRoot $codexRoot | Out-Null
     $secondHooksHash = (Get-FileHash -LiteralPath $hooksPath -Algorithm SHA256).Hash
     Assert-True ($firstHooksHash -eq $secondHooksHash) "installer is not idempotent"
 
-    & $installer -ProjectRoot $workspaceRoot -AppId "new-app" | Out-Null
+    & $installer -ProjectRoot $workspaceRoot -CodexRoot $codexRoot -AppId "new-app" | Out-Null
     $updatedSettings = Get-Content -LiteralPath $globalSettingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ([string]$updatedSettings.bot.app_id -eq "new-app" -and [string]$updatedSettings.bot.target_type -eq "group") "targeted AppID update changed another bot field"
 

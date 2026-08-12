@@ -427,6 +427,24 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "transform-formula-convention",
+      "kind": "positive",
+      "request": "给出 A 相对 B 以及 Fa 到 Fb 的矩阵变换公式；目标 API 使用行向量右乘。请先声明统一记法，再说明如何映射到 API，不能把另一套约定的公式直接套用。",
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
       "id": "bug-root-cause-fix",
       "kind": "positive",
       "request": "找出这个 bug 的根因并修复，证明原输入不再走错误路径。",

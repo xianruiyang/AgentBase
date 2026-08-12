@@ -99,6 +99,9 @@ try {
     $originalUserAgentHash = (Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\user-agent.toml") -Algorithm SHA256).Hash
 
     $defaultPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    if (-not [bool]$defaultPublish.skills_installed -or [bool]$defaultPublish.hooks_installed -or [bool]$defaultPublish.portable_settings_installed) {
+        throw "Default publish reported an inconsistent direct-compatibility payload"
+    }
     if ([bool]$defaultPublish.portable_settings_installed) {
         throw "Default publish unexpectedly installed portable settings"
     }
@@ -119,6 +122,10 @@ try {
     })
     if ($installedRuntimeArtifacts.Count -ne 0) {
         throw "Default publish copied runtime artifacts into the Codex skill payload"
+    }
+    $defaultStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    if (-not [bool]$defaultStatus.managed_payload_formally_published) {
+        throw "Status did not recognize the current direct-compatibility publish"
     }
     & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $defaultPublish.backup_path | Out-Null
 
@@ -169,6 +176,9 @@ try {
             throw "Portable custom agent is missing from the rollback manifest: $agentName"
         }
     }
+    if ([int]$manifest.schema_version -ne 2 -or [string]::IsNullOrWhiteSpace([string]$manifest.behavior_evidence_sha256)) {
+        throw "Publish manifest is missing the current blind behavior evidence receipt"
+    }
 
     $installedCacheRoot = Join-Path $codexRoot "skills\codex-event-logger\tests\__pycache__"
     New-Item -ItemType Directory -Path $installedCacheRoot -Force | Out-Null
@@ -199,6 +209,50 @@ try {
         throw "Rollback removed the unrelated user skill"
     }
 
+    $pluginConflictSkill = Join-Path $codexRoot "skills\codex-event-logger"
+    New-Item -ItemType Directory -Path $pluginConflictSkill -Force | Out-Null
+    Write-FixtureText -Path (Join-Path $pluginConflictSkill "SKILL.md") -Text ("direct compatibility conflict" + [Environment]::NewLine)
+    $pluginConflictStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings -SkillDeliveryMode Plugin
+    if ([bool]$pluginConflictStatus.plugin_mode_ready -or [int]$pluginConflictStatus.direct_compatibility_conflict_count -ne 1 -or [bool]$pluginConflictStatus.managed_payload_formally_published) {
+        throw "Plugin status did not expose the direct-compatibility conflict"
+    }
+    $pluginConflictRejected = $false
+    try {
+        & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings -SkillDeliveryMode Plugin | Out-Null
+    }
+    catch {
+        $pluginConflictRejected = $_.Exception.Message -like "Plugin delivery mode requires the direct-compatibility skills*"
+    }
+    if (-not $pluginConflictRejected) {
+        throw "Plugin delivery mode did not reject a duplicate direct skill"
+    }
+    Remove-Item -LiteralPath $pluginConflictSkill -Recurse -Force
+
+    $pluginPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings -SkillDeliveryMode Plugin
+    if ([bool]$pluginPublish.skills_installed -or [bool]$pluginPublish.hooks_installed -or -not [bool]$pluginPublish.plugin_installation_must_be_verified_separately) {
+        throw "Plugin delivery mode reported an inconsistent managed payload"
+    }
+    $pluginManagedSkill = Join-Path $codexRoot "skills\codex-event-logger"
+    if (Test-Path -LiteralPath $pluginManagedSkill) {
+        throw "Plugin delivery mode installed direct skill payloads"
+    }
+    if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "hooks.json") -Algorithm SHA256).Hash -ne $originalHooksHash) {
+        throw "Plugin delivery mode changed global hooks instead of using bundled plugin hooks"
+    }
+    $pluginManifest = Get-Content -LiteralPath (Join-Path $pluginPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $pluginTargets = @($pluginManifest.targets.relative_path)
+    if ($pluginTargets -contains "hooks.json" -or @($pluginTargets | Where-Object { $_ -like "skills\*" }).Count -ne 0) {
+        throw "Plugin delivery manifest contains direct skills or hooks"
+    }
+    $pluginStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings -SkillDeliveryMode Plugin
+    if (-not [bool]$pluginStatus.managed_payload_formally_published -or [bool]$pluginStatus.plugin_installation_inspected -or -not [bool]$pluginStatus.plugin_mode_ready -or [int]$pluginStatus.direct_compatibility_conflict_count -ne 0) {
+        throw "Plugin delivery status did not distinguish the managed payload from external plugin installation"
+    }
+    & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $pluginPublish.backup_path | Out-Null
+    if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "AGENTS.md") -Algorithm SHA256).Hash -ne $originalAgentsHash) {
+        throw "Plugin delivery rollback did not restore AGENTS.md"
+    }
+
     $succeeded = $true
     [pscustomobject]@{
         default_publish_preserved_settings = $true
@@ -208,6 +262,9 @@ try {
         rollback_restored_settings = $true
         runtime_artifacts_excluded = $true
         runtime_cache_ignored_for_rollback_drift = $true
+        status_derived_from_manifest_and_fingerprints = $true
+        plugin_delivery_rejected_parallel_direct_entry = $true
+        plugin_delivery_omitted_direct_skills_and_hooks = $true
         unrelated_skill_preserved = $true
         unrelated_agent_preserved = $true
         explicit_target_count = $manifestTargets.Count

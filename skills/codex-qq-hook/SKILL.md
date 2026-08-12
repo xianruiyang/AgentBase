@@ -1,6 +1,6 @@
 ---
 name: codex-qq-hook
-description: 配置和排查 Codex QQ 完成提醒。用于用户明确要求开启、关闭或只读查看当前工作区/当前对话的提醒开关，安装或迁移 QQ hook，设置机器人与目标账号，或排查未发送链路时；状态查询不得创建或改写配置，提醒默认关闭，只有显式开启的对话才加入 enabled_thread_ids。
+description: 配置和排查 Codex QQ 完成提醒。用于用户明确要求开启、关闭或只读查看当前工作区/当前对话的提醒开关，安装或迁移 QQ hook，设置机器人与目标账号，或排查未发送链路时；故障链路原因未确认时同时使用 change-governance 做根因裁决；状态查询不得创建或改写配置，提醒默认关闭，只有显式开启的对话才加入 enabled_thread_ids。
 ---
 
 # Codex QQ Hook
@@ -12,7 +12,7 @@ description: 配置和排查 Codex QQ 完成提醒。用于用户明确要求开
 - 开启、关闭或查看工作区/对话开关：直接按本文件执行；`status` 始终只读。
 - 安装、刷新或迁移 hook：完整读取 [setup.md](references/setup.md)。
 - 设置或更换机器人、目标 QQ 用户、OpenID、AppID 或 AppSecret：完整读取 [global-bot.md](references/global-bot.md)。
-- 排查未收到提醒、hook 链路或日志：完整读取 [troubleshooting.md](references/troubleshooting.md)。
+- 排查未收到提醒、hook 链路或日志：同时使用 `$change-governance` 并读取其 `causal-analysis.md`，再完整读取 [troubleshooting.md](references/troubleshooting.md)。
 
 ## 配置文件
 

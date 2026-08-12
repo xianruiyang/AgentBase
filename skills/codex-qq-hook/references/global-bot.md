@@ -46,7 +46,7 @@ $SkillDir = '<skill_dir>'
 & (Join-Path $SkillDir 'scripts\qq_ws_openid_capture.ps1')
 ```
 
-`<skill_dir>` 是当前 skill 目录；`<CodexRoot>` 由它向上两级得到。
+`<skill_dir>` 是当前 skill 目录；`<CodexRoot>` 由安装时的显式参数、`CODEX_HOME` 或默认用户 Codex 目录确定，不从 skill 目录层级反推。
 
 看到 `Identify sent` 后，让目标 QQ 用户扫码聊天并给机器人发一句私聊，读取输出中的 `QQ_BOT_OPENID=...`。
 

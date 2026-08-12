@@ -1,22 +1,27 @@
 param(
-    [ValidateSet("Validate", "Publish", "Rollback")]
+    [ValidateSet("Validate", "Status", "Publish", "Rollback")]
     [string]$Action = "Validate",
     [string]$ProjectRoot,
     [string]$CodexRoot,
     [string]$BackupPath,
     [switch]$AllowInstalledDrift,
-    [switch]$InstallPortableSettings
+    [switch]$InstallPortableSettings,
+    [ValidateSet("DirectCompatibility", "Plugin")]
+    [string]$SkillDeliveryMode = "DirectCompatibility"
 )
 
 $ErrorActionPreference = "Stop"
+
+$payloadContractPath = Join-Path (Split-Path -Parent $PSScriptRoot) "common\payload_contract.ps1"
+. $payloadContractPath
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 }
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 
-if ($InstallPortableSettings -and $Action -ne "Publish") {
-    throw "InstallPortableSettings is valid only with Action Publish"
+if ($InstallPortableSettings -and @("Publish", "Status") -notcontains $Action) {
+    throw "InstallPortableSettings is valid only with Action Publish or Status"
 }
 
 function Assert-ChildPath {
@@ -48,81 +53,6 @@ function Get-TextSha256 {
     }
 }
 
-function Test-IsExcludedDeploymentArtifact {
-    param(
-        [string]$RelativePath
-    )
-
-    $segments = @($RelativePath.Replace('\', '/').Split('/', [StringSplitOptions]::RemoveEmptyEntries))
-    $excludedDirectories = @(
-        ".codex",
-        ".mypy_cache",
-        ".pytest_cache",
-        ".ruff_cache",
-        ".tox",
-        "__pycache__",
-        "codexRuntimeLogFile",
-        "coverage",
-        "dist",
-        "htmlcov",
-        "node_modules",
-        "target"
-    )
-    for ($index = 0; $index -lt ($segments.Count - 1); $index++) {
-        if ($excludedDirectories -contains $segments[$index]) {
-            return $true
-        }
-    }
-
-    $leaf = if ($segments.Count -eq 0) { "" } else { $segments[-1] }
-    if ($leaf -in @(".DS_Store", ".coverage", "Thumbs.db", "desktop.ini")) {
-        return $true
-    }
-    return $leaf -match '(?i)\.(log|pyc|pyo|temp|tmp)$' -or $leaf -match '^\.coverage\.'
-}
-
-function Get-DeploymentPayloadFiles {
-    param(
-        [string]$Root
-    )
-
-    $rootItem = Get-Item -LiteralPath $Root -Force
-    if (-not $rootItem.PSIsContainer -or ($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-        throw "Deployment payload root must be a real directory: $Root"
-    }
-    $rootFull = $rootItem.FullName.TrimEnd('\')
-    return @(Get-ChildItem -LiteralPath $rootFull -Recurse -Force -File | ForEach-Object {
-        if (($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-            throw "Refusing to deploy a reparse point: $($_.FullName)"
-        }
-        $relativePath = $_.FullName.Substring($rootFull.Length + 1).Replace('\', '/')
-        if (-not (Test-IsExcludedDeploymentArtifact -RelativePath $relativePath)) {
-            $_
-        }
-    } | Sort-Object FullName)
-}
-
-function Copy-DeploymentPayloadDirectory {
-    param(
-        [string]$SourcePath,
-        [string]$DestinationPath
-    )
-
-    $sourceRoot = (Get-Item -LiteralPath $SourcePath -Force).FullName.TrimEnd('\')
-    New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
-    $destinationRoot = (Get-Item -LiteralPath $DestinationPath -Force).FullName.TrimEnd('\')
-    foreach ($sourceFile in @(Get-DeploymentPayloadFiles -Root $sourceRoot)) {
-        $relativePath = $sourceFile.FullName.Substring($sourceRoot.Length + 1)
-        $destinationFile = Join-Path $destinationRoot $relativePath
-        Assert-ChildPath -Root $destinationRoot -Path $destinationFile -Label "Staged payload file"
-        $destinationParent = Split-Path -Parent $destinationFile
-        if (-not (Test-Path -LiteralPath $destinationParent -PathType Container)) {
-            New-Item -ItemType Directory -Path $destinationParent -Force | Out-Null
-        }
-        Copy-Item -LiteralPath $sourceFile.FullName -Destination $destinationFile -Force
-    }
-}
-
 function Get-PathFingerprint {
     param(
         [string]$Path
@@ -141,7 +71,7 @@ function Get-PathFingerprint {
     }
 
     $root = $item.FullName.TrimEnd('\')
-    $records = @(Get-DeploymentPayloadFiles -Root $root | ForEach-Object {
+    $records = @(Get-AgentBasePayloadFiles -Root $root | ForEach-Object {
         $relativePath = $_.FullName.Substring($root.Length + 1).Replace('\', '/')
         "$relativePath|$($_.Length)|$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)"
     })
@@ -208,6 +138,141 @@ function Write-JsonFile {
     Write-Utf8NoBomFile -Path $Path -Text ($json + [Environment]::NewLine)
 }
 
+function Get-ValidatedBehaviorEvidence {
+    param(
+        [string]$Root
+    )
+
+    $evidencePath = Join-Path $Root "development\skill-routing\evidence\current.json"
+    if (-not (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
+        throw "Current blind behavior evidence is missing: $evidencePath"
+    }
+    $evidenceItem = Get-Item -LiteralPath $evidencePath -Force
+    if (($evidenceItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Current blind behavior evidence must be a real file: $evidencePath"
+    }
+
+    & (Join-Path $Root "development\skill-routing\validate_behavior_results.ps1") -ProjectRoot $Root -ResultsPath $evidencePath | Out-Null
+    $evidence = Get-Content -LiteralPath $evidencePath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace([string]$evidence.evaluator)) {
+        throw "Current blind behavior evidence does not identify its evaluator"
+    }
+    return [pscustomobject]@{
+        path = $evidenceItem.FullName
+        sha256 = (Get-FileHash -LiteralPath $evidenceItem.FullName -Algorithm SHA256).Hash
+        evaluator = [string]$evidence.evaluator
+        candidate_bundle_sha256 = [string]$evidence.candidate_bundle_sha256
+        evaluation_input_sha256 = [string]$evidence.evaluation_input_sha256
+        case_count = @($evidence.cases).Count
+    }
+}
+
+function Get-LatestPublishedManifest {
+    param(
+        [string]$InstallRoot,
+        [string]$DeliveryMode,
+        [bool]$PortableSettingsInstalled
+    )
+
+    $backupsRoot = Join-Path $InstallRoot "backups"
+    if (-not (Test-Path -LiteralPath $backupsRoot -PathType Container)) {
+        return $null
+    }
+
+    foreach ($backupDirectory in @(Get-ChildItem -LiteralPath $backupsRoot -Directory -Filter "AgentBase-*" -Force | Sort-Object Name -Descending | Select-Object -First 200)) {
+        if (($backupDirectory.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            continue
+        }
+        $manifestPath = Join-Path $backupDirectory.FullName "manifest.json"
+        if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+            continue
+        }
+        $manifestItem = Get-Item -LiteralPath $manifestPath -Force
+        if (($manifestItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            continue
+        }
+        try {
+            $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        }
+        catch {
+            continue
+        }
+        if ([string]$manifest.state -ne "published" -or @(1, 2) -notcontains [int]$manifest.schema_version) {
+            continue
+        }
+        if (-not [string]::Equals([IO.Path]::GetFullPath([string]$manifest.codex_root), [IO.Path]::GetFullPath($InstallRoot), [StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+        $manifestMode = if ($manifest.PSObject.Properties.Name -contains "skill_delivery_mode") {
+            [string]$manifest.skill_delivery_mode
+        }
+        else {
+            "DirectCompatibility"
+        }
+        if ($manifestMode -ne $DeliveryMode -or [bool]$manifest.portable_settings_installed -ne $PortableSettingsInstalled) {
+            continue
+        }
+        return [pscustomobject]@{
+            path = $manifestItem.FullName
+            document = $manifest
+        }
+    }
+    return $null
+}
+
+function Get-PluginModeDirectCompatibilityConflicts {
+    param(
+        [string]$InstallRoot,
+        [object[]]$RequiredSkills
+    )
+
+    $conflicts = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($skill in @($RequiredSkills)) {
+        $relativePath = "skills\$([string]$skill)"
+        if (Test-Path -LiteralPath (Join-Path $InstallRoot $relativePath)) {
+            $conflicts.Add($relativePath)
+        }
+    }
+
+    $hooksPath = Join-Path $InstallRoot "hooks.json"
+    if (Test-Path -LiteralPath $hooksPath -PathType Leaf) {
+        $hooksItem = Get-Item -LiteralPath $hooksPath -Force
+        if (($hooksItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            $conflicts.Add("hooks.json (unverified reparse point)")
+        }
+        else {
+            try {
+                $hooksDocument = Get-Content -LiteralPath $hooksPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                $hasAgentBaseHook = $false
+                if ($hooksDocument.PSObject.Properties.Name -contains "hooks") {
+                    foreach ($eventProperty in @($hooksDocument.hooks.PSObject.Properties)) {
+                        foreach ($group in @($eventProperty.Value)) {
+                            foreach ($handler in @($group.hooks)) {
+                                foreach ($commandProperty in @("command", "commandWindows")) {
+                                    if ($handler.PSObject.Properties.Name -contains $commandProperty) {
+                                        $commandText = [string]$handler.$commandProperty
+                                        if ($commandText -match '(?i)(codex-event-logger|codex-qq-hook)') {
+                                            $hasAgentBaseHook = $true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if ($hasAgentBaseHook) {
+                    $conflicts.Add("hooks.json (AgentBase direct hook)")
+                }
+            }
+            catch {
+                # Plugin delivery does not own unrelated global hooks. An unreadable file is
+                # handled by the host; it is not evidence of an AgentBase direct-hook conflict.
+            }
+        }
+    }
+    return @($conflicts)
+}
+
 function Get-ReversedArray {
     param(
         [object]$Values
@@ -251,6 +316,7 @@ function Test-PortableConfigSource {
         'personality = "pragmatic"'
         'sandbox_mode = "danger-full-access"'
         'service_tier = "priority"'
+        'project_doc_max_bytes = 65536'
         '[agents]'
         'enabled = true'
         'default_subagent_model = "gpt-5.6-luna"'
@@ -378,8 +444,8 @@ function Test-HooksTemplateSource {
         throw "Portable hooks template contains a machine path or a sensitive setting"
     }
     $placeholderCount = [regex]::Matches($raw, '\{\{CODEX_ROOT\}\}').Count
-    if ($placeholderCount -ne 10) {
-        throw "Portable hooks template must contain exactly 10 Codex-root placeholders; found $placeholderCount"
+    if ($placeholderCount -ne 12) {
+        throw "Portable hooks template must contain exactly 12 Codex-root placeholders; found $placeholderCount"
     }
 
     $expectedEvents = @("PostToolUse", "PreToolUse", "Stop", "UserPromptSubmit")
@@ -394,7 +460,7 @@ function Test-HooksTemplateSource {
         PostToolUse = 1
     }
     $eventLoggerCommand = 'pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{{CODEX_ROOT}}\skills\codex-event-logger\scripts\codex_event_logger.ps1"'
-    $qqCommand = 'pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{{CODEX_ROOT}}\skills\codex-qq-hook\scripts\codex_stop_qq_notify.ps1"'
+    $qqCommand = 'pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{{CODEX_ROOT}}\skills\codex-qq-hook\scripts\codex_stop_qq_notify.ps1" -CodexRoot "{{CODEX_ROOT}}"'
     $allowedCommands = @($eventLoggerCommand, $qqCommand)
     foreach ($eventName in $expectedEvents) {
         $groups = @($document.hooks.$eventName)
@@ -444,10 +510,13 @@ function Get-ValidatedSource {
     param(
         [string]$Root,
         [string]$InstallRoot,
-        [bool]$IncludePortableSettings
+        [bool]$IncludePortableSettings,
+        [ValidateSet("DirectCompatibility", "Plugin")]
+        [string]$DeliveryMode
     )
 
     & (Join-Path $Root "development\skill-routing\validate_contract.ps1") -ProjectRoot $Root | Out-Null
+    $behaviorEvidence = Get-ValidatedBehaviorEvidence -Root $Root
     $hostBootstrapPath = Join-Path $Root "development\codex-deployment\bootstrap_windows.ps1"
     if (-not (Test-Path -LiteralPath $hostBootstrapPath -PathType Leaf)) {
         throw "Windows host bootstrap is missing: $hostBootstrapPath"
@@ -504,15 +573,17 @@ function Get-ValidatedSource {
         installed_path = if ([string]::IsNullOrWhiteSpace($InstallRoot)) { $null } else { Join-Path $InstallRoot "AGENTS.md" }
         kind = "file"
     })
-    foreach ($skill in @($contract.required_skills)) {
-        $relativePath = "skills\$skill"
-        $targets.Add([pscustomobject]@{
-            relative_path = $relativePath
-            source_path = Join-Path (Join-Path $Root "skills") ([string]$skill)
-            source_text = $null
-            installed_path = if ([string]::IsNullOrWhiteSpace($InstallRoot)) { $null } else { Join-Path $InstallRoot $relativePath }
-            kind = "directory"
-        })
+    if ($DeliveryMode -eq "DirectCompatibility") {
+        foreach ($skill in @($contract.required_skills)) {
+            $relativePath = "skills\$skill"
+            $targets.Add([pscustomobject]@{
+                relative_path = $relativePath
+                source_path = Join-Path (Join-Path $Root "skills") ([string]$skill)
+                source_text = $null
+                installed_path = if ([string]::IsNullOrWhiteSpace($InstallRoot)) { $null } else { Join-Path $InstallRoot $relativePath }
+                kind = "directory"
+            })
+        }
     }
     if ($IncludePortableSettings) {
         if ([string]::IsNullOrWhiteSpace($InstallRoot)) {
@@ -525,13 +596,15 @@ function Get-ValidatedSource {
             installed_path = Join-Path $InstallRoot "config.toml"
             kind = "file"
         })
-        $targets.Add([pscustomobject]@{
-            relative_path = "hooks.json"
-            source_path = $hooksTemplatePath
-            source_text = Get-ResolvedHooksText -TemplatePath $hooksTemplatePath -InstallRoot $InstallRoot
-            installed_path = Join-Path $InstallRoot "hooks.json"
-            kind = "file"
-        })
+        if ($DeliveryMode -eq "DirectCompatibility") {
+            $targets.Add([pscustomobject]@{
+                relative_path = "hooks.json"
+                source_path = $hooksTemplatePath
+                source_text = Get-ResolvedHooksText -TemplatePath $hooksTemplatePath -InstallRoot $InstallRoot
+                installed_path = Join-Path $InstallRoot "hooks.json"
+                kind = "file"
+            })
+        }
         foreach ($portableAgentFile in $portableAgentFiles) {
             $relativePath = "agents\$($portableAgentFile.Name)"
             $targets.Add([pscustomobject]@{
@@ -564,6 +637,10 @@ function Get-ValidatedSource {
         portable_agents_path = $portableAgentsPath
         portable_agent_names = @($portableAgentFiles.BaseName)
         host_bootstrap_path = $hostBootstrapPath
+        behavior_evidence = $behaviorEvidence
+        skill_delivery_mode = $DeliveryMode
+        skills_managed = $DeliveryMode -eq "DirectCompatibility"
+        hooks_managed = $IncludePortableSettings -and $DeliveryMode -eq "DirectCompatibility"
     }
 }
 
@@ -595,10 +672,11 @@ function Resolve-CodexRoot {
 }
 
 if ($Action -eq "Validate") {
-    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $null -IncludePortableSettings $false
+    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $null -IncludePortableSettings $false -DeliveryMode $SkillDeliveryMode
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
     [pscustomobject]@{
         action = "Validate"
+        skill_delivery_mode = $SkillDeliveryMode
         source_bundle_sha256 = $sourceFingerprint
         global_bytes = (Get-Item -LiteralPath (Join-Path $ProjectRoot "global\AGENTS.md")).Length
         skill_count = @($source.contract.required_skills).Count
@@ -610,18 +688,68 @@ if ($Action -eq "Validate") {
         portable_agents = $source.portable_agents_path
         portable_agent_count = @($source.portable_agent_names).Count
         host_bootstrap = $source.host_bootstrap_path
+        behavior_evidence = $source.behavior_evidence.path
+        behavior_evidence_sha256 = $source.behavior_evidence.sha256
+        behavior_case_count = $source.behavior_evidence.case_count
     }
     return
 }
 
 $CodexRoot = Resolve-CodexRoot -RequestedRoot $CodexRoot -Create ($Action -eq "Publish")
 
+if ($Action -eq "Status") {
+    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode
+    $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
+    $installedFingerprint = Get-BundleFingerprint -Targets $source.targets -Side installed
+    $directCompatibilityConflicts = if ($SkillDeliveryMode -eq "Plugin") {
+        @(Get-PluginModeDirectCompatibilityConflicts -InstallRoot $CodexRoot -RequiredSkills @($source.contract.required_skills))
+    }
+    else {
+        @()
+    }
+    $pluginModeReady = $SkillDeliveryMode -ne "Plugin" -or $directCompatibilityConflicts.Count -eq 0
+    $publishRecord = Get-LatestPublishedManifest -InstallRoot $CodexRoot -DeliveryMode $SkillDeliveryMode -PortableSettingsInstalled ([bool]$InstallPortableSettings)
+    $manifest = if ($null -eq $publishRecord) { $null } else { $publishRecord.document }
+    $manifestMatchesSource = $null -ne $manifest -and [string]$manifest.source_bundle_sha256 -eq $sourceFingerprint
+    $manifestMatchesInstalled = $null -ne $manifest -and [string]$manifest.installed_bundle_sha256 -eq $installedFingerprint
+    $manifestEvidenceMatches = $null -ne $manifest -and
+        $manifest.PSObject.Properties.Name -contains "behavior_evidence_sha256" -and
+        [string]$manifest.behavior_evidence_sha256 -eq [string]$source.behavior_evidence.sha256
+    $installedMatchesSource = $installedFingerprint -eq $sourceFingerprint
+    [pscustomobject]@{
+        action = "Status"
+        codex_root = $CodexRoot
+        skill_delivery_mode = $SkillDeliveryMode
+        portable_settings_in_scope = [bool]$InstallPortableSettings
+        source_bundle_sha256 = $sourceFingerprint
+        installed_bundle_sha256 = $installedFingerprint
+        installed_matches_source = $installedMatchesSource
+        latest_publish_manifest = if ($null -eq $publishRecord) { $null } else { $publishRecord.path }
+        manifest_matches_source = $manifestMatchesSource
+        manifest_matches_installed = $manifestMatchesInstalled
+        manifest_matches_behavior_evidence = $manifestEvidenceMatches
+        managed_payload_formally_published = $installedMatchesSource -and $manifestMatchesSource -and $manifestMatchesInstalled -and $manifestEvidenceMatches -and $pluginModeReady
+        plugin_installation_in_scope = $SkillDeliveryMode -eq "Plugin"
+        plugin_installation_inspected = $false
+        plugin_mode_ready = if ($SkillDeliveryMode -eq "Plugin") { $pluginModeReady } else { $null }
+        direct_compatibility_conflict_count = $directCompatibilityConflicts.Count
+        direct_compatibility_conflicts = @($directCompatibilityConflicts)
+    }
+    return
+}
+
 if ($Action -eq "Publish") {
-    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings)
+    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode
+    if ($SkillDeliveryMode -eq "Plugin") {
+        $directCompatibilityConflicts = @(Get-PluginModeDirectCompatibilityConflicts -InstallRoot $CodexRoot -RequiredSkills @($source.contract.required_skills))
+        if ($directCompatibilityConflicts.Count -gt 0) {
+            throw "Plugin delivery mode requires the direct-compatibility skills and AgentBase global hooks to be removed or rolled back first. Conflicts: $($directCompatibilityConflicts -join ', ')"
+        }
+    }
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
     $stageRoot = Join-Path $CodexRoot (".agentbase-stage-" + [guid]::NewGuid().ToString("N"))
     Assert-ChildPath -Root $CodexRoot -Path $stageRoot -Label "Stage path"
-    New-Item -ItemType Directory -Path (Join-Path $stageRoot "skills") -Force | Out-Null
+    New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
 
     $backedUp = New-Object 'System.Collections.Generic.List[string]'
     $installed = New-Object 'System.Collections.Generic.List[string]'
@@ -638,7 +766,7 @@ if ($Action -eq "Publish") {
                 Write-Utf8NoBomFile -Path $stagePath -Text ([string]$target.source_text)
             }
             elseif ($target.kind -eq "directory") {
-                Copy-DeploymentPayloadDirectory -SourcePath $target.source_path -DestinationPath $stagePath
+                Copy-AgentBasePayloadDirectory -SourcePath $target.source_path -DestinationPath $stagePath
             }
             else {
                 Copy-Item -LiteralPath $target.source_path -Destination $stagePath -Recurse -Force
@@ -663,15 +791,24 @@ if ($Action -eq "Publish") {
             }
         })
         $manifest = [ordered]@{
-            schema_version = 1
+            schema_version = 2
             state = "prepared"
             created_at_utc = [DateTime]::UtcNow.ToString("o")
             project_root = $ProjectRoot
             codex_root = $CodexRoot
             source_bundle_sha256 = $sourceFingerprint
+            skill_delivery_mode = $SkillDeliveryMode
+            skills_installed = [bool]$source.skills_managed
+            hooks_installed = [bool]$source.hooks_managed
             portable_settings_sha256 = $source.portable_settings_sha256
             portable_settings_installed = [bool]$InstallPortableSettings
             portable_agent_names = @($source.portable_agent_names)
+            behavior_evidence_path = $source.behavior_evidence.path.Substring($ProjectRoot.Length + 1).Replace('\', '/')
+            behavior_evidence_sha256 = $source.behavior_evidence.sha256
+            behavior_evaluator = $source.behavior_evidence.evaluator
+            behavior_candidate_bundle_sha256 = $source.behavior_evidence.candidate_bundle_sha256
+            behavior_evaluation_input_sha256 = $source.behavior_evidence.evaluation_input_sha256
+            behavior_case_count = $source.behavior_evidence.case_count
             installed_bundle_sha256 = $null
             targets = $targetStates
             backed_up_targets = @()
@@ -757,11 +894,17 @@ if ($Action -eq "Publish") {
     [pscustomobject]@{
         action = "Publish"
         codex_root = $CodexRoot
+        skill_delivery_mode = $SkillDeliveryMode
         source_bundle_sha256 = $sourceFingerprint
         backup_path = Split-Path -Parent $manifestPath
         mcp_changed = $false
+        skills_installed = [bool]$source.skills_managed
+        hooks_installed = [bool]$source.hooks_managed
+        plugin_installation_managed = $false
+        plugin_installation_must_be_verified_separately = $SkillDeliveryMode -eq "Plugin"
         portable_settings_installed = [bool]$InstallPortableSettings
         portable_agent_count = if ($InstallPortableSettings) { @($source.portable_agent_names).Count } else { 0 }
+        behavior_evidence_sha256 = $source.behavior_evidence.sha256
     }
     return
 }
@@ -777,7 +920,7 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw "Backup manifest is missing: $manifestPath"
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($manifest.schema_version -ne 1 -or [string]$manifest.state -ne "published") {
+if (@(1, 2) -notcontains [int]$manifest.schema_version -or [string]$manifest.state -ne "published") {
     throw "Backup is not in a publish state that can be rolled back: $($manifest.state)"
 }
 if (-not [string]::Equals([IO.Path]::GetFullPath([string]$manifest.codex_root), [IO.Path]::GetFullPath($CodexRoot), [StringComparison]::OrdinalIgnoreCase)) {

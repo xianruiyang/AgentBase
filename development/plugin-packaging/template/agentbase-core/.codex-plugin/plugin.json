@@ -1,6 +1,6 @@
 {
   "name": "agentbase-core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AgentBase 关键基础工具与工程治理 skill 的本地可发布集合。",
   "author": {
     "name": "AgentBase maintainers"
@@ -13,6 +13,8 @@
     "developerName": "AgentBase maintainers",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "使用 AgentBase Core 中匹配当前任务的 skill，并遵守其触发边界。"
+    "defaultPrompt": [
+      "使用 AgentBase Core 中匹配当前任务的 skill，并遵守其触发边界。"
+    ]
   }
 }

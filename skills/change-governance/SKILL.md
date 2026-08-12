@@ -1,6 +1,6 @@
 ---
 name: change-governance
-description: 为复杂变更裁决根因证据、职责或权威入口归属、迁移兼容、共享阻断门禁和跨契约完成审计。用于 bug 根因诊断与修复、架构或跨模块重构、正式入口或权威来源迁移、临时方案转正、project-metadata.md/file-metadata.md 维护、共享门禁设计，以及用户明确要求或普通完成判断无法覆盖的完整差距与完成审计；不用于规格已完整的普通实现、常规局部验证、单步机械修改、普通文档编辑、普通问答或仅因任务结束而产生的完成声明。
+description: 为复杂变更裁决根因证据、职责或权威入口归属、迁移兼容、共享阻断门禁和跨契约完成审计。用于 bug 或故障链路根因诊断与修复、多个入口或第二状态源的方案裁决、架构或跨模块重构、正式入口或权威来源迁移、临时路径的风险评审、转正与退出条件、project-metadata.md/file-metadata.md 维护、共享门禁设计，以及用户明确要求或普通完成判断无法覆盖的完整差距与完成审计；不用于规格已完整的普通实现、常规局部验证、单步机械修改、普通文档编辑、普通问答或仅因任务结束而产生的完成声明。
 ---
 
 # Change Governance
@@ -9,8 +9,8 @@ description: 为复杂变更裁决根因证据、职责或权威入口归属、�
 
 ## 选择参考
 
-- 根因、系统机制、反复失效、差距或上游判断会改变动作时，完整读取 [causal-analysis.md](references/causal-analysis.md)。
-- 职责或权威入口变化、迁移兼容、原型转正或临时绕行时，完整读取 [lifecycle-and-entry.md](references/lifecycle-and-entry.md)。
+- bug 或故障链路的根因、系统机制、反复失效、差距或上游判断会改变动作时，完整读取 [causal-analysis.md](references/causal-analysis.md)。
+- 多个入口或第二状态源的方案裁决、职责或权威入口变化、迁移兼容、原型转正、临时路径风险评审或绕行退出条件时，完整读取 [lifecycle-and-entry.md](references/lifecycle-and-entry.md)。
 - 维护 `project-metadata.md`、`file-metadata.md` 或重构同类长期状态记录时，完整读取 [records-and-metadata.md](references/records-and-metadata.md)。
 - 需要证明反复失效、循环依赖或其他已修复机制确实改变，裁决测试 oracle，设计共享阻断门禁，或执行跨契约完成审计时，完整读取 [verification-and-gates.md](references/verification-and-gates.md)。
 - 同一任务跨越多个边界时读取所有对应文件；不要加载无关参考。

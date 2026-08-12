@@ -26,8 +26,8 @@
           },
           {
             "type": "command",
-            "command": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-qq-hook\\scripts\\codex_stop_qq_notify.ps1\"",
-            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-qq-hook\\scripts\\codex_stop_qq_notify.ps1\"",
+            "command": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-qq-hook\\scripts\\codex_stop_qq_notify.ps1\" -CodexRoot \"{{CODEX_ROOT}}\"",
+            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{{CODEX_ROOT}}\\skills\\codex-qq-hook\\scripts\\codex_stop_qq_notify.ps1\" -CodexRoot \"{{CODEX_ROOT}}\"",
             "timeout": 30,
             "statusMessage": "Sending QQ completion notification"
           }

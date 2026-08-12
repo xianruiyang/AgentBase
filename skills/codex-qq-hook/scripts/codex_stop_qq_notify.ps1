@@ -1,4 +1,10 @@
+param(
+    [string]$CodexRoot
+)
+
 $ErrorActionPreference = "Stop"
+
+. (Join-Path $PSScriptRoot "resolve_codex_home.ps1")
 
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 [Console]::InputEncoding = $utf8
@@ -107,8 +113,7 @@ $workspaceCodexDir = Join-Path $workspaceRoot ".codex"
 $configPath = Join-Path $workspaceCodexDir "qq-hook-settings.json"
 $workspaceDebugPath = Join-Path $workspaceCodexDir "qq-hook-debug.jsonl"
 $skillRoot = Split-Path -Parent $PSScriptRoot
-$skillsDir = Split-Path -Parent $skillRoot
-$codexHome = Split-Path -Parent $skillsDir
+$codexHome = Resolve-AgentBaseCodexHome -RequestedRoot $CodexRoot
 $globalSettingsPath = Join-Path $codexHome "qq-hook-global-settings.json"
 $globalDebugPath = Join-Path $codexHome "qq-hook-debug.jsonl"
 $templatePath = Join-Path $skillRoot "templates\qq-hook-settings.template.json"

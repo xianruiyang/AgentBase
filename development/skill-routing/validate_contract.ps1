@@ -57,6 +57,12 @@ $globalPath = Join-Path $ProjectRoot "global\AGENTS.md"
 $globalItem = Get-Item -LiteralPath $globalPath
 $globalContent = Get-Content -LiteralPath $globalPath -Raw -Encoding UTF8
 Assert-True ($globalItem.Length -le [int]$contract.global_max_bytes) "Global AGENTS.md is $($globalItem.Length) bytes; contract limit is $($contract.global_max_bytes)"
+$projectAgentsPath = Join-Path $ProjectRoot "AGENTS.md"
+$projectAgentsItem = Get-Item -LiteralPath $projectAgentsPath
+$projectAgentsContent = Get-Content -LiteralPath $projectAgentsPath -Raw -Encoding UTF8
+$combinedInstructionBytes = $globalItem.Length + $projectAgentsItem.Length
+Assert-True ($combinedInstructionBytes -le 28672) "AgentBase global and project AGENTS.md files use $combinedInstructionBytes bytes; keep at least 4 KiB below Codex's default 32 KiB project instruction limit"
+Assert-True ($projectAgentsContent.Contains("本仓库文件本身不创建 Git 外部写授权")) "Project AGENTS.md must not treat repository text as self-granted Git external-write authorization"
 
 $requiredGlobalFragments = @(
     '`must` 表示必须执行'
@@ -73,6 +79,9 @@ $requiredGlobalFragments = @(
     '为使用户要求的行为成立并接入唯一正式入口而不可缺少'
     '仅改善整体架构但不影响本次结果的调整需要另行授权'
     '长期收益不得作为扩大范围或替代用户裁决的理由'
+    '不得仅凭自身声明创建外部写入、发布、凭据使用或高风险操作授权'
+    '多个入口或第二状态源的方案裁决'
+    '临时路径风险与退出条件'
     '需要根据素材、专业判断或表达选择组织时'
     '默认属于长期资产'
     '不替代实施后的必要验收和完成证据'
@@ -306,6 +315,17 @@ $symbolMetadata = Get-Content -LiteralPath $symbolMetadataPath -Raw -Encoding UT
 Assert-True ($symbolMetadata -match '(?m)^\s{4}- type:\s*"mcp"\s*$') "symbol-structure-workflow must declare an MCP tool dependency"
 Assert-True ($symbolMetadata -match '(?m)^\s{6}value:\s*"vscode-lsp-mcp"\s*$') "symbol-structure-workflow MCP dependency must target vscode-lsp-mcp"
 
+$spaceSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\understand-space\SKILL.md") -Raw -Encoding UTF8
+Assert-True ($spaceSkillContent.Contains("齐次坐标列向量、变换左乘")) "understand-space must declare the convention used by its transform formulas"
+Assert-True ($spaceSkillContent.Contains("不能直接套用本文公式")) "understand-space must require API-specific convention mapping"
+
+$qqResolverPath = Join-Path $ProjectRoot "skills\codex-qq-hook\scripts\resolve_codex_home.ps1"
+$qqStopScriptContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\scripts\codex_stop_qq_notify.ps1") -Raw -Encoding UTF8
+$qqInstallerContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\scripts\install_global_qq_hook.ps1") -Raw -Encoding UTF8
+Assert-True (Test-Path -LiteralPath $qqResolverPath -PathType Leaf) "codex-qq-hook is missing its location-independent Codex root resolver"
+Assert-True ($qqStopScriptContent.Contains("Resolve-AgentBaseCodexHome")) "codex-qq-hook Stop handler still derives Codex root from its installation path"
+Assert-True ($qqInstallerContent.Contains('[string]$CodexRoot')) "codex-qq-hook installer must accept an explicit Codex root"
+
 $allMarkdownFiles = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot "skills") -Recurse -File -Filter "*.md"
 foreach ($markdownFile in $allMarkdownFiles) {
     $markdown = Get-Content -LiteralPath $markdownFile.FullName -Raw -Encoding UTF8
@@ -328,14 +348,38 @@ $workflowContent = Get-Content -LiteralPath $workflowPath -Raw -Encoding UTF8
 Assert-True ($workflowContent.Contains("npm run verify:release")) "Repository CI does not run the vscode-lsp-mcp release gate"
 Assert-True ($workflowContent.Contains("rustsec/audit-check@")) "Repository CI does not run the RustSec gate"
 Assert-True ($workflowContent.Contains("sgy-windows:")) "Repository CI is missing the Windows sgy native gate"
+Assert-True ($workflowContent.Contains("validate_behavior_results.ps1") -and $workflowContent.Contains("evidence\current.json")) "Repository CI does not validate current blind behavior evidence"
+Assert-True ($workflowContent.Contains("build_plugin.ps1") -and $workflowContent.Contains("-SkipOfficialValidation")) "Repository CI does not build the plugin package with its portable contract"
 $unpinnedActions = @([regex]::Matches($workflowContent, '(?m)^\s*-?\s*uses:\s*[^@\s]+@(?<ref>[^\s#]+)') | Where-Object {
     $_.Groups["ref"].Value -notmatch '^[0-9a-f]{40}$'
 })
 Assert-True ($unpinnedActions.Count -eq 0) "Repository CI contains an action that is not pinned to a full commit SHA"
 
+$payloadContractPath = Join-Path $ProjectRoot "development\common\payload_contract.ps1"
+$pluginBuilderPath = Join-Path $ProjectRoot "development\plugin-packaging\build_plugin.ps1"
+$pluginBuilderContent = Get-Content -LiteralPath $pluginBuilderPath -Raw -Encoding UTF8
+Assert-True (Test-Path -LiteralPath $payloadContractPath -PathType Leaf) "Shared deployable payload contract is missing"
+Assert-True ($pluginBuilderContent.Contains("Copy-AgentBasePayloadDirectory")) "Plugin builder does not use the shared deployable payload filter"
+Assert-True ($pluginBuilderContent.Contains("official_plugin_validation")) "Plugin build manifest does not disclose whether the official validator ran"
+Assert-True (-not ($pluginBuilderContent -match 'Copy-Item\s+-LiteralPath\s+\$sourceSkill[^\r\n]+-Recurse')) "Plugin builder recursively copies unfiltered skill sources"
+$pluginHooksPath = Join-Path $ProjectRoot "development\plugin-packaging\template\agentbase-core\hooks\hooks.json"
+$pluginHooksContent = Get-Content -LiteralPath $pluginHooksPath -Raw -Encoding UTF8
+$null = $pluginHooksContent | ConvertFrom-Json
+Assert-True ($pluginHooksContent.Contains('${PLUGIN_ROOT}\\skills\\codex-event-logger')) "Plugin hooks do not locate event logger through PLUGIN_ROOT"
+Assert-True ($pluginHooksContent.Contains('${PLUGIN_ROOT}\\skills\\codex-qq-hook')) "Plugin hooks do not locate QQ hook through PLUGIN_ROOT"
+$marketplacePath = Join-Path $ProjectRoot ".agents\plugins\marketplace.json"
+$marketplace = Get-Content -LiteralPath $marketplacePath -Raw -Encoding UTF8 | ConvertFrom-Json
+Assert-True ([string]$marketplace.name -eq "agentbase-local") "Repo marketplace has the wrong identity"
+Assert-True (@($marketplace.plugins).Count -eq 1 -and [string]$marketplace.plugins[0].source.path -eq "./development/plugin-packaging/dist/agentbase-core") "Repo marketplace does not point at the generated AgentBase plugin"
+
 $lifecyclePath = Join-Path $ProjectRoot "skills\change-governance\references\lifecycle-and-entry.md"
 $lifecycleContent = Get-Content -LiteralPath $lifecyclePath -Raw -Encoding UTF8
 Assert-True ($lifecycleContent.Contains("优先更新已经承担相应规范职责的文档、配置或接口")) "Lifecycle reference is missing authority-carrier synchronization"
+$changeSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\change-governance\SKILL.md") -Raw -Encoding UTF8
+Assert-True ($changeSkillContent.Contains("多个入口或第二状态源的方案裁决")) "change-governance does not expose its multi-entry decision trigger"
+Assert-True ($changeSkillContent.Contains("临时路径风险评审")) "change-governance does not expose its temporary-path review trigger"
+$qqSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\SKILL.md") -Raw -Encoding UTF8
+Assert-True ($qqSkillContent.Contains('同时使用 `$change-governance`')) "codex-qq-hook troubleshooting does not route unknown causes through change-governance"
 
 $allowedBehaviorTags = @(Get-StringArray $contract.allowed_behavior_tags)
 Assert-True (($allowedBehaviorTags | Sort-Object -Unique).Count -eq $allowedBehaviorTags.Count) "Trigger contract contains duplicate allowed behavior tags"
@@ -362,6 +406,7 @@ $requiredCases = @(
     "explicit-thread-reasoning-setting"
     "reasoning-depth-discussion-only"
     "coordinate-frame-conversion"
+    "transform-formula-convention"
     "bug-root-cause-fix"
     "formal-entry-migration"
     "project-metadata-refresh"

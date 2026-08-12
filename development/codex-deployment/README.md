@@ -1,19 +1,30 @@
 # Codex deployment
 
-`manage_agentbase.ps1` is the only AgentBase entry point that installs files into a Codex home. It validates project truth, stages the complete selected payload, backs up every target, installs atomically, verifies fingerprints, and records a rollback manifest. Directory payloads exclude runtime-only caches, logs, coverage output, dependency trees, build directories, and temporary files from both copying and fingerprinting, so local execution cannot change the deployable bundle.
+`manage_agentbase.ps1` is the only AgentBase entry point that installs project-managed files into a Codex home. It validates project truth and the canonical blind behavior evidence, stages the complete selected payload, backs up every target, installs atomically, verifies fingerprints, and records a rollback manifest. Directory payloads and plugin packaging share `development/common/payload_contract.ps1`, so runtime-only caches, logs, coverage output, dependency trees, build directories, temporary files, and reparse points cannot enter either bundle or its fingerprint.
 
 ## Payloads
 
-The default payload remains:
+`-SkillDeliveryMode DirectCompatibility` is the default only to preserve existing installations. Its payload is:
 
 - `global/AGENTS.md` -> `<CodexRoot>/AGENTS.md`;
 - the required `skills/<name>/` directories -> `<CodexRoot>/skills/<name>/`.
 
-`-InstallPortableSettings` explicitly adds:
+This is a declared migration path for hosts that already use `<CodexRoot>/skills`. Do not enable the `agentbase-core` plugin at the same time. Exit this mode after plugin installation, enable/disable behavior, bundled-hook trust, and uninstall/rollback have been verified on the target host.
+
+`-SkillDeliveryMode Plugin` manages:
+
+- `global/AGENTS.md` -> `<CodexRoot>/AGENTS.md`;
+- when selected, portable `config.toml` and the three custom agents.
+
+It deliberately omits direct skill directories and `hooks.json`; `agentbase-core` owns the skills and bundled hooks through `${PLUGIN_ROOT}`. Before writing, Plugin mode rejects any required skill still present under `<CodexRoot>/skills` and any AgentBase command still present in global `hooks.json`, so migration cannot silently retain parallel entries. The deployment script does not install, enable, or inspect the plugin, so plugin state remains a separate verified prerequisite rather than an implied part of the deployment receipt.
+
+In `DirectCompatibility` mode, `-InstallPortableSettings` explicitly adds:
 
 - `global/config.toml` -> `<CodexRoot>/config.toml`;
 - `global/hooks.template.json`, resolved against the selected Codex root -> `<CodexRoot>/hooks.json`.
 - `global/agents/luna.toml`, `sol.toml`, and `terra.toml` -> the matching files under `<CodexRoot>/agents/`.
+
+In `Plugin` mode the same switch adds `config.toml` and the three agents but omits `hooks.json`, because the plugin supplies those hooks.
 
 The settings option replaces an existing `config.toml`, `hooks.json`, and the three matching custom-agent files, but the same publish transaction backs them up and the normal rollback action restores them. It does not replace the whole `agents/` directory, so unrelated personal agents remain untouched. Omitting the option preserves the existing default behavior and never touches any settings or agent file.
 
@@ -37,7 +48,7 @@ The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerS
 
 ## Validate
 
-Validation checks the global rule and Skill contract, the portable config allowlist, the exact custom-agent file/schema contract, the hooks schema and placeholder boundary, and the independent `vscode-lsp-mcp` release owner:
+Validation checks the global rule and Skill contract, `development/skill-routing/evidence/current.json` against the current candidate and request hashes, the portable config allowlist, the exact custom-agent file/schema contract, the hooks schema and placeholder boundary, and the independent `vscode-lsp-mcp` release owner:
 
 ```powershell
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot (Get-Location).Path
@@ -51,15 +62,35 @@ The repeatable sandbox test covers default preservation, explicit settings and c
 
 ## Publish on another Windows machine
 
-Install and sign in to Codex first. Then clone or copy the repository, run the Windows host preparation above, review `global/config.toml`, and run from the project root:
+Install and sign in to Codex first. Then clone or copy the repository, run the Windows host preparation above, review `global/config.toml`, refresh the current blind evidence with an independent evaluator, and choose one delivery mode.
+
+For the recommended plugin route, build the package with the official validator, install `agentbase-core` from the repo-scoped `agentbase-local` marketplace, and publish only the project-managed global payload:
 
 ```powershell
-& '.\development\codex-deployment\manage_agentbase.ps1' -Action Publish -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -InstallPortableSettings
+& '.\development\plugin-packaging\build_plugin.ps1' -ProjectRoot (Get-Location).Path
+codex plugin add agentbase-core@agentbase-local
+& '.\development\codex-deployment\manage_agentbase.ps1' -Action Publish -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -SkillDeliveryMode Plugin -InstallPortableSettings
+```
+
+For an existing direct installation that has not completed plugin migration:
+
+```powershell
+& '.\development\codex-deployment\manage_agentbase.ps1' -Action Publish -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -SkillDeliveryMode DirectCompatibility -InstallPortableSettings
 ```
 
 The configured model, service tier, and plugin availability still depend on the signed-in account and any workspace or organization policy. Review or adjust those entries when the target account does not provide the same capabilities.
 
-Restart the ChatGPT desktop app or begin a new Codex task after publishing. Open `/hooks`, review the exact commands, and trust them on the new machine; hook trust hashes are machine state and are intentionally not copied. QQ completion remains off until it is enabled for a specific workspace or task through `codex-qq-hook`.
+Restart the ChatGPT desktop app or begin a new Codex task after publishing. In plugin mode, verify the plugin is installed and enabled; in either mode open `/hooks`, review the exact commands, and trust them on the new machine. Hook trust hashes are machine state and are intentionally not copied. QQ completion remains off until it is enabled for a specific workspace or task through `codex-qq-hook`.
+
+## Read publication status
+
+`Status` is read-only. It derives state from the selected source payload, installed payload, latest matching `published` manifest, and the current blind evidence instead of trusting a README claim:
+
+```powershell
+& '.\development\codex-deployment\manage_agentbase.ps1' -Action Status -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -SkillDeliveryMode DirectCompatibility -InstallPortableSettings
+```
+
+Use the same delivery mode and settings scope that were published. `managed_payload_formally_published=true` covers only files managed by this script. In `Plugin` mode, `plugin_mode_ready=false` and `direct_compatibility_conflicts` identify old direct skills or global AgentBase hooks that must be removed before migration. `plugin_installation_inspected=false` is intentional: inspect plugin state through the plugin browser or `codex plugin list`.
 
 The current workflow also uses these separately installed plugins when their capabilities are needed:
 

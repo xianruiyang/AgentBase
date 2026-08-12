@@ -12,6 +12,7 @@ model_reasoning_effort = "medium"
 personality = "pragmatic"
 sandbox_mode = "danger-full-access"
 service_tier = "priority"
+project_doc_max_bytes = 65536
 
 [agents]
 enabled = true

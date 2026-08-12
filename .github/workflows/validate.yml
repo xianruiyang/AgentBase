@@ -32,8 +32,27 @@ jobs:
       - name: Validate routing and portable deployment contracts
         run: |
           & .\development\skill-routing\validate_contract.ps1 -ProjectRoot $PWD.Path
+          & .\development\skill-routing\validate_behavior_results.ps1 -ProjectRoot $PWD.Path -ResultsPath .\development\skill-routing\evidence\current.json
           & .\development\codex-deployment\manage_agentbase.ps1 -Action Validate -ProjectRoot $PWD.Path
           & .\development\codex-deployment\test_manage_agentbase.ps1 -ProjectRoot $PWD.Path
+
+      - name: Build filtered plugin package
+        run: |
+          $defaultOutputRejected = $false
+          try {
+            & .\development\plugin-packaging\build_plugin.ps1 -ProjectRoot $PWD.Path -SkipOfficialValidation | Out-Null
+          } catch {
+            $defaultOutputRejected = $_.Exception.Message -like 'SkipOfficialValidation requires an explicit isolated OutputRoot*'
+          }
+          if (-not $defaultOutputRejected) { throw 'Plugin builder allowed an unvalidated package in the marketplace output' }
+          $pluginOutput = Join-Path $env:RUNNER_TEMP 'agentbase-plugin-package'
+          $pluginRoot = & .\development\plugin-packaging\build_plugin.ps1 -ProjectRoot $PWD.Path -OutputRoot $pluginOutput -SkipOfficialValidation
+          $manifest = Get-Content -LiteralPath (Join-Path $pluginRoot 'build-manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+          $expectedSkillCount = @((Get-Content -LiteralPath .\development\skill-routing\trigger-cases.json -Raw -Encoding UTF8 | ConvertFrom-Json).required_skills).Count
+          if ([int]$manifest.schema_version -ne 2 -or [int]$manifest.skill_count -ne $expectedSkillCount -or [bool]$manifest.official_plugin_validation) { throw 'Plugin CI build manifest is invalid' }
+          $pluginRootPath = [IO.Path]::GetFullPath([string]$pluginRoot).TrimEnd('\')
+          $runtimeArtifacts = @(Get-ChildItem -LiteralPath $pluginRootPath -Recurse -Force | Where-Object { $relative = $_.FullName.Substring($pluginRootPath.Length + 1); $relative -match '(?i)(^|[\\/])(__pycache__|node_modules|target|dist)([\\/]|$)' -or $_.Extension -in @('.pyc', '.pyo', '.log', '.tmp') })
+          if ($runtimeArtifacts.Count -ne 0) { throw "Plugin package contains a runtime artifact: $($runtimeArtifacts[0].FullName)" }
 
       - name: Run skill regression tests
         run: |

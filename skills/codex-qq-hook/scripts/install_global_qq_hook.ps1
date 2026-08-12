@@ -1,5 +1,6 @@
 param(
     [string]$ProjectRoot,
+    [string]$CodexRoot,
     [string]$AppId,
     [ValidateSet("user", "group", "channel")]
     [string]$TargetType,
@@ -11,14 +12,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "resolve_codex_home.ps1")
+
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 [Console]::InputEncoding = $utf8
 [Console]::OutputEncoding = $utf8
 $OutputEncoding = $utf8
 
 $skillRoot = Split-Path -Parent $PSScriptRoot
-$skillsDir = Split-Path -Parent $skillRoot
-$codexHome = Split-Path -Parent $skillsDir
+$codexHome = Resolve-AgentBaseCodexHome -RequestedRoot $CodexRoot
 $globalHooksPath = Join-Path $codexHome "hooks.json"
 $globalSettingsPath = Join-Path $codexHome "qq-hook-global-settings.json"
 $configTomlPath = Join-Path $codexHome "config.toml"
@@ -128,7 +130,7 @@ if ($hooksDocument.hooks.PSObject.Properties.Name -contains "Stop") {
     }
 }
 
-$command = "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$stopScript`""
+$command = "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$stopScript`" -CodexRoot `"$codexHome`""
 $qqStopGroup = [pscustomobject][ordered]@{
     hooks = @(
         [pscustomobject][ordered]@{

@@ -1,20 +1,42 @@
 param(
     [string]$ProjectRoot,
     [string]$OutputRoot,
-    [string]$PluginValidatorPath
+    [string]$PluginValidatorPath,
+    [switch]$SkipOfficialValidation
 )
 
 $ErrorActionPreference = "Stop"
+
+$payloadContractPath = Join-Path (Split-Path -Parent $PSScriptRoot) "common\payload_contract.ps1"
+. $payloadContractPath
+
+function Get-TextSha256 {
+    param(
+        [string]$Text
+    )
+
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString($algorithm.ComputeHash([Text.Encoding]::UTF8.GetBytes($Text)))).Replace("-", "")
+    }
+    finally {
+        $algorithm.Dispose()
+    }
+}
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 }
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 
+$outputRootWasSpecified = -not [string]::IsNullOrWhiteSpace($OutputRoot)
+if ($SkipOfficialValidation -and -not $outputRootWasSpecified) {
+    throw "SkipOfficialValidation requires an explicit isolated OutputRoot; the marketplace dist must remain officially validated"
+}
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $PSScriptRoot "dist"
 }
-if ([string]::IsNullOrWhiteSpace($PluginValidatorPath)) {
+if (-not $SkipOfficialValidation -and [string]::IsNullOrWhiteSpace($PluginValidatorPath)) {
     if ([string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
         throw "PluginValidatorPath is required when USERPROFILE is unavailable"
     }
@@ -31,17 +53,11 @@ $templateManifestPath = Join-Path $templateRoot ".codex-plugin\plugin.json"
 if (-not (Test-Path -LiteralPath $templateManifestPath -PathType Leaf)) {
     throw "Plugin template manifest is missing: $templateManifestPath"
 }
-if (-not (Test-Path -LiteralPath $PluginValidatorPath -PathType Leaf)) {
+if (-not $SkipOfficialValidation -and -not (Test-Path -LiteralPath $PluginValidatorPath -PathType Leaf)) {
     throw "Official plugin validator is missing: $PluginValidatorPath"
 }
 
 $sourceSkillsRoot = Join-Path $ProjectRoot "skills"
-$sourceLinks = @(Get-ChildItem -LiteralPath $sourceSkillsRoot -Recurse -Force | Where-Object {
-    ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
-})
-if ($sourceLinks.Count -gt 0) {
-    throw "Skill source contains reparse points; refusing to package: $($sourceLinks[0].FullName)"
-}
 
 $outputParent = Split-Path -Parent $OutputRoot
 if (-not (Test-Path -LiteralPath $outputParent -PathType Container)) {
@@ -58,7 +74,7 @@ $stageRoot = Join-Path $OutputRoot (".stage-" + [guid]::NewGuid().ToString("N"))
 $oldRoot = Join-Path $OutputRoot (".previous-" + [guid]::NewGuid().ToString("N"))
 
 try {
-    Copy-Item -LiteralPath $templateRoot -Destination $stageRoot -Recurse -Force
+    Copy-AgentBasePayloadDirectory -SourcePath $templateRoot -DestinationPath $stageRoot
     $stageSkillsRoot = Join-Path $stageRoot "skills"
     if (-not (Test-Path -LiteralPath $stageSkillsRoot -PathType Container)) {
         New-Item -ItemType Directory -Path $stageSkillsRoot | Out-Null
@@ -73,10 +89,20 @@ try {
         if (-not (Test-Path -LiteralPath (Join-Path $sourceSkill "SKILL.md") -PathType Leaf)) {
             throw "Required skill source is missing: $skill"
         }
-        Copy-Item -LiteralPath $sourceSkill -Destination $targetSkill -Recurse -Force
+        Copy-AgentBasePayloadDirectory -SourcePath $sourceSkill -DestinationPath $targetSkill
     }
 
-    $payloadFiles = @(Get-ChildItem -LiteralPath $stageRoot -Recurse -File | Sort-Object FullName | ForEach-Object {
+    $sourceSkillRecords = @($contract.required_skills | ForEach-Object {
+        $skillName = [string]$_
+        $sourceSkill = Join-Path $sourceSkillsRoot $skillName
+        Get-AgentBasePayloadFiles -Root $sourceSkill | ForEach-Object {
+            $relativePath = $_.FullName.Substring($sourceSkillsRoot.Length + 1).Replace('\', '/')
+            "$relativePath|$($_.Length)|$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)"
+        }
+    } | Sort-Object)
+    $sourceSkillFingerprint = Get-TextSha256 ($sourceSkillRecords -join [Environment]::NewLine)
+
+    $payloadFiles = @(Get-AgentBasePayloadFiles -Root $stageRoot | ForEach-Object {
         [ordered]@{
             path = $_.FullName.Substring($stageRoot.Length + 1).Replace('\', '/')
             sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
@@ -84,18 +110,31 @@ try {
         }
     })
     $buildManifest = [ordered]@{
-        schema_version = 1
+        schema_version = 2
         plugin = $pluginName
-        source = $ProjectRoot
         skill_count = @($contract.required_skills).Count
+        source_skill_bundle_sha256 = $sourceSkillFingerprint
+        payload_contract = "development/common/payload_contract.ps1"
+        official_plugin_validation = -not [bool]$SkipOfficialValidation
         files = $payloadFiles
     } | ConvertTo-Json -Depth 6
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [IO.File]::WriteAllText((Join-Path $stageRoot "build-manifest.json"), $buildManifest + [Environment]::NewLine, $utf8NoBom)
 
-    & python -X utf8 $PluginValidatorPath $stageRoot
-    if ($LASTEXITCODE -ne 0) {
-        throw "Official plugin validation failed"
+    $forbiddenArtifacts = @(Get-ChildItem -LiteralPath $stageRoot -Recurse -Force | Where-Object {
+        $relativePath = $_.FullName.Substring($stageRoot.Length + 1).Replace('\', '/')
+        Test-AgentBaseExcludedArtifact -RelativePath $relativePath
+    })
+    if ($forbiddenArtifacts.Count -gt 0) {
+        throw "Plugin package contains an excluded runtime artifact: $($forbiddenArtifacts[0].FullName)"
+    }
+
+    if (-not $SkipOfficialValidation) {
+        $validatorOutput = @(& python -X utf8 $PluginValidatorPath $stageRoot 2>&1)
+        $validatorExitCode = $LASTEXITCODE
+        if ($validatorExitCode -ne 0) {
+            throw ("Official plugin validation failed:" + [Environment]::NewLine + ($validatorOutput -join [Environment]::NewLine))
+        }
     }
 
     if (Test-Path -LiteralPath $targetRoot) {
