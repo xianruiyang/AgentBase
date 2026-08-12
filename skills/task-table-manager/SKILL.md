@@ -5,11 +5,11 @@ description: 管理有证据支撑的规划链和长期执行。用于工作必�
 
 # Task Table Manager
 
-质量优先；质量等价时减少含返工在内的总 Token；前两者等价时再提速。
+质量优先；等价时先降含返工的总 Token，再提速。
 
 ## 路由
 
-- 只用于跨轮、存在真实依赖或需要持久完成审计的工作。普通修改、一次性分析和简单清单不用。
+- 用于跨轮、真实依赖或持久完成审计；普通修改、一次性分析和简单清单不用。
 - 新计划放在 `docs/plan/<YYYYMMDD>_<NAME>/`；同计划文件以该目录为根。只有用户要求才移入 `old/`。
 - 有 `plan.json` 时走 v1；创建或修改完整读取 [create-plan.md](references/create-plan.md)。只有 Markdown 的旧计划按需完整读取 [writing.md](references/writing.md) 或 [execution.md](references/execution.md)，不得静默迁移。
 - 用户明确授权把旧任务表、测试、门禁或实现资产重建为 v1 计划时，完整读取 [extract-legacy-assets.md](references/extract-legacy-assets.md)；继续执行中的旧计划不因此迁移。
@@ -17,7 +17,7 @@ description: 管理有证据支撑的规划链和长期执行。用于工作必�
 
 ## 质量边界
 
-- CLI 只判断结构、依赖、revision、来源指纹和证据新鲜度，不证明需求、方案、oracle 或业务。`audit-plan` 只做结构审计；未登记预检时返回 `structural_only`。大规模迁移或历史身份重映射按 [create-plan.md](references/create-plan.md) 登记 `semantic_preflight` 回执；缺失、无效或任一债务非零时阻断。
+- CLI 只检查结构、指纹和证据新鲜度，不证明语义。新激活/修订的 `strict_v2` 按 [create-plan.md](references/create-plan.md) 选择 `semantic_preflight.mode`：普通用 `not_applicable`，批量迁移用 `required`。策略缺失、identity/回执不闭合即阻断；旧活动计划仅以 `legacy_*` 继续。
 - 计划前直接以用户要求、正式设计、完整实现差距和方案为真源，先正向检查上游是否全部覆盖，再反向检查每个动作是否有来源，并主动寻找反例。发现问题回到最早失效层；不得由任务、旧测试或现有代码反推上游，也不得用自动生成的追踪表自证。
 - 任务只表达未交付的用户结果、真实依赖和最小充分验收。大量 command/资产的逐项分配由任务目录内的定向脚本或清单检查，不把领域 inventory 逻辑塞入通用 CLI。
 - 测试先确认 requirement、oracle、baseline、negative path、真实 subject 和 readback；不为旧断言修改目标设计。outcome 只到证据实际穿过的最高入口，mock、recording、注册、编译或内部 runtime 不能冒充公开可用。

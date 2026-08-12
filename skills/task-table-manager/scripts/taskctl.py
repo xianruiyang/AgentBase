@@ -21,9 +21,10 @@ STATE_SCHEMA = "task.state.v1"
 EVIDENCE_SCHEMA = "task.evidence.v1"
 INDEX_SCHEMA = "task.evidence.index.v1"
 DECISION_SCHEMA = "task.decision.v1"
-COMPLETION_SCHEMA = "task.completion.v1"
-PLANNING_AUDIT_SCHEMA = "task.planning-audit.v2"
-SEMANTIC_PREFLIGHT_SCHEMA = "task.semantic-preflight.v1"
+COMPLETION_SCHEMA = "task.completion.v2"
+PLANNING_AUDIT_SCHEMA = "task.planning-audit.v3"
+SEMANTIC_PREFLIGHT_SCHEMA = "task.semantic-preflight.v2"
+LEGACY_SEMANTIC_PREFLIGHT_SCHEMA = "task.semantic-preflight.v1"
 
 TASK_STATUSES = {"todo", "ready", "active", "needs_review", "done", "blocked"}
 SOURCE_CLASSES = {"registered_machine", "derived_machine", "human_decision", "agent_context"}
@@ -68,6 +69,15 @@ COMPLETION_LEVELS = {
 EVIDENCE_RESULTS = {"pass", "expected_fail", "fail"}
 PHASES = {"tests", "implementation", "verification"}
 BASE_FRESHNESS_KEYS = {"contract", "production_scope", "test_scope"}
+SEMANTIC_PREFLIGHT_MODES = {"required", "not_applicable"}
+SEMANTIC_PREFLIGHT_CORE_DIMENSIONS = {
+    "owner",
+    "successor_contract",
+    "disposition",
+    "lifecycle",
+    "input_output",
+    "evidence_binding",
+}
 
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
 CLAIM_RE = re.compile(r"^[a-z][a-z0-9_.-]*$")
@@ -121,6 +131,15 @@ def _expect_id(value: Any, path: str) -> str:
 def _expect_claim(value: Any, path: str) -> str:
     text = _expect_string(value, path)
     _require(bool(CLAIM_RE.fullmatch(text)), f"{path} has an invalid claim id: {text!r}")
+    return text
+
+
+def _expect_sha256(value: Any, path: str) -> str:
+    text = _expect_string(value, path)
+    _require(
+        bool(re.fullmatch(r"sha256:[0-9a-f]{64}", text)),
+        f"{path} must be a lowercase sha256 identity",
+    )
     return text
 
 
@@ -645,6 +664,8 @@ def _validate_plan(
                 )
 
     semantic_preflight_value = plan.get("semantic_preflight")
+    semantic_preflight: dict[str, Any] | None = None
+    legacy_semantic_preflight = False
     if semantic_preflight_value is not None:
         _require(
             pipeline_strict,
@@ -653,17 +674,59 @@ def _validate_plan(
         semantic_preflight = _expect_object(
             semantic_preflight_value, "plan.semantic_preflight"
         )
-        _expect_keys(
-            semantic_preflight,
-            required={
-                "receipt_ref",
-                "producer_source_id",
-                "scope_source_ids",
-                "required_dimensions",
-            },
-            optional=set(),
-            path="plan.semantic_preflight",
-        )
+        if "mode" not in semantic_preflight:
+            legacy_semantic_preflight = True
+            _expect_keys(
+                semantic_preflight,
+                required={
+                    "receipt_ref",
+                    "producer_source_id",
+                    "scope_source_ids",
+                    "required_dimensions",
+                },
+                optional=set(),
+                path="plan.semantic_preflight",
+            )
+        else:
+            mode = _expect_string(
+                semantic_preflight.get("mode"), "plan.semantic_preflight.mode"
+            )
+            _require(
+                mode in SEMANTIC_PREFLIGHT_MODES,
+                "plan.semantic_preflight.mode must be required or not_applicable",
+            )
+            if mode == "not_applicable":
+                _expect_keys(
+                    semantic_preflight,
+                    required={"mode", "reason"},
+                    optional=set(),
+                    path="plan.semantic_preflight",
+                )
+                _expect_string(
+                    semantic_preflight["reason"], "plan.semantic_preflight.reason"
+                )
+                semantic_preflight = None
+            else:
+                _expect_keys(
+                    semantic_preflight,
+                    required={
+                        "mode",
+                        "reason",
+                        "receipt_ref",
+                        "identity_source_id",
+                        "producer_source_id",
+                        "scope_source_ids",
+                        "expected_total_count",
+                        "identity_set_fingerprint",
+                        "required_dimensions",
+                    },
+                    optional=set(),
+                    path="plan.semantic_preflight",
+                )
+                _expect_string(
+                    semantic_preflight["reason"], "plan.semantic_preflight.reason"
+                )
+    if semantic_preflight_value is not None and semantic_preflight is not None:
         receipt_ref = _validate_relative_path(
             _expect_string(
                 semantic_preflight["receipt_ref"],
@@ -691,7 +754,33 @@ def _validate_plan(
             claims=True,
             allow_empty=False,
         )
-        _require(bool(required_dimensions), "semantic preflight requires dimensions")
+        identity_source_id: str | None = None
+        if not legacy_semantic_preflight:
+            identity_source_id = _expect_id(
+                semantic_preflight["identity_source_id"],
+                "plan.semantic_preflight.identity_source_id",
+            )
+            _require(
+                producer_source_id != identity_source_id,
+                "semantic preflight identity and verifier sources must be distinct",
+            )
+            missing_core_dimensions = (
+                SEMANTIC_PREFLIGHT_CORE_DIMENSIONS - set(required_dimensions)
+            )
+            _require(
+                not missing_core_dimensions,
+                "semantic preflight is missing core dimensions: "
+                + ",".join(sorted(missing_core_dimensions)),
+            )
+            _expect_nonnegative_int(
+                semantic_preflight["expected_total_count"],
+                "plan.semantic_preflight.expected_total_count",
+                positive=True,
+            )
+            _expect_sha256(
+                semantic_preflight["identity_set_fingerprint"],
+                "plan.semantic_preflight.identity_set_fingerprint",
+            )
         unknown_sources = set(semantic_source_ids) - source_ids
         _require(
             not unknown_sources,
@@ -702,6 +791,18 @@ def _validate_plan(
             producer_source_id in semantic_source_ids,
             "semantic preflight producer_source_id must be included in scope_source_ids",
         )
+        if identity_source_id is not None:
+            _require(
+                identity_source_id in semantic_source_ids,
+                "semantic preflight identity_source_id must be included in scope_source_ids",
+            )
+            identity_source = sources_by_id[identity_source_id]
+            producer_source = sources_by_id[producer_source_id]
+            _require(
+                (identity_source.get("root"), identity_source["ref"])
+                != (producer_source.get("root"), producer_source["ref"]),
+                "semantic preflight identity and verifier sources must reference different files",
+            )
         for semantic_source_id in semantic_source_ids:
             _require(
                 sources_by_id[semantic_source_id].get("fingerprint_mode")
@@ -3228,7 +3329,9 @@ def _render_markdown(
     semantic_placeholders = semantic_progress["placeholder_count"]
     semantic_duplicates = semantic_progress["duplicate_count"]
     semantic_text = (
+        f"mode={semantic_progress['policy_mode']}, "
         f"status={semantic_progress['status']}, "
+        f"total={'unknown' if semantic_progress['total_count'] is None else semantic_progress['total_count']}, "
         f"unresolved={'unknown' if semantic_unresolved is None else semantic_unresolved}, "
         f"placeholders={'unknown' if semantic_placeholders is None else semantic_placeholders}, "
         f"duplicates={'unknown' if semantic_duplicates is None else semantic_duplicates}"
@@ -3434,15 +3537,20 @@ def _planning_audit_path(plan_dir: Path, plan: dict[str, Any]) -> Path:
 
 def _empty_semantic_preflight_progress(
     *,
-    required: bool,
+    policy_mode: str,
+    reason: str | None,
     status: str,
     receipt_ref: str | None,
+    identity_set_fingerprint: str | None,
     error_code: str | None,
 ) -> dict[str, Any]:
     return {
-        "required": required,
+        "policy_mode": policy_mode,
+        "required": policy_mode == "required",
+        "reason": reason,
         "status": status,
         "receipt_ref": receipt_ref,
+        "identity_set_fingerprint": identity_set_fingerprint,
         "total_count": None,
         "resolved_count": None,
         "unresolved_count": None,
@@ -3471,6 +3579,13 @@ def _read_semantic_preflight_progress(
     plan_dir: Path, plan: dict[str, Any]
 ) -> dict[str, Any]:
     semantic = _expect_object(plan["semantic_preflight"], "plan.semantic_preflight")
+    legacy_policy = "mode" not in semantic
+    if not legacy_policy:
+        _require(
+            semantic["mode"] == "required",
+            "semantic preflight receipt is only valid in required mode",
+            code="semantic_preflight_invalid",
+        )
     path = _semantic_preflight_receipt_path(plan_dir, plan)
     _require(
         path.is_file(),
@@ -3478,23 +3593,33 @@ def _read_semantic_preflight_progress(
         code="semantic_preflight_missing",
     )
     receipt = _load_json(path)
+    required_receipt_fields = {
+        "schema",
+        "plan_id",
+        "design_revision",
+        "producer_source_id",
+        "source_fingerprints",
+        "status",
+        "counts",
+    }
+    if not legacy_policy:
+        required_receipt_fields.update(
+            {"identity_set_fingerprint", "identities"}
+        )
     _expect_keys(
         receipt,
-        required={
-            "schema",
-            "plan_id",
-            "design_revision",
-            "producer_source_id",
-            "source_fingerprints",
-            "status",
-            "counts",
-        },
+        required=required_receipt_fields,
         optional=set(),
         path="semantic_preflight_receipt",
     )
+    expected_schema = (
+        LEGACY_SEMANTIC_PREFLIGHT_SCHEMA
+        if legacy_policy
+        else SEMANTIC_PREFLIGHT_SCHEMA
+    )
     _require(
-        receipt["schema"] == SEMANTIC_PREFLIGHT_SCHEMA,
-        f"semantic preflight schema must be {SEMANTIC_PREFLIGHT_SCHEMA}",
+        receipt["schema"] == expected_schema,
+        f"semantic preflight schema must be {expected_schema}",
         code="semantic_preflight_invalid",
     )
     _require(
@@ -3523,6 +3648,30 @@ def _read_semantic_preflight_progress(
             code="semantic_preflight_invalid",
         )
 
+    identities: list[str] | None = None
+    identity_set_fingerprint: str | None = None
+    if not legacy_policy:
+        identities = _unique_strings(
+            receipt["identities"],
+            "semantic_preflight_receipt.identities",
+            allow_empty=False,
+        )
+        _require(
+            identities == sorted(identities),
+            "semantic preflight identities must use stable sorted order",
+            code="semantic_preflight_invalid",
+        )
+        identity_set_fingerprint = _expect_sha256(
+            receipt["identity_set_fingerprint"],
+            "semantic_preflight_receipt.identity_set_fingerprint",
+        )
+        computed_identity_set_fingerprint = _json_identity(identities)
+        _require(
+            identity_set_fingerprint == computed_identity_set_fingerprint
+            and identity_set_fingerprint == semantic["identity_set_fingerprint"],
+            "semantic preflight identity set does not match the declared plan scope",
+            code="semantic_preflight_invalid",
+        )
     counts = _expect_object(receipt["counts"], "semantic_preflight_receipt.counts")
     _expect_keys(
         counts,
@@ -3558,6 +3707,13 @@ def _read_semantic_preflight_progress(
         counts["duplicate_count"],
         "semantic_preflight_receipt.counts.duplicate_count",
     )
+    if identities is not None:
+        _require(
+            total_count == semantic["expected_total_count"]
+            and total_count == len(identities),
+            "semantic preflight total_count must match the plan and identity set",
+            code="semantic_preflight_invalid",
+        )
     _require(
         resolved_count + unresolved_count == total_count,
         "semantic preflight resolved_count + unresolved_count must equal total_count",
@@ -3609,9 +3765,12 @@ def _read_semantic_preflight_progress(
         code="semantic_preflight_invalid",
     )
     return {
+        "policy_mode": "legacy_required_v1" if legacy_policy else "required",
         "required": True,
+        "reason": None if legacy_policy else semantic["reason"],
         "status": receipt_status,
         "receipt_ref": semantic["receipt_ref"],
+        "identity_set_fingerprint": identity_set_fingerprint,
         "total_count": total_count,
         "resolved_count": resolved_count,
         "unresolved_count": unresolved_count,
@@ -3629,20 +3788,36 @@ def _semantic_preflight_progress(
 ) -> dict[str, Any]:
     if "semantic_preflight" not in plan:
         return _empty_semantic_preflight_progress(
-            required=False,
+            policy_mode="missing",
+            reason=None,
             status="not_declared",
             receipt_ref=None,
+            identity_set_fingerprint=None,
+            error_code="semantic_preflight_policy_required",
+        )
+    semantic = _expect_object(plan["semantic_preflight"], "plan.semantic_preflight")
+    legacy_policy = "mode" not in semantic
+    if not legacy_policy and semantic["mode"] == "not_applicable":
+        return _empty_semantic_preflight_progress(
+            policy_mode="not_applicable",
+            reason=semantic["reason"],
+            status="not_applicable",
+            receipt_ref=None,
+            identity_set_fingerprint=None,
             error_code=None,
         )
-    receipt_ref = plan["semantic_preflight"].get("receipt_ref")
+    receipt_ref = semantic.get("receipt_ref")
+    identity_set_fingerprint = semantic.get("identity_set_fingerprint")
     try:
         return _read_semantic_preflight_progress(plan_dir, plan)
     except TaskCtlError as exc:
         missing = exc.code == "semantic_preflight_missing"
         return _empty_semantic_preflight_progress(
-            required=True,
+            policy_mode="legacy_required_v1" if legacy_policy else "required",
+            reason=None if legacy_policy else semantic.get("reason"),
             status="missing" if missing else "invalid",
             receipt_ref=receipt_ref,
+            identity_set_fingerprint=identity_set_fingerprint,
             error_code=(
                 "semantic_preflight_missing"
                 if missing
@@ -3651,29 +3826,53 @@ def _semantic_preflight_progress(
         )
 
 
-def _semantic_execution_readiness(progress: dict[str, Any]) -> str:
-    if not progress["required"]:
-        return "structural_only"
+def _semantic_execution_readiness(
+    progress: dict[str, Any], *, allow_legacy_missing: bool
+) -> str:
+    if progress["policy_mode"] == "missing":
+        return "legacy_structural_only" if allow_legacy_missing else "blocked"
+    if progress["policy_mode"] == "legacy_required_v1":
+        if not allow_legacy_missing or progress["status"] != "pass":
+            return "blocked"
+        return "legacy_semantic_v1"
+    if progress["policy_mode"] == "not_applicable":
+        return "ready"
     return "ready" if progress["status"] == "pass" else "blocked"
 
 
+def _require_explicit_semantic_preflight_policy(plan: dict[str, Any]) -> None:
+    semantic_preflight = plan.get("semantic_preflight")
+    _require(
+        isinstance(semantic_preflight, dict) and "mode" in semantic_preflight,
+        "new and amended strict_v2 plans must explicitly declare semantic_preflight.mode",
+        code="semantic_preflight_policy_required",
+    )
+
+
 def _require_semantic_preflight_ready(
-    plan_dir: Path, plan: dict[str, Any]
+    plan_dir: Path,
+    plan: dict[str, Any],
+    *,
+    allow_legacy_missing: bool,
 ) -> dict[str, Any]:
     progress = _semantic_preflight_progress(plan_dir, plan)
-    if not progress["required"]:
-        return progress
+    readiness = _semantic_execution_readiness(
+        progress, allow_legacy_missing=allow_legacy_missing
+    )
     _require(
-        progress["status"] == "pass",
+        readiness != "blocked",
         "project semantic preflight is not ready; "
-        f"status={progress['status']} unresolved={progress['unresolved_count']}",
+        f"mode={progress['policy_mode']} status={progress['status']} "
+        f"unresolved={progress['unresolved_count']}",
         code=progress["error_code"] or "semantic_preflight_blocked",
     )
     return progress
 
 
 def _planning_audit_payload(
-    plan: dict[str, Any], semantic_progress: dict[str, Any]
+    plan: dict[str, Any],
+    semantic_progress: dict[str, Any],
+    execution_readiness: str,
 ) -> dict[str, Any]:
     return {
         "schema": PLANNING_AUDIT_SCHEMA,
@@ -3683,7 +3882,7 @@ def _planning_audit_payload(
         "controller_identity": _controller_identity(),
         "audit_scope": "machine_structural_traceability",
         "structural_status": "pass",
-        "execution_readiness": _semantic_execution_readiness(semantic_progress),
+        "execution_readiness": execution_readiness,
         "semantic_preflight": semantic_progress,
         "counts": {
             "requirements": len(plan["requirements"]),
@@ -3697,7 +3896,12 @@ def _planning_audit_payload(
     }
 
 
-def _verify_planning_audit(plan_dir: Path, plan: dict[str, Any]) -> dict[str, Any]:
+def _verify_planning_audit(
+    plan_dir: Path,
+    plan: dict[str, Any],
+    *,
+    allow_legacy_missing: bool,
+) -> dict[str, Any]:
     _require(
         _enforcement_profile(plan) == PIPELINE_STRICT_ENFORCEMENT_PROFILE,
         "plan activation/completion requires enforcement_profile=strict_v2",
@@ -3743,35 +3947,47 @@ def _verify_planning_audit(plan_dir: Path, plan: dict[str, Any]) -> dict[str, An
         code="planning_audit_stale",
     )
     semantic_progress = _semantic_preflight_progress(plan_dir, plan)
-    execution_readiness = _semantic_execution_readiness(semantic_progress)
+    execution_readiness = _semantic_execution_readiness(
+        semantic_progress, allow_legacy_missing=allow_legacy_missing
+    )
     _require(
         receipt["semantic_preflight"] == semantic_progress
         and receipt["execution_readiness"] == execution_readiness,
         "planning audit semantic readiness is stale; run taskctl audit-plan again",
         code="planning_audit_stale",
     )
-    if semantic_progress["required"]:
-        _require_semantic_preflight_ready(plan_dir, plan)
+    _require_semantic_preflight_ready(
+        plan_dir,
+        plan,
+        allow_legacy_missing=allow_legacy_missing,
+    )
     _expect_object(receipt["counts"], "planning_audit_receipt.counts")
     return receipt
 
 
 def _command_audit_plan(args: argparse.Namespace) -> dict[str, Any]:
     plan_dir = _task_dir(args)
+    state: dict[str, Any] | None = None
     if args.candidate:
         plan_path = _resolve_task_input(args.candidate, plan_dir, "candidate plan")
         plan = _load_json(plan_path)
         _validate_plan(plan)
         _verify_scope_sources(plan, plan_dir)
     else:
-        plan, _state = _load_plan_state(plan_dir, require_state=False)
+        plan, state = _load_plan_state(plan_dir, require_state=False)
     _require(
         _enforcement_profile(plan) == PIPELINE_STRICT_ENFORCEMENT_PROFILE,
         "planning audit requires enforcement_profile=strict_v2",
         code="pipeline_profile_required",
     )
+    allow_legacy_missing = state is not None and not args.candidate
     semantic_progress = _semantic_preflight_progress(plan_dir, plan)
-    receipt = _planning_audit_payload(plan, semantic_progress)
+    execution_readiness = _semantic_execution_readiness(
+        semantic_progress, allow_legacy_missing=allow_legacy_missing
+    )
+    receipt = _planning_audit_payload(
+        plan, semantic_progress, execution_readiness
+    )
     path = _planning_audit_path(plan_dir, plan)
     _write_json_atomic(path, receipt)
     blocked = receipt["execution_readiness"] == "blocked"
@@ -3784,7 +4000,11 @@ def _command_audit_plan(args: argparse.Namespace) -> dict[str, Any]:
         "structural_status": receipt["structural_status"],
         "execution_readiness": receipt["execution_readiness"],
         "ready_for_execution": receipt["execution_readiness"] == "ready",
-        "activation_allowed": not blocked,
+        "activation_allowed": receipt["execution_readiness"] == "ready",
+        "legacy_continuation_allowed": (
+            receipt["execution_readiness"]
+            in {"legacy_structural_only", "legacy_semantic_v1"}
+        ),
         "semantic_preflight": semantic_progress,
         "receipt": path.relative_to(plan_dir).as_posix(),
         "counts": receipt["counts"],
@@ -3808,7 +4028,9 @@ def _command_validate(args: argparse.Namespace) -> dict[str, Any]:
             code="strict_profile_required",
         )
     semantic_progress = _semantic_preflight_progress(plan_dir, plan)
-    execution_readiness = _semantic_execution_readiness(semantic_progress)
+    execution_readiness = _semantic_execution_readiness(
+        semantic_progress, allow_legacy_missing=state is not None
+    )
     return {
         "ok": True,
         "plan_id": plan["plan_id"],
@@ -3817,8 +4039,10 @@ def _command_validate(args: argparse.Namespace) -> dict[str, Any]:
         "state": "valid" if state else "not_activated",
         "activation_allowed": (
             _enforcement_profile(plan) == PIPELINE_STRICT_ENFORCEMENT_PROFILE
-            and execution_readiness != "blocked"
+            and execution_readiness == "ready"
         ),
+        "legacy_continuation_allowed": execution_readiness
+        in {"legacy_structural_only", "legacy_semantic_v1"},
         "execution_readiness": execution_readiness,
         "ready_for_execution": execution_readiness == "ready",
         "semantic_preflight": semantic_progress,
@@ -3836,7 +4060,10 @@ def _command_activate(args: argparse.Namespace) -> dict[str, Any]:
         "new plan must declare enforcement_profile=strict_v2 before activation",
         code="pipeline_profile_required",
     )
-    planning_audit = _verify_planning_audit(plan_dir, plan)
+    _require_explicit_semantic_preflight_policy(plan)
+    planning_audit = _verify_planning_audit(
+        plan_dir, plan, allow_legacy_missing=False
+    )
     task_states = {task["id"]: _new_task_state() for task in plan["tasks"]}
     state = {
         "schema": STATE_SCHEMA,
@@ -3922,9 +4149,10 @@ def _command_resume(args: argparse.Namespace) -> dict[str, Any]:
     assert state is not None
     project_root = _project_root(plan_dir, args.project_root)
     semantic_progress = _semantic_preflight_progress(plan_dir, plan)
-    semantic_blocks_new_work = (
-        semantic_progress["required"] and semantic_progress["status"] != "pass"
+    semantic_readiness = _semantic_execution_readiness(
+        semantic_progress, allow_legacy_missing=True
     )
+    semantic_blocks_new_work = semantic_readiness == "blocked"
     tasks = _task_map(plan)
     evaluation_cache: dict[str, dict[str, Any]] = {}
     if state["active_package"]:
@@ -3948,6 +4176,7 @@ def _command_resume(args: argparse.Namespace) -> dict[str, Any]:
             "enforcement_profile": _enforcement_profile(plan),
             "completion_allowed": _enforcement_profile(plan)
             == PIPELINE_STRICT_ENFORCEMENT_PROFILE,
+            "execution_readiness": semantic_readiness,
             "semantic_preflight": semantic_progress,
             "new_work_blocked_by_semantic_preflight": semantic_blocks_new_work,
             "active_package": {
@@ -4034,6 +4263,7 @@ def _command_resume(args: argparse.Namespace) -> dict[str, Any]:
             _enforcement_profile(plan) == PIPELINE_STRICT_ENFORCEMENT_PROFILE
             and not semantic_blocks_new_work
         ),
+        "execution_readiness": semantic_readiness,
         "semantic_preflight": semantic_progress,
         "new_work_blocked_by_semantic_preflight": semantic_blocks_new_work,
         "active_package": None,
@@ -4073,7 +4303,9 @@ def _command_begin(args: argparse.Namespace) -> dict[str, Any]:
     plan_dir = _task_dir(args)
     plan, state = _load_plan_state(plan_dir)
     assert state is not None
-    _require_semantic_preflight_ready(plan_dir, plan)
+    _require_semantic_preflight_ready(
+        plan_dir, plan, allow_legacy_missing=True
+    )
     _require_revision(state, args.expected_revision)
     _require(state["active_package"] is None, "another work package is already active")
     selected = list(dict.fromkeys(args.task))
@@ -4975,6 +5207,7 @@ def _write_completion_receipt(
         "plan_revision": state["plan_revision"],
         "state_revision": state["revision"],
         "enforcement_profile": _enforcement_profile(plan),
+        "semantic_preflight": _semantic_preflight_progress(plan_dir, plan),
         "audited_task_ids": sorted(audited_task_ids),
         "audited_flow_ids": sorted(audited_flow_ids),
         "state_identity": _json_identity(state),
@@ -5012,7 +5245,9 @@ def _command_audit(args: argparse.Namespace) -> dict[str, Any]:
         )
     elif args.all:
         try:
-            _verify_planning_audit(plan_dir, plan)
+            _verify_planning_audit(
+                plan_dir, plan, allow_legacy_missing=True
+            )
         except TaskCtlError as exc:
             plan_failures.append(
                 {
@@ -5268,9 +5503,15 @@ def _amendment_impact(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any
         lowerings.append(
             "removed decision refs " + ",".join(sorted(removed_decision_refs))
         )
-    if old_semantic_preflight and not new_semantic_preflight:
-        lowerings.append("removed project semantic preflight")
-    elif old_semantic_preflight and new_semantic_preflight:
+    old_semantic_mode = (
+        old_semantic_preflight.get("mode") if old_semantic_preflight else None
+    )
+    new_semantic_mode = (
+        new_semantic_preflight.get("mode") if new_semantic_preflight else None
+    )
+    if old_semantic_mode == "required" and new_semantic_mode != "required":
+        lowerings.append("semantic preflight changed from required")
+    elif old_semantic_mode == "required" and new_semantic_mode == "required":
         removed_semantic_sources = set(
             old_semantic_preflight["scope_source_ids"]
         ) - set(new_semantic_preflight["scope_source_ids"])
@@ -5286,6 +5527,15 @@ def _amendment_impact(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any
             lowerings.append(
                 "semantic preflight removed dimensions "
                 + ",".join(sorted(removed_dimensions))
+            )
+        if (
+            new_semantic_preflight["expected_total_count"]
+            < old_semantic_preflight["expected_total_count"]
+        ):
+            lowerings.append(
+                "semantic preflight reduced expected identity count "
+                f"{old_semantic_preflight['expected_total_count']}->"
+                f"{new_semantic_preflight['expected_total_count']}"
             )
     for source_id, old_source in old_sources.items():
         new_source = new_sources.get(source_id)
@@ -5555,6 +5805,7 @@ def _command_amend(args: argparse.Namespace) -> dict[str, Any]:
     assert state is not None
     candidate = _load_json(_resolve_task_input(args.candidate, plan_dir, "candidate plan"))
     _validate_plan(candidate)
+    _require_explicit_semantic_preflight_policy(candidate)
     _require(
         _enforcement_profile(candidate) == PIPELINE_STRICT_ENFORCEMENT_PROFILE,
         "amended plan must declare enforcement_profile=strict_v2",
@@ -5580,7 +5831,9 @@ def _command_amend(args: argparse.Namespace) -> dict[str, Any]:
             "a lowering decision must already be recorded in the audited candidate plan",
             code="decision_ref_not_audited",
         )
-    _verify_planning_audit(plan_dir, candidate)
+    _verify_planning_audit(
+        plan_dir, candidate, allow_legacy_missing=False
+    )
     new_tasks = _task_map(candidate)
     old_task_states = state["task_states"]
     affected = set(impact["affected_tasks"])

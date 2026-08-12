@@ -1,5 +1,5 @@
 {
-  "schema": "task.semantic-preflight.v1",
+  "schema": "task.semantic-preflight.v2",
   "plan_id": "replace-with-plan-id",
   "design_revision": "replace-with-current-design-revision",
   "producer_source_id": "semantic-preflight-verifier",
@@ -7,6 +7,10 @@
     "migration-inventory": "sha256:replace-with-inventory-hash",
     "semantic-preflight-verifier": "sha256:replace-with-verifier-hash"
   },
+  "identity_set_fingerprint": "sha256:replace-with-canonical-identity-set-hash",
+  "identities": [
+    "replace-with-stable-identity-id"
+  ],
   "status": "blocked",
   "counts": {
     "total_count": 1,

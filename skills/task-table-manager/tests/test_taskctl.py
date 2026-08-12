@@ -16,6 +16,13 @@ assert SPEC and SPEC.loader
 TASKCTL = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(TASKCTL)
 
+SEMANTIC_IDENTITIES = [
+    "historical:alpha",
+    "historical:beta",
+    "historical:delta",
+    "historical:gamma",
+]
+
 
 def claim_rule() -> dict[str, object]:
     return {
@@ -239,6 +246,10 @@ def make_plan(
         "solution_steps": solution_steps,
         "gap_items": gap_items,
         "planning_audit": {"receipt_ref": "planning-audit.json"},
+        "semantic_preflight": {
+            "mode": "not_applicable",
+            "reason": "fixture plan has no bulk identity migration",
+        },
         "producers": {
             "machine": {
                 "version": "1",
@@ -267,17 +278,52 @@ def declare_semantic_preflight(
     receipt_ref: str = "semantic-preflight.design-v1.json",
     dimensions: list[str] | None = None,
 ) -> None:
+    semantic_sources = {
+        "semantic-identities": "semantic-identities.json",
+        "semantic-verifier": "task_tools/semantic-verifier.py",
+    }
+    known_sources = {source["id"] for source in plan["scope_sources"]}
+    for source_id, source_ref in semantic_sources.items():
+        if source_id in known_sources:
+            continue
+        plan["scope_sources"].append(
+            {
+                "id": source_id,
+                "ref": source_ref,
+                "fingerprint": "sha256:" + "0" * 64,
+                "inventory_mode": "advisory",
+                "requirement_ids": [],
+                "fingerprint_mode": "file_sha256",
+                "root": "task",
+            }
+        )
     plan["semantic_preflight"] = {
+        "mode": "required",
+        "reason": "fixture exercises bulk historical identity migration",
         "receipt_ref": receipt_ref,
-        "producer_source_id": "design",
-        "scope_source_ids": ["design"],
+        "identity_source_id": "semantic-identities",
+        "producer_source_id": "semantic-verifier",
+        "scope_source_ids": ["semantic-identities", "semantic-verifier"],
+        "expected_total_count": len(SEMANTIC_IDENTITIES),
+        "identity_set_fingerprint": TASKCTL._json_identity(
+            SEMANTIC_IDENTITIES
+        ),
         "required_dimensions": dimensions
-        or [
-            "coverage",
-            "evidence_binding",
-            "owner",
-            "successor_contract",
-        ],
+        or sorted(TASKCTL.SEMANTIC_PREFLIGHT_CORE_DIMENSIONS),
+    }
+
+
+def declare_legacy_semantic_preflight(plan: dict[str, object]) -> None:
+    declare_semantic_preflight(plan)
+    semantic = plan["semantic_preflight"]
+    plan["semantic_preflight"] = {
+        key: semantic[key]
+        for key in (
+            "receipt_ref",
+            "producer_source_id",
+            "scope_source_ids",
+            "required_dimensions",
+        )
     }
 
 
@@ -297,22 +343,28 @@ class TaskCtlTestCase(unittest.TestCase):
                 if (
                     source.get("fingerprint_mode") != "file_sha256"
                     or source.get("root") not in {"project", "task"}
-                    or not source.get("requirement_ids")
                 ):
                     continue
                 root = self.project if source["root"] == "project" else self.plan_dir
                 source_path = root / source["ref"]
                 source_path.parent.mkdir(parents=True, exist_ok=True)
-                inventory_ids = [
-                    *source.get("requirement_ids", []),
-                    *source.get("acceptance_clause_ids", []),
-                    *source.get("design_clause_ids", []),
-                    *source.get("solution_step_ids", []),
-                    *source.get("gap_ids", []),
-                ]
-                source_path.write_bytes(
-                    ("\n".join(inventory_ids) + "\n").encode("utf-8")
-                )
+                if source.get("requirement_ids"):
+                    inventory_ids = [
+                        *source.get("requirement_ids", []),
+                        *source.get("acceptance_clause_ids", []),
+                        *source.get("design_clause_ids", []),
+                        *source.get("solution_step_ids", []),
+                        *source.get("gap_ids", []),
+                    ]
+                    source_path.write_bytes(
+                        ("\n".join(inventory_ids) + "\n").encode("utf-8")
+                    )
+                elif source["id"] == "semantic-identities":
+                    source_path.write_bytes(TASKCTL._pretty_bytes(SEMANTIC_IDENTITIES))
+                else:
+                    source_path.write_text(
+                        "# deterministic fixture verifier\n", encoding="utf-8"
+                    )
                 fingerprint = TASKCTL._sha256_file(source_path)
                 source["fingerprint"] = fingerprint
                 source_id = source["id"]
@@ -448,14 +500,20 @@ class TaskCtlTestCase(unittest.TestCase):
         count_overrides: dict[str, object] | None = None,
         status: str | None = None,
         source_fingerprints: dict[str, str] | None = None,
+        identities: list[str] | None = None,
+        identity_set_fingerprint: str | None = None,
+        schema: str = "task.semantic-preflight.v2",
     ) -> Path:
         plan = plan or self.read_json(self.plan_dir / "plan.json")
         semantic = plan["semantic_preflight"]
         sources = {source["id"]: source for source in plan["scope_sources"]}
         dimensions = semantic["required_dimensions"]
+        identities = (
+            list(SEMANTIC_IDENTITIES) if identities is None else identities
+        )
         counts: dict[str, object] = {
-            "total_count": 4,
-            "resolved_count": 4,
+            "total_count": len(identities),
+            "resolved_count": len(identities),
             "unresolved_count": 0,
             "placeholder_count": 0,
             "duplicate_count": 0,
@@ -485,7 +543,7 @@ class TaskCtlTestCase(unittest.TestCase):
             or any(counts["dimension_unresolved_counts"].values())
         )
         receipt = {
-            "schema": "task.semantic-preflight.v1",
+            "schema": schema,
             "plan_id": plan["plan_id"],
             "design_revision": plan["design_revision"],
             "producer_source_id": semantic["producer_source_id"],
@@ -497,6 +555,14 @@ class TaskCtlTestCase(unittest.TestCase):
             "status": status or ("blocked" if blocked else "pass"),
             "counts": counts,
         }
+        if schema == "task.semantic-preflight.v2":
+            receipt.update(
+                {
+                    "identity_set_fingerprint": identity_set_fingerprint
+                    or TASKCTL._json_identity(identities),
+                    "identities": identities,
+                }
+            )
         path = self.plan_dir / semantic["receipt_ref"]
         self.write_json(path, receipt)
         return path
@@ -832,6 +898,7 @@ class TaskCtlTestCase(unittest.TestCase):
     def test_new_plan_requires_strict_profile_and_legacy_state_cannot_complete(self) -> None:
         plan = make_plan()
         plan.pop("enforcement_profile")
+        plan.pop("semantic_preflight")
         self.write_plan(plan)
         rejected = self.command("validate", "--task-dir", str(self.plan_dir), ok=False)
         self.assertEqual(rejected["error"]["code"], "strict_profile_required")
@@ -841,6 +908,7 @@ class TaskCtlTestCase(unittest.TestCase):
         self.activate()
         legacy_plan = self.read_json(self.plan_dir / "plan.json")
         legacy_plan.pop("enforcement_profile")
+        legacy_plan.pop("semantic_preflight")
         self.write_json(self.plan_dir / "plan.json", legacy_plan)
         state = self.state()
         state["plan_revision"] = TASKCTL._plan_hash(legacy_plan)
@@ -856,6 +924,7 @@ class TaskCtlTestCase(unittest.TestCase):
     def test_migrate_strict_makes_implicit_legacy_contract_explicit(self) -> None:
         plan = make_plan()
         plan.pop("enforcement_profile")
+        plan.pop("semantic_preflight")
         requirement = plan["requirements"][0]
         task_value = plan["tasks"][0]
         task_value.pop("completion_level")
@@ -877,6 +946,7 @@ class TaskCtlTestCase(unittest.TestCase):
     def test_migrate_strict_rejects_non_durable_requirement_source(self) -> None:
         plan = make_plan()
         plan.pop("enforcement_profile")
+        plan.pop("semantic_preflight")
         source = plan["scope_sources"][0]
         source.update(
             {
@@ -1077,22 +1147,184 @@ class TaskCtlTestCase(unittest.TestCase):
         self.assertTrue((self.plan_dir / active_audit["receipt"]).is_file())
         self.assertTrue((self.plan_dir / candidate_audit["receipt"]).is_file())
         TASKCTL._verify_planning_audit(
-            self.plan_dir, self.read_json(self.plan_dir / "plan.json")
+            self.plan_dir,
+            self.read_json(self.plan_dir / "plan.json"),
+            allow_legacy_missing=False,
         )
 
-    def test_structural_audit_does_not_claim_execution_readiness(self) -> None:
+    def test_candidate_amend_requires_explicit_semantic_policy(self) -> None:
+        self.write_plan(make_plan())
+        self.activate()
+        candidate = make_plan()
+        candidate.pop("semantic_preflight")
+        candidate_path = self.plan_dir / "candidate-without-policy.json"
+        self.write_json(candidate_path, candidate)
+
+        audit = self.command(
+            "audit-plan",
+            "--task-dir",
+            str(self.plan_dir),
+            "--candidate",
+            str(candidate_path),
+            ok=False,
+        )
+        amend = self.command(
+            "amend",
+            "--task-dir",
+            str(self.plan_dir),
+            "--candidate",
+            str(candidate_path),
+            ok=False,
+        )
+
+        self.assertEqual(
+            audit["error"]["code"], "semantic_preflight_policy_required"
+        )
+        self.assertEqual(
+            amend["error"]["code"], "semantic_preflight_policy_required"
+        )
+
+    def test_new_plan_without_semantic_policy_is_blocked(self) -> None:
+        plan = make_plan()
+        plan.pop("semantic_preflight")
+        self.write_plan(plan)
+
+        audit = self.command(
+            "audit-plan", "--task-dir", str(self.plan_dir), ok=False
+        )
+
+        self.assertEqual(audit["structural_status"], "pass")
+        self.assertEqual(audit["execution_readiness"], "blocked")
+        self.assertFalse(audit["ready_for_execution"])
+        self.assertEqual(
+            audit["semantic_preflight"]["status"], "not_declared"
+        )
+        self.assertEqual(
+            audit["error"]["code"], "semantic_preflight_policy_required"
+        )
+        rejected = self.command(
+            "activate", "--task-dir", str(self.plan_dir), ok=False
+        )
+        self.assertEqual(
+            rejected["error"]["code"], "semantic_preflight_policy_required"
+        )
+
+    def test_not_applicable_policy_is_explicit_and_ready(self) -> None:
         plan = make_plan()
         self.write_plan(plan)
 
         audit = self.command("audit-plan", "--task-dir", str(self.plan_dir))
 
-        self.assertEqual(audit["structural_status"], "pass")
-        self.assertEqual(audit["execution_readiness"], "structural_only")
-        self.assertFalse(audit["ready_for_execution"])
+        self.assertEqual(audit["execution_readiness"], "ready")
+        self.assertTrue(audit["ready_for_execution"])
         self.assertEqual(
-            audit["semantic_preflight"]["status"], "not_declared"
+            audit["semantic_preflight"]["status"], "not_applicable"
         )
         self.command("activate", "--task-dir", str(self.plan_dir))
+
+    def test_activated_legacy_plan_can_continue_without_policy(self) -> None:
+        plan = make_plan()
+        plan.pop("semantic_preflight")
+        self.write_plan(plan)
+        state = {
+            "schema": "task.state.v1",
+            "plan_id": plan["plan_id"],
+            "plan_revision": TASKCTL._plan_hash(plan),
+            "revision": 1,
+            "active_package": None,
+            "task_states": {
+                task["id"]: TASKCTL._new_task_state() for task in plan["tasks"]
+            },
+        }
+        TASKCTL._recompute_ready(plan, state)
+        self.write_json(self.plan_dir / "state.json", state)
+
+        audit = self.command("audit-plan", "--task-dir", str(self.plan_dir))
+        resumed = self.command("resume", "--task-dir", str(self.plan_dir))
+
+        self.assertEqual(
+            audit["execution_readiness"], "legacy_structural_only"
+        )
+        self.assertFalse(audit["ready_for_execution"])
+        self.assertTrue(audit["legacy_continuation_allowed"])
+        self.assertEqual(resumed["ready_ids"], ["T1"])
+        self.assertTrue(resumed["completion_allowed"])
+
+    def test_activated_v1_semantic_plan_continues_only_as_legacy(self) -> None:
+        plan = make_plan()
+        declare_legacy_semantic_preflight(plan)
+        self.write_plan(plan)
+        self.write_semantic_receipt(
+            plan, schema="task.semantic-preflight.v1"
+        )
+        state = {
+            "schema": "task.state.v1",
+            "plan_id": plan["plan_id"],
+            "plan_revision": TASKCTL._plan_hash(plan),
+            "revision": 1,
+            "active_package": None,
+            "task_states": {
+                task["id"]: TASKCTL._new_task_state() for task in plan["tasks"]
+            },
+        }
+        TASKCTL._recompute_ready(plan, state)
+        self.write_json(self.plan_dir / "state.json", state)
+
+        audit = self.command("audit-plan", "--task-dir", str(self.plan_dir))
+        resumed = self.command("resume", "--task-dir", str(self.plan_dir))
+
+        self.assertEqual(audit["execution_readiness"], "legacy_semantic_v1")
+        self.assertFalse(audit["ready_for_execution"])
+        self.assertTrue(audit["legacy_continuation_allowed"])
+        self.assertEqual(resumed["ready_ids"], ["T1"])
+
+        self.write_semantic_receipt(
+            plan,
+            schema="task.semantic-preflight.v1",
+            count_overrides={
+                "resolved_count": 3,
+                "unresolved_count": 1,
+                "dimension_unresolved_counts": {"owner": 1},
+            },
+        )
+        blocked_resume = self.command(
+            "resume", "--task-dir", str(self.plan_dir)
+        )
+        rejected_begin = self.command(
+            "begin",
+            "--task-dir",
+            str(self.plan_dir),
+            "--task",
+            "T1",
+            "--expected-revision",
+            "1",
+            ok=False,
+        )
+        self.assertEqual(blocked_resume["execution_readiness"], "blocked")
+        self.assertEqual(blocked_resume["semantic_blocked_ids"], ["T1"])
+        self.assertEqual(
+            rejected_begin["error"]["code"], "semantic_preflight_unresolved"
+        )
+
+    def test_new_v1_semantic_plan_requires_explicit_v2_policy(self) -> None:
+        plan = make_plan()
+        declare_legacy_semantic_preflight(plan)
+        self.write_plan(plan)
+        self.write_semantic_receipt(
+            plan, schema="task.semantic-preflight.v1"
+        )
+
+        audit = self.command(
+            "audit-plan", "--task-dir", str(self.plan_dir), ok=False
+        )
+        rejected = self.command(
+            "activate", "--task-dir", str(self.plan_dir), ok=False
+        )
+
+        self.assertEqual(audit["execution_readiness"], "blocked")
+        self.assertEqual(
+            rejected["error"]["code"], "semantic_preflight_policy_required"
+        )
 
     def test_declared_semantic_preflight_blocks_when_receipt_is_missing(self) -> None:
         plan = make_plan()
@@ -1139,7 +1371,7 @@ class TaskCtlTestCase(unittest.TestCase):
             "missing_row": {
                 "resolved_count": 3,
                 "unresolved_count": 1,
-                "dimension_unresolved_counts": {"coverage": 1},
+                "dimension_unresolved_counts": {"input_output": 1},
             },
             "duplicate_row": {"duplicate_count": 1},
             "irrelevant_evidence": {
@@ -1192,7 +1424,104 @@ class TaskCtlTestCase(unittest.TestCase):
         self.write_plan(plan)
         self.write_semantic_receipt(
             plan,
-            source_fingerprints={"design": "sha256:" + "0" * 64},
+            source_fingerprints={
+                "semantic-identities": "sha256:" + "0" * 64,
+                "semantic-verifier": next(
+                    source["fingerprint"]
+                    for source in plan["scope_sources"]
+                    if source["id"] == "semantic-verifier"
+                ),
+            },
+        )
+
+        audit = self.command(
+            "audit-plan", "--task-dir", str(self.plan_dir), ok=False
+        )
+
+        self.assertEqual(audit["semantic_preflight"]["status"], "invalid")
+        self.assertEqual(
+            audit["error"]["code"], "semantic_preflight_invalid"
+        )
+
+    def test_required_policy_rejects_missing_core_dimension(self) -> None:
+        plan = make_plan()
+        dimensions = sorted(
+            TASKCTL.SEMANTIC_PREFLIGHT_CORE_DIMENSIONS - {"lifecycle"}
+        )
+        declare_semantic_preflight(plan, dimensions=dimensions)
+        self.write_plan(plan)
+
+        rejected = self.command(
+            "audit-plan", "--task-dir", str(self.plan_dir), ok=False
+        )
+
+        self.assertEqual(rejected["error"]["code"], "invalid")
+        self.assertIn("missing core dimensions", rejected["error"]["message"])
+
+    def test_required_policy_rejects_inventory_verifier_file_alias(self) -> None:
+        plan = make_plan()
+        declare_semantic_preflight(plan)
+        identity_source = next(
+            source
+            for source in plan["scope_sources"]
+            if source["id"] == "semantic-identities"
+        )
+        verifier_source = next(
+            source
+            for source in plan["scope_sources"]
+            if source["id"] == "semantic-verifier"
+        )
+        verifier_source["root"] = identity_source["root"]
+        verifier_source["ref"] = identity_source["ref"]
+        self.write_plan(plan)
+
+        rejected = self.command(
+            "audit-plan", "--task-dir", str(self.plan_dir), ok=False
+        )
+
+        self.assertEqual(rejected["error"]["code"], "invalid")
+        self.assertIn("different files", rejected["error"]["message"])
+
+    def test_semantic_preflight_rejects_incomplete_identity_set(self) -> None:
+        plan = make_plan()
+        declare_semantic_preflight(plan)
+        self.write_plan(plan)
+        self.write_semantic_receipt(plan, identities=SEMANTIC_IDENTITIES[:-1])
+
+        audit = self.command(
+            "audit-plan", "--task-dir", str(self.plan_dir), ok=False
+        )
+
+        self.assertEqual(audit["semantic_preflight"]["status"], "invalid")
+        self.assertEqual(
+            audit["error"]["code"], "semantic_preflight_invalid"
+        )
+
+    def test_semantic_preflight_rejects_duplicate_identity(self) -> None:
+        plan = make_plan()
+        declare_semantic_preflight(plan)
+        self.write_plan(plan)
+        self.write_semantic_receipt(
+            plan,
+            identities=[*SEMANTIC_IDENTITIES, SEMANTIC_IDENTITIES[-1]],
+        )
+
+        audit = self.command(
+            "audit-plan", "--task-dir", str(self.plan_dir), ok=False
+        )
+
+        self.assertEqual(audit["semantic_preflight"]["status"], "invalid")
+        self.assertEqual(
+            audit["error"]["code"], "semantic_preflight_invalid"
+        )
+
+    def test_semantic_preflight_rejects_wrong_total_count(self) -> None:
+        plan = make_plan()
+        declare_semantic_preflight(plan)
+        self.write_plan(plan)
+        self.write_semantic_receipt(
+            plan,
+            count_overrides={"total_count": 1, "resolved_count": 1},
         )
 
         audit = self.command(
@@ -1224,7 +1553,10 @@ class TaskCtlTestCase(unittest.TestCase):
             rendered["semantic_preflight"]["unresolved_count"], 0
         )
         markdown = (self.plan_dir / "TASK_TABLE.md").read_text(encoding="utf-8")
-        self.assertIn("semantic_preflight: status=pass, unresolved=0", markdown)
+        self.assertIn(
+            "semantic_preflight: mode=required, status=pass, total=4, unresolved=0",
+            markdown,
+        )
 
         self.write_semantic_receipt(
             plan,
@@ -1626,7 +1958,7 @@ class TaskCtlTestCase(unittest.TestCase):
         audit = self.command("audit", "--task-dir", str(self.plan_dir), "--all")
         self.assertEqual(audit["failed_flow_ids"], [])
         self.assertEqual(audit["task_status_counts"]["done"], 1)
-        self.assertEqual(audit["semantic_preflight"]["status"], "not_declared")
+        self.assertEqual(audit["semantic_preflight"]["status"], "not_applicable")
         self.assertEqual(audit["product_evidence"]["closed_task_count"], 1)
         self.assertEqual(audit["product_evidence"]["unresolved_task_count"], 0)
         self.assertTrue(
@@ -1637,8 +1969,12 @@ class TaskCtlTestCase(unittest.TestCase):
         completion_path = self.plan_dir / completion["path"]
         self.assertTrue(completion_path.is_file())
         stored = self.read_json(completion_path)
+        self.assertEqual(stored["schema"], "task.completion.v2")
         self.assertEqual(stored["receipt_id"], completion["id"])
         self.assertEqual(stored["plan_revision"], self.state()["plan_revision"])
+        self.assertEqual(
+            stored["semantic_preflight"]["status"], "not_applicable"
+        )
 
     def test_coverage_matrix_requires_a_vertical_receipt_for_each_scope(self) -> None:
         plan = make_plan()
@@ -1947,6 +2283,11 @@ class TaskCtlTestCase(unittest.TestCase):
         template = json.loads(
             (SKILL_ROOT / "assets" / "templates" / "plan.json").read_text(encoding="utf-8")
         )
+        with self.assertRaises(TASKCTL.TaskCtlError):
+            TASKCTL._validate_plan(template)
+        template["semantic_preflight"]["reason"] = (
+            "template fixture has no bulk identity migration"
+        )
         TASKCTL._validate_plan(template)
 
     def test_packaged_semantic_preflight_template_matches_the_cli_contract(self) -> None:
@@ -1964,22 +2305,27 @@ class TaskCtlTestCase(unittest.TestCase):
         plan = make_plan()
         declare_semantic_preflight(plan, dimensions=dimensions)
         self.write_plan(plan)
-        design_source = plan["scope_sources"][0]
+        sources = {source["id"]: source for source in plan["scope_sources"]}
         template.update(
             {
                 "plan_id": plan["plan_id"],
                 "design_revision": plan["design_revision"],
-                "producer_source_id": "design",
+                "producer_source_id": "semantic-verifier",
                 "source_fingerprints": {
-                    "design": design_source["fingerprint"]
+                    source_id: sources[source_id]["fingerprint"]
+                    for source_id in plan["semantic_preflight"]["scope_source_ids"]
                 },
+                "identity_set_fingerprint": TASKCTL._json_identity(
+                    SEMANTIC_IDENTITIES
+                ),
+                "identities": SEMANTIC_IDENTITIES,
                 "status": "pass",
             }
         )
         template["counts"].update(
             {
-                "total_count": 1,
-                "resolved_count": 1,
+                "total_count": len(SEMANTIC_IDENTITIES),
+                "resolved_count": len(SEMANTIC_IDENTITIES),
                 "unresolved_count": 0,
                 "placeholder_count": 0,
                 "duplicate_count": 0,

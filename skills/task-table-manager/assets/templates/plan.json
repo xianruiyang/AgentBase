@@ -113,6 +113,10 @@
   "planning_audit": {
     "receipt_ref": "planning-audit.json"
   },
+  "semantic_preflight": {
+    "mode": "not_applicable",
+    "reason": ""
+  },
   "producers": {
     "test-runner": {
       "version": "replace-with-version",
