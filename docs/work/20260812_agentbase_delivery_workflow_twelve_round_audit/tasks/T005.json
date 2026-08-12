@@ -1,0 +1,38 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "第4轮已验证版本"
+      ],
+      "id": "T004",
+      "type": "hard"
+    }
+  ],
+  "id": "T005",
+  "mutation_scope": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/tooling.md"
+  ],
+  "outcome": "模型能够用固定小输出完整遍历任务、推荐项、依赖和后继",
+  "outputs": [
+    "四类查询的 ID 游标分页",
+    "第6轮可审查的新版本"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-005",
+    "GAP-005",
+    "DES-006",
+    "AC-002",
+    "AC-003",
+    "REQ-001"
+  ],
+  "suggested_skills": [],
+  "title": "第5轮补齐常用任务查询分页",
+  "verification": [
+    "逐页遍历无重复无缺失；无效游标 JSON 失败；回归通过"
+  ]
+}

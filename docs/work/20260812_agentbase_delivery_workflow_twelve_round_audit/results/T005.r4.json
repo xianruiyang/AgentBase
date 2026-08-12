@@ -1,0 +1,23 @@
+{
+  "changed_files": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/tooling.md"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "list、next、deps 和 dependents 支持低 Token ID 游标分页并能完整遍历当前结果",
+  "outputs": [
+    "四类查询的 ID 游标分页",
+    "第6轮可审查的新版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T005",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "task-table-manager tests - 43/43 passed",
+    "delivery-workflow tests - 22/22 passed",
+    "当前工作区 limit=2 逐页返回 T001..T005，无重复无缺失",
+    "无效游标返回 JSON 错误并要求从第一页重读"
+  ]
+}

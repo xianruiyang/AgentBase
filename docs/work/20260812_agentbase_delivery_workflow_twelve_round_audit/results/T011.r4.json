@@ -1,0 +1,24 @@
+{
+  "changed_files": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/tooling.md"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "TASK_TABLE.md 与 status 共享已校验的当前结果事实，并显式报告需复核及结果闭合数量",
+  "outputs": [
+    "可信的任务表 Markdown 投影",
+    "第12轮可审查的新版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T011",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "task-table-manager tests - 46/46 passed",
+    "delivery-workflow tests - 24/24 passed",
+    "真实 TASK_TABLE.md 显示需复核0、当前结果10、含验证结果10、含未决结果0",
+    "损坏当前结果反例使 render 有界失败",
+    "taskctl.py py_compile passed"
+  ]
+}

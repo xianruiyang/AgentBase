@@ -57,6 +57,25 @@ class TaskctlError(RuntimeError):
     pass
 
 
+class JsonArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        emit({"ok": False, "error": f"argument error: {message}"}, stream=sys.stderr)
+        raise SystemExit(2)
+
+
+def normalize_manifest_text(value: Any, field: str, *, writing: bool = False) -> str:
+    if not isinstance(value, str):
+        raise TaskctlError(f"{field} must be a string")
+    cleaned = value.strip()
+    if not cleaned:
+        raise TaskctlError(f"{field} must not be empty")
+    if len(cleaned) > MAX_STRING:
+        raise TaskctlError(f"{field} exceeds {MAX_STRING} characters")
+    if not writing and value != cleaned:
+        raise TaskctlError(f"{field} must not contain surrounding whitespace")
+    return cleaned
+
+
 def compact_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
@@ -177,9 +196,8 @@ def load_table(root: Path) -> dict[str, Any]:
     table = read_json(path)
     if not isinstance(table, dict) or table.get("schema") != "task.table":
         raise TaskctlError(f"unsupported task table manifest: {path}")
-    table_id = table.get("id")
-    if not isinstance(table_id, str) or not table_id.strip():
-        raise TaskctlError("task-table.json id must be a non-empty string")
+    table_id = normalize_manifest_text(table.get("id"), "task-table.json id")
+    normalize_manifest_text(table.get("title"), "task-table.json title")
     resolved_paths: dict[str, Path] = {}
     for field, default in (
         ("task_dir", "tasks"),
@@ -390,6 +408,15 @@ def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
         raise TaskctlError(f"completed state for {task_id} must reference a result")
     if status != "done" and result_ref is not None:
         raise TaskctlError(f"non-completed state for {task_id} must not reference a result")
+    blocked_reason = require_string(
+        raw.get("blocked_reason", ""),
+        f"state.blocked_reason[{task_id}]",
+        allow_empty=True,
+    )
+    if status == "blocked" and not blocked_reason:
+        raise TaskctlError(f"blocked state for {task_id} must have a blocked reason")
+    if status != "blocked" and blocked_reason:
+        raise TaskctlError(f"non-blocked state for {task_id} must not have a blocked reason")
     return {
         "schema": "task.state",
         "task_id": task_id,
@@ -397,11 +424,7 @@ def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
         "owner": owner,
         "revision": revision,
         "note": require_string(raw.get("note", ""), f"state.note[{task_id}]", allow_empty=True),
-        "blocked_reason": require_string(
-            raw.get("blocked_reason", ""),
-            f"state.blocked_reason[{task_id}]",
-            allow_empty=True,
-        ),
+        "blocked_reason": blocked_reason,
         "next_action": require_string(
             raw.get("next_action", ""),
             f"state.next_action[{task_id}]",
@@ -578,8 +601,8 @@ def load_workflow(root: Path) -> dict[str, Any] | None:
     if not isinstance(workflow, dict) or workflow.get("schema") != "delivery.workflow":
         raise TaskctlError(f"unsupported workflow manifest: {path}")
     workflow_id = workflow.get("id")
-    if not isinstance(workflow_id, str) or not workflow_id.strip():
-        raise TaskctlError("workflow.json id must be a non-empty string")
+    normalize_manifest_text(workflow_id, "workflow.json id")
+    normalize_manifest_text(workflow.get("title"), "workflow.json title")
     fixed_fields = {
         "task_table": "task-table.json",
         "protected_baseline": "protected-baseline.json",
@@ -625,6 +648,11 @@ def verify_protected_sources(
         raise TaskctlError(f"unsupported protected baseline: {baseline_path}")
     if baseline.get("workflow_id") != workflow.get("id"):
         raise TaskctlError("protected baseline belongs to a different workflow")
+    if baseline.get("confirmed_by") != "user":
+        raise TaskctlError("protected baseline must be confirmed by the user")
+    normalize_manifest_text(
+        baseline.get("confirmation_ref"), "protected baseline confirmation_ref"
+    )
     documents = baseline.get("documents")
     if not isinstance(documents, dict):
         raise TaskctlError("protected baseline documents must be an object")
@@ -894,6 +922,14 @@ def parse_dependency(raw: str) -> dict[str, Any]:
 
 def command_init(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.task_dir)
+    table_id = normalize_manifest_text(args.id, "--id", writing=True)
+    title = normalize_manifest_text(args.title, "--title", writing=True)
+    workflow = load_workflow(root)
+    if workflow is not None:
+        if table_id != workflow["id"]:
+            raise TaskctlError("--id must match the existing workflow id")
+        if title != workflow["title"]:
+            raise TaskctlError("--title must match the existing workflow title")
     root.mkdir(parents=True, exist_ok=True)
     conflicts = [
         relative
@@ -911,8 +947,8 @@ def command_init(args: argparse.Namespace) -> dict[str, Any]:
         (root / directory).mkdir(parents=True, exist_ok=True)
     table = {
         "schema": "task.table",
-        "id": args.id,
-        "title": args.title,
+        "id": table_id,
+        "title": title,
         "task_dir": "tasks",
         "state_dir": "state",
         "result_dir": "results",
@@ -1096,6 +1132,25 @@ def fit_payload(payload: dict[str, Any], budget: int) -> dict[str, Any]:
     return minimal
 
 
+def page_after_id(
+    items: list[dict[str, Any]], after_id: str | None, limit: int
+) -> tuple[list[dict[str, Any]], str | None]:
+    remaining = items
+    if after_id is not None:
+        cursor_index = next(
+            (index for index, item in enumerate(items) if item.get("id") == after_id),
+            None,
+        )
+        if cursor_index is None:
+            raise TaskctlError(
+                f"pagination cursor is not present in the current result: {after_id}; restart from the first page"
+            )
+        remaining = items[cursor_index + 1 :]
+    page = remaining[:limit]
+    next_after_id = page[-1]["id"] if len(remaining) > len(page) and page else None
+    return page, next_after_id
+
+
 def command_show(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.task_dir)
     table = load_table(root)
@@ -1137,13 +1192,15 @@ def command_list(args: argparse.Namespace) -> dict[str, Any]:
                 "state_revision": state["revision"],
             }
         )
+    page, next_after_id = page_after_id(rows, args.after_id, args.limit)
     return {
         "ok": True,
         "command": "list",
         "counts": counts_for(states),
-        "items": rows[: args.limit],
+        "items": page,
         "matched_count": len(rows),
-        "truncated": len(rows) > args.limit,
+        "next_after_id": next_after_id,
+        "truncated": next_after_id is not None,
     }
 
 
@@ -1205,7 +1262,7 @@ def command_deps(args: argparse.Namespace) -> dict[str, Any]:
     direct_types = {
         dependency["id"]: dependency["type"] for dependency in tasks[args.id]["dependencies"]
     }
-    for dependency_id in ids[: args.limit]:
+    for dependency_id in ids:
         if dependency_id in tasks:
             items.append(
                 {
@@ -1224,13 +1281,15 @@ def command_deps(args: argparse.Namespace) -> dict[str, Any]:
                     "type": direct_types.get(dependency_id, "transitive"),
                 }
             )
+    page, next_after_id = page_after_id(items, args.after_id, args.limit)
     return {
         "ok": True,
         "command": "deps",
         "id": args.id,
-        "items": items,
+        "items": page,
         "dependency_count": len(ids),
-        "truncated": len(ids) > args.limit,
+        "next_after_id": next_after_id,
+        "truncated": next_after_id is not None,
     }
 
 
@@ -1242,20 +1301,23 @@ def command_dependents(args: argparse.Namespace) -> dict[str, Any]:
         raise TaskctlError(f"unknown task: {args.id}")
     states = load_states(root, table, tasks)
     ids = dependent_ids(tasks, args.id, args.recursive)
+    items = [
+        {
+            "id": dependent_id,
+            "title": tasks[dependent_id]["title"],
+            "status": states[dependent_id]["status"],
+        }
+        for dependent_id in ids
+    ]
+    page, next_after_id = page_after_id(items, args.after_id, args.limit)
     return {
         "ok": True,
         "command": "dependents",
         "id": args.id,
-        "items": [
-            {
-                "id": dependent_id,
-                "title": tasks[dependent_id]["title"],
-                "status": states[dependent_id]["status"],
-            }
-            for dependent_id in ids[: args.limit]
-        ],
+        "items": page,
         "dependent_count": len(ids),
-        "truncated": len(ids) > args.limit,
+        "next_after_id": next_after_id,
+        "truncated": next_after_id is not None,
     }
 
 
@@ -1306,14 +1368,16 @@ def command_next(args: argparse.Namespace) -> dict[str, Any]:
             )
         )
     rows.sort(key=lambda row: row[0])
-    items = [row[1] for row in rows[: args.limit]]
+    ordered_items = [row[1] for row in rows]
+    items, next_after_id = page_after_id(ordered_items, args.after_id, args.limit)
     return {
         "ok": True,
         "command": "next",
         "items": items,
         "candidate_count": len(rows),
         "recommended_count": sum(row[1]["recommended"] for row in rows),
-        "truncated": len(rows) > args.limit,
+        "next_after_id": next_after_id,
+        "truncated": next_after_id is not None,
         "note": "recommendation is advisory and does not grant or deny execution",
     }
 
@@ -1471,6 +1535,7 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
                 }
             ),
             "targets": [],
+            "returned_streams": [],
             "diagnostics": diagnostics,
             "note": "no final judgment is produced",
         }
@@ -1511,7 +1576,27 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         for value in baseline_requirement_ids
         if value.split("-", 1)[0] == "CON"
     )
-    if args.target_id:
+    target_stream_continuation = bool(
+        args.after_id
+        or args.candidate_after_id
+        or (args.target_id and args.snapshot_id)
+    )
+    constraint_stream_continuation = args.constraint_after_id is not None
+    deferred_stream_continuation = args.deferred_after_id is not None
+    has_stream_continuation = any(
+        (
+            target_stream_continuation,
+            constraint_stream_continuation,
+            deferred_stream_continuation,
+        )
+    )
+    include_targets = not has_stream_continuation or target_stream_continuation
+    include_constraints = not has_stream_continuation or constraint_stream_continuation
+    include_deferred = not has_stream_continuation or deferred_stream_continuation
+
+    if not include_targets:
+        filtered_target_ids = []
+    elif args.target_id:
         if args.target_id not in all_target_ids:
             raise TaskctlError(f"unknown protected completion target: {args.target_id}")
         filtered_target_ids = [args.target_id]
@@ -1593,14 +1678,20 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         for value in index.get("deferred_change_ids", [])
         if isinstance(value, str)
     )
-    constraint_page_ids = [
-        value for value in constraint_ids if not args.constraint_after_id or value > args.constraint_after_id
-    ]
-    constraint_page_ids = constraint_page_ids[: args.max_items]
-    deferred_page_ids = [
-        value for value in deferred_ids if not args.deferred_after_id or value > args.deferred_after_id
-    ]
-    deferred_page_ids = deferred_page_ids[: args.max_items]
+    constraint_page_ids = []
+    if include_constraints:
+        constraint_page_ids = [
+            value
+            for value in constraint_ids
+            if not args.constraint_after_id or value > args.constraint_after_id
+        ][: args.max_items]
+    deferred_page_ids = []
+    if include_deferred:
+        deferred_page_ids = [
+            value
+            for value in deferred_ids
+            if not args.deferred_after_id or value > args.deferred_after_id
+        ][: args.max_items]
 
     def section_summary(section_id: str) -> dict[str, Any]:
         definitions = section_rows.get(section_id, [])
@@ -1618,12 +1709,24 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         }
 
     target_more = len(filtered_target_ids) > len(target_rows)
-    constraint_remaining = [
-        value for value in constraint_ids if not args.constraint_after_id or value > args.constraint_after_id
-    ]
-    deferred_remaining = [
-        value for value in deferred_ids if not args.deferred_after_id or value > args.deferred_after_id
-    ]
+    constraint_remaining = (
+        [
+            value
+            for value in constraint_ids
+            if not args.constraint_after_id or value > args.constraint_after_id
+        ]
+        if include_constraints
+        else []
+    )
+    deferred_remaining = (
+        [
+            value
+            for value in deferred_ids
+            if not args.deferred_after_id or value > args.deferred_after_id
+        ]
+        if include_deferred
+        else []
+    )
     pagination = {
         "target_next_after_id": (
             target_rows[-1]["id"] if target_more and target_rows else None
@@ -1654,6 +1757,15 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         "open_deferred_change_count": len(deferred_ids),
         "returned_open_deferred_change_count": len(deferred_page_ids),
         "open_deferred_changes": [section_summary(value) for value in deferred_page_ids],
+        "returned_streams": [
+            stream
+            for stream, included in (
+                ("targets", include_targets),
+                ("constraints", include_constraints),
+                ("deferred_changes", include_deferred),
+            )
+            if included
+        ],
         "pagination": pagination,
         "diagnostics": diagnostics,
         "note": (
@@ -1878,6 +1990,12 @@ def command_note(args: argparse.Namespace) -> dict[str, Any]:
             state["blocked_reason"] = require_string(
                 args.blocked_reason, "note.blocked_reason", allow_empty=True
             )
+            if state["blocked_reason"] and args.status is None:
+                state["status"] = "blocked"
+            if not state["blocked_reason"] and state["status"] == "blocked":
+                raise TaskctlError(
+                    "clearing a blocked reason requires a non-blocked --status"
+                )
         if args.next_action is not None:
             state["next_action"] = require_string(
                 args.next_action, "note.next_action", allow_empty=True
@@ -1903,6 +2021,10 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
         check_expected_state(state, args.expected_state_revision)
         if state["status"] == "done":
             raise TaskctlError("task is already complete")
+        if state["status"] not in {"in_progress", "review"}:
+            raise TaskctlError(
+                "a task can only be completed from in_progress or review"
+            )
         check_owner(state, args.owner)
         state["owner"] = args.owner
         _, _, result_dir = table_paths(root, table)
@@ -2011,9 +2133,10 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
     table = load_table(root)
     tasks = load_tasks(root, table)
     states = load_states(root, table, tasks)
-    index, _ = maybe_load_index(root, table)
+    storage = summarize_loaded_task_storage(root, table, tasks, states)
+    index, index_diagnostics = maybe_load_index(root, table)
     output_path = resolve_inside(root, str(table.get("table_view", "TASK_TABLE.md")))
-    counts = counts_for(states)
+    counts = storage["counts"]
     lines = [
         f"# {table.get('title') or table.get('id') or 'Tasks'}",
         "",
@@ -2026,6 +2149,17 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
     ]
     for status in STATUSES:
         lines.append(f"| {status} | {counts[status]} |")
+    lines.extend(
+        [
+            "",
+            "## 复核与结果",
+            "",
+            f"- 需复核任务：{counts['review']}",
+            f"- 当前有效结果：{storage['result_count']}",
+            f"- 含验证结果：{storage['result_with_verification_count']}",
+            f"- 含未决结果：{storage['result_with_unresolved_count']}",
+        ]
+    )
     if index is not None:
         summary = index.get("summary", {})
         lines.extend(
@@ -2075,6 +2209,15 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
         "output": str(output_path),
         "task_count": len(tasks),
         "status_counts": counts,
+        "needs_review_count": counts["review"],
+        "results": {
+            "current_result_count": storage["result_count"],
+            "result_with_verification_count": storage[
+                "result_with_verification_count"
+            ],
+            "result_with_unresolved_count": storage["result_with_unresolved_count"],
+        },
+        "index_diagnostics": index_diagnostics,
     }
 
 
@@ -2092,7 +2235,7 @@ def add_state_revision(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = JsonArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init")
@@ -2137,6 +2280,7 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser = subparsers.add_parser("list")
     add_common(list_parser)
     add_limit(list_parser)
+    list_parser.add_argument("--after-id")
     list_parser.add_argument("--status", action="append", choices=STATUSES)
     list_parser.set_defaults(handler=command_list)
 
@@ -2145,6 +2289,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_limit(deps_parser)
     deps_parser.add_argument("--id", required=True)
     deps_parser.add_argument("--recursive", action="store_true")
+    deps_parser.add_argument("--after-id")
     deps_parser.set_defaults(handler=command_deps)
 
     dependents_parser = subparsers.add_parser("dependents")
@@ -2152,6 +2297,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_limit(dependents_parser)
     dependents_parser.add_argument("--id", required=True)
     dependents_parser.add_argument("--recursive", action="store_true")
+    dependents_parser.add_argument("--after-id")
     dependents_parser.set_defaults(handler=command_dependents)
 
     next_parser = subparsers.add_parser("next")
@@ -2160,6 +2306,7 @@ def build_parser() -> argparse.ArgumentParser:
     next_parser.add_argument("--owner")
     next_parser.add_argument("--include-blocked", action="store_true")
     next_parser.add_argument("--diagnostic-limit", type=int, default=10)
+    next_parser.add_argument("--after-id")
     next_parser.set_defaults(handler=command_next)
 
     context_parser = subparsers.add_parser("context")
@@ -2284,6 +2431,22 @@ def validate_args(args: argparse.Namespace) -> None:
         )
         if has_cursor and not args.snapshot_id:
             raise TaskctlError("completion pagination requires --snapshot-id")
+        target_stream = bool(
+            args.after_id
+            or args.candidate_after_id
+            or (args.target_id and args.snapshot_id)
+        )
+        continued_streams = sum(
+            (
+                target_stream,
+                args.constraint_after_id is not None,
+                args.deferred_after_id is not None,
+            )
+        )
+        if continued_streams > 1:
+            raise TaskctlError(
+                "completion pagination accepts one result stream at a time"
+            )
     if hasattr(args, "expected_task_revision") and args.expected_task_revision < 1:
         raise TaskctlError("--expected-task-revision must be positive")
 
@@ -2298,6 +2461,12 @@ def main() -> int:
         return 0
     except TaskctlError as exc:
         emit({"ok": False, "error": str(exc)}, stream=sys.stderr)
+        return 2
+    except OSError as exc:
+        emit(
+            {"ok": False, "error": f"filesystem operation failed: {exc}"},
+            stream=sys.stderr,
+        )
         return 2
 
 

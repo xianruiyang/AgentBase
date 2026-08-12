@@ -1,0 +1,42 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "第5轮已验证版本"
+      ],
+      "id": "T005",
+      "type": "hard"
+    }
+  ],
+  "id": "T006",
+  "mutation_scope": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/delivery-workflow/references/artifact-contracts.md",
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py"
+  ],
+  "outcome": "受保护目标集合始终绑定到明确用户确认主体和非空确认引用",
+  "outputs": [
+    "基线确认来源不变量",
+    "第7轮可审查的新版本"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-006",
+    "GAP-006",
+    "DES-007",
+    "AC-003",
+    "UDES-001",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance"
+  ],
+  "title": "第6轮保护基线确认来源",
+  "verification": [
+    "空引用与篡改主体反例失败；摘要读回确认引用；回归通过"
+  ]
+}

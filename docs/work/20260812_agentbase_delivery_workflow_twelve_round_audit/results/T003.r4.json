@@ -1,0 +1,23 @@
+{
+  "changed_files": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/execution.md"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "任务状态与阻塞原因现在满足双向一致性，阻塞和恢复路径可可靠读回",
+  "outputs": [
+    "阻塞状态不变量",
+    "第4轮可审查的新版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T003",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "task-table-manager tests - 41/41 passed",
+    "delivery-workflow tests - 21/21 passed",
+    "原 blocked-reason 场景读回 status=blocked",
+    "blocked 空原因损坏状态被拒绝"
+  ]
+}

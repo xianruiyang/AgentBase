@@ -1,0 +1,24 @@
+{
+  "changed_files": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "两个 CLI 的参数解析失败现在返回统一有界 JSON，标准 help 行为保持不变",
+  "outputs": [
+    "机器可读 argparse 错误",
+    "第5轮可审查的新版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T004",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "delivery-workflow tests - 22/22 passed",
+    "task-table-manager tests - 42/42 passed",
+    "未知参数反例：exit 2、JSON parse passed、usage absent",
+    "两个 CLI --help：exit 0、usage present"
+  ]
+}

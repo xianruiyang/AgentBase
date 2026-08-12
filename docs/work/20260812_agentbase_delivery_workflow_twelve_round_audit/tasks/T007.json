@@ -1,0 +1,41 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "第6轮已验证版本"
+      ],
+      "id": "T006",
+      "type": "hard"
+    }
+  ],
+  "id": "T007",
+  "mutation_scope": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/tooling.md"
+  ],
+  "outcome": "taskctl 只按既有 delivery workflow 身份恢复缺失任务表",
+  "outputs": [
+    "组合工作区 init 身份继承",
+    "第8轮可审查的新版本"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-007",
+    "GAP-007",
+    "DES-008",
+    "AC-002",
+    "AC-003",
+    "UDES-001",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance"
+  ],
+  "title": "第7轮约束任务表恢复身份",
+  "verification": [
+    "原 mismatched 恢复反例写入前失败；matching 恢复成功；回归通过"
+  ]
+}

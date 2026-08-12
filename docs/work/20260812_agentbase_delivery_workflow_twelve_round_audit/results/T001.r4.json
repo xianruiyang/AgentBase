@@ -1,0 +1,24 @@
+{
+  "changed_files": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "两个初始化入口与后续读取入口现在共享非空、无外围空白的工作流身份合同",
+  "outputs": [
+    "统一的工作流 ID 与标题边界",
+    "第2轮可审查的新版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T001",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "python -m py_compile workctl.py taskctl.py - passed",
+    "delivery-workflow tests - 20/20 passed",
+    "task-table-manager tests - 38/38 passed",
+    "原空白 ID 反例退出 2 且未创建 workflow.json"
+  ]
+}

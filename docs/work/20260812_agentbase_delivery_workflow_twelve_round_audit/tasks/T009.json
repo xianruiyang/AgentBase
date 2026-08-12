@@ -1,0 +1,38 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "第8轮已验证版本"
+      ],
+      "id": "T008",
+      "type": "hard"
+    }
+  ],
+  "id": "T009",
+  "mutation_scope": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/execution.md"
+  ],
+  "outcome": "done 任务至少具有真实开始执行或进入评审的状态历史",
+  "outputs": [
+    "complete 来源状态不变量",
+    "第10轮可审查的新版本"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-009",
+    "GAP-009",
+    "DES-010",
+    "AC-002",
+    "AC-003",
+    "REQ-001"
+  ],
+  "suggested_skills": [],
+  "title": "第9轮约束任务完成状态变换",
+  "verification": [
+    "todo/claimed/blocked 反例失败；in_progress/review 成功；回归通过"
+  ]
+}

@@ -329,6 +329,49 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(cleared["state"]["note"], "")
 
+    def test_blocked_reason_and_status_remain_consistent(self) -> None:
+        started = self.run_task("start", "--id", "T001", "--owner", "agent-a")
+        blocked = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--blocked-reason",
+            "等待外部输入",
+            "--expected-state-revision",
+            str(started["state"]["revision"]),
+        )
+        self.assertEqual(blocked["state"]["status"], "blocked")
+        self.assertEqual(blocked["state"]["blocked_reason"], "等待外部输入")
+
+        resumed = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--status",
+            "in_progress",
+            "--expected-state-revision",
+            str(blocked["state"]["revision"]),
+        )
+        self.assertEqual(resumed["state"]["status"], "in_progress")
+        self.assertEqual(resumed["state"]["blocked_reason"], "")
+
+    def test_damaged_blocked_state_combinations_are_rejected(self) -> None:
+        state_path = self.root / "state" / "T001.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["status"] = "blocked"
+        state["owner"] = "agent-a"
+        state["blocked_reason"] = ""
+        state_path.write_text(
+            json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        listed = self.run_cli(TASKCTL, "list", "--task-dir", str(self.root))
+        self.assertEqual(listed.returncode, 2)
+        self.assertIn("must have a blocked reason", json.loads(listed.stderr)["error"])
+
     def test_release_requires_an_owner_and_clears_the_previous_next_action(self) -> None:
         unowned = self.run_cli(
             TASKCTL,
@@ -395,6 +438,68 @@ class TaskctlTests(unittest.TestCase):
             self.assertGreaterEqual(target["candidate_result_count"], 1)
         self.assertNotIn("passed", completion)
         self.assertNotIn("pass", completion)
+
+    def test_common_queries_support_cursor_pagination(self) -> None:
+        self.add_task(
+            self.task(
+                "T003",
+                "组合依赖",
+                ["SOL-001"],
+                dependencies=[
+                    {"id": "T001", "type": "hard", "consumes": ["接口"]},
+                    {"id": "T002", "type": "informational", "consumes": ["界面"]},
+                ],
+            )
+        )
+        self.add_task(
+            self.task(
+                "T004",
+                "另一后继",
+                ["SOL-001"],
+                dependencies=[
+                    {"id": "T001", "type": "ordering", "consumes": ["顺序"]}
+                ],
+            )
+        )
+
+        expected_count_fields = {
+            "list": "matched_count",
+            "next": "candidate_count",
+            "deps": "dependency_count",
+            "dependents": "dependent_count",
+        }
+        for command, extra in (
+            ("list", ()),
+            ("next", ("--include-blocked",)),
+            ("deps", ("--id", "T003")),
+            ("dependents", ("--id", "T001")),
+        ):
+            seen: list[str] = []
+            after_id: str | None = None
+            while True:
+                arguments = [command, *extra, "--limit", "1"]
+                if after_id is not None:
+                    arguments.extend(("--after-id", after_id))
+                page = self.run_task(*arguments)
+                seen.extend(item["id"] for item in page["items"])
+                after_id = page["next_after_id"]
+                if after_id is None:
+                    self.assertFalse(page["truncated"])
+                    break
+                self.assertTrue(page["truncated"])
+            self.assertEqual(len(seen), len(set(seen)))
+            self.assertEqual(len(seen), page[expected_count_fields[command]])
+
+        invalid = self.run_cli(
+            TASKCTL,
+            "list",
+            "--task-dir",
+            str(self.root),
+            "--after-id",
+            "T999",
+        )
+        self.assertEqual(invalid.returncode, 2)
+        self.assertIn("restart from the first page", json.loads(invalid.stderr)["error"])
 
     def test_task_revision_conflict_and_dependency_cycle_are_hard_errors(self) -> None:
         updated = self.task(
@@ -473,10 +578,30 @@ class TaskctlTests(unittest.TestCase):
             "mutation_overlap", {warning["kind"] for warning in claimed["warnings"]}
         )
 
-    def test_render_contains_zero_review_count(self) -> None:
+    def test_render_exposes_review_and_result_summary(self) -> None:
+        started = self.run_task("start", "--id", "T001", "--owner", "agent-a")
+        self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--status",
+            "review",
+            "--message",
+            "等待人工查看",
+            "--expected-state-revision",
+            str(started["state"]["revision"]),
+        )
         rendered = self.run_task("render")
         table = Path(rendered["output"]).read_text(encoding="utf-8")
-        self.assertIn("| review | 0 |", table)
+        self.assertEqual(rendered["needs_review_count"], 1)
+        self.assertEqual(rendered["results"]["current_result_count"], 0)
+        self.assertIn("| review | 1 |", table)
+        self.assertIn("需复核任务：1", table)
+        self.assertIn("当前有效结果：0", table)
+        self.assertIn("含验证结果：0", table)
+        self.assertIn("含未决结果：0", table)
         self.assertIn("只是任务合同与状态的可重建视图", table)
 
     def test_protected_source_drift_blocks_task_state_changes(self) -> None:
@@ -652,6 +777,17 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(listed.returncode, 2)
         self.assertIn("different workflow", json.loads(listed.stderr)["error"])
 
+    def test_tampered_baseline_confirmation_is_rejected(self) -> None:
+        baseline_path = self.root / "protected-baseline.json"
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        baseline["confirmed_by"] = "model"
+        baseline_path.write_text(
+            json.dumps(baseline, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        listed = self.run_cli(TASKCTL, "list", "--task-dir", str(self.root))
+        self.assertEqual(listed.returncode, 2)
+        self.assertIn("confirmed by the user", json.loads(listed.stderr)["error"])
+
     def test_generated_task_view_cannot_be_redirected_to_requirements(self) -> None:
         table_path = self.root / "task-table.json"
         table = json.loads(table_path.read_text(encoding="utf-8"))
@@ -747,6 +883,10 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(first["returned_open_deferred_change_count"], 1)
         self.assertEqual(first["targets"][0]["candidate_task_count"], 2)
         self.assertEqual(first["targets"][0]["returned_candidate_task_count"], 1)
+        self.assertEqual(
+            first["returned_streams"],
+            ["targets", "constraints", "deferred_changes"],
+        )
         self.assertIsNotNone(first["pagination"]["deferred_next_after_id"])
         candidate_cursor = first["targets"][0]["candidate_next_after_id"]
         candidate_page = self.run_task(
@@ -763,10 +903,11 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(
             candidate_page["targets"][0]["returned_candidate_task_count"], 1
         )
+        self.assertEqual(candidate_page["returned_streams"], ["targets"])
+        self.assertEqual(candidate_page["constraints"], [])
+        self.assertEqual(candidate_page["open_deferred_changes"], [])
         deferred_page = self.run_task(
             "completion-context",
-            "--target-id",
-            "REQ-001",
             "--deferred-after-id",
             first["pagination"]["deferred_next_after_id"],
             "--snapshot-id",
@@ -775,9 +916,52 @@ class TaskctlTests(unittest.TestCase):
             "1",
         )
         self.assertEqual(deferred_page["open_deferred_changes"][0]["id"], "DCR-002")
+        self.assertEqual(deferred_page["returned_streams"], ["deferred_changes"])
+        self.assertEqual(deferred_page["targets"], [])
+        self.assertEqual(deferred_page["constraints"], [])
+
+        target_first = self.run_task(
+            "completion-context", "--limit", "1", "--max-items", "1"
+        )
+        target_page = self.run_task(
+            "completion-context",
+            "--after-id",
+            target_first["pagination"]["target_next_after_id"],
+            "--snapshot-id",
+            target_first["snapshot_id"],
+            "--limit",
+            "1",
+            "--max-items",
+            "1",
+        )
+        self.assertEqual(target_page["returned_streams"], ["targets"])
+        self.assertEqual(target_page["constraints"], [])
+        self.assertEqual(target_page["open_deferred_changes"], [])
+
+        mixed_page = self.run_cli(
+            TASKCTL,
+            "completion-context",
+            "--task-dir",
+            str(self.root),
+            "--after-id",
+            target_first["pagination"]["target_next_after_id"],
+            "--deferred-after-id",
+            first["pagination"]["deferred_next_after_id"],
+            "--snapshot-id",
+            first["snapshot_id"],
+        )
+        self.assertEqual(mixed_page.returncode, 2)
+        self.assertIn(
+            "one result stream", json.loads(mixed_page.stderr)["error"]
+        )
 
     def test_current_result_must_match_current_task_revision(self) -> None:
         self.complete_t001()
+        rendered = self.run_task("render")
+        self.assertEqual(rendered["results"]["current_result_count"], 1)
+        self.assertEqual(rendered["results"]["result_with_verification_count"], 1)
+        table = Path(rendered["output"]).read_text(encoding="utf-8")
+        self.assertIn("当前有效结果：1", table)
         result_path = self.root / "results" / "T001.r4.json"
         result = json.loads(result_path.read_text(encoding="utf-8"))
         result["task_revision"] = 99
@@ -789,6 +973,11 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(shown.returncode, 2)
         self.assertIn("task_revision", json.loads(shown.stderr)["error"])
+        rerendered = self.run_cli(
+            TASKCTL, "render", "--task-dir", str(self.root)
+        )
+        self.assertEqual(rerendered.returncode, 2)
+        self.assertIn("task_revision", json.loads(rerendered.stderr)["error"])
 
     def test_reopen_requires_completed_state_and_matching_owner(self) -> None:
         not_done = self.run_cli(
@@ -856,6 +1045,80 @@ class TaskctlTests(unittest.TestCase):
         self.assertTrue(completed["recovered_partial_write"])
         self.assertEqual(completed["state"]["status"], "done")
 
+    def test_complete_requires_an_execution_or_review_state(self) -> None:
+        result_file = Path(self.temp.name) / "state-transition-result.json"
+        result_file.write_text(
+            json.dumps(self.result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        def rejected(revision: int) -> None:
+            result = self.run_cli(
+                TASKCTL,
+                "complete",
+                "--task-dir",
+                str(self.root),
+                "--id",
+                "T001",
+                "--owner",
+                "agent-a",
+                "--result-file",
+                str(result_file),
+                "--expected-state-revision",
+                str(revision),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("in_progress or review", json.loads(result.stderr)["error"])
+            self.assertEqual(list((self.root / "results").glob("T001.r*.json")), [])
+
+        rejected(1)
+        claimed = self.run_task("claim", "--id", "T001", "--owner", "agent-a")
+        rejected(claimed["state"]["revision"])
+        started = self.run_task(
+            "start",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--expected-state-revision",
+            str(claimed["state"]["revision"]),
+        )
+        blocked = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--blocked-reason",
+            "等待输入",
+            "--expected-state-revision",
+            str(started["state"]["revision"]),
+        )
+        rejected(blocked["state"]["revision"])
+        reviewed = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--status",
+            "review",
+            "--expected-state-revision",
+            str(blocked["state"]["revision"]),
+        )
+        completed = self.run_task(
+            "complete",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--expected-state-revision",
+            str(reviewed["state"]["revision"]),
+        )
+        self.assertEqual(completed["state"]["status"], "done")
+
     def test_add_recovers_matching_partial_task_record(self) -> None:
         task = self.task("T020", "恢复部分写入", ["SOL-001"])
         task_path = self.root / "tasks" / "T020.json"
@@ -886,6 +1149,105 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(initialized.returncode, 2)
         self.assertIn("refusing to overwrite", json.loads(initialized.stderr)["error"])
+
+    def test_init_rejects_blank_identity_before_writing(self) -> None:
+        for index, arguments in enumerate(
+            (("--id", " ", "--title", "有效标题"), ("--id", "valid", "--title", " "))
+        ):
+            target = Path(self.temp.name) / f"blank-task-identity-{index}"
+            initialized = self.run_cli(
+                TASKCTL, "init", "--task-dir", str(target), *arguments
+            )
+            self.assertEqual(initialized.returncode, 2)
+            self.assertIn("must not be empty", json.loads(initialized.stderr)["error"])
+            self.assertFalse((target / "task-table.json").exists())
+
+    def test_init_in_existing_workflow_must_use_the_workflow_identity(self) -> None:
+        target = Path(self.temp.name) / "recover-task-table"
+        initialized = self.run_cli(
+            WORKCTL,
+            "init",
+            "--work-dir",
+            str(target),
+            "--id",
+            "delivery-id",
+            "--title",
+            "Delivery Title",
+        )
+        self.assertEqual(initialized.returncode, 0, initialized.stderr)
+        (target / "task-table.json").unlink()
+
+        for arguments, expected in (
+            (("--id", "other-id", "--title", "Delivery Title"), "workflow id"),
+            (("--id", "delivery-id", "--title", "Other Title"), "workflow title"),
+        ):
+            rejected = self.run_cli(
+                TASKCTL, "init", "--task-dir", str(target), *arguments
+            )
+            self.assertEqual(rejected.returncode, 2)
+            self.assertIn(expected, json.loads(rejected.stderr)["error"])
+            self.assertFalse((target / "task-table.json").exists())
+
+        recovered = self.run_cli(
+            TASKCTL,
+            "init",
+            "--task-dir",
+            str(target),
+            "--id",
+            "delivery-id",
+            "--title",
+            "Delivery Title",
+        )
+        self.assertEqual(recovered.returncode, 0, recovered.stderr)
+        status = self.run_cli(TASKCTL, "status", "--task-dir", str(target))
+        self.assertEqual(status.returncode, 0, status.stderr)
+
+    def test_filesystem_error_is_bounded_json(self) -> None:
+        target = Path(self.temp.name) / "not-a-task-directory"
+        target.write_text("occupied", encoding="utf-8")
+        initialized = self.run_cli(
+            TASKCTL,
+            "init",
+            "--task-dir",
+            str(target),
+            "--id",
+            "valid",
+            "--title",
+            "有效标题",
+        )
+        self.assertEqual(initialized.returncode, 2)
+        payload = json.loads(initialized.stderr)
+        self.assertFalse(payload["ok"])
+        self.assertIn("filesystem operation failed", payload["error"])
+        self.assertNotIn("Traceback", initialized.stderr)
+
+    def test_argument_errors_are_bounded_json_while_help_remains_text(self) -> None:
+        cases = (
+            ("list", "--unknown"),
+            ("list",),
+            ("note", "--task-dir", str(self.root), "--id", "T001", "--owner", "a", "--status", "invalid"),
+        )
+        for arguments in cases:
+            result = self.run_cli(TASKCTL, *arguments)
+            self.assertEqual(result.returncode, 2)
+            payload = json.loads(result.stderr)
+            self.assertFalse(payload["ok"])
+            self.assertIn("argument error", payload["error"])
+            self.assertNotIn("usage:", result.stderr)
+        helped = self.run_cli(TASKCTL, "--help")
+        self.assertEqual(helped.returncode, 0)
+        self.assertIn("usage:", helped.stdout)
+
+    def test_task_table_rejects_noncanonical_title(self) -> None:
+        table_path = self.root / "task-table.json"
+        table = json.loads(table_path.read_text(encoding="utf-8"))
+        table["title"] = " 演示交付 "
+        table_path.write_text(
+            json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        listed = self.run_cli(TASKCTL, "list", "--task-dir", str(self.root))
+        self.assertEqual(listed.returncode, 2)
+        self.assertIn("surrounding whitespace", json.loads(listed.stderr)["error"])
 
     def test_completion_snapshot_rejects_cross_page_state_change(self) -> None:
         first = self.run_task("completion-context", "--limit", "1", "--budget", "12000")

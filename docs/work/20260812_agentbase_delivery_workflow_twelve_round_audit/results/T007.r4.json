@@ -1,0 +1,23 @@
+{
+  "changed_files": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/tooling.md"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "taskctl 在既有 delivery workflow 中只按同一 ID 和标题恢复缺失任务表",
+  "outputs": [
+    "组合工作区 init 身份继承",
+    "第8轮可审查的新版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T007",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "task-table-manager tests - 45/45 passed",
+    "delivery-workflow tests - 23/23 passed",
+    "原 mismatched 恢复反例 exit 2 且 task-table 不存在",
+    "matching 恢复和后续 status 均 exit 0"
+  ]
+}

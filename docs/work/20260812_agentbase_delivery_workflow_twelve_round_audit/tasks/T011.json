@@ -1,0 +1,40 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "第10轮已验证版本"
+      ],
+      "id": "T010",
+      "type": "hard"
+    }
+  ],
+  "id": "T011",
+  "mutation_scope": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/tooling.md"
+  ],
+  "outcome": "TASK_TABLE.md 与 status 使用同一当前结果事实并显式报告需复核和结果闭合数量",
+  "outputs": [
+    "可信的任务表 Markdown 投影",
+    "第12轮可审查的新版本"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-011",
+    "GAP-011",
+    "DES-012",
+    "AC-002",
+    "AC-003",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance"
+  ],
+  "title": "第11轮统一任务状态与导出视图",
+  "verification": [
+    "导出统计与 status 一致；损坏当前结果使 render 失败；回归通过"
+  ]
+}

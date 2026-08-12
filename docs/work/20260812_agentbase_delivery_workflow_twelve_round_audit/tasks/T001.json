@@ -1,0 +1,32 @@
+{
+  "dependencies": [],
+  "id": "T001",
+  "mutation_scope": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py"
+  ],
+  "outcome": "两个初始化入口只生成具有有效非空身份且能被后续命令读取的工作区",
+  "outputs": [
+    "统一的工作流 ID 与标题边界",
+    "第2轮可审查的新版本"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-001",
+    "GAP-001",
+    "DES-002",
+    "AC-002",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance"
+  ],
+  "title": "第1轮统一工作流身份合同",
+  "verification": [
+    "空白 ID/标题反例失败且不创建 manifest；正常初始化与读取回归通过"
+  ]
+}

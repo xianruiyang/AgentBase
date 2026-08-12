@@ -201,6 +201,116 @@ class WorkctlTests(unittest.TestCase):
         for relative in self.initialized["pending"]:
             self.assertFalse((self.root / relative).exists())
 
+    def test_render_exposes_confirmation_and_separate_progress_layers(self) -> None:
+        self.protect()
+        rendered = self.run_cli(
+            "render", "--work-dir", str(self.root), "--max-items", "100"
+        )
+        self.assertEqual(rendered.returncode, 0, rendered.stderr)
+        payload = self.payload(rendered)
+        self.assertEqual(payload["tasks"]["task_count"], 0)
+        self.assertEqual(payload["tasks"]["result_count"], 0)
+        view = Path(payload["output"]).read_text(encoding="utf-8")
+        self.assertIn("确认者：user", view)
+        self.assertIn("确认引用：conversation:confirmed", view)
+        self.assertIn("## 可修订语义闭合", view)
+        self.assertIn("## 任务执行状态", view)
+        self.assertIn("需复核任务：0", view)
+        self.assertIn("## 任务结果证据", view)
+        self.assertIn("当前有效结果：0", view)
+        self.assertIn("含验证结果：0", view)
+        self.assertIn("含未决结果：0", view)
+        self.assertIn("不定义语义、READY 或最终完成状态", view)
+
+    def test_render_rejects_a_corrupt_current_task_result(self) -> None:
+        task = {
+            "schema": "task.record",
+            "id": "T001",
+            "title": "导出结果",
+            "outcome": "结果可读回",
+            "source_ids": ["SOL-001"],
+            "dependencies": [],
+            "mutation_scope": ["exports"],
+            "outputs": ["导出结果"],
+            "verification": ["读回字段"],
+            "suggested_skills": [],
+            "reasoning_hint": "medium",
+            "revision": 1,
+        }
+        state = {
+            "schema": "task.state",
+            "task_id": "T001",
+            "status": "done",
+            "owner": "agent-a",
+            "revision": 4,
+            "note": "",
+            "blocked_reason": "",
+            "next_action": "",
+            "result_ref": "results/T001.r4.json",
+        }
+        (self.root / "tasks" / "T001.json").write_text(
+            json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        (self.root / "state" / "T001.json").write_text(
+            json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        (self.root / "results" / "T001.r4.json").write_text(
+            '{"schema":"task.result"}\n', encoding="utf-8"
+        )
+        rendered = self.run_cli("render", "--work-dir", str(self.root))
+        self.assertEqual(rendered.returncode, 2)
+        self.assertIn("task storage is invalid", self.payload(rendered)["error"])
+
+    def test_init_rejects_blank_identity_before_writing(self) -> None:
+        for index, arguments in enumerate(
+            (("--id", " ", "--title", "有效标题"), ("--id", "valid", "--title", " "))
+        ):
+            target = Path(self.temp.name) / f"blank-identity-{index}"
+            initialized = self.run_cli("init", "--work-dir", str(target), *arguments)
+            self.assertEqual(initialized.returncode, 2)
+            self.assertIn("must not be empty", self.payload(initialized)["error"])
+            self.assertFalse((target / "workflow.json").exists())
+
+    def test_filesystem_error_is_bounded_json(self) -> None:
+        target = Path(self.temp.name) / "not-a-directory"
+        target.write_text("occupied", encoding="utf-8")
+        initialized = self.run_cli(
+            "init", "--work-dir", str(target), "--id", "valid", "--title", "有效标题"
+        )
+        self.assertEqual(initialized.returncode, 2)
+        payload = self.payload(initialized)
+        self.assertFalse(payload["ok"])
+        self.assertIn("filesystem operation failed", payload["error"])
+        self.assertNotIn("Traceback", initialized.stderr)
+
+    def test_argument_errors_are_bounded_json_while_help_remains_text(self) -> None:
+        cases = (
+            ("status", "--unknown"),
+            ("status",),
+            ("outline", "--work-dir", str(self.root), "--stage", "invalid"),
+        )
+        for arguments in cases:
+            result = self.run_cli(*arguments)
+            self.assertEqual(result.returncode, 2)
+            payload = json.loads(result.stderr)
+            self.assertFalse(payload["ok"])
+            self.assertIn("argument error", payload["error"])
+            self.assertNotIn("usage:", result.stderr)
+        helped = self.run_cli("--help")
+        self.assertEqual(helped.returncode, 0)
+        self.assertIn("usage:", helped.stdout)
+
+    def test_manifest_rejects_noncanonical_identity(self) -> None:
+        manifest_path = self.root / "workflow.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["id"] = " demo "
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        status = self.run_cli("status", "--work-dir", str(self.root))
+        self.assertEqual(status.returncode, 2)
+        self.assertIn("surrounding whitespace", self.payload(status)["error"])
+
     def test_outline_uses_public_stage_names_and_the_workspace_argument(self) -> None:
         outlined = self.run_cli(
             "outline",
@@ -214,6 +324,31 @@ class WorkctlTests(unittest.TestCase):
         self.assertEqual(payload["stage"], "current-state")
         self.assertEqual(payload["document"], "current-state.md")
         self.assertEqual(payload["ids"], ["OBS", "GAP", "DEC"])
+
+    def test_only_explicit_relation_fields_create_semantic_edges(self) -> None:
+        with (self.root / "current-state.md").open("a", encoding="utf-8") as handle:
+            handle.write(
+                """
+
+## OBS-099 标题示例 REQ-IN-TITLE
+
+- 状态: confirmed
+- 来源或证据: 正文示例 REQ-IN-EVIDENCE
+- 关联: DES-001, REQ-MISSING
+
+说明文字再次出现 REQ-IN-BODY，但都不是关系。
+"""
+            )
+        module = load_workctl_module()
+        index = module.build_index(self.root)
+        observed = next(row for row in index["sections"] if row["id"] == "OBS-099")
+        self.assertEqual(observed["references"], ["DES-001", "REQ-MISSING"])
+        unknown = [
+            item["reference"]
+            for item in index["diagnostics"]
+            if item["kind"] == "unknown_reference" and item["id"] == "OBS-099"
+        ]
+        self.assertEqual(unknown, ["REQ-MISSING"])
 
     def test_protect_requires_confirmed_entries(self) -> None:
         content = (self.root / "requirements.md").read_text(encoding="utf-8")
@@ -378,6 +513,66 @@ class WorkctlTests(unittest.TestCase):
         indexed = self.run_cli("index", "--work-dir", str(self.root))
         self.assertEqual(indexed.returncode, 2)
         self.assertIn("ids do not match", self.payload(indexed)["error"])
+
+    def test_protected_baseline_requires_user_confirmation_provenance(self) -> None:
+        blank_root = Path(self.temp.name) / "blank-confirmation"
+        initialized = self.run_cli(
+            "init",
+            "--work-dir",
+            str(blank_root),
+            "--id",
+            "blank-confirmation",
+            "--title",
+            "空确认引用",
+        )
+        self.assertEqual(initialized.returncode, 0, initialized.stderr)
+        for filename in (
+            "requirements.md",
+            "user-design.md",
+            "design.md",
+            "current-state.md",
+            "solution.md",
+            "deferred-changes.md",
+        ):
+            source = self.root / filename
+            (blank_root / filename).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+        rejected = self.run_cli(
+            "protect",
+            "--work-dir",
+            str(blank_root),
+            "--confirmed-by",
+            "user",
+            "--confirmation-ref",
+            " ",
+        )
+        self.assertEqual(rejected.returncode, 2)
+        self.assertIn("must not be empty", self.payload(rejected)["error"])
+        self.assertFalse((blank_root / "protected-baseline.json").exists())
+
+        protected = self.protect()
+        baseline_path = self.root / "protected-baseline.json"
+        original = json.loads(baseline_path.read_text(encoding="utf-8"))
+        for field, value, expected in (
+            ("confirmed_by", "model", "confirmed by the user"),
+            ("confirmation_ref", " ", "must not be empty"),
+        ):
+            tampered = dict(original)
+            tampered[field] = value
+            baseline_path.write_text(
+                json.dumps(tampered, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            indexed = self.run_cli("index", "--work-dir", str(self.root))
+            self.assertEqual(indexed.returncode, 2)
+            self.assertIn(expected, self.payload(indexed)["error"])
+        baseline_path.write_text(
+            json.dumps(original, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        status = self.run_cli("status", "--work-dir", str(self.root))
+        self.assertEqual(status.returncode, 0, status.stderr)
+        self.assertEqual(
+            self.payload(status)["protected_baseline"]["confirmation_ref"],
+            "conversation:confirmed",
+        )
 
     def test_init_refuses_nonempty_managed_storage(self) -> None:
         other = Path(self.temp.name) / "occupied"

@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "",
+  "owner": "codex-root",
+  "result_ref": "results/T007.r4.json",
+  "revision": 4,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T007"
+}

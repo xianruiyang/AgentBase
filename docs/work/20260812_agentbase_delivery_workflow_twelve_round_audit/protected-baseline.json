@@ -1,0 +1,30 @@
+{
+  "confirmation_ref": "user-request-2026-08-12-twelve-round-audit-no-goal",
+  "confirmed_by": "user",
+  "documents": {
+    "requirements": {
+      "fingerprint": "sha256:3836d16b942e8811189f9939a26224718dec990adc62870952705f10b134c5a2",
+      "ids": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "CON-001",
+        "CON-002",
+        "REQ-001"
+      ],
+      "path": "requirements.md"
+    },
+    "user_design": {
+      "fingerprint": "sha256:9f9131c3cff1260140f7b9ebf1ea2222dcad03a5946525908a68d902c456bf59",
+      "ids": [
+        "UDES-001",
+        "UDES-002",
+        "UDES-003"
+      ],
+      "path": "user-design.md"
+    }
+  },
+  "schema": "delivery.protected-baseline",
+  "workflow_id": "agentbase-delivery-workflow-twelve-round-audit"
+}

@@ -1,0 +1,24 @@
+{
+  "changed_files": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/delivery-workflow/references/iteration.md"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "WORK_STATUS.md 分层呈现受保护基线确认、可修订语义、任务执行和已校验结果证据状态",
+  "outputs": [
+    "三类状态交付总览",
+    "十二轮迭代最终版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T012",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "delivery-workflow tests - 26/26 passed",
+    "task-table-manager tests - 46/46 passed",
+    "真实 WORK_STATUS.md 显示确认来源、三类状态及明确非完成声明",
+    "损坏当前结果反例使 workctl render 有界失败",
+    "workctl.py py_compile passed"
+  ]
+}

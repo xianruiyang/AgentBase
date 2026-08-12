@@ -1,0 +1,42 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "第9轮已验证版本"
+      ],
+      "id": "T009",
+      "type": "hard"
+    }
+  ],
+  "id": "T010",
+  "mutation_scope": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/tooling.md",
+    "skills/task-table-manager/references/execution.md",
+    "skills/delivery-workflow/references/iteration.md"
+  ],
+  "outcome": "最终复核能在同一快照中分别分页目标、候选、约束和 DCR，不重复无关流",
+  "outputs": [
+    "completion-context 独立分页流",
+    "十轮迭代最终版本"
+  ],
+  "reasoning_hint": "high",
+  "revision": 2,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-010",
+    "GAP-010",
+    "DES-011",
+    "AC-002",
+    "AC-003",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance"
+  ],
+  "title": "第10轮分离最终上下文分页流",
+  "verification": [
+    "四流分别续页；无重复；混合游标和 snapshot 变化失败；回归通过"
+  ]
+}

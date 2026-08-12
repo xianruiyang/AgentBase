@@ -1,0 +1,23 @@
+{
+  "changed_files": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/delivery-workflow/references/artifact-contracts.md"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "语义索引只从正式关系字段建立边，正文示例和证据文本不再污染追溯与完成候选",
+  "outputs": [
+    "结构化引用解析",
+    "第9轮可审查的新版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T008",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "delivery-workflow tests - 24/24 passed",
+    "task-table-manager tests - 45/45 passed",
+    "当前索引 unknown_reference_count=0 且 fake token 无诊断",
+    "显式关系字段中的缺失 ID 仍产生唯一 unknown_reference"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "changed_files": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/delivery-workflow/references/artifact-contracts.md",
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "受保护基线同时验证文档内容、用户确认主体和非空确认引用，并在摘要中暴露确认依据",
+  "outputs": [
+    "基线确认来源不变量",
+    "第7轮可审查的新版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T006",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "delivery-workflow tests - 23/23 passed",
+    "task-table-manager tests - 44/44 passed",
+    "原 confirmed_by=model 反例返回 exit 2",
+    "当前 status 读回 confirmed_by=user 和精确 confirmation_ref"
+  ]
+}

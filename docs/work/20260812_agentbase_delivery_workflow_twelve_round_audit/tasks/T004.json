@@ -1,0 +1,40 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "第3轮已验证版本"
+      ],
+      "id": "T003",
+      "type": "hard"
+    }
+  ],
+  "id": "T004",
+  "mutation_scope": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py"
+  ],
+  "outcome": "两个 CLI 的参数与运行错误都能由同一个有界 JSON 协议消费",
+  "outputs": [
+    "机器可读 argparse 错误",
+    "第5轮可审查的新版本"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-004",
+    "GAP-004",
+    "DES-005",
+    "AC-002",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance"
+  ],
+  "title": "第4轮统一参数解析错误协议",
+  "verification": [
+    "未知/缺失/choice 参数错误为 JSON；help 不变；全量回归通过"
+  ]
+}

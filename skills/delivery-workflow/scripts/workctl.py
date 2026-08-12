@@ -21,10 +21,17 @@ MAX_JSON_BYTES = 2 * 1024 * 1024
 MAX_DOCUMENT_BYTES = 4 * 1024 * 1024
 MAX_RECORDS = 20_000
 DEFAULT_MAX_ITEMS = 50
+MAX_MANIFEST_TEXT = 2_000
 ID_PATTERN = r"(?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-[A-Za-z0-9][A-Za-z0-9._-]*"
 ID_RE = re.compile(rf"\b({ID_PATTERN})\b")
 HEADING_RE = re.compile(rf"^##\s+(?P<id>{ID_PATTERN})(?:\s+(?P<title>.*?))?\s*$")
 STATUS_RE = re.compile(r"^\s*-\s*状态\s*[:：]\s*(?P<status>[^\s,，;；]+)", re.IGNORECASE)
+REFERENCE_FIELD_RE = re.compile(
+    r"^\s*-\s*(?:关联|关联需求|关联目标|满足|解决|依赖|后继证据|目标ID|"
+    r"references?|satisfies|solves|depends(?:\s+on)?|superseded\s+by|target\s+ids?)"
+    r"\s*[:：]\s*(?P<value>.*)$",
+    re.IGNORECASE,
+)
 UNRESOLVED_STATUSES = {"open", "unknown", "unresolved", "deferred", "待决", "未知", "延后"}
 DEFERRED_CHANGE_STATUSES = {"open", "unknown", "unresolved", "deferred", "待决", "未知", "延后"}
 STAGE_PREFIXES = {
@@ -49,6 +56,25 @@ PROTECTED_STAGES = ("requirements", "user_design")
 
 class WorkctlError(RuntimeError):
     pass
+
+
+class JsonArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        emit({"ok": False, "error": f"argument error: {message}"}, stream=sys.stderr)
+        raise SystemExit(2)
+
+
+def normalize_manifest_text(value: Any, field: str, *, writing: bool = False) -> str:
+    if not isinstance(value, str):
+        raise WorkctlError(f"{field} must be a string")
+    cleaned = value.strip()
+    if not cleaned:
+        raise WorkctlError(f"{field} must not be empty")
+    if len(cleaned) > MAX_MANIFEST_TEXT:
+        raise WorkctlError(f"{field} exceeds {MAX_MANIFEST_TEXT} characters")
+    if not writing and value != cleaned:
+        raise WorkctlError(f"{field} must not contain surrounding whitespace")
+    return cleaned
 
 
 def compact_json(value: Any) -> str:
@@ -192,6 +218,8 @@ def load_manifest(root: Path) -> dict[str, Any]:
     manifest = read_json(manifest_path)
     if not isinstance(manifest, dict) or manifest.get("schema") != "delivery.workflow":
         raise WorkctlError(f"unsupported workflow manifest: {manifest_path}")
+    normalize_manifest_text(manifest.get("id"), "workflow.json id")
+    normalize_manifest_text(manifest.get("title"), "workflow.json title")
     documents = manifest.get("documents")
     if not isinstance(documents, dict):
         raise WorkctlError("workflow.json documents must be an object")
@@ -278,6 +306,11 @@ def verify_protected_baseline(root: Path, manifest: dict[str, Any]) -> dict[str,
         raise WorkctlError(f"unsupported protected baseline: {baseline_path}")
     if baseline.get("workflow_id") != manifest.get("id"):
         raise WorkctlError("protected baseline belongs to a different workflow")
+    if baseline.get("confirmed_by") != "user":
+        raise WorkctlError("protected baseline must be confirmed by the user")
+    confirmation_ref = normalize_manifest_text(
+        baseline.get("confirmation_ref"), "protected baseline confirmation_ref"
+    )
     documents = baseline.get("documents")
     if not isinstance(documents, dict):
         raise WorkctlError("protected baseline documents must be an object")
@@ -312,6 +345,7 @@ def verify_protected_baseline(root: Path, manifest: dict[str, Any]) -> dict[str,
         "status": "protected",
         "path": baseline_path.name,
         "confirmed_by": baseline.get("confirmed_by"),
+        "confirmation_ref": confirmation_ref,
         "protected_ids": protected_ids,
     }
 
@@ -341,7 +375,12 @@ def parse_document(path: Path, stage: str) -> tuple[list[dict[str, Any]], str]:
                 break
         section_id = match.group("id")
         title = (match.group("title") or "").strip()
-        refs = sorted(set(ID_RE.findall(f"{title}\n{body}")) - {section_id})
+        relation_values = [
+            relation_match.group("value")
+            for body_line in body_lines
+            if (relation_match := REFERENCE_FIELD_RE.match(body_line)) is not None
+        ]
+        refs = sorted(set(ID_RE.findall("\n".join(relation_values))) - {section_id})
         sections.append(
             {
                 "id": section_id,
@@ -494,6 +533,8 @@ def task_status_summary(root: Path) -> dict[str, Any]:
 
 def init_workspace(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.work_dir)
+    workflow_id = normalize_manifest_text(args.id, "--id", writing=True)
+    title = normalize_manifest_text(args.title, "--title", writing=True)
     root.mkdir(parents=True, exist_ok=True)
     created_files = [
         "workflow.json",
@@ -521,12 +562,12 @@ def init_workspace(args: argparse.Namespace) -> dict[str, Any]:
     template_root = Path(__file__).resolve().parents[1] / "assets" / "templates"
     for filename in DEFAULT_DOCUMENTS.values():
         template = read_text_bounded(template_root / filename, MAX_DOCUMENT_BYTES)
-        atomic_write_text(root / filename, template.replace("{{TITLE}}", args.title))
+        atomic_write_text(root / filename, template.replace("{{TITLE}}", title))
 
     manifest = {
         "schema": "delivery.workflow",
-        "id": args.id,
-        "title": args.title,
+        "id": workflow_id,
+        "title": title,
         "documents": dict(DEFAULT_DOCUMENTS),
         "protected_baseline": "protected-baseline.json",
         "task_table": "task-table.json",
@@ -535,8 +576,8 @@ def init_workspace(args: argparse.Namespace) -> dict[str, Any]:
     }
     table = {
         "schema": "task.table",
-        "id": args.id,
-        "title": args.title,
+        "id": workflow_id,
+        "title": title,
         "task_dir": "tasks",
         "state_dir": "state",
         "result_dir": "results",
@@ -561,6 +602,9 @@ def protect_workspace(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def protect_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, Any]:
+    confirmation_ref = normalize_manifest_text(
+        args.confirmation_ref, "--confirmation-ref", writing=True
+    )
     manifest = load_manifest(root)
     baseline_path = resolve_inside(
         root, str(manifest.get("protected_baseline", "protected-baseline.json"))
@@ -616,7 +660,7 @@ def protect_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, 
         "schema": "delivery.protected-baseline",
         "workflow_id": manifest.get("id"),
         "confirmed_by": args.confirmed_by,
-        "confirmation_ref": args.confirmation_ref,
+        "confirmation_ref": confirmation_ref,
         "documents": protected_documents,
     }
     written_text = exclusive_write_json(baseline_path, baseline)
@@ -888,15 +932,16 @@ def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
     lines = [
         f"# {manifest.get('title') or manifest.get('id') or 'Delivery'} 状态",
         "",
-        "> 本文件由 workctl 生成，只是可重建视图，不定义语义或完成状态。",
+        "> 本文件由 workctl 生成，只是可重建的复核导航；其中计数不定义语义、READY 或最终完成状态。",
         "",
         "## 受保护基线",
         "",
         f"- 状态：{index['protected_baseline']['status']}",
         f"- 受保护 ID：{index['protected_baseline']['protected_ids']}",
-        f"- 未解决延后讨论项：{index['summary']['deferred_change_count']}",
+        f"- 确认者：{index['protected_baseline'].get('confirmed_by') or '未记录'}",
+        f"- 确认引用：{index['protected_baseline'].get('confirmation_ref') or '未记录'}",
         "",
-        "## 语义条目",
+        "## 可修订语义闭合",
         "",
         "| 类型 | 数量 |",
         "| --- | ---: |",
@@ -907,8 +952,9 @@ def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
         [
             f"| 未决条目 | {index['summary']['unresolved_count']} |",
             f"| 未解析引用 | {index['summary']['unknown_reference_count']} |",
+            f"| 未解决延后讨论项 | {index['summary']['deferred_change_count']} |",
             "",
-            "## 任务状态",
+            "## 任务执行状态",
             "",
             "| 状态 | 数量 |",
             "| --- | ---: |",
@@ -916,6 +962,20 @@ def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
     )
     for status, count in task_summary["counts"].items():
         lines.append(f"| {status} | {count} |")
+    lines.extend(
+        [
+            "",
+            f"- 任务总数：{task_summary['task_count']}",
+            f"- 需复核任务：{task_summary['counts']['review']}",
+            "",
+            "## 任务结果证据",
+            "",
+            f"- 当前有效结果：{task_summary['result_count']}",
+            f"- 含验证结果：{task_summary['result_with_verification_count']}",
+            f"- 含未决结果：{task_summary['result_with_unresolved_count']}",
+            f"- 使上游失效的 ID：{len(task_summary['invalidated_source_ids'])}",
+        ]
+    )
     lines.extend(["", "## 未决 ID", ""])
     if index["unresolved_ids"]:
         lines.extend(f"- {markdown_escape(section_id)}" for section_id in index["unresolved_ids"])
@@ -939,7 +999,7 @@ def add_common(subparser: argparse.ArgumentParser, *, include_work_dir: bool = T
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = JsonArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="create a delivery workspace")
@@ -1008,6 +1068,12 @@ def main() -> int:
         return 0
     except WorkctlError as exc:
         emit({"ok": False, "error": str(exc)}, stream=sys.stderr)
+        return 2
+    except OSError as exc:
+        emit(
+            {"ok": False, "error": f"filesystem operation failed: {exc}"},
+            stream=sys.stderr,
+        )
         return 2
 
 

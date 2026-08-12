@@ -38,9 +38,15 @@ release     释放未完成任务
 
 写命令返回新的 state revision；后续写入用 `--expected-state-revision` 防止覆盖。`update` 始终使用 `--expected-task-revision`，任务已有 owner 时还必须传相同 `--owner` 和当前 state revision。`reopen` 必须传当前 `--owner`。查询默认使用紧凑 JSON 并限制条目数量，人工阅读时使用 `--pretty`。
 
+`list`、`next`、`deps` 和 `dependents` 在截断时返回 `next_after_id`。下一页传回 `--after-id`；如果任务或筛选变化使游标不再属于当前结果，命令会要求从第一页重读。这些建议查询不建立跨页快照，最终复核仍使用 `completion-context` 的 snapshot 合同。
+
 `add` 和 `update` 先验证生成诊断所依赖的 task/state 存储集合，再写入并返回当前上游索引能够确定的合同诊断，例如未知 source ID、上游未决、缺少产出或验证。存储损坏会在本次候选落盘前失败；语义诊断帮助模型立即修订任务，但不会回滚成功写入、签发执行许可或判断任务语义正确。
 
 `task-table.json` 的 `tasks/`、`state/`、`results/`、`.work-cache/index.json` 和 `TASK_TABLE.md` 路径是固定存储合同，避免生成物被重定向到语义真源或结果记录。
+
+`render` 与 `status` 共享当前结果校验和汇总路径。生成的 `TASK_TABLE.md` 显式显示需复核任务、当前有效结果、含验证结果和含未决结果数量；损坏或任务修订不匹配的当前结果会使导出失败，而不会继续显示成可信结果路径。这些数量仍只是执行投影，不是产品完成结论。
+
+在已有 `workflow.json` 的交付工作区中重建缺失任务表时，`taskctl init` 的 ID 和标题必须与现有 workflow 完全一致；纯任务目录没有 workflow 时仍由调用方指定身份。
 
 ## 诊断语义
 
@@ -49,6 +55,6 @@ release     释放未完成任务
 - 依赖环、重复 ID、任务文件与内部 ID 不一致、路径逃逸、非法状态变换和并发 revision 冲突是写入安全错误。
 - `status`、`render`、依赖完成和结果文件都不能产生“允许执行”或“产品已经完成”的判定。
 - `completion-context` 只建立最终目标到候选证据的有界映射，不返回 pass/fail；目标集合直接来自 `protected-baseline.json`，可修订文档的新增同前缀条目不能扩张它。CLI 会由当前阶段文档重新派生索引并与缓存逐字段比较，缓存陈旧或被改写时返回诊断而不输出候选目标。
-- 首次查询返回 `snapshot_id`。目标页使用 `--after-id`；单目标候选任务续页使用 `--target-id` 与 `--candidate-after-id`；约束和延后项分别使用 `--constraint-after-id`、`--deferred-after-id`。所有续页都传首次返回的 `--snapshot-id`，游标在 `pagination` 中返回；任务、状态、结果或索引改变会要求从第一页重新复核。
+- 首次查询同时返回三个结果流及 `returned_streams`、`snapshot_id`。续页一次只选择一个结果流：目标页使用 `--after-id`；单目标候选任务续页使用 `--target-id` 与 `--candidate-after-id`；约束和延后项分别使用 `--constraint-after-id`、`--deferred-after-id`。续页不重复返回另外两个流，且必须传首次返回的 `--snapshot-id`；游标在 `pagination` 中返回，混用多个流的游标、任务或索引改变都会要求重新查询。
 
 `context` 的 `--budget` 是字符预算。输出被截断时按返回的任务或语义 ID继续精确查询，不直接读取整个任务目录。

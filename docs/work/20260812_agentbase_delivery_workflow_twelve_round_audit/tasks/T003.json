@@ -1,0 +1,39 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "第2轮已验证版本"
+      ],
+      "id": "T002",
+      "type": "hard"
+    }
+  ],
+  "id": "T003",
+  "mutation_scope": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/execution.md"
+  ],
+  "outcome": "任务状态与阻塞原因始终表达同一个可恢复事实",
+  "outputs": [
+    "阻塞状态不变量",
+    "第4轮可审查的新版本"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-003",
+    "GAP-003",
+    "DES-004",
+    "AC-002",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance"
+  ],
+  "title": "第3轮统一任务阻塞状态",
+  "verification": [
+    "原矛盾状态反例被修正；损坏组合被拒绝；恢复路径通过"
+  ]
+}

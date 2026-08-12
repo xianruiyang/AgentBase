@@ -1,0 +1,26 @@
+{
+  "changed_files": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/tooling.md",
+    "skills/task-table-manager/references/execution.md",
+    "skills/delivery-workflow/references/iteration.md"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "completion-context 首屏保留完整审计入口，后续分页只返回一个显式结果流并拒绝混合游标",
+  "outputs": [
+    "completion-context 独立分页流",
+    "十轮迭代最终版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T010",
+  "task_revision": 2,
+  "unresolved": [],
+  "verification": [
+    "task-table-manager tests - 46/46 passed",
+    "delivery-workflow tests - 24/24 passed",
+    "真实工作区目标第二页 returned_streams 仅含 targets 且 constraints/DCR 为空",
+    "混合目标与 DCR 游标反例 exit 2",
+    "taskctl.py py_compile passed"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "changed_files": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/execution.md"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "complete 只从 in_progress 或 review 进入 done，未执行和阻塞任务不能跳过生命周期",
+  "outputs": [
+    "complete 来源状态不变量",
+    "第10轮可审查的新版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T009",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "task-table-manager tests - 46/46 passed",
+    "delivery-workflow tests - 24/24 passed",
+    "原 todo complete 反例 exit 2、未写结果且状态保持 todo",
+    "review 状态完成成功"
+  ]
+}

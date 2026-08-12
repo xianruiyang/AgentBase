@@ -1,0 +1,23 @@
+{
+  "changed_files": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py"
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "两个 CLI 对文件系统异常返回退出码 2 和单个有界 JSON，不再泄漏 traceback",
+  "outputs": [
+    "统一的 OSError 顶层错误合同",
+    "第3轮可审查的新版本"
+  ],
+  "schema": "task.result",
+  "task_id": "T002",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "delivery-workflow tests - 21/21 passed",
+    "task-table-manager tests - 39/39 passed",
+    "原文件路径工作区反例：两个 CLI exit 2、JSON parse passed、Traceback absent"
+  ]
+}

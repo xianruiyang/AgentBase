@@ -1,0 +1,40 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "第11轮已验证版本"
+      ],
+      "id": "T011",
+      "type": "hard"
+    }
+  ],
+  "id": "T012",
+  "mutation_scope": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/delivery-workflow/references/iteration.md"
+  ],
+  "outcome": "WORK_STATUS.md 同时呈现任务执行、语义闭合、结果证据闭合及受保护基线确认来源",
+  "outputs": [
+    "三类状态交付总览",
+    "十二轮迭代最终版本"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-012",
+    "GAP-012",
+    "DES-013",
+    "AC-002",
+    "AC-003",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance"
+  ],
+  "title": "第12轮补齐交付总览的三类状态",
+  "verification": [
+    "确认来源和三类状态均显示；不产生完成判定；损坏结果失败；回归通过"
+  ]
+}

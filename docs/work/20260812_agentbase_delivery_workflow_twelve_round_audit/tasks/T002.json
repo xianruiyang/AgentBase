@@ -1,0 +1,40 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "第1轮已验证版本"
+      ],
+      "id": "T001",
+      "type": "hard"
+    }
+  ],
+  "id": "T002",
+  "mutation_scope": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py"
+  ],
+  "outcome": "两个 CLI 对可预期文件系统失败返回一致、有界且机器可读的错误",
+  "outputs": [
+    "统一的 OSError 顶层错误合同",
+    "第3轮可审查的新版本"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-002",
+    "GAP-002",
+    "DES-003",
+    "AC-002",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance"
+  ],
+  "title": "第2轮收敛 CLI 文件系统错误输出",
+  "verification": [
+    "文件路径工作区反例返回 JSON/exit 2/no traceback；既有回归通过"
+  ]
+}
