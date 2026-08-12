@@ -1,8 +1,9 @@
 {
   "schema_version": 1,
+  "fingerprint_schema": "text-lf-v1",
   "evaluator": "sol-blind-forward-v2-2026-08-13",
-  "candidate_bundle_sha256": "687BB9848FF666ED3FBEE895EA885248C2EF143D294CEFF99A1D4299F39675B4",
-  "evaluation_input_sha256": "4FE2F750ADAB0B75B371BDD422263B63CB2E527868C3F2FE75B65C3E027B190E",
+  "candidate_bundle_sha256": "8378434EA9E6B3C66E78B22C5247FE5EBA870FA02592E03464EFF14C6CA70C35",
+  "evaluation_input_sha256": "6A8950F08650D5A2203E81B0584F0E86A3AC0120861A8E67500AA5EEA886BED0",
   "cases": [
     {
       "id": "mechanical-document-edit",

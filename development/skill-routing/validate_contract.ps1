@@ -349,6 +349,7 @@ Assert-True ($workflowContent.Contains("npm run verify:release")) "Repository CI
 Assert-True ($workflowContent.Contains("rustsec/audit-check@")) "Repository CI does not run the RustSec gate"
 Assert-True ($workflowContent.Contains("sgy-windows:")) "Repository CI is missing the Windows sgy native gate"
 Assert-True ($workflowContent.Contains("validate_behavior_results.ps1") -and $workflowContent.Contains("evidence\current.json")) "Repository CI does not validate current blind behavior evidence"
+Assert-True ($workflowContent.Contains("test_behavior_fingerprint.ps1")) "Repository CI does not verify line-ending-neutral behavior fingerprints"
 Assert-True ($workflowContent.Contains("build_plugin.ps1") -and $workflowContent.Contains("-SkipOfficialValidation")) "Repository CI does not build the plugin package with its portable contract"
 $unpinnedActions = @([regex]::Matches($workflowContent, '(?m)^\s*-?\s*uses:\s*[^@\s]+@(?<ref>[^\s#]+)') | Where-Object {
     $_.Groups["ref"].Value -notmatch '^[0-9a-f]{40}$'

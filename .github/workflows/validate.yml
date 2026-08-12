@@ -32,6 +32,7 @@ jobs:
       - name: Validate routing and portable deployment contracts
         run: |
           & .\development\skill-routing\validate_contract.ps1 -ProjectRoot $PWD.Path
+          & .\development\skill-routing\test_behavior_fingerprint.ps1
           & .\development\skill-routing\validate_behavior_results.ps1 -ProjectRoot $PWD.Path -ResultsPath .\development\skill-routing\evidence\current.json
           & .\development\codex-deployment\manage_agentbase.ps1 -Action Validate -ProjectRoot $PWD.Path
           & .\development\codex-deployment\test_manage_agentbase.ps1 -ProjectRoot $PWD.Path

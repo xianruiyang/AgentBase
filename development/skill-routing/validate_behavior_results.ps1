@@ -8,20 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Get-TextSha256 {
-    param(
-        [string]$Text
-    )
-
-    $algorithm = [Security.Cryptography.SHA256]::Create()
-    try {
-        $bytes = [Text.Encoding]::UTF8.GetBytes($Text)
-        return ([BitConverter]::ToString($algorithm.ComputeHash($bytes))).Replace("-", "")
-    }
-    finally {
-        $algorithm.Dispose()
-    }
-}
+. (Join-Path $PSScriptRoot "behavior_fingerprint.ps1")
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -56,6 +43,9 @@ $results = Get-Content -LiteralPath $ResultsPath -Raw -Encoding UTF8 | ConvertFr
 if ($results.schema_version -ne 1) {
     throw "Unsupported behavior result schema: $($results.schema_version)"
 }
+if ([string]$results.fingerprint_schema -ne (Get-AgentBaseBehaviorFingerprintSchema)) {
+    throw "Unsupported behavior fingerprint schema: $($results.fingerprint_schema)"
+}
 
 $requiredSkills = @(Get-StringArray $contract.required_skills)
 $allowedBehaviorTags = @(Get-StringArray $contract.allowed_behavior_tags)
@@ -67,15 +57,8 @@ foreach ($skill in $requiredSkills) {
         Join-Path $skillRoot "agents\openai.yaml"
     )
 }
-$candidateRecords = @($candidateFiles | Sort-Object -Unique | ForEach-Object {
-    $item = Get-Item -LiteralPath $_
-    $relativePath = $item.FullName.Substring($ProjectRoot.Length + 1).Replace('\', '/')
-    "$relativePath|$($item.Length)|$((Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash)"
-})
-$candidateFingerprint = Get-TextSha256 ($candidateRecords -join [Environment]::NewLine)
-$inputRecords = @($contract.cases | ForEach-Object { "$($_.id)|$($_.request)" })
-$inputRecords += @($contract.allowed_behavior_tags | ForEach-Object { "behavior|$_" })
-$evaluationInputFingerprint = Get-TextSha256 ($inputRecords -join [Environment]::NewLine)
+$candidateFingerprint = Get-AgentBaseBehaviorCandidateFingerprint -ProjectRoot $ProjectRoot -CandidateFiles @($candidateFiles | Sort-Object -Unique)
+$evaluationInputFingerprint = Get-AgentBaseBehaviorInputFingerprint -Cases @($contract.cases) -AllowedBehaviorTags @($contract.allowed_behavior_tags)
 if ([string]$results.candidate_bundle_sha256 -ne $candidateFingerprint) {
     throw "Behavior result belongs to a different candidate bundle"
 }

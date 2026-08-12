@@ -5,20 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Get-TextSha256 {
-    param(
-        [string]$Text
-    )
-
-    $algorithm = [Security.Cryptography.SHA256]::Create()
-    try {
-        $bytes = [Text.Encoding]::UTF8.GetBytes($Text)
-        return ([BitConverter]::ToString($algorithm.ComputeHash($bytes))).Replace("-", "")
-    }
-    finally {
-        $algorithm.Dispose()
-    }
-}
+. (Join-Path $PSScriptRoot "behavior_fingerprint.ps1")
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -55,18 +42,12 @@ $candidateFiles = @(Join-Path $ProjectRoot "global\AGENTS.md")
 foreach ($skillSource in $skillSources) {
     $candidateFiles += @($skillSource.skill_path, $skillSource.metadata_path)
 }
-$candidateRecords = @($candidateFiles | Sort-Object -Unique | ForEach-Object {
-    $item = Get-Item -LiteralPath $_
-    $relativePath = $item.FullName.Substring($ProjectRoot.Length + 1).Replace('\', '/')
-    "$relativePath|$($item.Length)|$((Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash)"
-})
-$candidateFingerprint = Get-TextSha256 ($candidateRecords -join [Environment]::NewLine)
-$inputRecords = @($cases | ForEach-Object { "$($_.id)|$($_.request)" })
-$inputRecords += @($contract.allowed_behavior_tags | ForEach-Object { "behavior|$_" })
-$evaluationInputFingerprint = Get-TextSha256 ($inputRecords -join [Environment]::NewLine)
+$candidateFingerprint = Get-AgentBaseBehaviorCandidateFingerprint -ProjectRoot $ProjectRoot -CandidateFiles @($candidateFiles | Sort-Object -Unique)
+$evaluationInputFingerprint = Get-AgentBaseBehaviorInputFingerprint -Cases @($contract.cases) -AllowedBehaviorTags @($contract.allowed_behavior_tags)
 
 $payload = [ordered]@{
     schema_version = 1
+    fingerprint_schema = Get-AgentBaseBehaviorFingerprintSchema
     purpose = "Blind forward evaluation of candidate AgentBase skill routing and global behavior."
     candidate_global_path = Join-Path $ProjectRoot "global\AGENTS.md"
     candidate_bundle_sha256 = $candidateFingerprint
@@ -83,6 +64,7 @@ $payload = [ordered]@{
     allowed_behavior_tags = @($contract.allowed_behavior_tags)
     output_schema = [ordered]@{
         schema_version = 1
+        fingerprint_schema = Get-AgentBaseBehaviorFingerprintSchema
         evaluator = "free-form identifier"
         candidate_bundle_sha256 = $candidateFingerprint
         evaluation_input_sha256 = $evaluationInputFingerprint

@@ -85,7 +85,7 @@ skill 内置的 Windows/Linux `sgy 0.1.0` 由同一个不含 `.git`、`target/` 
 
 `development/skill-routing/evidence/` 中已有结果只作为对应候选哈希的历史快照。修改候选规则、skill 内容或请求集合后必须重新生成输入并取得独立评估结果；验证器会拒绝把旧结果当成当前候选证据。
 
-`development/skill-routing/evidence/current.json` 是正式发布门禁使用的唯一当前证据入口。评估器不得读取 `trigger-cases.json` 中的隐藏期望；`manage_agentbase.ps1 -Action Validate`、`Publish` 与 CI 都会重新核对候选哈希、输入哈希、用例完整性、期望项和禁选项。额外选择保持非阻断告警，因为当前合同只把明确期望和明确禁止定义为发布 oracle。
+`development/skill-routing/evidence/current.json` 是正式发布门禁使用的唯一当前证据入口。评估器不得读取 `trigger-cases.json` 中的隐藏期望；`manage_agentbase.ps1 -Action Validate`、`Publish` 与 CI 都会重新核对候选哈希、输入哈希、用例完整性、期望项和禁选项。候选与输入指纹先把文本换行规范化为 LF，因此同一 Git 内容在 CRLF/LF 工作树中保持同一证据身份。额外选择保持非阻断告警，因为当前合同只把明确期望和明确禁止定义为发布 oracle。
 
 ## 本地插件打包
 
