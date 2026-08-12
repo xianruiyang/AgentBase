@@ -27,7 +27,10 @@
     "architecture_integrated",
     "no_scope_expansion",
     "protected_user_baseline",
-    "final_user_scope_only"
+    "final_user_scope_only",
+    "document_authority",
+    "cli_assistive_only",
+    "local_mechanical_gates"
   ],
   "cases": [
     {
@@ -159,7 +162,6 @@
       "forbidden_skills": [],
       "expected_change_governance_references": [
         "causal-analysis.md",
-        "lifecycle-and-entry.md",
         "verification-and-gates.md"
       ],
       "expected_behavior_tags": [
@@ -320,7 +322,7 @@
     {
       "id": "cross-turn-dependent-plan",
       "kind": "positive",
-      "request": "这个迁移要跨多轮执行，任务之间有真实依赖，并且下周要按证据审计完成状态；请建立并执行任务表。",
+      "request": "这个迁移要跨多轮执行，任务之间有真实依赖，并且下周需要快速恢复上下文和查看执行状态；请建立并执行任务表。",
       "expected_skills": [
         "task-table-manager"
       ],
@@ -334,7 +336,7 @@
     {
       "id": "full-delivery-chain",
       "kind": "positive",
-      "request": "先和我商议并确认需求及我指定的设计，再完成模型设计、现状分析、方案、任务表和跨轮执行。执行中不得改需求或我的设计，模型产物可持续修订；最终只按全部需求和我的全部设计是否实现判断。",
+      "request": "先和我商议并确认需求及我指定的设计，再完成模型设计、现状分析、方案、任务表和跨轮执行。所有规则以文档为准，CLI 只做辅助编辑查询。执行中不得改需求或我的设计，模型产物可持续修订；最终只按全部需求和我的全部设计是否实现判断。",
       "expected_skills": [
         "change-governance",
         "delivery-workflow",
@@ -347,7 +349,9 @@
       "expected_behavior_tags": [
         "modify_authorized_scope",
         "protected_user_baseline",
-        "final_user_scope_only"
+        "final_user_scope_only",
+        "document_authority",
+        "cli_assistive_only"
       ],
       "forbidden_behavior_tags": []
     },
@@ -673,6 +677,43 @@
       "forbidden_behavior_tags": [
         "modify_authorized_scope"
       ]
+    },
+    {
+      "id": "workflow-cli-gate-boundary",
+      "kind": "behavior",
+      "request": "请完善长期交付链和任务表，并统一设计适用于两套 CLI 的共享门禁政策：目标、状态、依赖和完成规则必须写在文档中并由 agent 判断，CLI 只辅助编辑查询。只允许少量能机械证明且保护当前写入或查询快照的局部门禁，其余都返回诊断。",
+      "expected_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [
+        "verification-and-gates.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "document_authority",
+        "cli_assistive_only",
+        "local_mechanical_gates"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "single-task-cli-formatting",
+      "kind": "negative",
+      "request": "只用项目已有 CLI 格式化这一个已指定的任务 JSON，字段和内容都已确认，不建立长期流程。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
     }
   ]
 }

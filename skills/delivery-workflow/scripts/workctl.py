@@ -55,12 +55,37 @@ PROTECTED_STAGES = ("requirements", "user_design")
 
 
 class WorkctlError(RuntimeError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        gate_id: str = "WORK-INPUT-UNREADABLE",
+        risk: str = "the current command cannot safely interpret a required input",
+        scope: str = "current command",
+        recovery: str = "repair or narrow the reported input, then retry the command",
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.gate = {
+            "id": gate_id,
+            "risk": risk,
+            "scope": scope,
+            "recovery": recovery,
+            "retryable": retryable,
+        }
+
+    def payload(self) -> dict[str, Any]:
+        return {"ok": False, "error": str(self), "gate": self.gate}
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
-        emit({"ok": False, "error": f"argument error: {message}"}, stream=sys.stderr)
+        error = WorkctlError(
+            f"argument error: {message}",
+            recovery="correct the command arguments and retry",
+            retryable=True,
+        )
+        emit(error.payload(), stream=sys.stderr)
         raise SystemExit(2)
 
 
@@ -95,7 +120,12 @@ def read_text_bounded(path: Path, limit: int) -> str:
     except FileNotFoundError as exc:
         raise WorkctlError(f"missing file: {path}") from exc
     if size > limit:
-        raise WorkctlError(f"file exceeds {limit} bytes: {path}")
+        raise WorkctlError(
+            f"file exceeds {limit} bytes: {path}",
+            gate_id="WORK-LIMIT",
+            risk="the command cannot keep input and output resource use bounded",
+            recovery="narrow or split the input before retrying",
+        )
     try:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
@@ -135,7 +165,12 @@ def exclusive_write_json(path: Path, value: Any) -> str:
     try:
         descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError as exc:
-        raise WorkctlError(f"refusing to overwrite protected baseline: {path}") from exc
+        raise WorkctlError(
+            f"refusing to overwrite confirmation snapshot: {path}",
+            gate_id="WORK-OVERWRITE",
+            risk="an existing snapshot would be destroyed",
+            recovery="use --new-cycle to preserve the previous snapshot in history",
+        ) from exc
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(text)
@@ -157,12 +192,22 @@ def resolve_root(raw: str) -> Path:
 def resolve_inside(root: Path, relative: str) -> Path:
     candidate = Path(relative)
     if candidate.is_absolute():
-        raise WorkctlError(f"manifest path must be relative: {relative}")
+        raise WorkctlError(
+            f"manifest path must be relative: {relative}",
+            gate_id="WORK-PATH",
+            risk="the command could read or write outside the selected workflow",
+            recovery="use the fixed workflow-relative path",
+        )
     resolved = (root / candidate).resolve()
     try:
         resolved.relative_to(root)
     except ValueError as exc:
-        raise WorkctlError(f"path escapes work directory: {relative}") from exc
+        raise WorkctlError(
+            f"path escapes work directory: {relative}",
+            gate_id="WORK-PATH",
+            risk="the command could read or write outside the selected workflow",
+            recovery="use a path contained by the workflow directory",
+        ) from exc
     return resolved
 
 
@@ -195,7 +240,13 @@ def workspace_lock(root: Path) -> Iterator[None]:
 
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
-            raise WorkctlError("delivery workspace is being updated by another process") from exc
+            raise WorkctlError(
+                "delivery workspace is being updated by another process",
+                gate_id="WORK-LOCK",
+                risk="concurrent writes could overwrite workflow data",
+                recovery="wait for the other writer to finish, then retry",
+                retryable=True,
+            ) from exc
         yield
     finally:
         try:
@@ -256,7 +307,7 @@ def load_manifest(root: Path) -> dict[str, Any]:
     if index_path == status_path:
         raise WorkctlError("semantic index and status view must use distinct paths")
     if baseline_path in semantic_paths or baseline_path in {workflow_path, task_table_path}:
-        raise WorkctlError("protected baseline must use a dedicated path")
+        raise WorkctlError("confirmation snapshot must use a dedicated path")
     if task_table_path.exists():
         task_table = read_json(task_table_path)
         if not isinstance(task_table, dict) or task_table.get("schema") != "task.table":
@@ -300,53 +351,151 @@ def verify_protected_baseline(root: Path, manifest: dict[str, Any]) -> dict[str,
         root, str(manifest.get("protected_baseline", "protected-baseline.json"))
     )
     if not baseline_path.exists():
-        return {"status": "unprotected", "path": baseline_path.name, "protected_ids": 0}
-    baseline = read_json(baseline_path)
+        return {
+            "status": "unprotected",
+            "path": baseline_path.name,
+            "protected_ids": 0,
+            "diagnostics": [{"kind": "baseline_snapshot_missing"}],
+        }
+    try:
+        baseline = read_json(baseline_path)
+    except (OSError, WorkctlError) as exc:
+        return {
+            "status": "invalid",
+            "path": baseline_path.name,
+            "protected_ids": 0,
+            "diagnostics": [
+                {"kind": "baseline_snapshot_unreadable", "message": str(exc)}
+            ],
+        }
+    diagnostics: list[dict[str, Any]] = []
+    invalid = False
+    drifted = False
     if not isinstance(baseline, dict) or baseline.get("schema") != "delivery.protected-baseline":
-        raise WorkctlError(f"unsupported protected baseline: {baseline_path}")
+        return {
+            "status": "invalid",
+            "path": baseline_path.name,
+            "protected_ids": 0,
+            "diagnostics": [{"kind": "baseline_snapshot_unsupported"}],
+        }
     if baseline.get("workflow_id") != manifest.get("id"):
-        raise WorkctlError("protected baseline belongs to a different workflow")
+        invalid = True
+        diagnostics.append({"kind": "baseline_workflow_mismatch"})
     if baseline.get("confirmed_by") != "user":
-        raise WorkctlError("protected baseline must be confirmed by the user")
-    confirmation_ref = normalize_manifest_text(
-        baseline.get("confirmation_ref"), "protected baseline confirmation_ref"
-    )
+        invalid = True
+        diagnostics.append({"kind": "baseline_confirmation_provenance_unverified"})
+    confirmation_ref: str | None
+    try:
+        confirmation_ref = normalize_manifest_text(
+            baseline.get("confirmation_ref"), "protected baseline confirmation_ref"
+        )
+    except WorkctlError as exc:
+        invalid = True
+        confirmation_ref = None
+        diagnostics.append(
+            {"kind": "baseline_confirmation_reference_invalid", "message": str(exc)}
+        )
     documents = baseline.get("documents")
     if not isinstance(documents, dict):
-        raise WorkctlError("protected baseline documents must be an object")
+        return {
+            "status": "invalid",
+            "path": baseline_path.name,
+            "cycle_id": baseline.get("cycle_id"),
+            "confirmed_by": baseline.get("confirmed_by"),
+            "confirmation_ref": confirmation_ref,
+            "protected_ids": 0,
+            "history_count": 0,
+            "diagnostics": [*diagnostics, {"kind": "baseline_documents_invalid"}],
+        }
     protected_ids = 0
     for stage in PROTECTED_STAGES:
         record = documents.get(stage)
         if not isinstance(record, dict):
-            raise WorkctlError(f"protected baseline is missing {stage}")
+            invalid = True
+            diagnostics.append({"kind": "baseline_stage_missing", "stage": stage})
+            continue
         expected_path = str(manifest["documents"][stage])
         if record.get("path") != expected_path:
-            raise WorkctlError(f"protected baseline path mismatch for {stage}")
+            invalid = True
+            diagnostics.append(
+                {
+                    "kind": "baseline_path_mismatch",
+                    "stage": stage,
+                    "expected": expected_path,
+                    "recorded": record.get("path"),
+                }
+            )
         current_fingerprint = file_fingerprint(resolve_inside(root, expected_path))
         if record.get("fingerprint") != current_fingerprint:
-            raise WorkctlError(
-                f"protected source changed: {expected_path}; restore it and record a deferred change"
+            drifted = True
+            diagnostics.append(
+                {
+                    "kind": "baseline_source_drift",
+                    "stage": stage,
+                    "path": expected_path,
+                    "recorded": record.get("fingerprint"),
+                    "current": current_fingerprint,
+                }
             )
         ids = record.get("ids")
-        if (
-            not isinstance(ids, list)
-            or any(not isinstance(value, str) for value in ids)
-            or len(ids) != len(set(ids))
-        ):
-            raise WorkctlError(f"protected baseline ids are invalid for {stage}")
+        if not isinstance(ids, list) or any(not isinstance(value, str) for value in ids):
+            invalid = True
+            diagnostics.append({"kind": "baseline_ids_invalid", "stage": stage})
+            continue
+        if len(ids) != len(set(ids)):
+            diagnostics.append({"kind": "baseline_duplicate_ids", "stage": stage})
         actual_sections, _ = parse_document(resolve_inside(root, expected_path), stage)
         actual_ids = sorted(section["id"] for section in actual_sections)
         if sorted(ids) != actual_ids:
-            raise WorkctlError(f"protected baseline ids do not match {expected_path}")
+            drifted = True
+            diagnostics.append(
+                {
+                    "kind": "baseline_id_set_drift",
+                    "stage": stage,
+                    "path": expected_path,
+                }
+            )
         if any(section_prefix(value) not in STAGE_PREFIXES[stage] for value in ids):
-            raise WorkctlError(f"protected baseline contains an invalid {stage} id")
+            diagnostics.append({"kind": "baseline_stage_id_mismatch", "stage": stage})
+        unconfirmed = [
+            section["id"]
+            for section in actual_sections
+            if section["status"].casefold() != "confirmed"
+        ]
+        if unconfirmed:
+            diagnostics.append(
+                {
+                    "kind": "baseline_entries_not_confirmed",
+                    "stage": stage,
+                    "ids": unconfirmed[:20],
+                }
+            )
         protected_ids += len(ids)
+    current_target_ids = sorted(
+        section["id"]
+        for stage in PROTECTED_STAGES
+        for section in parse_document(
+            resolve_inside(root, str(manifest["documents"][stage])), stage
+        )[0]
+        if section_prefix(section["id"]) in {"REQ", "AC", "UDES"}
+    )
+    if not current_target_ids:
+        diagnostics.append({"kind": "baseline_has_no_final_target"})
+    history = baseline.get("history", [])
+    if not isinstance(history, list):
+        invalid = True
+        diagnostics.append({"kind": "baseline_history_invalid"})
+        history = []
     return {
-        "status": "protected",
+        "status": "invalid" if invalid else "drifted" if drifted else "protected",
         "path": baseline_path.name,
+        "cycle_id": baseline.get("cycle_id", "cycle-001"),
         "confirmed_by": baseline.get("confirmed_by"),
         "confirmation_ref": confirmation_ref,
         "protected_ids": protected_ids,
+        "current_target_count": len(current_target_ids),
+        "history_count": len(history),
+        "diagnostics": diagnostics,
     }
 
 
@@ -381,6 +530,9 @@ def parse_document(path: Path, stage: str) -> tuple[list[dict[str, Any]], str]:
             if (relation_match := REFERENCE_FIELD_RE.match(body_line)) is not None
         ]
         refs = sorted(set(ID_RE.findall("\n".join(relation_values))) - {section_id})
+        section_digest = hashlib.sha256(
+            f"{section_id}\n{title}\n{body}".encode("utf-8")
+        ).hexdigest()
         sections.append(
             {
                 "id": section_id,
@@ -390,6 +542,7 @@ def parse_document(path: Path, stage: str) -> tuple[list[dict[str, Any]], str]:
                 "line": line_index + 1,
                 "status": status,
                 "references": refs,
+                "fingerprint": f"sha256:{section_digest}",
                 "body": body,
             }
         )
@@ -402,7 +555,7 @@ def build_index(root: Path) -> dict[str, Any]:
     baseline = verify_protected_baseline(root, manifest)
     all_sections: list[dict[str, Any]] = []
     document_hashes: dict[str, str] = {}
-    diagnostics: list[dict[str, Any]] = []
+    diagnostics: list[dict[str, Any]] = list(baseline.get("diagnostics", []))
     for stage in STAGE_PREFIXES:
         path = resolve_inside(root, str(manifest["documents"][stage]))
         sections, digest = parse_document(path, stage)
@@ -419,6 +572,16 @@ def build_index(root: Path) -> dict[str, Any]:
                         "message": f"{section['id']} does not belong to {stage}",
                     }
                 )
+    for stage, recorded_fingerprint in document_hashes.items():
+        path = resolve_inside(root, str(manifest["documents"][stage]))
+        if file_fingerprint(path) != recorded_fingerprint:
+            raise WorkctlError(
+                f"workflow document changed while building the index: {path.name}",
+                gate_id="WORK-SNAPSHOT-RACE",
+                risk="one index would combine semantic sections from different document versions",
+                recovery="retry after document edits have stopped",
+                retryable=True,
+            )
     if len(all_sections) > MAX_RECORDS:
         raise WorkctlError(f"workflow contains more than {MAX_RECORDS} semantic sections")
 
@@ -513,10 +676,14 @@ def task_status_summary(root: Path) -> dict[str, Any]:
         / "taskctl.py"
     )
     if not script_path.is_file():
-        raise WorkctlError(f"task table manager is unavailable: {script_path}")
+        return unavailable_task_summary(
+            "task_table_manager_missing", f"task table manager is unavailable: {script_path}"
+        )
     spec = importlib.util.spec_from_file_location("_agentbase_taskctl", script_path)
     if spec is None or spec.loader is None:
-        raise WorkctlError(f"task table manager is unreadable: {script_path}")
+        return unavailable_task_summary(
+            "task_table_manager_unreadable", f"task table manager is unreadable: {script_path}"
+        )
     module = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(module)
@@ -524,18 +691,40 @@ def task_status_summary(root: Path) -> dict[str, Any]:
     except Exception as exc:
         taskctl_error = getattr(module, "TaskctlError", None)
         if taskctl_error is not None and isinstance(exc, taskctl_error):
-            raise WorkctlError(f"task storage is invalid: {exc}") from exc
-        raise WorkctlError(f"task table manager failed: {exc}") from exc
+            return unavailable_task_summary("task_storage_partially_unreadable", str(exc))
+        return unavailable_task_summary("task_table_manager_failed", str(exc))
     if not isinstance(summary, dict):
-        raise WorkctlError("task table manager returned an invalid storage summary")
+        return unavailable_task_summary(
+            "task_table_summary_invalid", "task table manager returned an invalid storage summary"
+        )
+    summary.setdefault("status", "available")
+    summary.setdefault("diagnostics", [])
     return summary
+
+
+def unavailable_task_summary(kind: str, message: str) -> dict[str, Any]:
+    return {
+        "status": "unavailable",
+        "counts": {},
+        "task_count": None,
+        "result_count": None,
+        "result_with_verification_count": None,
+        "result_with_unresolved_count": None,
+        "invalidated_source_ids": [],
+        "diagnostics": [{"kind": kind, "message": message}],
+    }
 
 
 def init_workspace(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.work_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    with workspace_lock(root):
+        return init_workspace_locked(args, root)
+
+
+def init_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     workflow_id = normalize_manifest_text(args.id, "--id", writing=True)
     title = normalize_manifest_text(args.title, "--title", writing=True)
-    root.mkdir(parents=True, exist_ok=True)
     created_files = [
         "workflow.json",
         "task-table.json",
@@ -555,7 +744,12 @@ def init_workspace(args: argparse.Namespace) -> dict[str, Any]:
         if (root / directory).is_dir() and any((root / directory).iterdir())
     )
     if conflicts:
-        raise WorkctlError(f"refusing to overwrite existing workspace files: {', '.join(conflicts)}")
+        raise WorkctlError(
+            f"refusing to overwrite existing workspace files: {', '.join(conflicts)}",
+            gate_id="WORK-OVERWRITE",
+            risk="initialization would overwrite existing workflow data",
+            recovery="choose an empty directory or preserve and inspect the existing workspace",
+        )
 
     for directory in ("tasks", "state", "results"):
         (root / directory).mkdir(parents=True, exist_ok=True)
@@ -609,75 +803,97 @@ def protect_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, 
     baseline_path = resolve_inside(
         root, str(manifest.get("protected_baseline", "protected-baseline.json"))
     )
+    existing_text: str | None = None
+    history: list[dict[str, Any]] = []
     if baseline_path.exists():
-        raise WorkctlError(f"refusing to overwrite protected baseline: {baseline_path}")
+        if not getattr(args, "new_cycle", False):
+            raise WorkctlError(
+                f"refusing to overwrite confirmation snapshot: {baseline_path}",
+                gate_id="WORK-OVERWRITE",
+                risk="the existing confirmation snapshot would be destroyed",
+                recovery="use --new-cycle to preserve it in history",
+            )
+        existing_text = read_text_bounded(baseline_path, MAX_JSON_BYTES)
+        existing = read_json(baseline_path)
+        if (
+            not isinstance(existing, dict)
+            or existing.get("schema") != "delivery.protected-baseline"
+            or existing.get("workflow_id") != manifest.get("id")
+        ):
+            raise WorkctlError(
+                f"cannot preserve unsupported existing baseline: {baseline_path}",
+                gate_id="WORK-OVERWRITE",
+                risk="replacing an unknown snapshot format could destroy provenance",
+                recovery="repair or explicitly archive the existing baseline before retrying",
+            )
+        existing_history = existing.get("history", [])
+        if not isinstance(existing_history, list):
+            raise WorkctlError(
+                "cannot preserve invalid baseline history",
+                gate_id="WORK-OVERWRITE",
+                risk="a new snapshot could silently discard prior provenance",
+                recovery="repair the history array before starting a new cycle",
+            )
+        history = [*existing_history]
+        history.append(
+            {
+                key: existing.get(key)
+                for key in (
+                    "cycle_id",
+                    "confirmed_by",
+                    "confirmation_ref",
+                    "documents",
+                )
+            }
+        )
     index = build_index(root)
-    if index["duplicates"]:
-        raise WorkctlError("cannot protect an ambiguous workflow with duplicate ids")
     protected_documents: dict[str, Any] = {}
     for stage in PROTECTED_STAGES:
         sections = [section for section in index["sections"] if section["stage"] == stage]
-        misplaced = [
-            section["id"]
-            for section in sections
-            if section_prefix(section["id"]) not in STAGE_PREFIXES[stage]
-        ]
-        if misplaced:
-            raise WorkctlError(
-                f"cannot protect {stage} with misplaced ids: {', '.join(misplaced[:10])}"
-            )
-        unconfirmed = [
-            section["id"]
-            for section in sections
-            if section["status"].casefold() != "confirmed"
-        ]
-        if unconfirmed:
-            raise WorkctlError(
-                f"cannot protect {stage} with entries not marked confirmed: "
-                f"{', '.join(unconfirmed[:10])}"
-            )
         relative_path = str(manifest["documents"][stage])
         protected_documents[stage] = {
             "path": relative_path,
             "fingerprint": index["document_hashes"][stage],
             "ids": sorted(section["id"] for section in sections),
         }
-    final_target_ids = [
-        value
-        for stage in PROTECTED_STAGES
-        for value in protected_documents[stage]["ids"]
-        if section_prefix(value) in {"REQ", "AC", "UDES"}
-    ]
-    if not final_target_ids:
-        raise WorkctlError("cannot protect a workflow without a REQ, AC, or UDES target")
     for stage in PROTECTED_STAGES:
         relative_path = str(manifest["documents"][stage])
         if file_fingerprint(resolve_inside(root, relative_path)) != index["document_hashes"][stage]:
             raise WorkctlError(
-                f"protected source changed while creating baseline: {relative_path}; retry"
+                f"confirmation source changed while creating the snapshot: {relative_path}; retry",
+                gate_id="WORK-SNAPSHOT-RACE",
+                risk="one snapshot would combine content from different document versions",
+                recovery="retry after document edits have stopped",
+                retryable=True,
             )
+    if existing_text is not None and read_text_bounded(baseline_path, MAX_JSON_BYTES) != existing_text:
+        raise WorkctlError(
+            "confirmation snapshot changed while starting a new cycle",
+            gate_id="WORK-SNAPSHOT-RACE",
+            risk="the new cycle could overwrite newer confirmation provenance",
+            recovery="read the current baseline and retry the new-cycle operation",
+            retryable=True,
+        )
     baseline = {
         "schema": "delivery.protected-baseline",
         "workflow_id": manifest.get("id"),
+        "cycle_id": f"cycle-{len(history) + 1:03d}",
         "confirmed_by": args.confirmed_by,
         "confirmation_ref": confirmation_ref,
         "documents": protected_documents,
+        "history": history,
     }
-    written_text = exclusive_write_json(baseline_path, baseline)
-    try:
-        summary = verify_protected_baseline(root, manifest)
-    except WorkctlError:
-        try:
-            if read_text_bounded(baseline_path, MAX_JSON_BYTES) == written_text:
-                baseline_path.unlink()
-        except (OSError, WorkctlError):
-            pass
-        raise
+    if existing_text is None:
+        exclusive_write_json(baseline_path, baseline)
+    else:
+        atomic_write_json(baseline_path, baseline)
+    summary = verify_protected_baseline(root, manifest)
     return {
         "ok": True,
         "command": "protect",
         "baseline": summary,
-        "note": "requirements and user design are protected for this execution closure",
+        "diagnostics": summary.get("diagnostics", []),
+        "note": "snapshot metadata records provenance; workflow documents remain authoritative",
     }
 
 
@@ -786,9 +1002,19 @@ def coverage_workspace(args: argparse.Namespace) -> dict[str, Any]:
 def unique_section(index: dict[str, Any], section_id: str) -> dict[str, Any]:
     matches = [section for section in index["sections"] if section["id"] == section_id]
     if not matches:
-        raise WorkctlError(f"unknown semantic id: {section_id}")
+        raise WorkctlError(
+            f"unknown semantic id: {section_id}",
+            gate_id="WORK-AMBIGUOUS-TARGET",
+            risk="the exact query has no uniquely identified target",
+            recovery="choose an ID present in the current Markdown documents",
+        )
     if len(matches) > 1:
-        raise WorkctlError(f"ambiguous semantic id: {section_id}")
+        raise WorkctlError(
+            f"ambiguous semantic id: {section_id}",
+            gate_id="WORK-AMBIGUOUS-TARGET",
+            risk="the exact query could return or mutate the wrong semantic object",
+            recovery="disambiguate duplicate IDs in the documents, then retry this exact query",
+        )
     return matches[0]
 
 
@@ -934,7 +1160,7 @@ def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
         "",
         "> 本文件由 workctl 生成，只是可重建的复核导航；其中计数不定义语义、READY 或最终完成状态。",
         "",
-        "## 受保护基线",
+        "## 用户确认快照",
         "",
         f"- 状态：{index['protected_baseline']['status']}",
         f"- 受保护 ID：{index['protected_baseline']['protected_ids']}",
@@ -960,22 +1186,31 @@ def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
             "| --- | ---: |",
         ]
     )
-    for status, count in task_summary["counts"].items():
-        lines.append(f"| {status} | {count} |")
+    if task_summary["status"] in {"available", "partial"}:
+        for status, count in task_summary["counts"].items():
+            lines.append(f"| {status} | {count} |")
+    else:
+        lines.append("| unavailable | 未知 |")
     lines.extend(
         [
             "",
-            f"- 任务总数：{task_summary['task_count']}",
-            f"- 需复核任务：{task_summary['counts']['review']}",
+            f"- 任务总数：{task_summary['task_count'] if task_summary['task_count'] is not None else '未知'}",
+            f"- 需复核任务：{task_summary['counts'].get('review', '未知')}",
             "",
             "## 任务结果证据",
             "",
-            f"- 当前有效结果：{task_summary['result_count']}",
-            f"- 含验证结果：{task_summary['result_with_verification_count']}",
-            f"- 含未决结果：{task_summary['result_with_unresolved_count']}",
+            f"- 当前可读取结果：{task_summary['result_count'] if task_summary['result_count'] is not None else '未知'}",
+            f"- 含验证结果：{task_summary['result_with_verification_count'] if task_summary['result_with_verification_count'] is not None else '未知'}",
+            f"- 含未决结果：{task_summary['result_with_unresolved_count'] if task_summary['result_with_unresolved_count'] is not None else '未知'}",
             f"- 使上游失效的 ID：{len(task_summary['invalidated_source_ids'])}",
         ]
     )
+    if task_summary.get("diagnostics"):
+        lines.extend(["", "## 任务读取诊断", ""])
+        lines.extend(
+            f"- {markdown_escape(item.get('kind'))}: {markdown_escape(item.get('message', ''))}"
+            for item in task_summary["diagnostics"][: args.max_items]
+        )
     lines.extend(["", "## 未决 ID", ""])
     if index["unresolved_ids"]:
         lines.extend(f"- {markdown_escape(section_id)}" for section_id in index["unresolved_ids"])
@@ -1019,6 +1254,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(protect_parser)
     protect_parser.add_argument("--confirmed-by", choices=("user",), required=True)
     protect_parser.add_argument("--confirmation-ref", required=True)
+    protect_parser.add_argument("--new-cycle", action="store_true")
     protect_parser.set_defaults(handler=protect_workspace)
 
     index_parser = subparsers.add_parser("index", help="rebuild the semantic index")
@@ -1067,13 +1303,16 @@ def main() -> int:
         emit(result, pretty=args.pretty)
         return 0
     except WorkctlError as exc:
-        emit({"ok": False, "error": str(exc)}, stream=sys.stderr)
+        emit(exc.payload(), stream=sys.stderr)
         return 2
     except OSError as exc:
-        emit(
-            {"ok": False, "error": f"filesystem operation failed: {exc}"},
-            stream=sys.stderr,
+        error = WorkctlError(
+            f"filesystem operation failed: {exc}",
+            risk="the current filesystem operation could not complete safely",
+            recovery="resolve the reported filesystem condition and retry",
+            retryable=True,
         )
+        emit(error.payload(), stream=sys.stderr)
         return 2
 
 

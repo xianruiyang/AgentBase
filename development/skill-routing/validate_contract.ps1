@@ -92,6 +92,9 @@ $requiredGlobalFragments = @(
     '在 active goal 中把深度作为 next-turn 可调配置'
     '简单且已限制的命令输出不创建日志文件'
     '新一轮调试前只清理会干扰当前判断且目标范围明确的旧日志'
+    '工作流程的目标、阶段、状态、依赖、完成和例外由适用文档定义'
+    'CLI、脚本、索引、缓存和生成视图只辅助编辑、查询、压缩与机械校验'
+    '防止本次操作写错对象、破坏数据、并发覆盖、资源无界或混用查询快照'
 )
 foreach ($fragment in $requiredGlobalFragments) {
     Assert-True ($globalContent.Contains($fragment)) "Missing required global contract fragment: $fragment"
@@ -190,24 +193,38 @@ $taskTableSkillContent = Get-Content -LiteralPath $taskTableSkillPath -Raw -Enco
 Assert-True ($taskTableSkillContent.Contains('`$reasoning-governor`')) "task-table-manager must delegate reasoning depth to reasoning-governor"
 $taskTableScriptPath = Join-Path $ProjectRoot "skills\task-table-manager\scripts\taskctl.py"
 $taskTableScriptContent = Get-Content -LiteralPath $taskTableScriptPath -Raw -Encoding UTF8
-Assert-True ($taskTableSkillContent.Contains('任务表是执行投影，不是计划正确性的裁判')) "task-table-manager does not declare its assistive responsibility"
-Assert-True ($taskTableSkillContent.Contains('最终完成标准只来自 `$delivery-workflow` 的受保护需求与用户设计')) "task-table-manager does not delegate final completion to the protected user scope"
+Assert-True ($taskTableSkillContent.Contains('任务表文档是执行投影，不是计划正确性的裁判')) "task-table-manager does not declare its assistive responsibility"
+Assert-True ($taskTableSkillContent.Contains('最终完成标准只来自 `$delivery-workflow` 当前执行周期经用户确认的需求与用户设计')) "task-table-manager does not delegate final completion to the user-confirmed document scope"
+Assert-True ($taskTableSkillContent.Contains('`taskctl` 只辅助存储、索引、查询、上下文压缩和可重建视图')) "task-table-manager does not keep taskctl assistive"
 Assert-True ($taskTableScriptContent.Contains('command_completion_context')) "taskctl is missing its bounded final-review context"
 Assert-True ($taskTableScriptContent.Contains('needs_review_count')) "taskctl status does not expose the review count"
 Assert-True ($taskTableScriptContent.Contains('upstream_index_derived_content_mismatch')) "taskctl does not bind cached index content to current workflow documents"
 Assert-True ($taskTableScriptContent.Contains('completion snapshot changed')) "taskctl completion pagination is missing snapshot consistency"
-Assert-True ($taskTableScriptContent.Contains('updating an owned task requires --owner')) "taskctl does not protect active task contracts by owner"
+Assert-True ($taskTableScriptContent.Contains('TASK-PAGINATION-SNAPSHOT')) "taskctl completion snapshot gate is not structured"
+Assert-True ($taskTableScriptContent.Contains('owner_mismatch')) "taskctl does not report owner conflicts as diagnostics"
+Assert-True ($taskTableScriptContent.Contains('dependency_cycle')) "taskctl does not report dependency cycles as diagnostics"
+Assert-True ($taskTableScriptContent.Contains('source_snapshot')) "taskctl results do not bind evidence to upstream source snapshots"
+Assert-True ($taskTableScriptContent.Contains('"retired"')) "taskctl is missing retired task state support"
+Assert-True ($taskTableScriptContent.Contains('non_standard_status')) "taskctl does not preserve non-standard states as diagnostics"
+Assert-True ($taskTableScriptContent.Contains('non_standard_dependency_type')) "taskctl does not preserve non-standard dependency semantics as diagnostics"
+Assert-True ($taskTableScriptContent.Contains('result_history_record_unreadable')) "taskctl does not isolate damaged historical results"
+Assert-True ($taskTableScriptContent.Contains('[*task["source_ids"], *evidence_for]')) "taskctl completion context does not consume direct result evidence mappings"
+Assert-True (-not $taskTableScriptContent.Contains('contains duplicate values')) "taskctl still blocks parseable duplicate values"
+Assert-True (-not $taskTableScriptContent.Contains('choices=STATUSES')) "taskctl still uses its status vocabulary as an argparse gate"
 Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot "skills\task-table-manager\tests\test_taskctl.py") -PathType Leaf) "task-table-manager is missing its CLI regression tests"
 
 $deliveryRoot = Join-Path $ProjectRoot "skills\delivery-workflow"
 $deliverySkillContent = Get-Content -LiteralPath (Join-Path $deliveryRoot "SKILL.md") -Raw -Encoding UTF8
 $deliveryScriptContent = Get-Content -LiteralPath (Join-Path $deliveryRoot "scripts\workctl.py") -Raw -Encoding UTF8
 Assert-True ($deliverySkillContent.Contains('requirements.md') -and $deliverySkillContent.Contains('user-design.md')) "delivery-workflow does not separate protected user sources"
-Assert-True ($deliverySkillContent.Contains('模型设计、分析、方案、任务状态、索引、结构检查和各阶段审核都只是中间结果')) "delivery-workflow does not limit intermediate reviews"
+Assert-True ($deliverySkillContent.Contains('模型设计、分析、方案、任务状态、快照、索引、结构检查和各阶段审核都只是中间结果')) "delivery-workflow does not limit intermediate reviews"
+Assert-True ($deliverySkillContent.Contains('Markdown 阶段文档是语义真源')) "delivery-workflow does not keep documents authoritative"
 Assert-True ($deliveryScriptContent.Contains('delivery.protected-baseline')) "workctl is missing protected baseline support"
-Assert-True ($deliveryScriptContent.Contains('protected source changed')) "workctl does not reject protected source drift"
+Assert-True ($deliveryScriptContent.Contains('baseline_source_drift')) "workctl does not report protected-source drift as a diagnostic"
 Assert-True ($deliveryScriptContent.Contains('exclusive_write_json')) "workctl protected baseline is not created exclusively"
-Assert-True ($deliveryScriptContent.Contains('without a REQ, AC, or UDES target')) "workctl allows a protected baseline without a final target"
+Assert-True ($deliveryScriptContent.Contains('baseline_has_no_final_target')) "workctl does not diagnose a snapshot without final targets"
+Assert-True ($deliveryScriptContent.Contains('WORK-SNAPSHOT-RACE')) "workctl snapshot-race gate is not structured"
+Assert-True ($deliveryScriptContent.Contains('history')) "workctl does not preserve prior confirmation snapshots for new cycles"
 Assert-True (Test-Path -LiteralPath (Join-Path $deliveryRoot "tests\test_workctl.py") -PathType Leaf) "delivery-workflow is missing its CLI regression tests"
 
 $taskDeliveryMarkdown = @(
@@ -403,6 +420,8 @@ $requiredCases = @(
     "cross-turn-dependent-plan"
     "full-delivery-chain"
     "protected-baseline-change-discovered"
+    "workflow-cli-gate-boundary"
+    "single-task-cli-formatting"
     "active-goal-reasoning-shift"
     "explicit-thread-reasoning-setting"
     "reasoning-depth-discussion-only"

@@ -35,7 +35,9 @@
 - `verification`：与 outcome 同层级的验证方式；允许在探索任务中写明实际可验证边界。
 - `suggested_skills`：任务开始时的路由提示，运行时仍按实际工作判断。
 - `reasoning_hint`：`low/medium/high/xhigh/max/ultra` 的非权威起始建议。
-- `revision`：每次更新递增，避免并发覆盖。
+- `revision`：首个版本推荐为 `1`，后续每次更新递增，避免并发覆盖。
+
+以上枚举、ID 格式和项目相对描述是文档合同。CLI 对可解析偏差保留原值并报告诊断，由模型决定修订、扩展合同或继续使用；它只对真实存储身份、路径和不可解析结构设门禁。
 
 ## 依赖类型
 
@@ -43,7 +45,7 @@
 - `ordering`：按此顺序通常降低返工，但不妨碍独立工作。
 - `informational`：只提供上下文或可能相关的结果。
 
-不得把所有早期任务都标为 `hard`，也不得把评审偏好伪装成真实依赖。CLI 会拒绝依赖环，因为它使任务图身份不明确；不会因依赖尚未完成而禁止读取、领取或更新任务。
+不得把所有早期任务都标为 `hard`，也不得把评审偏好伪装成真实依赖。CLI 会把依赖环、自依赖、重复依赖和未完成依赖都报告为诊断；它们可能要求模型修订任务设计，但不由 CLI 禁止读取、领取或更新任务。
 
 ## 任务准入
 
@@ -65,8 +67,15 @@
   "changed_files": ["src/export/service.py"],
   "verification": ["pytest tests/export - passed"],
   "unresolved": [],
-  "invalidated_source_ids": []
+  "invalidated_source_ids": [],
+  "evidence_for": ["REQ-001", "AC-001", "UDES-001"],
+  "evidence_refs": [
+    {"ref": "tests/export-readback", "kind": "test", "note": "真实调用并读回"}
+  ],
+  "source_snapshot": {
+    "SOL-001": "sha256:..."
+  }
 }
 ```
 
-结果内容由模型根据有效证据填写。CLI 校验每份历史结果的目录、身份、任务修订和文件 revision 边界，并由状态文件只指向当前结果；只允许当前状态的下一 revision 暂时存在一份可恢复的完成写入，明显超前的文件会作为存储损坏拒绝读取。重开后保留历史结果但不再把它当成当前证据。CLI 不判断验证文案是否真实，也不把结果文件存在视为产品完成。
+结果内容由模型根据有效证据填写。`evidence_for` 声明证据所支持的上游 ID，`evidence_refs` 指向可直接查看的证据，`source_snapshot` 保留当时依赖的上游条目指纹。合同修订、上游条目改变或完成后追加状态说明时，CLI 保留原结果指针和历史结果并报告 stale 诊断，不把语义时效性或 state revision 推进伪装成存储损坏。查询时单个损坏、命名异常或超前的历史结果只被隔离并诊断；只有当前精确写入将覆盖同名记录，或当前 `result_ref` 无法安全解引用时才阻断该操作。CLI 不判断验证文案是否真实，也不把结果文件存在视为产品完成。

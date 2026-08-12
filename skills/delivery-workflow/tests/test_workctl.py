@@ -161,7 +161,7 @@ class WorkctlTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return self.payload(result)
 
-    def test_init_index_and_protected_drift(self) -> None:
+    def test_init_index_and_protected_drift_is_advisory(self) -> None:
         before = self.run_cli("index", "--work-dir", str(self.root))
         self.assertEqual(before.returncode, 0, before.stderr)
         self.assertEqual(self.payload(before)["summary"]["section_count"], 8)
@@ -181,8 +181,13 @@ class WorkctlTests(unittest.TestCase):
         with (self.root / "requirements.md").open("a", encoding="utf-8") as handle:
             handle.write("\n未经确认的改写。\n")
         drifted = self.run_cli("index", "--work-dir", str(self.root))
-        self.assertEqual(drifted.returncode, 2)
-        self.assertIn("protected source changed", self.payload(drifted)["error"])
+        self.assertEqual(drifted.returncode, 0, drifted.stderr)
+        payload = self.payload(drifted)
+        self.assertIn("baseline_source_drift", {item["kind"] for item in payload["diagnostics"]})
+        cached = json.loads(
+            (self.root / ".work-cache" / "index.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(cached["protected_baseline"]["status"], "drifted")
 
     def test_init_distinguishes_created_and_pending_artifacts(self) -> None:
         self.assertIn("workflow.json", self.initialized["created"])
@@ -217,12 +222,12 @@ class WorkctlTests(unittest.TestCase):
         self.assertIn("## 任务执行状态", view)
         self.assertIn("需复核任务：0", view)
         self.assertIn("## 任务结果证据", view)
-        self.assertIn("当前有效结果：0", view)
+        self.assertIn("当前可读取结果：0", view)
         self.assertIn("含验证结果：0", view)
         self.assertIn("含未决结果：0", view)
         self.assertIn("不定义语义、READY 或最终完成状态", view)
 
-    def test_render_rejects_a_corrupt_current_task_result(self) -> None:
+    def test_render_isolates_a_corrupt_current_task_result(self) -> None:
         task = {
             "schema": "task.record",
             "id": "T001",
@@ -258,8 +263,13 @@ class WorkctlTests(unittest.TestCase):
             '{"schema":"task.result"}\n', encoding="utf-8"
         )
         rendered = self.run_cli("render", "--work-dir", str(self.root))
-        self.assertEqual(rendered.returncode, 2)
-        self.assertIn("task storage is invalid", self.payload(rendered)["error"])
+        self.assertEqual(rendered.returncode, 0, rendered.stderr)
+        payload = self.payload(rendered)
+        self.assertEqual(payload["tasks"]["status"], "partial")
+        self.assertIn(
+            "current_result_unreadable",
+            {item["kind"] for item in payload["tasks"]["diagnostics"]},
+        )
 
     def test_init_rejects_blank_identity_before_writing(self) -> None:
         for index, arguments in enumerate(
@@ -350,7 +360,7 @@ class WorkctlTests(unittest.TestCase):
         ]
         self.assertEqual(unknown, ["REQ-MISSING"])
 
-    def test_protect_requires_confirmed_entries(self) -> None:
+    def test_protect_reports_unconfirmed_entries_without_becoming_a_gate(self) -> None:
         content = (self.root / "requirements.md").read_text(encoding="utf-8")
         (self.root / "requirements.md").write_text(
             content.replace("状态: confirmed", "状态: proposed", 1), encoding="utf-8"
@@ -364,8 +374,12 @@ class WorkctlTests(unittest.TestCase):
             "--confirmation-ref",
             "conversation:confirmed",
         )
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("not marked confirmed", self.payload(result)["error"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = self.payload(result)
+        self.assertIn(
+            "baseline_entries_not_confirmed",
+            {item["kind"] for item in payload["diagnostics"]},
+        )
 
     def test_context_impact_and_bounded_output(self) -> None:
         self.protect()
@@ -466,7 +480,7 @@ class WorkctlTests(unittest.TestCase):
         self.assertEqual(status.returncode, 2)
         self.assertIn("different workflow", self.payload(status)["error"])
 
-    def test_task_summary_reuses_strict_task_storage_validation(self) -> None:
+    def test_task_summary_isolates_unrelated_storage_damage(self) -> None:
         orphan = {
             "schema": "task.state",
             "task_id": "T999",
@@ -482,10 +496,15 @@ class WorkctlTests(unittest.TestCase):
             json.dumps(orphan, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         status = self.run_cli("status", "--work-dir", str(self.root))
-        self.assertEqual(status.returncode, 2)
-        self.assertIn("task/state storage mismatch", self.payload(status)["error"])
+        self.assertEqual(status.returncode, 0, status.stderr)
+        payload = self.payload(status)
+        self.assertEqual(payload["tasks"]["status"], "partial")
+        self.assertIn(
+            "orphan_task_state",
+            {item["kind"] for item in payload["tasks"]["diagnostics"]},
+        )
 
-    def test_protect_rejects_model_decision_in_requirements(self) -> None:
+    def test_protect_reports_model_decision_in_requirements(self) -> None:
         with (self.root / "requirements.md").open("a", encoding="utf-8") as handle:
             handle.write(
                 "\n## DEC-001 模型待决选择\n\n- 状态: confirmed\n\n不属于用户基线。\n"
@@ -499,10 +518,13 @@ class WorkctlTests(unittest.TestCase):
             "--confirmation-ref",
             "conversation:confirmed",
         )
-        self.assertEqual(protected.returncode, 2)
-        self.assertIn("misplaced ids", self.payload(protected)["error"])
+        self.assertEqual(protected.returncode, 0, protected.stderr)
+        self.assertIn(
+            "baseline_stage_id_mismatch",
+            {item["kind"] for item in self.payload(protected)["diagnostics"]},
+        )
 
-    def test_tampered_baseline_ids_are_rejected(self) -> None:
+    def test_tampered_baseline_ids_are_reported(self) -> None:
         self.protect()
         baseline_path = self.root / "protected-baseline.json"
         baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
@@ -511,8 +533,11 @@ class WorkctlTests(unittest.TestCase):
             json.dumps(baseline, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         indexed = self.run_cli("index", "--work-dir", str(self.root))
-        self.assertEqual(indexed.returncode, 2)
-        self.assertIn("ids do not match", self.payload(indexed)["error"])
+        self.assertEqual(indexed.returncode, 0, indexed.stderr)
+        self.assertIn(
+            "baseline_id_set_drift",
+            {item["kind"] for item in self.payload(indexed)["diagnostics"]},
+        )
 
     def test_protected_baseline_requires_user_confirmation_provenance(self) -> None:
         blank_root = Path(self.temp.name) / "blank-confirmation"
@@ -552,9 +577,9 @@ class WorkctlTests(unittest.TestCase):
         protected = self.protect()
         baseline_path = self.root / "protected-baseline.json"
         original = json.loads(baseline_path.read_text(encoding="utf-8"))
-        for field, value, expected in (
-            ("confirmed_by", "model", "confirmed by the user"),
-            ("confirmation_ref", " ", "must not be empty"),
+        for field, value, expected_kind in (
+            ("confirmed_by", "model", "baseline_confirmation_provenance_unverified"),
+            ("confirmation_ref", " ", "baseline_confirmation_reference_invalid"),
         ):
             tampered = dict(original)
             tampered[field] = value
@@ -562,8 +587,11 @@ class WorkctlTests(unittest.TestCase):
                 json.dumps(tampered, ensure_ascii=False, indent=2), encoding="utf-8"
             )
             indexed = self.run_cli("index", "--work-dir", str(self.root))
-            self.assertEqual(indexed.returncode, 2)
-            self.assertIn(expected, self.payload(indexed)["error"])
+            self.assertEqual(indexed.returncode, 0, indexed.stderr)
+            self.assertIn(
+                expected_kind,
+                {item["kind"] for item in self.payload(indexed)["diagnostics"]},
+            )
         baseline_path.write_text(
             json.dumps(original, ensure_ascii=False, indent=2), encoding="utf-8"
         )
@@ -588,9 +616,11 @@ class WorkctlTests(unittest.TestCase):
             "不可覆盖",
         )
         self.assertEqual(initialized.returncode, 2)
-        self.assertIn("refusing to overwrite", self.payload(initialized)["error"])
+        payload = self.payload(initialized)
+        self.assertIn("refusing to overwrite", payload["error"])
+        self.assertEqual(payload["gate"]["id"], "WORK-OVERWRITE")
 
-    def test_protect_requires_at_least_one_final_target(self) -> None:
+    def test_protect_reports_a_snapshot_without_final_targets(self) -> None:
         (self.root / "requirements.md").write_text(
             """# 只有约束
 
@@ -612,8 +642,11 @@ class WorkctlTests(unittest.TestCase):
             "--confirmation-ref",
             "conversation:confirmed",
         )
-        self.assertEqual(protected.returncode, 2)
-        self.assertIn("without a REQ, AC, or UDES", self.payload(protected)["error"])
+        self.assertEqual(protected.returncode, 0, protected.stderr)
+        self.assertIn(
+            "baseline_has_no_final_target",
+            {item["kind"] for item in self.payload(protected)["diagnostics"]},
+        )
 
     def test_protect_detects_source_change_during_snapshot(self) -> None:
         module = load_workctl_module()
@@ -637,7 +670,8 @@ class WorkctlTests(unittest.TestCase):
                     confirmation_ref="conversation:confirmed",
                 )
             )
-        self.assertIn("changed while creating baseline", str(caught.exception))
+        self.assertEqual(caught.exception.gate["id"], "WORK-SNAPSHOT-RACE")
+        self.assertIn("changed", str(caught.exception))
         self.assertFalse((self.root / "protected-baseline.json").exists())
 
     def test_concurrent_protect_has_one_winner_and_no_overwrite(self) -> None:
@@ -674,6 +708,69 @@ class WorkctlTests(unittest.TestCase):
             (self.root / "protected-baseline.json").read_text(encoding="utf-8")
         )
         self.assertEqual(baseline["schema"], "delivery.protected-baseline")
+        self.assertEqual(baseline["cycle_id"], "cycle-001")
+
+    def test_concurrent_init_has_one_winner_and_no_mixed_identity(self) -> None:
+        root = Path(self.temp.name) / "concurrent-init"
+        commands = [
+            [
+                sys.executable,
+                "-X",
+                "utf8",
+                str(SCRIPT),
+                "init",
+                "--work-dir",
+                str(root),
+                "--id",
+                workflow_id,
+                "--title",
+                title,
+            ]
+            for workflow_id, title in (("first", "第一身份"), ("second", "第二身份"))
+        ]
+        environment = dict(os.environ)
+        environment["PYTHONUTF8"] = "1"
+        processes = [
+            subprocess.Popen(
+                command,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                encoding="utf-8",
+                env=environment,
+            )
+            for command in commands
+        ]
+        completed = [process.communicate(timeout=20) for process in processes]
+        self.assertEqual(sorted(process.returncode for process in processes), [0, 2], completed)
+        workflow = json.loads((root / "workflow.json").read_text(encoding="utf-8"))
+        table = json.loads((root / "task-table.json").read_text(encoding="utf-8"))
+        self.assertEqual((workflow["id"], workflow["title"]), (table["id"], table["title"]))
+
+    def test_new_cycle_preserves_previous_snapshot_history(self) -> None:
+        first = self.protect()
+        self.assertEqual(first["baseline"]["cycle_id"], "cycle-001")
+        with (self.root / "requirements.md").open("a", encoding="utf-8") as handle:
+            handle.write("\n用户已确认进入新执行周期。\n")
+        second = self.run_cli(
+            "protect",
+            "--work-dir",
+            str(self.root),
+            "--confirmed-by",
+            "user",
+            "--confirmation-ref",
+            "conversation:cycle-2",
+            "--new-cycle",
+        )
+        self.assertEqual(second.returncode, 0, second.stderr)
+        payload = self.payload(second)
+        self.assertEqual(payload["baseline"]["cycle_id"], "cycle-002")
+        self.assertEqual(payload["baseline"]["history_count"], 1)
+        baseline = json.loads(
+            (self.root / "protected-baseline.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(baseline["history"][0]["cycle_id"], "cycle-001")
+        self.assertEqual(baseline["confirmation_ref"], "conversation:cycle-2")
 
     def test_context_preserves_collection_truncation(self) -> None:
         module = load_workctl_module()

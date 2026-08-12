@@ -31,8 +31,8 @@
 | --- | --- | --- |
 | `codex-event-logger` | 历史独立 logger 工程 | 只在上下文缺失或用户要求追溯时读取项目级运行记录 |
 | `codex-qq-hook` | 历史 QQ bot 工程 | 按用户明确要求配置当前工作区 QQ 完成提醒 |
-| `delivery-workflow` | 项目内建立 | 组织受保护需求与用户设计、可修订模型设计、现状、方案、任务和执行反馈；最终只按当前范围用户基线复核 |
-| `task-table-manager` | 项目内建立 | 用低 Token 管理任务合同、三类依赖、多人状态、结果摘要、上下文包和最终复核候选证据，不签发执行或产品通过 |
+| `delivery-workflow` | 项目内建立 | 以 Markdown 文档为语义真源组织用户确认需求与设计、可修订模型产物和执行反馈；`workctl` 只辅助快照来源、索引、查询和视图 |
+| `task-table-manager` | 项目内建立 | 以文档合同管理任务、三类依赖、状态、结果摘要、证据映射和恢复上下文；`taskctl` 只辅助存储和查询，不签发执行或产品通过 |
 | `reasoning-governor` | 从 `task-table-manager` 的线程深度脚本拆分建源 | 读取和切换当前线程 next-turn 推理深度；模型自主切换只由 active Goal 续跑 |
 | `symbol-structure-workflow` | 历史 SymbolStructureWorkflow 工程 | 在文本、AST、LSP 和编辑工具间分层路由，并声明 `vscode-lsp-mcp` 依赖 |
 | `ast-grep-token-safe` | 历史 SymbolStructureWorkflow 工程 | 使用内置 `sgy` 做 Token-Safe AST 搜索与改写 |
@@ -63,7 +63,7 @@ skill 内置的 Windows/Linux `sgy 0.1.0` 由同一个不含 `.git`、`target/` 
 
 ## 路由与行为验证
 
-`development/skill-routing/trigger-cases.json` 中全部关键 skill 都至少有一个正向触发和一个相近非触发场景，并额外覆盖事实冲突、只读授权、长期收益、禁止越权替代执行、active Goal 内动态推理切换、显式线程设置、QQ 只读状态与故障排查、受保护用户基线、最终完成边界，以及三类架构边界：职责与入口已知时直接集成、未知时先治理裁决、一次性产物不得升级为架构工程。
+`development/skill-routing/trigger-cases.json` 中全部关键 skill 都至少有一个正向触发和一个相近非触发场景，并额外覆盖事实冲突、只读授权、长期收益、禁止越权替代执行、active Goal 内动态推理切换、显式线程设置、QQ 只读状态与故障排查、用户确认文档、最终完成边界、CLI 辅助责任和局部机械门禁，以及三类架构边界：职责与入口已知时直接集成、未知时先治理裁决、一次性产物不得升级为架构工程。
 
 静态合同会检查全局文件大小与关键语义、规则标签、重复规则、skill frontmatter、`agents/openai.yaml`、MCP 依赖、Markdown 相对引用、场景集合和正/负覆盖：
 
