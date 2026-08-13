@@ -1,4 +1,4 @@
 interface:
   display_name: "Delivery Workflow"
-  short_description: "以文档为真源组织用户目标、可迭代设计分析和执行反馈"
-  default_prompt: "使用 $delivery-workflow 以文档为语义真源组织用户目标、设计、分析、方案、任务与执行反馈。"
+  short_description: "以文档为真源组织目标、职责设计、影响传播和执行反馈"
+  default_prompt: "使用 $delivery-workflow 以文档为语义真源组织用户目标、职责设计、现状、方案、任务、影响传播与执行反馈。"

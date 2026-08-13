@@ -1121,13 +1121,35 @@ def result_diagnostics(
                 "current_task_revision": task["revision"],
             }
         )
-    if index is not None and result.get("source_snapshot"):
+    source_basis = sorted(set([*task["source_ids"], *result.get("evidence_for", [])]))
+    recorded_snapshot = result.get("source_snapshot", {})
+    if source_basis and not recorded_snapshot:
+        diagnostics.append(
+            {
+                "kind": "result_source_snapshot_missing",
+                "task_id": task["id"],
+                "source_ids": source_basis[:DEFAULT_LIMIT],
+                "source_count": len(source_basis),
+            }
+        )
+    if index is not None and recorded_snapshot:
+        expected_source_ids = semantic_source_closure(index, source_basis)
+        missing_source_ids = sorted(expected_source_ids - set(recorded_snapshot))
+        if missing_source_ids:
+            diagnostics.append(
+                {
+                    "kind": "result_source_snapshot_incomplete",
+                    "task_id": task["id"],
+                    "missing_source_ids": missing_source_ids[:DEFAULT_LIMIT],
+                    "missing_count": len(missing_source_ids),
+                }
+            )
         fingerprints = {
             section.get("id"): section.get("fingerprint")
             for section in index.get("sections", [])
             if isinstance(section, dict) and isinstance(section.get("id"), str)
         }
-        for source_id, recorded in result["source_snapshot"].items():
+        for source_id, recorded in recorded_snapshot.items():
             current = fingerprints.get(source_id)
             if current != recorded:
                 diagnostics.append(
@@ -1766,18 +1788,25 @@ def reverse_graph(tasks: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
 def dependent_ids(
     tasks: dict[str, dict[str, Any]], task_id: str, recursive: bool
 ) -> list[str]:
+    return [path[-1] for path in dependent_paths(tasks, task_id, recursive)]
+
+
+def dependent_paths(
+    tasks: dict[str, dict[str, Any]], task_id: str, recursive: bool
+) -> list[list[str]]:
     reverse = reverse_graph(tasks)
-    result: list[str] = []
-    seen: set[str] = set()
-    queue = deque(reverse[task_id])
+    result: list[list[str]] = []
+    seen: set[str] = {task_id}
+    queue = deque([task_id, dependent] for dependent in reverse[task_id])
     while queue:
-        current = queue.popleft()
+        path = queue.popleft()
+        current = path[-1]
         if current in seen:
             continue
         seen.add(current)
-        result.append(current)
+        result.append(path)
         if recursive:
-            queue.extend(reverse[current])
+            queue.extend([*path, dependent] for dependent in reverse[current])
     return result
 
 
@@ -1845,15 +1874,28 @@ def command_dependents(args: argparse.Namespace) -> dict[str, Any]:
             risk="the exact dependent query has no readable uniquely identified task",
             recovery="inspect storage diagnostics or choose a current task ID",
         )
-    ids = dependent_ids(tasks, args.id, args.recursive)
-    items = [
-        {
-            "id": dependent_id,
-            "title": tasks[dependent_id]["title"],
-            "status": states[dependent_id]["status"],
-        }
-        for dependent_id in ids
-    ]
+    paths = dependent_paths(tasks, args.id, args.recursive)
+    items = []
+    for path in paths:
+        dependent_id = path[-1]
+        via = path[-2]
+        edge = next(
+            dependency
+            for dependency in tasks[dependent_id]["dependencies"]
+            if dependency["id"] == via
+        )
+        items.append(
+            {
+                "id": dependent_id,
+                "title": tasks[dependent_id]["title"],
+                "status": states[dependent_id]["status"],
+                "depth": len(path) - 1,
+                "via": via,
+                "type": edge["type"],
+                "consumes": edge["consumes"],
+                "path": path,
+            }
+        )
     page, next_after_id, cursor_reset = page_after_id(items, args.after_id, args.limit)
     if cursor_reset:
         storage_diagnostics.append(
@@ -1864,7 +1906,7 @@ def command_dependents(args: argparse.Namespace) -> dict[str, Any]:
         "command": "dependents",
         "id": args.id,
         "items": page,
-        "dependent_count": len(ids),
+        "dependent_count": len(paths),
         "next_after_id": next_after_id,
         "truncated": next_after_id is not None,
         "diagnostics": storage_diagnostics[: args.limit],
@@ -1950,21 +1992,30 @@ def command_next(args: argparse.Namespace) -> dict[str, Any]:
 
 def select_upstream_context(
     index: dict[str, Any] | None, source_ids: list[str], maximum: int
-) -> tuple[list[dict[str, Any]], bool]:
+) -> tuple[list[dict[str, Any]], dict[str, str], bool, bool]:
     if index is None:
-        return [], False
-    by_id: dict[str, dict[str, Any]] = {}
+        return [], {}, False, False
+    rows_by_id: dict[str, list[dict[str, Any]]] = {}
     for section in index.get("sections", []):
         if isinstance(section, dict) and isinstance(section.get("id"), str):
-            by_id.setdefault(section["id"], section)
+            rows_by_id.setdefault(section["id"], []).append(section)
+    by_id = {
+        section_id: rows[0]
+        for section_id, rows in rows_by_id.items()
+        if len(rows) == 1
+    }
     selected: list[str] = []
     seen: set[str] = set()
+    unresolved = False
     queue = deque(source_ids)
     while queue and len(selected) < maximum:
         current = queue.popleft()
-        if current in seen or current not in by_id:
+        if current in seen:
             continue
         seen.add(current)
+        if current not in by_id:
+            unresolved = True
+            continue
         selected.append(current)
         queue.extend(by_id[current].get("references", []))
     rows = [
@@ -1980,7 +2031,33 @@ def select_upstream_context(
         }
         for section_id in selected
     ]
-    return rows, bool(queue)
+    source_snapshot: dict[str, str] = {}
+    for section_id in selected:
+        fingerprint = by_id[section_id].get("fingerprint")
+        if isinstance(fingerprint, str):
+            source_snapshot[section_id] = fingerprint
+        else:
+            unresolved = True
+    truncated = bool(queue)
+    return rows, source_snapshot, truncated, not truncated and not unresolved
+
+
+def semantic_source_closure(index: dict[str, Any], source_ids: list[str]) -> set[str]:
+    by_id: dict[str, dict[str, Any]] = {}
+    for section in index.get("sections", []):
+        if isinstance(section, dict) and isinstance(section.get("id"), str):
+            by_id.setdefault(section["id"], section)
+    selected: set[str] = set()
+    queue = deque(source_ids)
+    while queue:
+        current = queue.popleft()
+        if current in selected:
+            continue
+        selected.add(current)
+        section = by_id.get(current)
+        if section is not None:
+            queue.extend(section.get("references", []))
+    return selected
 
 
 def command_context(args: argparse.Namespace) -> dict[str, Any]:
@@ -2030,6 +2107,11 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
             "id": dependent_id,
             "title": tasks[dependent_id]["title"],
             "status": states[dependent_id]["status"],
+            "consumes": next(
+                dependency["consumes"]
+                for dependency in tasks[dependent_id]["dependencies"]
+                if dependency["id"] == args.id
+            ),
         }
         for dependent_id in all_dependents[: args.max_items]
     ]
@@ -2038,7 +2120,7 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
         *index_diagnostics,
         *task_diagnostics(task, tasks, states, index),
     ]
-    upstream, upstream_truncated = select_upstream_context(
+    upstream, source_snapshot, upstream_truncated, source_snapshot_complete = select_upstream_context(
         index, task["source_ids"], args.max_items
     )
     truncation = {
@@ -2055,6 +2137,8 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
         "diagnostics": all_diagnostics[: args.max_items],
         "protected_baseline": index.get("protected_baseline") if index else None,
         "upstream": upstream,
+        "source_snapshot": source_snapshot,
+        "source_snapshot_complete": source_snapshot_complete,
         "dependencies": dependency_context,
         "dependents": dependents,
         "truncation": truncation,
@@ -2714,22 +2798,6 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
             *index_diagnostics,
             *owner_diagnostics(state, args.owner),
         ]
-        generated_source_snapshot = False
-        if index is not None and not result["source_snapshot"]:
-            rows_by_id: dict[str, list[dict[str, Any]]] = {}
-            for section in index.get("sections", []):
-                if isinstance(section, dict) and isinstance(section.get("id"), str):
-                    rows_by_id.setdefault(section["id"], []).append(section)
-            snapshot_source_ids = sorted(
-                set([*task["source_ids"], *result.get("evidence_for", [])])
-            )
-            result["source_snapshot"] = {
-                source_id: rows_by_id[source_id][0]["fingerprint"]
-                for source_id in snapshot_source_ids
-                if len(rows_by_id.get(source_id, [])) == 1
-                and isinstance(rows_by_id[source_id][0].get("fingerprint"), str)
-            }
-            generated_source_snapshot = bool(result["source_snapshot"])
         if state["status"] == "done":
             diagnostics.append({"kind": "task_already_done"})
         if state["status"] not in {"in_progress", "review"}:
@@ -2755,10 +2823,7 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
         recovered_partial_write = result_path.exists()
         if recovered_partial_write:
             existing_result = validate_result(read_json(result_path), task)
-            comparable_result = dict(result)
-            if generated_source_snapshot and not existing_result["source_snapshot"]:
-                comparable_result["source_snapshot"] = {}
-            if existing_result != comparable_result:
+            if existing_result != result:
                 raise TaskctlError(
                     f"conflicting partial result: {result_path}",
                     gate_id="TASK-OVERWRITE",

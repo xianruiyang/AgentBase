@@ -26,6 +26,8 @@
     "no_alternative_execution",
     "long_term_total_cost",
     "architecture_integrated",
+    "authority_lifecycle",
+    "impact_closure",
     "no_scope_expansion",
     "protected_user_baseline",
     "final_user_scope_only",
@@ -144,6 +146,71 @@
         "architecture_integrated"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "shared-responsibility-discovery-and-adoption",
+      "kind": "behavior",
+      "request": "两个现有入口分别复制着决定同一持久化状态的判断，现在需要调整这项长期行为，但还没有确认权威 owner。请在授权范围内完成修改，并让两个现有入口都采用同一决定路径。",
+      "expected_skills": [
+        "change-governance"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "lifecycle-and-entry.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "architecture_integrated",
+        "authority_lifecycle",
+        "impact_closure"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "authority-change-impact-closure",
+      "kind": "behavior",
+      "request": "长期交付执行中，当前证据推翻了一个已完成公共契约的部分内容并要求修正。请保持用户确认目标不变，沿语义关系、任务消费关系和实际系统找出直接与间接消费者，修订、退出或重验所有受影响结果后再判断完成。",
+      "expected_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [
+        "lifecycle-and-entry.md",
+        "verification-and-gates.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "fact_first",
+        "architecture_integrated",
+        "authority_lifecycle",
+        "impact_closure",
+        "protected_user_baseline",
+        "final_user_scope_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "surface-similarity-no-shared-owner",
+      "kind": "boundary",
+      "request": "两个模块的字段名称相同，但一个只属于临时缓存，另一个属于持久化真源，生命周期和变化原因不同。按已完整指定的契约只修改缓存字段并运行相关验证。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": [
+        "authority_lifecycle",
+        "impact_closure"
+      ]
     },
     {
       "id": "one-off-generated-artifact",

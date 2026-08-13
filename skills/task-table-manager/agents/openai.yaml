@@ -1,4 +1,4 @@
 interface:
   display_name: "Task Table Manager"
-  short_description: "以文档合同管理长期任务、依赖、状态、证据与有界恢复上下文"
-  default_prompt: "使用 $task-table-manager 维护文档权威的长期任务合同，并把 CLI 限定为存储、查询和上下文辅助。"
+  short_description: "管理长期任务、消费依赖、来源版本、影响传播与恢复上下文"
+  default_prompt: "使用 $task-table-manager 维护长期任务合同、消费依赖、实际来源快照和影响传播，并把 CLI 限定为存储、查询与机械诊断辅助。"

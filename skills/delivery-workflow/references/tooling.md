@@ -16,7 +16,7 @@ index     从当前 Markdown 重建 .work-cache/index.json
 status    摘要报告语义条目和可读取的任务状态
 coverage  报告各类 ID、未决项和引用分布
 context   在字符预算内返回某个 ID 及邻接条目
-impact    返回引用指定 ID 的下游条目
+impact    递归返回显式引用指定 ID 的下游条目及首条依赖路径
 render    生成 WORK_STATUS.md 只读视图
 ```
 
@@ -30,7 +30,7 @@ render    生成 WORK_STATUS.md 只读视图
 - `protect` 记录确认者、确认引用、文档指纹和当时 ID；它不能自行证明用户已确认、目标足够或内容正确。确认者或引用缺失、空白或不是 `user` 时仍保存快照并返回诊断，由模型回到文档及真实对话来源裁决。开始新执行周期时使用 `--new-cycle`，旧快照保留在 `history`。
 - 快照缺失、确认条目状态不一致、没有最终目标、ID 变化或文档漂移都只返回诊断。查询和索引仍以当前 Markdown 为准，由模型对照用户确认来源决定当前执行周期。
 - 索引及其内存查询把同一版 `workflow.json` 的文档映射、确认快照诊断与当前 Markdown 条目组合为一次读取，并在索引中记录 manifest 指纹；若 manifest 或阶段文档在取样、构建或缓存写入期间变化，返回 `WORK-SNAPSHOT-RACE` 并重试，不得把不同 manifest 或文档版本写进同一查询快照。
-- `index` 检查 ID、阶段归属、重复和引用；`coverage` 只统计显式关系；`impact` 只返回潜在受影响对象。它们均不判断语义成立。
+- `index` 检查 ID、阶段归属、重复和引用；`coverage` 只统计显式关系；`impact` 只遍历已经写入关系字段的图并返回潜在受影响对象及首条路径。模型仍须从实际系统补齐未登记消费者、派生产物和旧关系，三者均不判断语义成立。
 - `status` 和 `render` 尽力读取 `$task-table-manager` 摘要；任务存储中某个记录无法读取时返回局部诊断，不让任务域故障阻断交付文档查询。
 - 重复 ID 是诊断；只有 `context/impact` 确实需要一个唯一对象时，才就该次精确查询拒绝歧义输入。
 

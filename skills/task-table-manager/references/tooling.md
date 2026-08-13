@@ -13,8 +13,8 @@ init        建立固定 tasks/state/results 目录和 task-table.json
 draft       输出最小候选任务 JSON，不写文件
 add/update  保存模型已编写的任务合同
 show/list   有界返回任务、状态、结果和局部诊断
-deps/dependents/impact  查询任务图，不裁决依赖是否成立
-next/context  生成选择建议和有界执行上下文
+deps/dependents/impact  查询任务图；后继查询返回首条路径与该边消费内容
+next/context  生成选择建议及带实际传递上游指纹的有界执行上下文
 completion-context  从当前 Markdown 分页返回 REQ/AC/UDES、CON、全部 DCR 与候选证据
 status/render  生成可重建的执行摘要和 TASK_TABLE.md
 ```
@@ -48,7 +48,9 @@ release     清除领取意图并回到 todo
 - `evidence_refs`：可直接查看的测试、日志、文件、页面或其他证据引用；至少包含 `ref`，可附 `kind` 和 `note`。
 - `source_snapshot`：生成结果时所依赖上游 ID 到指纹的映射。与当前索引不一致时标记陈旧，不将结果伪装成损坏数据。
 
-`completion-context` 同时使用任务合同的 `source_ids` 和结果的 `evidence_for` 建立候选映射；后者可直接把验收证据关联到 `REQ/AC/UDES`。若未显式提供 `source_snapshot`，`complete` 会对这两类当前可唯一定位的来源一起记录指纹。
+`context` 从任务 `source_ids` 沿当前语义引用读取传递祖先，并返回可直接写入结果的 `source_snapshot` 与完整性标记；它表示本次上下文实际读取的版本。若输出截断或来源无法唯一定位，模型先补齐输入或限定结果边界。
+
+`complete` 原样保存模型结果中的 `source_snapshot`，并以当前索引比较陈旧、缺失和传递覆盖不足；它不得在完成时自动生成当前指纹并伪装成任务实际输入。上述问题只返回诊断，不阻断结果记录。`completion-context` 同时使用任务合同的 `source_ids` 和结果的 `evidence_for` 建立候选映射；后者可直接把验收证据关联到 `REQ/AC/UDES`。
 
 `completion-context` 的 `deferred_changes` 流对当前 Markdown 中全部 `DCR` 分页，并返回每项的原始 `status`。它不根据内置状态集判断哪些条目会阻断完成；该结论由模型按交付文档、用户确认和证据裁决。
 

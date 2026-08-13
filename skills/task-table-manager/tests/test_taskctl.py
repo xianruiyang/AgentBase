@@ -250,6 +250,7 @@ class TaskctlTests(unittest.TestCase):
         }
 
     def complete_t001(self) -> dict:
+        context = self.run_task("context", "--id", "T001", "--budget", "12000")
         claimed = self.run_task("claim", "--id", "T001", "--owner", "agent-a")
         started = self.run_task(
             "start",
@@ -260,9 +261,11 @@ class TaskctlTests(unittest.TestCase):
             "--expected-state-revision",
             str(claimed["state"]["revision"]),
         )
+        result = self.result_payload()
+        result["source_snapshot"] = context["source_snapshot"]
         result_file = Path(self.temp.name) / "T001-result.json"
         result_file.write_text(
-            json.dumps(self.result_payload(), ensure_ascii=False, indent=2),
+            json.dumps(result, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         return self.run_task(
@@ -503,6 +506,7 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(result["evidence_for"], ["SOL-001"])
         self.assertEqual(result["evidence_refs"][0]["kind"], "test")
         self.assertIn("SOL-001", result["source_snapshot"])
+        self.assertIn("REQ-001", result["source_snapshot"])
 
         with (self.root / "solution.md").open("a", encoding="utf-8") as handle:
             handle.write("\n结果形成后上游文档变化。\n")
@@ -519,10 +523,88 @@ class TaskctlTests(unittest.TestCase):
             {item["kind"] for item in task_row["result_diagnostics"]},
         )
 
+    def test_completion_preserves_execution_snapshot_and_diagnoses_missing_snapshot(self) -> None:
+        context = self.run_task("context", "--id", "T001", "--budget", "12000")
+        self.assertTrue(context["source_snapshot_complete"])
+        captured = context["source_snapshot"]
+        with (self.root / "solution.md").open("a", encoding="utf-8") as handle:
+            handle.write("\n执行读取后方案发生变化。\n")
+
+        result = self.result_payload()
+        result["source_snapshot"] = captured
+        result_file = Path(self.temp.name) / "captured-result.json"
+        result_file.write_text(
+            json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        completed = self.run_task(
+            "complete",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+        )
+        kinds = {item["kind"] for item in completed["diagnostics"]}
+        self.assertIn("result_source_snapshot_stale", kinds)
+        stored = json.loads((self.root / completed["result_ref"]).read_text(encoding="utf-8"))
+        self.assertEqual(stored["source_snapshot"], captured)
+
+        self.add_task(self.task("T003", "记录无快照结果", ["REQ-001"]))
+        missing_file = Path(self.temp.name) / "missing-snapshot-result.json"
+        missing_file.write_text(
+            json.dumps(self.result_payload("T003"), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        missing = self.run_task(
+            "complete",
+            "--id",
+            "T003",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(missing_file),
+        )
+        missing_kinds = {item["kind"] for item in missing["diagnostics"]}
+        self.assertIn("result_source_snapshot_missing", missing_kinds)
+        missing_stored = json.loads(
+            (self.root / missing["result_ref"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(missing_stored["source_snapshot"], {})
+
+        self.add_task(self.task("T004", "记录部分来源快照", ["REQ-001"]))
+        partial_context = self.run_task("context", "--id", "T004", "--budget", "12000")
+        partial_result = self.result_payload("T004")
+        partial_result["source_snapshot"] = {
+            "REQ-001": partial_context["source_snapshot"]["REQ-001"]
+        }
+        partial_file = Path(self.temp.name) / "partial-snapshot-result.json"
+        partial_file.write_text(
+            json.dumps(partial_result, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        partial = self.run_task(
+            "complete",
+            "--id",
+            "T004",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(partial_file),
+        )
+        partial_kinds = {item["kind"] for item in partial["diagnostics"]}
+        self.assertIn("result_source_snapshot_incomplete", partial_kinds)
+
     def test_completion_context_uses_direct_result_evidence_mapping(self) -> None:
         self.add_task(self.task("T003", "提供直接验收证据", []))
+        index = json.loads(
+            (self.root / ".work-cache" / "index.json").read_text(encoding="utf-8")
+        )
+        requirement = next(
+            section for section in index["sections"] if section["id"] == "REQ-001"
+        )
         result = self.result_payload("T003")
         result["evidence_for"] = ["REQ-001"]
+        result["source_snapshot"] = {"REQ-001": requirement["fingerprint"]}
         result_file = Path(self.temp.name) / "T003-direct-evidence.json"
         result_file.write_text(
             json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -547,6 +629,25 @@ class TaskctlTests(unittest.TestCase):
             next((self.root / "results").glob("T003.r*.json")).read_text(encoding="utf-8")
         )
         self.assertIn("REQ-001", stored_result["source_snapshot"])
+
+    def test_recursive_dependents_report_consumption_path(self) -> None:
+        self.add_task(
+            self.task(
+                "T003",
+                "消费界面结果",
+                ["SOL-001"],
+                dependencies=[
+                    {"id": "T002", "type": "hard", "consumes": ["界面接入结果"]}
+                ],
+            )
+        )
+        impact = self.run_task("dependents", "--id", "T001", "--recursive")
+        by_id = {item["id"]: item for item in impact["items"]}
+        self.assertEqual(by_id["T002"]["path"], ["T001", "T002"])
+        self.assertEqual(by_id["T002"]["consumes"], ["导出接口"])
+        self.assertEqual(by_id["T003"]["path"], ["T001", "T002", "T003"])
+        self.assertEqual(by_id["T003"]["via"], "T002")
+        self.assertEqual(by_id["T003"]["consumes"], ["界面接入结果"])
 
     def test_retired_state_is_preserved_but_not_recommended(self) -> None:
         retired = self.run_task(
@@ -982,6 +1083,9 @@ class TaskctlTests(unittest.TestCase):
         self.assertIn("outputs_empty", added_kinds)
         self.assertIn("verification_empty", added_kinds)
         self.assertIn("advisory", added["note"])
+        context = self.run_task("context", "--id", "T010", "--budget", "12000")
+        self.assertFalse(context["source_snapshot_complete"])
+        self.assertEqual(context["source_snapshot"], {})
 
         candidate["title"] = "更新后的候选任务"
         update_file = Path(self.temp.name) / "T010-update.json"
@@ -1479,7 +1583,7 @@ class TaskctlTests(unittest.TestCase):
         )
         result_file = Path(self.temp.name) / "retry-done-result.json"
         result_file.write_text(
-            json.dumps(self.result_payload(), ensure_ascii=False, indent=2),
+            json.dumps(existing, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         recovered = self.run_task(

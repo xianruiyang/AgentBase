@@ -1250,6 +1250,7 @@ def impact_workspace(args: argparse.Namespace) -> dict[str, Any]:
     affected: list[str] = []
     seen = {args.id}
     queue = deque([args.id])
+    paths: dict[str, list[str]] = {args.id: [args.id]}
     while queue:
         current = queue.popleft()
         for dependent in index["reverse_references"].get(current, []):
@@ -1263,6 +1264,7 @@ def impact_workspace(args: argparse.Namespace) -> dict[str, Any]:
             if dependent not in seen:
                 seen.add(dependent)
                 affected.append(dependent)
+                paths[dependent] = [*paths[current], dependent]
                 queue.append(dependent)
     limited, truncated = limit_items(affected, args.max_items)
     by_id = {section["id"]: section for section in index["sections"]}
@@ -1276,6 +1278,9 @@ def impact_workspace(args: argparse.Namespace) -> dict[str, Any]:
                 "stage": by_id[section_id]["stage"],
                 "document": by_id[section_id]["document"],
                 "line": by_id[section_id]["line"],
+                "depth": len(paths[section_id]) - 1,
+                "via": paths[section_id][-2],
+                "path": paths[section_id],
             }
             for section_id in limited
         ],

@@ -4,6 +4,7 @@
 
 ## 真源与安装副本
 
+- [`docs/requirements.md`](docs/requirements.md) 是项目长期用户目标、可验收结果和约束的唯一需求真源；它不描述当前实现状态或具体方案。
 - `global/AGENTS.md` 是全局规则候选真源，不自动覆盖 Codex 用户目录。
 - `global/config.toml` 是经过筛选的可移植 Codex 设置真源；`global/hooks.template.json` 是按目标 Codex 根目录解析的 hooks 真源；`global/agents/*.toml` 是自定义子代理真源。它们都不会因文件存在而自动覆盖用户配置。
 - `skills/<skill-name>/` 是已迁入 skill 的唯一开发真源。
@@ -14,14 +15,9 @@
 - 由部署入口显式传入的 `<CodexRoot>` 中，`AGENTS.md`、同名 skill、`config.toml`、`hooks.json` 与 `agents/*.toml` 都是安装目标或宿主状态，不反向定义本项目。
 - 原工程目录只作为迁移来源保留，不自动双向同步；缓存、测试输出和构建产物不属于真源。
 
-## 任务流程链路约束
+## 根本需求
 
-以下是用户明确确认的项目级约束，适用于当前及后续新增的交付链、任务表和同类工作流程能力：
-
-- 目标、阶段、状态、依赖、完成条件和例外规则必须写在适用文档中，并由 agent 根据用户确认与有效证据裁决；文档是流程语义真源。
-- `workctl`、`taskctl` 及后续同类 CLI 只辅助模板创建、编辑、存储、索引、查询、上下文压缩和生成可重建视图，不得成为平行规则源、执行许可或完成裁判。
-- CLI 只允许少量必要硬门禁，并且失败必须能机械证明当前操作会写错对象、破坏数据、发生锁、在已有记录写入中缺少或冲突 CAS revision、超出资源边界、无法确定解释必需输入，或混用一次复核中的不同快照；其余可解析结构偏差和语义问题只返回诊断，由 agent 按文档裁决。
-- 修改 workflow skill、CLI 或共享校验时不得削弱以上边界；确需改变时，必须先取得用户明确裁决。具体产物和命令合同仍由对应 skill 文档唯一维护，本节不复制其易变实现细节。
+项目为什么存在、需要让 Codex 具备什么长期能力以及如何验收，以 [`docs/requirements.md`](docs/requirements.md) 为唯一需求真源。README 只提供入口，不复制需求正文；全局规则、skill、开发设计和脚本分别把这些需求落实为各自职责内的执行规则、方案与机械合同。
 
 ## 当前全局内核
 
@@ -60,6 +56,7 @@
 | `tools/sgy` | `ast-grep-token-safe` | 构建 skill 内置 `sgy` 的 Rust workspace、测试、fuzz、安装与发布工程 |
 | `development/codex-event-logger` | `codex-event-logger` | hook 设计资料；正式运行脚本仍在 skill 真源 |
 | `development/codex-qq-hook` | `codex-qq-hook` | Webhook 辅助程序和开发说明；正式运行脚本仍在 skill 真源 |
+| `development/responsibility-lifecycle.md` | 全局规则、`change-governance`、`delivery-workflow`、`task-table-manager` | 权威职责形成、消费者接入、后续影响传播与证据时效的设计分析 |
 | `development/skill-routing` | 全局规则与全部关键 skill | 静态触发合同、脱离仓库的路由评估 capsule 与结果判定 |
 | `development/plugin-packaging` | 合同声明的全部 skill | 生成经过滤的 `agentbase-core` 本地插件包及插件内 hooks |
 | `development/codex-deployment` | 全局规则、可移植设置、hooks、自定义子代理与全部关键 skill | 校验、可选设置安装、带备份发布和可验证回滚 |
@@ -72,7 +69,7 @@ skill 内置的 Windows/Linux `sgy 0.1.0` 由同一个不含 `.git`、`target/` 
 
 ## 路由策略验证与执行验证
 
-`development/skill-routing/trigger-cases.json` 只定义路由和粗粒度策略标签的测试 oracle。全部关键 skill 至少有一个正向触发和一个相近非触发场景，并覆盖混合意图、长上下文干扰、项目 skill 与外部 UI/UE skill 共存、事实冲突、只读授权、长期收益、禁止越权替代执行、动态推理、QQ 排障、交付链、CLI 边界和架构入口裁决。场景保持中文，不为了测试数量引入多语言变体。
+`development/skill-routing/trigger-cases.json` 只定义路由和粗粒度策略标签的测试 oracle。全部关键 skill 至少有一个正向触发和一个相近非触发场景，并覆盖混合意图、长上下文干扰、项目 skill 与外部 UI/UE skill 共存、事实冲突、只读授权、长期收益、禁止越权替代执行、动态推理、QQ 排障、交付链、CLI 边界、职责生命周期、影响闭合和架构入口裁决。场景保持中文，不为了测试数量引入多语言变体。
 
 静态合同会检查全局文件大小与关键语义、主 `SKILL.md` 大小、规则标签、重复规则、skill frontmatter、`agents/openai.yaml`、MCP 依赖、Markdown 相对引用、场景集合、严格路由用例以及正/负覆盖：
 

@@ -4,7 +4,7 @@
 
 must: 本文件只补充 `AgentBase` 项目约定，继承全局 `AGENTS.md`；项目架构、正式入口和当前状态以 `README.md` 为索引，不在本文件重复维护易失效的数量、哈希或发布日期
 
-must: 本项目的权威来源按职责划分：`global/AGENTS.md` 维护候选全局规则，`global/config.toml`、`global/hooks.template.json` 与 `global/agents/` 维护可移植 Codex 设置、hooks 模板和自定义子代理，`skills/` 维护 skill，`.agents/plugins/marketplace.json` 只维护仓库级插件发现入口，`mcp/` 维护 MCP，`tools/` 维护非 MCP 工具，`development/` 只维护验证、打包、部署和开发资料
+must: 本项目的权威来源按职责划分：`docs/requirements.md` 维护项目长期用户目标、可验收结果和约束，`global/AGENTS.md` 维护候选全局规则，`global/config.toml`、`global/hooks.template.json` 与 `global/agents/` 维护可移植 Codex 设置、hooks 模板和自定义子代理，`skills/` 维护 skill，`.agents/plugins/marketplace.json` 只维护仓库级插件发现入口，`mcp/` 维护 MCP，`tools/` 维护非 MCP 工具，`development/` 只维护验证、打包、部署和开发资料
 
 must: 由部署入口显式传入的 Codex 根目录中的同名内容是安装目标，不是项目真源；不得从安装副本反向决定项目内容，也不得绕过项目正式入口形成双向同步
 

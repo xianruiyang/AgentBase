@@ -75,6 +75,7 @@ $requiredGlobalFragments = @(
     '不得为迎合而接受错误前提或弱化结论'
     '不创建替代目标或实施授权'
     '长期净收益和整个系统总成本'
+    '稳定约束、状态与生命周期、失败边界、变化原因和当前直接消费者'
     '不默认把实现限定为最窄局部补丁'
     '为使用户要求的行为成立并接入唯一正式入口而不可缺少'
     '仅改善整体架构但不影响本次结果的调整需要另行授权'
@@ -89,6 +90,7 @@ $requiredGlobalFragments = @(
     '模块测试验证模块契约'
     '原场景、同类变体和相近非触发场景'
     '长期资产的验证还应确认本次改动已接入正确职责和唯一正式入口'
+    '沿实际依赖逐层复核本次方案直接影响的直接与间接消费者及其证据'
     '在 active goal 中把深度作为 next-turn 可调配置'
     '简单且已限制的命令输出不创建日志文件'
     '新一轮调试前只清理会干扰当前判断且目标范围明确的旧日志'
@@ -211,6 +213,10 @@ Assert-True ($taskTableScriptContent.Contains('TASK-PAGINATION-SNAPSHOT')) "task
 Assert-True ($taskTableScriptContent.Contains('owner_mismatch')) "taskctl does not report owner conflicts as diagnostics"
 Assert-True ($taskTableScriptContent.Contains('dependency_cycle')) "taskctl does not report dependency cycles as diagnostics"
 Assert-True ($taskTableScriptContent.Contains('source_snapshot')) "taskctl results do not bind evidence to upstream source snapshots"
+Assert-True ($taskTableScriptContent.Contains('result_source_snapshot_missing')) "taskctl does not diagnose results without an execution-time source snapshot"
+Assert-True ($taskTableScriptContent.Contains('result_source_snapshot_incomplete')) "taskctl does not diagnose incomplete transitive source snapshots"
+Assert-True ($taskTableScriptContent.Contains('source_snapshot_complete')) "taskctl context does not expose source snapshot completeness"
+Assert-True ($taskTableScriptContent.Contains('"path": path')) "taskctl dependent queries do not expose a traceable consumption path"
 Assert-True ($taskTableScriptContent.Contains('"retired"')) "taskctl is missing retired task state support"
 Assert-True ($taskTableScriptContent.Contains('non_standard_status')) "taskctl does not preserve non-standard states as diagnostics"
 Assert-True ($taskTableScriptContent.Contains('non_standard_dependency_type')) "taskctl does not preserve non-standard dependency semantics as diagnostics"
@@ -226,12 +232,14 @@ $deliveryScriptContent = Get-Content -LiteralPath (Join-Path $deliveryRoot "scri
 Assert-True ($deliverySkillContent.Contains('requirements.md') -and $deliverySkillContent.Contains('user-design.md')) "delivery-workflow does not separate protected user sources"
 Assert-True ($deliverySkillContent.Contains('模型设计、分析、方案、任务状态、快照、索引、结构检查和各阶段审核都只是中间结果')) "delivery-workflow does not limit intermediate reviews"
 Assert-True ($deliverySkillContent.Contains('Markdown 阶段文档是语义真源')) "delivery-workflow does not keep documents authoritative"
+Assert-True ($deliverySkillContent.Contains('当前消费者接入')) "delivery-workflow does not close shared responsibilities through current consumers"
 Assert-True ($deliveryScriptContent.Contains('delivery.protected-baseline')) "workctl is missing protected baseline support"
 Assert-True ($deliveryScriptContent.Contains('baseline_source_drift')) "workctl does not report protected-source drift as a diagnostic"
 Assert-True ($deliveryScriptContent.Contains('exclusive_write_json')) "workctl protected baseline is not created exclusively"
 Assert-True ($deliveryScriptContent.Contains('baseline_has_no_final_target')) "workctl does not diagnose a snapshot without final targets"
 Assert-True ($deliveryScriptContent.Contains('WORK-SNAPSHOT-RACE')) "workctl snapshot-race gate is not structured"
 Assert-True ($deliveryScriptContent.Contains('history')) "workctl does not preserve prior confirmation snapshots for new cycles"
+Assert-True ($deliveryScriptContent.Contains('"path": paths[section_id]')) "workctl impact does not expose a traceable semantic path"
 Assert-True (Test-Path -LiteralPath (Join-Path $deliveryRoot "tests\test_workctl.py") -PathType Leaf) "delivery-workflow is missing its CLI regression tests"
 
 $taskDeliveryMarkdown = @(
@@ -402,6 +410,11 @@ Assert-True (@($marketplace.plugins).Count -eq 1 -and [string]$marketplace.plugi
 $lifecyclePath = Join-Path $ProjectRoot "skills\change-governance\references\lifecycle-and-entry.md"
 $lifecycleContent = Get-Content -LiteralPath $lifecyclePath -Raw -Encoding UTF8
 Assert-True ($lifecycleContent.Contains("优先更新已经承担相应规范职责的文档、配置或接口")) "Lifecycle reference is missing authority-carrier synchronization"
+Assert-True ($lifecycleContent.Contains("按稳定约束、状态与生命周期、失败或持久化边界以及变化原因判断职责是否相同")) "Lifecycle reference is missing semantic shared-responsibility criteria"
+Assert-True ($lifecycleContent.Contains("每个适用下游必须形成可恢复的持久裁决")) "Lifecycle reference is missing downstream impact closure"
+$responsibilityDesignPath = Join-Path $ProjectRoot "development\responsibility-lifecycle.md"
+Assert-True (Test-Path -LiteralPath $responsibilityDesignPath -PathType Leaf) "Responsibility lifecycle design analysis is missing"
+Assert-True ($projectAgentsContent.Length -gt 0 -and (Get-Content -LiteralPath (Join-Path $ProjectRoot "README.md") -Raw -Encoding UTF8).Contains("development/responsibility-lifecycle.md")) "README does not index the responsibility lifecycle design analysis"
 $changeSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\change-governance\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($changeSkillContent.Contains("多个入口或第二状态源的方案裁决")) "change-governance does not expose its multi-entry decision trigger"
 Assert-True ($changeSkillContent.Contains("临时路径风险评审")) "change-governance does not expose its temporary-path review trigger"
@@ -425,6 +438,9 @@ $requiredCases = @(
     "mechanical-document-edit"
     "architecture-discovery-before-implementation"
     "implicit-architecture-integration"
+    "shared-responsibility-discovery-and-adoption"
+    "authority-change-impact-closure"
+    "surface-similarity-no-shared-owner"
     "one-off-generated-artifact"
     "cpp-include-edit"
     "ast-structural-call-search"

@@ -469,8 +469,14 @@ class WorkctlTests(unittest.TestCase):
             "impact", "--work-dir", str(self.root), "--id", "REQ-001"
         )
         self.assertEqual(impact.returncode, 0, impact.stderr)
-        affected = {item["id"] for item in self.payload(impact)["affected"]}
+        affected_rows = self.payload(impact)["affected"]
+        affected = {item["id"] for item in affected_rows}
         self.assertTrue({"DES-001", "GAP-001", "SOL-001"}.issubset(affected))
+        by_id = {item["id"]: item for item in affected_rows}
+        self.assertEqual(by_id["DES-001"]["path"], ["REQ-001", "DES-001"])
+        self.assertEqual(by_id["DES-001"]["via"], "REQ-001")
+        self.assertEqual(by_id["SOL-001"]["path"][0], "REQ-001")
+        self.assertEqual(by_id["SOL-001"]["path"][-1], "SOL-001")
 
     def test_all_deferred_changes_and_raw_statuses_are_reported(self) -> None:
         self.protect()
