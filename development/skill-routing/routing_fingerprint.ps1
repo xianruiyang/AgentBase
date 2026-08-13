@@ -1,10 +1,10 @@
 $ErrorActionPreference = "Stop"
 
-function Get-AgentBaseBehaviorFingerprintSchema {
+function Get-AgentBaseRoutingFingerprintSchema {
     return "text-lf-v1"
 }
 
-function Get-AgentBaseBehaviorSha256 {
+function Get-AgentBaseRoutingSha256 {
     param(
         [string]$Text
     )
@@ -28,7 +28,7 @@ function ConvertTo-AgentBaseCanonicalText {
     return $Text.Replace("`r`n", "`n").Replace("`r", "`n")
 }
 
-function Get-AgentBaseBehaviorCandidateFingerprint {
+function Get-AgentBaseRoutingCandidateFingerprint {
     param(
         [string]$ProjectRoot,
         [object[]]$CandidateFiles
@@ -43,23 +43,29 @@ function Get-AgentBaseBehaviorCandidateFingerprint {
         $relativePath = $item.FullName.Substring($rootFull.Length + 1).Replace('\', '/')
         $canonicalText = ConvertTo-AgentBaseCanonicalText ([IO.File]::ReadAllText($item.FullName, [Text.Encoding]::UTF8))
         $canonicalBytes = [Text.UTF8Encoding]::new($false).GetBytes($canonicalText)
-        $contentHash = Get-AgentBaseBehaviorSha256 $canonicalText
+        $contentHash = Get-AgentBaseRoutingSha256 $canonicalText
         "$relativePath|$($canonicalBytes.Length)|$contentHash"
     })
     [Array]::Sort([string[]]$records, [StringComparer]::Ordinal)
-    return Get-AgentBaseBehaviorSha256 ($records -join "`n")
+    return Get-AgentBaseRoutingSha256 ($records -join "`n")
 }
 
-function Get-AgentBaseBehaviorInputFingerprint {
+function Get-AgentBaseRoutingInputFingerprint {
     param(
         [object[]]$Cases,
-        [object[]]$AllowedBehaviorTags
+        [object[]]$AllowedBehaviorTags,
+        [object[]]$PeerSkills = @()
     )
 
     $records = @($Cases | ForEach-Object {
         $request = ConvertTo-AgentBaseCanonicalText ([string]$_.request)
-        "$([string]$_.id)|$request"
+        $availablePeers = @($_.available_peer_skills | ForEach-Object { [string]$_ } | Sort-Object)
+        "$([string]$_.id)|$request|peers=$($availablePeers -join ',')"
     })
     $records += @($AllowedBehaviorTags | ForEach-Object { "behavior|$([string]$_)" })
-    return Get-AgentBaseBehaviorSha256 ($records -join "`n")
+    $records += @($PeerSkills | ForEach-Object {
+        $description = ConvertTo-AgentBaseCanonicalText ([string]$_.description)
+        "peer|$([string]$_.name)|$description"
+    } | Sort-Object)
+    return Get-AgentBaseRoutingSha256 ($records -join "`n")
 }

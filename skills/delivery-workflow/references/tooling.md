@@ -27,7 +27,7 @@ render    生成 WORK_STATUS.md 只读视图
 ## 快照、索引与诊断
 
 - `init` 只创建 manifest、阶段模板和空任务目录，不填写语义结论。
-- `protect` 记录用户确认引用、文档指纹和当时 ID；它不能自行证明用户已确认、目标足够或内容正确。开始新执行周期时使用 `--new-cycle`，旧快照保留在 `history`。
+- `protect` 记录确认者、确认引用、文档指纹和当时 ID；它不能自行证明用户已确认、目标足够或内容正确。确认者或引用缺失、空白或不是 `user` 时仍保存快照并返回诊断，由模型回到文档及真实对话来源裁决。开始新执行周期时使用 `--new-cycle`，旧快照保留在 `history`。
 - 快照缺失、确认条目状态不一致、没有最终目标、ID 变化或文档漂移都只返回诊断。查询和索引仍以当前 Markdown 为准，由模型对照用户确认来源决定当前执行周期。
 - `index` 检查 ID、阶段归属、重复和引用；`coverage` 只统计显式关系；`impact` 只返回潜在受影响对象。它们均不判断语义成立。
 - `status` 和 `render` 尽力读取 `$task-table-manager` 摘要；任务存储中某个记录无法读取时返回局部诊断，不让任务域故障阻断交付文档查询。
@@ -42,6 +42,6 @@ render    生成 WORK_STATUS.md 只读视图
 - `WORK-LIMIT` / `WORK-INPUT-UNREADABLE`：当前命令无法有界、可确定地读写必需输入。
 - `WORK-AMBIGUOUS-TARGET`：精确命令需要唯一 ID，但当前匹配不唯一。
 
-门禁错误必须返回 `gate.id`、`gate.risk`、`gate.scope`、`gate.recovery` 和 `gate.retryable`。不在此清单内的缺失、漂移、状态、覆盖度或内容问题必须作为诊断，不得伪装成通用输入错误。
+门禁错误必须返回 `gate.id`、`gate.risk`、`gate.scope`、`gate.recovery` 和 `gate.retryable`。不在此清单内的缺失、空白、非标准值、漂移、状态、覆盖度或内容问题必须保存为可读结果并附诊断，不得伪装成通用输入错误。
 
 `$task-table-manager` 的 `taskctl context` 可消费当前 Markdown 重建的上游索引。缓存缺失或陈旧时，工具尝试在内存中重建并返回诊断；不改写任务状态。

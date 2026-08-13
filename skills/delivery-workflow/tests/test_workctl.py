@@ -271,15 +271,40 @@ class WorkctlTests(unittest.TestCase):
             {item["kind"] for item in payload["tasks"]["diagnostics"]},
         )
 
-    def test_init_rejects_blank_identity_before_writing(self) -> None:
-        for index, arguments in enumerate(
-            (("--id", " ", "--title", "有效标题"), ("--id", "valid", "--title", " "))
-        ):
-            target = Path(self.temp.name) / f"blank-identity-{index}"
-            initialized = self.run_cli("init", "--work-dir", str(target), *arguments)
-            self.assertEqual(initialized.returncode, 2)
-            self.assertIn("must not be empty", self.payload(initialized)["error"])
-            self.assertFalse((target / "workflow.json").exists())
+    def test_init_rejects_blank_id_but_preserves_blank_semantic_title(self) -> None:
+        rejected_root = Path(self.temp.name) / "blank-id"
+        rejected = self.run_cli(
+            "init",
+            "--work-dir",
+            str(rejected_root),
+            "--id",
+            " ",
+            "--title",
+            "有效标题",
+        )
+        self.assertEqual(rejected.returncode, 2)
+        self.assertIn("must not be empty", self.payload(rejected)["error"])
+        self.assertFalse((rejected_root / "workflow.json").exists())
+
+        accepted_root = Path(self.temp.name) / "blank-title"
+        accepted = self.run_cli(
+            "init",
+            "--work-dir",
+            str(accepted_root),
+            "--id",
+            "valid",
+            "--title",
+            " ",
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertIn(
+            "semantic_text_empty",
+            {item["kind"] for item in self.payload(accepted)["diagnostics"]},
+        )
+        manifest = json.loads(
+            (accepted_root / "workflow.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(manifest["title"], " ")
 
     def test_filesystem_error_is_bounded_json(self) -> None:
         target = Path(self.temp.name) / "not-a-directory"
@@ -539,7 +564,7 @@ class WorkctlTests(unittest.TestCase):
             {item["kind"] for item in self.payload(indexed)["diagnostics"]},
         )
 
-    def test_protected_baseline_requires_user_confirmation_provenance(self) -> None:
+    def test_protected_baseline_reports_confirmation_provenance_without_gating(self) -> None:
         blank_root = Path(self.temp.name) / "blank-confirmation"
         initialized = self.run_cli(
             "init",
@@ -561,25 +586,32 @@ class WorkctlTests(unittest.TestCase):
         ):
             source = self.root / filename
             (blank_root / filename).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
-        rejected = self.run_cli(
+        protected_without_provenance = self.run_cli(
             "protect",
             "--work-dir",
             str(blank_root),
-            "--confirmed-by",
-            "user",
-            "--confirmation-ref",
-            " ",
         )
-        self.assertEqual(rejected.returncode, 2)
-        self.assertIn("must not be empty", self.payload(rejected)["error"])
-        self.assertFalse((blank_root / "protected-baseline.json").exists())
+        self.assertEqual(
+            protected_without_provenance.returncode,
+            0,
+            protected_without_provenance.stderr,
+        )
+        missing_payload = self.payload(protected_without_provenance)
+        self.assertEqual(missing_payload["baseline"]["status"], "protected")
+        missing_kinds = {item["kind"] for item in missing_payload["diagnostics"]}
+        self.assertIn("baseline_confirmation_provenance_missing", missing_kinds)
+        self.assertIn("baseline_confirmation_reference_missing", missing_kinds)
 
         protected = self.protect()
         baseline_path = self.root / "protected-baseline.json"
         original = json.loads(baseline_path.read_text(encoding="utf-8"))
         for field, value, expected_kind in (
             ("confirmed_by", "model", "baseline_confirmation_provenance_unverified"),
-            ("confirmation_ref", " ", "baseline_confirmation_reference_invalid"),
+            (
+                "confirmation_ref",
+                " ",
+                "baseline_confirmation_reference_missing",
+            ),
         ):
             tampered = dict(original)
             tampered[field] = value

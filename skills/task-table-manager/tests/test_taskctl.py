@@ -92,7 +92,28 @@ class TaskctlTests(unittest.TestCase):
         return json.loads(result.stdout)
 
     def run_task(self, *args: str) -> dict:
-        return self.run_ok(TASKCTL, *args, "--task-dir", str(self.root))
+        arguments = list(args)
+        command = arguments[0] if arguments else ""
+        if command in {"claim", "start", "note", "complete", "reopen", "release"}:
+            if "--expected-state-revision" not in arguments and "--id" in arguments:
+                task_id = arguments[arguments.index("--id") + 1]
+                state_path = self.root / "state" / f"{task_id}.json"
+                if state_path.is_file():
+                    state = json.loads(state_path.read_text(encoding="utf-8"))
+                    arguments.extend(
+                        ["--expected-state-revision", str(state["revision"])]
+                    )
+        if command == "update" and "--expected-task-revision" not in arguments:
+            if "--file" in arguments:
+                candidate_path = Path(arguments[arguments.index("--file") + 1])
+                candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+                task_path = self.root / "tasks" / f"{candidate['id']}.json"
+                if task_path.is_file():
+                    task = json.loads(task_path.read_text(encoding="utf-8"))
+                    arguments.extend(
+                        ["--expected-task-revision", str(task["revision"])]
+                    )
+        return self.run_ok(TASKCTL, *arguments, "--task-dir", str(self.root))
 
     def write_documents(self) -> None:
         (self.root / "requirements.md").write_text(
@@ -412,6 +433,8 @@ class TaskctlTests(unittest.TestCase):
             "T001",
             "--owner",
             "agent-a",
+            "--expected-state-revision",
+            "1",
         )
         self.assertEqual(unowned.returncode, 0, unowned.stderr)
         unowned_payload = json.loads(unowned.stdout)
@@ -566,10 +589,28 @@ class TaskctlTests(unittest.TestCase):
         row = next(item for item in candidates["items"] if item["id"] == "T001")
         self.assertFalse(row["recommended"])
 
+        blank = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--status",
+            "",
+            "--message",
+            "文档状态暂未命名",
+        )
+        self.assertEqual(blank["state"]["status"], "")
+        self.assertIn(
+            "semantic_text_empty", {item["kind"] for item in blank["diagnostics"]}
+        )
+
     def test_parseable_non_standard_task_values_are_diagnostics(self) -> None:
         task = self.task("T003", "保留外部协调合同", ["custom-goal", "custom-goal"])
+        task["title"] = " "
+        task["outcome"] = ""
         task["dependencies"] = [
-            {"id": "external-task", "type": "custom", "consumes": []}
+            {"id": "", "type": "custom", "consumes": [""]}
         ]
         task["mutation_scope"] = ["C:/external/**", "C:/external/**"]
         task["outputs"] = ["协调结果", "协调结果"]
@@ -586,19 +627,27 @@ class TaskctlTests(unittest.TestCase):
                 "non_project_relative_mutation_scope",
                 "non_standard_reasoning_hint",
                 "non_initial_task_revision",
-            }.issubset(kinds)
+                "semantic_text_empty",
+            }.issubset(kinds),
+            kinds,
         )
         stored = json.loads(
             (self.root / "tasks" / "T003.json").read_text(encoding="utf-8")
         )
         self.assertEqual(stored["source_ids"], ["custom-goal", "custom-goal"])
         self.assertEqual(stored["mutation_scope"], ["C:/external/**", "C:/external/**"])
+        self.assertEqual(stored["title"], " ")
+        self.assertEqual(stored["outcome"], "")
+        self.assertEqual(stored["dependencies"][0]["id"], "")
         self.assertEqual(stored["revision"], 7)
 
     def test_parseable_non_standard_result_values_are_diagnostics(self) -> None:
         result = self.result_payload()
+        result["outcome"] = ""
         result["changed_files"] = ["C:/external/output.txt"]
         result["evidence_for"] = ["custom-goal"]
+        result["evidence_refs"] = [{"ref": ""}]
+        result["source_snapshot"] = {"": ""}
         result_file = Path(self.temp.name) / "non-standard-result.json"
         result_file.write_text(
             json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -617,6 +666,12 @@ class TaskctlTests(unittest.TestCase):
         kinds = {item["kind"] for item in completed["diagnostics"]}
         self.assertIn("non_project_relative_changed_file", kinds)
         self.assertIn("non_standard_result_source_id", kinds)
+        self.assertIn("semantic_text_empty", kinds)
+        stored = json.loads(
+            (self.root / completed["result_ref"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(stored["outcome"], "")
+        self.assertEqual(stored["evidence_refs"], [{"ref": ""}])
 
     def test_common_queries_support_cursor_pagination(self) -> None:
         self.add_task(
@@ -751,6 +806,43 @@ class TaskctlTests(unittest.TestCase):
             {item["kind"] for item in json.loads(cycle.stdout)["diagnostics"]},
         )
 
+    def test_existing_record_writes_require_compare_and_swap_revision(self) -> None:
+        missing_state_revision = self.run_cli(
+            TASKCTL,
+            "claim",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+        )
+        self.assertEqual(missing_state_revision.returncode, 2)
+        state_payload = json.loads(missing_state_revision.stderr)
+        self.assertEqual(state_payload["gate"]["id"], "TASK-REVISION")
+        self.assertIn("--expected-state-revision", state_payload["gate"]["recovery"])
+
+        candidate = json.loads(
+            (self.root / "tasks" / "T001.json").read_text(encoding="utf-8")
+        )
+        candidate["title"] = "并发安全更新"
+        candidate_file = Path(self.temp.name) / "T001-cas-update.json"
+        candidate_file.write_text(
+            json.dumps(candidate, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        missing_task_revision = self.run_cli(
+            TASKCTL,
+            "update",
+            "--task-dir",
+            str(self.root),
+            "--file",
+            str(candidate_file),
+        )
+        self.assertEqual(missing_task_revision.returncode, 2)
+        task_payload = json.loads(missing_task_revision.stderr)
+        self.assertEqual(task_payload["gate"]["id"], "TASK-REVISION")
+        self.assertIn("--expected-task-revision", task_payload["gate"]["recovery"])
+
     def test_parallel_scope_overlap_is_a_warning(self) -> None:
         self.add_task(
             self.task(
@@ -804,6 +896,8 @@ class TaskctlTests(unittest.TestCase):
             "T001",
             "--owner",
             "agent-a",
+            "--expected-state-revision",
+            "1",
         )
         self.assertEqual(started.returncode, 0, started.stderr)
         payload = json.loads(started.stdout)
@@ -1215,6 +1309,8 @@ class TaskctlTests(unittest.TestCase):
             "agent-a",
             "--reason",
             "合同改变",
+            "--expected-state-revision",
+            "1",
         )
         self.assertEqual(not_done.returncode, 0, not_done.stderr)
         self.assertIn(
@@ -1359,19 +1455,44 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(initialized.returncode, 2)
         self.assertIn("refusing to overwrite", json.loads(initialized.stderr)["error"])
 
-    def test_init_rejects_blank_identity_before_writing(self) -> None:
-        for index, arguments in enumerate(
-            (("--id", " ", "--title", "有效标题"), ("--id", "valid", "--title", " "))
-        ):
-            target = Path(self.temp.name) / f"blank-task-identity-{index}"
-            initialized = self.run_cli(
-                TASKCTL, "init", "--task-dir", str(target), *arguments
-            )
-            self.assertEqual(initialized.returncode, 2)
-            self.assertIn("must not be empty", json.loads(initialized.stderr)["error"])
-            self.assertFalse((target / "task-table.json").exists())
+    def test_init_rejects_blank_id_but_preserves_blank_semantic_title(self) -> None:
+        rejected_root = Path(self.temp.name) / "blank-task-id"
+        rejected = self.run_cli(
+            TASKCTL,
+            "init",
+            "--task-dir",
+            str(rejected_root),
+            "--id",
+            " ",
+            "--title",
+            "有效标题",
+        )
+        self.assertEqual(rejected.returncode, 2)
+        self.assertIn("must not be empty", json.loads(rejected.stderr)["error"])
+        self.assertFalse((rejected_root / "task-table.json").exists())
 
-    def test_init_in_existing_workflow_must_use_the_workflow_identity(self) -> None:
+        accepted_root = Path(self.temp.name) / "blank-task-title"
+        accepted = self.run_cli(
+            TASKCTL,
+            "init",
+            "--task-dir",
+            str(accepted_root),
+            "--id",
+            "valid",
+            "--title",
+            " ",
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertIn(
+            "semantic_text_empty",
+            {item["kind"] for item in json.loads(accepted.stdout)["diagnostics"]},
+        )
+        table = json.loads(
+            (accepted_root / "task-table.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(table["title"], " ")
+
+    def test_init_in_existing_workflow_gates_id_but_not_semantic_title(self) -> None:
         target = Path(self.temp.name) / "recover-task-table"
         initialized = self.run_cli(
             WORKCTL,
@@ -1386,28 +1507,29 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(initialized.returncode, 0, initialized.stderr)
         (target / "task-table.json").unlink()
 
-        for arguments, expected in (
-            (("--id", "other-id", "--title", "Delivery Title"), "workflow id"),
-            (("--id", "delivery-id", "--title", "Other Title"), "workflow title"),
-        ):
-            rejected = self.run_cli(
-                TASKCTL, "init", "--task-dir", str(target), *arguments
-            )
-            self.assertEqual(rejected.returncode, 2)
-            self.assertIn(expected, json.loads(rejected.stderr)["error"])
-            self.assertFalse((target / "task-table.json").exists())
-
-        recovered = self.run_cli(
+        rejected = self.run_cli(
             TASKCTL,
             "init",
             "--task-dir",
             str(target),
-            "--id",
-            "delivery-id",
-            "--title",
-            "Delivery Title",
+            "--id", "other-id",
+            "--title", "Delivery Title",
         )
-        self.assertEqual(recovered.returncode, 0, recovered.stderr)
+        self.assertEqual(rejected.returncode, 2)
+        self.assertIn("workflow id", json.loads(rejected.stderr)["error"])
+        self.assertFalse((target / "task-table.json").exists())
+
+        accepted = self.run_cli(
+            TASKCTL,
+            "init",
+            "--task-dir",
+            str(target),
+            "--id", "delivery-id",
+            "--title", "Other Title",
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        table = json.loads((target / "task-table.json").read_text(encoding="utf-8"))
+        self.assertEqual(table["title"], "Other Title")
         status = self.run_cli(TASKCTL, "status", "--task-dir", str(target))
         self.assertEqual(status.returncode, 0, status.stderr)
 
@@ -1447,7 +1569,7 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(helped.returncode, 0)
         self.assertIn("usage:", helped.stdout)
 
-    def test_task_table_rejects_noncanonical_title(self) -> None:
+    def test_task_table_preserves_noncanonical_semantic_title(self) -> None:
         table_path = self.root / "task-table.json"
         table = json.loads(table_path.read_text(encoding="utf-8"))
         table["title"] = " 演示交付 "
@@ -1455,8 +1577,11 @@ class TaskctlTests(unittest.TestCase):
             json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         listed = self.run_cli(TASKCTL, "list", "--task-dir", str(self.root))
-        self.assertEqual(listed.returncode, 2)
-        self.assertIn("surrounding whitespace", json.loads(listed.stderr)["error"])
+        self.assertEqual(listed.returncode, 0, listed.stderr)
+        self.assertIn(
+            "semantic_text_surrounding_whitespace",
+            {item["kind"] for item in json.loads(listed.stdout)["diagnostics"]},
+        )
 
     def test_completion_snapshot_rejects_cross_page_state_change(self) -> None:
         first = self.run_task("completion-context", "--limit", "1", "--budget", "12000")
@@ -1478,7 +1603,7 @@ class TaskctlTests(unittest.TestCase):
         self.assertIn("snapshot changed", payload["error"])
         self.assertEqual(payload["gate"]["id"], "TASK-PAGINATION-SNAPSHOT")
 
-    def test_owner_mismatch_is_advisory_but_explicit_state_revision_is_a_gate(self) -> None:
+    def test_owner_mismatch_is_advisory_but_state_revision_is_a_gate(self) -> None:
         claimed = self.run_task("claim", "--id", "T001", "--owner", "agent-a")
         candidate = Path(self.temp.name) / "owned-update.json"
         candidate.write_text(
@@ -1502,15 +1627,15 @@ class TaskctlTests(unittest.TestCase):
         )
         stale_state = self.run_cli(
             TASKCTL,
-            "update",
+            "note",
             "--task-dir",
             str(self.root),
-            "--file",
-            str(candidate),
-            "--expected-task-revision",
-            "2",
+            "--id",
+            "T001",
             "--owner",
             "agent-b",
+            "--message",
+            "基于陈旧状态的说明",
             "--expected-state-revision",
             str(claimed["state"]["revision"] - 1),
         )

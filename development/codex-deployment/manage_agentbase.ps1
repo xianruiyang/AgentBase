@@ -138,29 +138,35 @@ function Write-JsonFile {
     Write-Utf8NoBomFile -Path $Path -Text ($json + [Environment]::NewLine)
 }
 
-function Get-ValidatedBehaviorEvidence {
+function Get-ValidatedRoutingEvidence {
     param(
         [string]$Root
     )
 
     $evidencePath = Join-Path $Root "development\skill-routing\evidence\current.json"
     if (-not (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
-        throw "Current blind behavior evidence is missing: $evidencePath"
+        throw "Current routing-policy evidence is missing: $evidencePath"
     }
     $evidenceItem = Get-Item -LiteralPath $evidencePath -Force
     if (($evidenceItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-        throw "Current blind behavior evidence must be a real file: $evidencePath"
+        throw "Current routing-policy evidence must be a real file: $evidencePath"
     }
 
-    & (Join-Path $Root "development\skill-routing\validate_behavior_results.ps1") -ProjectRoot $Root -ResultsPath $evidencePath | Out-Null
-    $evidence = Get-Content -LiteralPath $evidencePath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([string]::IsNullOrWhiteSpace([string]$evidence.evaluator)) {
-        throw "Current blind behavior evidence does not identify its evaluator"
+    & (Join-Path $Root "development\skill-routing\validate_routing_results.ps1") -ProjectRoot $Root -ResultsPath $evidencePath | Out-Null
+    $evidence = Get-Content -LiteralPath $evidencePath -Raw -Encoding UTF8 | ConvertFrom-Json -DateKind String
+    if ([string]::IsNullOrWhiteSpace([string]$evidence.evaluator.id)) {
+        throw "Current routing-policy evidence does not identify its evaluator run"
     }
     return [pscustomobject]@{
         path = $evidenceItem.FullName
         sha256 = (Get-FileHash -LiteralPath $evidenceItem.FullName -Algorithm SHA256).Hash
-        evaluator = [string]$evidence.evaluator
+        evaluator_id = [string]$evidence.evaluator.id
+        evaluator_model = [string]$evidence.evaluator.model
+        evaluator_runtime = [string]$evidence.evaluator.runtime
+        evaluated_at_utc = [string]$evidence.evaluator.evaluated_at_utc
+        repository_accessed = [bool]$evidence.evaluator.repository_accessed
+        hidden_expectations_accessed = [bool]$evidence.evaluator.hidden_expectations_accessed
+        evaluation_capsule_sha256 = [string]$evidence.evaluation_capsule_sha256
         candidate_bundle_sha256 = [string]$evidence.candidate_bundle_sha256
         evaluation_input_sha256 = [string]$evidence.evaluation_input_sha256
         case_count = @($evidence.cases).Count
@@ -197,7 +203,7 @@ function Get-LatestPublishedManifest {
         catch {
             continue
         }
-        if ([string]$manifest.state -ne "published" -or @(1, 2) -notcontains [int]$manifest.schema_version) {
+        if ([string]$manifest.state -ne "published" -or @(1, 2, 3) -notcontains [int]$manifest.schema_version) {
             continue
         }
         if (-not [string]::Equals([IO.Path]::GetFullPath([string]$manifest.codex_root), [IO.Path]::GetFullPath($InstallRoot), [StringComparison]::OrdinalIgnoreCase)) {
@@ -516,7 +522,7 @@ function Get-ValidatedSource {
     )
 
     & (Join-Path $Root "development\skill-routing\validate_contract.ps1") -ProjectRoot $Root | Out-Null
-    $behaviorEvidence = Get-ValidatedBehaviorEvidence -Root $Root
+    $routingEvidence = Get-ValidatedRoutingEvidence -Root $Root
     $hostBootstrapPath = Join-Path $Root "development\codex-deployment\bootstrap_windows.ps1"
     if (-not (Test-Path -LiteralPath $hostBootstrapPath -PathType Leaf)) {
         throw "Windows host bootstrap is missing: $hostBootstrapPath"
@@ -637,7 +643,7 @@ function Get-ValidatedSource {
         portable_agents_path = $portableAgentsPath
         portable_agent_names = @($portableAgentFiles.BaseName)
         host_bootstrap_path = $hostBootstrapPath
-        behavior_evidence = $behaviorEvidence
+        routing_evidence = $routingEvidence
         skill_delivery_mode = $DeliveryMode
         skills_managed = $DeliveryMode -eq "DirectCompatibility"
         hooks_managed = $IncludePortableSettings -and $DeliveryMode -eq "DirectCompatibility"
@@ -688,9 +694,9 @@ if ($Action -eq "Validate") {
         portable_agents = $source.portable_agents_path
         portable_agent_count = @($source.portable_agent_names).Count
         host_bootstrap = $source.host_bootstrap_path
-        behavior_evidence = $source.behavior_evidence.path
-        behavior_evidence_sha256 = $source.behavior_evidence.sha256
-        behavior_case_count = $source.behavior_evidence.case_count
+        routing_evidence = $source.routing_evidence.path
+        routing_evidence_sha256 = $source.routing_evidence.sha256
+        routing_case_count = $source.routing_evidence.case_count
     }
     return
 }
@@ -713,9 +719,16 @@ if ($Action -eq "Status") {
     $manifestMatchesSource = $null -ne $manifest -and [string]$manifest.source_bundle_sha256 -eq $sourceFingerprint
     $manifestMatchesInstalled = $null -ne $manifest -and [string]$manifest.installed_bundle_sha256 -eq $installedFingerprint
     $manifestEvidenceMatches = $null -ne $manifest -and
-        $manifest.PSObject.Properties.Name -contains "behavior_evidence_sha256" -and
-        [string]$manifest.behavior_evidence_sha256 -eq [string]$source.behavior_evidence.sha256
+        $manifest.PSObject.Properties.Name -contains "routing_evidence_sha256" -and
+        [string]$manifest.routing_evidence_sha256 -eq [string]$source.routing_evidence.sha256
     $installedMatchesSource = $installedFingerprint -eq $sourceFingerprint
+    $publicationGaps = New-Object 'System.Collections.Generic.List[string]'
+    if (-not $installedMatchesSource) { $publicationGaps.Add("installed_payload_differs_from_source") }
+    if ($null -eq $manifest) { $publicationGaps.Add("published_manifest_missing") }
+    elseif (-not $manifestMatchesSource) { $publicationGaps.Add("published_manifest_source_is_stale") }
+    if ($null -ne $manifest -and -not $manifestMatchesInstalled) { $publicationGaps.Add("installed_payload_differs_from_manifest") }
+    if ($null -ne $manifest -and -not $manifestEvidenceMatches) { $publicationGaps.Add("published_manifest_routing_evidence_is_stale") }
+    if (-not $pluginModeReady) { $publicationGaps.Add("plugin_mode_has_direct_compatibility_conflicts") }
     [pscustomobject]@{
         action = "Status"
         codex_root = $CodexRoot
@@ -727,8 +740,10 @@ if ($Action -eq "Status") {
         latest_publish_manifest = if ($null -eq $publishRecord) { $null } else { $publishRecord.path }
         manifest_matches_source = $manifestMatchesSource
         manifest_matches_installed = $manifestMatchesInstalled
-        manifest_matches_behavior_evidence = $manifestEvidenceMatches
+        manifest_matches_routing_evidence = $manifestEvidenceMatches
         managed_payload_formally_published = $installedMatchesSource -and $manifestMatchesSource -and $manifestMatchesInstalled -and $manifestEvidenceMatches -and $pluginModeReady
+        formal_publication_gap_count = $publicationGaps.Count
+        formal_publication_gaps = @($publicationGaps)
         plugin_installation_in_scope = $SkillDeliveryMode -eq "Plugin"
         plugin_installation_inspected = $false
         plugin_mode_ready = if ($SkillDeliveryMode -eq "Plugin") { $pluginModeReady } else { $null }
@@ -791,7 +806,7 @@ if ($Action -eq "Publish") {
             }
         })
         $manifest = [ordered]@{
-            schema_version = 2
+            schema_version = 3
             state = "prepared"
             created_at_utc = [DateTime]::UtcNow.ToString("o")
             project_root = $ProjectRoot
@@ -803,12 +818,18 @@ if ($Action -eq "Publish") {
             portable_settings_sha256 = $source.portable_settings_sha256
             portable_settings_installed = [bool]$InstallPortableSettings
             portable_agent_names = @($source.portable_agent_names)
-            behavior_evidence_path = $source.behavior_evidence.path.Substring($ProjectRoot.Length + 1).Replace('\', '/')
-            behavior_evidence_sha256 = $source.behavior_evidence.sha256
-            behavior_evaluator = $source.behavior_evidence.evaluator
-            behavior_candidate_bundle_sha256 = $source.behavior_evidence.candidate_bundle_sha256
-            behavior_evaluation_input_sha256 = $source.behavior_evidence.evaluation_input_sha256
-            behavior_case_count = $source.behavior_evidence.case_count
+            routing_evidence_path = $source.routing_evidence.path.Substring($ProjectRoot.Length + 1).Replace('\', '/')
+            routing_evidence_sha256 = $source.routing_evidence.sha256
+            routing_evaluator_id = $source.routing_evidence.evaluator_id
+            routing_evaluator_model = $source.routing_evidence.evaluator_model
+            routing_evaluator_runtime = $source.routing_evidence.evaluator_runtime
+            routing_evaluated_at_utc = $source.routing_evidence.evaluated_at_utc
+            routing_repository_accessed = $source.routing_evidence.repository_accessed
+            routing_hidden_expectations_accessed = $source.routing_evidence.hidden_expectations_accessed
+            routing_evaluation_capsule_sha256 = $source.routing_evidence.evaluation_capsule_sha256
+            routing_candidate_bundle_sha256 = $source.routing_evidence.candidate_bundle_sha256
+            routing_evaluation_input_sha256 = $source.routing_evidence.evaluation_input_sha256
+            routing_case_count = $source.routing_evidence.case_count
             installed_bundle_sha256 = $null
             targets = $targetStates
             backed_up_targets = @()
@@ -904,7 +925,7 @@ if ($Action -eq "Publish") {
         plugin_installation_must_be_verified_separately = $SkillDeliveryMode -eq "Plugin"
         portable_settings_installed = [bool]$InstallPortableSettings
         portable_agent_count = if ($InstallPortableSettings) { @($source.portable_agent_names).Count } else { 0 }
-        behavior_evidence_sha256 = $source.behavior_evidence.sha256
+        routing_evidence_sha256 = $source.routing_evidence.sha256
     }
     return
 }
@@ -920,7 +941,7 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw "Backup manifest is missing: $manifestPath"
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if (@(1, 2) -notcontains [int]$manifest.schema_version -or [string]$manifest.state -ne "published") {
+if (@(1, 2, 3) -notcontains [int]$manifest.schema_version -or [string]$manifest.state -ne "published") {
     throw "Backup is not in a publish state that can be rolled back: $($manifest.state)"
 }
 if (-not [string]::Equals([IO.Path]::GetFullPath([string]$manifest.codex_root), [IO.Path]::GetFullPath($CodexRoot), [StringComparison]::OrdinalIgnoreCase)) {

@@ -1,6 +1,6 @@
 # Codex deployment
 
-`manage_agentbase.ps1` is the only AgentBase entry point that installs project-managed files into a Codex home. It validates project truth and the canonical blind behavior evidence, stages the complete selected payload, backs up every target, installs atomically, verifies fingerprints, and records a rollback manifest. Directory payloads and plugin packaging share `development/common/payload_contract.ps1`, so runtime-only caches, logs, coverage output, dependency trees, build directories, temporary files, and reparse points cannot enter either bundle or its fingerprint.
+`manage_agentbase.ps1` is the only AgentBase entry point that installs project-managed files into a Codex home. It validates project truth and the canonical detached routing-policy evidence, stages the complete selected payload, backs up every target, installs atomically, verifies fingerprints, and records a rollback manifest. Directory payloads and plugin packaging share `development/common/payload_contract.ps1`, so runtime-only caches, logs, coverage output, dependency trees, build directories, temporary files, and reparse points cannot enter either bundle or its fingerprint.
 
 ## Payloads
 
@@ -48,7 +48,7 @@ The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerS
 
 ## Validate
 
-Validation checks the global rule and Skill contract, `development/skill-routing/evidence/current.json` against the current candidate and request hashes, the portable config allowlist, the exact custom-agent file/schema contract, the hooks schema and placeholder boundary, and the independent `vscode-lsp-mcp` release owner:
+Validation checks the global rule and Skill contract, the detached-capsule evaluator identity, clean-input attestation, and capsule/candidate/request hashes in `development/skill-routing/evidence/current.json`, the portable config allowlist, the exact custom-agent file/schema contract, the hooks schema and placeholder boundary, and the independent `vscode-lsp-mcp` release owner. The attestation is an auditable input contract, not an OS sandbox claim. Routing-policy evidence proves selection and coarse policy labels only; it does not replace the skill regression or component release gates:
 
 ```powershell
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot (Get-Location).Path
@@ -62,7 +62,7 @@ The repeatable sandbox test covers default preservation, explicit settings and c
 
 ## Publish on another Windows machine
 
-Install and sign in to Codex first. Then clone or copy the repository, run the Windows host preparation above, review `global/config.toml`, refresh the current blind evidence with an independent evaluator, and choose one delivery mode.
+Install and sign in to Codex first. Then clone or copy the repository, run the Windows host preparation above, review `global/config.toml`, generate a detached routing capsule and refresh current evidence with an evaluator that can read only that capsule, and choose one delivery mode.
 
 For the recommended plugin route, build the package with the official validator, install `agentbase-core` from the repo-scoped `agentbase-local` marketplace, and publish only the project-managed global payload:
 
@@ -84,13 +84,13 @@ Restart the ChatGPT desktop app or begin a new Codex task after publishing. In p
 
 ## Read publication status
 
-`Status` is read-only. It derives state from the selected source payload, installed payload, latest matching `published` manifest, and the current blind evidence instead of trusting a README claim:
+`Status` is read-only. It derives state from the selected source payload, installed payload, latest matching `published` manifest, and current routing-policy evidence instead of trusting a README claim:
 
 ```powershell
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Status -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -SkillDeliveryMode DirectCompatibility -InstallPortableSettings
 ```
 
-Use the same delivery mode and settings scope that were published. `managed_payload_formally_published=true` covers only files managed by this script. In `Plugin` mode, `plugin_mode_ready=false` and `direct_compatibility_conflicts` identify old direct skills or global AgentBase hooks that must be removed before migration. `plugin_installation_inspected=false` is intentional: inspect plugin state through the plugin browser or `codex plugin list`.
+Use the same delivery mode and settings scope that were published. `managed_payload_formally_published=true` covers only files managed by this script; otherwise `formal_publication_gaps` identifies source/install/manifest/evidence drift. In `Plugin` mode, `plugin_mode_ready=false` and `direct_compatibility_conflicts` identify old direct skills or global AgentBase hooks that must be removed before migration. `plugin_installation_inspected=false` is intentional: inspect plugin state through the plugin browser or `codex plugin list`.
 
 The current workflow also uses these separately installed plugins when their capabilities are needed:
 

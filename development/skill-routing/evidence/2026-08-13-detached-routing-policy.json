@@ -3,16 +3,16 @@
   "evaluation_kind": "routing-policy",
   "fingerprint_schema": "text-lf-v1",
   "evaluator": {
-    "id": "routing-eval-20260813T034503Z-d1115e41-sol",
+    "id": "routing-eval-20260813T020819Z-attestation-sol",
     "model": "gpt-5.6-sol",
     "runtime": "codex-subagent-routing-eval",
-    "evaluated_at_utc": "2026-08-13T03:45:03Z",
+    "evaluated_at_utc": "2026-08-13T02:08:19Z",
     "isolation_mode": "detached-capsule",
     "repository_accessed": false,
     "hidden_expectations_accessed": false
   },
-  "evaluation_capsule_sha256": "7C292A486385D00714CAC60C5ED3B70E61010DC7C8D248A5B65C2C31CF715159",
-  "candidate_bundle_sha256": "26DDA1394E839CA311CF2D71D3BD6961C7520EF23A5E6E99C7343436FC9E9FE9",
+  "evaluation_capsule_sha256": "D05C7DFBB0831B8B792129497A54884B38616DF441F07AA820C67691D9DDFBF9",
+  "candidate_bundle_sha256": "C9C7C9FBBCD9D9E981F3EAC16B214870A44C27CF2C73F1C403C2CEB324F0C3C1",
   "evaluation_input_sha256": "966B86DD24E10AF026FB7166C35E4EEB32C89861C6530C90815E9B99529136A2",
   "cases": [
     {"id":"mechanical-document-edit","selected_skills":[],"selected_peer_skills":[],"selected_change_governance_references":[],"behavior_tags":["modify_authorized_scope"],"note":"对象和替换均已明确，属于普通机械文档修改。"},

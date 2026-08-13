@@ -16,7 +16,7 @@ todo → claimed → in_progress → review → done
 ```
 
 - 上图是默认表达，不是 CLI 强制状态机。非典型流转或文档定义的扩展状态会原样保存并返回诊断，但不代替模型根据真实工作作出判断。
-- `claim` 记录 owner 意图；不同任务可以并行领取。owner 不一致是协调诊断，显式 revision 冲突才阻断写入。
+- `claim` 记录 owner 意图；不同任务可以并行领取。owner 不一致是协调诊断；每次状态写入都必须基于调用方刚读到的 state revision，缺少或冲突才阻断写入。
 - `start` 表示开始实际工作。
 - `note` 更新简短进度、阻塞原因或下一动作，不保存运行日志。
 - 非空阻塞原因默认把任务表达为 `blocked`；原因与状态不一致时报告诊断并保留信息，不为了形式一致丢失原始记录。
@@ -24,7 +24,7 @@ todo → claimed → in_progress → review → done
 - `reopen` 和 `release` 分别记录完成结论失效与领取结束；对当前状态或 owner 的不一致返回诊断。
 - `retired` 用于上游方案变化、任务被替代或不再属于当前范围；保留原合同、结果和退出原因。
 
-CLI 会拒绝明确的 revision 冲突；owner 不一致和不同任务的 mutation scope 重叠都只返回协调诊断。
+CLI 对已有合同和状态写入统一使用 CAS：先读取当前记录，再把其 revision 作为对应 `--expected-*-revision` 传回；缺少或冲突都会拒绝本次写入。它只防止并发覆盖，不证明 owner、流转或工作内容正确。owner 不一致和不同任务的 mutation scope 重叠都只返回协调诊断。
 
 ## 并行与下游消费
 

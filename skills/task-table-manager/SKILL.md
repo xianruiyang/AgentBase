@@ -24,16 +24,16 @@ description: 用低 Token 管理长期执行的任务合同、依赖图、状态
 ## 使用方式
 
 1. 模型根据上游 `SOL/GAP/DES/AC/REQ` 和真实工作范围编写任务合同；需要模板时可用 `taskctl draft`，CLI 不自动把文档变成任务。
-2. 需要结构化存储时用 `add` 或 `update`。写入只对 ID/路径、破坏性覆盖、工作区锁和显式期望 revision 冲突设置门禁；owner、依赖环、状态流转、上游未决和验证缺失只作为诊断。
+2. 需要结构化存储时用 `add` 或 `update`。创建新任务不需要 revision；更新已有任务必须先读当前合同并传 `--expected-task-revision`。写入只对 ID/路径、破坏性覆盖、工作区锁和 CAS revision 冲突设置门禁；owner、依赖环、状态流转、上游未决和验证缺失只作为诊断。
 3. 用 `next`、`deps`、`dependents` 和 `context` 以有界输出选择工作。`hard` 依赖未完成时默认降低推荐度，但模型可用 `--include-blocked` 查看并继续分析或准备工作。
-4. 需要跨轮跟踪时用 `claim/start/note/complete/reopen/release`，不再执行的任务可标记 `retired`。命令记录模型已作出的判断，不决定该判断是否被允许。
+4. 需要跨轮跟踪时用 `claim/start/note/complete/reopen/release`，每次先读取当前 state revision 并传 `--expected-state-revision`；不再执行的任务可标记 `retired`。命令记录模型已作出的判断，不决定该判断是否被允许。
 5. `complete` 保存实际结果、验证、未决问题、证据指向和上游来源快照。后继任务读取前置结果摘要，不读取完整对话或原始日志。
 6. 上游改变时用 `$delivery-workflow` 的 `impact` 和本工具的 `dependents` 判断影响；CLI 不自动重置状态或宣布结果失效。
 7. 需要最终复核且范围较大时可用 `completion-context` 从当前 Markdown 取得每个 `REQ/AC/UDES`，再汇总关联结果；快照或缓存漂移只附加诊断。CLI 不返回整体通过值；分页必须沿用同一 snapshot ID，任务或文档改变时从第一页重审。
 
 ## 局部门禁与诊断
 
-只对以下机械风险阻断当前命令：路径越界或写错对象、破坏性覆盖、工作区锁、显式期望 revision 冲突、输入/输出资源超限，以及最终复核分页中快照改变。精确操作需唯一 ID 时，只就该对象的歧义拒绝操作。
+只对以下机械风险阻断当前命令：路径越界或写错对象、破坏性覆盖、工作区锁、已有记录写入缺少 CAS revision 或 revision 冲突、输入/输出资源超限，以及最终复核分页中快照改变。精确操作需唯一 ID 时，只就该对象的歧义拒绝操作。
 
 依赖环或自依赖、owner 不一致、状态流转、可解析但非标准的状态/依赖/来源 ID/描述性路径、重复值、已完成合同的后续修订、未完成依赖、上游未决、快照/缓存漂移、任务粒度、mutation scope 重叠、验证或结果为空、引用覆盖不完整和结果来源陈旧都只报告诊断。诊断不会产生执行许可或产品完成结论。
 

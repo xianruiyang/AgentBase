@@ -96,10 +96,41 @@ def normalize_manifest_text(value: Any, field: str, *, writing: bool = False) ->
     if not cleaned:
         raise WorkctlError(f"{field} must not be empty")
     if len(cleaned) > MAX_MANIFEST_TEXT:
-        raise WorkctlError(f"{field} exceeds {MAX_MANIFEST_TEXT} characters")
+        raise WorkctlError(
+            f"{field} exceeds {MAX_MANIFEST_TEXT} characters",
+            gate_id="WORK-LIMIT",
+            risk="the command cannot keep manifest input bounded",
+            recovery="shorten the manifest identity before retrying",
+        )
     if not writing and value != cleaned:
         raise WorkctlError(f"{field} must not contain surrounding whitespace")
     return cleaned
+
+
+def semantic_text(value: Any, field: str) -> str:
+    """Preserve semantic metadata; only unreadable types and resource bounds are gates."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise WorkctlError(f"{field} must be a string")
+    if len(value) > MAX_MANIFEST_TEXT:
+        raise WorkctlError(
+            f"{field} exceeds {MAX_MANIFEST_TEXT} characters",
+            gate_id="WORK-LIMIT",
+            risk="the command cannot keep structured input and output bounded",
+            recovery="shorten the semantic metadata before retrying",
+        )
+    return value
+
+
+def semantic_text_diagnostics(value: str, field: str) -> list[dict[str, Any]]:
+    if not value.strip():
+        return [{"kind": "semantic_text_empty", "field": field}]
+    if value != value.strip():
+        return [
+            {"kind": "semantic_text_surrounding_whitespace", "field": field}
+        ]
+    return []
 
 
 def compact_json(value: Any) -> str:
@@ -270,7 +301,10 @@ def load_manifest(root: Path) -> dict[str, Any]:
     if not isinstance(manifest, dict) or manifest.get("schema") != "delivery.workflow":
         raise WorkctlError(f"unsupported workflow manifest: {manifest_path}")
     normalize_manifest_text(manifest.get("id"), "workflow.json id")
-    normalize_manifest_text(manifest.get("title"), "workflow.json title")
+    manifest_title = semantic_text(manifest.get("title"), "workflow.json title")
+    manifest_diagnostics = semantic_text_diagnostics(
+        manifest_title, "workflow.title"
+    )
     documents = manifest.get("documents")
     if not isinstance(documents, dict):
         raise WorkctlError("workflow.json documents must be an object")
@@ -314,6 +348,20 @@ def load_manifest(root: Path) -> dict[str, Any]:
             raise WorkctlError(f"unsupported task table manifest: {task_table_path}")
         if task_table.get("id") != manifest.get("id"):
             raise WorkctlError("task table belongs to a different workflow")
+        task_table_title = semantic_text(
+            task_table.get("title"), "task-table.json title"
+        )
+        manifest_diagnostics.extend(
+            semantic_text_diagnostics(task_table_title, "task_table.title")
+        )
+        if task_table_title != manifest_title:
+            manifest_diagnostics.append(
+                {
+                    "kind": "task_table_title_differs_from_workflow",
+                    "workflow_title": manifest_title,
+                    "task_table_title": task_table_title,
+                }
+            )
         storage_paths = []
         for field, default in (
             ("task_dir", "tasks"),
@@ -338,6 +386,7 @@ def load_manifest(root: Path) -> dict[str, Any]:
                 for storage in storage_paths
             ):
                 raise WorkctlError("workflow generated files must not overwrite task storage")
+    manifest["_diagnostics"] = manifest_diagnostics
     return manifest
 
 
@@ -381,16 +430,26 @@ def verify_protected_baseline(root: Path, manifest: dict[str, Any]) -> dict[str,
     if baseline.get("workflow_id") != manifest.get("id"):
         invalid = True
         diagnostics.append({"kind": "baseline_workflow_mismatch"})
-    if baseline.get("confirmed_by") != "user":
-        invalid = True
+    confirmed_by = baseline.get("confirmed_by")
+    if not isinstance(confirmed_by, str):
+        confirmed_by = None
+        diagnostics.append({"kind": "baseline_confirmation_provenance_invalid"})
+    elif not confirmed_by.strip():
+        diagnostics.append({"kind": "baseline_confirmation_provenance_missing"})
+    elif confirmed_by != "user":
         diagnostics.append({"kind": "baseline_confirmation_provenance_unverified"})
     confirmation_ref: str | None
     try:
-        confirmation_ref = normalize_manifest_text(
+        confirmation_ref = semantic_text(
             baseline.get("confirmation_ref"), "protected baseline confirmation_ref"
         )
+        if not confirmation_ref.strip():
+            diagnostics.append({"kind": "baseline_confirmation_reference_missing"})
+        elif confirmation_ref != confirmation_ref.strip():
+            diagnostics.append(
+                {"kind": "baseline_confirmation_reference_surrounding_whitespace"}
+            )
     except WorkctlError as exc:
-        invalid = True
         confirmation_ref = None
         diagnostics.append(
             {"kind": "baseline_confirmation_reference_invalid", "message": str(exc)}
@@ -490,7 +549,7 @@ def verify_protected_baseline(root: Path, manifest: dict[str, Any]) -> dict[str,
         "status": "invalid" if invalid else "drifted" if drifted else "protected",
         "path": baseline_path.name,
         "cycle_id": baseline.get("cycle_id", "cycle-001"),
-        "confirmed_by": baseline.get("confirmed_by"),
+        "confirmed_by": confirmed_by,
         "confirmation_ref": confirmation_ref,
         "protected_ids": protected_ids,
         "current_target_count": len(current_target_ids),
@@ -555,7 +614,10 @@ def build_index(root: Path) -> dict[str, Any]:
     baseline = verify_protected_baseline(root, manifest)
     all_sections: list[dict[str, Any]] = []
     document_hashes: dict[str, str] = {}
-    diagnostics: list[dict[str, Any]] = list(baseline.get("diagnostics", []))
+    diagnostics: list[dict[str, Any]] = [
+        *manifest.get("_diagnostics", []),
+        *baseline.get("diagnostics", []),
+    ]
     for stage in STAGE_PREFIXES:
         path = resolve_inside(root, str(manifest["documents"][stage]))
         sections, digest = parse_document(path, stage)
@@ -583,7 +645,12 @@ def build_index(root: Path) -> dict[str, Any]:
                 retryable=True,
             )
     if len(all_sections) > MAX_RECORDS:
-        raise WorkctlError(f"workflow contains more than {MAX_RECORDS} semantic sections")
+        raise WorkctlError(
+            f"workflow contains more than {MAX_RECORDS} semantic sections",
+            gate_id="WORK-LIMIT",
+            risk="the command cannot keep workflow indexing bounded",
+            recovery="split or archive the workflow documents before retrying",
+        )
 
     definitions: dict[str, list[dict[str, Any]]] = {}
     for section in all_sections:
@@ -724,7 +791,7 @@ def init_workspace(args: argparse.Namespace) -> dict[str, Any]:
 
 def init_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     workflow_id = normalize_manifest_text(args.id, "--id", writing=True)
-    title = normalize_manifest_text(args.title, "--title", writing=True)
+    title = semantic_text(args.title, "--title")
     created_files = [
         "workflow.json",
         "task-table.json",
@@ -786,6 +853,7 @@ def init_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, Any
         "work_dir": str(root),
         "created": created_files + ["tasks/", "state/", "results/"],
         "pending": pending_files,
+        "diagnostics": semantic_text_diagnostics(title, "workflow.title"),
     }
 
 
@@ -796,9 +864,8 @@ def protect_workspace(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def protect_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, Any]:
-    confirmation_ref = normalize_manifest_text(
-        args.confirmation_ref, "--confirmation-ref", writing=True
-    )
+    confirmed_by = semantic_text(args.confirmed_by, "--confirmed-by")
+    confirmation_ref = semantic_text(args.confirmation_ref, "--confirmation-ref")
     manifest = load_manifest(root)
     baseline_path = resolve_inside(
         root, str(manifest.get("protected_baseline", "protected-baseline.json"))
@@ -878,7 +945,7 @@ def protect_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, 
         "schema": "delivery.protected-baseline",
         "workflow_id": manifest.get("id"),
         "cycle_id": f"cycle-{len(history) + 1:03d}",
-        "confirmed_by": args.confirmed_by,
+        "confirmed_by": confirmed_by,
         "confirmation_ref": confirmation_ref,
         "documents": protected_documents,
         "history": history,
@@ -1079,7 +1146,12 @@ def context_workspace(args: argparse.Namespace) -> dict[str, Any]:
         neighbors = list(section["references"]) + list(index["reverse_references"].get(current, []))
         for neighbor in neighbors:
             if neighbor in duplicates:
-                raise WorkctlError(f"ambiguous related semantic id: {neighbor}")
+                raise WorkctlError(
+                    f"ambiguous related semantic id: {neighbor}",
+                    gate_id="WORK-AMBIGUOUS-TARGET",
+                    risk="the exact context query could traverse the wrong semantic object",
+                    recovery="disambiguate the duplicate ID, then retry this exact query",
+                )
             if neighbor in by_id and neighbor not in seen:
                 seen.add(neighbor)
                 queue.append((neighbor, depth + 1))
@@ -1119,7 +1191,12 @@ def impact_workspace(args: argparse.Namespace) -> dict[str, Any]:
         current = queue.popleft()
         for dependent in index["reverse_references"].get(current, []):
             if dependent in duplicates:
-                raise WorkctlError(f"ambiguous related semantic id: {dependent}")
+                raise WorkctlError(
+                    f"ambiguous related semantic id: {dependent}",
+                    gate_id="WORK-AMBIGUOUS-TARGET",
+                    risk="the exact impact query could traverse the wrong semantic object",
+                    recovery="disambiguate the duplicate ID, then retry this exact query",
+                )
             if dependent not in seen:
                 seen.add(dependent)
                 affected.append(dependent)
@@ -1252,8 +1329,8 @@ def build_parser() -> argparse.ArgumentParser:
         "protect", help="protect user-confirmed requirements and user design"
     )
     add_common(protect_parser)
-    protect_parser.add_argument("--confirmed-by", choices=("user",), required=True)
-    protect_parser.add_argument("--confirmation-ref", required=True)
+    protect_parser.add_argument("--confirmed-by", default="")
+    protect_parser.add_argument("--confirmation-ref", default="")
     protect_parser.add_argument("--new-cycle", action="store_true")
     protect_parser.set_defaults(handler=protect_workspace)
 

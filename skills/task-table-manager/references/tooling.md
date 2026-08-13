@@ -34,11 +34,11 @@ reopen      记录完成结论或合同已失效
 release     清除领取意图并回到 todo
 ```
 
-写命令返回新 revision。`--expected-task-revision` 或 `--expected-state-revision` 只是调用方选择启用的 CAS 保护；一旦传入，不匹配必须阻断本次写入。owner 不一致、已 done、从非典型状态 complete/reopen/release，以及阻塞原因与状态不一致都返回诊断，由模型根据文档和真实工作判断。
+写命令返回新 revision。`add` 创建新记录，不需要预期 revision；`update` 必须传调用方刚读到的 `--expected-task-revision`，所有状态写命令必须传调用方刚读到的 `--expected-state-revision`。缺少预期 revision 或与当前值不匹配都用 `TASK-REVISION` 阻断，因为 CLI 无法证明不会覆盖并发写入。owner 不一致、已 done、从非典型状态 complete/reopen/release，以及阻塞原因与状态不一致都返回诊断，由模型根据文档和真实工作判断。
 
 `retired` 表示任务不再属于当前执行投影，应在 note 中记录原因及替代任务或上游决策 ID。这不删除历史。
 
-内置状态、依赖类型、来源 ID 格式、reasoning hint、项目相对 mutation scope 和去重列表是推荐合同。只要 JSON 结构和必需字段仍可解析，非标准值会原样保留并返回诊断，不借助 CLI 把文档语义强制改写成内置枚举。只有 `result_ref` 等 CLI 实际解引用的存储路径必须满足路径门禁。
+内置状态、依赖类型、来源 ID 格式、reasoning hint、项目相对 mutation scope 和去重列表是推荐合同。只要 JSON 结构仍可解释，空白、缺失或非标准的语义文本会以空值或原值保存并返回诊断，不借助 CLI 把文档语义强制改写成内置枚举。只有任务 ID、revision、`result_ref` 等 CLI 实际用于定位记录、并发比较或解引用存储的字段必须满足机械门禁。
 
 结果 JSON 在原有 `outcome/outputs/changed_files/verification/unresolved/invalidated_source_ids` 外可包含：
 
@@ -53,7 +53,7 @@ release     清除领取意图并回到 todo
 `taskctl` 只能用下列类型阻断当前命令：
 
 - `TASK-PATH` / `TASK-OVERWRITE`：路径越界、生成视图覆盖真源，或破坏性覆盖已有记录。
-- `TASK-LOCK` / `TASK-REVISION`：工作区并发写入，或调用方传入的期望 revision 已过期。
+- `TASK-LOCK` / `TASK-REVISION`：工作区并发写入，或已有记录写入缺少调用方已读 revision、期望 revision 已过期。
 - `TASK-LIMIT` / `TASK-INPUT-UNREADABLE`：当前命令无法有界读取，或 JSON/schema/必需字段的类型与身份使当前对象无法确定解释；不得用它阻断仍可保留并诊断的非标准语义值。批量查询中单个损坏记录应被隔离并诊断，不阻断其他记录。
 - `TASK-AMBIGUOUS-TARGET`：精确写入或查询需要唯一 ID，但当前匹配不唯一。
 - `TASK-PAGINATION-SNAPSHOT`：`completion-context` 续页会混用两个任务/文档快照。

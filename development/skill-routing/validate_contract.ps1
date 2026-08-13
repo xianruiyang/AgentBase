@@ -47,7 +47,7 @@ function Assert-Disjoint {
 
 $contractPath = Join-Path $PSScriptRoot "trigger-cases.json"
 $contract = Get-Content -LiteralPath $contractPath -Raw -Encoding UTF8 | ConvertFrom-Json
-Assert-True ($contract.schema_version -eq 2) "Unsupported trigger contract schema: $($contract.schema_version)"
+Assert-True ($contract.schema_version -eq 3) "Unsupported trigger contract schema: $($contract.schema_version)"
 
 $requiredSkills = @(Get-StringArray $contract.required_skills)
 Assert-True ($requiredSkills.Count -gt 0) "Trigger contract has no required skills"
@@ -94,7 +94,8 @@ $requiredGlobalFragments = @(
     '新一轮调试前只清理会干扰当前判断且目标范围明确的旧日志'
     '工作流程的目标、阶段、状态、依赖、完成和例外由适用文档定义'
     'CLI、脚本、索引、缓存和生成视图只辅助编辑、查询、压缩与机械校验'
-    '防止本次操作写错对象、破坏数据、并发覆盖、资源无界或混用查询快照'
+    '防止本次操作写错对象、破坏数据、并发覆盖、资源无界、无法确定解释必需输入或混用查询快照'
+    '其余可解析结构偏差和语义异常只作诊断'
 )
 foreach ($fragment in $requiredGlobalFragments) {
     Assert-True ($globalContent.Contains($fragment)) "Missing required global contract fragment: $fragment"
@@ -130,6 +131,8 @@ foreach ($skill in $requiredSkills) {
     Assert-True (Test-Path -LiteralPath $skillPath -PathType Leaf) "Missing SKILL.md for required skill: $skill"
     Assert-True (Test-Path -LiteralPath $metadataPath -PathType Leaf) "Missing agents/openai.yaml for required skill: $skill"
 
+    $skillItem = Get-Item -LiteralPath $skillPath
+    Assert-True ($skillItem.Length -le [int]$contract.skill_main_max_bytes) "SKILL.md for $skill is $($skillItem.Length) bytes; main-skill limit is $($contract.skill_main_max_bytes)"
     $skillContent = Get-Content -LiteralPath $skillPath -Raw -Encoding UTF8
     $frontmatterMatch = [regex]::Match($skillContent, '(?s)\A---\r?\n(?<frontmatter>.*?)\r?\n---')
     Assert-True $frontmatterMatch.Success "Invalid or missing frontmatter in skill: $skill"
@@ -172,11 +175,15 @@ foreach ($skill in $requiredSkills) {
     Assert-True ($promptMatch.Groups["value"].Value.Contains('$' + $skill)) "default_prompt must explicitly reference the skill token: $skill"
 }
 
-foreach ($behaviorScriptName in @("build_behavior_inputs.ps1", "validate_behavior_results.ps1")) {
-    $behaviorScriptContent = Get-Content -LiteralPath (Join-Path $PSScriptRoot $behaviorScriptName) -Raw -Encoding UTF8
-    Assert-True (-not ($behaviorScriptContent -match 'Get-ChildItem[^\r\n]+-Recurse')) "$behaviorScriptName must not hash recursive skill artifacts"
-    Assert-True ($behaviorScriptContent.Contains('"SKILL.md"')) "$behaviorScriptName must hash each evaluated SKILL.md"
-    Assert-True ($behaviorScriptContent.Contains('"agents\openai.yaml"')) "$behaviorScriptName must hash each evaluated agents/openai.yaml"
+$routingCommonPath = Join-Path $PSScriptRoot "routing_evaluation_common.ps1"
+$routingCommonContent = Get-Content -LiteralPath $routingCommonPath -Raw -Encoding UTF8
+Assert-True (-not ($routingCommonContent -match 'Get-ChildItem[^\r\n]+-Recurse')) "Routing evaluation must not collect recursive skill artifacts"
+Assert-True ($routingCommonContent.Contains('"SKILL.md"')) "Routing evaluation must bind each evaluated SKILL.md"
+Assert-True ($routingCommonContent.Contains('"agents\openai.yaml"')) "Routing evaluation must bind each evaluated agents/openai.yaml"
+Assert-True ($routingCommonContent.Contains('detached capsule')) "Routing evaluation must declare its detached-capsule boundary"
+foreach ($routingScriptName in @("build_routing_evaluation.ps1", "validate_routing_results.ps1")) {
+    $routingScriptContent = Get-Content -LiteralPath (Join-Path $PSScriptRoot $routingScriptName) -Raw -Encoding UTF8
+    Assert-True ($routingScriptContent.Contains('routing_evaluation_common.ps1')) "$routingScriptName must use the canonical detached-capsule implementation"
 }
 
 $governorSkillPath = Join-Path $ProjectRoot "skills\reasoning-governor\SKILL.md"
@@ -333,8 +340,9 @@ Assert-True ($symbolMetadata -match '(?m)^\s{4}- type:\s*"mcp"\s*$') "symbol-str
 Assert-True ($symbolMetadata -match '(?m)^\s{6}value:\s*"vscode-lsp-mcp"\s*$') "symbol-structure-workflow MCP dependency must target vscode-lsp-mcp"
 
 $spaceSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\understand-space\SKILL.md") -Raw -Encoding UTF8
-Assert-True ($spaceSkillContent.Contains("齐次坐标列向量、变换左乘")) "understand-space must declare the convention used by its transform formulas"
-Assert-True ($spaceSkillContent.Contains("不能直接套用本文公式")) "understand-space must require API-specific convention mapping"
+$spaceTransformReference = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\understand-space\references\frame-transform-verification.md") -Raw -Encoding UTF8
+Assert-True ($spaceTransformReference.Contains("齐次坐标列向量、变换左乘")) "understand-space must declare the convention used by its transform formulas"
+Assert-True ($spaceSkillContent.Contains("不能直接套用公式") -or $spaceTransformReference.Contains("不能直接套用公式")) "understand-space must require API-specific convention mapping"
 
 $qqResolverPath = Join-Path $ProjectRoot "skills\codex-qq-hook\scripts\resolve_codex_home.ps1"
 $qqStopScriptContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\scripts\codex_stop_qq_notify.ps1") -Raw -Encoding UTF8
@@ -365,8 +373,9 @@ $workflowContent = Get-Content -LiteralPath $workflowPath -Raw -Encoding UTF8
 Assert-True ($workflowContent.Contains("npm run verify:release")) "Repository CI does not run the vscode-lsp-mcp release gate"
 Assert-True ($workflowContent.Contains("rustsec/audit-check@")) "Repository CI does not run the RustSec gate"
 Assert-True ($workflowContent.Contains("sgy-windows:")) "Repository CI is missing the Windows sgy native gate"
-Assert-True ($workflowContent.Contains("validate_behavior_results.ps1") -and $workflowContent.Contains("evidence\current.json")) "Repository CI does not validate current blind behavior evidence"
-Assert-True ($workflowContent.Contains("test_behavior_fingerprint.ps1")) "Repository CI does not verify line-ending-neutral behavior fingerprints"
+Assert-True ($workflowContent.Contains("validate_routing_results.ps1") -and $workflowContent.Contains("evidence\current.json")) "Repository CI does not validate current routing-policy evidence"
+Assert-True ($workflowContent.Contains("test_routing_fingerprint.ps1")) "Repository CI does not verify line-ending-neutral routing fingerprints"
+Assert-True ($workflowContent.Contains("test_routing_capsule.ps1")) "Repository CI does not verify the detached routing capsule boundary"
 Assert-True ($workflowContent.Contains("build_plugin.ps1") -and $workflowContent.Contains("-SkipOfficialValidation")) "Repository CI does not build the plugin package with its portable contract"
 $unpinnedActions = @([regex]::Matches($workflowContent, '(?m)^\s*-?\s*uses:\s*[^@\s]+@(?<ref>[^\s#]+)') | Where-Object {
     $_.Groups["ref"].Value -notmatch '^[0-9a-f]{40}$'
@@ -401,6 +410,16 @@ Assert-True ($qqSkillContent.Contains('同时使用 `$change-governance`')) "cod
 
 $allowedBehaviorTags = @(Get-StringArray $contract.allowed_behavior_tags)
 Assert-True (($allowedBehaviorTags | Sort-Object -Unique).Count -eq $allowedBehaviorTags.Count) "Trigger contract contains duplicate allowed behavior tags"
+$peerSkills = @($contract.peer_skills)
+$peerSkillNames = @($peerSkills | ForEach-Object { [string]$_.name })
+Assert-True ($peerSkillNames.Count -gt 0) "Trigger contract has no peer-skill coexistence catalog"
+Assert-True (($peerSkillNames | Sort-Object -Unique).Count -eq $peerSkillNames.Count) "Trigger contract contains duplicate peer skill names"
+foreach ($peerSkill in $peerSkills) {
+    Assert-True ([string]$peerSkill.name -match '^peer-[a-z0-9][a-z0-9-]*$') "Invalid peer skill name: $($peerSkill.name)"
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$peerSkill.description)) "Peer skill is missing its description: $($peerSkill.name)"
+}
+$strictRoutingCaseIds = @(Get-StringArray $contract.strict_routing_case_ids)
+Assert-True (($strictRoutingCaseIds | Sort-Object -Unique).Count -eq $strictRoutingCaseIds.Count) "Trigger contract contains duplicate strict routing case ids"
 
 $requiredCases = @(
     "mechanical-document-edit"
@@ -434,6 +453,17 @@ $requiredCases = @(
     "fact-conflict-read-only"
     "long-term-without-scope-expansion"
     "review-only-no-alternative-execution"
+    "ast-rewrite-preview"
+    "event-log-explicit-history-request"
+    "fd-full-path-directory-discovery"
+    "powershell-readonly-command-inspection"
+    "mixed-cpp-powershell-review"
+    "long-context-latest-simple-request"
+    "ui-spatial-layout-with-peer"
+    "ui-copy-review-with-peer"
+    "ue-transform-with-peer"
+    "ue-mechanical-field-with-peer"
+    "qq-troubleshooting-with-powershell"
 )
 
 $seenCases = @{}
@@ -454,11 +484,15 @@ foreach ($case in @($contract.cases)) {
 
     $expectedSkills = @(Get-StringArray $case.expected_skills)
     $forbiddenSkills = @(Get-StringArray $case.forbidden_skills)
+    $availablePeerSkills = @(Get-StringArray $case.available_peer_skills)
+    $expectedPeerSkills = @(Get-StringArray $case.expected_peer_skills)
+    $forbiddenPeerSkills = @(Get-StringArray $case.forbidden_peer_skills)
     $references = @(Get-StringArray $case.expected_change_governance_references)
     $expectedBehaviors = @(Get-StringArray $case.expected_behavior_tags)
     $forbiddenBehaviors = @(Get-StringArray $case.forbidden_behavior_tags)
 
     Assert-Disjoint $expectedSkills $forbiddenSkills "Case $($case.id) skill contract"
+    Assert-Disjoint $expectedPeerSkills $forbiddenPeerSkills "Case $($case.id) peer-skill contract"
     Assert-Disjoint $expectedBehaviors $forbiddenBehaviors "Case $($case.id) behavior contract"
 
     foreach ($skill in @($expectedSkills + $forbiddenSkills)) {
@@ -469,6 +503,13 @@ foreach ($case in @($contract.cases)) {
     }
     foreach ($skill in $forbiddenSkills) {
         $negativeCoverage[$skill]++
+    }
+
+    foreach ($peerSkill in @($availablePeerSkills + $expectedPeerSkills + $forbiddenPeerSkills)) {
+        Assert-True ($peerSkillNames -contains $peerSkill) "Case $($case.id) references undeclared peer skill: $peerSkill"
+    }
+    foreach ($peerSkill in @($expectedPeerSkills + $forbiddenPeerSkills)) {
+        Assert-True ($availablePeerSkills -contains $peerSkill) "Case $($case.id) constrains unavailable peer skill: $peerSkill"
     }
 
     if ($references.Count -gt 0) {
@@ -487,10 +528,13 @@ foreach ($case in @($contract.cases)) {
 foreach ($requiredCase in $requiredCases) {
     Assert-True ($seenCases.ContainsKey($requiredCase)) "Missing required trigger case: $requiredCase"
 }
+foreach ($strictRoutingCaseId in $strictRoutingCaseIds) {
+    Assert-True ($seenCases.ContainsKey($strictRoutingCaseId)) "Strict routing policy references missing case: $strictRoutingCaseId"
+}
 
 foreach ($skill in $requiredSkills) {
     Assert-True ($positiveCoverage[$skill] -gt 0) "Required skill has no positive route case: $skill"
     Assert-True ($negativeCoverage[$skill] -gt 0) "Required skill has no non-trigger case: $skill"
 }
 
-Write-Output "Routing contract valid: $($seenCases.Count) cases; $($requiredSkills.Count)/$($requiredSkills.Count) skills have positive and non-trigger coverage; global, metadata, references, and behavior tags resolve."
+Write-Output "Routing contract valid: $($seenCases.Count) cases; $($strictRoutingCaseIds.Count) strict routing cases; $($requiredSkills.Count)/$($requiredSkills.Count) skills have positive and non-trigger coverage; global, metadata, references, peer skills, and policy tags resolve."

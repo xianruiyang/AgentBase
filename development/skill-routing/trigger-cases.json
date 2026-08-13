@@ -1,7 +1,8 @@
 {
-  "schema_version": 2,
-  "purpose": "发布前验证候选全局 AGENTS.md 与全部关键 skill 的触发边界。期望值只用于结果判定，不应暴露给接受场景请求的评估模型。",
+  "schema_version": 3,
+  "purpose": "发布前验证候选全局 AGENTS.md 与关键 skill 的路由及粗粒度策略标签。它不执行请求，也不证明 skill 执行行为；期望值只用于结果判定，不暴露给评估模型。",
   "global_max_bytes": 20480,
+  "skill_main_max_bytes": 8192,
   "required_skills": [
     "ast-grep-token-safe",
     "change-governance",
@@ -31,6 +32,43 @@
     "document_authority",
     "cli_assistive_only",
     "local_mechanical_gates"
+  ],
+  "peer_skills": [
+    {
+      "name": "peer-ui-design",
+      "description": "审查和设计界面、交互、可用性、视觉层级与无障碍；空间布局正确性仍由专门空间 skill 处理。"
+    },
+    {
+      "name": "peer-ue-authoring",
+      "description": "通过正式 Unreal Editor 接口读取或修改 UE 资产与编辑器状态；空间语义和坐标转换仍由专门空间 skill 处理。"
+    }
+  ],
+  "strict_routing_case_ids": [
+    "mechanical-document-edit",
+    "specified-local-implementation",
+    "one-off-generated-artifact",
+    "literal-text-search",
+    "bounded-file-discovery",
+    "powershell-command-authoring",
+    "current-context-is-sufficient",
+    "ordinary-completion-no-qq",
+    "cpp-word-in-document",
+    "known-file-content-search",
+    "mechanical-coordinate-field-edit",
+    "single-turn-checklist",
+    "windows-prose-without-command",
+    "single-task-cli-formatting",
+    "ast-rewrite-preview",
+    "event-log-explicit-history-request",
+    "fd-full-path-directory-discovery",
+    "powershell-readonly-command-inspection",
+    "mixed-cpp-powershell-review",
+    "long-context-latest-simple-request",
+    "ui-spatial-layout-with-peer",
+    "ui-copy-review-with-peer",
+    "ue-transform-with-peer",
+    "ue-mechanical-field-with-peer",
+    "qq-troubleshooting-with-powershell"
   ],
   "cases": [
     {
@@ -79,6 +117,7 @@
         "change-governance"
       ],
       "forbidden_skills": [
+        "symbol-structure-workflow",
         "task-table-manager"
       ],
       "expected_change_governance_references": [
@@ -172,12 +211,15 @@
     {
       "id": "ast-structural-call-search",
       "kind": "positive",
-      "request": "查找所有把 await 表达式作为第二个实参的 send 调用，并先预览结构化改写。",
+      "request": "用 ast-grep pattern 查找所有把 await 表达式作为第二个实参的 send 调用，并先预览结构化改写；工具已经明确，不需要再在文本、AST 与 LSP 间裁决，也不需要符号身份。",
       "expected_skills": [
-        "ast-grep-token-safe",
+        "ast-grep-token-safe"
+      ],
+      "forbidden_skills": [
         "symbol-structure-workflow"
       ],
       "forbidden_skills": [
+        "symbol-structure-workflow",
         "task-table-manager"
       ],
       "expected_change_governance_references": [],
@@ -714,6 +756,226 @@
         "modify_authorized_scope"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "ast-rewrite-preview",
+      "kind": "positive",
+      "request": "用 AST pattern 查找 TypeScript 中满足指定调用形状的代码，并给出批量 rewrite 预览；不要应用修改，也不需要判断重载或真实符号身份。",
+      "expected_skills": [
+        "ast-grep-token-safe"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "event-log-explicit-history-request",
+      "kind": "positive",
+      "request": "请追溯我上周在这个项目里某次 Codex 对话的用户输入、Goal 和文件操作；先有界列出候选 turn，不要扫描全部日志。",
+      "expected_skills": [
+        "codex-event-logger"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "fd-full-path-directory-discovery",
+      "kind": "positive",
+      "request": "使用 fd 按完整路径查找名称为 Generated 的目录，固定搜索基准并限制最多 20 个结果。",
+      "expected_skills": [
+        "fd-usage"
+      ],
+      "forbidden_skills": [
+        "rg-token-safe"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "powershell-readonly-command-inspection",
+      "kind": "positive",
+      "request": "用 PowerShell 7 写一条只读命令，精确读取已知 JSON 文件并输出三个指定字段；不要改文件。",
+      "expected_skills": [
+        "powershell-usage"
+      ],
+      "forbidden_skills": [
+        "change-governance"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "mixed-cpp-powershell-review",
+      "kind": "positive",
+      "request": "只读审查这个已知 C++ 头文件的 include、自包含性和前置声明，并用 PowerShell 7 读取相关构建配置；不要修改代码，也不做跨文件语义重命名。",
+      "expected_skills": [
+        "cpp-engineering-rules",
+        "powershell-usage"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "long-context-latest-simple-request",
+      "kind": "negative",
+      "request": "背景：上一轮曾讨论完整交付链、任务表、日志恢复和架构迁移，但那些工作已经结束。当前唯一请求：把 README 中已明确指定的一处旧命令替换为新命令并检查 Markdown，不创建计划或读取历史。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "codex-event-logger",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "no_scope_expansion"
+      ],
+      "forbidden_behavior_tags": [
+        "architecture_integrated"
+      ]
+    },
+    {
+      "id": "ui-spatial-layout-with-peer",
+      "kind": "positive",
+      "request": "审查响应式界面中弹窗相对视口居中、按钮与卡片右边缘间距以及滚动后是否出框；结论依赖布局坐标、裁剪和屏幕像素关系。",
+      "available_peer_skills": [
+        "peer-ui-design"
+      ],
+      "expected_peer_skills": [
+        "peer-ui-design"
+      ],
+      "forbidden_peer_skills": [],
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "fact_first"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "ui-copy-review-with-peer",
+      "kind": "negative",
+      "request": "只审查设置页面按钮文案、错误提示和无障碍标签是否清晰，不判断任何位置、尺寸、布局或坐标关系。",
+      "available_peer_skills": [
+        "peer-ui-design"
+      ],
+      "expected_peer_skills": [
+        "peer-ui-design"
+      ],
+      "forbidden_peer_skills": [],
+      "expected_skills": [],
+      "forbidden_skills": [
+        "understand-space"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "ue-transform-with-peer",
+      "kind": "positive",
+      "request": "在 Unreal Editor 中把控制器目标转换到组件空间写入，并验证角色最终世界姿态和相机画面中的前后关系。",
+      "available_peer_skills": [
+        "peer-ue-authoring"
+      ],
+      "expected_peer_skills": [
+        "peer-ue-authoring"
+      ],
+      "forbidden_peer_skills": [],
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "fact_first"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "ue-mechanical-field-with-peer",
+      "kind": "negative",
+      "request": "在 Unreal Editor 中把已经确认的 Actor Location.X 字段从 10 改为 20；字段、单位、坐标系和验收值都已给定，不需要空间关系判断。",
+      "available_peer_skills": [
+        "peer-ue-authoring"
+      ],
+      "expected_peer_skills": [
+        "peer-ue-authoring"
+      ],
+      "forbidden_peer_skills": [],
+      "expected_skills": [],
+      "forbidden_skills": [
+        "understand-space"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "qq-troubleshooting-with-powershell",
+      "kind": "positive",
+      "request": "只读排查为什么当前 Codex 对话没有收到 QQ 完成提醒，并使用 PowerShell 7 检查配置、hook 和有界日志；不要改开关或机器人配置。",
+      "expected_skills": [
+        "change-governance",
+        "codex-qq-hook",
+        "powershell-usage"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "causal-analysis.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "fact_first"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     }
   ]
 }

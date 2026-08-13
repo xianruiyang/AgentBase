@@ -86,7 +86,12 @@ def normalize_manifest_text(value: Any, field: str, *, writing: bool = False) ->
     if not cleaned:
         raise TaskctlError(f"{field} must not be empty")
     if len(cleaned) > MAX_STRING:
-        raise TaskctlError(f"{field} exceeds {MAX_STRING} characters")
+        raise TaskctlError(
+            f"{field} exceeds {MAX_STRING} characters",
+            gate_id="TASK-LIMIT",
+            risk="the command cannot keep manifest input bounded",
+            recovery="shorten the manifest identity before retrying",
+        )
     if not writing and value != cleaned:
         raise TaskctlError(f"{field} must not contain surrounding whitespace")
     return cleaned
@@ -234,7 +239,8 @@ def load_table(root: Path) -> dict[str, Any]:
     if not isinstance(table, dict) or table.get("schema") != "task.table":
         raise TaskctlError(f"unsupported task table manifest: {path}")
     table_id = normalize_manifest_text(table.get("id"), "task-table.json id")
-    normalize_manifest_text(table.get("title"), "task-table.json title")
+    table_title = semantic_string(table.get("title"), "task-table.json title")
+    table_diagnostics = semantic_text_diagnostics(table_title, "task_table.title")
     resolved_paths: dict[str, Path] = {}
     for field, default in (
         ("task_dir", "tasks"),
@@ -273,6 +279,15 @@ def load_table(root: Path) -> dict[str, Any]:
     if workflow is not None:
         if table_id != workflow.get("id"):
             raise TaskctlError("task table belongs to a different workflow")
+        table_diagnostics.extend(workflow.get("_diagnostics", []))
+        if table_title != workflow.get("title"):
+            table_diagnostics.append(
+                {
+                    "kind": "task_table_title_differs_from_workflow",
+                    "workflow_title": workflow.get("title"),
+                    "task_table_title": table_title,
+                }
+            )
         for relative in workflow["documents"].values():
             reserved_files.add(resolve_inside(root, relative))
         reserved_files.add((root / "protected-baseline.json").resolve())
@@ -290,6 +305,7 @@ def load_table(root: Path) -> dict[str, Any]:
     for storage_path in storage_paths:
         if any(storage_path == reserved.parent or storage_path in reserved.parents for reserved in reserved_files):
             raise TaskctlError("task storage must not contain workflow truth")
+    table["_diagnostics"] = table_diagnostics
     return table
 
 
@@ -301,15 +317,36 @@ def table_paths(root: Path, table: dict[str, Any]) -> tuple[Path, Path, Path]:
     )
 
 
-def require_string(value: Any, field: str, *, allow_empty: bool = False) -> str:
+def require_identity_string(value: Any, field: str) -> str:
     if not isinstance(value, str):
         raise TaskctlError(f"{field} must be a string")
     cleaned = value.strip()
-    if not allow_empty and not cleaned:
+    if not cleaned:
         raise TaskctlError(f"{field} must not be empty")
     if len(cleaned) > MAX_STRING:
-        raise TaskctlError(f"{field} exceeds {MAX_STRING} characters")
+        raise TaskctlError(
+            f"{field} exceeds {MAX_STRING} characters",
+            gate_id="TASK-LIMIT",
+            risk="the command cannot keep structured input and output bounded",
+            recovery="shorten the identity value before retrying",
+        )
     return cleaned
+
+
+def semantic_string(value: Any, field: str) -> str:
+    """Preserve parseable semantic text; only type and resource bounds are gates."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise TaskctlError(f"{field} must be a string")
+    if len(value) > MAX_STRING:
+        raise TaskctlError(
+            f"{field} exceeds {MAX_STRING} characters",
+            gate_id="TASK-LIMIT",
+            risk="the command cannot keep structured input and output bounded",
+            recovery="shorten or split the semantic value before retrying",
+        )
+    return value
 
 
 def string_list(value: Any, field: str, *, maximum: int = MAX_LIST_ITEMS) -> list[str]:
@@ -324,22 +361,29 @@ def string_list(value: Any, field: str, *, maximum: int = MAX_LIST_ITEMS) -> lis
             risk="the command cannot keep structured input and output bounded",
             recovery="split or reduce the list before retrying",
         )
-    return [require_string(item, f"{field}[]") for item in value]
+    return [semantic_string(item, f"{field}[]") for item in value]
 
 
 def evidence_ref_list(value: Any, field: str) -> list[dict[str, str]]:
     if value is None:
         return []
-    if not isinstance(value, list) or len(value) > MAX_LIST_ITEMS:
-        raise TaskctlError(f"{field} must contain at most {MAX_LIST_ITEMS} objects")
+    if not isinstance(value, list):
+        raise TaskctlError(f"{field} must be an array")
+    if len(value) > MAX_LIST_ITEMS:
+        raise TaskctlError(
+            f"{field} must contain at most {MAX_LIST_ITEMS} objects",
+            gate_id="TASK-LIMIT",
+            risk="the command cannot keep structured evidence input bounded",
+            recovery="split or reduce the evidence references before retrying",
+        )
     normalized: list[dict[str, str]] = []
     for index, item in enumerate(value):
         if not isinstance(item, dict):
             raise TaskctlError(f"{field}[{index}] must be an object")
-        row = {"ref": require_string(item.get("ref"), f"{field}[{index}].ref")}
+        row = {"ref": semantic_string(item.get("ref"), f"{field}[{index}].ref")}
         for key in ("kind", "note"):
             if item.get(key) is not None:
-                row[key] = require_string(item.get(key), f"{field}[{index}].{key}")
+                row[key] = semantic_string(item.get(key), f"{field}[{index}].{key}")
         normalized.append(row)
     return normalized
 
@@ -347,12 +391,19 @@ def evidence_ref_list(value: Any, field: str) -> list[dict[str, str]]:
 def source_snapshot_map(value: Any, field: str) -> dict[str, str]:
     if value is None:
         return {}
-    if not isinstance(value, dict) or len(value) > MAX_LIST_ITEMS:
-        raise TaskctlError(f"{field} must contain at most {MAX_LIST_ITEMS} entries")
+    if not isinstance(value, dict):
+        raise TaskctlError(f"{field} must be an object")
+    if len(value) > MAX_LIST_ITEMS:
+        raise TaskctlError(
+            f"{field} must contain at most {MAX_LIST_ITEMS} entries",
+            gate_id="TASK-LIMIT",
+            risk="the command cannot keep source snapshot input bounded",
+            recovery="split or reduce the source snapshot before retrying",
+        )
     normalized: dict[str, str] = {}
     for source_id, fingerprint in value.items():
-        source_id = require_string(source_id, f"{field} key")
-        normalized[source_id] = require_string(fingerprint, f"{field}[{source_id}]")
+        source_id = semantic_string(source_id, f"{field} key")
+        normalized[source_id] = semantic_string(fingerprint, f"{field}[{source_id}]")
     return dict(sorted(normalized.items()))
 
 
@@ -363,9 +414,9 @@ def validate_relative(
     allow_glob: bool = True,
     storage_path: bool = False,
 ) -> str:
-    cleaned = require_string(value, field).replace("\\", "/")
     if not storage_path:
-        return cleaned
+        return semantic_string(value, field)
+    cleaned = require_identity_string(value, field).replace("\\", "/")
     if Path(cleaned).is_absolute() or re.match(r"^[A-Za-z]:", cleaned):
         raise TaskctlError(
             f"{field} must be project-relative: {value}",
@@ -401,10 +452,23 @@ def is_project_relative_reference(value: str, *, allow_glob: bool = True) -> boo
     return allow_glob or not any(token in cleaned for token in ("*", "?", "[", "]"))
 
 
+def semantic_text_diagnostics(
+    value: str, field: str, *, task_id: str | None = None
+) -> list[dict[str, Any]]:
+    diagnostic: dict[str, Any] = {"field": field}
+    if task_id is not None:
+        diagnostic["task_id"] = task_id
+    if not value.strip():
+        return [{"kind": "semantic_text_empty", **diagnostic}]
+    if value != value.strip():
+        return [{"kind": "semantic_text_surrounding_whitespace", **diagnostic}]
+    return []
+
+
 def validate_task(raw: Any, *, expected_id: str | None = None) -> dict[str, Any]:
     if not isinstance(raw, dict) or raw.get("schema") != "task.record":
         raise TaskctlError("task file must use schema task.record")
-    task_id = require_string(raw.get("id"), "task.id")
+    task_id = require_identity_string(raw.get("id"), "task.id")
     if not TASK_ID_RE.fullmatch(task_id):
         raise TaskctlError(f"invalid task id: {task_id}")
     if expected_id is not None and task_id != expected_id:
@@ -415,14 +479,21 @@ def validate_task(raw: Any, *, expected_id: str | None = None) -> dict[str, Any]
     source_ids = string_list(raw.get("source_ids"), "task.source_ids")
 
     raw_dependencies = raw.get("dependencies", [])
-    if not isinstance(raw_dependencies, list) or len(raw_dependencies) > MAX_LIST_ITEMS:
-        raise TaskctlError(f"task.dependencies must contain at most {MAX_LIST_ITEMS} items")
+    if not isinstance(raw_dependencies, list):
+        raise TaskctlError("task.dependencies must be an array")
+    if len(raw_dependencies) > MAX_LIST_ITEMS:
+        raise TaskctlError(
+            f"task.dependencies must contain at most {MAX_LIST_ITEMS} items",
+            gate_id="TASK-LIMIT",
+            risk="the command cannot keep task dependency input bounded",
+            recovery="split or reduce the dependency list before retrying",
+        )
     dependencies: list[dict[str, Any]] = []
     for index, dependency in enumerate(raw_dependencies):
         if not isinstance(dependency, dict):
             raise TaskctlError(f"task.dependencies[{index}] must be an object")
-        dependency_id = require_string(dependency.get("id"), f"task.dependencies[{index}].id")
-        dependency_type = require_string(
+        dependency_id = semantic_string(dependency.get("id"), f"task.dependencies[{index}].id")
+        dependency_type = semantic_string(
             dependency.get("type"), f"task.dependencies[{index}].type"
         )
         dependencies.append(
@@ -441,15 +512,15 @@ def validate_task(raw: Any, *, expected_id: str | None = None) -> dict[str, Any]
     ]
     reasoning_hint = raw.get("reasoning_hint")
     if reasoning_hint is not None:
-        reasoning_hint = require_string(reasoning_hint, "task.reasoning_hint")
+        reasoning_hint = semantic_string(reasoning_hint, "task.reasoning_hint")
     metadata = raw.get("metadata", {})
     if not isinstance(metadata, dict):
         raise TaskctlError("task.metadata must be an object")
     normalized = {
         "schema": "task.record",
         "id": task_id,
-        "title": require_string(raw.get("title"), "task.title"),
-        "outcome": require_string(raw.get("outcome"), "task.outcome"),
+        "title": semantic_string(raw.get("title"), "task.title"),
+        "outcome": semantic_string(raw.get("outcome"), "task.outcome"),
         "source_ids": source_ids,
         "dependencies": dependencies,
         "mutation_scope": mutation_scope,
@@ -472,25 +543,23 @@ def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
     if raw.get("task_id") != task_id:
         raise TaskctlError(f"state identity mismatch for {task_id}")
     status = raw.get("status")
-    status = require_string(status, f"state.status[{task_id}]")
+    status = semantic_string(status, f"state.status[{task_id}]")
     revision = raw.get("revision")
     if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
         raise TaskctlError(f"state revision for {task_id} must be a positive integer")
     owner = raw.get("owner")
     if owner is not None:
-        owner = require_string(owner, f"state.owner[{task_id}]")
+        owner = semantic_string(owner, f"state.owner[{task_id}]")
     result_ref = raw.get("result_ref")
     if result_ref is not None:
         result_ref = validate_relative(
-            require_string(result_ref, f"state.result_ref[{task_id}]"),
+            require_identity_string(result_ref, f"state.result_ref[{task_id}]"),
             f"state.result_ref[{task_id}]",
             allow_glob=False,
             storage_path=True,
         )
-    blocked_reason = require_string(
-        raw.get("blocked_reason", ""),
-        f"state.blocked_reason[{task_id}]",
-        allow_empty=True,
+    blocked_reason = semantic_string(
+        raw.get("blocked_reason", ""), f"state.blocked_reason[{task_id}]"
     )
     return {
         "schema": "task.state",
@@ -498,12 +567,10 @@ def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
         "status": status,
         "owner": owner,
         "revision": revision,
-        "note": require_string(raw.get("note", ""), f"state.note[{task_id}]", allow_empty=True),
+        "note": semantic_string(raw.get("note", ""), f"state.note[{task_id}]"),
         "blocked_reason": blocked_reason,
-        "next_action": require_string(
-            raw.get("next_action", ""),
-            f"state.next_action[{task_id}]",
-            allow_empty=True,
+        "next_action": semantic_string(
+            raw.get("next_action", ""), f"state.next_action[{task_id}]"
         ),
         "result_ref": result_ref,
     }
@@ -544,7 +611,7 @@ def validate_result_for_task(
         "schema": "task.result",
         "task_id": task["id"],
         "task_revision": result_revision,
-        "outcome": require_string(raw.get("outcome"), "result.outcome"),
+        "outcome": semantic_string(raw.get("outcome"), "result.outcome"),
         "outputs": string_list(raw.get("outputs"), "result.outputs"),
         "changed_files": changed_files,
         "verification": string_list(raw.get("verification"), "result.verification"),
@@ -573,9 +640,12 @@ def load_query_storage(
     root: Path, table: dict[str, Any]
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], list[dict[str, Any]]]:
     task_dir, state_dir, _ = table_paths(root, table)
-    diagnostics: list[dict[str, Any]] = []
+    diagnostics: list[dict[str, Any]] = list(table.get("_diagnostics", []))
     if not task_dir.exists():
-        return {}, {}, [{"kind": "task_directory_missing", "path": str(task_dir)}]
+        return {}, {}, [
+            *diagnostics,
+            {"kind": "task_directory_missing", "path": str(task_dir)},
+        ]
     task_paths = sorted(task_dir.glob("*.json"))
     if len(task_paths) > MAX_RECORDS:
         raise TaskctlError(
@@ -706,7 +776,10 @@ def load_workflow(root: Path) -> dict[str, Any] | None:
         raise TaskctlError(f"unsupported workflow manifest: {path}")
     workflow_id = workflow.get("id")
     normalize_manifest_text(workflow_id, "workflow.json id")
-    normalize_manifest_text(workflow.get("title"), "workflow.json title")
+    workflow_title = semantic_string(workflow.get("title"), "workflow.json title")
+    workflow["_diagnostics"] = semantic_text_diagnostics(
+        workflow_title, "workflow.title"
+    )
     fixed_fields = {
         "task_table": "task-table.json",
         "protected_baseline": "protected-baseline.json",
@@ -920,6 +993,13 @@ def state_diagnostics(task_id: str, state: dict[str, Any]) -> list[dict[str, Any
     owner = state.get("owner")
     result_ref = state.get("result_ref")
     blocked_reason = state.get("blocked_reason", "")
+    diagnostics.extend(
+        semantic_text_diagnostics(status, "state.status", task_id=task_id)
+    )
+    if owner is not None:
+        diagnostics.extend(
+            semantic_text_diagnostics(owner, "state.owner", task_id=task_id)
+        )
     if status not in STATUSES:
         diagnostics.append(
             {
@@ -958,6 +1038,11 @@ def result_diagnostics(
     if result is None:
         return []
     diagnostics: list[dict[str, Any]] = []
+    diagnostics.extend(
+        semantic_text_diagnostics(
+            result["outcome"], "result.outcome", task_id=task["id"]
+        )
+    )
     for field in (
         "outputs",
         "changed_files",
@@ -967,10 +1052,46 @@ def result_diagnostics(
         "evidence_for",
     ):
         values = result.get(field, [])
+        for value_index, value in enumerate(values):
+            diagnostics.extend(
+                semantic_text_diagnostics(
+                    value, f"result.{field}[{value_index}]", task_id=task["id"]
+                )
+            )
         if len(values) != len(set(values)):
             diagnostics.append(
                 {"kind": "duplicate_result_values", "task_id": task["id"], "field": field}
             )
+    for ref_index, evidence_ref in enumerate(result.get("evidence_refs", [])):
+        diagnostics.extend(
+            semantic_text_diagnostics(
+                evidence_ref["ref"],
+                f"result.evidence_refs[{ref_index}].ref",
+                task_id=task["id"],
+            )
+        )
+        for key in ("kind", "note"):
+            if key in evidence_ref:
+                diagnostics.extend(
+                    semantic_text_diagnostics(
+                        evidence_ref[key],
+                        f"result.evidence_refs[{ref_index}].{key}",
+                        task_id=task["id"],
+                    )
+                )
+    for source_id, fingerprint in result.get("source_snapshot", {}).items():
+        diagnostics.extend(
+            semantic_text_diagnostics(
+                source_id, "result.source_snapshot key", task_id=task["id"]
+            )
+        )
+        diagnostics.extend(
+            semantic_text_diagnostics(
+                fingerprint,
+                f"result.source_snapshot[{source_id}]",
+                task_id=task["id"],
+            )
+        )
     for source_id in [
         *result.get("invalidated_source_ids", []),
         *result.get("evidence_for", []),
@@ -1083,6 +1204,10 @@ def task_diagnostics(
     cycle_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     diagnostics: list[dict[str, Any]] = []
+    for field in ("title", "outcome"):
+        diagnostics.extend(
+            semantic_text_diagnostics(task[field], f"task.{field}", task_id=task["id"])
+        )
     if not task["source_ids"]:
         diagnostics.append({"kind": "source_ids_empty"})
     if not task["outputs"]:
@@ -1097,6 +1222,12 @@ def task_diagnostics(
         "suggested_skills",
     ):
         values = task.get(field, [])
+        for value_index, value in enumerate(values):
+            diagnostics.extend(
+                semantic_text_diagnostics(
+                    value, f"task.{field}[{value_index}]", task_id=task["id"]
+                )
+            )
         if len(values) != len(set(values)):
             diagnostics.append({"kind": "duplicate_task_values", "field": field})
     for source_id in task["source_ids"]:
@@ -1109,6 +1240,12 @@ def task_diagnostics(
             diagnostics.append(
                 {"kind": "non_project_relative_mutation_scope", "scope": scope}
             )
+    if task.get("reasoning_hint") is not None:
+        diagnostics.extend(
+            semantic_text_diagnostics(
+                task["reasoning_hint"], "task.reasoning_hint", task_id=task["id"]
+            )
+        )
     if task.get("reasoning_hint") not in (None, *REASONING_HINTS):
         diagnostics.append(
             {
@@ -1117,8 +1254,30 @@ def task_diagnostics(
             }
         )
     seen_dependencies: set[str] = set()
-    for dependency in task["dependencies"]:
+    for dependency_index, dependency in enumerate(task["dependencies"]):
         dependency_id = dependency["id"]
+        diagnostics.extend(
+            semantic_text_diagnostics(
+                dependency_id,
+                f"task.dependencies[{dependency_index}].id",
+                task_id=task["id"],
+            )
+        )
+        diagnostics.extend(
+            semantic_text_diagnostics(
+                dependency["type"],
+                f"task.dependencies[{dependency_index}].type",
+                task_id=task["id"],
+            )
+        )
+        for consumes_index, value in enumerate(dependency.get("consumes", [])):
+            diagnostics.extend(
+                semantic_text_diagnostics(
+                    value,
+                    f"task.dependencies[{dependency_index}].consumes[{consumes_index}]",
+                    task_id=task["id"],
+                )
+            )
         if not TASK_ID_RE.fullmatch(dependency_id):
             diagnostics.append(
                 {"kind": "non_standard_dependency_id", "dependency_id": dependency_id}
@@ -1207,13 +1366,11 @@ def command_init(args: argparse.Namespace) -> dict[str, Any]:
 
 def command_init_locked(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     table_id = normalize_manifest_text(args.id, "--id", writing=True)
-    title = normalize_manifest_text(args.title, "--title", writing=True)
+    title = semantic_string(args.title, "--title")
     workflow = load_workflow(root)
     if workflow is not None:
         if table_id != workflow["id"]:
             raise TaskctlError("--id must match the existing workflow id")
-        if title != workflow["title"]:
-            raise TaskctlError("--title must match the existing workflow title")
     conflicts = [
         relative
         for relative in ("task-table.json", "TASK_TABLE.md")
@@ -1244,7 +1401,23 @@ def command_init_locked(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         "table_view": "TASK_TABLE.md",
     }
     atomic_write_json(root / "task-table.json", table)
-    return {"ok": True, "command": "init", "task_dir": str(root)}
+    diagnostics = semantic_text_diagnostics(title, "task_table.title")
+    if workflow is not None:
+        diagnostics.extend(workflow.get("_diagnostics", []))
+        if title != workflow.get("title"):
+            diagnostics.append(
+                {
+                    "kind": "task_table_title_differs_from_workflow",
+                    "workflow_title": workflow.get("title"),
+                    "task_table_title": title,
+                }
+            )
+    return {
+        "ok": True,
+        "command": "init",
+        "task_dir": str(root),
+        "diagnostics": diagnostics,
+    }
 
 
 def command_draft(args: argparse.Namespace) -> dict[str, Any]:
@@ -1359,10 +1532,15 @@ def command_update(args: argparse.Namespace) -> dict[str, Any]:
                 recovery="repair the matching task/state record or choose a current task ID",
             )
         current = tasks[task_id]
-        if (
-            args.expected_task_revision is not None
-            and current["revision"] != args.expected_task_revision
-        ):
+        if args.expected_task_revision is None:
+            raise TaskctlError(
+                "update requires --expected-task-revision",
+                gate_id="TASK-REVISION",
+                risk="the update has no caller-observed task revision and could overwrite a newer contract",
+                recovery="read the current task revision, merge the intended change, and retry with --expected-task-revision",
+                retryable=True,
+            )
+        if current["revision"] != args.expected_task_revision:
             raise TaskctlError(
                 f"task revision conflict: expected {args.expected_task_revision}, "
                 f"current {current['revision']}",
@@ -1388,8 +1566,6 @@ def command_update(args: argparse.Namespace) -> dict[str, Any]:
                     "requested_owner": args.owner,
                 }
             )
-        if args.expected_state_revision is not None:
-            check_expected_state(state, args.expected_state_revision)
         candidate["revision"] = current["revision"] + 1
         proposed = dict(tasks)
         proposed[task_id] = candidate
@@ -2300,7 +2476,15 @@ def mutation_overlap_warnings(
 
 
 def check_expected_state(state: dict[str, Any], expected: int | None) -> None:
-    if expected is not None and state["revision"] != expected:
+    if expected is None:
+        raise TaskctlError(
+            "state write requires --expected-state-revision",
+            gate_id="TASK-REVISION",
+            risk="the write has no caller-observed state revision and could overwrite newer task state",
+            recovery="read the current state revision, reconcile the intended change, and retry with --expected-state-revision",
+            retryable=True,
+        )
+    if state["revision"] != expected:
         raise TaskctlError(
             f"state revision conflict: expected {expected}, current {state['revision']}",
             gate_id="TASK-REVISION",
@@ -2444,15 +2628,15 @@ def command_note(args: argparse.Namespace) -> dict[str, Any]:
             state["owner"] = args.owner
         if state["status"] == "todo" and args.status is None:
             state["status"] = "claimed"
-        if args.status:
+        if args.status is not None:
             state["status"] = args.status
             if args.status != "blocked" and args.blocked_reason is None:
                 state["blocked_reason"] = ""
         if args.message is not None:
-            state["note"] = require_string(args.message, "note.message", allow_empty=True)
+            state["note"] = semantic_string(args.message, "note.message")
         if args.blocked_reason is not None:
-            state["blocked_reason"] = require_string(
-                args.blocked_reason, "note.blocked_reason", allow_empty=True
+            state["blocked_reason"] = semantic_string(
+                args.blocked_reason, "note.blocked_reason"
             )
             if state["blocked_reason"] and args.status is None:
                 state["status"] = "blocked"
@@ -2461,9 +2645,7 @@ def command_note(args: argparse.Namespace) -> dict[str, Any]:
                     {"kind": "blocked_reason_cleared_while_status_remains_blocked"}
                 )
         if args.next_action is not None:
-            state["next_action"] = require_string(
-                args.next_action, "note.next_action", allow_empty=True
-            )
+            state["next_action"] = semantic_string(args.next_action, "note.next_action")
         state = write_state(root, table, state)
         diagnostics.extend(state_diagnostics(args.id, state))
     return {
@@ -2579,7 +2761,7 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def command_reopen(args: argparse.Namespace) -> dict[str, Any]:
-    reason = require_string(args.reason, "reopen.reason")
+    reason = semantic_string(args.reason, "reopen.reason")
     root = resolve_root(args.task_dir)
     with workspace_lock(root):
         table = load_table(root)
@@ -2829,7 +3011,6 @@ def build_parser() -> argparse.ArgumentParser:
     update_parser.add_argument("--file", required=True)
     update_parser.add_argument("--owner")
     update_parser.add_argument("--expected-task-revision", type=int)
-    add_state_revision(update_parser)
     update_parser.set_defaults(handler=command_update)
 
     show_parser = subparsers.add_parser("show")

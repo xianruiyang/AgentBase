@@ -176,8 +176,8 @@ try {
             throw "Portable custom agent is missing from the rollback manifest: $agentName"
         }
     }
-    if ([int]$manifest.schema_version -ne 2 -or [string]::IsNullOrWhiteSpace([string]$manifest.behavior_evidence_sha256)) {
-        throw "Publish manifest is missing the current blind behavior evidence receipt"
+    if ([int]$manifest.schema_version -ne 3 -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evidence_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evaluation_capsule_sha256)) {
+        throw "Publish manifest is missing the current detached routing-policy evidence receipt"
     }
 
     $installedCacheRoot = Join-Path $codexRoot "skills\codex-event-logger\tests\__pycache__"

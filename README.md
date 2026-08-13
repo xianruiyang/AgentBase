@@ -1,6 +1,6 @@
 # AgentBase
 
-本项目集中维护候选全局 `AGENTS.md`、可移植 Codex 关键设置与自定义子代理、关键 skill、对应开发工程以及实际依赖的 MCP/CLI。所有改动先进入本目录真源，通过静态合同、盲测和隔离发布验证后，再由用户明确决定是否发布到 Codex。
+本项目集中维护候选全局 `AGENTS.md`、可移植 Codex 关键设置与自定义子代理、关键 skill、对应开发工程以及实际依赖的 MCP/CLI。所有改动先进入本目录真源，通过静态合同、隔离路由策略评估和发布沙箱验证后，再由用户明确决定是否发布到 Codex。
 
 ## 真源与安装副本
 
@@ -13,6 +13,15 @@
 - `development/<name>/` 只承载验证、打包、部署和不随 skill 安装的开发资料。
 - 由部署入口显式传入的 `<CodexRoot>` 中，`AGENTS.md`、同名 skill、`config.toml`、`hooks.json` 与 `agents/*.toml` 都是安装目标或宿主状态，不反向定义本项目。
 - 原工程目录只作为迁移来源保留，不自动双向同步；缓存、测试输出和构建产物不属于真源。
+
+## 任务流程链路约束
+
+以下是用户明确确认的项目级约束，适用于当前及后续新增的交付链、任务表和同类工作流程能力：
+
+- 目标、阶段、状态、依赖、完成条件和例外规则必须写在适用文档中，并由 agent 根据用户确认与有效证据裁决；文档是流程语义真源。
+- `workctl`、`taskctl` 及后续同类 CLI 只辅助模板创建、编辑、存储、索引、查询、上下文压缩和生成可重建视图，不得成为平行规则源、执行许可或完成裁判。
+- CLI 只允许少量必要硬门禁，并且失败必须能机械证明当前操作会写错对象、破坏数据、发生锁、在已有记录写入中缺少或冲突 CAS revision、超出资源边界、无法确定解释必需输入，或混用一次复核中的不同快照；其余可解析结构偏差和语义问题只返回诊断，由 agent 按文档裁决。
+- 修改 workflow skill、CLI 或共享校验时不得削弱以上边界；确需改变时，必须先取得用户明确裁决。具体产物和命令合同仍由对应 skill 文档唯一维护，本节不复制其易变实现细节。
 
 ## 当前全局内核
 
@@ -51,7 +60,7 @@
 | `tools/sgy` | `ast-grep-token-safe` | 构建 skill 内置 `sgy` 的 Rust workspace、测试、fuzz、安装与发布工程 |
 | `development/codex-event-logger` | `codex-event-logger` | hook 设计资料；正式运行脚本仍在 skill 真源 |
 | `development/codex-qq-hook` | `codex-qq-hook` | Webhook 辅助程序和开发说明；正式运行脚本仍在 skill 真源 |
-| `development/skill-routing` | 全局规则与全部关键 skill | 静态触发合同、盲测输入生成与结果判定 |
+| `development/skill-routing` | 全局规则与全部关键 skill | 静态触发合同、脱离仓库的路由评估 capsule 与结果判定 |
 | `development/plugin-packaging` | 合同声明的全部 skill | 生成经过滤的 `agentbase-core` 本地插件包及插件内 hooks |
 | `development/codex-deployment` | 全局规则、可移植设置、hooks、自定义子代理与全部关键 skill | 校验、可选设置安装、带备份发布和可验证回滚 |
 
@@ -61,31 +70,31 @@ skill 内置的 Windows/Linux `sgy 0.1.0` 由同一个不含 `.git`、`target/` 
 
 许可按组件独立生效：`mcp/vscode-lsp-mcp` 使用 Apache-2.0，`tools/sgy` 使用 MIT OR Apache-2.0。仓库根目前没有统一 `LICENSE`，因此不能把组件许可证外推为整个 AgentBase 的授权；对外整体分发前仍需由权利人明确选择根级许可证。
 
-## 路由与行为验证
+## 路由策略验证与执行验证
 
-`development/skill-routing/trigger-cases.json` 中全部关键 skill 都至少有一个正向触发和一个相近非触发场景，并额外覆盖事实冲突、只读授权、长期收益、禁止越权替代执行、active Goal 内动态推理切换、显式线程设置、QQ 只读状态与故障排查、用户确认文档、最终完成边界、CLI 辅助责任和局部机械门禁，以及三类架构边界：职责与入口已知时直接集成、未知时先治理裁决、一次性产物不得升级为架构工程。
+`development/skill-routing/trigger-cases.json` 只定义路由和粗粒度策略标签的测试 oracle。全部关键 skill 至少有一个正向触发和一个相近非触发场景，并覆盖混合意图、长上下文干扰、项目 skill 与外部 UI/UE skill 共存、事实冲突、只读授权、长期收益、禁止越权替代执行、动态推理、QQ 排障、交付链、CLI 边界和架构入口裁决。场景保持中文，不为了测试数量引入多语言变体。
 
-静态合同会检查全局文件大小与关键语义、规则标签、重复规则、skill frontmatter、`agents/openai.yaml`、MCP 依赖、Markdown 相对引用、场景集合和正/负覆盖：
+静态合同会检查全局文件大小与关键语义、主 `SKILL.md` 大小、规则标签、重复规则、skill frontmatter、`agents/openai.yaml`、MCP 依赖、Markdown 相对引用、场景集合、严格路由用例以及正/负覆盖：
 
 ```powershell
 & '.\development\skill-routing\validate_contract.ps1' -ProjectRoot (Get-Location).Path
 ```
 
-盲测输入生成器只暴露请求、候选规则和允许的行为标签，不暴露期望技能或禁选技能。候选哈希只覆盖评估器实际读取的全局规则、各 skill 的 `SKILL.md` 与 `agents/openai.yaml`，不会被测试缓存或其他未评估的运行产物扰动：
+路由评估输入生成器把候选全局规则、各 skill 的 `SKILL.md`/`agents/openai.yaml`、外部 skill 摘要和请求嵌入一个可脱离仓库读取的 capsule。capsule 不包含仓库绝对路径、隐藏期望、禁选项或严格用例清单；生成器返回 capsule 哈希、候选哈希和输入哈希：
 
 ```powershell
-& '.\development\skill-routing\build_behavior_inputs.ps1' -ProjectRoot (Get-Location).Path
+& '.\development\skill-routing\build_routing_evaluation.ps1' -ProjectRoot (Get-Location).Path
 ```
 
-评估结果必须回传候选 bundle 哈希和输入哈希；候选文件或测试请求变化后，旧结果会自动失效：
+独立评估器只能读取该 capsule，不能读取源仓库或执行请求。结果必须记录唯一运行 ID、实际模型、运行环境、UTC 时间、`detached-capsule` 模式、未访问仓库/隐藏期望的输入声明和三个哈希；候选或请求变化后旧结果自动失效。明确的边界与共存用例对项目 skill、外部 skill 和治理引用采用精确路由，粗粒度策略标签只约束必需项与禁选项，未声明额外标签保持诊断：
 
 ```powershell
-& '.\development\skill-routing\validate_behavior_results.ps1' -ProjectRoot (Get-Location).Path -ResultsPath '.\development\skill-routing\evidence\<result>.json'
+& '.\development\skill-routing\validate_routing_results.ps1' -ProjectRoot (Get-Location).Path -ResultsPath '.\development\skill-routing\evidence\<result>.json'
 ```
 
-`development/skill-routing/evidence/` 中已有结果只作为对应候选哈希的历史快照。修改候选规则、skill 内容或请求集合后必须重新生成输入并取得独立评估结果；验证器会拒绝把旧结果当成当前候选证据。
+`development/skill-routing/evidence/current.json` 是发布门禁使用的唯一当前路由策略证据；历史结果只对应各自 capsule。`Validate`、`Publish` 与 CI 会重新核对评估器元数据、capsule/候选/输入哈希、用例完整性、期望项、禁选项和严格路由用例。候选、请求和外部 skill 摘要先规范化为 LF，保证 CRLF/LF 工作树中的证据身份一致。
 
-`development/skill-routing/evidence/current.json` 是正式发布门禁使用的唯一当前证据入口。评估器不得读取 `trigger-cases.json` 中的隐藏期望；`manage_agentbase.ps1 -Action Validate`、`Publish` 与 CI 都会重新核对候选哈希、输入哈希、用例完整性、期望项和禁选项。候选与输入指纹先把文本换行规范化为 LF，因此同一 Git 内容在 CRLF/LF 工作树中保持同一证据身份。额外选择保持非阻断告警，因为当前合同只把明确期望和明确禁止定义为发布 oracle。
+`detached-capsule` 是输入隔离合同：capsule 测试证明发给评估器的载荷不含仓库路径和隐藏期望，评估结果声明实际输入边界并由哈希绑定；除非承载运行时另有文件系统沙箱，它不被声称为操作系统级隔离。这项评估不执行请求，因此只证明“应该加载哪些 skill、治理引用与粗粒度策略标签”，不证明 skill 内步骤被正确执行。执行验证由三层分别承担：skill 脚本回归测试验证其程序合同；`vscode-lsp-mcp` 和 `sgy` 使用各自 release gate；具体任务仍须按真实输入运行直接受影响的构建、测试、读回或运行时验收。三层结果不得互相替代。
 
 ## 本地插件打包
 
@@ -115,7 +124,7 @@ PowerShell 7、支持 `--max-results` 的 `fd`、Python 3.11+、Node.js `>=22.9 
 
 仓库级持续验证入口是 [`.github/workflows/validate.yml`](.github/workflows/validate.yml)：Windows 项目合同 job 覆盖部署与 skill 回归测试，`vscode-lsp-mcp` job 执行完整 Windows 发布门禁，`sgy-windows` job 执行 Windows 原生构建、已签署运行时完整性检查、真实 ast-grep smoke 和 RustSec。CI 是持续门禁，不替代本地发布前对当前工作区执行的最小充分验证。
 
-部署入口默认校验全局规则、合同声明的全部 skill、当前盲测证据、可移植设置、hooks 模板、自定义子代理和 MCP 独立发布入口：
+部署入口默认校验全局规则、合同声明的全部 skill、当前隔离路由策略证据、可移植设置、hooks 模板、自定义子代理和 MCP 独立发布入口：
 
 ```powershell
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot (Get-Location).Path
@@ -149,10 +158,10 @@ codex plugin add agentbase-core@agentbase-local
 
 ## 当前发布状态
 
-发布状态不再手工写在 README。使用只读 `Status` 按所选分发范围比较当前项目指纹、已安装指纹、最近处于 `published` 状态的清单和清单记录的盲测证据：
+发布状态不再手工写在 README。使用只读 `Status` 按所选分发范围比较当前项目指纹、已安装指纹、最近处于 `published` 状态的清单和清单记录的路由策略证据：
 
 ```powershell
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Status -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -SkillDeliveryMode DirectCompatibility -InstallPortableSettings
 ```
 
-只有 `managed_payload_formally_published=true` 才表示该范围内的受管文件与当前候选、正式发布清单和当前盲测证据一致。`Plugin` 模式还会返回 `plugin_mode_ready` 与 `direct_compatibility_conflicts`；存在旧直装 skill 或 AgentBase 全局 hooks 时不会报告正式发布成立。该状态只覆盖部署脚本管理的全局文件与可选设置，明确不证明插件本身已经安装或启用。任何项目修改只有在用户明确要求加载、对应 `Publish` 成功并开启新任务后才会进入 Codex 指令链；项目验证和 Git 同步不会隐式改写安装副本。
+只有 `managed_payload_formally_published=true` 才表示该范围内的受管文件与当前候选、正式发布清单和当前路由策略证据一致；否则 `formal_publication_gaps` 会列出安装漂移、清单缺失/过期或证据过期等精确原因。`Plugin` 模式还会返回 `plugin_mode_ready` 与 `direct_compatibility_conflicts`。该状态只覆盖部署脚本管理的全局文件与可选设置，不证明插件本身已经安装或启用。任何项目修改只有在用户明确要求加载、`Publish` 成功并开启新任务后才会进入 Codex 指令链；项目验证和 Git 同步不会隐式改写安装副本。

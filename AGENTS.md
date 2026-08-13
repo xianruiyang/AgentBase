@@ -38,7 +38,7 @@ must: 全局规则或 skill 变更至少运行：
 & (Join-Path (Get-Location).Path 'development\skill-routing\validate_contract.ps1') -ProjectRoot (Get-Location).Path
 ```
 
-must: 全局规则、skill 内容或触发场景变化后，正式 `Validate` 或 `Publish` 前必须由未读取 `trigger-cases.json` 期望值的独立评估器刷新 `development/skill-routing/evidence/current.json`；部署入口和 CI 必须拒绝哈希过期、缺项或违反期望/禁选约束的证据
+must: 全局规则、skill 内容、外部 skill 共存摘要或触发场景变化后，正式 `Validate` 或 `Publish` 前必须由只读取脱离仓库 capsule 的独立评估运行刷新 `development/skill-routing/evidence/current.json`，记录运行、模型、环境、UTC 时间、capsule 哈希和未访问仓库/隐藏期望的输入声明；部署入口与 CI 必须拒绝身份或声明缺失、哈希过期、缺项或违反期望、禁选及严格路由约束的证据
 
 must: 修改 `global/config.toml`、`global/hooks.template.json`、`global/agents/` 或部署合同后运行：
 
