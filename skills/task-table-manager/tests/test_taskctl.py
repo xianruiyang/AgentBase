@@ -1134,11 +1134,39 @@ class TaskctlTests(unittest.TestCase):
         completion = self.run_task("completion-context")
         self.assertEqual(completion["target_source"], "current_markdown_documents")
         self.assertTrue(completion["targets"])
-        self.assertEqual(completion["open_deferred_change_count"], 1)
+        self.assertEqual(completion["deferred_change_count"], 1)
         self.assertIn(
             "upstream_index_stale",
             {diagnostic["kind"] for diagnostic in completion["diagnostics"]},
         )
+
+    def test_completion_context_preserves_distinct_relative_document_paths(self) -> None:
+        requirements_path = Path("requirements") / "stage.md"
+        user_design_path = Path("user-design") / "stage.md"
+        for source_name, configured_path in (
+            ("requirements.md", requirements_path),
+            ("user-design.md", user_design_path),
+        ):
+            destination = self.root / configured_path
+            destination.parent.mkdir(parents=True)
+            (self.root / source_name).replace(destination)
+        workflow_path = self.root / "workflow.json"
+        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+        workflow["documents"]["requirements"] = requirements_path.as_posix()
+        workflow["documents"]["user_design"] = user_design_path.as_posix()
+        workflow_path.write_text(
+            json.dumps(workflow, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        completion = self.run_task("completion-context", "--limit", "20")
+        documents = {
+            row["id"]: row["document"]
+            for row in completion["targets"]
+            if row["id"] in {"REQ-001", "UDES-001"}
+        }
+        self.assertEqual(documents["REQ-001"], requirements_path.as_posix())
+        self.assertEqual(documents["UDES-001"], user_design_path.as_posix())
+        self.assertNotEqual(documents["REQ-001"], documents["UDES-001"])
 
     def test_completion_context_ignores_tampered_cached_derived_content(self) -> None:
         index_path = self.root / ".work-cache" / "index.json"
@@ -1168,9 +1196,9 @@ class TaskctlTests(unittest.TestCase):
 - 状态: deferred
 - 目标: UDES-001
 
-## DCR-002 延后格式调整
+## DCR-002 需复核的项目自定义状态
 
-- 状态: deferred
+- 状态: project-paused
 - 目标: REQ-001
 """,
             encoding="utf-8",
@@ -1187,8 +1215,12 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(first["constraint_count"], 1)
         self.assertEqual(first["returned_constraint_count"], 1)
-        self.assertEqual(first["open_deferred_change_count"], 2)
-        self.assertEqual(first["returned_open_deferred_change_count"], 1)
+        self.assertEqual(first["deferred_change_count"], 2)
+        self.assertEqual(first["returned_deferred_change_count"], 1)
+        self.assertIn(
+            "non_standard_deferred_change_status",
+            {item["kind"] for item in first["diagnostics"]},
+        )
         self.assertEqual(first["targets"][0]["candidate_task_count"], 2)
         self.assertEqual(first["targets"][0]["returned_candidate_task_count"], 1)
         self.assertEqual(
@@ -1213,7 +1245,7 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(candidate_page["returned_streams"], ["targets"])
         self.assertEqual(candidate_page["constraints"], [])
-        self.assertEqual(candidate_page["open_deferred_changes"], [])
+        self.assertEqual(candidate_page["deferred_changes"], [])
         deferred_page = self.run_task(
             "completion-context",
             "--deferred-after-id",
@@ -1223,7 +1255,10 @@ class TaskctlTests(unittest.TestCase):
             "--max-items",
             "1",
         )
-        self.assertEqual(deferred_page["open_deferred_changes"][0]["id"], "DCR-002")
+        self.assertEqual(deferred_page["deferred_changes"][0]["id"], "DCR-002")
+        self.assertEqual(
+            deferred_page["deferred_changes"][0]["status"], "project-paused"
+        )
         self.assertEqual(deferred_page["returned_streams"], ["deferred_changes"])
         self.assertEqual(deferred_page["targets"], [])
         self.assertEqual(deferred_page["constraints"], [])
@@ -1244,7 +1279,7 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(target_page["returned_streams"], ["targets"])
         self.assertEqual(target_page["constraints"], [])
-        self.assertEqual(target_page["open_deferred_changes"], [])
+        self.assertEqual(target_page["deferred_changes"], [])
 
         mixed_page = self.run_cli(
             TASKCTL,
@@ -1262,6 +1297,55 @@ class TaskctlTests(unittest.TestCase):
         self.assertIn(
             "one result stream", json.loads(mixed_page.stderr)["error"]
         )
+
+    def test_completion_context_rejects_unknown_stream_cursors(self) -> None:
+        (self.root / "deferred-changes.md").write_text(
+            """# 延后讨论项
+
+## DCR-001 延后入口调整
+
+- 状态: deferred
+- 目标: UDES-001
+""",
+            encoding="utf-8",
+        )
+        first = self.run_task(
+            "completion-context", "--limit", "1", "--max-items", "1"
+        )
+        probes = (
+            ("--after-id", "REQ-999"),
+            ("--constraint-after-id", "CON-999"),
+            ("--deferred-after-id", "DCR-999"),
+            (
+                "--target-id",
+                "REQ-001",
+                "--candidate-after-id",
+                "T999",
+            ),
+        )
+        for probe in probes:
+            with self.subTest(probe=probe):
+                continued = self.run_cli(
+                    TASKCTL,
+                    "completion-context",
+                    "--task-dir",
+                    str(self.root),
+                    *probe,
+                    "--snapshot-id",
+                    first["snapshot_id"],
+                    "--limit",
+                    "1",
+                    "--max-items",
+                    "1",
+                )
+                self.assertEqual(continued.returncode, 2, continued.stdout)
+                payload = json.loads(continued.stderr)
+                self.assertEqual(payload["gate"]["id"], "TASK-INPUT-UNREADABLE")
+                self.assertEqual(
+                    payload["gate"]["scope"],
+                    "current completion-context continuation",
+                )
+                self.assertIn("exact cursor", payload["gate"]["recovery"])
 
     def test_unreadable_current_result_is_isolated_from_batch_render(self) -> None:
         self.complete_t001()
@@ -1602,6 +1686,58 @@ class TaskctlTests(unittest.TestCase):
         payload = json.loads(continued.stderr)
         self.assertIn("snapshot changed", payload["error"])
         self.assertEqual(payload["gate"]["id"], "TASK-PAGINATION-SNAPSHOT")
+
+    def test_completion_snapshot_rejects_unreadable_markdown_continuation(self) -> None:
+        first = self.run_task(
+            "completion-context", "--limit", "1", "--max-items", "1"
+        )
+        cursor = first["pagination"]["target_next_after_id"]
+        self.assertIsNotNone(cursor)
+        (self.root / "requirements.md").unlink()
+
+        first_page_retry = self.run_cli(
+            TASKCTL,
+            "completion-context",
+            "--task-dir",
+            str(self.root),
+            "--limit",
+            "1",
+            "--max-items",
+            "1",
+        )
+        self.assertEqual(first_page_retry.returncode, 0, first_page_retry.stderr)
+        first_page_payload = json.loads(first_page_retry.stdout)
+        self.assertNotIn("snapshot_id", first_page_payload)
+        self.assertIn(
+            "delivery_index_rebuild_failed",
+            {item["kind"] for item in first_page_payload["diagnostics"]},
+        )
+
+        continued = self.run_cli(
+            TASKCTL,
+            "completion-context",
+            "--task-dir",
+            str(self.root),
+            "--after-id",
+            cursor,
+            "--snapshot-id",
+            first["snapshot_id"],
+            "--limit",
+            "1",
+            "--max-items",
+            "1",
+        )
+        self.assertEqual(continued.returncode, 2, continued.stdout)
+        payload = json.loads(continued.stderr)
+        self.assertEqual(payload["gate"]["id"], "TASK-INPUT-UNREADABLE")
+        self.assertEqual(
+            payload["gate"]["scope"], "current completion-context continuation"
+        )
+        self.assertIn(
+            "restart completion-context from the first page",
+            payload["gate"]["recovery"],
+        )
+        self.assertIn("missing file", payload["error"])
 
     def test_owner_mismatch_is_advisory_but_state_revision_is_a_gate(self) -> None:
         claimed = self.run_task("claim", "--id", "T001", "--owner", "agent-a")

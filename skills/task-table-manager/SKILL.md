@@ -29,7 +29,7 @@ description: 用低 Token 管理长期执行的任务合同、依赖图、状态
 4. 需要跨轮跟踪时用 `claim/start/note/complete/reopen/release`，每次先读取当前 state revision 并传 `--expected-state-revision`；不再执行的任务可标记 `retired`。命令记录模型已作出的判断，不决定该判断是否被允许。
 5. `complete` 保存实际结果、验证、未决问题、证据指向和上游来源快照。后继任务读取前置结果摘要，不读取完整对话或原始日志。
 6. 上游改变时用 `$delivery-workflow` 的 `impact` 和本工具的 `dependents` 判断影响；CLI 不自动重置状态或宣布结果失效。
-7. 需要最终复核且范围较大时可用 `completion-context` 从当前 Markdown 取得每个 `REQ/AC/UDES`，再汇总关联结果；快照或缓存漂移只附加诊断。CLI 不返回整体通过值；分页必须沿用同一 snapshot ID，任务或文档改变时从第一页重审。
+7. 需要最终复核且范围较大时可用 `completion-context` 从当前 Markdown 取得每个 `REQ/AC/UDES`、`CON` 和全部 `DCR`，再汇总关联结果；DCR 原始状态只供模型复核，不由 CLI 筛选完成阻断项。快照或缓存漂移只附加诊断。CLI 不返回整体通过值；分页必须沿用同一 snapshot ID，任务或文档改变时从第一页重审。
 
 ## 局部门禁与诊断
 

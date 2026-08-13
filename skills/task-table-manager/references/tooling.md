@@ -15,7 +15,7 @@ add/update  保存模型已编写的任务合同
 show/list   有界返回任务、状态、结果和局部诊断
 deps/dependents/impact  查询任务图，不裁决依赖是否成立
 next/context  生成选择建议和有界执行上下文
-completion-context  从当前 Markdown 分页映射 REQ/AC/UDES 到候选证据
+completion-context  从当前 Markdown 分页返回 REQ/AC/UDES、CON、全部 DCR 与候选证据
 status/render  生成可重建的执行摘要和 TASK_TABLE.md
 ```
 
@@ -48,13 +48,21 @@ release     清除领取意图并回到 todo
 
 `completion-context` 同时使用任务合同的 `source_ids` 和结果的 `evidence_for` 建立候选映射；后者可直接把验收证据关联到 `REQ/AC/UDES`。若未显式提供 `source_snapshot`，`complete` 会对这两类当前可唯一定位的来源一起记录指纹。
 
+`completion-context` 的 `deferred_changes` 流对当前 Markdown 中全部 `DCR` 分页，并返回每项的原始 `status`。它不根据内置状态集判断哪些条目会阻断完成；该结论由模型按交付文档、用户确认和证据裁决。
+
+`completion-context` 返回的目标、约束和 DCR 条目以 `workflow.json.documents` 中的完整工作区相对路径标识 `document`，不把不同目录中的同名阶段文档压缩成相同文件名。
+
+`completion-context` 续页必须传首页 `snapshot_id`，一次只选择一个结果流，并原样传回该流上一页返回的 `target_next_after_id`、`constraint_next_after_id`、`deferred_next_after_id` 或 `candidate_next_after_id`。游标必须精确标识同一快照中该流的一项；未知游标无法机械确定续点，工具拒绝该次续页并要求使用已返回游标或从首页重审，不得按字符串大小猜测位置而漏掉复核项。
+
+首页无法从当前 Markdown 重建索引时仍返回局部诊断，供模型直接检查文档；携带 `snapshot_id` 的续页若遇到同一故障，则无法机械确认仍属于首页快照，使用 `TASK-INPUT-UNREADABLE` 只阻断该次续页。修复报告的输入后必须丢弃旧游标和快照，从首页重新取得复核上下文。
+
 ## 局部门禁
 
 `taskctl` 只能用下列类型阻断当前命令：
 
 - `TASK-PATH` / `TASK-OVERWRITE`：路径越界、生成视图覆盖真源，或破坏性覆盖已有记录。
 - `TASK-LOCK` / `TASK-REVISION`：工作区并发写入，或已有记录写入缺少调用方已读 revision、期望 revision 已过期。
-- `TASK-LIMIT` / `TASK-INPUT-UNREADABLE`：当前命令无法有界读取，或 JSON/schema/必需字段的类型与身份使当前对象无法确定解释；不得用它阻断仍可保留并诊断的非标准语义值。批量查询中单个损坏记录应被隔离并诊断，不阻断其他记录。
+- `TASK-LIMIT` / `TASK-INPUT-UNREADABLE`：当前命令无法有界读取，JSON/schema/必需字段的类型与身份使当前对象无法确定解释，最终复核续页游标无法标识当前快照中的续点，或续页时无法重建当前 Markdown 以核对快照身份；不得用它阻断仍可保留并诊断的非标准语义值。批量查询中单个损坏记录应被隔离并诊断，不阻断其他记录。
 - `TASK-AMBIGUOUS-TARGET`：精确写入或查询需要唯一 ID，但当前匹配不唯一。
 - `TASK-PAGINATION-SNAPSHOT`：`completion-context` 续页会混用两个任务/文档快照。
 

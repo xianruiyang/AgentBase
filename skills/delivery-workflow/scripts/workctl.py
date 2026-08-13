@@ -33,7 +33,7 @@ REFERENCE_FIELD_RE = re.compile(
     re.IGNORECASE,
 )
 UNRESOLVED_STATUSES = {"open", "unknown", "unresolved", "deferred", "待决", "未知", "延后"}
-DEFERRED_CHANGE_STATUSES = {"open", "unknown", "unresolved", "deferred", "待决", "未知", "延后"}
+DCR_STATUSES = {"deferred", "discussed", "resolved", "withdrawn"}
 STAGE_PREFIXES = {
     "requirements": {"REQ", "AC", "CON"},
     "user_design": {"UDES"},
@@ -164,11 +164,36 @@ def read_text_bounded(path: Path, limit: int) -> str:
 
 
 def read_json(path: Path, limit: int = MAX_JSON_BYTES) -> Any:
+    value, _ = read_json_snapshot(path, limit)
+    return value
+
+
+def read_json_snapshot(path: Path, limit: int = MAX_JSON_BYTES) -> tuple[Any, str]:
     text = read_text_bounded(path, limit)
     try:
-        return json.loads(text)
+        value = json.loads(text)
     except json.JSONDecodeError as exc:
         raise WorkctlError(f"invalid JSON in {path}: {exc}") from exc
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return value, f"sha256:{digest}"
+
+
+def ensure_workflow_manifest_unchanged(
+    root: Path, expected_fingerprint: str, operation: str
+) -> None:
+    manifest_path = root / "workflow.json"
+    _, current_fingerprint = read_json_snapshot(manifest_path)
+    if current_fingerprint != expected_fingerprint:
+        raise WorkctlError(
+            f"workflow manifest changed while {operation}",
+            gate_id="WORK-SNAPSHOT-RACE",
+            risk=(
+                "one workflow query would combine document mappings or metadata "
+                "from different manifest versions"
+            ),
+            recovery="retry after workflow.json edits have stopped",
+            retryable=True,
+        )
 
 
 def atomic_write_text(path: Path, text: str) -> None:
@@ -297,7 +322,7 @@ def workspace_lock(root: Path) -> Iterator[None]:
 
 def load_manifest(root: Path) -> dict[str, Any]:
     manifest_path = root / "workflow.json"
-    manifest = read_json(manifest_path)
+    manifest, manifest_fingerprint = read_json_snapshot(manifest_path)
     if not isinstance(manifest, dict) or manifest.get("schema") != "delivery.workflow":
         raise WorkctlError(f"unsupported workflow manifest: {manifest_path}")
     normalize_manifest_text(manifest.get("id"), "workflow.json id")
@@ -386,7 +411,9 @@ def load_manifest(root: Path) -> dict[str, Any]:
                 for storage in storage_paths
             ):
                 raise WorkctlError("workflow generated files must not overwrite task storage")
+    ensure_workflow_manifest_unchanged(root, manifest_fingerprint, "reading workflow.json")
     manifest["_diagnostics"] = manifest_diagnostics
+    manifest["_source_fingerprint"] = manifest_fingerprint
     return manifest
 
 
@@ -503,7 +530,9 @@ def verify_protected_baseline(root: Path, manifest: dict[str, Any]) -> dict[str,
             continue
         if len(ids) != len(set(ids)):
             diagnostics.append({"kind": "baseline_duplicate_ids", "stage": stage})
-        actual_sections, _ = parse_document(resolve_inside(root, expected_path), stage)
+        actual_sections, _ = parse_document(
+            resolve_inside(root, expected_path), stage, expected_path
+        )
         actual_ids = sorted(section["id"] for section in actual_sections)
         if sorted(ids) != actual_ids:
             drifted = True
@@ -534,7 +563,9 @@ def verify_protected_baseline(root: Path, manifest: dict[str, Any]) -> dict[str,
         section["id"]
         for stage in PROTECTED_STAGES
         for section in parse_document(
-            resolve_inside(root, str(manifest["documents"][stage])), stage
+            resolve_inside(root, str(manifest["documents"][stage])),
+            stage,
+            str(manifest["documents"][stage]),
         )[0]
         if section_prefix(section["id"]) in {"REQ", "AC", "UDES"}
     )
@@ -562,7 +593,9 @@ def section_prefix(section_id: str) -> str:
     return section_id.split("-", 1)[0]
 
 
-def parse_document(path: Path, stage: str) -> tuple[list[dict[str, Any]], str]:
+def parse_document(
+    path: Path, stage: str, document: str
+) -> tuple[list[dict[str, Any]], str]:
     text = read_text_bounded(path, MAX_DOCUMENT_BYTES)
     lines = text.splitlines()
     matches: list[tuple[int, re.Match[str]]] = []
@@ -597,7 +630,7 @@ def parse_document(path: Path, stage: str) -> tuple[list[dict[str, Any]], str]:
                 "id": section_id,
                 "title": title,
                 "stage": stage,
-                "document": path.name,
+                "document": document,
                 "line": line_index + 1,
                 "status": status,
                 "references": refs,
@@ -609,18 +642,20 @@ def parse_document(path: Path, stage: str) -> tuple[list[dict[str, Any]], str]:
     return sections, f"sha256:{digest}"
 
 
-def build_index(root: Path) -> dict[str, Any]:
-    manifest = load_manifest(root)
-    baseline = verify_protected_baseline(root, manifest)
+def build_index(
+    root: Path, manifest: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    manifest = manifest or load_manifest(root)
+    manifest_fingerprint = manifest.get("_source_fingerprint")
+    if not isinstance(manifest_fingerprint, str):
+        raise WorkctlError("workflow manifest snapshot identity is unavailable")
     all_sections: list[dict[str, Any]] = []
     document_hashes: dict[str, str] = {}
-    diagnostics: list[dict[str, Any]] = [
-        *manifest.get("_diagnostics", []),
-        *baseline.get("diagnostics", []),
-    ]
+    diagnostics: list[dict[str, Any]] = list(manifest.get("_diagnostics", []))
     for stage in STAGE_PREFIXES:
-        path = resolve_inside(root, str(manifest["documents"][stage]))
-        sections, digest = parse_document(path, stage)
+        relative_path = str(manifest["documents"][stage])
+        path = resolve_inside(root, relative_path)
+        sections, digest = parse_document(path, stage, relative_path)
         document_hashes[stage] = digest
         all_sections.extend(sections)
         for section in sections:
@@ -634,6 +669,8 @@ def build_index(root: Path) -> dict[str, Any]:
                         "message": f"{section['id']} does not belong to {stage}",
                     }
                 )
+    baseline = verify_protected_baseline(root, manifest)
+    diagnostics.extend(baseline.get("diagnostics", []))
     for stage, recorded_fingerprint in document_hashes.items():
         path = resolve_inside(root, str(manifest["documents"][stage]))
         if file_fingerprint(path) != recorded_fingerprint:
@@ -644,6 +681,7 @@ def build_index(root: Path) -> dict[str, Any]:
                 recovery="retry after document edits have stopped",
                 retryable=True,
             )
+    ensure_workflow_manifest_unchanged(root, manifest_fingerprint, "building the index")
     if len(all_sections) > MAX_RECORDS:
         raise WorkctlError(
             f"workflow contains more than {MAX_RECORDS} semantic sections",
@@ -695,18 +733,35 @@ def build_index(root: Path) -> dict[str, Any]:
         for section in all_sections
         if section["status"].casefold() in UNRESOLVED_STATUSES
     )
-    deferred_change_ids = sorted(
-        section["id"]
+    deferred_changes = [
+        section
         for section in all_sections
         if section_prefix(section["id"]) == "DCR"
-        and section["status"].casefold() in DEFERRED_CHANGE_STATUSES
+    ]
+    deferred_change_ids = sorted({section["id"] for section in deferred_changes})
+    deferred_change_status_counts = Counter(
+        section["status"] for section in deferred_changes
     )
+    for section in deferred_changes:
+        if section["status"] not in DCR_STATUSES:
+            diagnostics.append(
+                {
+                    "kind": "non_standard_deferred_change_status",
+                    "id": section["id"],
+                    "status": section["status"],
+                    "document": section["document"],
+                    "line": section["line"],
+                }
+            )
     summary = {
         "section_count": len(all_sections),
         "stage_counts": dict(sorted(stage_counts.items())),
         "prefix_counts": dict(sorted(prefix_counts.items())),
         "unresolved_count": len(unresolved_ids),
         "deferred_change_count": len(deferred_change_ids),
+        "deferred_change_status_counts": dict(
+            sorted(deferred_change_status_counts.items())
+        ),
         "duplicate_count": len(duplicates),
         "unknown_reference_count": sum(
             diagnostic["kind"] == "unknown_reference" for diagnostic in diagnostics
@@ -718,6 +773,7 @@ def build_index(root: Path) -> dict[str, Any]:
     return {
         "schema": "delivery.index",
         "workflow_id": manifest.get("id"),
+        "workflow_manifest_fingerprint": manifest_fingerprint,
         "documents": dict(manifest["documents"]),
         "protected_baseline": baseline,
         "document_hashes": document_hashes,
@@ -913,7 +969,7 @@ def protect_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, 
                 )
             }
         )
-    index = build_index(root)
+    index = build_index(root, manifest)
     protected_documents: dict[str, Any] = {}
     for stage in PROTECTED_STAGES:
         sections = [section for section in index["sections"] if section["stage"] == stage]
@@ -966,6 +1022,7 @@ def protect_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, 
 
 def outline_stage(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.work_dir)
+    manifest = load_manifest(root)
     stage = PUBLIC_STAGES[args.stage]
     outlines = {
         "requirements": {
@@ -998,7 +1055,7 @@ def outline_stage(args: argparse.Namespace) -> dict[str, Any]:
         "command": "outline",
         "work_dir": str(root),
         "stage": args.stage,
-        "document": DEFAULT_DOCUMENTS[stage],
+        "document": str(manifest["documents"][stage]),
         "heading": "## <ID> <title>",
         **outlines[stage],
     }
@@ -1007,9 +1064,15 @@ def outline_stage(args: argparse.Namespace) -> dict[str, Any]:
 def index_workspace(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.work_dir)
     index = build_index(root)
-    manifest = load_manifest(root)
-    cache_path = resolve_inside(root, str(manifest.get("semantic_index", ".work-cache/index.json")))
+    manifest_fingerprint = index["workflow_manifest_fingerprint"]
+    cache_path = resolve_inside(root, ".work-cache/index.json")
+    ensure_workflow_manifest_unchanged(
+        root, manifest_fingerprint, "preparing the semantic index write"
+    )
     atomic_write_json(cache_path, index)
+    ensure_workflow_manifest_unchanged(
+        root, manifest_fingerprint, "writing the semantic index"
+    )
     diagnostics, truncated = limit_items(index["diagnostics"], args.max_items)
     return {
         "ok": True,
@@ -1229,7 +1292,7 @@ def markdown_escape(value: Any) -> str:
 def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.work_dir)
     manifest = load_manifest(root)
-    index = build_index(root)
+    index = build_index(root, manifest)
     task_summary = task_status_summary(root)
     output_path = resolve_inside(root, str(manifest.get("status_view", "WORK_STATUS.md")))
     lines = [
@@ -1255,7 +1318,7 @@ def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
         [
             f"| 未决条目 | {index['summary']['unresolved_count']} |",
             f"| 未解析引用 | {index['summary']['unknown_reference_count']} |",
-            f"| 未解决延后讨论项 | {index['summary']['deferred_change_count']} |",
+            f"| 延后讨论项 | {index['summary']['deferred_change_count']} |",
             "",
             "## 任务执行状态",
             "",

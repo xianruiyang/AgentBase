@@ -900,9 +900,7 @@ def maybe_load_index(root: Path, table: dict[str, Any]) -> tuple[dict[str, Any] 
         if not path.exists():
             diagnostics.append({"kind": "upstream_index_missing", "path": str(source_index)})
         return None, diagnostics
-    diagnostics: list[dict[str, Any]] = list(
-        rebuilt.get("protected_baseline", {}).get("diagnostics", [])
-    )
+    diagnostics: list[dict[str, Any]] = list(rebuilt.get("diagnostics", []))
     if not path.exists():
         diagnostics.append({"kind": "upstream_index_missing", "path": str(source_index)})
         return rebuilt, diagnostics
@@ -1639,6 +1637,28 @@ def page_after_id(
     return page, next_after_id, cursor_reset
 
 
+def completion_ids_after(
+    item_ids: list[str], after_id: str | None, stream: str
+) -> list[str]:
+    if after_id is None:
+        return item_ids
+    try:
+        cursor_index = item_ids.index(after_id)
+    except ValueError as exc:
+        raise TaskctlError(
+            f"unknown completion {stream} cursor: {after_id}",
+            gate_id="TASK-INPUT-UNREADABLE",
+            risk="the final-review continuation point is not identifiable and could omit review items",
+            scope="current completion-context continuation",
+            recovery=(
+                "use the exact cursor returned for this stream and snapshot, "
+                "or restart completion-context from the first page"
+            ),
+            retryable=True,
+        ) from exc
+    return item_ids[cursor_index + 1 :]
+
+
 def command_show(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.task_dir)
     table = load_table(root)
@@ -2072,6 +2092,32 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
     index, index_diagnostics = maybe_load_index(root, table)
     if index is None:
         diagnostics = [*storage_diagnostics, *index_diagnostics]
+        if args.snapshot_id is not None:
+            rebuild_message = next(
+                (
+                    diagnostic.get("message")
+                    for diagnostic in index_diagnostics
+                    if isinstance(diagnostic, dict)
+                    and isinstance(diagnostic.get("message"), str)
+                ),
+                None,
+            )
+            detail = f": {rebuild_message}" if rebuild_message else ""
+            raise TaskctlError(
+                "completion snapshot cannot be verified because current Markdown "
+                f"could not be indexed{detail}",
+                gate_id="TASK-INPUT-UNREADABLE",
+                risk=(
+                    "the current final-review snapshot is not identifiable and "
+                    "continuing could omit or mix review items"
+                ),
+                scope="current completion-context continuation",
+                recovery=(
+                    "repair the reported current Markdown input, then restart "
+                    "completion-context from the first page without old cursors"
+                ),
+                retryable=True,
+            )
         return {
             "ok": True,
             "command": "completion-context",
@@ -2142,9 +2188,9 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         if value.split("-", 1)[0] == "CON"
     )
     target_stream_continuation = bool(
-        args.after_id
-        or args.candidate_after_id
-        or (args.target_id and args.snapshot_id)
+        args.after_id is not None
+        or args.candidate_after_id is not None
+        or (args.target_id is not None and args.snapshot_id)
     )
     constraint_stream_continuation = args.constraint_after_id is not None
     deferred_stream_continuation = args.deferred_after_id is not None
@@ -2161,7 +2207,7 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
 
     if not include_targets:
         filtered_target_ids = []
-    elif args.target_id:
+    elif args.target_id is not None:
         if args.target_id not in all_target_ids:
             raise TaskctlError(
                 f"unknown current completion target: {args.target_id}",
@@ -2171,11 +2217,9 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
             )
         filtered_target_ids = [args.target_id]
     else:
-        filtered_target_ids = all_target_ids
-        if args.after_id:
-            filtered_target_ids = [
-                target_id for target_id in filtered_target_ids if target_id > args.after_id
-            ]
+        filtered_target_ids = completion_ids_after(
+            all_target_ids, args.after_id, "target"
+        )
     page_ids = filtered_target_ids[: args.limit]
     diagnostics = [
         *storage_diagnostics,
@@ -2219,11 +2263,15 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
                     "result_diagnostics": result_diagnostics(result, task, index),
                 }
             )
-        candidate_page = all_linked_tasks
-        if args.candidate_after_id:
-            candidate_page = [
-                row for row in candidate_page if row["id"] > args.candidate_after_id
-            ]
+        candidate_ids = [row["id"] for row in all_linked_tasks]
+        remaining_candidate_ids = set(
+            completion_ids_after(
+                candidate_ids, args.candidate_after_id, "candidate"
+            )
+        )
+        candidate_page = [
+            row for row in all_linked_tasks if row["id"] in remaining_candidate_ids
+        ]
         linked_tasks = candidate_page[: args.max_items]
         candidate_more = len(candidate_page) > len(linked_tasks)
         candidate_next_after_ids[target_id] = (
@@ -2257,20 +2305,22 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         for value in index.get("deferred_change_ids", [])
         if isinstance(value, str)
     )
-    constraint_page_ids = []
-    if include_constraints:
-        constraint_page_ids = [
-            value
-            for value in constraint_ids
-            if not args.constraint_after_id or value > args.constraint_after_id
-        ][: args.max_items]
-    deferred_page_ids = []
-    if include_deferred:
-        deferred_page_ids = [
-            value
-            for value in deferred_ids
-            if not args.deferred_after_id or value > args.deferred_after_id
-        ][: args.max_items]
+    constraint_remaining = (
+        completion_ids_after(
+            constraint_ids, args.constraint_after_id, "constraint"
+        )
+        if include_constraints
+        else []
+    )
+    constraint_page_ids = constraint_remaining[: args.max_items]
+    deferred_remaining = (
+        completion_ids_after(
+            deferred_ids, args.deferred_after_id, "deferred-change"
+        )
+        if include_deferred
+        else []
+    )
+    deferred_page_ids = deferred_remaining[: args.max_items]
 
     def section_summary(section_id: str) -> dict[str, Any]:
         definitions = section_rows.get(section_id, [])
@@ -2284,28 +2334,11 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
             "title": section.get("title"),
             "document": section.get("document"),
             "line": section.get("line"),
+            "status": section.get("status"),
             "body": section.get("body", ""),
         }
 
     target_more = len(filtered_target_ids) > len(target_rows)
-    constraint_remaining = (
-        [
-            value
-            for value in constraint_ids
-            if not args.constraint_after_id or value > args.constraint_after_id
-        ]
-        if include_constraints
-        else []
-    )
-    deferred_remaining = (
-        [
-            value
-            for value in deferred_ids
-            if not args.deferred_after_id or value > args.deferred_after_id
-        ]
-        if include_deferred
-        else []
-    )
     pagination = {
         "target_next_after_id": (
             target_rows[-1]["id"] if target_more and target_rows else None
@@ -2334,9 +2367,9 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         "constraint_count": len(constraint_ids),
         "returned_constraint_count": len(constraint_page_ids),
         "constraints": [section_summary(value) for value in constraint_page_ids],
-        "open_deferred_change_count": len(deferred_ids),
-        "returned_open_deferred_change_count": len(deferred_page_ids),
-        "open_deferred_changes": [section_summary(value) for value in deferred_page_ids],
+        "deferred_change_count": len(deferred_ids),
+        "returned_deferred_change_count": len(deferred_page_ids),
+        "deferred_changes": [section_summary(value) for value in deferred_page_ids],
         "returned_streams": [
             stream
             for stream, included in (
@@ -2898,7 +2931,7 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
                 "",
                 f"- 用户确认快照：{index.get('protected_baseline', {}).get('status')}",
                 f"- 可修订上游未决：{summary.get('unresolved_count')}",
-                f"- 未解决延后讨论项：{summary.get('deferred_change_count', 0)}",
+                f"- 延后讨论项：{summary.get('deferred_change_count', 0)}",
             ]
         )
     all_storage_diagnostics = [
@@ -3151,19 +3184,19 @@ def validate_args(args: argparse.Namespace) -> None:
             raise TaskctlError("--expected-state-revision must be positive")
     if (
         getattr(args, "command", None) == "completion-context"
-        and args.target_id
-        and args.after_id
+        and args.target_id is not None
+        and args.after_id is not None
     ):
         raise TaskctlError("--target-id and --after-id cannot be combined")
     if (
         getattr(args, "command", None) == "completion-context"
-        and args.candidate_after_id
-        and not args.target_id
+        and args.candidate_after_id is not None
+        and args.target_id is None
     ):
         raise TaskctlError("--candidate-after-id requires --target-id")
     if getattr(args, "command", None) == "completion-context":
         has_cursor = any(
-            value
+            value is not None
             for value in (
                 args.after_id,
                 args.candidate_after_id,
@@ -3174,9 +3207,9 @@ def validate_args(args: argparse.Namespace) -> None:
         if has_cursor and not args.snapshot_id:
             raise TaskctlError("completion pagination requires --snapshot-id")
         target_stream = bool(
-            args.after_id
-            or args.candidate_after_id
-            or (args.target_id and args.snapshot_id)
+            args.after_id is not None
+            or args.candidate_after_id is not None
+            or (args.target_id is not None and args.snapshot_id)
         )
         continued_streams = sum(
             (

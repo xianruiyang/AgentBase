@@ -346,7 +346,18 @@ class WorkctlTests(unittest.TestCase):
         self.assertEqual(status.returncode, 2)
         self.assertIn("surrounding whitespace", self.payload(status)["error"])
 
-    def test_outline_uses_public_stage_names_and_the_workspace_argument(self) -> None:
+    def test_outline_uses_public_stage_and_current_manifest_document(self) -> None:
+        configured_path = Path("docs") / "analysis" / "current.md"
+        configured_document = self.root / configured_path
+        configured_document.parent.mkdir(parents=True)
+        (self.root / "current-state.md").replace(configured_document)
+        manifest_path = self.root / "workflow.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["documents"]["current_state"] = configured_path.as_posix()
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
         outlined = self.run_cli(
             "outline",
             "--work-dir",
@@ -357,8 +368,37 @@ class WorkctlTests(unittest.TestCase):
         self.assertEqual(outlined.returncode, 0, outlined.stderr)
         payload = self.payload(outlined)
         self.assertEqual(payload["stage"], "current-state")
-        self.assertEqual(payload["document"], "current-state.md")
+        self.assertEqual(payload["document"], configured_path.as_posix())
         self.assertEqual(payload["ids"], ["OBS", "GAP", "DEC"])
+
+    def test_index_preserves_distinct_workspace_relative_document_paths(self) -> None:
+        requirements_path = Path("requirements") / "stage.md"
+        user_design_path = Path("user-design") / "stage.md"
+        for source_name, configured_path in (
+            ("requirements.md", requirements_path),
+            ("user-design.md", user_design_path),
+        ):
+            destination = self.root / configured_path
+            destination.parent.mkdir(parents=True)
+            (self.root / source_name).replace(destination)
+        manifest_path = self.root / "workflow.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["documents"]["requirements"] = requirements_path.as_posix()
+        manifest["documents"]["user_design"] = user_design_path.as_posix()
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        module = load_workctl_module()
+        index = module.build_index(self.root)
+        documents = {
+            row["id"]: row["document"]
+            for row in index["sections"]
+            if row["id"] in {"REQ-001", "UDES-001"}
+        }
+        self.assertEqual(documents["REQ-001"], requirements_path.as_posix())
+        self.assertEqual(documents["UDES-001"], user_design_path.as_posix())
+        self.assertNotEqual(documents["REQ-001"], documents["UDES-001"])
 
     def test_only_explicit_relation_fields_create_semantic_edges(self) -> None:
         with (self.root / "current-state.md").open("a", encoding="utf-8") as handle:
@@ -432,7 +472,7 @@ class WorkctlTests(unittest.TestCase):
         affected = {item["id"] for item in self.payload(impact)["affected"]}
         self.assertTrue({"DES-001", "GAP-001", "SOL-001"}.issubset(affected))
 
-    def test_deferred_change_is_reported_separately(self) -> None:
+    def test_all_deferred_changes_and_raw_statuses_are_reported(self) -> None:
         self.protect()
         (self.root / "deferred-changes.md").write_text(
             """# 演示：延后讨论项
@@ -443,14 +483,28 @@ class WorkctlTests(unittest.TestCase):
 - 目标: UDES-001
 
 其余工作完成后再与用户讨论。
+
+## DCR-002 使用项目自定义状态
+
+- 状态: project-paused
+- 目标: REQ-001
 """,
             encoding="utf-8",
         )
         indexed = self.run_cli("index", "--work-dir", str(self.root))
         self.assertEqual(indexed.returncode, 0, indexed.stderr)
         payload = self.payload(indexed)
-        self.assertEqual(payload["summary"]["deferred_change_count"], 1)
+        self.assertEqual(payload["summary"]["deferred_change_count"], 2)
+        self.assertEqual(
+            payload["summary"]["deferred_change_status_counts"],
+            {"deferred": 1, "project-paused": 1},
+        )
         self.assertIn("DCR-001", payload["unresolved_ids"])
+        self.assertNotIn("DCR-002", payload["unresolved_ids"])
+        self.assertIn(
+            "non_standard_deferred_change_status",
+            {item["kind"] for item in payload["diagnostics"]},
+        )
 
     def test_duplicate_identity_is_diagnostic_but_context_is_ambiguous(self) -> None:
         content = (self.root / "design.md").read_text(encoding="utf-8")
@@ -705,6 +759,74 @@ class WorkctlTests(unittest.TestCase):
         self.assertEqual(caught.exception.gate["id"], "WORK-SNAPSHOT-RACE")
         self.assertIn("changed", str(caught.exception))
         self.assertFalse((self.root / "protected-baseline.json").exists())
+
+    def test_index_does_not_mix_baseline_review_with_later_documents(self) -> None:
+        self.protect()
+        module = load_workctl_module()
+        original = module.verify_protected_baseline
+        changed = False
+
+        def review_then_mutate(root: Path, manifest: dict) -> dict:
+            nonlocal changed
+            baseline = original(root, manifest)
+            if not changed:
+                changed = True
+                with (root / "requirements.md").open("a", encoding="utf-8") as handle:
+                    handle.write("\n索引取得期间发生改变。\n")
+            return baseline
+
+        module.verify_protected_baseline = review_then_mutate
+        with self.assertRaises(module.WorkctlError) as caught:
+            module.build_index(self.root)
+        self.assertEqual(caught.exception.gate["id"], "WORK-SNAPSHOT-RACE")
+        self.assertIn("changed", str(caught.exception))
+
+    def test_index_rejects_manifest_change_during_snapshot(self) -> None:
+        module = load_workctl_module()
+        original = module.verify_protected_baseline
+        changed = False
+
+        def review_then_change_manifest(root: Path, manifest: dict) -> dict:
+            nonlocal changed
+            baseline = original(root, manifest)
+            if not changed:
+                changed = True
+                manifest_path = root / "workflow.json"
+                current = json.loads(manifest_path.read_text(encoding="utf-8"))
+                current["title"] = "索引期间改变的标题"
+                manifest_path.write_text(
+                    json.dumps(current, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            return baseline
+
+        module.verify_protected_baseline = review_then_change_manifest
+        with self.assertRaises(module.WorkctlError) as caught:
+            module.build_index(self.root)
+        self.assertEqual(caught.exception.gate["id"], "WORK-SNAPSHOT-RACE")
+        self.assertIn("manifest changed", str(caught.exception))
+
+    def test_index_write_rejects_manifest_change_after_build(self) -> None:
+        module = load_workctl_module()
+        original = module.build_index
+
+        def build_then_change_manifest(root: Path) -> dict:
+            index = original(root)
+            manifest_path = root / "workflow.json"
+            current = json.loads(manifest_path.read_text(encoding="utf-8"))
+            current["title"] = "写入前改变的标题"
+            manifest_path.write_text(
+                json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            return index
+
+        module.build_index = build_then_change_manifest
+        with self.assertRaises(module.WorkctlError) as caught:
+            module.index_workspace(
+                Namespace(work_dir=str(self.root), max_items=50)
+            )
+        self.assertEqual(caught.exception.gate["id"], "WORK-SNAPSHOT-RACE")
+        self.assertFalse((self.root / ".work-cache" / "index.json").exists())
 
     def test_concurrent_protect_has_one_winner_and_no_overwrite(self) -> None:
         command = [
