@@ -2890,6 +2890,13 @@ def markdown_cell(value: Any, maximum: int = 120) -> str:
     return text if len(text) <= maximum else text[:maximum] + "…"
 
 
+def markdown_table_cell(value: Any, maximum: int = 120) -> str:
+    if value is None:
+        return "—"
+    text = markdown_cell(value, maximum)
+    return text if text.strip() else "—"
+
+
 def command_render(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.task_dir)
     table = load_table(root)
@@ -2963,12 +2970,12 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
             "| "
             + " | ".join(
                 [
-                    markdown_cell(task_id),
-                    markdown_cell(state["status"]),
-                    markdown_cell(state["owner"] or ""),
-                    markdown_cell(task["title"]),
-                    markdown_cell(dependencies),
-                    markdown_cell(state["result_ref"] or ""),
+                    markdown_table_cell(task_id),
+                    markdown_table_cell(state["status"]),
+                    markdown_table_cell(state["owner"]),
+                    markdown_table_cell(task["title"]),
+                    markdown_table_cell(dependencies),
+                    markdown_table_cell(state["result_ref"]),
                     str(task["revision"]),
                 ]
             )

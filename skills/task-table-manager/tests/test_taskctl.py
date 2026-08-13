@@ -884,6 +884,18 @@ class TaskctlTests(unittest.TestCase):
         self.assertIn("含未决结果：0", table)
         self.assertIn("只是任务合同与状态的可重建视图", table)
 
+    def test_render_uses_visible_placeholders_for_empty_task_cells(self) -> None:
+        rendered = self.run_task("render")
+        table = Path(rendered["output"]).read_text(encoding="utf-8")
+        self.assertIn(
+            "| T001 | todo | — | 实现导出职责 | — | — | 1 |",
+            table,
+        )
+        self.assertIn(
+            "| T002 | todo | — | 接入界面 | T001:hard | — | 1 |",
+            table,
+        )
+
     def test_protected_source_drift_is_diagnostic_for_state_changes(self) -> None:
         with (self.root / "requirements.md").open("a", encoding="utf-8") as handle:
             handle.write("\n执行期改写。\n")

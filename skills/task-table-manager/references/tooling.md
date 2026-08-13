@@ -23,6 +23,8 @@ status/render  生成可重建的执行摘要和 TASK_TABLE.md
 
 `task-table.json` 的 `tasks/`、`state/`、`results/`、`.work-cache/index.json` 和 `TASK_TABLE.md` 路径固定，只为防止生成物覆盖语义真源或结果记录。
 
+`render` 生成的任务表固定保留全部列；没有可显示值的单元格使用 `—` 占位，避免长文本换行时产生列错位错觉。占位符只属于生成视图，不写回任务合同、状态或结果，也不表示模型已经裁决该字段语义为“无”。
+
 ## 状态与结果命令
 
 ```text
