@@ -2,7 +2,7 @@
 
 ## 1. 职责与状态
 
-本文件是统一源码查询网关分支的可重复基准合同，状态为 `proposed`。它固定测试对象、隔离角色、监控数据、对照顺序、质量复核和历史结果复用方式，不执行测试，也不授权发布。分支实施后扩展现有 `development/code-search-benchmark` 承担 runner、monitor、汇总与 capsule 生成；不得复制临时脚本形成第二入口。
+本文件是统一源码查询网关分支的可重复基准合同，状态为 `proposed`。它固定测试对象、隔离角色、监控数据、对照顺序、质量复核和历史结果复用方式，不执行测试，也不授权发布。分支实施后扩展现有 `development/code-search-benchmark` 承担 runner、monitor、汇总与 capsule 生成；不得复制临时脚本形成第二入口，也不得把本协议或其实现放入 Codex payload。
 
 ## 2. 证据角色
 
@@ -77,6 +77,6 @@ control 与 candidate 除允许差异外必须逐项相等。环境构建不得�
 
 ## 8. 产物与生命周期
 
-正式实现至少生成：`corpus.json`、`experiment.json`、`environment-diff.json`、每次 run 的 JSONL/stderr、`summary.json`、`audit-capsule.json` 和独立 `audit-result.json`。大体积原始结果进入明确的 benchmark 产物目录或外部归档，不写入对话；仓库只保留版本化语料、schema、runner、必要小型 fixtures、聚合结果和 hash 索引。
+正式实现至少生成：`corpus.json`、`experiment.json`、`environment-diff.json`、每次 run 的 JSONL/stderr、`summary.json`、`audit-capsule.json` 和独立 `audit-result.json`。大体积原始结果进入明确的 benchmark 产物目录或外部归档，不写入对话；仓库只保留版本化语料、schema、runner、必要小型 fixtures、聚合结果和 hash 索引。所有这些内容均为项目开发资产，Plugin 与 DirectCompatibility payload 都必须排除；测试结果只能影响发布裁决，不能成为运行时输入。
 
 未完成、被终止或 identity 无效的实验保留状态但不进入聚合。候选机制未变化时不重复运行；机制、语料或环境变化时只使实际依赖它的结果失效。发布到 Codex 仍需要用户针对当次明确确认，benchmark 通过本身不创建发布授权。

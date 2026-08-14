@@ -94,9 +94,11 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短
 
 ### DES-SQG-010 受监控隔离基准是唯一收益入口
 
-- 满足: AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004, UDES-SQG-007
+- 满足: AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004, CON-SQG-003, UDES-SQG-007, UDES-SQG-008
 
 [benchmark-protocol.md](benchmark-protocol.md) 定义本分支的语料、环境身份、隔离、监控、计量、审计和历史复用合同。分支获准实施后，由现有 `development/code-search-benchmark` 扩展为唯一 runner/monitor 与汇总 owner；其当前只分析记录的入口继续作为后处理子职责，不在本目录另写第二套执行器。分支目录只维护候选协议和版本化语料。
+
+benchmark owner、语料、测试代码、fixtures、原始事件和审计结果全部留在 `development/` 或明确的项目外测试产物目录。发布 payload 只消费通过审计得到的设计裁决和运行时实现，不复制 benchmark 文件；共享 payload 合同负责让 Plugin 与 DirectCompatibility 两条发布路径执行同一排除规则，并在直接兼容发布时删除受管理 skill 下的旧测试副本。
 
 每条 run 使用新鲜 `codex exec --json --ephemeral` 进程或能提供等价隔离与完整 usage 事件的正式入口。monitor 位于被测 agent 外部，只启动、观察、限时、归档和终止，不改变 prompt、补救答案或共享另一环境信息。subject、monitor 和 audit 的输入/输出单向流动；独立 audit 只能读取冻结 capsule，不读取候选实现讨论或历史结论。
 
@@ -117,6 +119,7 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短
 | `symbol-structure-workflow` | 保留，只维护查询与 LSP 的升级边界 |
 | 现有 sgy runtime、cache 与发布记录 | 原位沿用，不复制、不建立第二状态源 |
 | `development/code-search-benchmark` | 分支实施后扩展为唯一隔离运行、监控、汇总和复核入口；不复制临时 runner |
+| Codex Plugin/DirectCompatibility payload | 只接收运行时规则、skill 与工具；测试、benchmark 和审计资产始终排除 |
 
 ## 5. 主要风险与控制
 
@@ -130,6 +133,7 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短
 | 简单查询承担固定成本 | 保留适用范围不同的原生快路径，以端到端 Token 验证触发边界 |
 | 基准 agent 受对照输出或协调方干预 | 新鲜 subject、单向监控、冻结 capsule 与独立 audit |
 | 环境差异被误归因给候选 | 环境树 hash、允许差异清单、只读项目快照和身份不等即降级结论 |
+| 测试资产增加 Codex 运行时体积或 Token | 测试 owner 固定在 development，共享 payload 过滤并清理旧受管理副本 |
 
 ## 6. 设计完成判定
 

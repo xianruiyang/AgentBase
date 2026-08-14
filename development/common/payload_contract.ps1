@@ -14,10 +14,41 @@ function Assert-AgentBaseChildPath {
     }
 }
 
+function Test-AgentBaseProjectOnlyArtifact {
+    param(
+        [string]$RelativePath
+    )
+
+    $segments = @($RelativePath.Replace('\', '/').Split('/', [StringSplitOptions]::RemoveEmptyEntries))
+    $projectOnlyDirectories = @(
+        "__tests__",
+        "bench",
+        "benches",
+        "benchmark",
+        "benchmarks",
+        "test",
+        "tests"
+    )
+    for ($index = 0; $index -lt ($segments.Count - 1); $index++) {
+        if ($projectOnlyDirectories -contains $segments[$index].ToLowerInvariant()) {
+            return $true
+        }
+    }
+
+    $leaf = if ($segments.Count -eq 0) { "" } else { $segments[-1] }
+    return $leaf -match '(?i)^(test_.+|.+_test)\.(py|ps1|mjs|cjs|js|jsx|ts|tsx|rs)$' -or
+        $leaf -match '(?i)^.+\.(test|spec)\.(mjs|cjs|js|jsx|ts|tsx)$' -or
+        $leaf -match '(?i)^.+\.tests\.ps1$'
+}
+
 function Test-AgentBaseExcludedArtifact {
     param(
         [string]$RelativePath
     )
+
+    if (Test-AgentBaseProjectOnlyArtifact -RelativePath $RelativePath) {
+        return $true
+    }
 
     $segments = @($RelativePath.Replace('\', '/').Split('/', [StringSplitOptions]::RemoveEmptyEntries))
     $excludedDirectories = @(
@@ -49,7 +80,8 @@ function Test-AgentBaseExcludedArtifact {
 
 function Get-AgentBasePayloadFiles {
     param(
-        [string]$Root
+        [string]$Root,
+        [switch]$IncludeProjectOnlyArtifacts
     )
 
     $rootItem = Get-Item -LiteralPath $Root -Force
@@ -66,7 +98,8 @@ function Get-AgentBasePayloadFiles {
 
     return @($entries | Where-Object { -not $_.PSIsContainer } | ForEach-Object {
         $relativePath = $_.FullName.Substring($rootFull.Length + 1).Replace('\', '/')
-        if (-not (Test-AgentBaseExcludedArtifact -RelativePath $relativePath)) {
+        if (-not (Test-AgentBaseExcludedArtifact -RelativePath $relativePath) -or
+            ($IncludeProjectOnlyArtifacts -and (Test-AgentBaseProjectOnlyArtifact -RelativePath $relativePath))) {
             $_
         }
     } | Sort-Object FullName)

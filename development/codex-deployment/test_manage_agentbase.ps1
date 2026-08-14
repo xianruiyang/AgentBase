@@ -13,6 +13,8 @@ $sandboxRoot = Join-Path $ProjectRoot "development\codex-deployment\sandbox"
 $testRoot = Join-Path $sandboxRoot ("portable-settings-test-" + [guid]::NewGuid().ToString("N"))
 $codexRoot = Join-Path $testRoot "codex"
 $manage = Join-Path $ProjectRoot "development\codex-deployment\manage_agentbase.ps1"
+$payloadContractPath = Join-Path $ProjectRoot "development\common\payload_contract.ps1"
+. $payloadContractPath
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $succeeded = $false
 $sourceCacheRoot = Join-Path $ProjectRoot "skills\codex-event-logger\tests\__pycache__"
@@ -128,9 +130,33 @@ try {
     if ($installedRuntimeArtifacts.Count -ne 0) {
         throw "Default publish copied runtime artifacts into the Codex skill payload"
     }
+    $installedProjectOnlyArtifacts = @(Get-ChildItem -LiteralPath (Join-Path $codexRoot "skills") -Recurse -Force -File | Where-Object {
+        $relativePath = $_.FullName.Substring((Join-Path $codexRoot "skills").Length + 1).Replace('\', '/')
+        Test-AgentBaseProjectOnlyArtifact -RelativePath $relativePath
+    })
+    if ($installedProjectOnlyArtifacts.Count -ne 0) {
+        throw "Default publish copied project-only tests or benchmarks into the Codex skill payload"
+    }
     $defaultStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
     if (-not [bool]$defaultStatus.managed_payload_formally_published) {
         throw "Status did not recognize the current direct-compatibility publish"
+    }
+
+    $staleProjectTestPath = Join-Path $codexRoot "skills\codex-event-logger\tests\stale_project_test.py"
+    New-Item -ItemType Directory -Path (Split-Path -Parent $staleProjectTestPath) -Force | Out-Null
+    Write-FixtureText -Path $staleProjectTestPath -Text ("project-only" + [Environment]::NewLine)
+    $staleTestStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    if ([bool]$staleTestStatus.managed_payload_formally_published -or @($staleTestStatus.formal_publication_gaps) -notcontains "installed_payload_differs_from_source") {
+        throw "Status did not report a stale project-only test in the managed Codex payload"
+    }
+    $testCleanupPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    $testCleanupManifest = Get-Content -LiteralPath (Join-Path $testCleanupPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([int]$testCleanupPublish.changed_path_count -ne 1 -or @($testCleanupManifest.targets).Count -ne 1 -or
+        [string]$testCleanupManifest.targets[0].relative_path -ne "skills\codex-event-logger\tests\stale_project_test.py" -or
+        [string]$testCleanupManifest.targets[0].desired_state -ne "absent" -or
+        (Test-Path -LiteralPath $staleProjectTestPath) -or
+        (Test-Path -LiteralPath (Split-Path -Parent $staleProjectTestPath))) {
+        throw "Incremental publish did not remove a stale project-only test from the Codex payload"
     }
 
     $changedSkillPath = Join-Path $codexRoot "skills\codex-event-logger\SKILL.md"
@@ -311,6 +337,7 @@ try {
         hooks_root_resolved = $true
         rollback_restored_settings = $true
         runtime_artifacts_excluded = $true
+        project_only_tests_and_benchmarks_excluded = $true
         runtime_cache_ignored_for_rollback_drift = $true
         single_file_incremental_publish = $true
         no_op_publish_touched_nothing = $true

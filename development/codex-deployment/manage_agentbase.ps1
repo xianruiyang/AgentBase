@@ -57,7 +57,8 @@ function Get-TextSha256 {
 
 function Get-PathFingerprint {
     param(
-        [string]$Path
+        [string]$Path,
+        [switch]$IncludeProjectOnlyArtifacts
     )
 
     if (-not (Test-Path -LiteralPath $Path)) {
@@ -73,7 +74,7 @@ function Get-PathFingerprint {
     }
 
     $root = $item.FullName.TrimEnd('\')
-    $records = @(Get-AgentBasePayloadFiles -Root $root | ForEach-Object {
+    $records = @(Get-AgentBasePayloadFiles -Root $root -IncludeProjectOnlyArtifacts:$IncludeProjectOnlyArtifacts | ForEach-Object {
         $relativePath = $_.FullName.Substring($root.Length + 1).Replace('\', '/')
         "$relativePath|$($_.Length)|$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)"
     })
@@ -112,7 +113,7 @@ function Get-TargetInstalledContractFingerprint {
     if ($Target.PSObject.Properties.Name -contains "fingerprint_mode" -and [string]$Target.fingerprint_mode -eq "portable_config") {
         return Get-PortableConfigContractFingerprint -Path ([string]$Target.installed_path) -PortableSourcePath ([string]$Target.source_path)
     }
-    return Get-PathFingerprint ([string]$Target.installed_path)
+    return Get-PathFingerprint ([string]$Target.installed_path) -IncludeProjectOnlyArtifacts
 }
 
 function Get-ExpectedStagedFingerprint {
@@ -151,7 +152,7 @@ function Get-FullInstalledBundleFingerprint {
     )
 
     $records = @($Targets | Sort-Object relative_path | ForEach-Object {
-        "$($_.relative_path)|$(Get-PathFingerprint $_.installed_path)"
+        "$($_.relative_path)|$(Get-PathFingerprint $_.installed_path -IncludeProjectOnlyArtifacts)"
     })
     return Get-TextSha256 ($records -join [Environment]::NewLine)
 }
@@ -202,7 +203,7 @@ function Get-IncrementalChangeTargets {
         $installedRoot = [IO.Path]::GetFullPath([string]$target.installed_path).TrimEnd('\')
         $installedFiles = @{}
         if (Test-Path -LiteralPath $installedRoot -PathType Container) {
-            foreach ($file in @(Get-AgentBasePayloadFiles -Root $installedRoot)) {
+            foreach ($file in @(Get-AgentBasePayloadFiles -Root $installedRoot -IncludeProjectOnlyArtifacts)) {
                 $relativeFile = $file.FullName.Substring($installedRoot.Length + 1).Replace('\', '/')
                 $installedFiles[$relativeFile] = $file
             }
@@ -233,6 +234,31 @@ function Get-IncrementalChangeTargets {
         }
     }
     return $changes.ToArray()
+}
+
+function Remove-EmptyManagedProjectOnlyDirectories {
+    param(
+        [object[]]$Targets
+    )
+
+    foreach ($target in @($Targets | Where-Object { [string]$_.kind -eq "directory" })) {
+        $installedRoot = [IO.Path]::GetFullPath([string]$target.installed_path).TrimEnd('\')
+        if (-not (Test-Path -LiteralPath $installedRoot -PathType Container)) {
+            continue
+        }
+        $directories = @(Get-ChildItem -LiteralPath $installedRoot -Recurse -Force -Directory | Sort-Object { $_.FullName.Length } -Descending)
+        foreach ($directory in $directories) {
+            $relativeDirectory = $directory.FullName.Substring($installedRoot.Length + 1).Replace('\', '/')
+            if (-not (Test-AgentBaseProjectOnlyArtifact -RelativePath ($relativeDirectory + "/.agentbase-directory-probe"))) {
+                continue
+            }
+            if ($null -ne (Get-ChildItem -LiteralPath $directory.FullName -Force | Select-Object -First 1)) {
+                continue
+            }
+            Assert-ChildPath -Root $installedRoot -Path $directory.FullName -Label "Empty project-only payload directory"
+            Remove-Item -LiteralPath $directory.FullName -Force
+        }
+    }
 }
 
 function Write-Utf8NoBomFile {
@@ -981,6 +1007,7 @@ if ($Action -eq "Publish") {
                 Write-JsonFile -Path $manifestPath -Value $manifest
             }
         }
+        Remove-EmptyManagedProjectOnlyDirectories -Targets $source.targets
 
         $manifest.state = "backed_up"
         Write-JsonFile -Path $manifestPath -Value $manifest

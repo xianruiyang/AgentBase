@@ -78,7 +78,7 @@
 | T-SQG-003 | 冻结当前 sgy AST 可观察合同 | T-SQG-002 | CLI/schema/cache/process/rewrite/TTY/LSP/release 基线 | 当前定向、集成和真实引擎用例可重复，结果或结构等价边界明确 |
 | T-SQG-004 | 登记历史 Token 基线及其身份和证据上限 | T-SQG-001 | 只读历史结果索引、审计 hash 与不可直接比较边界 | 数值可从原始 usage 复算；未记录源码快照和环境混杂明确可见 |
 | T-SQG-005 | 从 `benchmark-corpus-seed.json` 生成绑定只读源码快照的正式 corpus 与结构化语义 oracle | T-SQG-004 | corpus/schema、工作区角色、快照绑定和 oracle fixtures | 六个旧 prompt 可追溯；逐项复核历史事实，不再用词面正则替代关系，源码变化产生新版本 |
-| T-SQG-006 | 扩展现有 code-search-benchmark 为隔离 runner/monitor 和 audit capsule owner | T-SQG-005 | 环境构建、allowlist diff、平衡调度、事件归档、汇总和 detached capsule | 新鲜 agent、只读快照、完整 usage、超时失败保留、subject/monitor/auditor 单向隔离均有定向测试 |
+| T-SQG-006 | 在 `development/code-search-benchmark` 内扩展隔离 runner/monitor 和 audit capsule owner | T-SQG-005 | 仅项目可用的环境构建、allowlist diff、平衡调度、事件归档、汇总和 detached capsule | 新鲜 agent、只读快照、完整 usage、超时失败保留、角色单向隔离均有定向测试；Plugin/DirectCompatibility payload 清单中无 benchmark 资产 |
 
 P0 闭环：能逐项回答要兼容什么、AST 什么不能改变、原生事实是什么、如何证明没有漏模式，并能通过唯一入口重复运行受监控隔离 agent、复算总 Token 和独立审计质量。
 
@@ -132,7 +132,7 @@ P4 闭环：同一 sgy 二进制完成 fd、rg 与 AST 真实任务；rg/fd 共�
 | T-SQG-050 | 建立精炼的统一查询 skill 和按需 backend 引用 | T-SQG-023, T-SQG-033, T-SQG-042 | 候选 skill | 简单快路径、完整性、tree、AST、LSP 边界和 PowerShell 非触发路由通过 |
 | T-SQG-051 | 将现有 AST skill 语义原样迁入按需引用 | T-SQG-050 | AST 规则等价映射 | sgy 命令、profile、cache、process、rewrite 和安全边界无丢项；独立行为证据等价 |
 | T-SQG-052 | 更新消费者并退出已被替代的 rg/fd wrapper 与旧 skill | T-SQG-050, T-SQG-051 | 唯一职责方向 | 不删除 sgy AST 命令；仓库不存在同责 Python wrapper、重复规则或悬空引用 |
-| T-SQG-053 | 更新分支内发布候选清单与供应链材料 | T-SQG-052 | 候选 runtime manifest、来源、许可证和部署差异 | 二进制 hash、源码 revision、archive 与真实运行读回一致 |
+| T-SQG-053 | 更新分支内发布候选清单与供应链材料 | T-SQG-052 | 候选 runtime manifest、来源、许可证和部署差异 | 二进制 hash、源码 revision、archive 与真实运行读回一致；payload 不含 tests、fixtures、benchmark、runner、corpus、结果或 audit 资产，旧直接安装副本被移除 |
 
 P5 闭环：查询规则只有一个低成本入口，AST 设计保持，重复的 rg/fd 包装职责退出；总体项目仍未因此自动采纳分支。
 
@@ -156,3 +156,4 @@ P6 闭环：先有直接证据证明模型取得正确且充分的所需内容�
 - fd tree 不能机械还原路径或预计 Token 不低于 flat 时不选 tree。
 - 真实 Codex 质量退化时先修正质量；质量相同但总 Token 高于冻结消融且无必要证据收益时，继续收紧或退出，不以速度补偿。
 - control/candidate 出现 allowlist 外环境差异、subject 接触对照信息、monitor 干预答案、usage 缺失或 audit capsule 不完整时，该实验停止且不得进入收益聚合。
+- Plugin 或 DirectCompatibility 候选 payload 中出现测试、fixture、benchmark、runner、corpus、原始结果或审计资产时停止发布，不以它们位于 skill 子目录为理由保留。
