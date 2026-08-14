@@ -2,11 +2,13 @@
 
 ## 1. 文档职责与状态
 
-本文件定义 [requirements.md](requirements.md) 的候选模型设计，状态为 `proposed`。它只属于本分支，不证明实现可用，也不改变 AgentBase 总体需求或正式入口；实施顺序以 [plan.md](plan.md) 为准。
+本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的候选模型设计，状态为 `proposed`。它只属于本分支，不证明实现可用，也不改变 AgentBase 总体需求或正式入口；实施顺序以 [plan.md](plan.md) 为准。
 
 ## 2. 设计结论
 
 扩展现有 `tools/sgy`，用同一个 Windows 原生二进制承载 AST、rg 与 fd，但以现有 AST 设计为锚点：AST 的公开命令和行为合同保持不变，rg/fd 作为新的并列命令域接入。内部只抽取已经能证明相同的进程、预算、完整性、产物和发布职责，不要求三个 backend 共享同一种表面命令或结果记录。
+
+该网关只是满足 `REQ-SQG-001` 的候选手段。所有接口统一、兼容矩阵和结构优化最终都必须证明模型先取得正确且充分的内容，再降低完整查找链的总 Token，并在前两项不退化时降低耗时；否则不能以工具实现完整代替根本需求达成。
 
 | 命令域 | 原生 owner | 公开入口 |
 | --- | --- | --- |
@@ -20,7 +22,7 @@ LSP 继续由 `vscode-lsp-mcp` 负责真实符号身份、类型、精确引用�
 
 ### DES-SQG-001 AST 设计是稳定基线
 
-- 满足: R-SQG-006, R-SQG-002, R-SQG-005
+- 满足: AC-SQG-001, UDES-SQG-002, UDES-SQG-005, UDES-SQG-006
 
 AST 继续使用当前强制 `--` argv 边界、透明参数数组、默认 JSON stream 注入、Token-Safe YAML、profile、cache、fingerprint、后处理、rewrite 安全边界、TTY/LSP、artifact、诊断退出码和发布来源。现有命令不是待淘汰兼容入口，而是 AST 的正式入口。
 
@@ -28,7 +30,7 @@ AST 继续使用当前强制 `--` argv 边界、透明参数数组、默认 JSON
 
 ### DES-SQG-002 公共内核只抽取真实共同职责
 
-- 满足: R-SQG-001, R-SQG-005, A-SQG-001
+- 满足: AC-SQG-001, AC-SQG-002, UDES-SQG-001, UDES-SQG-005
 
 `tools/sgy` 维护一个内部公共执行包络，可包含引擎发现、cwd、参数数组、stdin/TTY、stdout/stderr 捕获、超时、退出状态、结果 spool、查询身份、上下文预算、诊断、artifact 和发布来源。每项抽取都必须先证明三个命令域具有相同生命周期和失败语义；否则留在 backend 内。
 
@@ -36,7 +38,7 @@ AST 继续使用当前强制 `--` argv 边界、透明参数数组、默认 JSON
 
 ### DES-SQG-003 原生命令透明边界
 
-- 满足: R-SQG-002, R-SQG-005
+- 满足: AC-SQG-001, UDES-SQG-002, UDES-SQG-005
 
 所有 `--` 后 token 均以参数数组保留值、顺序和重复项，不经 shell 拼接。AST 沿用现有 `sgy defaults`；rg/fd 的 `defaults` 只展示原始 argv、为机器读取追加的参数、抑制原因和最终 argv，不启动底层引擎。
 
@@ -44,7 +46,7 @@ AST 继续使用当前强制 `--` argv 边界、透明参数数组、默认 JSON
 
 ### DES-SQG-004 最短充分输出规划
 
-- 满足: R-SQG-003, A-SQG-001, A-SQG-003
+- 满足: AC-SQG-001, AC-SQG-002, UDES-SQG-003
 
 backend 先形成 `EvidenceSignature`，明确当前表示必须保留的路径、类型、位置、正文、捕获、规则、诊断、顺序和完整性。规划器只比较签名相同的候选表示，并使用随二进制发布的确定性 Token 估算器选择预计成本最低者；真实 Codex 的 `input + output` Token 用于发布收益判断。
 
@@ -52,7 +54,7 @@ AST 现有 profile 及其选择语义保持不变，不迁入新的 `auto` 规�
 
 ### DES-SQG-005 结果完整性与分页快照
 
-- 满足: A-SQG-001, R-SQG-003
+- 满足: AC-SQG-001, AC-SQG-002, UDES-SQG-003
 
 每个 backend 的结构化结果都能表达引擎版本、查询身份、原生退出、总量、展示量、省略量、结果完整性、正文完整性和诊断。大结果先完整执行并有界 spool，再从同一不可变结果快照投影或分页；游标绑定查询、快照和 view，分页不缩小底层查询范围。
 
@@ -60,7 +62,7 @@ AST 继续使用现有 cache 与 fingerprint 合同，不迁移到 rg/fd 的分�
 
 ### DES-SQG-006 fd 可逆目录树
 
-- 满足: R-SQG-004, R-SQG-003, A-SQG-001
+- 满足: AC-SQG-001, AC-SQG-002, UDES-SQG-003, UDES-SQG-004
 
 fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短别名，并按词法相对路径建立 trie。名称采用可逆转义，文件、目录和其他已识别类型可区分；多根、绝对路径和根外结果不合并成虚假共同根，重复项遵循原生命令语义。
 
@@ -68,7 +70,7 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短
 
 ### DES-SQG-007 rg 结果适配
 
-- 满足: R-SQG-002, R-SQG-003, A-SQG-001
+- 满足: AC-SQG-001, AC-SQG-002, UDES-SQG-002, UDES-SQG-003
 
 普通 batch 搜索使用 ripgrep 原生 JSON 事件，区分 match、context、begin/end、summary 与错误，并按 EvidenceSignature 选择分组正文、位置或文件视图。count、文件列表、replace 展示、passthru、preprocessor、显式 JSON、help/version 和特殊报告分别进入命令矩阵，不以启发式输出 flag 黑名单猜测。
 
@@ -76,7 +78,7 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短
 
 ### DES-SQG-008 Skill 与成本路由
 
-- 满足: R-SQG-001, A-SQG-002, A-SQG-003
+- 满足: AC-SQG-002, AC-SQG-003, UDES-SQG-001
 
 候选最终只保留一个精炼的源码查询 skill，主文件说明触发边界、backend 选择、完整性和写入安全，rg、fd 与 AST 的详细协议按需读取。AST 部分以现有 `ast-grep-token-safe` 合同为语义来源，迁移只改变文档归属，不改变 sgy 用法和安全边界；只有独立路由与行为证据证明等价后才退出旧 skill。
 
@@ -84,7 +86,7 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短
 
 ### DES-SQG-009 安全与故障边界
 
-- 满足: R-SQG-002, R-SQG-005, A-SQG-001
+- 满足: AC-SQG-001, UDES-SQG-002, UDES-SQG-005
 
 网关不是 sandbox 或授权系统。rg preprocessor、fd exec/batch 与 ast-grep rewrite/apply 继续使用当前用户权限和上位授权。网关只对缺少解释必需输入、可能混用快照、二进制输出缺少产物目标或转换会破坏原生字节设置局部可恢复门禁；其他特殊模式透传或落产物并给诊断。
 
@@ -116,4 +118,4 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短
 
 ## 6. 设计完成判定
 
-只有 rg/fd 全部公开模式有持久分类，结果完整性可复核，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项不退化，消费者与旧同责入口完成迁移，且真实 Codex 质量与总 Token 验证通过时，本设计才可由 `proposed` 进入待主线采纳状态。该状态仍不自动修改总体项目或授权发布。
+只有 rg/fd 全部公开模式有持久分类，结果完整性可复核，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项不退化，消费者与旧同责入口完成迁移，并且真实 Codex 依次证明 `AC-SQG-001` 的质量充分、`AC-SQG-002` 的端到端总 Token 收益和 `AC-SQG-003` 的速度取舍时，本设计才可由 `proposed` 进入待主线采纳状态。该状态仍不自动修改总体项目或授权发布。
