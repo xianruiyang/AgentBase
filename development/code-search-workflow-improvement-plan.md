@@ -1,6 +1,6 @@
 # 代码搜索流程既有改进与成本记录
 
-> 状态：本文件保留既有方案、实现和真实 Codex 成本证据，不再承担下一阶段实施计划。统一源码查询网关的当前设计与计划分别见 [source-query-gateway/design.md](source-query-gateway/design.md) 和 [source-query-gateway/plan.md](source-query-gateway/plan.md)；尚未发布到 Codex，安装状态保持不变。
+> 状态：本文件保留既有方案、实现和真实 Codex 成本证据；尚未发布到 Codex，安装状态保持不变。
 >
 > 取舍顺序：先保证定位完整性和结论质量，在此基础上降低模型可见 Token，再在前两项不变差时提升速度。
 

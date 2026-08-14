@@ -63,7 +63,6 @@ AgentBase 只维护 Windows 宿主。项目自有 skill 运行时、MCP、CLI、
 | `development/codex-qq-hook` | `codex-qq-hook` | Webhook 辅助程序和开发说明；正式运行脚本仍在 skill 真源 |
 | `development/responsibility-lifecycle.md` | 全局规则、`change-governance`、`delivery-workflow`、`task-table-manager` | 权威职责形成、消费者接入、后续影响传播与证据时效的设计分析 |
 | `development/code-search-workflow-improvement-plan.md` | `rg-token-safe`、`ast-grep-token-safe`、`symbol-structure-workflow`、`vscode-lsp-mcp` | 代码搜索既有改进记录、真实 Codex 成本证据与冻结对照 |
-| `development/source-query-gateway/` | `tools/sgy`、rg、fd、ast-grep 与查询 skill | 统一源码查询网关的用户设计、模型设计和当前实施计划 |
 | `development/skill-routing` | 全局规则与全部关键 skill | 静态触发合同、脱离仓库的路由评估 capsule 与结果判定 |
 | `development/plugin-packaging` | 合同声明的全部 skill | 生成经过滤的 `agentbase-core` 本地插件包及插件内 hooks |
 | `development/codex-deployment` | 全局规则、可移植设置、hooks、自定义子代理与全部关键 skill | 校验、可选设置安装、带备份发布和可验证回滚 |
