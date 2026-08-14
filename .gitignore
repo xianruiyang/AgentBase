@@ -28,24 +28,21 @@ Thumbs.db
 **/.eslintcache
 **/*.tsbuildinfo
 mcp/vscode-lsp-mcp/.vscode-lsp-mcp/
-mcp/vscode-lsp-mcp/dist/
-mcp/vscode-lsp-mcp/packages/*/dist/
 mcp/vscode-lsp-mcp/packages/*/build/
 mcp/vscode-lsp-mcp/packages/win32-security/Release/
 mcp/vscode-lsp-mcp/tests/fixtures/**/bin/
 mcp/vscode-lsp-mcp/tests/fixtures/**/obj/
 
-# Rust
-tools/sgy/target/
-tools/sgy/dist/
+# Generated build outputs
+**/dist/
+**/target/
 tools/sgy/fuzz/artifacts/
 
 # Runtime logs
 **/runtimeLogs/
 *.log
 
-# Generated AgentBase packages and deployment simulations
-development/plugin-packaging/dist/
+# Deployment simulations
 development/codex-deployment/sandbox/
 
 # Development helper binaries
