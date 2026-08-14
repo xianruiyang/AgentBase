@@ -98,6 +98,7 @@ $requiredGlobalFragments = @(
     '新一轮调试前只清理会干扰当前判断且目标范围明确的旧日志'
     '工作流程的目标、阶段、状态、依赖、完成和例外由文档定义'
     'CLI、脚本、索引、缓存和生成视图只辅助编辑、查询、压缩和机械校验'
+    '`--no-heading` 只用于不进入模型上下文的逐行机器消费'
     '写错对象、破坏数据、并发覆盖、资源无界、缺少解释必需输入或混用查询快照'
     '其余可解析偏差只诊断'
 )
@@ -367,6 +368,10 @@ foreach ($sgyTarget in $sgyTargets) {
     Assert-True ($sgyManifestBinary[0].sha256 -eq $sgyBinaryHash) "sgy target provenance binary hash does not match the installed runtime: $($sgyTarget.target)"
     Assert-True ([UInt64]$sgyManifestBinary[0].bytes -eq [UInt64]$sgyBinaryItem.Length) "sgy target provenance binary size does not match the installed runtime: $($sgyTarget.target)"
 }
+
+$rgSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\rg-token-safe\SKILL.md") -Raw -Encoding UTF8
+Assert-True ($rgSkillContent.Contains('进入模型上下文的正文不得使用 `--no-heading`')) "rg-token-safe must reserve --no-heading for machine-only output"
+Assert-True ($rgSkillContent.Contains('多文件、目录、glob 或文件数未知时使用 `--heading`')) "rg-token-safe must prefer heading output for model-readable multi-file matches"
 
 $powerShellSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\powershell-usage\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($powerShellSkillContent.Contains('--heading -M 240 --max-columns-preview')) "powershell-usage rg example is missing bounded file identity and width options"
