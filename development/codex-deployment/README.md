@@ -1,6 +1,6 @@
 # Codex deployment
 
-`manage_agentbase.ps1` is the only AgentBase entry point that installs project-managed files into a Codex home. It validates project truth and the canonical detached routing-policy evidence, stages the complete selected payload, backs up every target, installs atomically, verifies fingerprints, and records a rollback manifest. Directory payloads and plugin packaging share `development/common/payload_contract.ps1`, so runtime-only caches, logs, coverage output, dependency trees, build directories, temporary files, and reparse points cannot enter either bundle or its fingerprint.
+`manage_agentbase.ps1` is the only AgentBase entry point that installs project-managed files into a Codex home. It validates project truth and the canonical detached routing-policy evidence, compares the selected managed contract with the installation, stages and backs up only changed managed paths, applies them atomically, verifies fingerprints, and records a rollback manifest. Directory payloads and plugin packaging share `development/common/payload_contract.ps1`, so runtime-only caches, logs, coverage output, dependency trees, build directories, temporary files, and reparse points cannot enter either bundle or its fingerprint.
 
 ## Payloads
 
@@ -26,9 +26,9 @@ In `DirectCompatibility` mode, `-InstallPortableSettings` explicitly adds:
 
 In `Plugin` mode the same switch adds `config.toml` and the three agents but omits `hooks.json`, because the plugin supplies those hooks.
 
-The settings option replaces an existing `config.toml`, `hooks.json`, and the three matching custom-agent files, but the same publish transaction backs them up and the normal rollback action restores them. It does not replace the whole `agents/` directory, so unrelated personal agents remain untouched. Omitting the option preserves the existing default behavior and never touches any settings or agent file.
+The settings option merges only changed, explicitly reviewed portable keys from `global/config.toml` into an existing `config.toml`. MCP tables, project trust, plugin and marketplace state, runtime-generated fields, and unowned keys that share a managed table remain unchanged. Standalone managed files are replaced only when their content differs; skill directories are diffed at managed-file granularity, including removal of stale managed files while excluded runtime artifacts remain untouched. The publish transaction backs up only changed complete files, rollback restores them, and unrelated personal agents remain untouched. Omitting the option never touches settings or agent files.
 
-The portable config reproduces the reviewed model, balanced main-thread reasoning default, personality, service tier, sandbox, multi-agent, hook, and desktop preferences. The portable agents reproduce the current `luna`, `sol`, and `terra` role descriptions, models, and developer instructions; subagent reasoning effort is intentionally unpinned so model defaults or explicit dispatch settings can choose it. The payload deliberately excludes authentication, project trust paths, marketplace/plugin caches, MCP absolute paths, hook trust hashes, runtime-generated `notify` and `node_repl` entries, histories, logs, and secrets.
+The portable config reproduces the reviewed model, balanced main-thread reasoning default, personality, service tier, sandbox, multi-agent, hook, and desktop preferences. The portable agents reproduce the current `luna`, `sol`, and `terra` role descriptions, models, and developer instructions; subagent reasoning effort is intentionally unpinned so model defaults or explicit dispatch settings can choose it. The portable key set deliberately excludes authentication, project trust paths, marketplace/plugin caches, MCP absolute paths, hook trust hashes, runtime-generated `notify` and `node_repl` entries, histories, logs, and secrets. Exclusion means AgentBase does not own or replace those host values; it does not mean deployment deletes them.
 
 The files under `global/agents/` follow the [official Codex custom-agent schema](https://learn.chatgpt.com/docs/agent-configuration/subagents). Codex-provided `default`, `worker`, and `explorer` agents are not duplicated in the repository. They remain owned by the installed Codex release, avoiding custom files that would override built-in agents with the same names.
 
@@ -57,6 +57,7 @@ Validation checks the global rule and Skill contract, the separately isolated de
 The repeatable sandbox test covers default preservation, explicit settings and custom-agent installation, resolved hook paths, unrelated Skill and agent preservation, and rollback:
 
 ```powershell
+& '.\development\codex-deployment\test_portable_config.ps1' -ProjectRoot (Get-Location).Path
 & '.\development\codex-deployment\test_manage_agentbase.ps1' -ProjectRoot (Get-Location).Path
 ```
 
@@ -84,7 +85,7 @@ Restart the ChatGPT desktop app or begin a new Codex task after publishing. In p
 
 ## Read publication status
 
-`Status` is read-only. It derives state from the selected source payload, installed payload, latest matching `published` manifest, and current routing-policy evidence instead of trusting a README claim:
+`Status` is read-only. It derives state from the selected source payload, installed managed contract, latest matching `published` manifest, and current routing-policy evidence instead of trusting a README claim. For `config.toml`, only AgentBase-owned portable keys participate in publication identity; host-owned MCP, trust, plugin, marketplace, and runtime changes do not create false managed drift. Rollback still fingerprints the complete installed file and refuses to overwrite post-publish host changes unless drift is explicitly accepted:
 
 ```powershell
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Status -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -SkillDeliveryMode DirectCompatibility -InstallPortableSettings

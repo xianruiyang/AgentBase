@@ -67,8 +67,13 @@ try {
     Write-FixtureText -Path (Join-Path $codexRoot "AGENTS.md") -Text ("old agents" + [Environment]::NewLine)
     Write-FixtureText -Path (Join-Path $codexRoot "config.toml") -Text ((@(
         'model = "old-model"'
+        'notify = ["keep-host-notify"]'
         '[mcp_servers.keep]'
         'command = "keep"'
+        '[features]'
+        'path = "keep-host-feature"'
+        '[projects.''D:\workspace'']'
+        'trust_level = "trusted"'
     ) -join [Environment]::NewLine) + [Environment]::NewLine)
     Write-FixtureText -Path (Join-Path $codexRoot "hooks.json") -Text ((@(
         '{'
@@ -127,6 +132,28 @@ try {
     if (-not [bool]$defaultStatus.managed_payload_formally_published) {
         throw "Status did not recognize the current direct-compatibility publish"
     }
+
+    $changedSkillPath = Join-Path $codexRoot "skills\codex-event-logger\SKILL.md"
+    $untouchedSkillPath = Join-Path $codexRoot "skills\codex-qq-hook\SKILL.md"
+    Write-FixtureText -Path $changedSkillPath -Text ("corrupted installed skill" + [Environment]::NewLine)
+    $sentinelWriteTime = [DateTime]::SpecifyKind([DateTime]::Parse("2020-01-02T03:04:05"), [DateTimeKind]::Utc)
+    [IO.File]::SetLastWriteTimeUtc($untouchedSkillPath, $sentinelWriteTime)
+    $repairPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    $repairManifest = Get-Content -LiteralPath (Join-Path $repairPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([int]$repairPublish.changed_path_count -ne 1 -or @($repairManifest.targets).Count -ne 1 -or [string]$repairManifest.targets[0].relative_path -ne "skills\codex-event-logger\SKILL.md") {
+        throw "Incremental publish did not limit the transaction to the changed managed file"
+    }
+    if ([IO.File]::GetLastWriteTimeUtc($untouchedSkillPath) -ne $sentinelWriteTime) {
+        throw "Incremental publish rewrote an unchanged managed file"
+    }
+    $noOpPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    $noOpManifest = Get-Content -LiteralPath (Join-Path $noOpPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([int]$noOpPublish.changed_path_count -ne 0 -or @($noOpManifest.targets).Count -ne 0) {
+        throw "No-op publish created changed payload targets"
+    }
+    if ([IO.File]::GetLastWriteTimeUtc($untouchedSkillPath) -ne $sentinelWriteTime) {
+        throw "No-op publish touched an unchanged managed file"
+    }
     & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $defaultPublish.backup_path | Out-Null
 
     $settingsPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings
@@ -136,10 +163,32 @@ try {
     if ([int]$settingsPublish.portable_agent_count -ne 3) {
         throw "Portable-settings publish reported an unexpected custom-agent count"
     }
-    $sourceConfigHash = (Get-FileHash -LiteralPath (Join-Path $ProjectRoot "global\config.toml") -Algorithm SHA256).Hash
-    $installedConfigHash = (Get-FileHash -LiteralPath (Join-Path $codexRoot "config.toml") -Algorithm SHA256).Hash
-    if ($sourceConfigHash -ne $installedConfigHash) {
-        throw "Installed config.toml does not match the portable source"
+    $installedConfigText = Get-Content -LiteralPath (Join-Path $codexRoot "config.toml") -Raw -Encoding UTF8
+    foreach ($preservedHostFragment in @(
+        'notify = ["keep-host-notify"]'
+        '[mcp_servers.keep]'
+        'command = "keep"'
+        'path = "keep-host-feature"'
+        '[projects.''D:\workspace'']'
+        'trust_level = "trusted"'
+    )) {
+        if (-not $installedConfigText.Contains($preservedHostFragment)) {
+            throw "Portable-settings publish removed host-owned config: $preservedHostFragment"
+        }
+    }
+    foreach ($portableFragment in @(
+        'model = "gpt-5.6-sol"'
+        'project_doc_max_bytes = 65536'
+        'default_subagent_model = "gpt-5.6-luna"'
+        'conversationDetailMode = "STEPS_COMMANDS"'
+    )) {
+        if (-not $installedConfigText.Contains($portableFragment)) {
+            throw "Portable-settings publish did not install a managed setting: $portableFragment"
+        }
+    }
+    $settingsStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings
+    if (-not [bool]$settingsStatus.managed_payload_formally_published -or -not [bool]$settingsStatus.installed_matches_source) {
+        throw "Status did not compare portable config by its managed contract"
     }
     $installedHooksText = Get-Content -LiteralPath (Join-Path $codexRoot "hooks.json") -Raw -Encoding UTF8
     if ($installedHooksText.Contains("{{CODEX_ROOT}}")) {
@@ -176,7 +225,7 @@ try {
             throw "Portable custom agent is missing from the rollback manifest: $agentName"
         }
     }
-    if ([int]$manifest.schema_version -ne 3 -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evidence_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evaluation_capsule_sha256)) {
+    if ([int]$manifest.schema_version -ne 5 -or [string]::IsNullOrWhiteSpace([string]$manifest.installed_contract_bundle_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evidence_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evaluation_capsule_sha256)) {
         throw "Publish manifest is missing the current detached routing-policy evidence receipt"
     }
 
@@ -256,12 +305,15 @@ try {
     $succeeded = $true
     [pscustomobject]@{
         default_publish_preserved_settings = $true
-        explicit_publish_installed_settings = $true
+        explicit_publish_merged_portable_settings = $true
+        host_owned_config_preserved = $true
         custom_agents_installed = $true
         hooks_root_resolved = $true
         rollback_restored_settings = $true
         runtime_artifacts_excluded = $true
         runtime_cache_ignored_for_rollback_drift = $true
+        single_file_incremental_publish = $true
+        no_op_publish_touched_nothing = $true
         status_derived_from_manifest_and_fingerprints = $true
         plugin_delivery_rejected_parallel_direct_entry = $true
         plugin_delivery_omitted_direct_skills_and_hooks = $true

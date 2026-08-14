@@ -114,7 +114,7 @@ skill 内置的 Windows x86_64 `sgy 0.1.1` 由 `tools/sgy` 的受签署源码版
 
 ## 可移植 Codex 工作流
 
-`global/config.toml` 保存当前工作流中可跨机器复用的模型、人格、服务层级、sandbox、多代理、hooks、项目指令预算和桌面偏好。主线程以 `medium` 作为普通任务的平衡起点，active Goal 可按全局治理规则升降到包括 `max` 在内的支持等级；子代理只设置默认模型，不统一钉死推理深度。该文件明确排除认证、项目 trust 路径、插件/marketplace 缓存、MCP 绝对路径、hook 信任哈希、宿主生成的 `notify`/`node_repl`、历史、日志和秘密。
+`global/config.toml` 保存当前工作流中可跨机器复用的模型、人格、服务层级、sandbox、多代理、hooks、项目指令预算和桌面偏好。主线程以 `medium` 作为普通任务的平衡起点，active Goal 可按全局治理规则升降到包括 `max` 在内的支持等级；子代理只设置默认模型，不统一钉死推理深度。发布按受管内容差异增量执行：该文件只合入实际变化的受管键，skill 目录只更新实际变化的受管文件；认证、项目 trust 路径、插件/marketplace 缓存、MCP、hook 信任哈希、宿主生成的 `notify`/`node_repl`、历史、日志和秘密等非受管状态保持不变。
 
 `global/hooks.template.json` 保存全局事件记录与按工作区显式开启的 QQ 完成提醒 hook；部署时只把 `{{CODEX_ROOT}}` 解析为用户明确指定的 Codex 根目录。新机器必须通过 `/hooks` 审查并信任实际命令，项目不复制旧机器的信任哈希。
 

@@ -36,6 +36,7 @@ jobs:
           & .\development\skill-routing\test_routing_capsule.ps1
           & .\development\skill-routing\validate_routing_results.ps1 -ProjectRoot $PWD.Path -ResultsPath .\development\skill-routing\evidence\current.json
           & .\development\codex-deployment\manage_agentbase.ps1 -Action Validate -ProjectRoot $PWD.Path
+          & .\development\codex-deployment\test_portable_config.ps1 -ProjectRoot $PWD.Path
           & .\development\codex-deployment\test_manage_agentbase.ps1 -ProjectRoot $PWD.Path
 
       - name: Build filtered plugin package

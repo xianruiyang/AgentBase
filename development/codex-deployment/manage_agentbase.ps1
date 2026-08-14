@@ -14,6 +14,8 @@ $ErrorActionPreference = "Stop"
 
 $payloadContractPath = Join-Path (Split-Path -Parent $PSScriptRoot) "common\payload_contract.ps1"
 . $payloadContractPath
+$portableConfigContractPath = Join-Path $PSScriptRoot "portable_config.ps1"
+. $portableConfigContractPath
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -93,10 +95,35 @@ function Get-TargetSourceFingerprint {
         [object]$Target
     )
 
+    if ($Target.PSObject.Properties.Name -contains "fingerprint_mode" -and [string]$Target.fingerprint_mode -eq "portable_config") {
+        return Get-PortableConfigContractFingerprint -Path ([string]$Target.source_path) -PortableSourcePath ([string]$Target.source_path)
+    }
     if ($Target.PSObject.Properties.Name -contains "source_text" -and $null -ne $Target.source_text) {
         return Get-TextFileFingerprint ([string]$Target.source_text)
     }
     return Get-PathFingerprint ([string]$Target.source_path)
+}
+
+function Get-TargetInstalledContractFingerprint {
+    param(
+        [object]$Target
+    )
+
+    if ($Target.PSObject.Properties.Name -contains "fingerprint_mode" -and [string]$Target.fingerprint_mode -eq "portable_config") {
+        return Get-PortableConfigContractFingerprint -Path ([string]$Target.installed_path) -PortableSourcePath ([string]$Target.source_path)
+    }
+    return Get-PathFingerprint ([string]$Target.installed_path)
+}
+
+function Get-ExpectedStagedFingerprint {
+    param(
+        [object]$Target
+    )
+
+    if ($Target.PSObject.Properties.Name -contains "source_text" -and $null -ne $Target.source_text) {
+        return Get-TextFileFingerprint ([string]$Target.source_text)
+    }
+    return Get-TargetSourceFingerprint $Target
 }
 
 function Get-BundleFingerprint {
@@ -111,11 +138,101 @@ function Get-BundleFingerprint {
             Get-TargetSourceFingerprint $_
         }
         else {
-            Get-PathFingerprint $_.installed_path
+            Get-TargetInstalledContractFingerprint $_
         }
         "$($_.relative_path)|$fingerprint"
     })
     return Get-TextSha256 ($records -join [Environment]::NewLine)
+}
+
+function Get-FullInstalledBundleFingerprint {
+    param(
+        [object[]]$Targets
+    )
+
+    $records = @($Targets | Sort-Object relative_path | ForEach-Object {
+        "$($_.relative_path)|$(Get-PathFingerprint $_.installed_path)"
+    })
+    return Get-TextSha256 ($records -join [Environment]::NewLine)
+}
+
+function Get-IncrementalChangeTargets {
+    param(
+        [object[]]$Targets
+    )
+
+    $changes = New-Object 'System.Collections.Generic.List[object]'
+    foreach ($target in @($Targets)) {
+        if ([string]$target.kind -eq "file") {
+            if (Test-Path -LiteralPath $target.installed_path -PathType Container) {
+                throw "Managed file target is occupied by a directory: $($target.relative_path)"
+            }
+            if ((Get-TargetInstalledContractFingerprint $target) -eq (Get-TargetSourceFingerprint $target)) {
+                continue
+            }
+            $change = [ordered]@{
+                relative_path = [string]$target.relative_path
+                source_path = [string]$target.source_path
+                source_text = if ($target.PSObject.Properties.Name -contains "source_text") { $target.source_text } else { $null }
+                installed_path = [string]$target.installed_path
+                kind = "file"
+                desired_state = "present"
+            }
+            if ($target.PSObject.Properties.Name -contains "fingerprint_mode") {
+                $change.fingerprint_mode = [string]$target.fingerprint_mode
+            }
+            $changes.Add([pscustomobject]$change)
+            continue
+        }
+
+        if ([string]$target.kind -ne "directory") {
+            throw "Unsupported incremental target kind: $($target.kind)"
+        }
+        if (Test-Path -LiteralPath $target.installed_path -PathType Leaf) {
+            throw "Managed directory target is occupied by a file: $($target.relative_path)"
+        }
+
+        $sourceRoot = (Get-Item -LiteralPath $target.source_path -Force).FullName.TrimEnd('\')
+        $sourceFiles = @{}
+        foreach ($file in @(Get-AgentBasePayloadFiles -Root $sourceRoot)) {
+            $relativeFile = $file.FullName.Substring($sourceRoot.Length + 1).Replace('\', '/')
+            $sourceFiles[$relativeFile] = $file
+        }
+
+        $installedRoot = [IO.Path]::GetFullPath([string]$target.installed_path).TrimEnd('\')
+        $installedFiles = @{}
+        if (Test-Path -LiteralPath $installedRoot -PathType Container) {
+            foreach ($file in @(Get-AgentBasePayloadFiles -Root $installedRoot)) {
+                $relativeFile = $file.FullName.Substring($installedRoot.Length + 1).Replace('\', '/')
+                $installedFiles[$relativeFile] = $file
+            }
+        }
+
+        $relativeFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+        foreach ($relativeFile in @($sourceFiles.Keys)) { $null = $relativeFiles.Add([string]$relativeFile) }
+        foreach ($relativeFile in @($installedFiles.Keys)) { $null = $relativeFiles.Add([string]$relativeFile) }
+        foreach ($relativeFile in @($relativeFiles | Sort-Object)) {
+            $hasSource = $sourceFiles.ContainsKey($relativeFile)
+            $hasInstalled = $installedFiles.ContainsKey($relativeFile)
+            if ($hasSource -and $hasInstalled -and
+                (Get-PathFingerprint $sourceFiles[$relativeFile].FullName) -eq (Get-PathFingerprint $installedFiles[$relativeFile].FullName)) {
+                continue
+            }
+
+            $relativePath = (([string]$target.relative_path).TrimEnd([char[]]@('\', '/')) + '\' + $relativeFile.Replace('/', '\'))
+            $installedPath = Join-Path $installedRoot $relativeFile.Replace('/', '\')
+            Assert-ChildPath -Root $installedRoot -Path $installedPath -Label "Incremental managed file"
+            $changes.Add([pscustomobject]@{
+                relative_path = $relativePath
+                source_path = if ($hasSource) { [string]$sourceFiles[$relativeFile].FullName } else { $null }
+                source_text = $null
+                installed_path = $installedPath
+                kind = "file"
+                desired_state = if ($hasSource) { "present" } else { "absent" }
+            })
+        }
+    }
+    return $changes.ToArray()
 }
 
 function Write-Utf8NoBomFile {
@@ -203,7 +320,7 @@ function Get-LatestPublishedManifest {
         catch {
             continue
         }
-        if ([string]$manifest.state -ne "published" -or @(1, 2, 3) -notcontains [int]$manifest.schema_version) {
+        if ([string]$manifest.state -ne "published" -or @(1, 2, 3, 4, 5) -notcontains [int]$manifest.schema_version) {
             continue
         }
         if (-not [string]::Equals([IO.Path]::GetFullPath([string]$manifest.codex_root), [IO.Path]::GetFullPath($InstallRoot), [StringComparison]::OrdinalIgnoreCase)) {
@@ -235,7 +352,7 @@ function Get-PluginModeDirectCompatibilityConflicts {
     $conflicts = New-Object 'System.Collections.Generic.List[string]'
     foreach ($skill in @($RequiredSkills)) {
         $relativePath = "skills\$([string]$skill)"
-        if (Test-Path -LiteralPath (Join-Path $InstallRoot $relativePath)) {
+        if (Test-Path -LiteralPath (Join-Path (Join-Path $InstallRoot $relativePath) "SKILL.md") -PathType Leaf) {
             $conflicts.Add($relativePath)
         }
     }
@@ -598,9 +715,10 @@ function Get-ValidatedSource {
         $targets.Add([pscustomobject]@{
             relative_path = "config.toml"
             source_path = $portableConfigPath
-            source_text = $null
+            source_text = Get-MergedPortableConfigText -PortableSourcePath $portableConfigPath -InstalledPath (Join-Path $InstallRoot "config.toml")
             installed_path = Join-Path $InstallRoot "config.toml"
             kind = "file"
+            fingerprint_mode = "portable_config"
         })
         if ($DeliveryMode -eq "DirectCompatibility") {
             $targets.Add([pscustomobject]@{
@@ -707,6 +825,7 @@ if ($Action -eq "Status") {
     $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
     $installedFingerprint = Get-BundleFingerprint -Targets $source.targets -Side installed
+    $installedFullFingerprint = Get-FullInstalledBundleFingerprint -Targets $source.targets
     $directCompatibilityConflicts = if ($SkillDeliveryMode -eq "Plugin") {
         @(Get-PluginModeDirectCompatibilityConflicts -InstallRoot $CodexRoot -RequiredSkills @($source.contract.required_skills))
     }
@@ -717,7 +836,16 @@ if ($Action -eq "Status") {
     $publishRecord = Get-LatestPublishedManifest -InstallRoot $CodexRoot -DeliveryMode $SkillDeliveryMode -PortableSettingsInstalled ([bool]$InstallPortableSettings)
     $manifest = if ($null -eq $publishRecord) { $null } else { $publishRecord.document }
     $manifestMatchesSource = $null -ne $manifest -and [string]$manifest.source_bundle_sha256 -eq $sourceFingerprint
-    $manifestMatchesInstalled = $null -ne $manifest -and [string]$manifest.installed_bundle_sha256 -eq $installedFingerprint
+    $manifestInstalledContractFingerprint = if ($null -ne $manifest -and $manifest.PSObject.Properties.Name -contains "installed_contract_bundle_sha256") {
+        [string]$manifest.installed_contract_bundle_sha256
+    }
+    elseif ($null -ne $manifest) {
+        [string]$manifest.installed_bundle_sha256
+    }
+    else {
+        $null
+    }
+    $manifestMatchesInstalled = $null -ne $manifest -and $manifestInstalledContractFingerprint -eq $installedFingerprint
     $manifestEvidenceMatches = $null -ne $manifest -and
         $manifest.PSObject.Properties.Name -contains "routing_evidence_sha256" -and
         [string]$manifest.routing_evidence_sha256 -eq [string]$source.routing_evidence.sha256
@@ -736,6 +864,8 @@ if ($Action -eq "Status") {
         portable_settings_in_scope = [bool]$InstallPortableSettings
         source_bundle_sha256 = $sourceFingerprint
         installed_bundle_sha256 = $installedFingerprint
+        installed_contract_bundle_sha256 = $installedFingerprint
+        installed_full_bundle_sha256 = $installedFullFingerprint
         installed_matches_source = $installedMatchesSource
         latest_publish_manifest = if ($null -eq $publishRecord) { $null } else { $publishRecord.path }
         manifest_matches_source = $manifestMatchesSource
@@ -762,6 +892,7 @@ if ($Action -eq "Publish") {
         }
     }
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
+    $changeTargets = @(Get-IncrementalChangeTargets -Targets $source.targets)
     $stageRoot = Join-Path $CodexRoot (".agentbase-stage-" + [guid]::NewGuid().ToString("N"))
     Assert-ChildPath -Root $CodexRoot -Path $stageRoot -Label "Stage path"
     New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
@@ -771,7 +902,7 @@ if ($Action -eq "Publish") {
     $manifest = $null
     $manifestPath = $null
     try {
-        foreach ($target in $source.targets) {
+        foreach ($target in @($changeTargets | Where-Object { [string]$_.desired_state -eq "present" })) {
             $stagePath = Join-Path $stageRoot $target.relative_path
             $stageParent = Split-Path -Parent $stagePath
             if (-not (Test-Path -LiteralPath $stageParent -PathType Container)) {
@@ -780,13 +911,10 @@ if ($Action -eq "Publish") {
             if ($target.PSObject.Properties.Name -contains "source_text" -and $null -ne $target.source_text) {
                 Write-Utf8NoBomFile -Path $stagePath -Text ([string]$target.source_text)
             }
-            elseif ($target.kind -eq "directory") {
-                Copy-AgentBasePayloadDirectory -SourcePath $target.source_path -DestinationPath $stagePath
-            }
             else {
-                Copy-Item -LiteralPath $target.source_path -Destination $stagePath -Recurse -Force
+                Copy-Item -LiteralPath $target.source_path -Destination $stagePath -Force
             }
-            if ((Get-PathFingerprint $stagePath) -ne (Get-TargetSourceFingerprint $target)) {
+            if ((Get-PathFingerprint $stagePath) -ne (Get-ExpectedStagedFingerprint $target)) {
                 throw "Staged payload hash mismatch: $($target.relative_path)"
             }
         }
@@ -797,16 +925,17 @@ if ($Action -eq "Publish") {
         New-Item -ItemType Directory -Path (Join-Path $backupRoot "payload") -Force | Out-Null
         $manifestPath = Join-Path $backupRoot "manifest.json"
 
-        $targetStates = @($source.targets | ForEach-Object {
+        $targetStates = @($changeTargets | ForEach-Object {
             [ordered]@{
                 relative_path = $_.relative_path
                 kind = $_.kind
+                desired_state = $_.desired_state
                 existed_before = Test-Path -LiteralPath $_.installed_path
                 before_fingerprint = Get-PathFingerprint $_.installed_path
             }
         })
         $manifest = [ordered]@{
-            schema_version = 3
+            schema_version = 5
             state = "prepared"
             created_at_utc = [DateTime]::UtcNow.ToString("o")
             project_root = $ProjectRoot
@@ -831,13 +960,14 @@ if ($Action -eq "Publish") {
             routing_evaluation_input_sha256 = $source.routing_evidence.evaluation_input_sha256
             routing_case_count = $source.routing_evidence.case_count
             installed_bundle_sha256 = $null
+            installed_contract_bundle_sha256 = $null
             targets = $targetStates
             backed_up_targets = @()
             installed_targets = @()
         }
         Write-JsonFile -Path $manifestPath -Value $manifest
 
-        foreach ($target in $source.targets) {
+        foreach ($target in $changeTargets) {
             if (Test-Path -LiteralPath $target.installed_path) {
                 $backupTarget = Join-Path (Join-Path $backupRoot "payload") $target.relative_path
                 $backupParent = Split-Path -Parent $backupTarget
@@ -854,7 +984,7 @@ if ($Action -eq "Publish") {
 
         $manifest.state = "backed_up"
         Write-JsonFile -Path $manifestPath -Value $manifest
-        foreach ($target in $source.targets) {
+        foreach ($target in @($changeTargets | Where-Object { [string]$_.desired_state -eq "present" })) {
             $stagePath = Join-Path $stageRoot $target.relative_path
             $targetParent = Split-Path -Parent $target.installed_path
             if (-not (Test-Path -LiteralPath $targetParent -PathType Container)) {
@@ -867,11 +997,12 @@ if ($Action -eq "Publish") {
             Write-JsonFile -Path $manifestPath -Value $manifest
         }
 
-        $installedFingerprint = Get-BundleFingerprint -Targets $source.targets -Side installed
-        if ($installedFingerprint -ne $sourceFingerprint) {
+        $installedContractFingerprint = Get-BundleFingerprint -Targets $source.targets -Side installed
+        if ($installedContractFingerprint -ne $sourceFingerprint) {
             throw "Installed bundle hash does not match the validated source bundle"
         }
-        $manifest.installed_bundle_sha256 = $installedFingerprint
+        $manifest.installed_bundle_sha256 = Get-FullInstalledBundleFingerprint -Targets $changeTargets
+        $manifest.installed_contract_bundle_sha256 = $installedContractFingerprint
         $manifest.state = "published"
         Set-ObjectProperty -Object $manifest -Name "published_at_utc" -Value ([DateTime]::UtcNow.ToString("o"))
         Write-JsonFile -Path $manifestPath -Value $manifest
@@ -925,6 +1056,8 @@ if ($Action -eq "Publish") {
         plugin_installation_must_be_verified_separately = $SkillDeliveryMode -eq "Plugin"
         portable_settings_installed = [bool]$InstallPortableSettings
         portable_agent_count = if ($InstallPortableSettings) { @($source.portable_agent_names).Count } else { 0 }
+        changed_path_count = $changeTargets.Count
+        managed_contract_count = @($source.targets).Count
         routing_evidence_sha256 = $source.routing_evidence.sha256
     }
     return
@@ -941,7 +1074,7 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw "Backup manifest is missing: $manifestPath"
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if (@(1, 2, 3) -notcontains [int]$manifest.schema_version -or [string]$manifest.state -ne "published") {
+if (@(1, 2, 3, 4, 5) -notcontains [int]$manifest.schema_version -or [string]$manifest.state -ne "published") {
     throw "Backup is not in a publish state that can be rolled back: $($manifest.state)"
 }
 if (-not [string]::Equals([IO.Path]::GetFullPath([string]$manifest.codex_root), [IO.Path]::GetFullPath($CodexRoot), [StringComparison]::OrdinalIgnoreCase)) {
