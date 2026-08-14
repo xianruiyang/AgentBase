@@ -1,0 +1,33 @@
+{
+  "schema": "agentbase.sgy-ast-baseline/v1",
+  "capturedDate": "2026-08-15",
+  "platform": "windows-x86_64-msvc",
+  "sgyVersion": "0.1.2",
+  "sourceRevision": "sha256:ca18b3ba31582ed789eb3efb9f915d68aaf5e8b2838582cd487c8ff56d614e4f",
+  "sourceFileCount": 176,
+  "cargoLockSha256": "3411f3ea4ee8d28279a4e92500852b5ef286278d3fdf4d52a1c165400b7e4296",
+  "signedReleaseRecord": {
+    "path": "skills/ast-grep-token-safe/scripts/provenance/release-record.json",
+    "sha256": "3055b839b158006cc7d6db02aed946d6400a1db4dc5948d62d1e2bd439caa707",
+    "binarySha256": "892d6ebd99b271cb6535bd93352646a2d699d4df3cd6607489b9f37241f7ba9f"
+  },
+  "observableFiles": [
+    {"path":"cache-help.txt","sha256":"6f723601a65fb040d69c2b45f6d5f578e9e0f25430a6c5190556661f41319dbd"},
+    {"path":"capabilities.yaml","sha256":"9bbe71626535924eead5553429bda854c1b5682a458f32735f097c1cb41c5956"},
+    {"path":"defaults-help.txt","sha256":"b910a07440a769d14771669f237c158953aa8a692c6f55de5ac5e220e41b6a7b"},
+    {"path":"doctor-help.txt","sha256":"50706d380a069fc67894cbfdf18ef9707d415f3c09a047a4ce357558906b7205"},
+    {"path":"exec-help.txt","sha256":"b9ec5a4cccb9fe8af4ca5c9213303a6673c303963860d8b369f89ce17bace178"},
+    {"path":"help.txt","sha256":"446b0303c2c480302ba6a323ce8d5fbe41114acc9973d047ffb4cc30329db8ed"},
+    {"path":"process-help.txt","sha256":"385e0914681f44ba73e8040695d9d4692e2b3427a5f8d32130870a982ce743f2"},
+    {"path":"schema.yaml","sha256":"d5df6780a132ae106c9e4f9cd8eb0415091658c1ed4953b41be8af72c72fd06f"},
+    {"path":"version.txt","sha256":"c56d9f9f4262e1ecbe1f0f5028f8f8def2684873f0580b6904c2dc7ea62c3940"}
+  ],
+  "verification": {
+    "workspace": "cargo ci-test -- all workspace targets and features passed in 129.9 seconds",
+    "realEngineMatrix": {
+      "versions": ["0.41.1", "0.42.0", "0.44.1"],
+      "testsPerVersion": 10,
+      "covered": ["run", "scan", "rewrite preview/apply", "cache/process", "raw artifact", "LSP byte passthrough", "help/version/completions/new", "failure/timeout/cancellation"]
+    }
+  }
+}

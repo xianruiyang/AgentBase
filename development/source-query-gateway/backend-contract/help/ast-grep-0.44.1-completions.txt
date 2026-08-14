@@ -1,0 +1,10 @@
+Generate shell completion script
+
+Usage: ast-grep.exe completions [OPTIONS] [SHELL]
+
+Arguments:
+  [SHELL]  Output the completion file for given shell. If not provided, shell flavor will be inferred from environment [possible values: bash, elvish, fish, powershell, zsh]
+
+Options:
+  -c, --config <CONFIG_FILE>  Path to ast-grep root config, default is sgconfig.yml
+  -h, --help                  Print help

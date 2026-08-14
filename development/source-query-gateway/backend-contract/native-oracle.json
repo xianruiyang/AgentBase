@@ -1,0 +1,221 @@
+{
+  "schema": "agentbase.source-query-native-oracle/v1",
+  "fixture": "fixtures/root",
+  "versions": {
+    "rg": "ripgrep 15.1.0 (rev af60c2de9d)\n\nfeatures:+pcre2\nsimd(compile):+SSE2,-SSSE3,-AVX2\nsimd(runtime):+SSE2,+SSSE3,+AVX2\n\nPCRE2 10.45 is available (JIT is available)",
+    "fd": "fd 10.4.2",
+    "ast-grep": "ast-grep 0.44.1"
+  },
+  "cases": [
+    {
+      "id": "rg-match-json",
+      "backend": "rg",
+      "argv": [
+        "--json",
+        "--sort",
+        "path",
+        "-F",
+        "alpha",
+        "."
+      ],
+      "normalizer": "jsonl-strip-timing",
+      "exitCode": 0,
+      "stdoutBytes": 2475,
+      "stderrBytes": 0,
+      "stdoutSha256": "73dc5f91e1a01f0f02232cc70b06ce2b769e4bc635b912c354a64f3c3a130cbd",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": "{\"data\":{\"path\":{\"text\":\".\\\\docs\\\\read me.txt\"}},\"type\":\"begin\"}\n{\"data\":{\"absolute_offset\":0,\"line_number\":1,\"lines\":{\"text\":\"alpha in a path containing a space\\n\"},\"path\":{\"text\":\".\\\\docs\\\\read me.txt\"},\"submatches\":[{\"end\":5,\"match\":{\"text\":\"alpha\"},\"start\":0}]},\"type\":\"match\"}\n{\"data\":{\"binary_offset\":null,\"path\":{\"text\":\".\\\\docs\\\\read me.txt\"},\"stats\":{\"bytes_printed\":282,\"bytes_searched\":35,\"matched_lines\":1,\"matches\":1,\"searches\":1,\"searches_with_match\":1}},\"type\":\"end\"}\n{\"data\":{\"path\":{\"text\":\".\\\\src\\\\a.ts\"}},\"type\":\"begin\"}\n{\"data\":{\"absolute_offset\":0,\"line_number\":1,\"lines\":{\"text\":\"export function alpha(value: string): string {\\n\"},\"path\":{\"text\":\".\\\\src\\\\a.ts\"},\"submatches\":[{\"end\":21,\"match\":{\"text\":\"alpha\"},\"start\":16}]},\"type\":\"match\"}\n{\"data\":{\"absolute_offset\":69,\"line_number\":3,\"lines\":{\"text\":\"  return `alpha:${value}`;\\n\"},\"path\":{\"text\":\".\\\\src\\\\a.ts\"},\"submatches\":[{\"end\":15,\"match\":{\"text\":\"alpha\"},\"start\":10}]},\"type\":\"match\"}\n{\"data\":{\"binary_offset\":null,\"path\":{\"text\":\".\\\\src\\\\a.ts\"},\"stats\":{\"bytes_printed\":484,\"bytes_searched\":133,\"matched_lines\":2,\"matches\":2,\"searches\":1,\"searches_with_match\":1}},\"type\":\"end\"}\n{\"data\":{\"path\":{\"text\":\".\\\\src\\\\nested\\\\b.ts\"}},\"type\":\"begin\"}\n{\"data\":{\"absolute_offset\":0,\"line_number\":1,\"lines\":{\"text\":\"import { alpha } from \\\"../a\\\";\\n\"},\"path\":{\"text\":\".\\\\src\\\\nested\\\\b.ts\"},\"submatches\":[{\"end\":14,\"match\":{\"text\":\"alpha\"},\"start\":9}]},\"type\":\"match\"}\n{\"data\":{\"absolute_offset\":64,\"line_number\":4,\"lines\":{\"text\":\"  return alpha(\\\"nested\\\");\\n\"},\"path\":{\"text\":\".\\\\src\\\\nested\\\\b.ts\"},\"submatches\":[{\"end\":14,\"match\":{\"text\":\"alpha\"},\"start\":9}]},\"type\":\"match\"}\n{\"data\":{\"binary_offset\":null,\"path\":{\"text\":\".\\\\src\\\\nested\\\\b.ts\"},\"stats\":{\"bytes_printed\":492,\"bytes_searched\":129,\"matched_lines\":2,\"matches\":2,\"searches\":1,\"searches_with_match\":1}},\"type\":\"end\"}\n{\"data\":{\"path\":{\"text\":\".\\\\unicode\\\\文件.txt\"}},\"type\":\"begin\"}\n{\"data\":{\"absolute_offset\":0,\"line_number\":1,\"lines\":{\"text\":\"alpha unicode path\\n\"},\"path\":{\"text\":\".\\\\unicode\\\\文件.txt\"},\"submatches\":[{\"end\":5,\"match\":{\"text\":\"alpha\"},\"start\":0}]},\"type\":\"match\"}\n{\"data\":{\"binary_offset\":null,\"path\":{\"text\":\".\\\\unicode\\\\文件.txt\"},\"stats\":{\"bytes_printed\":270,\"bytes_searched\":19,\"matched_lines\":1,\"matches\":1,\"searches\":1,\"searches_with_match\":1}},\"type\":\"end\"}\n{\"data\":{\"stats\":{\"bytes_printed\":1528,\"bytes_searched\":316,\"matched_lines\":6,\"matches\":6,\"searches\":4,\"searches_with_match\":4}},\"type\":\"summary\"}\n",
+      "stderrUtf8": "",
+      "stdoutBase64": null
+    },
+    {
+      "id": "rg-no-match-json",
+      "backend": "rg",
+      "argv": [
+        "--json",
+        "--sort",
+        "path",
+        "-F",
+        "__missing__",
+        "."
+      ],
+      "normalizer": "jsonl-strip-timing",
+      "exitCode": 1,
+      "stdoutBytes": 144,
+      "stderrBytes": 0,
+      "stdoutSha256": "44b9878eefd3fe05fc9e3f5e3c0da4024a28bab77631e2fae03c3e8630598d7e",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": "{\"data\":{\"stats\":{\"bytes_printed\":0,\"bytes_searched\":316,\"matched_lines\":0,\"matches\":0,\"searches\":4,\"searches_with_match\":0}},\"type\":\"summary\"}\n",
+      "stderrUtf8": "",
+      "stdoutBase64": null
+    },
+    {
+      "id": "rg-files",
+      "backend": "rg",
+      "argv": [
+        "--files",
+        "--sort",
+        "path",
+        "."
+      ],
+      "normalizer": "raw",
+      "exitCode": 0,
+      "stdoutBytes": 69,
+      "stderrBytes": 0,
+      "stdoutSha256": "d2b80a039860276930368dc25fbd455b2643a0e0117eff6aabf90a6de5902ee5",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": ".\\docs\\read me.txt\n.\\src\\a.ts\n.\\src\\nested\\b.ts\n.\\unicode\\文件.txt\n",
+      "stderrUtf8": "",
+      "stdoutBase64": null
+    },
+    {
+      "id": "rg-count-matches",
+      "backend": "rg",
+      "argv": [
+        "--count-matches",
+        "--sort",
+        "path",
+        "-F",
+        "alpha",
+        "."
+      ],
+      "normalizer": "raw",
+      "exitCode": 0,
+      "stdoutBytes": 77,
+      "stderrBytes": 0,
+      "stdoutSha256": "db39365fe1d57d4115bcc51fbcaba807b1d9c09aaa2da3f3ec81dc61f895c3ae",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": ".\\docs\\read me.txt:1\n.\\src\\a.ts:2\n.\\src\\nested\\b.ts:2\n.\\unicode\\文件.txt:1\n",
+      "stderrUtf8": "",
+      "stdoutBase64": null
+    },
+    {
+      "id": "fd-files",
+      "backend": "fd",
+      "argv": [
+        "-t",
+        "f",
+        "--threads",
+        "1",
+        "--path-separator",
+        "/",
+        ".",
+        "."
+      ],
+      "normalizer": "raw",
+      "exitCode": 0,
+      "stdoutBytes": 69,
+      "stderrBytes": 0,
+      "stdoutSha256": "b465677b7f98bbad33ae4de6a68cc77d43940788f10015b2682c2e320db63e12",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": "./docs/read me.txt\n./src/a.ts\n./src/nested/b.ts\n./unicode/文件.txt\n",
+      "stderrUtf8": "",
+      "stdoutBase64": null
+    },
+    {
+      "id": "fd-no-match",
+      "backend": "fd",
+      "argv": [
+        "-t",
+        "f",
+        "--threads",
+        "1",
+        "__missing__",
+        "."
+      ],
+      "normalizer": "raw",
+      "exitCode": 0,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": "",
+      "stderrUtf8": "",
+      "stdoutBase64": null
+    },
+    {
+      "id": "fd-print0",
+      "backend": "fd",
+      "argv": [
+        "-0",
+        "-t",
+        "f",
+        "--threads",
+        "1",
+        ".",
+        "."
+      ],
+      "normalizer": "raw",
+      "exitCode": 0,
+      "stdoutBytes": 69,
+      "stderrBytes": 0,
+      "stdoutSha256": "f6635fe8c7df47e0d4abca54ae7caf2cd05a0c965c583311ac716a68b41ceb8b",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": "./docs\\read me.txt\u0000./src\\a.ts\u0000./src\\nested\\b.ts\u0000./unicode\\文件.txt\u0000",
+      "stderrUtf8": "",
+      "stdoutBase64": "Li9kb2NzXHJlYWQgbWUudHh0AC4vc3JjXGEudHMALi9zcmNcbmVzdGVkXGIudHMALi91bmljb2RlXOaWh+S7ti50eHQA"
+    },
+    {
+      "id": "ast-run-json",
+      "backend": "ast-grep",
+      "argv": [
+        "run",
+        "-p",
+        "alpha($A)",
+        "-l",
+        "ts",
+        "--json=stream",
+        "src"
+      ],
+      "normalizer": "jsonl",
+      "exitCode": 0,
+      "stdoutBytes": 449,
+      "stderrBytes": 0,
+      "stdoutSha256": "b5aee197722e0d9f7b32f029a97be6da92cd9fd55363780fa7e1e2321d6193f0",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": "{\"charCount\":{\"leading\":9,\"trailing\":1},\"file\":\"src\\\\nested\\\\b.ts\",\"language\":\"TypeScript\",\"lines\":\"  return alpha(\\\"nested\\\");\",\"metaVariables\":{\"multi\":{},\"single\":{\"A\":{\"range\":{\"byteOffset\":{\"end\":87,\"start\":79},\"end\":{\"column\":23,\"line\":3},\"start\":{\"column\":15,\"line\":3}},\"text\":\"\\\"nested\\\"\"}},\"transformed\":{}},\"range\":{\"byteOffset\":{\"end\":88,\"start\":73},\"end\":{\"column\":24,\"line\":3},\"start\":{\"column\":9,\"line\":3}},\"text\":\"alpha(\\\"nested\\\")\"}\n",
+      "stderrUtf8": "",
+      "stdoutBase64": null
+    },
+    {
+      "id": "ast-run-no-match",
+      "backend": "ast-grep",
+      "argv": [
+        "run",
+        "-p",
+        "missing($A)",
+        "-l",
+        "ts",
+        "--json=stream",
+        "src"
+      ],
+      "normalizer": "jsonl",
+      "exitCode": 1,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": "",
+      "stderrUtf8": "",
+      "stdoutBase64": null
+    },
+    {
+      "id": "ast-outline-json",
+      "backend": "ast-grep",
+      "argv": [
+        "outline",
+        "--json=stream",
+        "src"
+      ],
+      "normalizer": "jsonl",
+      "exitCode": 0,
+      "stdoutBytes": 1078,
+      "stderrBytes": 0,
+      "stdoutSha256": "88de94df3cf72deba1c120302716a45ed86784976e91f949c3f668bc8271a111",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": "{\"items\":[{\"astKind\":\"export_statement\",\"isExported\":true,\"isImport\":false,\"name\":\"beta\",\"range\":{\"byteOffset\":{\"end\":91,\"start\":31},\"end\":{\"column\":1,\"line\":4},\"start\":{\"column\":0,\"line\":2}},\"role\":\"item\",\"signature\":\"\",\"symbolType\":\"function\"},{\"astKind\":\"export_statement\",\"isExported\":true,\"isImport\":false,\"name\":\"sharedName\",\"range\":{\"byteOffset\":{\"end\":128,\"start\":93},\"end\":{\"column\":35,\"line\":6},\"start\":{\"column\":0,\"line\":6}},\"role\":\"item\",\"signature\":\"\",\"symbolType\":\"constant\"}],\"language\":\"TypeScript\",\"path\":\"src\\\\nested\\\\b.ts\"}\n{\"items\":[{\"astKind\":\"export_statement\",\"isExported\":true,\"isImport\":false,\"name\":\"alpha\",\"range\":{\"byteOffset\":{\"end\":97,\"start\":0},\"end\":{\"column\":1,\"line\":3},\"start\":{\"column\":0,\"line\":0}},\"role\":\"item\",\"signature\":\"\",\"symbolType\":\"function\"},{\"astKind\":\"export_statement\",\"isExported\":true,\"isImport\":false,\"name\":\"sharedName\",\"range\":{\"byteOffset\":{\"end\":132,\"start\":99},\"end\":{\"column\":33,\"line\":5},\"start\":{\"column\":0,\"line\":5}},\"role\":\"item\",\"signature\":\"\",\"symbolType\":\"constant\"}],\"language\":\"TypeScript\",\"path\":\"src\\\\a.ts\"}\n",
+      "stderrUtf8": "",
+      "stdoutBase64": null
+    }
+  ]
+}

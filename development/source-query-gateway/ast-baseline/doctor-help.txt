@@ -1,0 +1,8 @@
+Diagnose config, engine, cache, YAML, and protocol limits without scanning
+
+Usage: sgy.exe doctor [OPTIONS]
+
+Options:
+      --engine <PATH>  
+      --cwd <PATH>     
+  -h, --help           Print help

@@ -1,0 +1,127 @@
+{
+  "schema": "agentbase.source-query-help-manifest/v1",
+  "normalizedEncoding": "utf-8-no-bom",
+  "normalizedNewlines": "host-capture-preserved",
+  "files": [
+    {
+      "path": "help/ast-grep-0.41.1-completions.txt",
+      "bytes": 411,
+      "sha256": "5d4bf531d273102c0b3c1df95eecba58455a28bd55b47746b651fabbc93bfe84"
+    },
+    {
+      "path": "help/ast-grep-0.41.1-lsp.txt",
+      "bytes": 195,
+      "sha256": "b42176143dbfd3011276cad4c5a648534b0464424abca790135180876ed4896f"
+    },
+    {
+      "path": "help/ast-grep-0.41.1-new.txt",
+      "bytes": 1007,
+      "sha256": "cd87e83c64d76a251a71dc76605b701ed340cbadd0fd81340b70ea483dd929a1"
+    },
+    {
+      "path": "help/ast-grep-0.41.1-run.txt",
+      "bytes": 9042,
+      "sha256": "6ea7e5edca9a76c6498ae4c0f4b7a4599a2a69d1c681da28e5e61b9d3f1429a0"
+    },
+    {
+      "path": "help/ast-grep-0.41.1-scan.txt",
+      "bytes": 10201,
+      "sha256": "0637da5b94367d7b2234efc667855433949e4c2c8b9da5e22350bfc1ee71c26e"
+    },
+    {
+      "path": "help/ast-grep-0.41.1-test.txt",
+      "bytes": 1138,
+      "sha256": "943273f0962da2a6e5f84a75c6f9da84e2131462886009b2f898b0f19462df80"
+    },
+    {
+      "path": "help/ast-grep-0.41.1.txt",
+      "bytes": 1008,
+      "sha256": "bed631d940fe7007357db31b4e36c594df3f5e24d42334313ceafb2418e6694e"
+    },
+    {
+      "path": "help/ast-grep-0.42.0-completions.txt",
+      "bytes": 411,
+      "sha256": "5d4bf531d273102c0b3c1df95eecba58455a28bd55b47746b651fabbc93bfe84"
+    },
+    {
+      "path": "help/ast-grep-0.42.0-lsp.txt",
+      "bytes": 195,
+      "sha256": "b42176143dbfd3011276cad4c5a648534b0464424abca790135180876ed4896f"
+    },
+    {
+      "path": "help/ast-grep-0.42.0-new.txt",
+      "bytes": 1007,
+      "sha256": "cd87e83c64d76a251a71dc76605b701ed340cbadd0fd81340b70ea483dd929a1"
+    },
+    {
+      "path": "help/ast-grep-0.42.0-run.txt",
+      "bytes": 9042,
+      "sha256": "6ea7e5edca9a76c6498ae4c0f4b7a4599a2a69d1c681da28e5e61b9d3f1429a0"
+    },
+    {
+      "path": "help/ast-grep-0.42.0-scan.txt",
+      "bytes": 10201,
+      "sha256": "0637da5b94367d7b2234efc667855433949e4c2c8b9da5e22350bfc1ee71c26e"
+    },
+    {
+      "path": "help/ast-grep-0.42.0-test.txt",
+      "bytes": 1138,
+      "sha256": "943273f0962da2a6e5f84a75c6f9da84e2131462886009b2f898b0f19462df80"
+    },
+    {
+      "path": "help/ast-grep-0.42.0.txt",
+      "bytes": 1008,
+      "sha256": "bed631d940fe7007357db31b4e36c594df3f5e24d42334313ceafb2418e6694e"
+    },
+    {
+      "path": "help/ast-grep-0.44.1-completions.txt",
+      "bytes": 415,
+      "sha256": "33e1eb74f9284eaab18445c7635208ef9e02d4711b7c3e40c8d09b1ef49515f3"
+    },
+    {
+      "path": "help/ast-grep-0.44.1-lsp.txt",
+      "bytes": 199,
+      "sha256": "bb44f9b58559a32b6cd36d530755b505279baab465933f6a349de2bd3424f214"
+    },
+    {
+      "path": "help/ast-grep-0.44.1-new.txt",
+      "bytes": 1007,
+      "sha256": "e602a8c026332d0e8acab02b1b873849b5c673fcb46bdd589ebc86362cbc1453"
+    },
+    {
+      "path": "help/ast-grep-0.44.1-outline.txt",
+      "bytes": 7569,
+      "sha256": "a9234dc1ecd78cb235e545ab714b8a89eda7924b2ca9051b8bf2b28765dd20eb"
+    },
+    {
+      "path": "help/ast-grep-0.44.1-run.txt",
+      "bytes": 9409,
+      "sha256": "502f3b4c51672b7093038a604b729c9acf7d16f664911fe39882f1f0c71ea700"
+    },
+    {
+      "path": "help/ast-grep-0.44.1-scan.txt",
+      "bytes": 10205,
+      "sha256": "31ee61a97084a5774c06f04aa6f1f23b9bd59f5ce181dae3b5af88340c1030fb"
+    },
+    {
+      "path": "help/ast-grep-0.44.1-test.txt",
+      "bytes": 2359,
+      "sha256": "75398e342c8b5fb8171da609ce110cc34b81c4f34693774a37cfdbdc0f7ab666"
+    },
+    {
+      "path": "help/ast-grep-0.44.1.txt",
+      "bytes": 1094,
+      "sha256": "15c78fe5f4751072e662840a767b81b356995d997ea432749c154809e8483c68"
+    },
+    {
+      "path": "help/fd-10.4.2.txt",
+      "bytes": 16224,
+      "sha256": "40f7fc804e2719c880fe12be17a7ea44e779440f7219f1c5e51be1f3a46db47f"
+    },
+    {
+      "path": "help/ripgrep-15.1.0.txt",
+      "bytes": 76018,
+      "sha256": "1027a6117bcc61a5109b61d6affaba313a37504df7a44f4cd8a284f49616680d"
+    }
+  ]
+}

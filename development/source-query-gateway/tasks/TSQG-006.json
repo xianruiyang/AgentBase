@@ -1,0 +1,44 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "正式 corpus/schema",
+        "快照绑定与 oracle"
+      ],
+      "id": "TSQG-005",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-006",
+  "mutation_scope": [
+    "development/code-search-benchmark/**",
+    "development/common/payload_contract.ps1",
+    "development/codex-deployment/**",
+    "development/plugin-packaging/**"
+  ],
+  "outcome": "项目内唯一 benchmark 入口能够构建受控环境、运行新鲜隔离 agent、监控完整事件和用量并生成 detached audit capsule",
+  "outputs": [
+    "环境 identity 与 allowlist diff",
+    "A-B-B-A 调度与外部 monitor",
+    "原始事件归档、汇总和 detached audit capsule"
+  ],
+  "reasoning_hint": "max",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "AC-SQG-004",
+    "CON-SQG-003",
+    "UDES-SQG-007",
+    "UDES-SQG-008",
+    "DES-SQG-010"
+  ],
+  "suggested_skills": [
+    "powershell-usage",
+    "change-governance"
+  ],
+  "title": "扩展唯一隔离 benchmark runner 与 monitor",
+  "verification": [
+    "定向测试新鲜 agent、只读快照、完整 usage、超时失败保留和角色单向隔离",
+    "验证 Plugin 与 DirectCompatibility payload 不含 benchmark 资产"
+  ]
+}

@@ -1,0 +1,20 @@
+Safely process sgy YAML or verified cache results
+
+Usage: sgy.exe process <COMMAND>
+
+Commands:
+  validate         Validate safe YAML and schemas
+  select           Select record fields
+  filter           Keep records equal to one JSON value
+  count            Count input records
+  group            Count records by one scalar field
+  containing       Select the smallest cached ranges containing one 0-based position
+  group-locations  Group verified cached locations without repeating file paths
+  sort             Stably sort records by one scalar field
+  dedupe           Stably remove duplicate record identities
+  merge            Merge explicit file/cache sources with provenance
+  to-jsonl         Convert safe YAML documents to compact JSONL
+  from-jsonl       Convert bounded JSONL records to safe YAML
+
+Options:
+  -h, --help  Print help

@@ -1,0 +1,22 @@
+Execute ast-grep and convert its output
+
+Usage: sgy.exe exec [OPTIONS]
+
+Options:
+      --engine <PATH>            
+      --cwd <PATH>               
+      --yaml-out <PATH>          
+      --artifact-out <PATH>      
+      --stderr-yaml <PATH>       
+      --meta-out <PATH>          Write bounded execution metadata for batch, TTY, or LSP execution
+      --profile <PROFILE>        [possible values: token-safe, locations, lossless, files, custom]
+      --cache <MODE>             [possible values: auto, on, off]
+      --fingerprint-file <PATH>  Snapshot one source file before execution for verified cache reuse
+      --max-detail-results <N>   
+      --max-text-chars <N>       
+      --max-context-bytes <N>    
+      --keep-fields <PATHS>      
+      --prune-fields <PATHS>     
+      --no-native-defaults       
+      --strict                   
+  -h, --help                     Print help

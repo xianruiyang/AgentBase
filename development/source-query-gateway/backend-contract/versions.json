@@ -1,0 +1,47 @@
+{
+  "schema": "agentbase.source-query-backend-versions/v1",
+  "platform": "windows-x86_64",
+  "capturedDate": "2026-08-15",
+  "backends": [
+    {
+      "id": "rg-15.1.0",
+      "backend": "rg",
+      "version": "15.1.0",
+      "versionOutputPrefix": "ripgrep 15.1.0",
+      "commands": ["search", "files", "generate", "help", "version"],
+      "help": ["help/ripgrep-15.1.0.txt"]
+    },
+    {
+      "id": "fd-10.4.2",
+      "backend": "fd",
+      "version": "10.4.2",
+      "versionOutput": "fd 10.4.2",
+      "commands": ["search", "exec", "exec-batch", "help", "version"],
+      "help": ["help/fd-10.4.2.txt"]
+    },
+    {
+      "id": "ast-grep-0.41.1",
+      "backend": "ast-grep",
+      "version": "0.41.1",
+      "versionOutput": "ast-grep 0.41.1",
+      "commands": ["run", "scan", "test", "new", "lsp", "completions", "help", "version"],
+      "helpPrefix": "help/ast-grep-0.41.1"
+    },
+    {
+      "id": "ast-grep-0.42.0",
+      "backend": "ast-grep",
+      "version": "0.42.0",
+      "versionOutput": "ast-grep 0.42.0",
+      "commands": ["run", "scan", "test", "new", "lsp", "completions", "help", "version"],
+      "helpPrefix": "help/ast-grep-0.42.0"
+    },
+    {
+      "id": "ast-grep-0.44.1",
+      "backend": "ast-grep",
+      "version": "0.44.1",
+      "versionOutput": "ast-grep 0.44.1",
+      "commands": ["run", "scan", "test", "new", "lsp", "outline", "completions", "help", "version"],
+      "helpPrefix": "help/ast-grep-0.44.1"
+    }
+  ]
+}

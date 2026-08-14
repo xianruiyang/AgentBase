@@ -1,0 +1,13 @@
+Retrieve and maintain committed native-result caches
+
+Usage: sgy.exe cache <COMMAND>
+
+Commands:
+  get     Retrieve a complete cache, one result, or one result field
+  query   Filter cached results by indexed file and rule id
+  info    Show verified cache metadata
+  remove  Remove one inactive cache
+  gc      Run TTL and quota garbage collection
+
+Options:
+  -h, --help  Print help

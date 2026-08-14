@@ -1,0 +1,21 @@
+Token-safe YAML adapter for ast-grep
+
+Usage: sgy.exe [COMMAND]
+
+Commands:
+  exec          Execute ast-grep and convert its output
+  defaults      Preview wrapper defaults without discovering or starting ast-grep
+  cache         Retrieve and maintain committed native-result caches
+  process       Safely process sgy YAML or verified cache results
+  schema        Print the bounded sgy configuration schema
+  capabilities  Print bounded wrapper capabilities
+  doctor        Diagnose config, engine, cache, YAML, and protocol limits without scanning
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+
+Operational syntax: sgy <exec|defaults> [wrapper options] -- <ast-grep argv...>
+Inspection syntax: sgy <schema|capabilities|doctor> ...
+Cache syntax: sgy cache <get|query|info|remove|gc> ...
+Process syntax: sgy process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...

@@ -1,0 +1,57 @@
+{
+  "schema": "agentbase.source-query.history/v1",
+  "total_token_formula": "input_tokens + output_tokens",
+  "experiments": [
+    {
+      "id": "2026-08-14-pilot-24-v2",
+      "status": "directional-only",
+      "result": {
+        "observed_location": "C:\\Users\\gzxt\\AppData\\Local\\Temp\\AgentBase-codex-ab-benchmark\\pilot-24-v2\\summary.json",
+        "sha256": "4b0121552201b8387d8188edcf4e149ff772fa5ee3d2e5c37538a18d94522029",
+        "bytes": 78447,
+        "records": 24
+      },
+      "audit": {
+        "kind": "independent-human-semantic-audit",
+        "observed_location": "C:\\Users\\gzxt\\AppData\\Local\\Temp\\AgentBase-codex-ab-benchmark\\independent-audit.md",
+        "sha256": "ba024bc72423d675c82d340a5f60179c7a410d7937647036e97f10d616783104",
+        "bytes": 13763
+      },
+      "aggregates": {
+        "baseline": {"records": 12, "input_tokens": 1751898, "cached_input_tokens": 1443328, "output_tokens": 13324, "reasoning_output_tokens": 5043, "total_tokens": 1765222, "elapsed_ms": 835899, "raw_oracle_passed": 9, "audited_strict_passed": 11, "audited_core_passed": 12},
+        "candidate": {"records": 12, "input_tokens": 2178931, "cached_input_tokens": 1754624, "output_tokens": 14612, "reasoning_output_tokens": 4605, "total_tokens": 2193543, "elapsed_ms": 777845, "raw_oracle_passed": 9, "audited_strict_passed": 11, "audited_core_passed": 12}
+      },
+      "identity_limits": [
+        "source commit and dirty patch were not frozen",
+        "environment tree was not recorded as one portable manifest",
+        "candidate changed multiple skill and wrapper mechanisms",
+        "quality corpus used lexical oracle patterns before independent semantic correction"
+      ]
+    },
+    {
+      "id": "2026-08-14-five-skill-ablation-full-24-v2",
+      "status": "directional-only",
+      "result": {
+        "observed_location": "C:\\Users\\gzxt\\AppData\\Local\\Temp\\AgentBase-code-search-opt-benchmark-v2\\full-24-v2\\summary.json",
+        "sha256": "0ba2907b45e1a57df881cff8b95f8f92b1d63cc0a5be175a3695c09fc19c72d4",
+        "bytes": 61318,
+        "records": 24
+      },
+      "audit": {
+        "kind": "historical-conversation-review",
+        "artifact": null,
+        "limitation": "no detached audit artifact remains; conservative 11/12 and core 12/12 are historical reviewed conclusions, not recomputable from the raw lexical oracle alone"
+      },
+      "aggregates": {
+        "ablation": {"records": 12, "input_tokens": 1149926, "cached_input_tokens": 802816, "output_tokens": 7185, "reasoning_output_tokens": 2692, "total_tokens": 1157111, "elapsed_ms": 508509, "raw_oracle_passed": 10, "historical_strict_passed": 11, "historical_core_passed": 12},
+        "candidate": {"records": 12, "input_tokens": 1372957, "cached_input_tokens": 1046016, "output_tokens": 10057, "reasoning_output_tokens": 3717, "total_tokens": 1383014, "elapsed_ms": 582805, "raw_oracle_passed": 8, "historical_strict_passed": 11, "historical_core_passed": 12}
+      },
+      "identity_limits": [
+        "source commit and dirty patch were not frozen",
+        "the five removed skills are one compound treatment rather than a single mechanism",
+        "no surviving detached semantic audit artifact",
+        "raw lexical oracle scores cannot substitute for the historical semantic review"
+      ]
+    }
+  ]
+}

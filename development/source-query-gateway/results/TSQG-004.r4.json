@@ -1,0 +1,55 @@
+{
+  "changed_files": [
+    "development/source-query-gateway/history/README.md",
+    "development/source-query-gateway/history/index.json",
+    "development/source-query-gateway/history/verify_history.py"
+  ],
+  "evidence_for": [
+    "AC-SQG-002",
+    "AC-SQG-003",
+    "AC-SQG-004",
+    "DES-SQG-010"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "history-index",
+      "note": "只读历史实验身份、聚合和证据上限",
+      "ref": "development/source-query-gateway/history/index.json"
+    },
+    {
+      "kind": "verification",
+      "note": "原始 usage 哈希与聚合复算入口",
+      "ref": "development/source-query-gateway/history/verify_history.py"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "两轮既有真实 Codex 对照已按 input+output 的唯一总 Token 口径登记，原始 summary 与首轮独立审计均绑定哈希；未冻结源码和环境身份、第二轮无留存 detached audit 等限制明确阻止它们被拼接为当前候选因果基线。",
+  "outputs": [
+    "首轮 baseline 1765222、candidate 2193543 actual total tokens",
+    "第二轮 five-skill ablation 1157111、candidate 1383014 actual total tokens",
+    "历史结果可用时可从 24 条逐次 usage 复算，缺失时只报告 unavailable",
+    "历史身份不足时仅作方向性现实依据"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:edefa68fe1e105b5bcb1d32724315d480083f4fad7a27b129787b8ca2cdc2224",
+    "AC-SQG-002": "sha256:9431f26723ac18686507f57487f1c8ad3991aa0c2e37fe44a1bc9bc62d48ce9f",
+    "AC-SQG-003": "sha256:dd62ea72b87d1869e8ed85483f7c071873844544c058c11969c24788e76617cc",
+    "AC-SQG-004": "sha256:c6b2799ece418f7f7ee4e37ab22e15a9a8cb724731def5b0853335f00aa542b1",
+    "CON-SQG-001": "sha256:e224215fe1492c484306b35827babb9f11e1efd0915b35feabd3cee660081eb3",
+    "CON-SQG-002": "sha256:fd5ad79f19a584827b89c9b831166884608e15a6a5e1e1415c051bb38a8fea68",
+    "CON-SQG-003": "sha256:56b350a9ceb81ce73d6d6376f9bd1ac81785ac08e374219f6ba36e0ddb956ef0",
+    "DES-SQG-010": "sha256:dd682e350f743719c25ecd147cc78f3b9406417ad8836add252b7f3dd4c71904",
+    "REQ-SQG-001": "sha256:3be96a1ab34b2f80f823730a8a8c941e20578a6bec36b12fe87346f502ce869b",
+    "UDES-SQG-007": "sha256:8550290e06b1f91fa8d90d84ee6eeb13431d0cd4c46b297ca8efe688aacf00bc",
+    "UDES-SQG-008": "sha256:6e678e375156b50e60791bc88d85df53ba4f074855df336a8b053bf1f7aa0df4"
+  },
+  "task_id": "TSQG-004",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "verify_history.py：2 个 summary 哈希匹配、24+24 条结果按环境复算通过",
+    "首轮 independent-audit.md 哈希已登记",
+    "第二轮缺少 detached audit artifact 的限制已显式记录"
+  ]
+}

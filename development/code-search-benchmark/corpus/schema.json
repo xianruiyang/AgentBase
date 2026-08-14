@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentbase.source-query-corpus/v1",
+  "type": "object",
+  "required": ["schema", "version", "created_utc", "workspace_roles", "cases"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "agentbase.source-query-corpus/v1"},
+    "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}\\.[0-9]+$"},
+    "created_utc": {"type": "string"},
+    "workspace_roles": {"type": "object", "minProperties": 1},
+    "cases": {"type": "array", "minItems": 1}
+  }
+}

@@ -1,0 +1,63 @@
+"schema": "sgy.schema/v1"
+"subject": "sgy.config/v1"
+"document":
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+  "$id": "https://sgy.local/schema/config-v1"
+  "type": "object"
+  "additionalProperties": false
+  "required":
+    - "schema"
+  "properties":
+    "schema":
+      "const": "sgy.config/v1"
+    "engine":
+      "type": "string"
+      "minLength": 1
+    "cwd":
+      "type": "string"
+      "minLength": 1
+    "profile":
+      "enum":
+        - "token-safe"
+        - "locations"
+        - "lossless"
+        - "files"
+        - "custom"
+    "native_defaults":
+      "type": "boolean"
+    "cache":
+      "enum":
+        - "auto"
+        - "on"
+        - "off"
+    "max_detail_results":
+      "type": "integer"
+      "minimum": 1
+      "maximum": 4294967295
+    "max_text_chars":
+      "type": "integer"
+      "minimum": 0
+      "maximum": 4294967295
+    "max_context_bytes":
+      "type": "integer"
+      "minimum": 1
+    "keep_fields":
+      "type": "string"
+    "prune_fields":
+      "type": "string"
+"scope_rules":
+  "project":
+    "filename": ".sgy.yml"
+    "forbidden_fields":
+      - "engine"
+      - "cwd"
+      - "cache"
+    "reason": "project config cannot select executables, expand cwd, or enable writes"
+  "user":
+    "filename": "sgy/config.yml"
+"parser_limits":
+  "max_bytes": 65536
+  "max_depth": 16
+  "max_nodes": 256
+  "documents": 1
+  "aliases_anchors_tags": "forbidden"

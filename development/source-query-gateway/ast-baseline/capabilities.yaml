@@ -1,0 +1,77 @@
+"schema": "sgy.capabilities/v1"
+"wrapper":
+  "version": "0.1.2"
+"commands":
+  "native":
+    - "exec"
+    - "defaults"
+  "inspection":
+    - "schema"
+    - "capabilities"
+    - "doctor"
+  "cache":
+    - "get"
+    - "query"
+    - "info"
+    - "remove"
+    - "gc"
+  "process":
+    - "validate"
+    - "select"
+    - "filter"
+    - "count"
+    - "group"
+    - "sort"
+    - "dedupe"
+    - "merge"
+    - "to-jsonl"
+    - "from-jsonl"
+    - "containing"
+    - "group-locations"
+"config":
+  "schema": "sgy.config/v1"
+  "precedence":
+    - "explicit_native_argv"
+    - "explicit_sgy"
+    - "project"
+    - "user"
+    - "builtin"
+  "project_forbidden":
+    - "engine"
+    - "cwd"
+    - "cache"
+"formats":
+  "input":
+    - "json"
+    - "jsonl"
+    - "sarif"
+    - "safe_yaml"
+  "context_output": "yaml-1.2-safe-subset"
+  "jsonl_round_trip": "common_data_model"
+"yaml":
+  "aliases_anchors_tags": false
+  "duplicate_json_keys": false
+  "streaming_documents": true
+"protocols":
+  "lsp":
+    "mode": "byte_passthrough"
+    "yaml_output": false
+  "interactive_tty":
+    "mode": "inherited"
+    "yaml_output": false
+"defaults":
+  "schema": "sgy.builtin-defaults/v1"
+  "profile": "token-safe"
+  "native_defaults": true
+  "cache": "auto"
+  "max_detail_results": 40
+  "max_text_chars": 400
+  "max_context_bytes": 24576
+  "project_config":
+    "filename": ".sgy.yml"
+    "forbidden_fields":
+      - "engine"
+      - "cwd"
+      - "cache"
+  "config_schema": "sgy.config/v1"
+"diagnostic_output_limit_bytes": 131072

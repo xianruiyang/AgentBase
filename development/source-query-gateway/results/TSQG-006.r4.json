@@ -1,0 +1,44 @@
+{
+  "changed_files": [
+    "development/code-search-benchmark/README.md",
+    "development/code-search-benchmark/experiment.py",
+    "development/code-search-benchmark/tests/test_experiment.py"
+  ],
+  "evidence_for": ["AC-SQG-004", "CON-SQG-003", "UDES-SQG-007", "UDES-SQG-008", "DES-SQG-010"],
+  "evidence_refs": [
+    {"kind": "runner-monitor", "note": "唯一环境构建、调度、监控与 capsule 入口", "ref": "development/code-search-benchmark/experiment.py"},
+    {"kind": "test-suite", "note": "平衡调度、环境差异、快照失效、usage 与超时验证", "ref": "development/code-search-benchmark/tests/test_experiment.py"},
+    {"kind": "deployment-contract", "note": "正式部署只从 global、required skills 与 portable settings 组装，不消费 development benchmark", "ref": "development/codex-deployment/manage_agentbase.ps1"}
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "项目内唯一 benchmark owner 现可冻结 corpus、Git 工作区快照、最小 Codex home 树、工具版本和 allowlist 差异，按平衡顺序运行新鲜只读 subject，完整保留超时/失败/usage 并生成只供独立审计读取的 capsule。",
+  "outputs": [
+    "agentbase.source-query-experiment/v1 身份与前后快照复核",
+    "两次重复的 A-B-B-A 或 B-A-A-B 平衡调度",
+    "codex exec --json --ephemeral --sandbox read-only 外部 monitor",
+    "summary 与 detached audit capsule，raw JSONL/stderr 仅以哈希进入 capsule"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:edefa68fe1e105b5bcb1d32724315d480083f4fad7a27b129787b8ca2cdc2224",
+    "AC-SQG-002": "sha256:9431f26723ac18686507f57487f1c8ad3991aa0c2e37fe44a1bc9bc62d48ce9f",
+    "AC-SQG-003": "sha256:dd62ea72b87d1869e8ed85483f7c071873844544c058c11969c24788e76617cc",
+    "AC-SQG-004": "sha256:c6b2799ece418f7f7ee4e37ab22e15a9a8cb724731def5b0853335f00aa542b1",
+    "CON-SQG-001": "sha256:e224215fe1492c484306b35827babb9f11e1efd0915b35feabd3cee660081eb3",
+    "CON-SQG-002": "sha256:fd5ad79f19a584827b89c9b831166884608e15a6a5e1e1415c051bb38a8fea68",
+    "CON-SQG-003": "sha256:56b350a9ceb81ce73d6d6376f9bd1ac81785ac08e374219f6ba36e0ddb956ef0",
+    "DES-SQG-010": "sha256:dd682e350f743719c25ecd147cc78f3b9406417ad8836add252b7f3dd4c71904",
+    "REQ-SQG-001": "sha256:3be96a1ab34b2f80f823730a8a8c941e20578a6bec36b12fe87346f502ce869b",
+    "UDES-SQG-007": "sha256:8550290e06b1f91fa8d90d84ee6eeb13431d0cd4c46b297ca8efe688aacf00bc",
+    "UDES-SQG-008": "sha256:6e678e375156b50e60791bc88d85df53ba4f074855df336a8b053bf1f7aa0df4"
+  },
+  "task_id": "TSQG-006",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "code-search-benchmark 受影响测试：7 tests passed",
+    "py_compile：experiment、corpus validator、history verifier 通过",
+    "部署源清单检索：无 code-search-benchmark 或 source-query-gateway 发布引用",
+    "monitor 定向测试真实启动新进程、读回完整 usage，并在 1 秒超时后终止保留失败"
+  ]
+}

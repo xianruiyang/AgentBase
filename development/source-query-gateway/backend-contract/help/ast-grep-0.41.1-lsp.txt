@@ -1,0 +1,7 @@
+Start language server
+
+Usage: ast-grep lsp [OPTIONS]
+
+Options:
+  -c, --config <CONFIG_FILE>  Path to ast-grep root config, default is sgconfig.yml
+  -h, --help                  Print help

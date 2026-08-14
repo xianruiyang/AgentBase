@@ -1,0 +1,39 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "质量、总 Token、速度的验收顺序"
+      ],
+      "id": "TSQG-001",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-004",
+  "mutation_scope": [
+    "development/source-query-gateway/history/**",
+    "development/code-search-benchmark/**"
+  ],
+  "outcome": "既有真实 Codex 对照的用量、审计身份、可复算来源和不可直接比较边界形成只读历史索引",
+  "outputs": [
+    "历史运行与独立审计的只读索引",
+    "experiment identity 缺口和复用上限"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "AC-SQG-002",
+    "AC-SQG-003",
+    "AC-SQG-004",
+    "DES-SQG-010"
+  ],
+  "suggested_skills": [
+    "token-usage-analysis",
+    "powershell-usage"
+  ],
+  "title": "登记历史总 Token 基线及证据边界",
+  "verification": [
+    "从现有 usage 与审计结果复算聚合值",
+    "确认缺失源码快照或环境混杂不会进入新因果结论"
+  ]
+}

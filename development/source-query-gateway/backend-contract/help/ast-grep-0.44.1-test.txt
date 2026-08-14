@@ -1,0 +1,49 @@
+Test ast-grep rules
+
+Usage: ast-grep.exe test [OPTIONS]
+
+Options:
+  -t, --test-dir <TEST_DIR>
+          the directories to search test YAML files
+
+      --snapshot-dir <SNAPSHOT_DIR>
+          Specify the directory name storing snapshots. Default to __snapshots__
+
+      --skip-snapshot-tests
+          Only check if the test code is valid, without checking rule output. Turn it on when you want to ignore the output of rules. Conflicts with --update-all
+
+  -U, --update-all
+          Update the content of all snapshots that have changed in test. Conflicts with --skip-snapshot-tests
+
+  -i, --interactive
+          Start an interactive review to update snapshots selectively
+
+  -f, --filter <REGEX>
+          Only run rule test cases that matches REGEX
+
+      --include-off
+          Include `severity:off` rules in test
+          
+          ast-grep will not run rules with `severity: off` by default. This option will include those rules in the test.
+
+  -c, --config <CONFIG_FILE>
+          Path to ast-grep root config, default is sgconfig.yml
+
+      --follow
+          Follow symbolic links while searching test YAML files
+
+      --color <WHEN>
+          Controls output color.
+          
+          This flag controls when to use colors. The default setting is 'auto', which means ast-grep will try to guess when to use colors. If ast-grep is printing to a terminal, then it will use colors, but if it is redirected to a file or a pipe, then it will suppress color output. ast-grep will also suppress color output in some other circumstances. For example, no color will be used if the TERM environment variable is not set or set to 'dumb'.
+
+          Possible values:
+          - auto:   Try to use colors, but don't force the issue. If the output is piped to another program, or the console isn't available on Windows, or if TERM=dumb, or if `NO_COLOR` is defined, for example, then don't use colors
+          - always: Try very hard to emit colors. This includes emitting ANSI colors on Windows if the console API is unavailable (not implemented yet)
+          - ansi:   Ansi is like Always, except it never tries to use anything other than emitting ANSI color codes
+          - never:  Never emit colors
+          
+          [default: auto]
+
+  -h, --help
+          Print help (see a summary with '-h')

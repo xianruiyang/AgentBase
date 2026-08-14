@@ -1,6 +1,16 @@
 # 代码搜索收益基准
 
-本入口只核算已经完成的真实搜索运行，不执行搜索命令。这样可把不同工具、MCP 调用和失败回退统一记录，同时避免 benchmark 形成第二套搜索执行入口。
+本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule。两者不实现查询语义，也不进入 sgy 或 Codex 发布 payload。
+
+正式语料在 `corpus/`。真实对照先由独立配置生成 experiment，预检 control/candidate 环境差异只包含 allowlist 后才运行：
+
+```powershell
+python -X utf8 development\code-search-benchmark\experiment.py prepare --config <config.json> --output <new-output-dir>
+python -X utf8 development\code-search-benchmark\experiment.py run --experiment <new-output-dir>\experiment.json
+python -X utf8 development\code-search-benchmark\experiment.py capsule --experiment <new-output-dir>\experiment.json
+```
+
+每个 subject 都由新的 `codex exec --json --ephemeral --sandbox read-only` 进程执行。monitor 只捕获 stdout JSONL、stderr、退出、wall time、工具项和最后一个 `turn.completed.usage`；超时会终止该次进程树并保留失败，不静默重试。运行前后都重算 corpus、工作区 Git 快照和最小 Codex home 环境树身份。凭据不得复制进实验目录或环境树，只能通过既有安全环境提供。
 
 每个 manifest 使用 `agentbase.code-search-benchmark/v1`，`runs` 中每项记录：
 

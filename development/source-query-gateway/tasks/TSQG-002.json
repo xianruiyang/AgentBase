@@ -1,0 +1,38 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "确认目标集合",
+        "分支授权边界"
+      ],
+      "id": "TSQG-001",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-002",
+  "mutation_scope": [
+    "development/source-query-gateway/backend-contract/**"
+  ],
+  "outcome": "rg、fd 和 ast-grep 的受支持精确版本、公开命令模式、原生 argv、退出和输出分类形成可复核基线",
+  "outputs": [
+    "三个后端的版本身份、help 快照哈希和公开模式矩阵",
+    "真实原生行为 oracle 语料"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "AC-SQG-001",
+    "UDES-SQG-002",
+    "UDES-SQG-005",
+    "DES-SQG-003"
+  ],
+  "suggested_skills": [
+    "powershell-usage"
+  ],
+  "title": "冻结三个查询后端的精确版本与公开模式",
+  "verification": [
+    "读回本机正式工具版本",
+    "逐项核对公开模式都有持久分类和原生证据入口"
+  ]
+}

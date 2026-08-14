@@ -1,0 +1,45 @@
+{
+  "changed_files": [
+    "development/code-search-benchmark/corpus/README.md",
+    "development/code-search-benchmark/corpus/schema.json",
+    "development/code-search-benchmark/corpus/v1.json",
+    "development/code-search-benchmark/corpus/validate_corpus.py",
+    "development/code-search-benchmark/tests/test_corpus.py"
+  ],
+  "evidence_for": ["AC-SQG-001", "AC-SQG-004", "CON-SQG-003", "UDES-SQG-007", "UDES-SQG-008", "DES-SQG-010"],
+  "evidence_refs": [
+    {"kind": "corpus", "note": "六个版本化 prompt 与结构化语义 oracle", "ref": "development/code-search-benchmark/corpus/v1.json"},
+    {"kind": "schema", "note": "正式 corpus 顶层合同", "ref": "development/code-search-benchmark/corpus/schema.json"},
+    {"kind": "verification", "note": "直接 oracle 文件快照与唯一文件事实验证", "ref": "development/code-search-benchmark/corpus/validate_corpus.py"}
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "六个历史 prompt 已转为按工作区角色和直接源码 SHA-256 绑定的正式 corpus；oracle 使用定义、调用、泛型暴露、完整范围和正式来源等关系表达，不再用固定措辞判定语义。",
+  "outputs": [
+    "agentbase.source-query-corpus/v1，版本 2026-08-15.1，共 6 cases",
+    "AgentBase 与大型 C++ 工作区的直接 oracle 文件快照",
+    "IsBareKey 当前事实修正为定义 2655、调用 648/868/2037",
+    "源码变化使旧版本显式失败并要求创建新 corpus 版本"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:edefa68fe1e105b5bcb1d32724315d480083f4fad7a27b129787b8ca2cdc2224",
+    "AC-SQG-002": "sha256:9431f26723ac18686507f57487f1c8ad3991aa0c2e37fe44a1bc9bc62d48ce9f",
+    "AC-SQG-003": "sha256:dd62ea72b87d1869e8ed85483f7c071873844544c058c11969c24788e76617cc",
+    "AC-SQG-004": "sha256:c6b2799ece418f7f7ee4e37ab22e15a9a8cb724731def5b0853335f00aa542b1",
+    "CON-SQG-001": "sha256:e224215fe1492c484306b35827babb9f11e1efd0915b35feabd3cee660081eb3",
+    "CON-SQG-002": "sha256:fd5ad79f19a584827b89c9b831166884608e15a6a5e1e1415c051bb38a8fea68",
+    "CON-SQG-003": "sha256:56b350a9ceb81ce73d6d6376f9bd1ac81785ac08e374219f6ba36e0ddb956ef0",
+    "DES-SQG-010": "sha256:dd682e350f743719c25ecd147cc78f3b9406417ad8836add252b7f3dd4c71904",
+    "REQ-SQG-001": "sha256:3be96a1ab34b2f80f823730a8a8c941e20578a6bec36b12fe87346f502ce869b",
+    "UDES-SQG-007": "sha256:8550290e06b1f91fa8d90d84ee6eeb13431d0cd4c46b297ca8efe688aacf00bc",
+    "UDES-SQG-008": "sha256:6e678e375156b50e60791bc88d85df53ba4f074855df336a8b053bf1f7aa0df4"
+  },
+  "task_id": "TSQG-005",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "validate_corpus.py 对两个真实工作区：6 cases，0 failures",
+    "code-search-benchmark 受影响测试：3 tests passed",
+    "逐项人工核对 definition/call/range/field/source-role 关系"
+  ]
+}
