@@ -1,0 +1,36 @@
+{
+  "changed_files": [
+    "tools/sgy/**",
+    "development/source-query-gateway/**"
+  ],
+  "evidence_for": [
+    "UDES-SQG-002",
+    "DES-SQG-003"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "verification-summary",
+      "ref": "development/source-query-gateway/verification.md"
+    },
+    {
+      "kind": "current-state",
+      "ref": "development/source-query-gateway/current-state.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "fd 10.4.2 全部公开模式有结构化、文本、产物或透传分类",
+  "outputs": [
+    "fd 10.4.2 全部公开模式有结构化、文本、产物或透传分类"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "DES-SQG-003": "sha256:2f1df14fae09c697c21cdbbc690634e908c682f7a529490bd6eb2bdcd9e270b2",
+    "UDES-SQG-002": "sha256:384b2cf66ae1e2de765d43e0ec6259f0ec0277d4d604827f2d8ea6c992159a8d"
+  },
+  "task_id": "TSQG-022",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "见 development/source-query-gateway/verification.md 的直接影响验证"
+  ]
+}

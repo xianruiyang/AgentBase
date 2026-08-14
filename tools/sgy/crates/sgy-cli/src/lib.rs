@@ -7,12 +7,13 @@ pub mod cache;
 pub mod defaults_output;
 pub mod diagnostics;
 pub mod processor;
+pub mod query_gateway;
 
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::path::PathBuf;
 
-use clap::builder::PossibleValuesParser;
+use clap::builder::{OsStringValueParser, PossibleValuesParser};
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use sgy_core::invocation::{ExplicitOptions, NativeInvocation, Profile, WrapperCommand};
 
@@ -36,6 +37,8 @@ pub fn command() -> Command {
         ))
         .subcommand(cache_subcommand())
         .subcommand(process_subcommand())
+        .subcommand(gateway_backend_subcommand("rg", "ripgrep").hide(true))
+        .subcommand(gateway_backend_subcommand("fd", "fd").hide(true))
         .subcommand(
             Command::new("schema")
                 .about("Print the bounded sgy configuration schema")
@@ -66,6 +69,75 @@ pub fn command() -> Command {
         .after_help(
             "Operational syntax: sgy <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: sgy <schema|capabilities|doctor> ...\nCache syntax: sgy cache <get|query|info|remove|gc> ...\nProcess syntax: sgy process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...",
         )
+}
+
+fn gateway_backend_subcommand(name: &'static str, engine_name: &'static str) -> Command {
+    Command::new(name)
+        .about(format!("Token-safe {engine_name} gateway"))
+        .subcommand_required(true)
+        .subcommand(gateway_operation_subcommand("exec", true))
+        .subcommand(gateway_operation_subcommand("defaults", true))
+        .subcommand(
+            Command::new("doctor")
+                .about("Diagnose the exact native engine without searching")
+                .arg(gateway_engine_arg())
+                .arg(gateway_cwd_arg()),
+        )
+}
+
+fn gateway_operation_subcommand(name: &'static str, _native_required: bool) -> Command {
+    let native = Arg::new("native")
+        .value_name("NATIVE_ARGV")
+        .value_parser(OsStringValueParser::new())
+        .num_args(0..)
+        .allow_hyphen_values(true)
+        .trailing_var_arg(true);
+    Command::new(name)
+        .arg(gateway_engine_arg())
+        .arg(gateway_cwd_arg())
+        .arg(
+            Arg::new("view")
+                .long("view")
+                .value_name("VIEW")
+                .default_value("auto"),
+        )
+        .arg(
+            Arg::new("limit")
+                .long("limit")
+                .value_name("N")
+                .default_value("80")
+                .value_parser(clap::value_parser!(u64).range(1..=10000)),
+        )
+        .arg(
+            Arg::new("max-text-chars")
+                .long("max-text-chars")
+                .value_name("N")
+                .default_value("240")
+                .value_parser(clap::value_parser!(u64).range(1..=1_000_000)),
+        )
+        .arg(
+            Arg::new("artifact-out")
+                .long("artifact-out")
+                .value_name("PATH")
+                .value_parser(clap::value_parser!(PathBuf)),
+        )
+        .arg(Arg::new("snapshot").long("snapshot").value_name("SHA256"))
+        .arg(Arg::new("after").long("after").value_name("CURSOR"))
+        .arg(native)
+}
+
+fn gateway_engine_arg() -> Arg {
+    Arg::new("engine")
+        .long("engine")
+        .value_name("PATH")
+        .value_parser(clap::value_parser!(PathBuf))
+}
+
+fn gateway_cwd_arg() -> Arg {
+    Arg::new("cwd")
+        .long("cwd")
+        .value_name("PATH")
+        .value_parser(clap::value_parser!(PathBuf))
 }
 
 fn process_subcommand() -> Command {
@@ -321,6 +393,35 @@ pub enum CliAction {
     Cache(CacheCommand),
     Process(ProcessCommand),
     Inspect(InspectionCommand),
+    Gateway(GatewayCommand),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GatewayBackend {
+    Rg,
+    Fd,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GatewayOperation {
+    Exec,
+    Defaults,
+    Doctor,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GatewayCommand {
+    pub backend: GatewayBackend,
+    pub operation: GatewayOperation,
+    pub engine: Option<PathBuf>,
+    pub cwd: Option<PathBuf>,
+    pub view: String,
+    pub limit: usize,
+    pub max_text_chars: usize,
+    pub artifact_out: Option<PathBuf>,
+    pub snapshot: Option<String>,
+    pub after: Option<String>,
+    pub native_argv: Vec<OsString>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -604,7 +705,22 @@ pub fn parse_cli_from(
             || value == OsStr::new("schema")
             || value == OsStr::new("capabilities")
             || value == OsStr::new("doctor")
+            || value == OsStr::new("rg")
+            || value == OsStr::new("fd")
     }) {
+        if matches!(
+            raw.get(1).and_then(|value| value.to_str()),
+            Some("rg" | "fd")
+        ) && matches!(
+            raw.get(2).and_then(|value| value.to_str()),
+            Some("exec" | "defaults")
+        ) && !raw
+            .iter()
+            .skip(3)
+            .any(|value| value == OsStr::new(NATIVE_DELIMITER))
+        {
+            return Err(CliParseError::MissingDelimiter);
+        }
         let matches = command()
             .try_get_matches_from(raw)
             .map_err(CliParseError::Clap)?;
@@ -617,10 +733,81 @@ pub fn parse_cli_from(
                 engine: values.get_one::<PathBuf>("engine").cloned(),
                 cwd: values.get_one::<PathBuf>("cwd").cloned(),
             })),
+            Some(("rg", values)) => {
+                parse_gateway_command(GatewayBackend::Rg, values).map(CliAction::Gateway)
+            }
+            Some(("fd", values)) => {
+                parse_gateway_command(GatewayBackend::Fd, values).map(CliAction::Gateway)
+            }
             _ => Err(CliParseError::MissingDelimiter),
         };
     }
     parse_invocation_from(raw).map(|invocation| CliAction::Native(Box::new(invocation)))
+}
+
+fn parse_gateway_command(
+    backend: GatewayBackend,
+    matches: &ArgMatches,
+) -> Result<GatewayCommand, CliParseError> {
+    let Some((name, values)) = matches.subcommand() else {
+        return Err(CliParseError::MissingDelimiter);
+    };
+    let operation = match name {
+        "exec" => GatewayOperation::Exec,
+        "defaults" => GatewayOperation::Defaults,
+        "doctor" => GatewayOperation::Doctor,
+        _ => return Err(CliParseError::MissingDelimiter),
+    };
+    let native_argv = values
+        .try_get_many::<OsString>("native")
+        .ok()
+        .flatten()
+        .map(|items| items.cloned().collect())
+        .unwrap_or_default();
+    Ok(GatewayCommand {
+        backend,
+        operation,
+        engine: values
+            .try_get_one::<PathBuf>("engine")
+            .ok()
+            .flatten()
+            .cloned(),
+        cwd: values.try_get_one::<PathBuf>("cwd").ok().flatten().cloned(),
+        view: values
+            .try_get_one::<String>("view")
+            .ok()
+            .flatten()
+            .cloned()
+            .unwrap_or_else(|| "auto".to_owned()),
+        limit: values
+            .try_get_one::<u64>("limit")
+            .ok()
+            .flatten()
+            .and_then(|value| usize::try_from(*value).ok())
+            .unwrap_or(80),
+        max_text_chars: values
+            .try_get_one::<u64>("max-text-chars")
+            .ok()
+            .flatten()
+            .and_then(|value| usize::try_from(*value).ok())
+            .unwrap_or(240),
+        artifact_out: values
+            .try_get_one::<PathBuf>("artifact-out")
+            .ok()
+            .flatten()
+            .cloned(),
+        snapshot: values
+            .try_get_one::<String>("snapshot")
+            .ok()
+            .flatten()
+            .cloned(),
+        after: values
+            .try_get_one::<String>("after")
+            .ok()
+            .flatten()
+            .cloned(),
+        native_argv,
+    })
 }
 
 fn parse_process_command(matches: &ArgMatches) -> Result<ProcessCommand, CliParseError> {
@@ -778,7 +965,7 @@ mod tests {
 
     use super::{
         parse_cli_from, parse_invocation_from, CacheCommand, CliAction, CliParseError,
-        ProcessAction, ProcessCommand, ProcessInput,
+        GatewayBackend, GatewayOperation, ProcessAction, ProcessCommand, ProcessInput,
     };
 
     fn os_args(values: &[&str]) -> Vec<OsString> {
@@ -977,6 +1164,48 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn parses_gateway_native_argv_without_reordering_or_deduplication() {
+        let action = parse_cli_from(os_args(&[
+            "sgy", "rg", "exec", "--view", "grouped", "--limit", "7", "--", "-e", "a b", "-g",
+            "*.rs", "-e", "a b", "", "--", "tail",
+        ]))
+        .expect("rg gateway");
+        let CliAction::Gateway(command) = action else {
+            panic!("expected gateway")
+        };
+        assert_eq!(GatewayBackend::Rg, command.backend);
+        assert_eq!(GatewayOperation::Exec, command.operation);
+        assert_eq!(7, command.limit);
+        assert_eq!("grouped", command.view);
+        assert_eq!(
+            os_args(&["-e", "a b", "-g", "*.rs", "-e", "a b", "", "--", "tail"]),
+            command.native_argv
+        );
+    }
+
+    #[test]
+    fn gateway_requires_the_boundary_but_preserves_an_empty_native_invocation() {
+        assert!(matches!(
+            parse_cli_from(os_args(&["sgy", "fd", "exec"])),
+            Err(CliParseError::MissingDelimiter)
+        ));
+        let action = parse_cli_from(os_args(&["sgy", "fd", "exec", "--"]))
+            .expect("empty native fd invocation");
+        assert!(
+            matches!(action, CliAction::Gateway(command) if command.backend == GatewayBackend::Fd && command.native_argv.is_empty())
+        );
+    }
+
+    #[test]
+    fn parses_gateway_doctor_without_native_argv() {
+        let action = parse_cli_from(os_args(&["sgy", "fd", "doctor", "--engine", "fd.exe"]))
+            .expect("fd doctor");
+        assert!(
+            matches!(action, CliAction::Gateway(command) if command.backend == GatewayBackend::Fd && command.operation == GatewayOperation::Doctor && command.native_argv.is_empty())
+        );
     }
 
     #[test]

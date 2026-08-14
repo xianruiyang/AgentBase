@@ -2,7 +2,7 @@
 
 ## 1. 文档职责
 
-本文件只安排 [requirements.md](requirements.md)、[user-design.md](user-design.md) 与 [design.md](design.md) 已定义的候选分支工作，不创建总体项目需求。状态为 `proposed`，尚未开始实现，也未授权写入正式 skill、总体项目入口或实际 Codex。
+本文件只安排 [requirements.md](requirements.md)、[user-design.md](user-design.md) 与 [design.md](design.md) 已定义的候选分支工作，不创建总体项目需求。当前 P0—P5 候选实现与分层质量验证已经闭环，P6 独立模型行为与总成本实验正在进行；未授权写入正式 skill、总体项目入口或实际 Codex。
 
 ## 2. 推进原则
 

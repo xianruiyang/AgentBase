@@ -8,7 +8,11 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $Engine,
 
-    [string] $Output
+    [string] $Output,
+
+    [string] $ExpectedVersionV1 = "0.1.0",
+
+    [string] $ExpectedVersionV2 = "0.1.1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -66,7 +70,7 @@ try {
         $rollbackObserved = $true
     }
     Assert-True $rollbackObserved "upgrade commit failure was not surfaced"
-    Assert-True ((& (Join-Path $installRoot "current\sgy.exe") --version) -eq "sgy 0.1.0") "failed upgrade did not restore the old binary"
+    Assert-True ((& (Join-Path $installRoot "current\sgy.exe") --version) -eq "sgy $ExpectedVersionV1") "failed upgrade did not restore the old binary"
     Assert-True ([IO.File]::ReadAllText($pathFile) -eq $pathAfterFirst) "failed upgrade changed PATH"
     Remove-Item -LiteralPath $stateTemporaryBlocker -Recurse -Force
 
@@ -95,13 +99,13 @@ try {
     }
     Assert-True $maliciousRejected "unsafe ZIP member was accepted"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $root "escape.txt"))) "unsafe ZIP member escaped staging"
-    Assert-True ((& (Join-Path $installRoot "current\sgy.exe") --version) -eq "sgy 0.1.0") "rejected package changed the installed version"
+    Assert-True ((& (Join-Path $installRoot "current\sgy.exe") --version) -eq "sgy $ExpectedVersionV1") "rejected package changed the installed version"
 
     $upgrade = Invoke-InstallerJson -Arguments (@("Install", "-Archive", $ArchiveV2) + $common)
-    Assert-True ($upgrade.version -eq "0.1.1") "upgrade did not install 0.1.1"
+    Assert-True ($upgrade.version -eq $ExpectedVersionV2) "upgrade did not install $ExpectedVersionV2"
     $binary = Join-Path $entry "sgy.exe"
     $version = & $binary --version
-    Assert-True ($version -eq "sgy 0.1.1") "upgraded binary version mismatch"
+    Assert-True ($version -eq "sgy $ExpectedVersionV2") "upgraded binary version mismatch"
     Assert-True ((Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash -eq $configHash) "upgrade changed user config"
     Assert-True ((Get-FileHash -LiteralPath $cache -Algorithm SHA256).Hash -eq $cacheHash) "upgrade changed cache"
 

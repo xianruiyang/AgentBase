@@ -1,0 +1,36 @@
+{
+  "changed_files": [
+    "tools/sgy/**",
+    "development/source-query-gateway/**"
+  ],
+  "evidence_for": [
+    "UDES-SQG-005",
+    "DES-SQG-009"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "verification-summary",
+      "ref": "development/source-query-gateway/verification.md"
+    },
+    {
+      "kind": "current-state",
+      "ref": "development/source-query-gateway/current-state.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "三个引擎版本、缺失与候选发布来源可读回",
+  "outputs": [
+    "三个引擎版本、缺失与候选发布来源可读回"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "DES-SQG-009": "sha256:7660649948c30aee0e683156d13a7e075d22ef017705f20553abb0c48dc1e092",
+    "UDES-SQG-005": "sha256:1d80a6ccb980074fd1e40303dfb48ad3398948c18acfe68b1aa9e7f3c5deade9"
+  },
+  "task_id": "TSQG-042",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "见 development/source-query-gateway/verification.md 的直接影响验证"
+  ]
+}

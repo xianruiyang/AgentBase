@@ -45,6 +45,16 @@ fn drains_large_stdout_and_stderr_concurrently() {
 }
 
 #[test]
+fn capture_limit_terminates_unbounded_native_output() {
+    let directory = tempdir().expect("temp directory");
+    let mut process = request(directory.path(), &["dual", &(2 * 1024 * 1024).to_string()]);
+    process.max_stdout_bytes = Some(64 * 1024);
+    process.max_stderr_bytes = Some(64 * 1024);
+    let error = run(process).expect_err("capture limit must reject oversized output");
+    assert!(error.to_string().contains("capture limit"));
+}
+
+#[test]
 fn copies_binary_stdin_and_closes_pipe_for_eof() {
     let directory = tempdir().expect("temp directory");
     let input = vec![0, b'a', 0xff, b'\n', 0, b'z'];

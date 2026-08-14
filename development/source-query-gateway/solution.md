@@ -6,8 +6,8 @@
 
 ## SOL-SQG-001 固定后端、AST 与历史证据基线
 
-- 状态: proposed
-- 解决: GAP-SQG-002, GAP-SQG-003
+- 状态: verified
+- 解决: 已闭环的 P0 基线与 benchmark owner
 - 满足: DES-SQG-001, DES-SQG-003, DES-SQG-010
 - 依赖: AC-SQG-004, UDES-SQG-007, UDES-SQG-008
 
@@ -17,8 +17,8 @@
 
 ## SOL-SQG-002 提取不改变 AST 的公共执行原语
 
-- 状态: proposed
-- 解决: GAP-SQG-001, GAP-SQG-002
+- 状态: verified
+- 解决: 已闭环的公共执行边界
 - 满足: DES-SQG-001, DES-SQG-002, DES-SQG-004, DES-SQG-005
 - 依赖: SOL-SQG-001
 
@@ -28,8 +28,8 @@
 
 ## SOL-SQG-003 建立 fd 完整兼容与可逆低成本输出
 
-- 状态: proposed
-- 解决: GAP-SQG-001, GAP-SQG-002
+- 状态: verified
+- 解决: 已闭环的 fd 命令域与可逆表示
 - 满足: DES-SQG-003, DES-SQG-004, DES-SQG-005, DES-SQG-006
 - 依赖: SOL-SQG-001, SOL-SQG-002
 
@@ -39,8 +39,8 @@
 
 ## SOL-SQG-004 建立 rg 完整兼容与自适应结果表示
 
-- 状态: proposed
-- 解决: GAP-SQG-001, GAP-SQG-002
+- 状态: verified
+- 解决: 已闭环的 rg 命令域与自适应表示
 - 满足: DES-SQG-003, DES-SQG-004, DES-SQG-005, DES-SQG-007
 - 依赖: SOL-SQG-001, SOL-SQG-002
 
@@ -50,8 +50,8 @@
 
 ## SOL-SQG-005 复核 AST 并收敛三后端诊断与供应链
 
-- 状态: proposed
-- 解决: GAP-SQG-002
+- 状态: verified
+- 解决: 已闭环的 AST 非回退、诊断与候选供应链
 - 满足: DES-SQG-001, DES-SQG-002, DES-SQG-009
 - 依赖: SOL-SQG-003, SOL-SQG-004
 
@@ -61,8 +61,8 @@
 
 ## SOL-SQG-006 建立候选统一 skill 并完成旧入口退出准备
 
-- 状态: proposed
-- 解决: GAP-SQG-004
+- 状态: implemented
+- 解决: GAP-SQG-002
 - 满足: DES-SQG-008, DES-SQG-009
 - 依赖: SOL-SQG-003, SOL-SQG-004, SOL-SQG-005
 
@@ -72,8 +72,8 @@
 
 ## SOL-SQG-007 以隔离总成本证据裁决采纳
 
-- 状态: proposed
-- 解决: GAP-SQG-003, GAP-SQG-005
+- 状态: in_progress
+- 解决: GAP-SQG-001, GAP-SQG-002
 - 满足: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004, DES-SQG-010
 - 依赖: SOL-SQG-001, SOL-SQG-005, SOL-SQG-006
 

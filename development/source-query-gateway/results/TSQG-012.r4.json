@@ -1,0 +1,38 @@
+{
+  "changed_files": [
+    "tools/sgy/crates/sgy-cli/src/query_gateway.rs"
+  ],
+  "evidence_for": [
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "UDES-SQG-003",
+    "DES-SQG-004",
+    "DES-SQG-005"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "implementation",
+      "ref": "tools/sgy/crates/sgy-cli/src/query_gateway.rs"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "rg/fd 结构化结果分别表达 backend、引擎、query identity、native exit、总量、展示量、结果/正文/显示完整性、snapshot、cursor 与诊断，并只在证据签名等价的 renderer 间选择。",
+  "outputs": [
+    "rg/fd EvidenceSignature 与 view 规划"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:edefa68fe1e105b5bcb1d32724315d480083f4fad7a27b129787b8ca2cdc2224",
+    "AC-SQG-002": "sha256:9431f26723ac18686507f57487f1c8ad3991aa0c2e37fe44a1bc9bc62d48ce9f",
+    "DES-SQG-004": "sha256:ef658c63d60ca337e0106865b118e9ae675754f2ca62c545631995291b233264",
+    "DES-SQG-005": "sha256:1da8806c06c0379eed9e1e8734d1b5bd395b66c79d0c4b1d566ec174479a0169",
+    "UDES-SQG-003": "sha256:9013ceeb35208ac27e40c3ac1c217d1be852e6ec6f8636c8204d2a3ff9a86271"
+  },
+  "task_id": "TSQG-012",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "sgy-cli 26 单元测试和 10 真实集成测试通过",
+    "错误 view 与转换失败不会伪装为空成功"
+  ]
+}

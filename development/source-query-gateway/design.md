@@ -2,7 +2,7 @@
 
 ## 1. 文档职责与状态
 
-本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的候选模型设计，状态为 `proposed`。它只属于本分支，不证明实现可用，也不改变 AgentBase 总体需求或正式入口；实施顺序以 [plan.md](plan.md) 为准。
+本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的候选模型设计，状态为 `implemented_pending_benefit_evidence`。backend、候选 skill 与发布 payload 已实现并通过分层质量验证，但端到端模型收益尚待 P6 隔离实验；它仍只属于本分支，不改变 AgentBase 总体需求或正式入口。
 
 ## 2. 设计结论
 

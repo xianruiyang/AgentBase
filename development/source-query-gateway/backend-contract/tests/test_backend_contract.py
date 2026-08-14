@@ -70,6 +70,26 @@ class BackendContractTests(unittest.TestCase):
         for command in ("run", "scan", "test", "new", "lsp", "outline", "completions"):
             self.assertIn(command, ast_selectors)
 
+    def test_candidate_verifier_samples_every_rg_fd_mode(self) -> None:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-X",
+                "utf8",
+                str(ROOT / "verify_candidate.py"),
+                "--check-contract",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertTrue(json.loads(completed.stdout)["ok"])
+
     def test_native_oracle_records_distinct_no_match_semantics(self) -> None:
         oracle = load_json("native-oracle.json")
         cases = {case["id"]: case for case in oracle["cases"]}

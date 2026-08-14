@@ -31,6 +31,9 @@
 
     {"id":"FD-PATHS","backend":"fd","selector":"default path output","handling":"adaptive","sideEffects":"read-only"},
     {"id":"FD-LIST-DETAILS","backend":"fd","selector":"-l|--list-details","handling":"bounded-text","sideEffects":"read-only-metadata"},
+    {"id":"FD-FORMAT","backend":"fd","selector":"--format","handling":"bounded-text","sideEffects":"read-only-output-transform"},
+    {"id":"FD-HYPERLINK","backend":"fd","selector":"--hyperlink","handling":"bounded-text","sideEffects":"read-only-output-transform"},
+    {"id":"FD-QUIET","backend":"fd","selector":"-q|--quiet|--has-results","handling":"bounded-text","sideEffects":"read-only"},
     {"id":"FD-PRINT0","backend":"fd","selector":"-0|--print0","handling":"artifact","sideEffects":"read-only"},
     {"id":"FD-EXEC","backend":"fd","selector":"-x|--exec","handling":"passthrough","sideEffects":"executes-user-command-per-result"},
     {"id":"FD-EXEC-BATCH","backend":"fd","selector":"-X|--exec-batch","handling":"passthrough","sideEffects":"executes-user-command-batch"},

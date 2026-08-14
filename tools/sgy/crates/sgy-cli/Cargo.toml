@@ -1,6 +1,6 @@
 [package]
 name = "sgy-cli"
-description = "Command-line adapter for the ast-grep Token-Safe YAML wrapper"
+description = "Windows token-safe source query adapter for ast-grep, ripgrep, and fd"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -21,6 +21,7 @@ required-features = ["test-helper"]
 [dependencies]
 clap.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 sgy-core = { path = "../sgy-core" }
 thiserror.workspace = true
 tempfile.workspace = true

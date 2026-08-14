@@ -682,6 +682,7 @@ dependencies = [
  "saphyr-parser",
  "serde_json",
  "sgy-core",
+ "sha2",
  "tempfile",
  "thiserror 2.0.18",
 ]

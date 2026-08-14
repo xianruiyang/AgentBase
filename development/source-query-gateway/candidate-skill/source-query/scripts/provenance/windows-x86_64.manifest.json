@@ -1,0 +1,74 @@
+{
+  "schema": "sgy.release/v1",
+  "name": "sgy",
+  "version": "0.2.0",
+  "target": "x86_64-pc-windows-msvc",
+  "archive": "sgy-0.2.0-x86_64-pc-windows-msvc.zip",
+  "binary": "sgy.exe",
+  "source": {
+    "revision": "sha256:47c02bb684c6957735844b5abc2f3a56b52b7fc2c2f62bc21528f226dc9b71e5",
+    "sourceDateEpoch": 0,
+    "cargoLockSha256": "092420ea7d0bda015fe0f012e9cbcb70ee6469213e4b240be7d5968aba653c5f"
+  },
+  "build": {
+    "rustc": "rustc 1.85.0 (4d91de4e4 2025-02-17)",
+    "rustToolchain": "1.85.0",
+    "profile": "release",
+    "deterministicArchive": true
+  },
+  "astGrepCompatibility": {
+    "fixed": "0.42.0",
+    "verified": [
+      "0.41.1",
+      "0.42.0",
+      "0.44.1"
+    ]
+  },
+  "runtime": {
+    "requiredExecutable": "ast-grep",
+    "node": false,
+    "python": false
+  },
+  "files": [
+    {
+      "path": "sgy.exe",
+      "bytes": 2250752,
+      "sha256": "126f68cd1ffbd9c272833cc66ac36e6723f96d511b02f282fe90fd976c51392b"
+    },
+    {
+      "path": "README.md",
+      "bytes": 4396,
+      "sha256": "acaa970bf4ff9dead03f3da6c299b8639f92aed3b8b1f18f6a4babe4b1b00cb8"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 330,
+      "sha256": "d5d57cda5b1766fe3772795a52083e16b1454d1f6b2b23c786518aa79839b926"
+    },
+    {
+      "path": "LICENSE-MIT",
+      "bytes": 1073,
+      "sha256": "b94d742a9110832480fd7e291b08c080f28fb74aed6cb21ce736d29082c52458"
+    },
+    {
+      "path": "LICENSE-APACHE",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "NOTICE",
+      "bytes": 381,
+      "sha256": "8c282cb4af2890f1c069ff2a5b010aff445795661fdd52d2b0a621bc8f536408"
+    },
+    {
+      "path": "THIRD_PARTY_LICENSES.txt",
+      "bytes": 212129,
+      "sha256": "01c1f3e9a8d00eddd9dfeda19a488d3bb82ccb478890a9c20815b2ec6c5ec8cb"
+    },
+    {
+      "path": "sbom.spdx.json",
+      "bytes": 29210,
+      "sha256": "5206001d82044ac176b47f9c4d22e7f484e9bf3e5c2821e0a3564fc53671a787"
+    }
+  ]
+}

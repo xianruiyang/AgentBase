@@ -53,6 +53,7 @@ fn run_main() -> i32 {
         sgy_cli::CliAction::Cache(command) => return execute_cache(&command),
         sgy_cli::CliAction::Process(command) => return execute_process(&command),
         sgy_cli::CliAction::Inspect(command) => return execute_inspection(&command),
+        sgy_cli::CliAction::Gateway(command) => return sgy_cli::query_gateway::execute(&command),
         sgy_cli::CliAction::Native(invocation) => *invocation,
     };
     if invocation.command == WrapperCommand::Exec

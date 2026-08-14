@@ -1,0 +1,36 @@
+{
+  "changed_files": [
+    "tools/sgy/**",
+    "development/source-query-gateway/**"
+  ],
+  "evidence_for": [
+    "UDES-SQG-006",
+    "DES-SQG-001"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "verification-summary",
+      "ref": "development/source-query-gateway/verification.md"
+    },
+    {
+      "kind": "current-state",
+      "ref": "development/source-query-gateway/current-state.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "候选版本除 release version 外保持 P0 AST 冻结输出",
+  "outputs": [
+    "候选版本除 release version 外保持 P0 AST 冻结输出"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "DES-SQG-001": "sha256:472ca9c6b805923fc6aecd5c94778ce28d1317a879004cc8e6f3997cca79a843",
+    "UDES-SQG-006": "sha256:93e3d4beea415292dc9a835cc04fa979b2c299ab090492142fc53f57f7665f5b"
+  },
+  "task_id": "TSQG-040",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "见 development/source-query-gateway/verification.md 的直接影响验证"
+  ]
+}

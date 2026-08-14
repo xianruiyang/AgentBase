@@ -1,6 +1,6 @@
 # sgy
 
-`sgy` 是 ast-grep 的本地 CLI 适配器：原生参数放在 `--` 后交给 ast-grep，结构化结果先按原生 JSON 解析，再输出安全 YAML。默认 `token-safe` profile 会在完整执行之后压缩模型可见上下文；它不会缩小 ast-grep 的扫描或写入范围。
+`sgy` 是 Windows 本地源码查询适配器。现有 ast-grep 命令、profile、cache、process、TTY/LSP 和 rewrite 合同保持不变；新增的 `sgy rg` 与 `sgy fd` 命令域把原生参数完整放在 `--` 后，并只在安全等价时压缩模型可见输出。
 
 ```text
 ast-grep 原生输出 → 可选完整缓存 → YAML profile → 模型上下文
@@ -11,8 +11,9 @@ ast-grep 原生输出 → 可选完整缓存 → YAML profile → 模型上下�
 - 当前版本：`sgy 0.1.2`。
 - 当前固定验证引擎：`ast-grep 0.42.0`。
 - 精确验证的 ast-grep 版本：`0.41.1`、`0.42.0`、`0.44.1`；不外推为连续版本范围。
+- rg/fd 候选命令域精确验证 `ripgrep 15.1.0` 与 `fd 10.4.2`；29 个公开主模式均有持久分类，版本不匹配时执行入口局部拒绝，`doctor` 给出读回。
 - 唯一维护平台是 Windows x86_64 MSVC，已完成真实引擎、协议、release 和安装生命周期。
-- `sgy` 不包含 ast-grep，也不安装语言运行时；必须另行提供可执行的 `ast-grep`。
+- `sgy` 不包含 ast-grep、ripgrep 或 fd，也不安装语言运行时；必须另行提供相应精确版本的原生引擎。
 
 ## 快速开始
 
@@ -48,6 +49,17 @@ wrapper 参数必须位于 `--` 前，原生 ast-grep 参数位于 `--` 后：
 sgy exec --profile lossless --cache off -- run -p 'foo($A)' -l ts src
 ```
 
+文本与文件查询同样保持原生 argv，不引入第二套简化语法：
+
+```powershell
+sgy rg exec --view auto --limit 80 -- -n -F 'needle' -g '*.cpp' .
+sgy fd exec --view auto --limit 80 -- -t f 'CommandDispatch' .
+sgy rg defaults --view grouped -- -n -F 'needle' .
+sgy fd doctor
+```
+
+普通 rg 搜索和 fd 路径结果先完整进入有界快照，再投影或分页。响应中的 `query_snapshot` 与 `next_cursor` 必须原样用于下一页；backend、cwd、原生 argv、引擎版本、snapshot 或实际 view 不匹配时拒绝续页。结果集合、投影内容和当前展示的完整性分别报告。二进制/NUL 模式要求 `--artifact-out`，fd exec/batch 直接透传，help、统计和其他显式文本报告默认有界。详见 [rg/fd 查询网关](docs/query-gateway.md)。
+
 ## Profile
 
 | Profile | 用途 | 模型上下文建议 |
@@ -70,6 +82,7 @@ sgy exec --profile lossless --cache off -- run -p 'foo($A)' -l ts src
 - [缓存与取回](docs/cache.md)
 - [安全边界](docs/security.md)
 - [命令兼容](docs/compatibility.md)
+- [rg/fd 查询网关](docs/query-gateway.md)
 - [排障](docs/troubleshooting.md)
 - [开发与发布](docs/development.md)
 - [第一版发布门禁](docs/release-checklist.md)

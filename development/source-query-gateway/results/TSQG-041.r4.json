@@ -1,0 +1,36 @@
+{
+  "changed_files": [
+    "tools/sgy/**",
+    "development/source-query-gateway/**"
+  ],
+  "evidence_for": [
+    "UDES-SQG-005",
+    "DES-SQG-002"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "verification-summary",
+      "ref": "development/source-query-gateway/verification.md"
+    },
+    {
+      "kind": "current-state",
+      "ref": "development/source-query-gateway/current-state.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "只复用已证明同责的执行上限，不迁移 AST 特有职责",
+  "outputs": [
+    "只复用已证明同责的执行上限，不迁移 AST 特有职责"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "DES-SQG-002": "sha256:30204c930a4e388ae21fb6b15d5a317582dd28a43c1e47f97d14e5eef5b9cff5",
+    "UDES-SQG-005": "sha256:1d80a6ccb980074fd1e40303dfb48ad3398948c18acfe68b1aa9e7f3c5deade9"
+  },
+  "task_id": "TSQG-041",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "见 development/source-query-gateway/verification.md 的直接影响验证"
+  ]
+}

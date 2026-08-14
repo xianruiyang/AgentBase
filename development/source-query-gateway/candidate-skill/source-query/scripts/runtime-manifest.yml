@@ -1,0 +1,31 @@
+schema: sgy.skill-runtime/v1
+version: 0.2.0
+build_toolchain: rustc 1.85.0
+source_revision: sha256:47c02bb684c6957735844b5abc2f3a56b52b7fc2c2f62bc21528f226dc9b71e5
+source_snapshot: provenance/sgy-source-snapshot.json
+source_date_epoch: 0
+cargo_lock_sha256: 092420ea7d0bda015fe0f012e9cbcb70ee6469213e4b240be7d5968aba653c5f
+release_record: provenance/release-record.json
+engines:
+  ast_grep:
+    bundled: false
+    verified:
+      - 0.41.1
+      - 0.42.0
+      - 0.44.1
+  ripgrep:
+    bundled: false
+    verified:
+      - 15.1.0
+  fd:
+    bundled: false
+    verified:
+      - 10.4.2
+targets:
+  - target: x86_64-pc-windows-msvc
+    path: bin/windows-x86_64/sgy.exe
+    bytes: 2250752
+    sha256: 126f68cd1ffbd9c272833cc66ac36e6723f96d511b02f282fe90fd976c51392b
+    release_manifest: provenance/windows-x86_64.manifest.json
+    archive_sha256: 9c6d1ba36c082299bde5a61cc4df59c4c79e0ba17cbc0cc3b91ebc9a4a75c5a1
+licenses: legal/

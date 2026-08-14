@@ -1,0 +1,36 @@
+{
+  "changed_files": [
+    "tools/sgy/**",
+    "development/source-query-gateway/**"
+  ],
+  "evidence_for": [
+    "UDES-SQG-006",
+    "DES-SQG-008"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "verification-summary",
+      "ref": "development/source-query-gateway/verification.md"
+    },
+    {
+      "kind": "current-state",
+      "ref": "development/source-query-gateway/current-state.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "AST 按需引用保留命令、profile、cache、process、rewrite 与安全边界",
+  "outputs": [
+    "AST 按需引用保留命令、profile、cache、process、rewrite 与安全边界"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "DES-SQG-008": "sha256:04aa1e3e01044b86faee18d201f16d34d90c275b88546834a97032dcb9b67a86",
+    "UDES-SQG-006": "sha256:93e3d4beea415292dc9a835cc04fa979b2c299ab090492142fc53f57f7665f5b"
+  },
+  "task_id": "TSQG-051",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "见 development/source-query-gateway/verification.md 的直接影响验证"
+  ]
+}

@@ -39,6 +39,9 @@ pub struct ProcessRequest {
     pub cancellation: CancellationToken,
     pub poll_interval: Duration,
     pub grace_period: Duration,
+    /// Optional hard capture bounds. Crossing either bound terminates the native process group.
+    pub max_stdout_bytes: Option<u64>,
+    pub max_stderr_bytes: Option<u64>,
 }
 
 impl ProcessRequest {
@@ -53,6 +56,8 @@ impl ProcessRequest {
             cancellation: CancellationToken::new(),
             poll_interval: DEFAULT_POLL_INTERVAL,
             grace_period: DEFAULT_GRACE_PERIOD,
+            max_stdout_bytes: None,
+            max_stderr_bytes: None,
         }
     }
 }
@@ -221,6 +226,7 @@ pub fn run(request: ProcessRequest) -> Result<ProcessOutcome, ProcessError> {
         child_stdout,
         stdout_file,
         false,
+        request.max_stdout_bytes,
         pump_errors_tx.clone(),
     )?;
     let stderr_thread = spawn_pump(
@@ -228,6 +234,7 @@ pub fn run(request: ProcessRequest) -> Result<ProcessOutcome, ProcessError> {
         child_stderr,
         stderr_file,
         request.forward_stderr,
+        request.max_stderr_bytes,
         pump_errors_tx.clone(),
     )?;
 
@@ -334,6 +341,7 @@ fn spawn_pump<R>(
     mut reader: R,
     mut staging: File,
     forward_stderr: bool,
+    max_bytes: Option<u64>,
     errors: mpsc::Sender<PumpError>,
 ) -> Result<thread::JoinHandle<u64>, ProcessError>
 where
@@ -343,9 +351,9 @@ where
         .name(format!("sgy-{name}-pump"))
         .spawn(move || {
             let result = if forward_stderr {
-                copy_with_optional_stderr(&mut reader, &mut staging, true)
+                copy_with_optional_stderr(&mut reader, &mut staging, true, max_bytes)
             } else {
-                copy_with_optional_stderr(&mut reader, &mut staging, false)
+                copy_with_optional_stderr(&mut reader, &mut staging, false, max_bytes)
             };
             match result {
                 Ok(bytes) => bytes,
@@ -365,6 +373,7 @@ fn copy_with_optional_stderr(
     reader: &mut impl Read,
     staging: &mut File,
     forward_stderr: bool,
+    max_bytes: Option<u64>,
 ) -> io::Result<u64> {
     let mut buffer = [0_u8; 64 * 1024];
     let mut total = 0_u64;
@@ -375,13 +384,20 @@ fn copy_with_optional_stderr(
             staging.sync_all()?;
             return Ok(total);
         }
+        let next = total + u64::try_from(count).map_err(io::Error::other)?;
+        if max_bytes.is_some_and(|limit| next > limit) {
+            return Err(io::Error::new(
+                io::ErrorKind::FileTooLarge,
+                "native output exceeded the configured capture limit",
+            ));
+        }
         staging.write_all(&buffer[..count])?;
         if forward_stderr {
             let mut destination = io::stderr().lock();
             destination.write_all(&buffer[..count])?;
             destination.flush()?;
         }
-        total += u64::try_from(count).map_err(io::Error::other)?;
+        total = next;
     }
 }
 

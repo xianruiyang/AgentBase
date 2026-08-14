@@ -27,6 +27,10 @@ def normalized_text(data: bytes) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sgy", required=True, type=Path)
+    parser.add_argument(
+        "--expected-version",
+        help="allow only the release version line to differ from the frozen AST baseline",
+    )
     args = parser.parse_args()
     if sys.platform != "win32":
         raise SystemExit("the sgy AST baseline is maintained only on Windows")
@@ -42,6 +46,14 @@ def main() -> int:
             check=False,
         )
         expected = normalized_text((ROOT / filename).read_bytes())
+        if filename == "version.txt" and args.expected_version:
+            expected = f"sgy {args.expected_version}\n"
+        if filename == "capabilities.yaml" and args.expected_version:
+            expected = expected.replace(
+                '  "version": "0.1.2"\n',
+                f'  "version": "{args.expected_version}"\n',
+                1,
+            )
         actual = normalized_text(completed.stdout)
         if completed.returncode != 0 or completed.stderr or actual != expected:
             differences.append(
@@ -58,7 +70,8 @@ def main() -> int:
 
         print(json.dumps({"ok": False, "differences": differences}, ensure_ascii=False, indent=2))
         return 1
-    print('{"ok":true,"baseline":"sgy-0.1.2-ast"}')
+    version = args.expected_version or "0.1.2"
+    print(f'{{"ok":true,"baseline":"sgy-0.1.2-ast","subjectVersion":"{version}"}}')
     return 0
 
 
