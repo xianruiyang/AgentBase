@@ -51,3 +51,11 @@ fd 返回大量共享目录前缀时，在确实更短的条件下使用可还�
 - 关联: REQ-SQG-001, AC-SQG-001
 
 当前 sgy 的 AST 命令结构、argv 边界、profile、safe YAML、cache、fingerprint、`process containing`、`group-locations`、rewrite preview/apply、TTY/LSP、artifact、诊断和发布链继续作为正式基线。统一化不得把 AST 迁入另一套命令模型，也不得用 rg/fd 的需求削弱其边界。
+
+## UDES-SQG-007 通过外部监控运行隔离 agent 对照
+
+- 状态: confirmed
+- 来源: 用户要求把既有 Token 测试固化为可重复利用的、通过监控隔离 agent 测试内容的流程
+- 关联: REQ-SQG-001, AC-SQG-004
+
+每个测试回合使用无对话历史的新鲜隔离 agent；协调方只负责按冻结输入启动、监控事件流、限时、保存原始结果和结束进程，不在运行中提示或修正被测 agent。对照 agent 不得看到另一环境的输出或聚合结论，质量复核由独立审计角色在运行完成后执行。

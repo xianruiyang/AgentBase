@@ -92,6 +92,18 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短
 
 原生退出与 wrapper 错误分通道记录。转换失败不得输出成功空结果；stderr 不混入结构化 stdout，源码正文和秘密不进入 telemetry/meta。
 
+### DES-SQG-010 受监控隔离基准是唯一收益入口
+
+- 满足: AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004, UDES-SQG-007
+
+[benchmark-protocol.md](benchmark-protocol.md) 定义本分支的语料、环境身份、隔离、监控、计量、审计和历史复用合同。分支获准实施后，由现有 `development/code-search-benchmark` 扩展为唯一 runner/monitor 与汇总 owner；其当前只分析记录的入口继续作为后处理子职责，不在本目录另写第二套执行器。分支目录只维护候选协议和版本化语料。
+
+每条 run 使用新鲜 `codex exec --json --ephemeral` 进程或能提供等价隔离与完整 usage 事件的正式入口。monitor 位于被测 agent 外部，只启动、观察、限时、归档和终止，不改变 prompt、补救答案或共享另一环境信息。subject、monitor 和 audit 的输入/输出单向流动；独立 audit 只能读取冻结 capsule，不读取候选实现讨论或历史结论。
+
+实验 manifest 固定语料版本、项目快照、Codex/模型/推理/service tier、环境树 hash、允许差异、工具与 MCP 可用集、运行顺序种子、超时和网络策略。原始 JSONL、stderr、退出状态、最终答案、工具调用和最后一个 `turn.completed.usage` 一并保存。`total_tokens = input_tokens + output_tokens`；cached input 与 reasoning output 只作子项，不重复相加。质量先用结构化事实关系 oracle，再由独立审计处理语言等价和 oracle 缺陷。
+
+历史结果按 experiment identity 只读登记。相同身份可直接复用，不为期待不同结果而重跑；候选实现或唯一差异改变时只运行受影响对照。身份不等或存在额外环境差异时，结果只能作为方向性现实依据，不能拼成因果结论。
+
 ## 4. 版本与迁移边界
 
 首个候选以 ripgrep 15.1.0、fd 10.4.2 和当前 sgy 已验证的 ast-grep 0.41.1、0.42.0、0.44.1 建立 Windows 精确版本矩阵，不外推连续版本范围。完整兼容表示该精确版本所有公开模式都可通过相应命令域调用并保持原生语义，不表示所有模式都能结构化压缩。
@@ -104,6 +116,7 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短
 | `ast-grep-token-safe` | 语义原样迁入按需 AST 引用后退出；sgy 命令不迁移 |
 | `symbol-structure-workflow` | 保留，只维护查询与 LSP 的升级边界 |
 | 现有 sgy runtime、cache 与发布记录 | 原位沿用，不复制、不建立第二状态源 |
+| `development/code-search-benchmark` | 分支实施后扩展为唯一隔离运行、监控、汇总和复核入口；不复制临时 runner |
 
 ## 5. 主要风险与控制
 
@@ -115,7 +128,9 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短
 | 更短输出丢失必要证据 | 先固定 EvidenceSignature，只比较语义等价表示 |
 | fd tree 路径歧义 | 根别名、可逆转义、类型标记和 round-trip 性质测试 |
 | 简单查询承担固定成本 | 保留适用范围不同的原生快路径，以端到端 Token 验证触发边界 |
+| 基准 agent 受对照输出或协调方干预 | 新鲜 subject、单向监控、冻结 capsule 与独立 audit |
+| 环境差异被误归因给候选 | 环境树 hash、允许差异清单、只读项目快照和身份不等即降级结论 |
 
 ## 6. 设计完成判定
 
-只有 rg/fd 全部公开模式有持久分类，结果完整性可复核，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项不退化，消费者与旧同责入口完成迁移，并且真实 Codex 依次证明 `AC-SQG-001` 的质量充分、`AC-SQG-002` 的端到端总 Token 收益和 `AC-SQG-003` 的速度取舍时，本设计才可由 `proposed` 进入待主线采纳状态。该状态仍不自动修改总体项目或授权发布。
+只有 rg/fd 全部公开模式有持久分类，结果完整性可复核，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项不退化，消费者与旧同责入口完成迁移，并且 `DES-SQG-010` 的受控隔离证据依次证明 `AC-SQG-001` 的质量充分、`AC-SQG-002` 的端到端总 Token 收益和 `AC-SQG-003` 的速度取舍时，本设计才可由 `proposed` 进入待主线采纳状态。该状态仍不自动修改总体项目或授权发布。

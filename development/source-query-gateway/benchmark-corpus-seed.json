@@ -1,0 +1,87 @@
+{
+  "schema": "agentbase.source-query-benchmark-seed/v1",
+  "status": "historical-seed",
+  "recordedDate": "2026-08-14",
+  "requiresSnapshotRevalidation": true,
+  "notes": "These are the six historical prompts and semantic facts used to seed a future snapshot-bound corpus. Historical runs did not record complete workspace commit and dirty-patch identities, so this file is not itself a rerunnable oracle.",
+  "cases": [
+    {
+      "id": "agentbase-file-discovery-control",
+      "workspaceRole": "agentbase",
+      "prompt": "在当前仓库中找到 rg_receipt.py。只返回它的仓库相对路径。",
+      "answerMaxLines": 1,
+      "historicalOracle": {
+        "path": "skills/rg-token-safe/scripts/rg_receipt.py"
+      }
+    },
+    {
+      "id": "agentbase-rg-policy-sources",
+      "workspaceRole": "agentbase",
+      "prompt": "当前仓库中，哪些正式规则文件明确规定：进入模型上下文的 rg 正文不得使用 --no-heading？排除测试和验证脚本。只返回相对路径，并用一句话概括规则。",
+      "answerMaxLines": 4,
+      "historicalOracle": {
+        "sourcePaths": [
+          "global/AGENTS.md",
+          "skills/rg-token-safe/SKILL.md"
+        ],
+        "relation": "both sources define the no-heading policy"
+      }
+    },
+    {
+      "id": "agentbase-provider-observation",
+      "workspaceRole": "agentbase",
+      "prompt": "定位 TypeScript 中 ProviderObservation interface 的唯一定义，并指出 document_symbols 成功响应通过哪个 DTO 泛型字段暴露它。返回相对文件、1-based 行号和字段名，答案不超过四行。",
+      "answerMaxLines": 4,
+      "historicalOracle": {
+        "fileSuffix": "dto.ts",
+        "definitionLine": 310,
+        "mappingLine": 694,
+        "field": "provider",
+        "relation": "document_symbols exposes ProviderObservation through the DTO generic field"
+      }
+    },
+    {
+      "id": "agentbase-sgy-containing-contract",
+      "workspaceRole": "agentbase",
+      "prompt": "定位 sgy 的 process containing 位置投影实现，并简述它使用的坐标边界、最小包含选择和源码失效处理。返回实现文件相对路径及三项结论，答案不超过六行。",
+      "answerMaxLines": 6,
+      "historicalOracle": {
+        "fileSuffix": "location_projection.rs",
+        "coordinateContract": "0-based half-open [start,end)",
+        "selection": "all tied smallest containing nodes are retained",
+        "staleness": "fingerprint mismatch rejects reuse"
+      }
+    },
+    {
+      "id": "ue-command-dispatch-submit",
+      "workspaceRole": "large-cpp",
+      "prompt": "在正式生产源码中定位 FUeAgentCommandDispatch::Submit 的完整定义范围，并给出它返回的两个协议错误 code。返回相对文件、起止行和两个 code，答案不超过五行。",
+      "answerMaxLines": 5,
+      "historicalOracle": {
+        "fileSuffix": "UeAgentCommandDispatch.cpp",
+        "startLine": 53,
+        "endLine": 84,
+        "errorCodes": [
+          "command_dispatch_handler_missing",
+          "command_handler_result_identity_mismatch"
+        ]
+      }
+    },
+    {
+      "id": "ue-hjson-isbarekey-occurrences",
+      "workspaceRole": "large-cpp",
+      "prompt": "列出正式生产源码中 FUeAgentStructuredHjsonFormatter::IsBareKey 的定义和全部调用位置。只返回相对文件与 1-based 行号，并确认结果是否完整。",
+      "answerMaxLines": 8,
+      "historicalOracle": {
+        "fileSuffix": "UeAgentStructuredHjsonFormatter.cpp",
+        "definitionLine": 648,
+        "callLines": [
+          868,
+          2037,
+          2655
+        ],
+        "requiresCompletenessStatement": true
+      }
+    }
+  ]
+}
