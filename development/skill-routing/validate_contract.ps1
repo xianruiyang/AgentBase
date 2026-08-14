@@ -271,6 +271,18 @@ Assert-True ($qqFileWriteIndex -gt $qqStatusIndex) "codex-qq-hook status must re
 Assert-True (-not $qqSwitchContent.Contains('default-on')) "codex-qq-hook exposes an undocumented default-on mutation"
 Assert-True (-not $qqSwitchContent.Contains('default-off')) "codex-qq-hook exposes an undocumented default-off mutation"
 Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\tests\test_qq_hook_switch.ps1") -PathType Leaf) "codex-qq-hook is missing its switch regression test"
+$qqDirectScriptPath = Join-Path $ProjectRoot "skills\codex-qq-hook\scripts\send_qq_message.ps1"
+$qqDirectScriptContent = Get-Content -LiteralPath $qqDirectScriptPath -Raw -Encoding UTF8
+$qqTransportContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\scripts\codex_qq_notify.py") -Raw -Encoding UTF8
+$qqRuntimePath = Join-Path $ProjectRoot "skills\codex-qq-hook\scripts\qq_notify_runtime.ps1"
+$qqGlobalTemplateContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\templates\qq-hook-global-settings.template.json") -Raw -Encoding UTF8
+Assert-True (Test-Path -LiteralPath $qqDirectScriptPath -PathType Leaf) "codex-qq-hook is missing its direct message entry"
+Assert-True (Test-Path -LiteralPath $qqRuntimePath -PathType Leaf) "codex-qq-hook is missing its shared notification runtime"
+Assert-True ($qqDirectScriptContent.Contains('QQ_BOT_DIRECT_SEND_AUTHORIZED')) "codex-qq-hook direct entry does not bind transport authorization"
+Assert-True ($qqDirectScriptContent.Contains('send requires a non-sensitive -Reason')) "codex-qq-hook direct entry does not require an audit reason"
+Assert-True ($qqTransportContent.Contains('direct sending requires the authorized wrapper')) "codex-qq-hook transport exposes a parallel direct-send entry"
+Assert-True ($qqGlobalTemplateContent.Contains('"direct_send"') -and $qqGlobalTemplateContent.Contains('"enabled": false')) "codex-qq-hook direct sending must default off"
+Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\tests\test_send_qq_message.ps1") -PathType Leaf) "codex-qq-hook is missing its direct message regression test"
 
 $eventLoggerRoot = Join-Path $ProjectRoot "skills\codex-event-logger"
 $eventLoggerSkillContent = Get-Content -LiteralPath (Join-Path $eventLoggerRoot "SKILL.md") -Raw -Encoding UTF8
@@ -364,6 +376,7 @@ $qqStopScriptContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\
 $qqInstallerContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\scripts\install_global_qq_hook.ps1") -Raw -Encoding UTF8
 Assert-True (Test-Path -LiteralPath $qqResolverPath -PathType Leaf) "codex-qq-hook is missing its location-independent Codex root resolver"
 Assert-True ($qqStopScriptContent.Contains("Resolve-AgentBaseCodexHome")) "codex-qq-hook Stop handler still derives Codex root from its installation path"
+Assert-True ($qqStopScriptContent.Contains('qq_notify_runtime.ps1') -and $qqDirectScriptContent.Contains('qq_notify_runtime.ps1')) "QQ Hook and direct sending do not share configuration loading"
 Assert-True ($qqInstallerContent.Contains('[string]$CodexRoot')) "codex-qq-hook installer must accept an explicit Codex root"
 
 $allMarkdownFiles = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot "skills") -Recurse -File -Filter "*.md"
@@ -391,6 +404,7 @@ Assert-True ($workflowContent.Contains("sgy-windows:")) "Repository CI is missin
 Assert-True ($workflowContent.Contains("validate_routing_results.ps1") -and $workflowContent.Contains("evidence\current.json")) "Repository CI does not validate current routing-policy evidence"
 Assert-True ($workflowContent.Contains("test_routing_fingerprint.ps1")) "Repository CI does not verify line-ending-neutral routing fingerprints"
 Assert-True ($workflowContent.Contains("test_routing_capsule.ps1")) "Repository CI does not verify the detached routing capsule boundary"
+Assert-True ($workflowContent.Contains("test_send_qq_message.ps1")) "Repository CI does not run the direct QQ message regression test"
 Assert-True ($workflowContent.Contains("build_plugin.ps1") -and $workflowContent.Contains("-SkipOfficialValidation")) "Repository CI does not build the plugin package with its portable contract"
 $unpinnedActions = @([regex]::Matches($workflowContent, '(?m)^\s*-?\s*uses:\s*[^@\s]+@(?<ref>[^\s#]+)') | Where-Object {
     $_.Groups["ref"].Value -notmatch '^[0-9a-f]{40}$'
@@ -473,6 +487,7 @@ $requiredCases = @(
     "event-log-context-recovery"
     "qq-hook-explicit-enable"
     "qq-hook-status-read-only"
+    "qq-direct-message-required"
     "qq-hook-troubleshooting"
     "cross-turn-dependent-plan"
     "full-delivery-chain"

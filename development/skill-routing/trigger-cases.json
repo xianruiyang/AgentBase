@@ -94,6 +94,7 @@
     "ue-transform-with-peer",
     "ue-mechanical-field-with-peer",
     "qq-troubleshooting-with-powershell",
+    "qq-direct-message-required",
     "vertical-validation-closure-selection"
   ],
   "cases": [
@@ -466,6 +467,23 @@
       ]
     },
     {
+      "id": "qq-direct-message-required",
+      "kind": "positive",
+      "request": "当前任务仍在执行，已确认一个必须由用户及时裁决的问题，延迟获知会提高不可逆外部操作的风险；用户已经开启全局主动 QQ 直发。请不等待 Stop Hook，使用正式直发入口发送一次最小消息，并保留当前任务状态。",
+      "expected_skills": [
+        "codex-qq-hook"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
       "id": "qq-hook-troubleshooting",
       "kind": "positive",
       "request": "我没有收到 QQ 完成提醒；请只读检查 hook、工作区白名单和错误日志，说明链路在哪一步失败。",
@@ -534,7 +552,6 @@
       "expected_change_governance_references": [],
       "expected_behavior_tags": [
         "read_only",
-        "quality_token_speed_order",
         "vertical_validation_closure"
       ],
       "forbidden_behavior_tags": [

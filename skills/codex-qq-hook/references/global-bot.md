@@ -21,11 +21,16 @@
     "group_openid": "",
     "channel_id": "",
     "is_wakeup": false
+  },
+  "direct_send": {
+    "enabled": false
   }
 }
 ```
 
 不要把 AppSecret 写入这个文件。
+
+`direct_send.enabled` 是面向当前目标通道的主动直发持续授权，默认 `false`。它与工作区完成提醒开关独立；只通过 [direct-message.md](direct-message.md) 的正式脚本按用户明确要求改变。
 
 ## AppSecret
 

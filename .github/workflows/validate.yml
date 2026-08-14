@@ -63,6 +63,7 @@ jobs:
           python -X utf8 .\skills\task-table-manager\tests\test_taskctl.py
           node --test .\skills\reasoning-governor\tests\test_reasoning_governor.mjs
           & .\skills\codex-qq-hook\tests\test_qq_hook_switch.ps1
+          & .\skills\codex-qq-hook\tests\test_send_qq_message.ps1
           & .\skills\codex-qq-hook\tests\test_install_global_qq_hook.ps1
 
       - name: Test QQ event capture server

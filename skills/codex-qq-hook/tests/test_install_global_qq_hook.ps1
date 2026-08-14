@@ -42,7 +42,7 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $installedSkillRoot "scripts") | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $installedSkillRoot "templates") | Out-Null
     New-Item -ItemType Directory -Force -Path $workspaceRoot | Out-Null
-    foreach ($name in @("install_global_qq_hook.ps1", "codex_stop_qq_notify.ps1", "resolve_codex_home.ps1")) {
+    foreach ($name in @("install_global_qq_hook.ps1", "codex_stop_qq_notify.ps1", "resolve_codex_home.ps1", "qq_notify_runtime.ps1")) {
         Copy-Item -LiteralPath (Join-Path $sourceSkillRoot "scripts\$name") -Destination (Join-Path $installedSkillRoot "scripts\$name")
     }
     foreach ($name in @("qq-hook-settings.template.json", "qq-hook-global-settings.template.json")) {

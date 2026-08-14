@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Send a Codex hook notification through the official QQ Bot OpenAPI.
+Send a Codex notification through the official QQ Bot OpenAPI.
 
 This file is intentionally standalone: it uses only Python stdlib and reads all
 secrets from environment variables.
@@ -617,6 +617,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--hook-mode", action="store_true", help="Read Codex hook JSON from stdin.")
     parser.add_argument("--message", help="Send this message instead of building one from stdin.")
+    parser.add_argument(
+        "--direct-reason",
+        help="Non-sensitive explanation for why delayed notice would materially matter.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Do not call QQ API.")
     parser.add_argument("--print-result", action="store_true", help="Print JSON result to stdout.")
     args = parser.parse_args()
@@ -624,6 +628,18 @@ def main() -> int:
     data = read_json_stdin() if args.hook_mode else {}
 
     dry_run = args.dry_run or truthy(env("QQ_BOT_DRY_RUN"))
+    mode = "hook" if args.hook_mode else "direct"
+    direct_reason = compact_text(args.direct_reason, 240)
+
+    if not args.hook_mode and not direct_reason:
+        print("codex_qq_notify: direct sending requires --direct-reason", file=sys.stderr)
+        return 1
+    if not args.hook_mode and not dry_run and not truthy(env("QQ_BOT_DIRECT_SEND_AUTHORIZED")):
+        print(
+            "codex_qq_notify: direct sending requires the authorized wrapper",
+            file=sys.stderr,
+        )
+        return 1
 
     if args.hook_mode and not event_allowed(data):
         debug_log("skip", data, reason="event_not_allowed")
@@ -652,7 +668,14 @@ def main() -> int:
     try:
         result = send_message(message, timeout=timeout, dry_run=dry_run)
     except NotifyError as exc:
-        debug_log("error", data, reason="notify_error", error=str(exc))
+        debug_log(
+            "error",
+            data,
+            reason="notify_error",
+            error=str(exc),
+            mode=mode,
+            direct_reason=direct_reason,
+        )
         print(f"codex_qq_notify: {exc}", file=sys.stderr)
         return 0 if args.hook_mode else 1
 
@@ -662,6 +685,8 @@ def main() -> int:
         dry_run=dry_run,
         message_sha256_16=digest_message(message),
         target_type=env("QQ_BOT_TARGET_TYPE", "user"),
+        mode=mode,
+        direct_reason=direct_reason,
     )
 
     if args.print_result or truthy(env("QQ_BOT_PRINT_RESULT")):

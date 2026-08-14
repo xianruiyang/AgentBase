@@ -36,7 +36,7 @@
 | Skill | 迁移来源 | 当前职责 |
 | --- | --- | --- |
 | `codex-event-logger` | 历史独立 logger 工程 | 只在上下文缺失或用户要求追溯时读取项目级运行记录 |
-| `codex-qq-hook` | 历史 QQ bot 工程 | 按用户明确要求配置当前工作区 QQ 完成提醒 |
+| `codex-qq-hook` | 历史 QQ bot 工程 | 按独立授权管理 QQ 完成提醒，并在延迟通知会造成实质影响时主动发送最小消息 |
 | `delivery-workflow` | 项目内建立 | 以 Markdown 文档为语义真源组织用户确认需求与设计、可修订模型产物和执行反馈；`workctl` 只辅助快照来源、索引、查询和视图 |
 | `task-table-manager` | 项目内建立 | 以文档合同管理任务、三类依赖、状态、结果摘要、证据映射和恢复上下文；`taskctl` 只辅助存储和查询，不签发执行或产品通过 |
 | `reasoning-governor` | 从 `task-table-manager` 的线程深度脚本拆分建源 | 读取和切换当前线程 next-turn 推理深度；模型自主切换只由 active Goal 续跑 |
@@ -70,7 +70,7 @@ skill 内置的 Windows/Linux `sgy 0.1.0` 由同一个不含 `.git`、`target/` 
 
 ## 路由策略验证与执行验证
 
-`development/skill-routing/trigger-cases.json` 只定义路由和粗粒度策略标签的测试 oracle。全部关键 skill 至少有一个正向触发和一个相近非触发场景，并覆盖混合意图、长上下文干扰、项目 skill 与外部 UI/UE skill 共存、事实冲突、只读授权、长期收益、禁止越权替代执行、动态推理、QQ 排障、交付链、纵向验证闭环、CLI 边界、职责生命周期、影响闭合和架构入口裁决。场景保持中文，不为了测试数量引入多语言变体。
+`development/skill-routing/trigger-cases.json` 只定义路由和粗粒度策略标签的测试 oracle。全部关键 skill 至少有一个正向触发和一个相近非触发场景，并覆盖混合意图、长上下文干扰、项目 skill 与外部 UI/UE skill 共存、事实冲突、只读授权、长期收益、禁止越权替代执行、动态推理、QQ 主动通知与排障、交付链、纵向验证闭环、CLI 边界、职责生命周期、影响闭合和架构入口裁决。场景保持中文，不为了测试数量引入多语言变体。
 
 静态合同会检查全局文件大小与关键语义、主 `SKILL.md` 大小、规则标签、重复规则、skill frontmatter、`agents/openai.yaml`、MCP 依赖、Markdown 相对引用、场景集合、严格路由用例以及正/负覆盖：
 

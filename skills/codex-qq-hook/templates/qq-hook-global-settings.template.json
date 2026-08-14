@@ -6,5 +6,8 @@
     "group_openid": "",
     "channel_id": "",
     "is_wakeup": false
+  },
+  "direct_send": {
+    "enabled": false
   }
 }

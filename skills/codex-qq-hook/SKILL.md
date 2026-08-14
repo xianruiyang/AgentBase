@@ -1,15 +1,16 @@
 ---
 name: codex-qq-hook
-description: 配置和排查 Codex QQ 完成提醒。用于用户明确要求开启、关闭或只读查看当前工作区/当前对话的提醒开关，安装或迁移 QQ hook，设置机器人与目标账号，或排查未发送链路时；故障链路原因未确认时同时使用 change-governance 做根因裁决；状态查询不得创建或改写配置，提醒默认关闭，只有显式开启的对话才加入 enabled_thread_ids。
+description: 配置、主动发送和排查 Codex QQ 通知。用于用户明确要求管理完成提醒、机器人或主动直发开关，安装或迁移 QQ Hook，排查未发送链路，或主动直发已显式开启且延迟通知会实质影响安全、正确性、可恢复性或必要用户裁决时在 Hook 之外发送一次最小消息；故障原因未确认时同时使用 change-governance。状态查询不得创建或改写配置；所有通知默认关闭，主动直发不用于普通进度、完成或可在当前对话等待的沟通。
 ---
 
-# Codex QQ Hook
+# Codex QQ 通知
 
-用中文回复，结果先行。开关操作只处理当前工作区的 `.codex\qq-hook-settings.json`；安装、全局机器人配置和排障仅在用户明确要求对应动作时进入各自参考。
+用中文回复，结果先行。完成提醒按工作区和对话授权，主动直发按全局目标通道独立授权；两者共享机器人配置和传输，不互相推导开关。
 
 ## 路由
 
 - 开启、关闭或查看工作区/对话开关：直接按本文件执行；`status` 始终只读。
+- 开启、关闭、查看或执行主动直发：完整读取 [direct-message.md](references/direct-message.md)；模型不得自行开启或更换目标。
 - 安装、刷新或迁移 hook：完整读取 [setup.md](references/setup.md)。
 - 设置或更换机器人、目标 QQ 用户、OpenID、AppID 或 AppSecret：完整读取 [global-bot.md](references/global-bot.md)。
 - 排查未收到提醒、hook 链路或日志：同时使用 `$change-governance` 并读取其 `causal-analysis.md`，再完整读取 [troubleshooting.md](references/troubleshooting.md)。

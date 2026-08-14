@@ -5,6 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "resolve_codex_home.ps1")
+. (Join-Path $PSScriptRoot "qq_notify_runtime.ps1")
 
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 [Console]::InputEncoding = $utf8
@@ -68,46 +69,6 @@ function Resolve-WorkspaceRoot {
     }
 }
 
-function Set-EnvFromConfig {
-    param(
-        [string]$EnvName,
-        $Value,
-        [string]$Default = $null
-    )
-    if ($null -ne $Value) {
-        Set-Item -Path "Env:\$EnvName" -Value ([string]$Value)
-    } elseif ($null -ne $Default) {
-        Set-Item -Path "Env:\$EnvName" -Value $Default
-    }
-}
-
-function Test-RealConfigValue {
-    param($Value)
-    if ($null -eq $Value) {
-        return $false
-    }
-    $text = [string]$Value
-    if ([string]::IsNullOrWhiteSpace($text)) {
-        return $false
-    }
-    return -not ($text -match "替换为|QQ 开放平台 AppID|目标用户 QQ_BOT_OPENID")
-}
-
-function Select-ConfigValue {
-    param(
-        $Primary,
-        $Fallback,
-        $Default = $null
-    )
-    if (Test-RealConfigValue $Primary) {
-        return $Primary
-    }
-    if (Test-RealConfigValue $Fallback) {
-        return $Fallback
-    }
-    return $Default
-}
-
 $workspaceRoot = Resolve-WorkspaceRoot $stdinPayload
 $workspaceCodexDir = Join-Path $workspaceRoot ".codex"
 $configPath = Join-Path $workspaceCodexDir "qq-hook-settings.json"
@@ -161,36 +122,21 @@ Write-HookDebug "start"
 $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $globalConfig = Get-Content -LiteralPath $globalSettingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
 
-if ([string]::IsNullOrWhiteSpace($env:QQ_BOT_APP_SECRET)) {
-    $secret = [Environment]::GetEnvironmentVariable("QQ_BOT_APP_SECRET", "User")
-    if ([string]::IsNullOrWhiteSpace($secret)) {
-        $secret = [Environment]::GetEnvironmentVariable("QQ_BOT_APP_SECRET", "Machine")
-    }
-    if (-not [string]::IsNullOrWhiteSpace($secret)) {
-        $env:QQ_BOT_APP_SECRET = $secret
-    }
-}
-
 $globalBot = $globalConfig.bot
 $workspaceBot = $config.bot
 $message = $config.message
 $goal = $config.goal
 
-Set-EnvFromConfig "QQ_BOT_APP_ID" (Select-ConfigValue $globalBot.app_id $workspaceBot.app_id)
-Set-EnvFromConfig "QQ_BOT_TARGET_TYPE" (Select-ConfigValue $globalBot.target_type $workspaceBot.target_type "user")
-Set-EnvFromConfig "QQ_BOT_OPENID" (Select-ConfigValue $globalBot.openid $workspaceBot.openid)
-Set-EnvFromConfig "QQ_BOT_GROUP_OPENID" (Select-ConfigValue $globalBot.group_openid $workspaceBot.group_openid)
-Set-EnvFromConfig "QQ_BOT_CHANNEL_ID" (Select-ConfigValue $globalBot.channel_id $workspaceBot.channel_id)
-Set-EnvFromConfig "QQ_BOT_IS_WAKEUP" (Select-ConfigValue $globalBot.is_wakeup $workspaceBot.is_wakeup "false")
+Set-AgentBaseQqBotEnvironment -GlobalBot $globalBot -WorkspaceBot $workspaceBot
 
 $env:QQ_BOT_ENABLE = "1"
 $env:QQ_BOT_NOTIFY_EVENTS = "*"
 $env:QQ_BOT_PROJECT_ROOT = $workspaceRoot
-Set-EnvFromConfig "QQ_BOT_STOP_TEMPLATE" $message.stop_template "work_complete"
-Set-EnvFromConfig "QQ_BOT_MESSAGE_PREFIX" $message.prefix " "
-Set-EnvFromConfig "QQ_BOT_MAX_CHARS" $message.max_chars "1200"
-Set-EnvFromConfig "QQ_BOT_COMPLETION_MAX_CHARS" $message.completion_max_chars "700"
-Set-EnvFromConfig "QQ_BOT_GOAL_AWARE" $goal.aware "true"
+Set-AgentBaseQqEnvironmentValue -Name "QQ_BOT_STOP_TEMPLATE" -Value $message.stop_template -Default "work_complete"
+Set-AgentBaseQqEnvironmentValue -Name "QQ_BOT_MESSAGE_PREFIX" -Value $message.prefix -Default " "
+Set-AgentBaseQqEnvironmentValue -Name "QQ_BOT_MAX_CHARS" -Value $message.max_chars -Default "1200"
+Set-AgentBaseQqEnvironmentValue -Name "QQ_BOT_COMPLETION_MAX_CHARS" -Value $message.completion_max_chars -Default "700"
+Set-AgentBaseQqEnvironmentValue -Name "QQ_BOT_GOAL_AWARE" -Value $goal.aware -Default "true"
 $env:QQ_BOT_THREAD_SWITCH_CONFIG = $configPath
 $env:QQ_BOT_DEBUG_LOG = "$globalDebugPath;$workspaceDebugPath"
 
