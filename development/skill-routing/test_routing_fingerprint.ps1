@@ -38,13 +38,66 @@ try {
     $crlfCases = @([pscustomobject]@{ id = "sample"; request = "line one`r`nline two"; available_peer_skills = @("peer-sample") })
     $lfPeers = @([pscustomobject]@{ name = "peer-sample"; description = "line one`nline two" })
     $crlfPeers = @([pscustomobject]@{ name = "peer-sample"; description = "line one`r`nline two" })
-    $lfInputFingerprint = Get-AgentBaseRoutingInputFingerprint -Cases $lfCases -AllowedBehaviorTags @("read_only") -PeerSkills $lfPeers
-    $crlfInputFingerprint = Get-AgentBaseRoutingInputFingerprint -Cases $crlfCases -AllowedBehaviorTags @("read_only") -PeerSkills $crlfPeers
+    $lfInputFingerprint = Get-AgentBaseRoutingInputFingerprint -Cases $lfCases -PeerSkills $lfPeers
+    $crlfInputFingerprint = Get-AgentBaseRoutingInputFingerprint -Cases $crlfCases -PeerSkills $crlfPeers
     if ($lfInputFingerprint -ne $crlfInputFingerprint) {
         throw "Evaluation input fingerprint changes across LF and CRLF text"
     }
 
-    Write-Output "Routing fingerprint tests passed: candidate, peer-catalog, and request hashes are line-ending neutral."
+    $lfTagDefinitions = [pscustomobject]@{ read_only = "line one`nline two" }
+    $crlfTagDefinitions = [pscustomobject]@{ read_only = "line one`r`nline two" }
+    $lfPolicyCases = @([pscustomobject]@{ id = "sample"; request = "line one`nline two" })
+    $crlfPolicyCases = @([pscustomobject]@{ id = "sample"; request = "line one`r`nline two" })
+    $lfPolicyFingerprint = Get-AgentBasePolicyInputFingerprint -Cases $lfPolicyCases -AllowedBehaviorTags @("read_only") -BehaviorTagDefinitions $lfTagDefinitions
+    $crlfPolicyFingerprint = Get-AgentBasePolicyInputFingerprint -Cases $crlfPolicyCases -AllowedBehaviorTags @("read_only") -BehaviorTagDefinitions $crlfTagDefinitions
+    if ($lfPolicyFingerprint -ne $crlfPolicyFingerprint) {
+        throw "Policy-stage input fingerprint changes across LF and CRLF text"
+    }
+    $changedTagDefinitions = [pscustomobject]@{ read_only = "different definition" }
+    $changedPolicyFingerprint = Get-AgentBasePolicyInputFingerprint -Cases $lfPolicyCases -AllowedBehaviorTags @("read_only") -BehaviorTagDefinitions $changedTagDefinitions
+    if ($lfPolicyFingerprint -eq $changedPolicyFingerprint) {
+        throw "Policy-stage input fingerprint does not include behavior tag definitions"
+    }
+
+    $lfRoutingResult = [pscustomobject]@{
+        schema_version = 3
+        evaluation_kind = "skill-routing"
+        evaluation_capsule_sha256 = "capsule"
+        candidate_bundle_sha256 = "candidate"
+        evaluation_input_sha256 = "input"
+        evaluator = [pscustomobject]@{ id = "run"; model = "model"; runtime = "runtime"; evaluated_at_utc = "2026-08-14T00:00:00Z" }
+        cases = @([pscustomobject]@{ id = "sample"; selected_skills = @("sample"); selected_peer_skills = @("peer-sample") })
+    }
+    $sameRoutingResultDifferentOrder = [pscustomobject]@{
+        schema_version = 3
+        evaluation_kind = "skill-routing"
+        evaluation_capsule_sha256 = "capsule"
+        candidate_bundle_sha256 = "candidate"
+        evaluation_input_sha256 = "input"
+        evaluator = [pscustomobject]@{ id = "run"; model = "model"; runtime = "runtime"; evaluated_at_utc = "2026-08-14T00:00:00Z" }
+        cases = @([pscustomobject]@{ id = "sample"; selected_skills = @("sample"); selected_peer_skills = @("peer-sample") })
+    }
+    $routingResultFingerprint = Get-AgentBaseRoutingResultFingerprint -RoutingResults $lfRoutingResult
+    if ($routingResultFingerprint -ne (Get-AgentBaseRoutingResultFingerprint -RoutingResults $sameRoutingResultDifferentOrder)) {
+        throw "Routing-result fingerprint changes without a semantic input change"
+    }
+    $changedRoutingResult = $lfRoutingResult | ConvertTo-Json -Depth 10 | ConvertFrom-Json -Depth 10
+    $changedRoutingResult.cases[0].selected_skills = @("different-skill")
+    if ($routingResultFingerprint -eq (Get-AgentBaseRoutingResultFingerprint -RoutingResults $changedRoutingResult)) {
+        throw "Routing-result fingerprint does not bind selected skills"
+    }
+
+    $lfReferenceFingerprint = Get-AgentBaseReferenceInputFingerprint -Cases $lfCases
+    $crlfReferenceFingerprint = Get-AgentBaseReferenceInputFingerprint -Cases $crlfCases
+    if ($lfReferenceFingerprint -ne $crlfReferenceFingerprint) {
+        throw "Reference-stage input fingerprint changes across LF and CRLF text"
+    }
+    $changedReferenceCases = @([pscustomobject]@{ id = "sample"; request = "different request" })
+    if ($lfReferenceFingerprint -eq (Get-AgentBaseReferenceInputFingerprint -Cases $changedReferenceCases)) {
+        throw "Reference-stage input fingerprint does not include case requests"
+    }
+
+    Write-Output "Routing fingerprint tests passed: candidate, routing-input, policy-input, and reference-input hashes are line-ending neutral and bind their semantic inputs."
 }
 finally {
     $resolvedTestRoot = [IO.Path]::GetFullPath($testRoot)

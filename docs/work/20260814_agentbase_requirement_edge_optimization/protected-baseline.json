@@ -1,0 +1,29 @@
+{
+  "confirmation_ref": "thread goal 2026-08-14: 根据需求持续优化到收益边缘，每轮完整后允许发布到 Codex",
+  "confirmed_by": "user",
+  "cycle_id": "cycle-001",
+  "documents": {
+    "requirements": {
+      "fingerprint": "sha256:b85ca765d841a90214affd0d165886a974790cfb63b65c38517b861c4b6604dc",
+      "ids": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "CON-001",
+        "CON-002",
+        "REQ-001"
+      ],
+      "path": "requirements.md"
+    },
+    "user_design": {
+      "fingerprint": "sha256:bdcf454ad41b4475ed9d71dc6288f3064e52183172f07c2819e4395a02b9db20",
+      "ids": [
+        "UDES-001"
+      ],
+      "path": "user-design.md"
+    }
+  },
+  "history": [],
+  "schema": "delivery.protected-baseline",
+  "workflow_id": "agentbase-requirement-edge-optimization"
+}

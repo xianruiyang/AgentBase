@@ -1,0 +1,74 @@
+{
+  "changed_files": [
+    "README.md",
+    "development/codex-deployment/README.md",
+    "development/skill-routing/build_routing_evaluation.ps1",
+    "development/skill-routing/evidence/current.json",
+    "development/skill-routing/merge_routing_evidence.ps1",
+    "development/skill-routing/routing_evaluation_common.ps1",
+    "development/skill-routing/routing_fingerprint.ps1",
+    "development/skill-routing/test_routing_capsule.ps1",
+    "development/skill-routing/test_routing_fingerprint.ps1",
+    "development/skill-routing/validate_contract.ps1",
+    "development/skill-routing/validate_routing_results.ps1"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "AC-001",
+    "AC-002",
+    "CON-001",
+    "CON-002",
+    "DES-001",
+    "DES-002",
+    "GAP-004",
+    "SOL-004"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "independent-evaluation",
+      "note": "description-only routing passed 57/57 cases and post-selection change-governance reference routing passed 14/14 cases in separately isolated gpt-5.6-sol max runs",
+      "ref": "development/skill-routing/evidence/current.json"
+    },
+    {
+      "kind": "publication-readback",
+      "note": "formal publication status matched source, installed payload, manifest and the merged two-stage routing evidence",
+      "ref": "C:/Users/gzxt/.codex/backups/AgentBase-20260814-034817-727c59fb/manifest.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "正式路由证据已按真实渐进加载顺序拆分：首次选择只看到全局规则和 skill description，选中 change-governance 后才读取其正文选择引用；两个隔离结果经隐藏 oracle 分别验证、合并为唯一正式 evidence，并已发布读回。",
+  "outputs": [
+    "仅暴露 description 的首次路由 capsule 与 57/57 独立结果",
+    "仅暴露已选 change-governance 正文的引用 capsule 与 14/14 独立结果",
+    "同时绑定两阶段身份和隔离声明的唯一 evidence/current.json",
+    "已发布且项目源、安装副本、清单和证据一致的 DirectCompatibility 安装"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:bf3f83fc69fadc178659a8862297d23e37723cf924294ee28794abedf95909e2",
+    "AC-002": "sha256:c2505dc8d7c2be6a39701a11e220d9c3e0680db1164173b69cca0a7775f3932c",
+    "AC-003": "sha256:db1342f8f491e4bab9616f5e0355985a92741c25ae75eb6697a17fbe4124aea5",
+    "CON-001": "sha256:b6a4a10c1135a2c4b566ede2b674a9b608fb4465811d8bb6ef239b3da398743b",
+    "CON-002": "sha256:dac4a3717b000caa83b51dfae8b869964699321a562c37ef3c60e76b208c72b8",
+    "DES-001": "sha256:2242464038b32e9ae74e947e48f26cccbae159ca6cfa04946063265c842ee344",
+    "DES-002": "sha256:42b26bae1bca2db697028edd310bfaddb1332646dcb2eee17607ed4e298d074a",
+    "GAP-003": "sha256:584267a47527ddfc63a378bdf38ae7a27ad445a1ea6741ba797ae56f53eaf742",
+    "GAP-004": "sha256:99bcd0e30225284089b8b635028eb418835be21c420dbcd7f411ef39eb685541",
+    "OBS-004": "sha256:a9878fd82b31476eaf5d617fc0b3b1fb25d6aa250a5f6a5dd9161a77e29e4dc6",
+    "OBS-005": "sha256:cd31af00b11bbaf3ce8b0ed8c294d353359d61e4c7ac4bfbdf5dfa4f51c9fe65",
+    "REQ-001": "sha256:ffbb2ebd7000b1ae224ae71c1bcbba22ed9f1e93287e5d732dc3fb76b9922cdf",
+    "SOL-003": "sha256:9fc3ee425c6f9a7c8189b9f7fe2f10048756825a34b002b5dff7dccd256226e2",
+    "SOL-004": "sha256:f5d90373c2decceac207cd72e1bd66d5fb8c780b61a0b77658aee42af7dac943"
+  },
+  "task_id": "T004-STAGED-ROUTING-EVIDENCE",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "routing contract passed 57 cases, 25 strict cases and 13/13 positive/non-trigger coverage",
+    "capsule tests proved stage-specific visibility, hidden-field isolation, repository-path isolation and cross-stage identity binding",
+    "candidate, routing-input and reference-input fingerprints are line-ending neutral and bind semantic inputs",
+    "detached gpt-5.6-sol max routing evaluation passed 57/57 and detached reference evaluation passed 14/14",
+    "merged evidence passed full validation and deployment Validate",
+    "Publish Status shows source, installed, manifest and evidence match with gap_count 0"
+  ]
+}

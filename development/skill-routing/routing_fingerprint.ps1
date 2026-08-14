@@ -53,7 +53,6 @@ function Get-AgentBaseRoutingCandidateFingerprint {
 function Get-AgentBaseRoutingInputFingerprint {
     param(
         [object[]]$Cases,
-        [object[]]$AllowedBehaviorTags,
         [object[]]$PeerSkills = @()
     )
 
@@ -62,10 +61,62 @@ function Get-AgentBaseRoutingInputFingerprint {
         $availablePeers = @($_.available_peer_skills | ForEach-Object { [string]$_ } | Sort-Object)
         "$([string]$_.id)|$request|peers=$($availablePeers -join ',')"
     })
-    $records += @($AllowedBehaviorTags | ForEach-Object { "behavior|$([string]$_)" })
     $records += @($PeerSkills | ForEach-Object {
         $description = ConvertTo-AgentBaseCanonicalText ([string]$_.description)
         "peer|$([string]$_.name)|$description"
     } | Sort-Object)
+    return Get-AgentBaseRoutingSha256 ($records -join "`n")
+}
+
+function Get-AgentBasePolicyInputFingerprint {
+    param(
+        [object[]]$Cases,
+        [object[]]$AllowedBehaviorTags,
+        [object]$BehaviorTagDefinitions
+    )
+
+    $records = @("phase|post-routing-policy")
+    $records += @($Cases | ForEach-Object {
+        $request = ConvertTo-AgentBaseCanonicalText ([string]$_.request)
+        "$([string]$_.id)|$request"
+    })
+    $records += @($AllowedBehaviorTags | ForEach-Object {
+        $tag = [string]$_
+        $description = ConvertTo-AgentBaseCanonicalText ([string]$BehaviorTagDefinitions.$tag)
+        "behavior|$tag|$description"
+    })
+    return Get-AgentBaseRoutingSha256 ($records -join "`n")
+}
+
+function Get-AgentBaseRoutingResultFingerprint {
+    param(
+        [object]$RoutingResults
+    )
+
+    $records = @(
+        "schema|$([string]$RoutingResults.schema_version)|kind=$([string]$RoutingResults.evaluation_kind)"
+        "capsule|$([string]$RoutingResults.evaluation_capsule_sha256)"
+        "candidate|$([string]$RoutingResults.candidate_bundle_sha256)"
+        "input|$([string]$RoutingResults.evaluation_input_sha256)"
+        "evaluator|$([string]$RoutingResults.evaluator.id)|$([string]$RoutingResults.evaluator.model)|$([string]$RoutingResults.evaluator.runtime)|$([string]$RoutingResults.evaluator.evaluated_at_utc)"
+    )
+    $records += @($RoutingResults.cases | ForEach-Object {
+        $selectedSkills = @($_.selected_skills | ForEach-Object { [string]$_ } | Sort-Object)
+        $selectedPeers = @($_.selected_peer_skills | ForEach-Object { [string]$_ } | Sort-Object)
+        "$([string]$_.id)|skills=$($selectedSkills -join ',')|peers=$($selectedPeers -join ',')"
+    })
+    return Get-AgentBaseRoutingSha256 ($records -join "`n")
+}
+
+function Get-AgentBaseReferenceInputFingerprint {
+    param(
+        [object[]]$Cases
+    )
+
+    $records = @("phase|change-governance-references")
+    $records += @($Cases | ForEach-Object {
+        $request = ConvertTo-AgentBaseCanonicalText ([string]$_.request)
+        "$([string]$_.id)|$request"
+    })
     return Get-AgentBaseRoutingSha256 ($records -join "`n")
 }

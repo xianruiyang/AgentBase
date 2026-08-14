@@ -1,0 +1,33 @@
+{
+  "schema": "task.record",
+  "id": "T001-RUNTIME-ALIGNMENT",
+  "title": "接入协作洞察与优化优先级",
+  "outcome": "运行时全局内核与复杂交付链能稳定引导模型洞察需求、共同校准并按质量、Token、速度顺序优化",
+  "source_ids": [
+    "SOL-001",
+    "GAP-001",
+    "DES-001",
+    "AC-001",
+    "REQ-001"
+  ],
+  "dependencies": [],
+  "mutation_scope": [
+    "global/AGENTS.md",
+    "skills/delivery-workflow/**",
+    "development/skill-routing/**",
+    "README.md"
+  ],
+  "outputs": [
+    "精炼的运行时规则",
+    "更新后的独立路由行为证据"
+  ],
+  "verification": [
+    "运行全局/skill 静态合同、delivery-workflow 回归、独立 detached capsule 评估和正式发布读回"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "skill-creator"
+  ],
+  "reasoning_hint": "max",
+  "revision": 1
+}

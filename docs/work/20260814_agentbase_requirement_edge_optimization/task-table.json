@@ -1,0 +1,10 @@
+{
+  "id": "agentbase-requirement-edge-optimization",
+  "result_dir": "results",
+  "schema": "task.table",
+  "source_index": ".work-cache/index.json",
+  "state_dir": "state",
+  "table_view": "TASK_TABLE.md",
+  "task_dir": "tasks",
+  "title": "AgentBase 根需求收益边缘持续优化"
+}

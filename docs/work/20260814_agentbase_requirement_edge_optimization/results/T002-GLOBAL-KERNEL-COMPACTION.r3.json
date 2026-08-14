@@ -1,0 +1,63 @@
+{
+  "changed_files": [
+    "global/AGENTS.md",
+    "development/skill-routing/validate_contract.ps1",
+    "development/skill-routing/evidence/current.json"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "AC-001",
+    "AC-002",
+    "CON-001",
+    "CON-002",
+    "DES-001",
+    "DES-002",
+    "GAP-002",
+    "SOL-002"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "independent-evaluation",
+      "note": "detached capsule evaluation validated 57/57 cases after compaction",
+      "ref": "development/skill-routing/evidence/current.json"
+    },
+    {
+      "kind": "publication-readback",
+      "note": "formal publication status matched source, installed payload and routing evidence",
+      "ref": "C:/Users/gzxt/.codex/backups/AgentBase-20260814-031816-fe51efc5/manifest.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "全局常驻规则在保持目标、授权、职责、路由、验证和完成边界的同时，从 20,231 字节降到 18,293 字节，固定上下文减少 1,938 字节（约 9.6%），并已通过独立评估和正式发布读回。",
+  "outputs": [
+    "18,293 字节的精炼全局运行时内核",
+    "57/57 通过的 detached 独立路由行为证据",
+    "项目叠加指令从 26,595 降至 24,657 字节",
+    "已发布且四方一致的 DirectCompatibility 安装"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:bf3f83fc69fadc178659a8862297d23e37723cf924294ee28794abedf95909e2",
+    "AC-002": "sha256:c2505dc8d7c2be6a39701a11e220d9c3e0680db1164173b69cca0a7775f3932c",
+    "AC-003": "sha256:db1342f8f491e4bab9616f5e0355985a92741c25ae75eb6697a17fbe4124aea5",
+    "CON-001": "sha256:b6a4a10c1135a2c4b566ede2b674a9b608fb4465811d8bb6ef239b3da398743b",
+    "CON-002": "sha256:dac4a3717b000caa83b51dfae8b869964699321a562c37ef3c60e76b208c72b8",
+    "DES-001": "sha256:2242464038b32e9ae74e947e48f26cccbae159ca6cfa04946063265c842ee344",
+    "DES-002": "sha256:42b26bae1bca2db697028edd310bfaddb1332646dcb2eee17607ed4e298d074a",
+    "GAP-002": "sha256:ad5bc041a81aa62d0c3b8643b680ebb5461352f0f2bb600318db9a43bc459141",
+    "OBS-003": "sha256:4ed64848f2622d4b1bd251b02d2a882af8cdac73da83cb0f6caa4e06acf2c8e3",
+    "REQ-001": "sha256:ffbb2ebd7000b1ae224ae71c1bcbba22ed9f1e93287e5d732dc3fb76b9922cdf",
+    "SOL-002": "sha256:e9419a26055d26844ebb8390bd01e0783eaf5b56e364517149ffa95fc7da37b8f"
+  },
+  "task_id": "T002-GLOBAL-KERNEL-COMPACTION",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "global bytes 20231 -> 18293 and combined bytes 26595 -> 24657",
+    "routing contract 57 cases and 25 strict cases passed",
+    "routing capsule and fingerprint tests passed",
+    "detached gpt-5.6-sol max evaluation 57/57 passed",
+    "deployment Validate passed with global_bytes=18293",
+    "Publish Status shows source, installed, manifest and evidence match with gap_count 0"
+  ]
+}

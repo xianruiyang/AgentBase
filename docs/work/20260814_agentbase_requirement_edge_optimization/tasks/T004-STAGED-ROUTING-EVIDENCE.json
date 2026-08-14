@@ -1,0 +1,34 @@
+{
+  "dependencies": [],
+  "id": "T004-STAGED-ROUTING-EVIDENCE",
+  "mutation_scope": [
+    "development/skill-routing/**",
+    "development/codex-deployment/**",
+    "README.md"
+  ],
+  "outcome": "正式发布证据分别证明 description-only 首次路由和选中 skill 后的治理引用选择",
+  "outputs": [
+    "description-only 首次路由 capsule",
+    "post-selection 治理引用 capsule",
+    "唯一的两阶段正式 evidence/current.json"
+  ],
+  "reasoning_hint": "max",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-004",
+    "GAP-004",
+    "DES-001",
+    "DES-002",
+    "AC-001",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "按真实加载顺序分层独立路由评估",
+  "verification": [
+    "验证首次 capsule 不含 skill 正文，两个独立结果分别通过隐藏 oracle，合并证据通过部署 Validate、Publish 与 Status 读回"
+  ]
+}

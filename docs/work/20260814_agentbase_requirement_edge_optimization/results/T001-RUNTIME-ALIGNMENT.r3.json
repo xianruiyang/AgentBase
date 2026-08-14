@@ -1,0 +1,74 @@
+{
+  "changed_files": [
+    "global/AGENTS.md",
+    "skills/delivery-workflow/SKILL.md",
+    "skills/delivery-workflow/references/artifact-contracts.md",
+    "skills/delivery-workflow/references/iteration.md",
+    "development/skill-routing/trigger-cases.json",
+    "development/skill-routing/routing_fingerprint.ps1",
+    "development/skill-routing/routing_evaluation_common.ps1",
+    "development/skill-routing/validate_contract.ps1",
+    "development/skill-routing/test_routing_capsule.ps1",
+    "development/skill-routing/test_routing_fingerprint.ps1",
+    "development/skill-routing/evidence/current.json",
+    "README.md"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "AC-001",
+    "AC-002",
+    "CON-001",
+    "CON-002",
+    "DES-001",
+    "DES-002",
+    "GAP-001",
+    "SOL-001"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "independent-evaluation",
+      "note": "detached capsule evaluation validated 57/57 cases",
+      "ref": "development/skill-routing/evidence/current.json"
+    },
+    {
+      "kind": "publication-readback",
+      "note": "formal publication status matched source, installed payload and routing evidence",
+      "ref": "C:/Users/gzxt/.codex/backups/AgentBase-20260814-030730-88530ee1/manifest.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "全局运行时内核与复杂交付链已接入协作式需求洞察、用户最终裁决、防目标偏离以及质量、Token、速度不可倒置的优化顺序；独立路由评估和正式发布读回均成立。",
+  "outputs": [
+    "global/AGENTS.md 的跨项目协作洞察与优化优先级规则",
+    "delivery-workflow 的需求洞察、持续防偏离和最终复核合同",
+    "具有明确行为标签定义且身份绑定这些定义的独立路由评估合同",
+    "已发布且四方一致的 DirectCompatibility 安装"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:bf3f83fc69fadc178659a8862297d23e37723cf924294ee28794abedf95909e2",
+    "AC-002": "sha256:c2505dc8d7c2be6a39701a11e220d9c3e0680db1164173b69cca0a7775f3932c",
+    "AC-003": "sha256:db1342f8f491e4bab9616f5e0355985a92741c25ae75eb6697a17fbe4124aea5",
+    "CON-001": "sha256:b6a4a10c1135a2c4b566ede2b674a9b608fb4465811d8bb6ef239b3da398743b",
+    "CON-002": "sha256:dac4a3717b000caa83b51dfae8b869964699321a562c37ef3c60e76b208c72b8",
+    "DES-001": "sha256:2242464038b32e9ae74e947e48f26cccbae159ca6cfa04946063265c842ee344",
+    "DES-002": "sha256:42b26bae1bca2db697028edd310bfaddb1332646dcb2eee17607ed4e298d074a",
+    "GAP-001": "sha256:79224aa63f120f2ec34c937f60b58e67fdc3e26e46997104bac7abfbf1e9a670",
+    "OBS-002": "sha256:dd487a726c6011927788f3ce18dd456af3386adcd4147e813e8d25244349a095",
+    "REQ-001": "sha256:ffbb2ebd7000b1ae224ae71c1bcbba22ed9f1e93287e5d732dc3fb76b9922cdf",
+    "SOL-001": "sha256:7fac7b79a0d54cab85926dc44e5f45ecaa834ec56b8b04efcd1a857a5ed6648f"
+  },
+  "task_id": "T001-RUNTIME-ALIGNMENT",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "delivery-workflow 32/32 tests passed",
+    "task-table-manager 63/63 tests passed",
+    "skill-creator quick_validate passed",
+    "routing contract 57 cases and 25 strict cases passed",
+    "routing capsule and fingerprint tests passed",
+    "detached gpt-5.6-sol max evaluation 57/57 passed",
+    "deployment Validate passed",
+    "Publish Status shows source, installed, manifest and evidence match with gap_count 0"
+  ]
+}

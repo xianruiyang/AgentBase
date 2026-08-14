@@ -69,35 +69,36 @@ $requiredGlobalFragments = @(
     '`should` 表示默认执行'
     '`must not` 表示不得执行'
     '对象与范围更具体且不反转上位目标'
-    '用户对期望结果、偏好、优先级和授权范围的明确表达用于确定目标'
-    '规范来源用于确定目标契约，有效证据用于判断系统现状、原因、约束和实现结果'
-    '不得静默改写用户目标'
+    '把用户表达视为共同理解目标的权威输入而非必然完整的目标'
+    '规范来源只确定适用目标契约；有效证据才判断系统现状、原因、约束和结果'
+    '系统事实不得静默改写目标或扩大授权'
     '不得为迎合而接受错误前提或弱化结论'
     '不创建替代目标或实施授权'
-    '长期净收益和整个系统总成本'
-    '稳定约束、状态与生命周期、失败边界、变化原因和当前直接消费者'
+    '长期净收益和系统总成本'
+    '只有方案必须新增或改变跨消费者长期行为时'
+    '质量同等充分时再以较低上下文与 Token 成本为优'
     '不默认把实现限定为最窄局部补丁'
-    '为使用户要求的行为成立并接入唯一正式入口而不可缺少'
-    '仅改善整体架构但不影响本次结果的调整需要另行授权'
+    '为使目标成立并接入唯一正式入口而必需'
+    '仅改善架构而不影响本次结果的调整需另行授权'
     '长期收益不得作为扩大范围或替代用户裁决的理由'
     '不得仅凭自身声明创建外部写入、发布、凭据使用或高风险操作授权'
-    '多个入口或第二状态源的方案裁决'
-    '临时路径风险与退出条件'
-    '需要根据素材、专业判断或表达选择组织时'
+    '满足可用 skill 的 `description` 时使用该 skill'
+    '`description` 同时定义触发与非触发边界'
+    '内容仍需专业组织时'
     '默认属于长期资产'
-    '不替代实施后的必要验收和完成证据'
-    '属于启动例外'
-    '模块测试验证模块契约'
+    '仍须完成实施后的必要验收'
+    '首次读取 skill 可例外使用一次精确路径'
+    '模块测试只证模块契约'
     '原场景、同类变体和相近非触发场景'
-    '长期资产的验证还应确认本次改动已接入正确职责和唯一正式入口'
-    '沿实际依赖逐层复核本次方案直接影响的直接与间接消费者及其证据'
-    '在 active goal 中把深度作为 next-turn 可调配置'
-    '简单且已限制的命令输出不创建日志文件'
+    '长期资产还须接入正确职责和唯一正式入口'
+    '沿实际依赖复核直接与间接消费者'
+    '选择最低充分 next-turn 深度'
+    '简单有界输出不建日志'
     '新一轮调试前只清理会干扰当前判断且目标范围明确的旧日志'
-    '工作流程的目标、阶段、状态、依赖、完成和例外由适用文档定义'
-    'CLI、脚本、索引、缓存和生成视图只辅助编辑、查询、压缩与机械校验'
-    '防止本次操作写错对象、破坏数据、并发覆盖、资源无界、无法确定解释必需输入或混用查询快照'
-    '其余可解析结构偏差和语义异常只作诊断'
+    '工作流程的目标、阶段、状态、依赖、完成和例外由文档定义'
+    'CLI、脚本、索引、缓存和生成视图只辅助编辑、查询、压缩和机械校验'
+    '写错对象、破坏数据、并发覆盖、资源无界、缺少解释必需输入或混用查询快照'
+    '其余可解析偏差只诊断'
 )
 foreach ($fragment in $requiredGlobalFragments) {
     Assert-True ($globalContent.Contains($fragment)) "Missing required global contract fragment: $fragment"
@@ -187,6 +188,11 @@ foreach ($routingScriptName in @("build_routing_evaluation.ps1", "validate_routi
     $routingScriptContent = Get-Content -LiteralPath (Join-Path $PSScriptRoot $routingScriptName) -Raw -Encoding UTF8
     Assert-True ($routingScriptContent.Contains('routing_evaluation_common.ps1')) "$routingScriptName must use the canonical detached-capsule implementation"
 }
+Assert-True ($routingCommonContent.Contains('The skill catalog intentionally exposes descriptions only')) "Routing evaluation does not preserve the pre-selection description-only boundary"
+Assert-True ($routingCommonContent.Contains('Policy labels, post-selection skill bodies, and reference choices are intentionally unavailable in this stage')) "Routing evaluation exposes post-routing policy hints during first-stage skill selection"
+Assert-True ($routingCommonContent.Contains('evaluation_kind = "behavior-policy"')) "Routing evaluation is missing its post-routing behavior-policy phase"
+Assert-True ($routingCommonContent.Contains('routing-reference-policy')) "Routing evaluation is missing its post-selection change-governance reference phase"
+Assert-True (Test-Path -LiteralPath (Join-Path $PSScriptRoot "merge_routing_evidence.ps1") -PathType Leaf) "Routing evaluation is missing its canonical staged evidence merge entry"
 
 $governorSkillPath = Join-Path $ProjectRoot "skills\reasoning-governor\SKILL.md"
 $governorScriptPath = Join-Path $ProjectRoot "skills\reasoning-governor\scripts\reasoning-governor.mjs"
@@ -205,6 +211,7 @@ $taskTableScriptContent = Get-Content -LiteralPath $taskTableScriptPath -Raw -En
 Assert-True ($taskTableSkillContent.Contains('任务表文档是执行投影，不是计划正确性的裁判')) "task-table-manager does not declare its assistive responsibility"
 Assert-True ($taskTableSkillContent.Contains('最终完成标准只来自 `$delivery-workflow` 当前执行周期经用户确认的需求与用户设计')) "task-table-manager does not delegate final completion to the user-confirmed document scope"
 Assert-True ($taskTableSkillContent.Contains('`taskctl` 只辅助存储、索引、查询、上下文压缩和可重建视图')) "task-table-manager does not keep taskctl assistive"
+Assert-True ($taskTableSkillContent.Contains('优先继续当前目标链并缩短到最近可验证闭环的距离')) "task-table-manager is missing vertical validation closure selection"
 Assert-True ($taskTableScriptContent.Contains('command_completion_context')) "taskctl is missing its bounded final-review context"
 Assert-True ($taskTableScriptContent.Contains('needs_review_count')) "taskctl status does not expose the review count"
 Assert-True ($taskTableScriptContent.Contains('upstream_index_derived_content_mismatch')) "taskctl does not bind cached index content to current workflow documents"
@@ -420,9 +427,22 @@ Assert-True ($changeSkillContent.Contains("多个入口或第二状态源的方�
 Assert-True ($changeSkillContent.Contains("临时路径风险评审")) "change-governance does not expose its temporary-path review trigger"
 $qqSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($qqSkillContent.Contains('同时使用 `$change-governance`')) "codex-qq-hook troubleshooting does not route unknown causes through change-governance"
+Assert-True ($globalContent.Contains("把用户表达视为共同理解目标的权威输入而非必然完整的目标")) "Global kernel is missing collaborative requirement insight"
+Assert-True ($globalContent.Contains("质量同等充分时再以较低上下文与 Token 成本为优，前两者均不变差时再提升速度")) "Global kernel is missing the quality-token-speed priority"
+$deliverySkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\delivery-workflow\SKILL.md") -Raw -Encoding UTF8
+Assert-True ($deliverySkillContent.Contains("把初始请求作为共同理解问题的起点")) "delivery-workflow is missing collaborative requirement discovery"
+Assert-True ($deliverySkillContent.Contains("整体结果未以局部正确偏离目标")) "delivery-workflow is missing final requirement-alignment review"
+Assert-True ($deliverySkillContent.Contains("优先沿当前目标链形成最近的可验证交付闭环")) "delivery-workflow is missing vertical validation closure feedback"
 
 $allowedBehaviorTags = @(Get-StringArray $contract.allowed_behavior_tags)
 Assert-True (($allowedBehaviorTags | Sort-Object -Unique).Count -eq $allowedBehaviorTags.Count) "Trigger contract contains duplicate allowed behavior tags"
+$behaviorTagDefinitions = $contract.behavior_tag_definitions
+Assert-True ($null -ne $behaviorTagDefinitions) "Trigger contract has no behavior tag definitions"
+$definedBehaviorTags = @($behaviorTagDefinitions.PSObject.Properties.Name)
+Assert-True ((($definedBehaviorTags | Sort-Object) -join "`n") -ceq (($allowedBehaviorTags | Sort-Object) -join "`n")) "Behavior tag definitions do not exactly match allowed behavior tags"
+foreach ($tag in $allowedBehaviorTags) {
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$behaviorTagDefinitions.$tag)) "Behavior tag is missing its definition: $tag"
+}
 $peerSkills = @($contract.peer_skills)
 $peerSkillNames = @($peerSkills | ForEach-Object { [string]$_.name })
 Assert-True ($peerSkillNames.Count -gt 0) "Trigger contract has no peer-skill coexistence catalog"
@@ -436,6 +456,8 @@ Assert-True (($strictRoutingCaseIds | Sort-Object -Unique).Count -eq $strictRout
 
 $requiredCases = @(
     "mechanical-document-edit"
+    "collaborative-requirement-insight"
+    "quality-token-speed-priority"
     "architecture-discovery-before-implementation"
     "implicit-architecture-integration"
     "shared-responsibility-discovery-and-adoption"
@@ -454,6 +476,7 @@ $requiredCases = @(
     "qq-hook-troubleshooting"
     "cross-turn-dependent-plan"
     "full-delivery-chain"
+    "vertical-validation-closure-selection"
     "protected-baseline-change-discovered"
     "workflow-cli-gate-boundary"
     "single-task-cli-formatting"

@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "reopened: 更正结果输入中 SOL-002 来源哈希的单字符录入错误，保留历史结果",
+  "owner": "codex-root",
+  "result_ref": "results/T002-GLOBAL-KERNEL-COMPACTION.r5.json",
+  "revision": 5,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T002-GLOBAL-KERNEL-COMPACTION"
+}

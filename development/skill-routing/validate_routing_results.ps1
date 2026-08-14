@@ -4,7 +4,8 @@ param(
     [string]$ResultsPath,
     [string]$ProjectRoot,
     [switch]$FailOnUnexpectedSelections,
-    [switch]$ShowWarnings
+    [switch]$ShowWarnings,
+    [switch]$RoutingOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,10 +42,10 @@ function Add-Failure {
 
 $contract = Get-Content -LiteralPath (Join-Path $PSScriptRoot "trigger-cases.json") -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100
 $results = Get-Content -LiteralPath $ResultsPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100 -DateKind String
-if ($results.schema_version -ne 2) {
-    throw "Unsupported routing-policy result schema: $($results.schema_version)"
+if ($results.schema_version -ne 3) {
+    throw "Unsupported skill-routing result schema: $($results.schema_version)"
 }
-if ([string]$results.evaluation_kind -ne "routing-policy") {
+if ([string]$results.evaluation_kind -ne "skill-routing") {
     throw "Unsupported evaluation kind: $($results.evaluation_kind)"
 }
 if ([string]$results.fingerprint_schema -ne (Get-AgentBaseRoutingFingerprintSchema)) {
@@ -53,7 +54,6 @@ if ([string]$results.fingerprint_schema -ne (Get-AgentBaseRoutingFingerprintSche
 
 $requiredSkills = @(Get-StringArray $contract.required_skills)
 $peerSkillNames = @($contract.peer_skills | ForEach-Object { [string]$_.name })
-$allowedBehaviorTags = @(Get-StringArray $contract.allowed_behavior_tags)
 $strictRoutingCaseIds = @(Get-StringArray $contract.strict_routing_case_ids)
 $capsule = Get-AgentBaseRoutingEvaluationCapsule -ProjectRoot $ProjectRoot -Contract $contract
 if ([string]$results.candidate_bundle_sha256 -ne $capsule.candidate_bundle_sha256) {
@@ -67,30 +67,7 @@ if ([string]$results.evaluation_capsule_sha256 -ne $capsule.sha256) {
 }
 
 $evaluator = $results.evaluator
-foreach ($field in @("id", "model", "runtime", "evaluated_at_utc", "isolation_mode")) {
-    if ($null -eq $evaluator -or [string]::IsNullOrWhiteSpace([string]$evaluator.$field)) {
-        throw "Routing result evaluator is missing required field: $field"
-    }
-}
-if ([string]$evaluator.isolation_mode -ne "detached-capsule") {
-    throw "Routing result was not produced from the detached capsule"
-}
-foreach ($attestationField in @("repository_accessed", "hidden_expectations_accessed")) {
-    if ($null -eq $evaluator -or -not ($evaluator.PSObject.Properties.Name -contains $attestationField) -or $evaluator.$attestationField.GetType().FullName -ne "System.Boolean") {
-        throw "Routing result evaluator is missing boolean input attestation: $attestationField"
-    }
-    if ([bool]$evaluator.$attestationField) {
-        throw "Routing result evaluator attested that prohibited input was accessed: $attestationField"
-    }
-}
-$evaluatedAtText = [string]$evaluator.evaluated_at_utc
-$evaluatedAt = [DateTimeOffset]::MinValue
-if (-not $evaluatedAtText.EndsWith("Z", [StringComparison]::OrdinalIgnoreCase) -or -not [DateTimeOffset]::TryParse($evaluatedAtText, [ref]$evaluatedAt) -or $evaluatedAt.Offset -ne [TimeSpan]::Zero) {
-    throw "Routing evaluator timestamp must be a valid UTC ISO-8601 value"
-}
-if ($evaluatedAt -gt [DateTimeOffset]::UtcNow.AddMinutes(5)) {
-    throw "Routing evaluator timestamp is unexpectedly in the future"
-}
+Assert-AgentBaseDetachedEvaluator -Evaluator $evaluator -Label "Skill-routing"
 $contractById = @{}
 foreach ($case in @($contract.cases)) {
     $contractById[[string]$case.id] = $case
@@ -99,7 +76,6 @@ foreach ($case in @($contract.cases)) {
 $resultById = @{}
 $failures = New-Object 'System.Collections.Generic.List[string]'
 $routingWarnings = New-Object 'System.Collections.Generic.List[string]'
-$policyDiagnostics = New-Object 'System.Collections.Generic.List[string]'
 foreach ($result in @($results.cases)) {
     $id = [string]$result.id
     if ([string]::IsNullOrWhiteSpace($id)) {
@@ -132,12 +108,13 @@ foreach ($id in $contractById.Keys) {
     $expectedPeerSkills = @(Get-StringArray $case.expected_peer_skills)
     $forbiddenPeerSkills = @(Get-StringArray $case.forbidden_peer_skills)
     $selectedPeerSkills = @(Get-StringArray $result.selected_peer_skills)
-    $expectedReferences = @(Get-StringArray $case.expected_change_governance_references)
-    $selectedReferences = @(Get-StringArray $result.selected_change_governance_references)
-    $expectedBehaviors = @(Get-StringArray $case.expected_behavior_tags)
-    $forbiddenBehaviors = @(Get-StringArray $case.forbidden_behavior_tags)
-    $selectedBehaviors = @(Get-StringArray $result.behavior_tags)
     $strictRouting = $strictRoutingCaseIds -contains $id
+
+    foreach ($postRoutingField in @("behavior_tags", "selected_change_governance_references")) {
+        if ($result.PSObject.Properties.Name -contains $postRoutingField) {
+            Add-Failure $failures "$id returned post-routing field during the skill-routing stage: $postRoutingField"
+        }
+    }
 
     foreach ($skill in $selectedSkills) {
         if ($requiredSkills -notcontains $skill) {
@@ -192,67 +169,44 @@ foreach ($id in $contractById.Keys) {
         }
     }
 
-    foreach ($reference in $expectedReferences) {
-        if ($selectedReferences -notcontains $reference) {
-            Add-Failure $failures "$id missed expected change-governance reference: $reference"
-        }
-    }
-    if ($selectedReferences.Count -gt 0 -and $selectedSkills -notcontains "change-governance") {
-        Add-Failure $failures "$id selected change-governance references without selecting the skill"
-    }
-    if ($strictRouting) {
-        foreach ($reference in @($selectedReferences | Where-Object { $expectedReferences -notcontains $_ })) {
-            Add-Failure $failures "$id selected an unspecified change-governance reference: $reference"
-        }
-    }
-
-    foreach ($tag in $selectedBehaviors) {
-        if ($allowedBehaviorTags -notcontains $tag) {
-            Add-Failure $failures "$id selected an unknown behavior tag: $tag"
-        }
-    }
-    foreach ($tag in $expectedBehaviors) {
-        if ($selectedBehaviors -notcontains $tag) {
-            Add-Failure $failures "$id missed expected behavior tag: $tag"
-        }
-    }
-    foreach ($tag in $forbiddenBehaviors) {
-        if ($selectedBehaviors -contains $tag) {
-            Add-Failure $failures "$id selected forbidden behavior tag: $tag"
-        }
-    }
-
-    $unexpectedBehaviors = @($selectedBehaviors | Where-Object { $expectedBehaviors -notcontains $_ -and $forbiddenBehaviors -notcontains $_ })
-    foreach ($tag in $unexpectedBehaviors) {
-        if ($FailOnUnexpectedSelections) {
-            Add-Failure $failures "$id selected an unspecified behavior tag: $tag"
-        }
-        else {
-            $policyDiagnostics.Add("$id selected an unspecified policy label: $tag")
-        }
-    }
 }
 
-if ($routingWarnings.Count -gt 0 -or $policyDiagnostics.Count -gt 0) {
+if ($routingWarnings.Count -gt 0) {
     if ($ShowWarnings) {
-        if ($routingWarnings.Count -gt 0) {
-            Write-Warning ($routingWarnings -join [Environment]::NewLine)
-        }
-        if ($policyDiagnostics.Count -gt 0) {
-            Write-Information ($policyDiagnostics -join [Environment]::NewLine) -InformationAction Continue
-        }
+        Write-Warning ($routingWarnings -join [Environment]::NewLine)
     }
     else {
-        if ($routingWarnings.Count -gt 0) {
-            Write-Warning "Routing-policy evaluation recorded $($routingWarnings.Count) unspecified routing selections in non-strict cases. Use -ShowWarnings to list them or -FailOnUnexpectedSelections to make every unspecified selection blocking."
-        }
-        if ($policyDiagnostics.Count -gt 0) {
-            Write-Verbose "Routing-policy evaluation recorded $($policyDiagnostics.Count) additional compatible policy labels. Use -ShowWarnings to list them."
-        }
+        Write-Warning "Skill-routing evaluation recorded $($routingWarnings.Count) unspecified routing selections in non-strict cases. Use -ShowWarnings to list them or -FailOnUnexpectedSelections to make every unspecified selection blocking."
     }
 }
 if ($failures.Count -gt 0) {
-    throw ("Routing-policy evaluation failed with $($failures.Count) violation(s):" + [Environment]::NewLine + ($failures -join [Environment]::NewLine))
+    throw ("Skill-routing evaluation failed with $($failures.Count) violation(s):" + [Environment]::NewLine + ($failures -join [Environment]::NewLine))
 }
 
-Write-Output "Routing-policy evaluation valid: $($resultById.Count)/$($contractById.Count) cases satisfy the declared project-skill, peer-skill, reference, and policy-label constraints."
+if (-not $RoutingOnly) {
+    if (-not ($results.PSObject.Properties.Name -contains "policy_evaluation") -or $null -eq $results.policy_evaluation) {
+        throw "Skill-routing evidence is missing its post-routing behavior-policy evaluation"
+    }
+    if (-not ($results.PSObject.Properties.Name -contains "reference_evaluation") -or $null -eq $results.reference_evaluation) {
+        throw "Skill-routing evidence is missing its post-routing change-governance reference evaluation"
+    }
+    $policyMessage = Assert-AgentBasePolicyEvaluationResults -ProjectRoot $ProjectRoot -Contract $contract -RoutingResults $results -PolicyResults $results.policy_evaluation -FailOnUnexpectedSelections:$FailOnUnexpectedSelections -ShowWarnings:$ShowWarnings
+    Write-Verbose $policyMessage
+    $referenceMessage = Assert-AgentBaseReferenceEvaluationResults -ProjectRoot $ProjectRoot -Contract $contract -RoutingResults $results -ReferenceResults $results.reference_evaluation
+    Write-Verbose $referenceMessage
+    $stageEvaluatorIds = @(
+        [string]$results.evaluator.id
+        [string]$results.policy_evaluation.evaluator.id
+        [string]$results.reference_evaluation.evaluator.id
+    )
+    if (@($stageEvaluatorIds | Sort-Object -Unique).Count -ne 3) {
+        throw "Routing, behavior-policy, and routing-reference evidence must come from distinct evaluator runs"
+    }
+}
+
+if ($RoutingOnly) {
+    Write-Output "Skill-routing evaluation valid: $($resultById.Count)/$($contractById.Count) cases satisfy the declared project-skill and peer-skill constraints."
+}
+else {
+    Write-Output "Staged routing evidence valid: $($resultById.Count)/$($contractById.Count) skill-routing cases, $(@($results.policy_evaluation.cases).Count) behavior-policy cases, and $(@($results.reference_evaluation.cases).Count) routing-reference cases satisfy their declared constraints."
+}

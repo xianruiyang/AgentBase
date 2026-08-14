@@ -1,459 +1,1140 @@
 {
-  "schema_version": 2,
-  "evaluation_kind": "routing-policy",
+  "schema_version": 3,
+  "evaluation_kind": "skill-routing",
   "fingerprint_schema": "text-lf-v1",
   "evaluator": {
-    "id": "c7abe7f8-a426-4bb8-8198-f0ea44f46682",
+    "id": "95628101-d7e5-4944-a2cd-68507e7da8aa",
     "model": "gpt-5.6-sol",
-    "runtime": "codex-subagent",
-    "evaluated_at_utc": "2026-08-13T16:45:06Z",
+    "runtime": "codex-desktop-windows-powershell",
+    "evaluated_at_utc": "2026-08-14T02:22:11.7315592Z",
     "isolation_mode": "detached-capsule",
     "repository_accessed": false,
     "hidden_expectations_accessed": false
   },
-  "evaluation_capsule_sha256": "FFBD4ADD382EF3754617B720F7958756EEBF3385458D7D2C4413BC97C474674A",
-  "candidate_bundle_sha256": "2258196A69F89636F16677375A623133B89A0283B51170CC387B32E7AA12D5E4",
-  "evaluation_input_sha256": "7602DC2BC1CA76AEF34E257010DBCA75F2F9501320E51DD52C05902481439647",
+  "evaluation_capsule_sha256": "679A79E41555008E2A960C633CA5BDEAFE6A0CBF01FD000F89E68E2434E1FCEA",
+  "candidate_bundle_sha256": "64FE4FED0C8F5E4699D1E58655A199EEDA12BD1033AE2E3FC13F7EBFD67C92A6",
+  "evaluation_input_sha256": "445954F81B83C61844950082BE307A87C7D62B3A5E56413AFC34D9BE6ECF9D9F",
   "cases": [
     {
       "id": "mechanical-document-edit",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope"],
-      "note": "对象和替换内容均已明确，属于普通机械文档修改。"
+      "note": "单步机械文档替换，无需专项 skill。"
     },
     {
       "id": "specified-local-implementation",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope"],
-      "note": "接口、模块和验收均已完整指定，按授权进行常规局部实现。"
+      "note": "契约、owner 与局部验证均已明确，普通实现即可。"
+    },
+    {
+      "id": "collaborative-requirement-insight",
+      "selected_skills": [],
+      "selected_peer_skills": [],
+      "note": "当前仅做目标与风险校准，不进入根因修复或架构变更。"
+    },
+    {
+      "id": "quality-token-speed-priority",
+      "selected_skills": [],
+      "selected_peer_skills": [],
+      "note": "按全局质量优先级作方案判断，无专项 skill。"
     },
     {
       "id": "architecture-discovery-before-implementation",
-      "selected_skills": ["change-governance"],
+      "selected_skills": [
+        "change-governance"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["lifecycle-and-entry.md"],
-      "behavior_tags": ["modify_authorized_scope", "architecture_integrated", "authority_lifecycle"],
-      "note": "持久化职责和正式入口尚未确定，实施前需裁决 owner 与入口归属。"
+      "note": "实现前必须裁决持久化权威 owner 与正式迁移入口。"
     },
     {
       "id": "implicit-architecture-integration",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope", "architecture_integrated"],
-      "note": "已有唯一 owner 和迁移入口，属于依赖明确的普通集成实现。"
+      "note": "已有唯一 owner 和迁移入口，属于规格明确的普通实现。"
     },
     {
       "id": "shared-responsibility-discovery-and-adoption",
-      "selected_skills": ["change-governance"],
+      "selected_skills": [
+        "change-governance"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["lifecycle-and-entry.md"],
-      "behavior_tags": ["modify_authorized_scope", "long_term_total_cost", "architecture_integrated", "authority_lifecycle", "impact_closure"],
-      "note": "重复持久化判断且权威 owner 未定，需形成共享职责并让两个消费者收敛到唯一决定路径。"
+      "note": "需形成共享权威职责并让多个入口完成接入。"
     },
     {
       "id": "authority-change-impact-closure",
-      "selected_skills": ["change-governance", "delivery-workflow", "task-table-manager"],
+      "selected_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["causal-analysis.md", "lifecycle-and-entry.md", "verification-and-gates.md"],
-      "behavior_tags": ["modify_authorized_scope", "fact_first", "architecture_integrated", "authority_lifecycle", "impact_closure", "protected_user_baseline", "final_user_scope_only"],
-      "note": "新证据推翻公共契约时须保护用户目标，并沿语义、任务和系统依赖闭合所有消费者影响后重判完成。"
+      "note": "公共契约被推翻后需跨语义、任务依赖和系统消费者完成纵向闭环。"
     },
     {
       "id": "surface-similarity-no-shared-owner",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope", "no_scope_expansion"],
-      "note": "同名字段生命周期和变化原因不同，已明确只修改缓存字段，不形成共享 owner。"
+      "note": "同名字段生命周期不同且契约只要求局部缓存修改。"
     },
     {
       "id": "one-off-generated-artifact",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope", "no_scope_expansion"],
-      "note": "这是格式与内容已指定的一次性临时产物，无长期项目职责。"
+      "note": "一次性临时文本且格式内容已完全指定。"
     },
     {
       "id": "specified-synthesis-artifact",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope"],
-      "note": "受众、权威素材和验收边界已明确，直接组织实施说明。"
+      "note": "权威素材、受众与验收均已明确，属于普通专业组织。"
     },
     {
       "id": "cpp-include-edit",
-      "selected_skills": ["cpp-engineering-rules"],
+      "selected_skills": [
+        "cpp-engineering-rules"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope"],
-      "note": "修改 C++ 公共头的 include 与前置声明，必须应用 C++ 工程规则。"
+      "note": "涉及 C++ 公共头 include、前置声明和公开 API 边界。"
     },
     {
       "id": "cpp-module-cycle-diagnosis",
-      "selected_skills": ["change-governance", "cpp-engineering-rules"],
+      "selected_skills": [
+        "change-governance",
+        "cpp-engineering-rules"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["causal-analysis.md", "verification-and-gates.md"],
-      "behavior_tags": ["modify_authorized_scope", "fact_first", "architecture_integrated"],
-      "note": "反复循环依赖需要根因与依赖职责裁决，并按 C++ 模块规则修复和验证。"
+      "note": "循环依赖修复同时需要根因/职责裁决与 C++ 模块依赖规则。"
     },
     {
       "id": "ast-structural-call-search",
-      "selected_skills": ["ast-grep-token-safe"],
+      "selected_skills": [
+        "ast-grep-token-safe"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "已明确使用 AST pattern 且只预览 rewrite，不需要符号语义裁决。"
+      "note": "已明确使用 AST pattern 与结构化 rewrite 预览，无需符号裁决。"
     },
     {
       "id": "literal-text-search",
-      "selected_skills": ["rg-token-safe"],
+      "selected_skills": [
+        "rg-token-safe"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "这是要求保留定位并限制输出的 rg 字面量搜索。"
+      "note": "字面量 rg 搜索结果需有界且可定位。"
     },
     {
       "id": "bounded-file-discovery",
-      "selected_skills": ["fd-usage"],
+      "selected_skills": [
+        "fd-usage"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "请求明确用 fd 从固定基准有界发现文件。"
+      "note": "明确要求使用 fd 有界发现文件。"
     },
     {
       "id": "powershell-command-authoring",
-      "selected_skills": ["powershell-usage"],
+      "selected_skills": [
+        "powershell-usage"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "需要编写符合 pwsh 编码与原生命令退出码规则的只读命令。"
+      "note": "需要编写 PowerShell 7 命令并正确处理编码与退出码。"
     },
     {
       "id": "semantic-safe-rename",
-      "selected_skills": ["symbol-structure-workflow"],
+      "selected_skills": [
+        "symbol-structure-workflow"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope"],
-      "note": "跨文件重载方法重命名依赖真实符号身份、引用与诊断。"
+      "note": "跨文件重载方法重命名依赖真实符号引用与诊断。"
     },
     {
       "id": "event-log-context-recovery",
-      "selected_skills": ["codex-event-logger"],
+      "selected_skills": [
+        "codex-event-logger"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "上下文压缩后明确要求从项目级运行记录恢复当前轮状态。"
+      "note": "上下文压缩后需从项目级运行记录恢复当前轮状态。"
     },
     {
       "id": "qq-hook-explicit-enable",
-      "selected_skills": ["codex-qq-hook"],
+      "selected_skills": [
+        "codex-qq-hook"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope"],
-      "note": "用户明确授权为当前工作区和对话开启 QQ 完成提醒。"
+      "note": "用户明确要求为工作区和当前对话开启 QQ 提醒。"
     },
     {
       "id": "qq-hook-status-read-only",
-      "selected_skills": ["codex-qq-hook"],
+      "selected_skills": [
+        "codex-qq-hook"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only", "no_scope_expansion"],
-      "note": "只允许查看 QQ 提醒状态，配置缺失也不得创建或补写。"
+      "note": "QQ 提醒状态只读查询属于该专项 skill。"
     },
     {
       "id": "qq-hook-troubleshooting",
-      "selected_skills": ["change-governance", "codex-qq-hook"],
+      "selected_skills": [
+        "change-governance",
+        "codex-qq-hook"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["causal-analysis.md"],
-      "behavior_tags": ["read_only", "fact_first"],
-      "note": "提醒失败机制尚未确认，需只读检查完整链路并基于证据定位根因。"
+      "note": "未发送链路原因未确认，需专项排查并裁决根因证据。"
     },
     {
       "id": "cross-turn-dependent-plan",
-      "selected_skills": ["task-table-manager"],
+      "selected_skills": [
+        "task-table-manager"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope"],
-      "note": "任务跨轮且存在真实依赖与恢复需求，应建立并执行任务表。"
+      "note": "跨轮真实依赖、状态与恢复上下文需要任务表。"
     },
     {
       "id": "full-delivery-chain",
-      "selected_skills": ["change-governance", "delivery-workflow", "task-table-manager"],
+      "selected_skills": [
+        "delivery-workflow",
+        "task-table-manager"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["verification-and-gates.md"],
-      "behavior_tags": ["modify_authorized_scope", "protected_user_baseline", "final_user_scope_only", "document_authority", "cli_assistive_only"],
-      "note": "请求完整交付链、跨轮任务合同与跨契约完成审计，并明确文档权威和用户基线。"
+      "note": "请求完整交付链并包含跨轮任务表执行。"
+    },
+    {
+      "id": "vertical-validation-closure-selection",
+      "selected_skills": [
+        "task-table-manager"
+      ],
+      "selected_peer_skills": [],
+      "note": "上游已稳定，只需基于现有任务图选择能形成纵向验证闭环的下一项。"
     },
     {
       "id": "protected-baseline-change-discovered",
-      "selected_skills": ["delivery-workflow", "task-table-manager"],
+      "selected_skills": [
+        "delivery-workflow",
+        "task-table-manager"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope", "protected_user_baseline", "no_scope_expansion", "final_user_scope_only"],
-      "note": "长期交付中必须保护用户确认设计，继续不依赖冲突的任务并把必要变更留待用户裁决。"
+      "note": "长期交付执行中需延后受保护设计变更并重排独立任务。"
     },
     {
       "id": "active-goal-reasoning-shift",
-      "selected_skills": ["reasoning-governor"],
+      "selected_skills": [
+        "reasoning-governor"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope", "fact_first"],
-      "note": "active Goal 的下一段风险与不确定性已实质变化，需重判并按需调整 next-turn 深度。"
+      "note": "active Goal 下一段风险与不确定性实质变化，需调整推理深度。"
     },
     {
       "id": "explicit-thread-reasoning-setting",
-      "selected_skills": ["reasoning-governor"],
+      "selected_skills": [
+        "reasoning-governor"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope"],
-      "note": "用户明确要求设置并读回当前线程下一轮推理深度。"
+      "note": "用户明确要求设置并读回当前线程 next-turn 深度。"
     },
     {
       "id": "reasoning-depth-discussion-only",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only", "no_alternative_execution"],
-      "note": "仅讨论通用设计且明确不读取或修改线程设置。"
+      "note": "只讨论设计且明确不读取或修改线程设置。"
     },
     {
       "id": "coordinate-frame-conversion",
-      "selected_skills": ["understand-space"],
+      "selected_skills": [
+        "understand-space"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only", "fact_first"],
-      "note": "屏幕到世界转换依赖视口、投影、父级变换和坐标系证据。"
+      "note": "屏幕到世界坐标转换依赖视口、投影和父级变换。"
     },
     {
       "id": "transform-formula-convention",
-      "selected_skills": ["understand-space"],
+      "selected_skills": [
+        "understand-space"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "矩阵转换正确性取决于统一记法、映射方向及行向量右乘约定。"
+      "note": "矩阵变换正确性依赖统一坐标与行向量约定。"
     },
     {
       "id": "bug-root-cause-fix",
-      "selected_skills": ["change-governance"],
+      "selected_skills": [
+        "change-governance"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["causal-analysis.md", "verification-and-gates.md"],
-      "behavior_tags": ["modify_authorized_scope", "fact_first", "architecture_integrated"],
-      "note": "请求明确要求根因修复并证明原输入不再进入错误机制。"
+      "note": "明确要求根因诊断、修复及原路径因果验证。"
     },
     {
       "id": "formal-entry-migration",
-      "selected_skills": ["change-governance"],
+      "selected_skills": [
+        "change-governance"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["lifecycle-and-entry.md"],
-      "behavior_tags": ["modify_authorized_scope", "architecture_integrated", "authority_lifecycle", "impact_closure"],
-      "note": "正式入口迁移需要兼容期、消费者迁移、旧入口退出条件和完整影响闭合。"
+      "note": "正式入口迁移涉及兼容期和旧路径退出条件。"
     },
     {
       "id": "project-metadata-refresh",
-      "selected_skills": ["change-governance"],
+      "selected_skills": [
+        "change-governance"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["records-and-metadata.md"],
-      "behavior_tags": ["modify_authorized_scope", "fact_first"],
-      "note": "维护 project-metadata 状态与验证依据属于治理记录职责。"
+      "note": "架构入口变化后的 project-metadata 维护由该 skill 覆盖。"
     },
     {
       "id": "shared-blocking-gate",
-      "selected_skills": ["change-governance"],
+      "selected_skills": [
+        "change-governance"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["verification-and-gates.md"],
-      "behavior_tags": ["read_only", "fact_first"],
-      "note": "共享阻断门禁必须证明每个失败都直接表示契约违反。"
+      "note": "共享阻断门禁及失败 oracle 需要跨契约裁决。"
     },
     {
       "id": "current-context-is-sufficient",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope"],
-      "note": "当前上下文已充分，无需为形式完整读取历史或建立额外记录。"
+      "note": "当前上下文充分，无需历史恢复专项 skill。"
     },
     {
       "id": "ordinary-completion-no-qq",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "仅汇报普通机械修改完成状态，不涉及 QQ 提醒配置。"
+      "note": "普通机械修改完成汇报不触发 QQ 或完成审计专项。"
     },
     {
       "id": "cpp-word-in-document",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope", "no_scope_expansion"],
-      "note": "C++ 仅出现在 README 文案中，明确不改源码。"
+      "note": "只改文档中的 C++ 文案，不涉及 C++ 工程结构。"
     },
     {
       "id": "known-file-content-search",
-      "selected_skills": ["rg-token-safe"],
+      "selected_skills": [
+        "rg-token-safe"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "在已知文件中执行受限字符串搜索，rg 输出进入上下文。"
+      "note": "已知文件内的字符串搜索仍需有界 rg 输出。"
     },
     {
       "id": "mechanical-coordinate-field-edit",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope"],
-      "note": "字段和值已精确确认且不依赖空间关系，属于机械字段修改。"
+      "note": "坐标字段和值均已确认，不需要空间推理。"
     },
     {
       "id": "single-turn-checklist",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "单轮检查三个明确字段，不需要计划或跨轮任务表。"
+      "note": "单轮、无依赖的简单字段检查不需要任务表。"
     },
     {
       "id": "windows-prose-without-command",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "只解释 Windows 目录概念，不编写或执行 PowerShell。"
+      "note": "仅解释 Windows 概念且不编写或执行 PowerShell。"
     },
     {
       "id": "fact-conflict-read-only",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only", "fact_first", "challenge_false_premise"],
-      "note": "直接文件读回证据优先于未经验证的用户断言，并须指出冲突而不修改。"
+      "note": "只读事实冲突可由全局证据规则直接裁决。"
     },
     {
       "id": "long-term-without-scope-expansion",
-      "selected_skills": ["change-governance"],
+      "selected_skills": [
+        "change-governance"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["lifecycle-and-entry.md"],
-      "behavior_tags": ["modify_authorized_scope", "long_term_total_cost", "architecture_integrated", "authority_lifecycle", "no_scope_expansion"],
-      "note": "应按长期总成本收敛到既有唯一入口，同时严格不顺带重构其他模块。"
+      "note": "方案选择涉及永久第二状态源与唯一正式入口收敛。"
     },
     {
       "id": "review-only-no-alternative-execution",
-      "selected_skills": ["change-governance"],
+      "selected_skills": [
+        "change-governance"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["lifecycle-and-entry.md"],
-      "behavior_tags": ["read_only", "long_term_total_cost", "authority_lifecycle", "no_alternative_execution"],
-      "note": "只评审临时路径的生命周期与长期风险，不得把建议升级为替代实施。"
+      "note": "明确评审临时方案的长期风险和退出问题。"
     },
     {
       "id": "workflow-cli-gate-boundary",
-      "selected_skills": ["change-governance", "delivery-workflow", "task-table-manager"],
+      "selected_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["verification-and-gates.md"],
-      "behavior_tags": ["modify_authorized_scope", "document_authority", "cli_assistive_only", "local_mechanical_gates"],
-      "note": "长期交付和任务合同由文档与 agent 裁决，CLI 只辅助且仅可设置局部可机械证明门禁。"
+      "note": "同时涉及完整交付链、任务表及跨 CLI 共享门禁裁决。"
     },
     {
       "id": "single-task-cli-formatting",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope", "no_scope_expansion", "cli_assistive_only"],
-      "note": "只用既有 CLI 机械格式化一个已指定 JSON，不建立长期流程。"
+      "note": "字段内容明确的一次性 CLI 格式化不建立长期流程。"
     },
     {
       "id": "ast-rewrite-preview",
-      "selected_skills": ["ast-grep-token-safe"],
+      "selected_skills": [
+        "ast-grep-token-safe"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "明确需要 AST 形状搜索和 rewrite 预览，且不应用修改或判断符号身份。"
+      "note": "指定 AST 形状与 rewrite 预览且无需符号身份。"
     },
     {
       "id": "event-log-explicit-history-request",
-      "selected_skills": ["codex-event-logger"],
+      "selected_skills": [
+        "codex-event-logger"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "用户明确要求有界追溯历史 Codex 对话、Goal 与文件操作。"
+      "note": "明确要求有界追溯历史 Codex 输入、Goal 和文件操作。"
     },
     {
       "id": "fd-full-path-directory-discovery",
-      "selected_skills": ["fd-usage"],
+      "selected_skills": [
+        "fd-usage"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "请求按完整路径用 fd 从固定基准有界发现目录。"
+      "note": "要求 fd 按完整路径有界发现目录。"
     },
     {
       "id": "powershell-readonly-command-inspection",
-      "selected_skills": ["powershell-usage"],
+      "selected_skills": [
+        "powershell-usage"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "明确要求用 PowerShell 7 精确只读 JSON 并输出有限字段。"
+      "note": "需编写 PowerShell 7 只读 JSON 提取命令。"
     },
     {
       "id": "mixed-cpp-powershell-review",
-      "selected_skills": ["cpp-engineering-rules", "powershell-usage"],
+      "selected_skills": [
+        "cpp-engineering-rules",
+        "powershell-usage"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "只读审查 C++ 头依赖规则，并需用 PowerShell 读取构建配置。"
+      "note": "C++ 头依赖审查和 PowerShell 配置读取各自触发专项规则。"
     },
     {
       "id": "long-context-latest-simple-request",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope", "no_scope_expansion"],
-      "note": "旧背景已结束，当前仅是明确的 README 机械替换与 Markdown 检查。"
+      "note": "旧工作已结束，当前仅为机械 README 修改且不读历史。"
     },
     {
       "id": "ui-spatial-layout-with-peer",
-      "selected_skills": ["understand-space"],
-      "selected_peer_skills": ["peer-ui-design"],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only", "fact_first"],
-      "note": "界面审查既需要 UI 专业判断，也依赖视口、像素、裁剪和布局空间关系。"
+      "selected_skills": [
+        "understand-space"
+      ],
+      "selected_peer_skills": [
+        "peer-ui-design"
+      ],
+      "note": "界面审查同时依赖 UI/UX 判断与布局坐标、裁剪、像素关系。"
     },
     {
       "id": "ui-copy-review-with-peer",
       "selected_skills": [],
-      "selected_peer_skills": ["peer-ui-design"],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["read_only"],
-      "note": "只审查界面文案和无障碍标签，不涉及空间推理。"
+      "selected_peer_skills": [
+        "peer-ui-design"
+      ],
+      "note": "文案和无障碍标签属于 UI 设计，但不涉及空间关系。"
     },
     {
       "id": "ue-transform-with-peer",
-      "selected_skills": ["understand-space"],
-      "selected_peer_skills": ["peer-ue-authoring"],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope", "fact_first"],
-      "note": "UE 资产写入需正式编辑器能力，组件空间转换和最终世界姿态验收需空间规范化。"
+      "selected_skills": [
+        "understand-space"
+      ],
+      "selected_peer_skills": [
+        "peer-ue-authoring"
+      ],
+      "note": "UE 资产写入与组件/世界/画面空间转换均为必要能力。"
     },
     {
       "id": "ue-mechanical-field-with-peer",
       "selected_skills": [],
-      "selected_peer_skills": ["peer-ue-authoring"],
-      "selected_change_governance_references": [],
-      "behavior_tags": ["modify_authorized_scope"],
-      "note": "UE 字段写入需编辑器 authoring 能力，但坐标系和值均已明确，无需空间推理。"
+      "selected_peer_skills": [
+        "peer-ue-authoring"
+      ],
+      "note": "需要 UE 编辑器 authoring，但字段、坐标系和值已确定，无需空间推理。"
     },
     {
       "id": "qq-troubleshooting-with-powershell",
-      "selected_skills": ["change-governance", "codex-qq-hook", "powershell-usage"],
+      "selected_skills": [
+        "change-governance",
+        "codex-qq-hook",
+        "powershell-usage"
+      ],
       "selected_peer_skills": [],
-      "selected_change_governance_references": ["causal-analysis.md"],
-      "behavior_tags": ["read_only", "fact_first", "no_scope_expansion"],
-      "note": "QQ 提醒故障机制未明，需用 pwsh 有界只读检查配置、hook 与日志，不得改变开关或机器人。"
+      "note": "QQ 未发送根因排查明确要求 PowerShell 读取配置、hook 与日志。"
     }
-  ]
+  ],
+  "policy_evaluation": {
+    "schema_version": 3,
+    "evaluation_kind": "behavior-policy",
+    "fingerprint_schema": "text-lf-v1",
+    "evaluator": {
+      "id": "5e9ba0ad-810a-4ce0-b18d-d9de93017e62",
+      "model": "gpt-5.6-sol",
+      "runtime": "Codex Desktop on Windows / PowerShell 7",
+      "evaluated_at_utc": "2026-08-14T02:24:26.717Z",
+      "isolation_mode": "detached-capsule",
+      "repository_accessed": false,
+      "hidden_expectations_accessed": false
+    },
+    "evaluation_capsule_sha256": "A3E50C4695226C494099DC9C10C9FAAFA8A78F4919FFFE49E0F653D7AED99361",
+    "candidate_bundle_sha256": "64FE4FED0C8F5E4699D1E58655A199EEDA12BD1033AE2E3FC13F7EBFD67C92A6",
+    "evaluation_input_sha256": "2BAEE33279F1B8A73167DB1D98BCC0B73BB58460DCCA6FAB184A194BF29F5EBA",
+    "routing_evaluation_capsule_sha256": "679A79E41555008E2A960C633CA5BDEAFE6A0CBF01FD000F89E68E2434E1FCEA",
+    "routing_result_sha256": "880DD79DA4D4ABEB2C50BBE2F682FB54FA7547CA87E35B203698CB3A499A41F1",
+    "cases": [
+      {
+        "id": "mechanical-document-edit",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "final_user_scope_only"
+        ],
+        "note": "对象、替换内容和验收均明确，应在授权范围内机械修改并按用户目标验收。"
+      },
+      {
+        "id": "specified-local-implementation",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "final_user_scope_only"
+        ],
+        "note": "按完整接口在既有模块局部实现，先核实现状并以相关测试覆盖所述结果。"
+      },
+      {
+        "id": "collaborative-requirement-insight",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "challenge_false_premise",
+          "no_alternative_execution",
+          "collaborative_requirement_insight",
+          "protected_user_baseline"
+        ],
+        "note": "证据表明盲目重试可能损害真实目标，应只读指出风险并与用户校准而不代行修改。"
+      },
+      {
+        "id": "quality-token-speed-priority",
+        "behavior_tags": [
+          "read_only",
+          "quality_token_speed_order",
+          "impact_closure",
+          "no_alternative_execution"
+        ],
+        "note": "应选择完整满足需求并覆盖消费者的 C，质量充分性优先于 Token 和速度，且不实施。"
+      },
+      {
+        "id": "architecture-discovery-before-implementation",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "architecture_integrated",
+          "authority_lifecycle"
+        ],
+        "note": "正确实现取决于先确认持久化权威 owner 与迁移入口，再接入该正式职责。"
+      },
+      {
+        "id": "implicit-architecture-integration",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "architecture_integrated"
+        ],
+        "note": "实现方式虽未指定，但应识别并接入项目已有唯一 owner 和迁移入口。"
+      },
+      {
+        "id": "shared-responsibility-discovery-and-adoption",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "architecture_integrated",
+          "authority_lifecycle",
+          "impact_closure"
+        ],
+        "note": "需裁决单一决定路径并让两个既有入口共同采用，完成共享职责及消费者闭环。"
+      },
+      {
+        "id": "authority-change-impact-closure",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "protected_user_baseline",
+          "impact_closure",
+          "final_user_scope_only"
+        ],
+        "note": "公共契约证据变化时保持已确认目标，闭合所有语义与任务消费者后才能重新判定完成。"
+      },
+      {
+        "id": "surface-similarity-no-shared-owner",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "no_scope_expansion",
+          "final_user_scope_only"
+        ],
+        "note": "生命周期不同排除了共享 owner，本次只改已指定缓存字段并验证，不扩到持久化真源。"
+      },
+      {
+        "id": "one-off-generated-artifact",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "final_user_scope_only"
+        ],
+        "note": "一次性产物的格式、内容和生命周期已明确，仅生成本轮临时结果即可。"
+      },
+      {
+        "id": "specified-synthesis-artifact",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "final_user_scope_only"
+        ],
+        "note": "应依据已确认权威素材，围绕受众和明确验收约束组织说明。"
+      },
+      {
+        "id": "cpp-include-edit",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "impact_closure",
+          "final_user_scope_only"
+        ],
+        "note": "公共头依赖调整需保持 API，并验证直接依赖与受影响消费者仍有效。"
+      },
+      {
+        "id": "cpp-module-cycle-diagnosis",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "architecture_integrated",
+          "authority_lifecycle",
+          "impact_closure"
+        ],
+        "note": "反复循环依赖要求以证据定位职责与依赖根因，修复后闭合两个模块影响。"
+      },
+      {
+        "id": "ast-structural-call-search",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "no_alternative_execution"
+        ],
+        "note": "按已指定结构条件查找并只预览改写，不执行修改或另行升级工具裁决。"
+      },
+      {
+        "id": "literal-text-search",
+        "behavior_tags": [
+          "read_only",
+          "fact_first"
+        ],
+        "note": "有界字面量查询只读取源码并保留定位，不改变任何状态。"
+      },
+      {
+        "id": "bounded-file-discovery",
+        "behavior_tags": [
+          "read_only",
+          "fact_first"
+        ],
+        "note": "按指定基准和数量上限发现文件，属于有界只读事实查询。"
+      },
+      {
+        "id": "powershell-command-authoring",
+        "behavior_tags": [
+          "read_only",
+          "final_user_scope_only"
+        ],
+        "note": "只需给出满足 UTF-8 读取与退出码检查约束的命令文本，不改主机状态。"
+      },
+      {
+        "id": "semantic-safe-rename",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "impact_closure"
+        ],
+        "note": "需以真实符号身份限定跨文件引用，重命名后读回诊断以闭合影响。"
+      },
+      {
+        "id": "event-log-context-recovery",
+        "behavior_tags": [
+          "read_only",
+          "fact_first"
+        ],
+        "note": "从指定运行记录恢复当前轮事实是只读取证，不执行历史请求。"
+      },
+      {
+        "id": "qq-hook-explicit-enable",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "final_user_scope_only"
+        ],
+        "note": "用户明确授权为当前工作区与对话开启提醒，修改范围仅限对应开关。"
+      },
+      {
+        "id": "qq-hook-status-read-only",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "no_alternative_execution"
+        ],
+        "note": "仅查询现状，配置缺失也不得创建或补写任何状态。"
+      },
+      {
+        "id": "qq-hook-troubleshooting",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "no_alternative_execution"
+        ],
+        "note": "只读检查链路证据并定位失败阶段，不修复或改写配置。"
+      },
+      {
+        "id": "cross-turn-dependent-plan",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "document_authority",
+          "cli_assistive_only",
+          "final_user_scope_only"
+        ],
+        "note": "真实跨轮依赖授权建立并执行任务表，状态合同由文档承担，工具仅辅助。"
+      },
+      {
+        "id": "full-delivery-chain",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "collaborative_requirement_insight",
+          "protected_user_baseline",
+          "document_authority",
+          "cli_assistive_only",
+          "final_user_scope_only",
+          "vertical_validation_closure"
+        ],
+        "note": "先共同确认并保护需求与用户设计，再按文档推进全链，沿依赖形成可验证闭环并只以最终需求判定。"
+      },
+      {
+        "id": "vertical-validation-closure-selection",
+        "behavior_tags": [
+          "read_only",
+          "quality_token_speed_order",
+          "vertical_validation_closure",
+          "no_alternative_execution"
+        ],
+        "note": "在质量边界不受损时优先延续当前目标链并尽快形成可验证用户结果，仅作选择说明。"
+      },
+      {
+        "id": "protected-baseline-change-discovered",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "protected_user_baseline",
+          "no_scope_expansion",
+          "final_user_scope_only",
+          "vertical_validation_closure"
+        ],
+        "note": "不得擅改用户确认设计，应继续独立任务链并将必要变更及影响延后交用户裁决。"
+      },
+      {
+        "id": "active-goal-reasoning-shift",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "quality_token_speed_order"
+        ],
+        "note": "新证据实质提高风险和验证负担，应在继续前据此调整到最低充分推理深度并读回。"
+      },
+      {
+        "id": "explicit-thread-reasoning-setting",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "final_user_scope_only"
+        ],
+        "note": "用户明确授权设置下一轮深度为 max，应修改并读回实际线程状态。"
+      },
+      {
+        "id": "reasoning-depth-discussion-only",
+        "behavior_tags": [
+          "read_only",
+          "no_alternative_execution"
+        ],
+        "note": "请求只讨论设计原则，不能读取或修改线程设置。"
+      },
+      {
+        "id": "coordinate-frame-conversion",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "final_user_scope_only"
+        ],
+        "note": "需明确适用视口、投影和父级变换事实，并给出直接可读回的验收条件。"
+      },
+      {
+        "id": "transform-formula-convention",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "challenge_false_premise",
+          "final_user_scope_only"
+        ],
+        "note": "必须先统一矩阵记法并正确映射行向量右乘约定，不能混用另一套公式。"
+      },
+      {
+        "id": "bug-root-cause-fix",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "architecture_integrated",
+          "vertical_validation_closure"
+        ],
+        "note": "先用证据确定根因，再修复相应职责并以原输入证明错误路径已关闭。"
+      },
+      {
+        "id": "formal-entry-migration",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "architecture_integrated",
+          "authority_lifecycle",
+          "impact_closure"
+        ],
+        "note": "迁移正式入口会改变权威与生命周期，需覆盖兼容消费者并定义三个月后的退出条件。"
+      },
+      {
+        "id": "project-metadata-refresh",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "document_authority",
+          "impact_closure"
+        ],
+        "note": "架构入口变化后应以直接证据重写权威状态文档，清除失效内容并反映影响闭环。"
+      },
+      {
+        "id": "shared-blocking-gate",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "document_authority",
+          "cli_assistive_only",
+          "local_mechanical_gates",
+          "impact_closure"
+        ],
+        "note": "共享阻断规则须由契约文档定义，并证明各失败均为可机械确认的契约违反。"
+      },
+      {
+        "id": "current-context-is-sufficient",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "no_scope_expansion",
+          "vertical_validation_closure"
+        ],
+        "note": "当前上下文已足以继续既定下一项，无需扩展到历史恢复或额外记录。"
+      },
+      {
+        "id": "ordinary-completion-no-qq",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "final_user_scope_only"
+        ],
+        "note": "只按刚才单文件修改及其证据汇报完成状态，不产生额外外部动作。"
+      },
+      {
+        "id": "cpp-word-in-document",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "no_scope_expansion",
+          "final_user_scope_only"
+        ],
+        "note": "仅机械修改 README 文案，C++ 字样不授权源码或构建依赖变更。"
+      },
+      {
+        "id": "known-file-content-search",
+        "behavior_tags": [
+          "read_only",
+          "fact_first"
+        ],
+        "note": "在已知单一文件中有界查找字符串，属于精确只读事实查询。"
+      },
+      {
+        "id": "mechanical-coordinate-field-edit",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "final_user_scope_only"
+        ],
+        "note": "对象、字段、值均已确认，应直接做机械字段修改，不扩展为空间推理。"
+      },
+      {
+        "id": "single-turn-checklist",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "final_user_scope_only"
+        ],
+        "note": "单轮只检查三个指定字段并回复，不建立计划或持久状态。"
+      },
+      {
+        "id": "windows-prose-without-command",
+        "behavior_tags": [
+          "read_only",
+          "no_alternative_execution"
+        ],
+        "note": "只解释文档概念，不生成或执行命令，也不改变系统。"
+      },
+      {
+        "id": "fact-conflict-read-only",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "challenge_false_premise"
+        ],
+        "note": "直接文件观察优先于未经验证的坚持，应明确纠正冲突且不修改文件。"
+      },
+      {
+        "id": "long-term-without-scope-expansion",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "long_term_total_cost",
+          "architecture_integrated",
+          "no_scope_expansion"
+        ],
+        "note": "应选择收敛到唯一入口的长期低成本方案，同时不顺带重构授权外模块。"
+      },
+      {
+        "id": "review-only-no-alternative-execution",
+        "behavior_tags": [
+          "read_only",
+          "no_alternative_execution",
+          "long_term_total_cost",
+          "no_scope_expansion"
+        ],
+        "note": "只评审长期风险并建议，不能把意见升级为替用户执行替代方案。"
+      },
+      {
+        "id": "workflow-cli-gate-boundary",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "document_authority",
+          "cli_assistive_only",
+          "local_mechanical_gates",
+          "architecture_integrated"
+        ],
+        "note": "共享政策应把语义规则留在文档和 agent，只给两套 CLI 设置局部、可恢复的机械门禁。"
+      },
+      {
+        "id": "single-task-cli-formatting",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "cli_assistive_only",
+          "final_user_scope_only"
+        ],
+        "note": "CLI 仅机械格式化已指定 JSON，不建立长期工作流或赋予其语义裁决权。"
+      },
+      {
+        "id": "ast-rewrite-preview",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "no_alternative_execution"
+        ],
+        "note": "只按指定 AST 形状查找并预览 rewrite，不应用修改或扩展到符号身份判断。"
+      },
+      {
+        "id": "event-log-explicit-history-request",
+        "behavior_tags": [
+          "read_only",
+          "fact_first"
+        ],
+        "note": "先有界列出历史候选 turn 再追溯所需输入、Goal 和操作，不扫描全部日志。"
+      },
+      {
+        "id": "fd-full-path-directory-discovery",
+        "behavior_tags": [
+          "read_only",
+          "fact_first"
+        ],
+        "note": "固定基准、按完整路径并限制数量的目录发现是有界只读查询。"
+      },
+      {
+        "id": "powershell-readonly-command-inspection",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "no_alternative_execution"
+        ],
+        "note": "仅提供并使用精确只读命令输出指定字段，不得改写 JSON。"
+      },
+      {
+        "id": "mixed-cpp-powershell-review",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "no_alternative_execution"
+        ],
+        "note": "审查与配置读取均为只读，范围限于已知头文件和相关配置，不做语义重命名。"
+      },
+      {
+        "id": "long-context-latest-simple-request",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "no_scope_expansion",
+          "final_user_scope_only"
+        ],
+        "note": "已结束的历史背景不扩展当前范围，只机械替换指定命令并检查 Markdown。"
+      },
+      {
+        "id": "ui-spatial-layout-with-peer",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "final_user_scope_only"
+        ],
+        "note": "只读审查需以布局坐标、裁剪和像素关系的直接证据支撑结论。"
+      },
+      {
+        "id": "ui-copy-review-with-peer",
+        "behavior_tags": [
+          "read_only",
+          "no_scope_expansion",
+          "final_user_scope_only"
+        ],
+        "note": "范围仅为文案与无障碍标签清晰度，不扩展到位置、尺寸或布局判断。"
+      },
+      {
+        "id": "ue-transform-with-peer",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "fact_first",
+          "vertical_validation_closure"
+        ],
+        "note": "空间转换写入后必须读回组件与世界姿态，并以相机画面关系完成运行时闭环。"
+      },
+      {
+        "id": "ue-mechanical-field-with-peer",
+        "behavior_tags": [
+          "modify_authorized_scope",
+          "final_user_scope_only"
+        ],
+        "note": "坐标系、单位和值均已确定，只需机械修改指定字段并按给定值验收。"
+      },
+      {
+        "id": "qq-troubleshooting-with-powershell",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "no_alternative_execution"
+        ],
+        "note": "以只读配置、hook 和有界日志证据定位失败，不修改提醒开关或机器人配置。"
+      }
+    ]
+  },
+  "reference_evaluation": {
+    "schema_version": 3,
+    "evaluation_kind": "routing-reference-policy",
+    "fingerprint_schema": "text-lf-v1",
+    "evaluator": {
+      "id": "c986bc86-f59b-43e8-8bbc-16c945aac9ff",
+      "model": "gpt-5",
+      "runtime": "Codex desktop / PowerShell 7.6.4 / Windows",
+      "evaluated_at_utc": "2026-08-14T02:24:39.8717724Z",
+      "isolation_mode": "detached-capsule",
+      "repository_accessed": false,
+      "hidden_expectations_accessed": false
+    },
+    "evaluation_capsule_sha256": "FC4B0F7C6BFB84B74013A3BBADD6086E52AF4CE806CFB41358F3AEB9CDCE3103",
+    "candidate_bundle_sha256": "64FE4FED0C8F5E4699D1E58655A199EEDA12BD1033AE2E3FC13F7EBFD67C92A6",
+    "evaluation_input_sha256": "2AD3DFC9646FFD547158F410B7FDC49D3234DC75C190EBEECDC4EE0ADC8DFB18",
+    "routing_evaluation_capsule_sha256": "679A79E41555008E2A960C633CA5BDEAFE6A0CBF01FD000F89E68E2434E1FCEA",
+    "routing_result_sha256": "880DD79DA4D4ABEB2C50BBE2F682FB54FA7547CA87E35B203698CB3A499A41F1",
+    "cases": [
+      {
+        "id": "architecture-discovery-before-implementation",
+        "selected_change_governance_references": [
+          "lifecycle-and-entry.md"
+        ],
+        "note": "实现前必须裁决持久化职责、权威 owner 与正式迁移入口。"
+      },
+      {
+        "id": "shared-responsibility-discovery-and-adoption",
+        "selected_change_governance_references": [
+          "lifecycle-and-entry.md"
+        ],
+        "note": "需要形成共享职责、确定唯一决定路径并让多个入口完成采用。"
+      },
+      {
+        "id": "authority-change-impact-closure",
+        "selected_change_governance_references": [
+          "lifecycle-and-entry.md",
+          "verification-and-gates.md"
+        ],
+        "note": "公共契约权威变化要求传播到直接与间接消费者，并执行跨契约完成审计。"
+      },
+      {
+        "id": "cpp-module-cycle-diagnosis",
+        "selected_change_governance_references": [
+          "causal-analysis.md",
+          "verification-and-gates.md"
+        ],
+        "note": "反复循环依赖需要根因与机制分析，并证明已修复机制确实改变。"
+      },
+      {
+        "id": "qq-hook-troubleshooting",
+        "selected_change_governance_references": [
+          "causal-analysis.md"
+        ],
+        "note": "只读定位提醒链路的具体失败环节属于故障链路根因诊断。"
+      },
+      {
+        "id": "bug-root-cause-fix",
+        "selected_change_governance_references": [
+          "causal-analysis.md",
+          "verification-and-gates.md"
+        ],
+        "note": "既要裁决 bug 根因，也要证明原输入不再经过错误机制。"
+      },
+      {
+        "id": "formal-entry-migration",
+        "selected_change_governance_references": [
+          "lifecycle-and-entry.md"
+        ],
+        "note": "正式入口迁移、兼容窗口和退出条件均属于入口生命周期治理。"
+      },
+      {
+        "id": "project-metadata-refresh",
+        "selected_change_governance_references": [
+          "lifecycle-and-entry.md",
+          "records-and-metadata.md"
+        ],
+        "note": "需基于架构入口权威变化重写长期项目状态记录及验证依据。"
+      },
+      {
+        "id": "shared-blocking-gate",
+        "selected_change_governance_references": [
+          "verification-and-gates.md"
+        ],
+        "note": "设计共享阻断门禁并裁决每个失败的契约语义。"
+      },
+      {
+        "id": "long-term-without-scope-expansion",
+        "selected_change_governance_references": [
+          "lifecycle-and-entry.md"
+        ],
+        "note": "需在第二状态源与现有唯一入口之间裁决长期权威路径。"
+      },
+      {
+        "id": "review-only-no-alternative-execution",
+        "selected_change_governance_references": [
+          "lifecycle-and-entry.md"
+        ],
+        "note": "临时方案的长期风险、替换条件和退出触发属于生命周期评审。"
+      },
+      {
+        "id": "workflow-cli-gate-boundary",
+        "selected_change_governance_references": [
+          "verification-and-gates.md"
+        ],
+        "note": "任务核心是统一设计共享门禁及其可阻断与仅诊断边界。"
+      },
+      {
+        "id": "qq-troubleshooting-with-powershell",
+        "selected_change_governance_references": [
+          "causal-analysis.md"
+        ],
+        "note": "PowerShell 只是检查手段，治理引用需求仍是只读故障链路根因诊断。"
+      }
+    ]
+  }
 }

@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "",
+  "owner": "codex-root",
+  "result_ref": "results/T003-SKILL-ROUTING-AUTHORITY.r3.json",
+  "revision": 3,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T003-SKILL-ROUTING-AUTHORITY"
+}

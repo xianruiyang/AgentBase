@@ -1,0 +1,33 @@
+{
+  "dependencies": [],
+  "id": "T002-GLOBAL-KERNEL-COMPACTION",
+  "mutation_scope": [
+    "global/AGENTS.md",
+    "development/skill-routing/**"
+  ],
+  "outcome": "跨项目全局规则以更低固定上下文成本保持原有目标、授权、职责、路由、验证和完成边界",
+  "outputs": [
+    "精炼后的全局常驻规则",
+    "保持行为边界的独立路由证据",
+    "量化的固定字节与 Token 成本下降"
+  ],
+  "reasoning_hint": "max",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-002",
+    "GAP-002",
+    "DES-001",
+    "DES-002",
+    "AC-001",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "无损精炼全局常驻内核",
+  "verification": [
+    "比较精炼前后字节数，运行静态合同、路由 capsule/fingerprint 回归、detached 独立评估、部署 Validate、Publish 与 Status 读回"
+  ]
+}

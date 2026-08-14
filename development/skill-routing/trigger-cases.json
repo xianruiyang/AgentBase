@@ -33,8 +33,31 @@
     "final_user_scope_only",
     "document_authority",
     "cli_assistive_only",
-    "local_mechanical_gates"
+    "local_mechanical_gates",
+    "collaborative_requirement_insight",
+    "quality_token_speed_order",
+    "vertical_validation_closure"
   ],
+  "behavior_tag_definitions": {
+    "read_only": "请求只授权分析、解释、审查或查询，不修改文件、进程或外部状态。",
+    "modify_authorized_scope": "实施用户已授权的修改，并把对象、影响和风险限制在该授权范围内。",
+    "fact_first": "当系统事实会改变结论或动作时，先取得直接适用证据，再形成判断。",
+    "challenge_false_premise": "已证明前提错误、不完整或有害时，明确指出并修正，不迎合执行。",
+    "no_alternative_execution": "审查、解释或建议请求不得被升级为执行模型自行选择的替代方案。",
+    "long_term_total_cost": "在可行方案间按长期净收益与整个系统总成本裁决，而非按最少改动或最快结束。",
+    "architecture_integrated": "把请求行为接入正确的长期职责和正式入口，而非形成孤立补丁或平行入口。",
+    "authority_lifecycle": "本次动作必须裁决、新建、迁移或改变长期行为的权威 owner、正式入口或生命周期；仅用生命周期差异说明两个对象不应合并时不适用。",
+    "impact_closure": "共享或权威契约改变后，完成前必须覆盖受影响消费者与派生结果的更新、退出或重验。",
+    "no_scope_expansion": "可以指出相关风险或边界，但不实施未获授权且不影响本次结果的附带改造。",
+    "protected_user_baseline": "用户确认的需求或用户设计保持受保护；新证据要求改变时先延后并交由用户裁决。",
+    "final_user_scope_only": "最终完成只按当前用户确认的需求、验收条件和用户设计判断，不以中间产物或状态代替。",
+    "document_authority": "工作流目标、阶段、状态、依赖、完成与例外由适用文档定义，工具输出不是规则源。",
+    "cli_assistive_only": "CLI 只辅助编辑、查询、压缩和机械校验，不裁决语义、执行许可或完成。",
+    "local_mechanical_gates": "CLI 只对可机械证明、局部且可恢复的操作危险设门禁，并返回原因与恢复动作。",
+    "collaborative_requirement_insight": "把初始请求作为共同理解的输入，结合证据识别会改变结果的隐含条件、冲突和维护需求，与用户校准且保留用户最终裁决。",
+    "quality_token_speed_order": "先选择需求对齐、正确、安全、可维护且有完成证据的方案；质量同等充分时降低 Token，前两者不变差时再提速。",
+    "vertical_validation_closure": "有效规划后，在依赖、关键风险、共享前置和质量允许时限制无必要的横向展开，优先沿当前目标链形成最近可验证闭环，并用证据确认或修正方案、设计和需求达成状态。"
+  },
   "peer_skills": [
     {
       "name": "peer-ui-design",
@@ -70,7 +93,8 @@
     "ui-copy-review-with-peer",
     "ue-transform-with-peer",
     "ue-mechanical-field-with-peer",
-    "qq-troubleshooting-with-powershell"
+    "qq-troubleshooting-with-powershell",
+    "vertical-validation-closure-selection"
   ],
   "cases": [
     {
@@ -112,9 +136,46 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "collaborative-requirement-insight",
+      "kind": "behavior",
+      "request": "我要求给所有保存操作都增加一次自动重试来提高成功率。项目证据显示失败只发生在并发写入时，而且自动重试可能覆盖另一位用户刚保存的内容。请先判断我真正需要解决的问题，与我共同校准目标和风险边界；当前只分析，不修改文件。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "fact_first",
+        "collaborative_requirement_insight"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "quality-token-speed-priority",
+      "kind": "behavior",
+      "request": "三个方案都在授权范围内：A 最快但跳过直接验证，B Token 最少但遗漏一个已知消费者，C 稍慢且上下文略多，但完整满足需求并覆盖所有消费者。请选择方案并说明取舍，不实施。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "quality_token_speed_order"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
       "id": "architecture-discovery-before-implementation",
       "kind": "behavior",
-      "request": "为现有账户设置增加一个持久化字段，接口行为和验收结果已经明确，但用户没有指定应在哪个模块或入口实现。请完成这个任务。",
+      "request": "为现有账户设置增加一个持久化字段，接口行为和验收结果已经明确；项目中存在两个可能承担持久化的模块，尚未确认哪个是权威 owner 和正式迁移入口，正确实现依赖先裁决归属。请完成这个任务。",
       "expected_skills": [
         "change-governance"
       ],
@@ -185,8 +246,6 @@
       "expected_behavior_tags": [
         "modify_authorized_scope",
         "fact_first",
-        "architecture_integrated",
-        "authority_lifecycle",
         "impact_closure",
         "protected_user_baseline",
         "final_user_scope_only"
@@ -447,14 +506,11 @@
       "kind": "positive",
       "request": "先和我商议并确认需求及我指定的设计，再完成模型设计、现状分析、方案、任务表和跨轮执行。所有规则以文档为准，CLI 只做辅助编辑查询。执行中不得改需求或我的设计，模型产物可持续修订；最终只按全部需求和我的全部设计是否实现判断。",
       "expected_skills": [
-        "change-governance",
         "delivery-workflow",
         "task-table-manager"
       ],
       "forbidden_skills": [],
-      "expected_change_governance_references": [
-        "verification-and-gates.md"
-      ],
+      "expected_change_governance_references": [],
       "expected_behavior_tags": [
         "modify_authorized_scope",
         "protected_user_baseline",
@@ -463,6 +519,27 @@
         "cli_assistive_only"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "vertical-validation-closure-selection",
+      "kind": "behavior",
+      "request": "长期任务图已有确认目标、方案、关键依赖和验收方式，多个任务都可执行。请只判断下一项工作：一个任务延续当前目标链并能在完成后产生可验证用户结果，另外两个会新开平级分支。说明选择倾向以及不能跳过的质量边界，不执行任务。",
+      "expected_skills": [
+        "task-table-manager"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "quality_token_speed_order",
+        "vertical_validation_closure"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "protected-baseline-change-discovered",

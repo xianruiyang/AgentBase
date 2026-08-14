@@ -1,0 +1,33 @@
+{
+  "dependencies": [],
+  "id": "T003-SKILL-ROUTING-AUTHORITY",
+  "mutation_scope": [
+    "global/AGENTS.md",
+    "development/skill-routing/**"
+  ],
+  "outcome": "具体 skill 触发边界只由各自 description 维护，全局以一个通用不变量完成最小充分路由",
+  "outputs": [
+    "单一 skill 路由权威分层",
+    "降低后的全局固定上下文",
+    "全量独立路由证据"
+  ],
+  "reasoning_hint": "max",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-003",
+    "GAP-003",
+    "DES-001",
+    "DES-002",
+    "AC-001",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "收敛 skill 路由权威入口",
+  "verification": [
+    "验证 13/13 skill description 正向与非触发覆盖、57 个 detached 路由用例、部署 Validate、Publish 与 Status 读回"
+  ]
+}

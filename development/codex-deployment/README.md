@@ -48,7 +48,7 @@ The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerS
 
 ## Validate
 
-Validation checks the global rule and Skill contract, the detached-capsule evaluator identity, clean-input attestation, and capsule/candidate/request hashes in `development/skill-routing/evidence/current.json`, the portable config allowlist, the exact custom-agent file/schema contract, the hooks schema and placeholder boundary, and the independent `vscode-lsp-mcp` release owner. The attestation is an auditable input contract, not an OS sandbox claim. Routing-policy evidence proves selection and coarse policy labels only; it does not replace the skill regression or component release gates:
+Validation checks the global rule and Skill contract, the separately isolated description-only routing, post-routing behavior-policy and post-selection reference capsules, their evaluator identities, clean-input attestations and capsule/candidate/input hashes in `development/skill-routing/evidence/current.json`, the portable config allowlist, the exact custom-agent file/schema contract, the hooks schema and placeholder boundary, and the independent `vscode-lsp-mcp` release owner. The attestation is an auditable input contract, not an OS sandbox claim. Staged evidence proves routing, coarse policy labels and reference selection only; it does not replace the skill regression or component release gates:
 
 ```powershell
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot (Get-Location).Path

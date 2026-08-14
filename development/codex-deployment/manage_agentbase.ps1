@@ -145,17 +145,17 @@ function Get-ValidatedRoutingEvidence {
 
     $evidencePath = Join-Path $Root "development\skill-routing\evidence\current.json"
     if (-not (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
-        throw "Current routing-policy evidence is missing: $evidencePath"
+        throw "Current staged routing evidence is missing: $evidencePath"
     }
     $evidenceItem = Get-Item -LiteralPath $evidencePath -Force
     if (($evidenceItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-        throw "Current routing-policy evidence must be a real file: $evidencePath"
+        throw "Current staged routing evidence must be a real file: $evidencePath"
     }
 
     & (Join-Path $Root "development\skill-routing\validate_routing_results.ps1") -ProjectRoot $Root -ResultsPath $evidencePath | Out-Null
     $evidence = Get-Content -LiteralPath $evidencePath -Raw -Encoding UTF8 | ConvertFrom-Json -DateKind String
     if ([string]::IsNullOrWhiteSpace([string]$evidence.evaluator.id)) {
-        throw "Current routing-policy evidence does not identify its evaluator run"
+        throw "Current staged routing evidence does not identify its routing evaluator run"
     }
     return [pscustomobject]@{
         path = $evidenceItem.FullName

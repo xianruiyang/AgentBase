@@ -1,0 +1,84 @@
+{
+  "changed_files": [
+    "README.md",
+    "development/codex-deployment/README.md",
+    "development/codex-deployment/manage_agentbase.ps1",
+    "development/skill-routing/build_routing_evaluation.ps1",
+    "development/skill-routing/evidence/current.json",
+    "development/skill-routing/merge_routing_evidence.ps1",
+    "development/skill-routing/routing_evaluation_common.ps1",
+    "development/skill-routing/routing_fingerprint.ps1",
+    "development/skill-routing/test_routing_capsule.ps1",
+    "development/skill-routing/test_routing_fingerprint.ps1",
+    "development/skill-routing/trigger-cases.json",
+    "development/skill-routing/validate_contract.ps1",
+    "development/skill-routing/validate_routing_results.ps1"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "UDES-001",
+    "CON-001",
+    "CON-002",
+    "DES-001",
+    "DES-002",
+    "GAP-005",
+    "SOL-005"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "independent-evaluation",
+      "note": "three distinct detached gpt-5.6-sol max runs passed 57/57 description-only routing cases, 57/57 behavior-policy cases and 13/13 post-selection reference cases without repository or hidden-expectation access",
+      "ref": "development/skill-routing/evidence/current.json"
+    },
+    {
+      "kind": "publication-readback",
+      "note": "formal publication status matched project source, installed payload, manifest and three-stage evidence with zero publication gaps",
+      "ref": "C:/Users/gzxt/.codex/backups/AgentBase-20260814-043551-8b50d428/manifest.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "正式发布证据已按真实输入职责拆成首次 skill 路由、全局规则行为和选中 change-governance 后的引用选择三个独立阶段；每阶段只读取完成自身判断所需输入，并通过身份绑定合并为唯一 evidence/current.json 后发布读回。",
+  "outputs": [
+    "不含行为标签和 skill 正文的首次路由 capsule 与 57/57 独立结果",
+    "不含 skill 选择和正文的规则行为 capsule 与 57/57 独立结果",
+    "只读取已选治理 skill 正文的引用 capsule 与 13/13 独立结果",
+    "原子合并、分别验证三个运行身份和输入指纹的唯一正式 evidence/current.json",
+    "已发布且项目源、安装副本、清单和证据一致的 DirectCompatibility 安装"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:bf3f83fc69fadc178659a8862297d23e37723cf924294ee28794abedf95909e2",
+    "AC-002": "sha256:c2505dc8d7c2be6a39701a11e220d9c3e0680db1164173b69cca0a7775f3932c",
+    "AC-003": "sha256:db1342f8f491e4bab9616f5e0355985a92741c25ae75eb6697a17fbe4124aea5",
+    "CON-001": "sha256:b6a4a10c1135a2c4b566ede2b674a9b608fb4465811d8bb6ef239b3da398743b",
+    "CON-002": "sha256:dac4a3717b000caa83b51dfae8b869964699321a562c37ef3c60e76b208c72b8",
+    "DES-001": "sha256:2242464038b32e9ae74e947e48f26cccbae159ca6cfa04946063265c842ee344",
+    "DES-002": "sha256:42b26bae1bca2db697028edd310bfaddb1332646dcb2eee17607ed4e298d074a",
+    "GAP-003": "sha256:584267a47527ddfc63a378bdf38ae7a27ad445a1ea6741ba797ae56f53eaf742",
+    "GAP-004": "sha256:99bcd0e30225284089b8b635028eb418835be21c420dbcd7f411ef39eb685541",
+    "GAP-005": "sha256:a5cbf6825357960de962cc263913f1c3dfb44627a53136337ca6550e837ea334",
+    "OBS-004": "sha256:a9878fd82b31476eaf5d617fc0b3b1fb25d6aa250a5f6a5dd9161a77e29e4dc6",
+    "OBS-005": "sha256:cd31af00b11bbaf3ce8b0ed8c294d353359d61e4c7ac4bfbdf5dfa4f51c9fe65",
+    "OBS-006": "sha256:aac22b1f45a6f6dfffa5904beabcd97ede63d4071d1cc01778c8530ee7129c5e",
+    "REQ-001": "sha256:ffbb2ebd7000b1ae224ae71c1bcbba22ed9f1e93287e5d732dc3fb76b9922cdf",
+    "SOL-003": "sha256:9fc3ee425c6f9a7c8189b9f7fe2f10048756825a34b002b5dff7dccd256226e2",
+    "SOL-004": "sha256:f5d90373c2decceac207cd72e1bd66d5fb8c780b61a0b77658aee42af7dac943",
+    "SOL-005": "sha256:15a4097e299faa93bbc09bc845dae4788ae52ed10485cf4b95b87c2f04f19941",
+    "UDES-001": "sha256:8205a677b5e92a244ec7adf229cacb53e6b5ff4ba1ca29c462501ab18e416b3c"
+  },
+  "task_id": "T005-ISOLATED-ROUTING-POLICY",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "routing contract passed 57 cases, 25 strict cases and 13/13 project skills with positive and non-trigger coverage",
+    "capsule tests proved stage-specific visibility, no policy hints in first routing, hidden-field and repository-path isolation, and cross-stage result identity binding",
+    "fingerprint tests proved candidate, stage input and routing-result identities bind their semantic inputs",
+    "three distinct detached gpt-5.6-sol max evaluations passed routing 57/57, behavior policy 57/57 and references 13/13",
+    "delivery-workflow passed 32 tests and task-table-manager passed 63 tests",
+    "three affected skills passed quick_validate; deployment Validate passed with global size 15,981 bytes",
+    "Publish Status shows source, installed payload, manifest and evidence match with publication gap count 0"
+  ]
+}

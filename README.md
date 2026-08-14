@@ -23,10 +23,11 @@
 
 `global/AGENTS.md` 只保留跨项目都成立的目标、证据、授权、工具路由、修改、验证、记录和交付规则。复杂根因、职责/入口迁移、共享门禁和跨契约审计细节由 `change-governance` 承担；C++、PowerShell、搜索、符号/AST、空间、任务表和动态推理协议由对应 skill 承担。
 
-当前候选受 20 KiB 单文件静态合同约束，`global/config.toml` 显式设置 `project_doc_max_bytes = 65536`。合同还要求本项目的候选全局规则与根项目规则合计不超过 28 KiB，因此即使目标主机尚未安装可移植配置，也会在 Codex 默认 32 KiB 上限下保留至少 4 KiB 余量。全局文件只承担跨项目目标、证据、授权、路由和交付内核，完整交付链与执行协议分别收敛到对应 skill。当前内核收敛为四项核心约束：
+当前候选受 20 KiB 单文件静态合同约束，`global/config.toml` 显式设置 `project_doc_max_bytes = 65536`。合同还要求本项目的候选全局规则与根项目规则合计不超过 28 KiB，因此即使目标主机尚未安装可移植配置，也会在 Codex 默认 32 KiB 上限下保留至少 4 KiB 余量。全局文件只承担跨项目目标、证据、授权、路由和交付内核，完整交付链与执行协议分别收敛到对应 skill。当前内核收敛为五项核心约束：
 
+- 初始请求是共同理解问题的权威输入，不必然是完整目标；模型结合规范、事实、历史决策和长期后果主动提出洞察，与用户共同校准目标，用户保有最终裁决权。
 - 规范来源用于确定目标契约，有效证据用于判断系统现状与实现结果；两者不得互相替代，用户目标也不得被系统现状静默改写。
-- 在用户目标和授权范围内按长期净收益与系统总成本选择方案；长期收益不得用于扩大范围或替用户裁决。
+- 先保证需求对齐、正确性、授权、安全、可维护性和完成证据；质量同等充分时降低 Token，前两者不变差时再提升速度。
 - 不自动把实现收缩成最窄局部补丁；为使用户要求成立并接入唯一正式入口而不可缺少的调整属于本次实现，仅改善整体架构但不影响本次结果的调整需要另行授权。
 - 用户未固定深度时，在 active Goal 内按下一段工作的真实不确定性、后果、可逆性和验证负担自由升降 next-turn 推理深度；不绑定任务项边界，不用 hook 或持久状态模拟续跑。
 
@@ -69,7 +70,7 @@ skill 内置的 Windows/Linux `sgy 0.1.0` 由同一个不含 `.git`、`target/` 
 
 ## 路由策略验证与执行验证
 
-`development/skill-routing/trigger-cases.json` 只定义路由和粗粒度策略标签的测试 oracle。全部关键 skill 至少有一个正向触发和一个相近非触发场景，并覆盖混合意图、长上下文干扰、项目 skill 与外部 UI/UE skill 共存、事实冲突、只读授权、长期收益、禁止越权替代执行、动态推理、QQ 排障、交付链、CLI 边界、职责生命周期、影响闭合和架构入口裁决。场景保持中文，不为了测试数量引入多语言变体。
+`development/skill-routing/trigger-cases.json` 只定义路由和粗粒度策略标签的测试 oracle。全部关键 skill 至少有一个正向触发和一个相近非触发场景，并覆盖混合意图、长上下文干扰、项目 skill 与外部 UI/UE skill 共存、事实冲突、只读授权、长期收益、禁止越权替代执行、动态推理、QQ 排障、交付链、纵向验证闭环、CLI 边界、职责生命周期、影响闭合和架构入口裁决。场景保持中文，不为了测试数量引入多语言变体。
 
 静态合同会检查全局文件大小与关键语义、主 `SKILL.md` 大小、规则标签、重复规则、skill frontmatter、`agents/openai.yaml`、MCP 依赖、Markdown 相对引用、场景集合、严格路由用例以及正/负覆盖：
 
@@ -77,21 +78,23 @@ skill 内置的 Windows/Linux `sgy 0.1.0` 由同一个不含 `.git`、`target/` 
 & '.\development\skill-routing\validate_contract.ps1' -ProjectRoot (Get-Location).Path
 ```
 
-路由评估输入生成器把候选全局规则、各 skill 的 `SKILL.md`/`agents/openai.yaml`、外部 skill 摘要和请求嵌入一个可脱离仓库读取的 capsule。capsule 不包含仓库绝对路径、隐藏期望、禁选项或严格用例清单；生成器返回 capsule 哈希、候选哈希和输入哈希：
+独立评估按证明职责分三阶段。首次路由 capsule 只嵌入候选全局规则、各 skill 的 frontmatter `description`、外部 skill 摘要和请求，不提供行为标签或选中后才可读取的 skill 正文，避免评估专用解释反向帮助首次选择；它不包含仓库绝对路径、隐藏期望、禁选项或严格用例清单：
 
 ```powershell
 & '.\development\skill-routing\build_routing_evaluation.ps1' -ProjectRoot (Get-Location).Path
 ```
 
-独立评估器只能读取该 capsule，不能读取源仓库或执行请求。结果必须记录唯一运行 ID、实际模型、运行环境、UTC 时间、`detached-capsule` 模式、未访问仓库/隐藏期望的输入声明和三个哈希；候选或请求变化后旧结果自动失效。明确的边界与共存用例对项目 skill、外部 skill 和治理引用采用精确路由，粗粒度策略标签只约束必需项与禁选项，未声明额外标签保持诊断：
+独立评估器只读该 capsule 并产出首次路由结果。首次结果通过隐藏 oracle 后，分别生成规则行为 capsule 和治理引用 capsule：前者只读取始终可见的全局规则、请求与行为标签定义，并绑定已验证首次 capsule 的身份，不让其他案例的已选 skill 正文污染规则判断；后者只包含被首次结果选中的治理用例和 `change-governance` 正文，只判断引用选择。两个新的隔离运行分别读取对应 capsule：
 
 ```powershell
-& '.\development\skill-routing\validate_routing_results.ps1' -ProjectRoot (Get-Location).Path -ResultsPath '.\development\skill-routing\evidence\<result>.json'
+& '.\development\skill-routing\build_routing_evaluation.ps1' -Phase Policy -ProjectRoot (Get-Location).Path -RoutingResultsPath '<routing-result>.json'
+& '.\development\skill-routing\build_routing_evaluation.ps1' -Phase References -ProjectRoot (Get-Location).Path -RoutingResultsPath '<routing-result>.json'
+& '.\development\skill-routing\merge_routing_evidence.ps1' -ProjectRoot (Get-Location).Path -RoutingResultsPath '<routing-result>.json' -PolicyResultsPath '<policy-result>.json' -ReferenceResultsPath '<reference-result>.json' -OutputPath '.\development\skill-routing\evidence\current.json'
 ```
 
-`development/skill-routing/evidence/current.json` 是发布门禁使用的唯一当前路由策略证据；历史结果只对应各自 capsule。`Validate`、`Publish` 与 CI 会重新核对评估器元数据、capsule/候选/输入哈希、用例完整性、期望项、禁选项和严格路由用例。候选、请求和外部 skill 摘要先规范化为 LF，保证 CRLF/LF 工作树中的证据身份一致。
+三阶段结果都须记录唯一运行 ID、实际模型、运行环境、UTC 时间、`detached-capsule` 模式、未访问仓库/隐藏期望的声明和身份哈希；候选或请求变化后旧结果失效。`development/skill-routing/evidence/current.json` 仍是发布门禁使用的唯一当前证据，其中嵌入后置规则行为和引用结果；`Validate`、`Publish` 与 CI 会分别重建三个 capsule，核对元数据、身份、用例完整性、期望、禁选和严格用例。明确边界与共存用例采用精确路由，粗粒度标签的未声明额外项保持非阻断诊断。
 
-`detached-capsule` 是输入隔离合同：capsule 测试证明发给评估器的载荷不含仓库路径和隐藏期望，评估结果声明实际输入边界并由哈希绑定；除非承载运行时另有文件系统沙箱，它不被声称为操作系统级隔离。这项评估不执行请求，因此只证明“应该加载哪些 skill、治理引用与粗粒度策略标签”，不证明 skill 内步骤被正确执行。执行验证由三层分别承担：skill 脚本回归测试验证其程序合同；`vscode-lsp-mcp` 和 `sgy` 使用各自 release gate；具体任务仍须按真实输入运行直接受影响的构建、测试、读回或运行时验收。三层结果不得互相替代。
+`detached-capsule` 是输入隔离合同：capsule 测试证明首次载荷只有路由前可见信息，后置载荷只含各自所需的已验证选择、规则或已选 skill，三者均不含仓库路径和隐藏期望；除非承载运行时另有文件系统沙箱，它不声称操作系统级隔离。评估不执行请求，只分别证明“首次应加载哪些 skill”“适用哪些粗粒度行为”和“之后应读取哪些治理引用”，不证明 skill 内步骤被正确执行。执行验证仍由 skill 回归、组件 release gate 和具体任务的直接验收承担。
 
 ## 本地插件打包
 

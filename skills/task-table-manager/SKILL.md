@@ -25,7 +25,7 @@ description: 用低 Token 管理长期执行的任务合同、依赖图、状态
 
 1. 模型根据上游 `SOL/GAP/DES/AC/REQ` 和真实工作范围编写任务合同；公共产出与消费者接入拆分时必须声明真实消费依赖，需要模板时可用 `taskctl draft`，CLI 不自动把文档变成任务。
 2. 需要结构化存储时用 `add` 或 `update`。创建新任务不需要 revision；更新已有任务必须先读当前合同并传 `--expected-task-revision`。写入只对 ID/路径、破坏性覆盖、工作区锁和 CAS revision 冲突设置门禁；owner、依赖环、状态流转、上游未决和验证缺失只作为诊断。
-3. 用 `next`、`deps`、`dependents` 和 `context` 以有界输出选择工作。`context` 返回本次实际读取的传递上游指纹，执行结果沿用该快照；`hard` 依赖未完成时默认降低推荐度，但模型可用 `--include-blocked` 查看并继续分析或准备工作。
+3. 用 `next`、`deps`、`dependents` 和 `context` 以有界输出选择工作。先考虑用户优先级、硬依赖、关键风险、共享前置、冲突和当前能力；条件相当时，优先继续当前目标链并缩短到最近可验证闭环的距离，避免打开更多未闭合的平级分支。任务深度只作线索，CLI 排序只是建议。`context` 返回本次实际读取的传递上游指纹，执行结果沿用该快照；`hard` 依赖未完成时可用 `--include-blocked` 查看并继续分析或准备工作。
 4. 需要跨轮跟踪时用 `claim/start/note/complete/reopen/release`，每次先读取当前 state revision 并传 `--expected-state-revision`；不再执行的任务可标记 `retired`。命令记录模型已作出的判断，不决定该判断是否被允许。
 5. `complete` 保存实际结果、验证、未决问题、证据指向和工作实际依据的上游来源快照；完成时当前版本只用于比较，不替代实际输入。后继任务读取前置结果摘要，不读取完整对话或原始日志。
 6. 上游改变时用 `$delivery-workflow` 的 `impact`、本工具的递归 `impact` 和实际系统依赖逐项判断消费者与结果，按结论更新、重开或退休任务并重新验证；CLI 只返回路径和陈旧诊断，不自动重置状态或宣布结果失效。

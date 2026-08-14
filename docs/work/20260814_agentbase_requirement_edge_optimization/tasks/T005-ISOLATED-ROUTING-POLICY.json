@@ -1,0 +1,35 @@
+{
+  "dependencies": [],
+  "id": "T005-ISOLATED-ROUTING-POLICY",
+  "mutation_scope": [
+    "development/skill-routing/**",
+    "development/codex-deployment/**",
+    "README.md"
+  ],
+  "outcome": "正式发布证据分别证明首次 skill 路由、全局规则行为和选中 skill 后的治理引用选择",
+  "outputs": [
+    "description-only 且无策略提示的首次路由 capsule",
+    "基于已验证路由选择的规则行为 capsule",
+    "post-selection 治理引用 capsule",
+    "唯一的三阶段正式 evidence/current.json"
+  ],
+  "reasoning_hint": "max",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-005",
+    "GAP-005",
+    "DES-001",
+    "DES-002",
+    "AC-001",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "隔离首次路由与规则行为评估",
+  "verification": [
+    "验证首次 capsule 不含策略标签或 skill 正文，三个独立结果分别通过隐藏 oracle，合并证据通过部署 Validate、Publish 与 Status 读回"
+  ]
+}
