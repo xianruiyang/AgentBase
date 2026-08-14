@@ -309,7 +309,8 @@ $sgyReleaseRecordPath = Join-Path $sgyScriptsRoot "provenance\release-record.jso
 $sgyRuntimeManifest = Get-Content -LiteralPath $sgyRuntimeManifestPath -Raw -Encoding UTF8
 $sgyReleaseRecord = Get-Content -LiteralPath $sgyReleaseRecordPath -Raw -Encoding UTF8 | ConvertFrom-Json
 Assert-True ($sgyReleaseRecord.schema -eq "sgy.skill-runtime-release/v1") "sgy release record has an unsupported schema"
-Assert-True ($sgyReleaseRecord.version -eq "0.1.1") "sgy release record version does not match the skill runtime"
+Assert-True ($sgyReleaseRecord.version -match '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') "sgy release record has an invalid version"
+Assert-True ($sgyRuntimeManifest -match "(?m)^version: $([regex]::Escape([string]$sgyReleaseRecord.version))$") "sgy runtime manifest version does not match the release record"
 Assert-True ($sgyReleaseRecord.pathBase -eq "scripts") "sgy release record paths must be relative to the skill scripts directory"
 Assert-True ($sgyReleaseRecord.source.revision -match '^sha256:[0-9a-f]{64}$') "sgy release record has an invalid source revision"
 Assert-True ($sgyRuntimeManifest.Contains("source_revision: $($sgyReleaseRecord.source.revision)")) "sgy runtime manifest does not identify its source revision"
@@ -356,6 +357,7 @@ foreach ($sgyTarget in $sgyTargets) {
 
     $sgyTargetManifest = Get-Content -LiteralPath $sgyManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ($sgyTargetManifest.schema -eq "sgy.release/v1") "sgy target provenance manifest has an unsupported schema: $($sgyTarget.target)"
+    Assert-True ($sgyTargetManifest.version -eq $sgyReleaseRecord.version) "sgy target provenance version does not match the release record: $($sgyTarget.target)"
     Assert-True ($sgyTargetManifest.target -eq $sgyTarget.target) "sgy target provenance identifies a different target: $($sgyTarget.target)"
     Assert-True ($sgyTargetManifest.archive -eq $sgyTarget.archive) "sgy target archive name does not match its provenance: $($sgyTarget.target)"
     Assert-True ($sgyTargetManifest.source.revision -eq $sgyReleaseRecord.source.revision) "sgy target provenance source does not match the release record: $($sgyTarget.target)"

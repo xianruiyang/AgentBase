@@ -5,8 +5,8 @@
 ## 1. 来源与版本
 
 - [ ] 版本与 `Cargo.toml`、`sgy --version`、manifest 和归档名一致。
-- [ ] Git 工作区使用真实 commit；没有 Git 元数据的来源运行 `scripts/new-source-snapshot.ps1`，将 `sha256:<digest>` 作为 `SourceRevision`，并随 release 保存完整 snapshot manifest。
-- [ ] source snapshot 在最终源码/文档变更后生成；`target/`、`dist/` 和 `.git/` 不参与 digest。
+- [ ] Git 工作区在 release record 中记录真实 commit；进入 skill 运行时时使用 `scripts/new-source-snapshot.ps1` 生成的 `sha256:<digest>` 作为不可变 `SourceRevision`，并随 release 保存完整 snapshot manifest。
+- [ ] source snapshot 在最终源码/文档变更后生成；`target/`、`dist/` 和 `.git/` 不参与 digest；没有 Git 元数据时只省略 commit，不降低快照要求。
 - [ ] `Cargo.lock`、Rust 1.85.0 和 `release-targets.json` 已固定。
 
 ## 2. Windows 原生门禁

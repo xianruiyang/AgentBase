@@ -557,7 +557,7 @@ dependencies = [
 
 [[package]]
 name = "sgy-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "serde_json",
@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "sgy-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "atomic-write-file",
  "command-group",
