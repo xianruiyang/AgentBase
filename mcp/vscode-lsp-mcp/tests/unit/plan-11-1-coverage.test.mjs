@@ -121,11 +121,10 @@ const coverage = Object.freeze([
     ],
   },
   {
-    id: 'POSIX-RUNTIME',
+    id: 'WINDOWS-RUNTIME',
     evidence: [
-      evidence('packages/protocol/src/runtime-directory.test.ts', 'POSIX directory and socket metadata require exact owner, type, and modes'),
-      evidence('packages/protocol/src/runtime-directory.test.ts', 'IPC endpoints are bounded, collision-resistant, and platform-specific'),
-      evidence('packages/protocol/src/runtime-directory.test.ts', 'stale Unix socket cleanup removes only an owned unreachable exact endpoint'),
+      evidence('packages/protocol/src/runtime-directory.test.ts', 'runtime directory derivation requires the secure Windows adapter'),
+      evidence('packages/protocol/src/runtime-directory.test.ts', 'IPC endpoint is a collision-resistant Windows named pipe'),
     ],
   },
   {

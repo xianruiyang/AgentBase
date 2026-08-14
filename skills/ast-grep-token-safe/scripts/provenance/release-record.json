@@ -1,34 +1,39 @@
 {
   "schema": "sgy.skill-runtime-release/v1",
-  "version": "0.1.0",
-  "recordedDate": "2026-08-11",
+  "version": "0.1.1",
+  "recordedDate": "2026-08-14",
   "pathBase": "scripts",
   "source": {
-    "revision": "sha256:338fe5fa8ec319cc0d4354c2584ab94b4445901903cf30aa0acc1575ade57f09",
+    "revision": "sha256:db44e075b5778d33a364389f77fa84f8ac18ddd5850a52eeca8403a3a1182f36",
     "snapshot": "provenance/sgy-source-snapshot.json",
     "sourceDateEpoch": 0,
-    "cargoLockSha256": "305f27f995fafae87d04b0e21476d5b2537df463491dd43152c27ce1aa85a1c5",
-    "fileCount": 177
+    "cargoLockSha256": "131d77d1db86af3442ee4c839962a1823b38d76168b47ece178c6e13704f7c40",
+    "fileCount": 175
   },
   "rustsec": {
     "status": "passed",
+    "basis": "The previously audited 129-package lockfile changed only by removing signal-hook 0.3.18 and signal-hook-registry 1.4.8; the current 127-package dependency set is therefore a strict subset at the recorded advisory database revision.",
+    "removedSinceAudit": [
+      "signal-hook 0.3.18",
+      "signal-hook-registry 1.4.8"
+    ],
     "cargoAuditVersion": "0.22.2",
     "cargoAuditArchiveSha256": "0a7316540862c13d954f648917ceacca593747baed6eec180fafa590be2710ab",
     "advisoryDbRevision": "2ae3ea41b89902e846595002ca29a91df471097d",
     "advisoryCount": 1207,
-    "dependencyCount": 129,
+    "dependencyCount": 127,
     "projectLockfile": "tools/sgy/Cargo.lock"
   },
   "targets": [
     {
       "target": "x86_64-pc-windows-msvc",
-      "archive": "sgy-0.1.0-x86_64-pc-windows-msvc.zip",
-      "archiveSha256": "fcf57da86e98eafce8d9e2442bb22aafd11a3cc0a266cb47188327df3956d0d0",
+      "archive": "sgy-0.1.1-x86_64-pc-windows-msvc.zip",
+      "archiveSha256": "c37807eeb4c6efe0d907f670a58a4e965ff365face85e26a9bce98323f049ad0",
       "manifest": "provenance/windows-x86_64.manifest.json",
       "binary": {
         "path": "bin/windows-x86_64/sgy.exe",
-        "bytes": 1864704,
-        "sha256": "984143b7b273997d34fb4e316f9e255d9344e97af6e4c6f6ff5b60c7d1cb6072"
+        "bytes": 1870336,
+        "sha256": "e61b5ddec6fbda2b9222e6e1256b8ad84975290e69c6870a27086840e1bcbee6"
       },
       "nativeBuild": {
         "status": "passed",
@@ -36,30 +41,7 @@
         "toolchain": "rustc 1.85.0",
         "sourceDateEpoch": 0
       }
-    },
-    {
-      "target": "x86_64-unknown-linux-gnu",
-      "archive": "sgy-0.1.0-x86_64-unknown-linux-gnu.zip",
-      "archiveSha256": "4c0432465b8d69e3227bb1530a6a1a8e4cd6b6788313c2546b8caaab27a89719",
-      "manifest": "provenance/linux-x86_64.manifest.json",
-      "binary": {
-        "path": "bin/linux-x86_64/sgy",
-        "bytes": 2128416,
-        "sha256": "a6c7ea26f8643cb4efb2ba47749bb836b9a0889510c79044859bad309f75fa9d"
-      },
-      "nativeBuild": {
-        "status": "passed",
-        "runner": "rust:1.85-bookworm x86_64 container",
-        "containerImage": "rust@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4",
-        "toolchain": "rustc 1.85.0",
-        "sourceDateEpoch": 0,
-        "cargoBuildJobs": 1
-      }
     }
-  ],
-  "unreleasedTargets": [
-    "x86_64-apple-darwin",
-    "aarch64-apple-darwin"
   ],
   "runtime": {
     "astGrepBundled": false,

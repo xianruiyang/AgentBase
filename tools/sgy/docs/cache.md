@@ -10,11 +10,7 @@
 
 cache 在 Token-Safe 投影前保存原生 JSON/JSONL 字节和索引。它不是第二次 ast-grep 扫描，也不受 40/400/24 KiB 模型上下文预算影响。提交 cache 时会对已发现的引擎执行有界版本探测并记录实际 `ast-grep ...` 版本；仅在探测失败时使用 `unknown`。
 
-默认位置：
-
-- Windows：`%LOCALAPPDATA%\sgy\cache\v1`
-- Linux：`$XDG_CACHE_HOME/sgy/v1`，未设置时为 `$HOME/.cache/sgy/v1`
-- macOS：`$HOME/Library/Caches/sgy/v1`
+默认位置为 `%LOCALAPPDATA%\sgy\cache\v1`。
 
 cache root 不允许位于当前 workspace 内。默认 TTL 为 7 天，总配额 1 GiB，单条上限 512 MiB；失败保留的 incomplete staging 最长 1 天。GC 按 TTL、LRU 和配额回收，不删除 active entry。
 

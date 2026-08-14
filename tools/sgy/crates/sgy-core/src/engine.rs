@@ -1,4 +1,3 @@
-#[cfg(windows)]
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fs;
@@ -182,24 +181,17 @@ impl SystemEngineEnvironment {
     }
 
     fn path_candidates(&self, directory: &Path, program: &str) -> Vec<PathBuf> {
-        #[cfg(windows)]
-        {
-            let direct = directory.join(format!("{program}.exe"));
-            let npm_shim = directory.join(format!("{program}.cmd"));
-            let npm_binary = directory
-                .join("node_modules")
-                .join("@ast-grep")
-                .join("cli")
-                .join(format!("{program}.exe"));
-            if npm_shim.is_file() {
-                vec![direct, npm_binary]
-            } else {
-                vec![direct]
-            }
-        }
-        #[cfg(not(windows))]
-        {
-            vec![directory.join(program)]
+        let direct = directory.join(format!("{program}.exe"));
+        let npm_shim = directory.join(format!("{program}.cmd"));
+        let npm_binary = directory
+            .join("node_modules")
+            .join("@ast-grep")
+            .join("cli")
+            .join(format!("{program}.exe"));
+        if npm_shim.is_file() {
+            vec![direct, npm_binary]
+        } else {
+            vec![direct]
         }
     }
 }
@@ -211,7 +203,6 @@ impl EngineEnvironment for SystemEngineEnvironment {
         } else {
             launch_cwd.join(path)
         };
-        #[cfg(windows)]
         let candidate = resolve_windows_configured_candidate(candidate)?;
         let canonical = fs::canonicalize(&candidate)
             .map_err(|_| EngineError::ConfiguredEngineMissing(candidate.clone()))?;
@@ -238,7 +229,6 @@ impl EngineEnvironment for SystemEngineEnvironment {
     }
 }
 
-#[cfg(windows)]
 fn resolve_windows_configured_candidate(candidate: PathBuf) -> Result<PathBuf, EngineError> {
     let extension = candidate
         .extension()
@@ -267,16 +257,6 @@ fn resolve_windows_configured_candidate(candidate: PathBuf) -> Result<PathBuf, E
     }
 }
 
-#[cfg(unix)]
-fn is_executable_file(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-
-    path.metadata()
-        .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
-}
-
-#[cfg(windows)]
 fn is_executable_file(path: &Path) -> bool {
     path.is_file()
 }
@@ -421,14 +401,6 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
-    fn success_status() -> ExitStatus {
-        use std::os::unix::process::ExitStatusExt;
-
-        ExitStatus::from_raw(0)
-    }
-
-    #[cfg(windows)]
     fn success_status() -> ExitStatus {
         use std::os::windows::process::ExitStatusExt;
 
@@ -501,21 +473,8 @@ mod tests {
             std::process::id()
         ));
         fs::create_dir_all(&directory).expect("create isolated PATH directory");
-        #[cfg(windows)]
         let executable = directory.join("ast-grep.EXE");
-        #[cfg(not(windows))]
-        let executable = directory.join("ast-grep");
         fs::write(&executable, []).expect("create PATH candidate");
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-
-            let mut permissions = fs::metadata(&executable)
-                .expect("read test candidate metadata")
-                .permissions();
-            permissions.set_mode(0o755);
-            fs::set_permissions(&executable, permissions).expect("mark test candidate executable");
-        }
         let path = std::env::join_paths([&directory]).expect("encode isolated PATH");
         let environment = SystemEngineEnvironment::from_path(Some(path));
         let discovered = environment
@@ -528,7 +487,6 @@ mod tests {
         fs::remove_dir_all(&directory).expect("remove isolated PATH directory");
     }
 
-    #[cfg(windows)]
     #[test]
     fn windows_npm_shim_resolves_to_native_binary_without_running_cmd() {
         let nonce = SystemTime::now()

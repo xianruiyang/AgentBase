@@ -1,6 +1,6 @@
 ---
 name: ast-grep-token-safe
-description: 使用 skill 内置的 sgy（Windows/Linux x86_64）驱动原生 ast-grep，以有界 Token-Safe YAML 完成结构化代码搜索、规则扫描、pattern 调试、结果缓存/后处理和安全批量改写。用于按语法结构定位调用、声明或控制流，编写/调试 pattern 或 YAML rule，预览与应用 rewrite，或文本搜索无法可靠表达结构关系时；不用于单纯字符串、注释、日志文案、文件名搜索，也不替代 LSP 的定义、引用、类型和安全重命名。
+description: 使用 skill 内置的 Windows x86_64 sgy 驱动原生 ast-grep，以有界 Token-Safe YAML 完成结构化代码搜索、规则扫描、pattern 调试、结果缓存/后处理和安全批量改写。用于按语法结构定位调用、声明或控制流，编写/调试 pattern 或 YAML rule，预览与应用 rewrite，或文本搜索无法可靠表达结构关系时；不用于单纯字符串、注释、日志文案、文件名搜索，也不替代 LSP 的定义、引用、类型和安全重命名。
 ---
 
 # ast-grep 低 Token 工作流
@@ -23,12 +23,7 @@ $Sgy = '<skill_dir>\scripts\bin\windows-x86_64\sgy.exe'
 & $Sgy doctor --cwd '<repo>'
 ```
 
-```sh
-bash '<skill_dir>/scripts/sgy.sh' --version
-bash '<skill_dir>/scripts/sgy.sh' doctor --cwd '<repo>'
-```
-
-仅在环境首次使用、引擎变更或执行失败时运行 `doctor`。内置 sgy 支持 Windows/Linux x86_64；其他平台先尝试全局 `sgy`，再回退原生 `ast-grep`。
+仅在环境首次使用、引擎变更或执行失败时运行 `doctor`。内置 sgy 只维护 Windows x86_64 运行时。
 
 sgy 不内置 ast-grep。确保 `ast-grep` 在 PATH，或向 wrapper 显式传 `--engine <path>`；不要假定 `sg` 的身份。优先使用已验证的 ast-grep 0.44.1；只有引擎缺失且任务允许安装依赖时才按需安装。
 
@@ -53,16 +48,15 @@ sgy exec [wrapper options] -- <原生 ast-grep argv...>
 & $Sgy exec --cwd '<repo>' -- scan --rule rules/no-console.yml src
 ```
 
-Linux 只需把启动器替换为 `bash '<skill_dir>/scripts/sgy.sh'`，其余 argv 保持一致。
-
 ## Token-Safe 读取协议
 
 1. 默认使用 `token-safe`，不要额外请求 raw JSON。
-2. 读取 `_sgy.total/files/shown/omitted/complete`；`complete: false` 表示详情或文本被省略，不能从可见列表推断全部结果。
-3. 先利用文件/规则汇总缩小范围；需要遗漏详情时，用 `_sgy.cache` 进行分页查询，不要重新无界扫描。
-4. 需要完整机器 round-trip 或未知字段时才用 `--profile lossless`，并通过 `--yaml-out` 写本地文件；不要把完整 lossless/cache 输出倾倒到模型上下文。
-5. 默认 40 条详情、单文本 400 字符、约 24 KiB 上下文预算只限制可见 YAML，不限制 ast-grep 的扫描或写入集合。
-6. 显式 SARIF 可由 Token-Safe 提取 finding；只有完整 SARIF 审计才使用 lossless。
+2. 已知只需每条命中的文件和完整起止范围、不需正文、捕获或规则诊断时，使用 `--profile locations`；其结果为 0-based 紧凑位置串。
+3. 读取 `_sgy.total/files/shown/omitted/complete`；`complete: false` 表示详情或文本被省略，不能从可见列表推断全部结果。
+4. 先利用文件/规则汇总缩小范围；需要遗漏详情时，用 `_sgy.cache` 进行分页查询，不要重新无界扫描。
+5. 需要完整机器 round-trip 或未知字段时才用 `--profile lossless`，并通过 `--yaml-out` 写本地文件；不要把完整 lossless/cache 输出倾倒到模型上下文。
+6. 默认 40 条详情、单文本 400 字符、约 24 KiB 上下文预算只限制可见 YAML，不限制 ast-grep 的扫描或写入集合。
+7. 显式 SARIF 可由 Token-Safe 提取 finding；只有完整 SARIF 审计才使用 lossless。
 
 常用取回与聚合：
 

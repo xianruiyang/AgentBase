@@ -325,7 +325,6 @@ fn profiles_formats_and_cache_failure_policy_are_end_to_end() {
     assert!(invalid_stream.stdout.is_empty());
 }
 
-#[cfg(windows)]
 fn configure_cache_environment(command: &mut Command, root: &Path) {
     command.env("LOCALAPPDATA", root);
 }
@@ -343,31 +342,6 @@ fn committed_cache_ids(environment_root: &Path) -> Vec<String> {
         .collect()
 }
 
-#[cfg(windows)]
 fn platform_cache_root(environment_root: &Path) -> std::path::PathBuf {
     environment_root.join("sgy").join("cache").join("v1")
-}
-
-#[cfg(target_os = "macos")]
-fn platform_cache_root(environment_root: &Path) -> std::path::PathBuf {
-    environment_root
-        .join("Library")
-        .join("Caches")
-        .join("sgy")
-        .join("v1")
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn platform_cache_root(environment_root: &Path) -> std::path::PathBuf {
-    environment_root.join("sgy").join("v1")
-}
-
-#[cfg(target_os = "macos")]
-fn configure_cache_environment(command: &mut Command, root: &Path) {
-    command.env("HOME", root);
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn configure_cache_environment(command: &mut Command, root: &Path) {
-    command.env("XDG_CACHE_HOME", root);
 }

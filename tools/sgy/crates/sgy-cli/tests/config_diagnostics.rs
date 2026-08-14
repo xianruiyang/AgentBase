@@ -12,39 +12,12 @@ fn isolated_command(cwd: &Path) -> Command {
 }
 
 fn isolate_config_and_cache(command: &mut Command, root: &Path) {
-    #[cfg(windows)]
-    {
-        command.env("APPDATA", root.join("appdata"));
-        command.env("LOCALAPPDATA", root.join("localappdata"));
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        command.env("XDG_CONFIG_HOME", root.join("config"));
-        command.env("XDG_CACHE_HOME", root.join("cache"));
-    }
-    #[cfg(target_os = "macos")]
-    {
-        command.env("HOME", root.join("home"));
-    }
+    command.env("APPDATA", root.join("appdata"));
+    command.env("LOCALAPPDATA", root.join("localappdata"));
 }
 
 fn user_config_path(root: &Path) -> std::path::PathBuf {
-    #[cfg(windows)]
-    {
-        root.join("appdata").join("sgy").join("config.yml")
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        root.join("config").join("sgy").join("config.yml")
-    }
-    #[cfg(target_os = "macos")]
-    {
-        root.join("home")
-            .join("Library")
-            .join("Application Support")
-            .join("sgy")
-            .join("config.yml")
-    }
+    root.join("appdata").join("sgy").join("config.yml")
 }
 
 fn yaml(stdout: &[u8]) -> serde_json::Value {

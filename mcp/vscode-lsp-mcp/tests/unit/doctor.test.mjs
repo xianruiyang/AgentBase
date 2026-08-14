@@ -63,7 +63,6 @@ const createInstalledFixture = async (root, version = '0.1.0') => {
     writeFile(path.join(versionRoot, 'extension.vsix'), extensionBytes),
     writeFile(path.join(installRoot, 'bin', 'vscode-lsp-mcp.cjs'), 'fixture'),
     writeFile(path.join(installRoot, 'bin', 'vscode-lsp-mcp.cmd'), 'fixture'),
-    writeFile(path.join(installRoot, 'bin', 'vscode-lsp-mcp'), 'fixture'),
     writeFile(path.join(configRoot, 'config.json'), `${JSON.stringify({ schemaVersion: 1 })}\n`),
   ]);
   return { installRoot, configRoot, manifest, versionRoot };
@@ -78,9 +77,9 @@ const createRuntime = async (root) => {
   return runtimeRoot;
 };
 
-const usableRecord = (label, updatedAt, endpoint = process.platform === 'win32'
-  ? { kind: 'namedPipe', address: `\\\\.\\pipe\\vscode-lsp-mcp-test-${label}` }
-  : { kind: 'unix', address: `/tmp/vscode-lsp-mcp-test-${label}.sock` }) => {
+const usableRecord = (label, updatedAt, endpoint = {
+  kind: 'namedPipe', address: `\\\\.\\pipe\\vscode-lsp-mcp-test-${label}`,
+}) => {
   const secrets = createRegistrationSecrets(systemRuntimePrimitives);
   return {
     registryVersion: REGISTRY_VERSION,
@@ -121,7 +120,6 @@ const injected = (now, overrides = {}) => ({
   platform: process.platform,
   architecture: process.arch,
   environment: process.env,
-  uid: typeof process.getuid === 'function' ? process.getuid() : undefined,
   now: () => now,
   verifyWindowsRegistryFile: () => true,
   getExtensionInstallationStatus: async () => ({ installed: true, version: '0.1.0' }),
@@ -129,19 +127,14 @@ const injected = (now, overrides = {}) => ({
   ...overrides,
 });
 
-test('doctor derives the same bounded runtime roots as the bridge contract', () => {
+test('doctor derives the bounded Windows runtime root and rejects other platforms', () => {
   assert.equal(
     defaultRuntimeRoot({ platform: 'win32', environment: { LOCALAPPDATA: 'C:\\Users\\sample\\AppData\\Local' } }),
     'C:\\Users\\sample\\AppData\\Local\\vscode-lsp-mcp\\run',
   );
-  assert.equal(
-    defaultRuntimeRoot({ platform: 'linux', environment: { XDG_RUNTIME_DIR: '/run/user/1000' }, uid: 1000 }),
-    '/run/user/1000/vscode-lsp-mcp',
-  );
-  assert.match(
-    defaultRuntimeRoot({ platform: 'darwin', environment: {}, uid: 501 }),
-    /^\/tmp\/vlm-[0-9a-f]{12}$/u,
-  );
+  assert.throws(() => defaultRuntimeRoot({ platform: 'unsupported', environment: {} }), {
+    code: 'RUNTIME_ROOT_UNAVAILABLE',
+  });
 });
 
 test('doctor reports a missing install and writes a bounded redacted log', async () => {

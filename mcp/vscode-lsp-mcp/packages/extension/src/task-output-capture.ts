@@ -135,7 +135,7 @@ const rootForTask = (
   if (typeof task.scope !== 'object' || task.scope.uri.scheme !== 'file') return undefined;
   let key: string;
   try {
-    key = toPathComparisonKey(task.scope.uri.fsPath, context.platform);
+    key = toPathComparisonKey(task.scope.uri.fsPath);
   } catch {
     return undefined;
   }

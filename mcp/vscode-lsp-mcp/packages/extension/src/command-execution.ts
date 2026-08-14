@@ -277,8 +277,8 @@ const outputFrom = (value: unknown, maximumCodePoints: number): CommandResult =>
     : Object.freeze({ result: publicValue });
 };
 
-const isInside = (root: string, target: string, platform: WorkspacePathContext['platform']): string | undefined => {
-  const api = platform === 'win32' ? path.win32 : path.posix;
+const isInside = (root: string, target: string): string | undefined => {
+  const api = path.win32;
   const relative = api.relative(root, target);
   return relative !== '' && !api.isAbsolute(relative) && relative !== '..' &&
       !relative.startsWith(`..${api.sep}`)
@@ -291,9 +291,9 @@ const missingDocumentLogicalPath = async (
   absolutePath: string,
   access: WorkspacePathAccess,
 ): Promise<string | undefined> => {
-  const api = context.platform === 'win32' ? path.win32 : path.posix;
+  const api = path.win32;
   const candidates = context.roots.flatMap((root) => {
-    const relative = isInside(root.lexicalAbsolutePath, absolutePath, context.platform);
+    const relative = isInside(root.lexicalAbsolutePath, absolutePath);
     return relative === undefined ? [] : [{ root, relative }];
   }).sort((left, right) => right.root.lexicalComparisonKey.length - left.root.lexicalComparisonKey.length);
   for (const candidate of candidates) {
@@ -941,7 +941,7 @@ const taskScopeKey = (
   if (typeof task.scope !== 'object' || task.scope.uri.scheme !== 'file') return undefined;
   let scope: string;
   try {
-    scope = toPathComparisonKey(task.scope.uri.fsPath, context.platform);
+    scope = toPathComparisonKey(task.scope.uri.fsPath);
   } catch {
     return undefined;
   }

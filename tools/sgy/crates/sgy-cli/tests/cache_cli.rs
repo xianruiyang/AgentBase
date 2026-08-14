@@ -35,17 +35,6 @@ fn cache_gc_runs_without_engine_discovery_and_emits_yaml() {
     assert!(!stderr.contains("engine"));
 }
 
-#[cfg(windows)]
 fn configure_cache_environment(command: &mut Command, root: &std::path::Path) {
     command.env("LOCALAPPDATA", root);
-}
-
-#[cfg(target_os = "macos")]
-fn configure_cache_environment(command: &mut Command, root: &std::path::Path) {
-    command.env("HOME", root);
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn configure_cache_environment(command: &mut Command, root: &std::path::Path) {
-    command.env("XDG_CACHE_HOME", root);
 }

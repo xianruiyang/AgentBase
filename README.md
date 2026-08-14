@@ -15,6 +15,10 @@
 - 由部署入口显式传入的 `<CodexRoot>` 中，`AGENTS.md`、同名 skill、`config.toml`、`hooks.json` 与 `agents/*.toml` 都是安装目标或宿主状态，不反向定义本项目。
 - 原工程目录只作为迁移来源保留，不自动双向同步；缓存、测试输出和构建产物不属于真源。
 
+## 平台范围
+
+AgentBase 只维护 Windows 宿主。项目自有 skill 运行时、MCP、CLI、安装器、构建与验证不发布或承诺 Linux、macOS 等非 Windows 平台；外部协议或归档格式中的平台术语不表示对应平台受支持。
+
 ## 根本需求
 
 项目为什么存在、需要让 Codex 具备什么长期能力以及如何验收，以 [`docs/requirements.md`](docs/requirements.md) 为唯一需求真源。README 只提供入口，不复制需求正文；全局规则、skill、开发设计和脚本分别把这些需求落实为各自职责内的执行规则、方案与机械合同。
@@ -64,7 +68,7 @@
 
 `vscode-lsp-mcp` 保持独立发布真源：它已有 `release:build` 和 `release:verify`，且还包含 VS Code companion 与安装生命周期。插件包不复制 MCP，也不创建第二套安装入口；`symbol-structure-workflow/agents/openai.yaml` 只声明对 `vscode-lsp-mcp` 的工具依赖。旧的 `vscode-mcp` 与 `ast-mcp` 不属于当前权威依赖。
 
-skill 内置的 Windows/Linux `sgy 0.1.0` 由同一个不含 `.git`、`target/` 和 `dist/` 的源码快照生成。`scripts/runtime-manifest.yml` 记录安装二进制 hash，`scripts/provenance/release-record.json` 汇总源码 revision、Cargo.lock、两平台原生 manifest、归档校验和、构建环境和 RustSec 结果；静态合同会把这些记录与实际文件逐项读回，不再只信任手工填写的 hash。
+skill 内置的 Windows x86_64 `sgy 0.1.1` 由 `tools/sgy` 的受签署源码版本生成。`scripts/runtime-manifest.yml` 记录安装二进制 hash，`scripts/provenance/release-record.json` 汇总源码 revision、Cargo.lock、Windows 原生 manifest、归档校验和、构建环境和 RustSec 结果；静态合同会把这些记录与实际文件逐项读回，不再只信任手工填写的 hash。
 
 许可按组件独立生效：`mcp/vscode-lsp-mcp` 使用 Apache-2.0，`tools/sgy` 使用 MIT OR Apache-2.0。仓库根目前没有统一 `LICENSE`，因此不能把组件许可证外推为整个 AgentBase 的授权；对外整体分发前仍需由权利人明确选择根级许可证。
 

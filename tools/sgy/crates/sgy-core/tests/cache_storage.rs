@@ -568,12 +568,7 @@ fn cache_root_validation_rejects_workspace_and_untrusted_ids_without_writes() {
 
     let default = default_cache_root().expect("platform cache root");
     assert!(default.is_absolute());
-    #[cfg(windows)]
     assert!(default.ends_with(Path::new("sgy/cache/v1")));
-    #[cfg(target_os = "macos")]
-    assert!(default.ends_with(Path::new("Library/Caches/sgy/v1")));
-    #[cfg(all(unix, not(target_os = "macos")))]
-    assert!(default.ends_with(Path::new("sgy/v1")));
 
     let store = fixture.store(CacheLimits::default());
     let mut disabled = audit("off");

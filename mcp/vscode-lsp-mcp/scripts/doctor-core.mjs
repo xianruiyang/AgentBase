@@ -211,7 +211,7 @@ const inspectInstallation = async (options, dependencies, checks) => {
     addCheck(checks, 'install.versionIdentity', 'fail', 'VERSION_MISMATCH', 'Installed package versions or hashes disagree.');
   }
 
-  const launchers = ['vscode-lsp-mcp.cjs', 'vscode-lsp-mcp.cmd', 'vscode-lsp-mcp'];
+  const launchers = ['vscode-lsp-mcp.cjs', 'vscode-lsp-mcp.cmd'];
   const launcherStates = await Promise.all(launchers.map((name) => statIfPresent(path.join(options.installRoot, 'bin', name))));
   if (launcherStates.every((entry) => entry?.isFile() === true && !entry.isSymbolicLink())) {
     addCheck(checks, 'install.launchers', 'pass', 'LAUNCHERS_PRESENT', 'All stable launchers are present.');
@@ -260,28 +260,14 @@ const inspectInstallation = async (options, dependencies, checks) => {
 export const defaultRuntimeRoot = ({
   platform = process.platform,
   environment = process.env,
-  uid = typeof process.getuid === 'function' ? process.getuid() : undefined,
 } = {}) => {
-  if (platform === 'win32') {
-    if (typeof environment.LOCALAPPDATA !== 'string' || !path.win32.isAbsolute(environment.LOCALAPPDATA)) {
-      doctorFailure('RUNTIME_ROOT_UNAVAILABLE', 'LOCALAPPDATA is required to locate the runtime directory.');
-    }
-    return path.win32.join(environment.LOCALAPPDATA, 'vscode-lsp-mcp', 'run');
+  if (platform !== 'win32') {
+    doctorFailure('RUNTIME_ROOT_UNAVAILABLE', 'vscode-lsp-mcp is maintained only on Windows.');
   }
-  if ((platform !== 'linux' && platform !== 'darwin') || !Number.isSafeInteger(uid) || uid < 0) {
-    doctorFailure('RUNTIME_ROOT_UNAVAILABLE', 'A supported platform and numeric uid are required.');
+  if (typeof environment.LOCALAPPDATA !== 'string' || !path.win32.isAbsolute(environment.LOCALAPPDATA)) {
+    doctorFailure('RUNTIME_ROOT_UNAVAILABLE', 'LOCALAPPDATA is required to locate the runtime directory.');
   }
-  const uidHash = systemRuntimePrimitives
-    .sha256Hex(new TextEncoder().encode(String(uid)))
-    .slice(0, 12);
-  if (platform === 'linux') {
-    return typeof environment.XDG_RUNTIME_DIR === 'string' && path.posix.isAbsolute(environment.XDG_RUNTIME_DIR)
-      ? path.posix.join(environment.XDG_RUNTIME_DIR, 'vscode-lsp-mcp')
-      : `/tmp/vlm-${uidHash}`;
-  }
-  return typeof environment.TMPDIR === 'string' && path.posix.isAbsolute(environment.TMPDIR)
-    ? path.posix.join(environment.TMPDIR, `vscode-lsp-mcp-${uidHash}`)
-    : `/tmp/vlm-${uidHash}`;
+  return path.win32.join(environment.LOCALAPPDATA, 'vscode-lsp-mcp', 'run');
 };
 
 const loadWindowsRegistryVerifier = (installation) => {
@@ -304,39 +290,29 @@ const loadWindowsRegistryVerifier = (installation) => {
   }
 };
 
-const assertSecureRegistryFile = (metadata, platform, uid, filePath, verifier) => {
+const assertSecureRegistryFile = (metadata, filePath, verifier) => {
   if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size < 1 ||
       metadata.size > REGISTRY_MAX_RECORD_BYTES) {
     throw new Error('Registration file shape or size is invalid.');
   }
-  if (platform === 'win32') {
-    if (verifier?.(filePath) !== true) throw new Error('Registration ACL is invalid or unavailable.');
-    return;
-  }
-  if (metadata.uid !== uid || (metadata.mode & 0o777) !== 0o600) {
-    throw new Error('Registration ownership or mode is invalid.');
-  }
+  if (verifier?.(filePath) !== true) throw new Error('Registration ACL is invalid or unavailable.');
 };
 
-const scanRegistrations = async ({ runtimeRoot, platform, uid, verifier }, checks) => {
+const scanRegistrations = async ({ runtimeRoot, verifier }, checks) => {
   const rootMetadata = await statIfPresent(runtimeRoot);
   if (rootMetadata === undefined) return Object.freeze({ records: [], invalid: 0, versionMismatches: 0, quarantine: 0 });
-  const insecurePosixRoot = platform !== 'win32' &&
-    (rootMetadata.uid !== uid || (rootMetadata.mode & 0o777) !== 0o700);
-  if (!rootMetadata.isDirectory() || rootMetadata.isSymbolicLink() || insecurePosixRoot) {
+  if (!rootMetadata.isDirectory() || rootMetadata.isSymbolicLink()) {
     addCheck(checks, 'runtime.directory', 'fail', 'RUNTIME_SECURITY_FAILED', 'The runtime directory is unsafe.');
     return Object.freeze({ records: [], invalid: 0, versionMismatches: 0, quarantine: 0 });
   }
   const registrationsRoot = path.join(runtimeRoot, 'registrations');
   const registrationsMetadata = await statIfPresent(registrationsRoot);
   if (registrationsMetadata === undefined) return Object.freeze({ records: [], invalid: 0, versionMismatches: 0, quarantine: 0 });
-  const insecurePosixRegistrations = platform !== 'win32' &&
-    (registrationsMetadata.uid !== uid || (registrationsMetadata.mode & 0o777) !== 0o700);
-  if (!registrationsMetadata.isDirectory() || registrationsMetadata.isSymbolicLink() || insecurePosixRegistrations) {
+  if (!registrationsMetadata.isDirectory() || registrationsMetadata.isSymbolicLink()) {
     addCheck(checks, 'runtime.registryDirectory', 'fail', 'RUNTIME_SECURITY_FAILED', 'The registration directory is unsafe.');
     return Object.freeze({ records: [], invalid: 0, versionMismatches: 0, quarantine: 0 });
   }
-  if (platform === 'win32' && verifier === undefined) {
+  if (verifier === undefined) {
     addCheck(checks, 'runtime.registrySecurity', 'fail', 'REGISTRY_SECURITY_UNAVAILABLE', 'Registration ACL verification is unavailable.');
     return Object.freeze({ records: [], invalid: 0, versionMismatches: 0, quarantine: 0 });
   }
@@ -355,7 +331,7 @@ const scanRegistrations = async ({ runtimeRoot, platform, uid, verifier }, check
     const filePath = path.join(registrationsRoot, candidate.name);
     try {
       const metadata = await lstat(filePath);
-      assertSecureRegistryFile(metadata, platform, uid, filePath, verifier);
+      assertSecureRegistryFile(metadata, filePath, verifier);
       const text = await readFile(filePath, 'utf8');
       const raw = parseStrictJson(text);
       if (raw !== null && typeof raw === 'object' && !Array.isArray(raw) &&
@@ -470,14 +446,11 @@ const inspectRuntime = async (options, dependencies, installation, checks) => {
   const runtimeRoot = options.runtimeRoot ?? defaultRuntimeRoot({
     platform: dependencies.platform,
     environment: dependencies.environment,
-    uid: dependencies.uid,
   });
   const verifier = dependencies.verifyWindowsRegistryFile ??
-    (dependencies.platform === 'win32' ? loadWindowsRegistryVerifier(installation) : undefined);
+    loadWindowsRegistryVerifier(installation);
   const scanned = await scanRegistrations({
     runtimeRoot,
-    platform: dependencies.platform,
-    uid: dependencies.uid,
     verifier,
   }, checks);
   if (scanned.invalid > 0) {
@@ -643,10 +616,12 @@ export const runDoctor = async (options, injected = {}) => {
     platform: injected.platform ?? process.platform,
     architecture: injected.architecture ?? process.arch,
     environment: injected.environment ?? process.env,
-    uid: injected.uid ?? (typeof process.getuid === 'function' ? process.getuid() : undefined),
     now: injected.now ?? Date.now,
     ...injected,
   };
+  if (dependencies.platform !== 'win32') {
+    doctorFailure('UNSUPPORTED_PLATFORM', 'vscode-lsp-mcp is maintained only on Windows.');
+  }
   const checks = [];
   const installation = await inspectInstallation(options, dependencies, checks);
   const runtime = await inspectRuntime(options, dependencies, installation, checks);

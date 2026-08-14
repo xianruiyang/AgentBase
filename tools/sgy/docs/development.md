@@ -31,23 +31,15 @@ cargo fmt-check
 
 ## Release
 
-Windows：
-
 ```powershell
 .\scripts\build-release.ps1 -Clean -SourceRevision <commit> -SourceDateEpoch <unix-seconds>
 ```
 
-Linux/macOS：
-
-```sh
-./scripts/build-release.sh --clean --source-revision <commit> --source-date-epoch <unix-seconds>
-```
-
-固定目标见 `scripts/release-targets.json`。正式构建必须传真实 commit 和对应时间戳，验证 ZIP checksum、manifest version/target、SPDX、第三方许可证以及目标平台原生 smoke。
+唯一目标见 `scripts/release-targets.json`。正式构建必须在 Windows x86_64 原生环境传入真实 commit 和对应时间戳，并验证 ZIP checksum、manifest version/target、SPDX、第三方许可证以及原生 smoke。
 
 增加或升级依赖时必须重新生成并审查：
 
-1. Cargo.lock 与 target-filtered SBOM；
+1. Cargo.lock 与 Windows target-filtered SBOM；
 2. `THIRD_PARTY_LICENSES.txt` 中 package/文件映射和完整文本；
 3. 许可证表达式 allowlist；
 4. `cargo audit` 及高风险 advisory 处置；

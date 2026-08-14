@@ -454,15 +454,7 @@ mod tests {
     }
 
     fn success_status() -> ExitStatus {
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::ExitStatusExt;
-            ExitStatus::from_raw(0)
-        }
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::ExitStatusExt;
-            ExitStatus::from_raw(0)
-        }
+        use std::os::windows::process::ExitStatusExt;
+        ExitStatus::from_raw(0)
     }
 }

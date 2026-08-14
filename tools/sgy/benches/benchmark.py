@@ -12,7 +12,6 @@ import platform
 import shutil
 import statistics
 import subprocess
-import sys
 import tempfile
 import threading
 import time
@@ -175,7 +174,7 @@ def run_measured(
             stdin=subprocess.DEVNULL,
             stdout=stdout_file,
             stderr=stderr_file,
-            creationflags=(subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0),
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
         ps_process = psutil.Process(process.pid)
         peak_rss = 0
@@ -456,12 +455,14 @@ def version_output(argv: list[str], cwd: Path, environment: dict[str, str]) -> s
         stdin=subprocess.DEVNULL,
         capture_output=True,
         check=True,
-        creationflags=(subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0),
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
     return result.stdout.decode("utf-8", errors="replace").strip()
 
 
 def main() -> int:
+    if os.name != "nt":
+        raise SystemExit("sgy benchmarks are maintained only on Windows")
     args = parse_args()
     engine = args.engine.resolve(strict=True)
     sgy = args.sgy.resolve(strict=True)
@@ -482,14 +483,8 @@ def main() -> int:
     environment = os.environ.copy()
     isolated_environment = output / "isolated-environment"
     isolated_environment.mkdir(exist_ok=True)
-    if os.name == "nt":
-        environment["APPDATA"] = str(isolated_environment / "appdata")
-        environment["LOCALAPPDATA"] = str(isolated_environment / "localappdata")
-    elif sys.platform == "darwin":
-        environment["HOME"] = str(isolated_environment / "home")
-    else:
-        environment["XDG_CONFIG_HOME"] = str(isolated_environment / "config")
-        environment["XDG_CACHE_HOME"] = str(isolated_environment / "cache")
+    environment["APPDATA"] = str(isolated_environment / "appdata")
+    environment["LOCALAPPDATA"] = str(isolated_environment / "localappdata")
 
     qwen = Tokenizer.from_pretrained(QWEN_REPO, revision=QWEN_REVISION)
     cl100k = tiktoken.get_encoding("cl100k_base")
@@ -676,7 +671,7 @@ def main() -> int:
         env=environment,
         capture_output=True,
         check=True,
-        creationflags=(subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0),
+        creationflags=subprocess.CREATE_NO_WINDOW,
     ).stdout
     defaults_document = list(yaml.safe_load_all(defaults_output.decode("utf-8")))[0]
 

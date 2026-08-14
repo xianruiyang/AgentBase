@@ -66,39 +66,6 @@ fn real_interactive_run_and_scan_use_the_platform_pty_without_yaml() {
     }
 }
 
-#[cfg(unix)]
-#[test]
-#[ignore = "requires SGY_AST_GREP and a real platform PTY"]
-fn real_unix_pty_sigint_is_reported_and_reaped_without_modification() {
-    let engine = real_engine();
-    let directory = tempfile::tempdir().expect("Ctrl+C fixture");
-    let source = directory.path().join("input.ts");
-    let original = b"const value = 1;\nconsole.log(value);\n";
-    fs::write(&source, original).expect("Ctrl+C source");
-    let args = os_args([
-        "run",
-        "-p",
-        "console.log($A)",
-        "-r",
-        "logger.info($A)",
-        "-i",
-        "-l",
-        "ts",
-    ])
-    .into_iter()
-    .chain([source.clone().into_os_string()])
-    .collect();
-    let outcome = run_pty(
-        directory.path(),
-        &engine,
-        args,
-        &[PtyAction::Interrupt(Duration::from_millis(1100))],
-    );
-    assert_eq!(outcome.status.exit_code(), 130);
-    assert_eq!(fs::read(&source).expect("source after Ctrl+C"), original);
-    assert!(!String::from_utf8_lossy(&outcome.output).contains("_sgy"));
-}
-
 #[cfg(windows)]
 #[test]
 #[ignore = "requires SGY_AST_GREP and a real Windows Console"]
@@ -313,14 +280,10 @@ struct PtyOutcome {
 
 enum PtyAction<'a> {
     Write(Duration, &'a [u8]),
-    #[cfg(unix)]
-    Interrupt(Duration),
 }
 
 enum OwnedPtyAction {
     Write(Duration, Vec<u8>),
-    #[cfg(unix)]
-    Interrupt(Duration),
 }
 
 fn run_pty(
@@ -371,12 +334,8 @@ fn run_pty(
         .iter()
         .map(|action| match action {
             PtyAction::Write(delay, bytes) => OwnedPtyAction::Write(*delay, bytes.to_vec()),
-            #[cfg(unix)]
-            PtyAction::Interrupt(delay) => OwnedPtyAction::Interrupt(*delay),
         })
         .collect::<Vec<_>>();
-    #[cfg(unix)]
-    let process_id = child.process_id().expect("PTY child process id");
     let (writer_tx, writer_rx) = mpsc::channel();
     let _writer_thread = thread::spawn(move || {
         for action in input {
@@ -386,26 +345,6 @@ fn run_pty(
                     if let Err(error) = writer.write_all(&bytes) {
                         let _ = writer_tx.send(Err(error));
                         return;
-                    }
-                }
-                #[cfg(unix)]
-                OwnedPtyAction::Interrupt(delay) => {
-                    thread::sleep(delay);
-                    let status = Command::new("kill")
-                        .args(["-INT", "--", &format!("-{process_id}")])
-                        .status();
-                    match status {
-                        Ok(status) if status.success() => {}
-                        Ok(status) => {
-                            let _ = writer_tx.send(Err(std::io::Error::other(format!(
-                                "kill -INT failed with {status}"
-                            ))));
-                            return;
-                        }
-                        Err(error) => {
-                            let _ = writer_tx.send(Err(error));
-                            return;
-                        }
                     }
                 }
             }
@@ -453,23 +392,9 @@ fn run_pty(
     PtyOutcome { status, output }
 }
 
-#[cfg(windows)]
 fn configure_pty_environment(command: &mut CommandBuilder, root: &Path) {
     command.env("LOCALAPPDATA", root);
     command.env("APPDATA", root);
-}
-
-#[cfg(target_os = "macos")]
-fn configure_pty_environment(command: &mut CommandBuilder, root: &Path) {
-    command.env("HOME", root);
-    command.env("XDG_CONFIG_HOME", root);
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn configure_pty_environment(command: &mut CommandBuilder, root: &Path) {
-    command.env("XDG_CACHE_HOME", root);
-    command.env("XDG_CONFIG_HOME", root);
-    command.env("HOME", root);
 }
 
 fn output_with_input(command: &mut Command, input: &[u8]) -> Output {
@@ -569,35 +494,14 @@ fn sgy(cwd: &Path) -> Command {
     command
 }
 
-#[cfg(windows)]
 fn configure_command_environment(command: &mut Command, root: &Path) {
     command.env("LOCALAPPDATA", root).env("APPDATA", root);
 }
 
-#[cfg(target_os = "macos")]
-fn configure_command_environment(command: &mut Command, root: &Path) {
-    command.env("HOME", root).env("XDG_CONFIG_HOME", root);
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn configure_command_environment(command: &mut Command, root: &Path) {
-    command
-        .env("XDG_CACHE_HOME", root)
-        .env("XDG_CONFIG_HOME", root)
-        .env("HOME", root);
-}
-
-#[cfg(windows)]
 fn completion_target() -> (&'static str, &'static str, &'static str) {
     ("powershell", "ps1", "text/x-powershell")
 }
 
-#[cfg(not(windows))]
-fn completion_target() -> (&'static str, &'static str, &'static str) {
-    ("bash", "bash", "text/x-shellscript")
-}
-
-#[cfg(windows)]
 fn load_completion(path: &Path) {
     let output = Command::new("pwsh")
         .args([
@@ -614,25 +518,6 @@ fn load_completion(path: &Path) {
         output.status.success(),
         "PowerShell rejected completion: {}",
         String::from_utf8_lossy(&output.stderr)
-    );
-}
-
-#[cfg(not(windows))]
-fn load_completion(path: &Path) {
-    let syntax = Command::new("bash")
-        .args([std::ffi::OsStr::new("-n"), path.as_os_str()])
-        .output()
-        .expect("parse Bash completion");
-    assert!(syntax.status.success());
-    let loaded = Command::new("bash")
-        .args(["--noprofile", "--norc", "-c", "source \"$1\"", "_"])
-        .arg(path)
-        .output()
-        .expect("load Bash completion");
-    assert!(
-        loaded.status.success(),
-        "Bash rejected completion: {}",
-        String::from_utf8_lossy(&loaded.stderr)
     );
 }
 

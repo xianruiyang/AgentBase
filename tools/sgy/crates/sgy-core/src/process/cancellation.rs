@@ -86,74 +86,19 @@ pub enum SignalRelayError {
     Install(String),
 }
 
-/// Owns the platform signal registration for one active CLI invocation.
-///
-/// Unix registrations are removed when this value is dropped. Windows console handlers are
-/// process-global and cannot be unregistered through `ctrlc`; the CLI therefore installs the
-/// relay once for its process lifetime.
+/// Owns the Windows console signal registration for one active CLI invocation.
+/// Console handlers are process-global and cannot be unregistered through `ctrlc`; the CLI
+/// therefore installs the relay once for its process lifetime.
 #[derive(Debug)]
-pub struct SignalRelay {
-    #[cfg(unix)]
-    handle: signal_hook::iterator::Handle,
-    #[cfg(unix)]
-    thread: Option<std::thread::JoinHandle<()>>,
-}
+pub struct SignalRelay {}
 
 impl SignalRelay {
     pub fn install(token: CancellationToken) -> Result<Self, SignalRelayError> {
-        #[cfg(unix)]
-        {
-            use signal_hook::consts::signal::{SIGINT, SIGTERM};
-            use signal_hook::iterator::Signals;
-
-            let mut signals = Signals::new([SIGINT, SIGTERM])
-                .map_err(|error| SignalRelayError::Install(error.to_string()))?;
-            let handle = signals.handle();
-            let thread = std::thread::Builder::new()
-                .name("sgy-signal-relay".to_owned())
-                .spawn(move || {
-                    if let Some(signal) = signals.forever().next() {
-                        let reason = if signal == SIGINT {
-                            CancellationKind::CtrlC
-                        } else {
-                            CancellationKind::Termination
-                        };
-                        token.cancel(reason);
-                    }
-                })
-                .map_err(|error| SignalRelayError::Install(error.to_string()))?;
-            Ok(Self {
-                handle,
-                thread: Some(thread),
-            })
-        }
-
-        #[cfg(windows)]
-        {
-            ctrlc::try_set_handler(move || {
-                token.cancel(CancellationKind::CtrlC);
-            })
-            .map_err(|error| SignalRelayError::Install(error.to_string()))?;
-            Ok(Self {})
-        }
-
-        #[cfg(not(any(unix, windows)))]
-        {
-            let _ = token;
-            Err(SignalRelayError::Install(
-                "unsupported signal platform".to_owned(),
-            ))
-        }
-    }
-}
-
-#[cfg(unix)]
-impl Drop for SignalRelay {
-    fn drop(&mut self) {
-        self.handle.close();
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
+        ctrlc::try_set_handler(move || {
+            token.cancel(CancellationKind::CtrlC);
+        })
+        .map_err(|error| SignalRelayError::Install(error.to_string()))?;
+        Ok(Self {})
     }
 }
 

@@ -39,7 +39,7 @@ class FakePathAccess implements WorkspacePathAccess {
   }
 
   #key(value: string): string {
-    const pathApi = this.#platform === 'win32' ? path.win32 : path.posix;
+    const pathApi = path.win32;
     const normalized = pathApi.normalize(value);
     return this.#platform === 'win32' ? normalized.toLowerCase() : normalized;
   }
@@ -106,12 +106,12 @@ test('alias normalization and collision suffixes are deterministic and index-sta
   assert.equal(normalizeRootAliasBase('...'), 'root');
   assert.equal(normalizeRootAliasBase('A'.repeat(80)).length, 40);
 
-  const access = new FakePathAccess('posix')
-    .add('/workspace/a', 'directory')
-    .add('/workspace/b', 'directory');
+  const access = new FakePathAccess('win32')
+    .add('C:\\workspace\\a', 'directory')
+    .add('C:\\workspace\\b', 'directory');
   const context = await contextFor(
-    [folder('Foo', '/workspace/a'), folder('Ｆｏｏ', '/workspace/b')],
-    'posix',
+    [folder('Foo', 'C:\\workspace\\a'), folder('Ｆｏｏ', 'C:\\workspace\\b')],
+    'win32',
     access,
   );
 
@@ -124,40 +124,40 @@ test('alias normalization and collision suffixes are deterministic and index-sta
 });
 
 test('unusable roots and duplicate canonical roots fail closed', async () => {
-  const access = new FakePathAccess('posix')
-    .add('/lexical/a', 'directory', '/canonical/shared')
-    .add('/lexical/b', 'directory', '/canonical/shared');
+  const access = new FakePathAccess('win32')
+    .add('C:\\lexical\\a', 'directory', 'C:\\canonical\\shared')
+    .add('C:\\lexical\\b', 'directory', 'C:\\canonical\\shared');
 
-  await assertRejectsCode(() => contextFor([], 'posix', access), 'WORKSPACE_UNAVAILABLE');
+  await assertRejectsCode(() => contextFor([], 'win32', access), 'WORKSPACE_UNAVAILABLE');
   await assertRejectsCode(
     () =>
       contextFor(
-        [{ name: 'virtual', uriScheme: 'untitled', lexicalAbsolutePath: '/virtual' }],
-        'posix',
+        [{ name: 'virtual', uriScheme: 'untitled', lexicalAbsolutePath: 'C:\\virtual' }],
+        'win32',
         access,
       ),
     'WORKSPACE_UNAVAILABLE',
   );
   await assertRejectsCode(
-    () => contextFor([folder('a', '/lexical/a'), folder('b', '/lexical/b')], 'posix', access),
+    () => contextFor([folder('a', 'C:\\lexical\\a'), folder('b', 'C:\\lexical\\b')], 'win32', access),
     'WORKSPACE_UNAVAILABLE',
   );
 });
 
 test('single-root logical and lexical paths round-trip without exposing the alias', async () => {
-  const access = new FakePathAccess('posix')
-    .add('/workspace', 'directory')
-    .add('/workspace/src/main.ts', 'file');
-  const context = await contextFor([folder('Demo', '/workspace')], 'posix', access);
+  const access = new FakePathAccess('win32')
+    .add('C:\\workspace', 'directory')
+    .add('C:\\workspace\\src\\main.ts', 'file');
+  const context = await contextFor([folder('Demo', 'C:\\workspace')], 'win32', access);
   const resolved = await resolveLogicalPath(context, 'src/main.ts', access);
   const reversed = await logicalPathFromProviderLocation(
     context,
-    { uriScheme: 'file', lexicalAbsolutePath: '/workspace/src/main.ts' },
+    { uriScheme: 'file', lexicalAbsolutePath: 'C:\\workspace\\src\\main.ts' },
     access,
   );
 
-  assert.equal(resolved.lexicalAbsolutePath, '/workspace/src/main.ts');
-  assert.equal(resolved.canonicalVerificationPath, '/workspace/src/main.ts');
+  assert.equal(resolved.lexicalAbsolutePath, 'C:\\workspace\\src\\main.ts');
+  assert.equal(resolved.canonicalVerificationPath, 'C:\\workspace\\src\\main.ts');
   assert.equal(resolved.exists, true);
   assert.equal(reversed.logicalPath, 'src/main.ts');
   assertThrowsCode(() => parseLogicalPath(context, 'demo/src/main.ts'), 'INVALID_ARGUMENT');
@@ -168,31 +168,31 @@ test('single-root logical and lexical paths round-trip without exposing the alia
     context,
   );
   assert.deepEqual(publicWorkspace.roots, ['demo']);
-  assert.equal(JSON.stringify(publicWorkspace).includes('/workspace'), false);
+  assert.equal(JSON.stringify(publicWorkspace).includes('C:\\workspace'), false);
   assert.equal(JSON.stringify(publicWorkspace).includes('canonical'), false);
 });
 
 test('multi-root paths select exact aliases and reverse-map to the matching root', async () => {
-  const access = new FakePathAccess('posix')
-    .add('/workspace/app', 'directory')
-    .add('/workspace/lib', 'directory')
-    .add('/workspace/app/src/main.ts', 'file')
-    .add('/workspace/lib/src/index.ts', 'file');
+  const access = new FakePathAccess('win32')
+    .add('C:\\workspace\\app', 'directory')
+    .add('C:\\workspace\\lib', 'directory')
+    .add('C:\\workspace\\app\\src\\main.ts', 'file')
+    .add('C:\\workspace\\lib\\src\\index.ts', 'file');
   const context = await contextFor(
-    [folder('App', '/workspace/app'), folder('Library', '/workspace/lib')],
-    'posix',
+    [folder('App', 'C:\\workspace\\app'), folder('Library', 'C:\\workspace\\lib')],
+    'win32',
     access,
   );
 
   assert.equal(
     (await resolveLogicalPath(context, 'app/src/main.ts', access)).lexicalAbsolutePath,
-    '/workspace/app/src/main.ts',
+    'C:\\workspace\\app\\src\\main.ts',
   );
   assert.equal(
     (
       await logicalPathFromProviderLocation(
         context,
-        { uriScheme: 'file', lexicalAbsolutePath: '/workspace/lib/src/index.ts' },
+        { uriScheme: 'file', lexicalAbsolutePath: 'C:\\workspace\\lib\\src\\index.ts' },
         access,
       )
     ).logicalPath,
@@ -221,8 +221,8 @@ test('Windows logical syntax and comparison reject ambiguous filesystem spelling
     'src/File.ts',
   );
   assert.equal(
-    toPathComparisonKey('C:/WORK/Root/', 'win32'),
-    toPathComparisonKey('c:\\work\\root', 'win32'),
+    toPathComparisonKey('C:/WORK/Root/'),
+    toPathComparisonKey('c:\\work\\root'),
   );
 
   for (const invalid of [
@@ -251,20 +251,20 @@ test('Windows logical syntax and comparison reject ambiguous filesystem spelling
 });
 
 test('canonical containment accepts internal links and rejects cross-root escapes', async () => {
-  const access = new FakePathAccess('posix')
-    .add('/one', 'directory')
-    .add('/two', 'directory')
-    .add('/one/inside-link.ts', 'file', '/one/actual.ts')
-    .add('/one/escape-link.ts', 'file', '/two/secret.ts');
+  const access = new FakePathAccess('win32')
+    .add('C:\\one', 'directory')
+    .add('C:\\two', 'directory')
+    .add('C:\\one\\inside-link.ts', 'file', 'C:\\one\\actual.ts')
+    .add('C:\\one\\escape-link.ts', 'file', 'C:\\two\\secret.ts');
   const context = await contextFor(
-    [folder('One', '/one'), folder('Two', '/two')],
-    'posix',
+    [folder('One', 'C:\\one'), folder('Two', 'C:\\two')],
+    'win32',
     access,
   );
 
   assert.equal(
     (await resolveLogicalPath(context, 'one/inside-link.ts', access)).canonicalVerificationPath,
-    '/one/actual.ts',
+    'C:\\one\\actual.ts',
   );
   await assertRejectsCode(
     () => resolveLogicalPath(context, 'one/escape-link.ts', access),
@@ -273,38 +273,38 @@ test('canonical containment accepts internal links and rejects cross-root escape
 });
 
 test('root symlinks and nested roots reverse-map through the most specific canonical root', async () => {
-  const rootLinkAccess = new FakePathAccess('posix')
-    .add('/lexical/root', 'directory', '/real/root')
-    .add('/lexical/root/src/a.ts', 'file', '/real/root/src/a.ts')
-    .add('/real/root/src/a.ts', 'file');
+  const rootLinkAccess = new FakePathAccess('win32')
+    .add('C:\\lexical\\root', 'directory', 'C:\\real\\root')
+    .add('C:\\lexical\\root\\src\\a.ts', 'file', 'C:\\real\\root\\src\\a.ts')
+    .add('C:\\real\\root\\src\\a.ts', 'file');
   const rootLinkContext = await contextFor(
-    [folder('Linked', '/lexical/root')],
-    'posix',
+    [folder('Linked', 'C:\\lexical\\root')],
+    'win32',
     rootLinkAccess,
   );
   assert.equal(
     (
       await logicalPathFromProviderLocation(
         rootLinkContext,
-        { uriScheme: 'file', lexicalAbsolutePath: '/real/root/src/a.ts' },
+        { uriScheme: 'file', lexicalAbsolutePath: 'C:\\real\\root\\src\\a.ts' },
         rootLinkAccess,
       )
     ).logicalPath,
     'src/a.ts',
   );
 
-  const nestedAccess = new FakePathAccess('posix')
-    .add('/work', 'directory')
-    .add('/work/packages/app', 'directory')
-    .add('/work/packages/app/src/main.ts', 'file');
+  const nestedAccess = new FakePathAccess('win32')
+    .add('C:\\work', 'directory')
+    .add('C:\\work\\packages\\app', 'directory')
+    .add('C:\\work\\packages\\app\\src\\main.ts', 'file');
   const nestedContext = await contextFor(
-    [folder('Outer', '/work'), folder('App', '/work/packages/app')],
-    'posix',
+    [folder('Outer', 'C:\\work'), folder('App', 'C:\\work\\packages\\app')],
+    'win32',
     nestedAccess,
   );
   const mapped = await logicalPathFromProviderLocation(
     nestedContext,
-    { uriScheme: 'file', lexicalAbsolutePath: '/work/packages/app/src/main.ts' },
+    { uriScheme: 'file', lexicalAbsolutePath: 'C:\\work\\packages\\app\\src\\main.ts' },
     nestedAccess,
   );
   assert.equal(mapped.logicalPath, 'app/src/main.ts');
@@ -340,18 +340,18 @@ test('Windows junction targets use native realpath and cannot escape the workspa
 });
 
 test('missing create targets validate their nearest existing parent canonically', async () => {
-  const access = new FakePathAccess('posix')
-    .add('/root', 'directory')
-    .add('/root/new', 'directory')
-    .add('/root/out', 'directory', '/outside');
-  const context = await contextFor([folder('Root', '/root')], 'posix', access);
+  const access = new FakePathAccess('win32')
+    .add('C:\\root', 'directory')
+    .add('C:\\root\\new', 'directory')
+    .add('C:\\root\\out', 'directory', 'C:\\outside');
+  const context = await contextFor([folder('Root', 'C:\\root')], 'win32', access);
 
   const missing = await resolveLogicalPath(context, 'new/deep/file.ts', access, {
     allowMissing: true,
   });
   assert.equal(missing.exists, false);
-  assert.equal(missing.lexicalAbsolutePath, '/root/new/deep/file.ts');
-  assert.equal(missing.canonicalVerificationPath, '/root/new');
+  assert.equal(missing.lexicalAbsolutePath, 'C:\\root\\new\\deep\\file.ts');
+  assert.equal(missing.canonicalVerificationPath, 'C:\\root\\new');
   await assertRejectsCode(
     () => resolveLogicalPath(context, 'out/file.ts', access, { allowMissing: true }),
     'PATH_OUTSIDE_WORKSPACE',
@@ -363,23 +363,23 @@ test('missing create targets validate their nearest existing parent canonically'
 });
 
 test('provider errors remain safe and never echo physical paths', async () => {
-  const access = new FakePathAccess('posix')
-    .add('/workspace', 'directory')
-    .add('/outside/secret.ts', 'file')
-    .add('/outside/link-in.ts', 'file', '/workspace/inside.ts');
-  const context = await contextFor([folder('Workspace', '/workspace')], 'posix', access);
+  const access = new FakePathAccess('win32')
+    .add('C:\\workspace', 'directory')
+    .add('C:\\outside\\secret.ts', 'file')
+    .add('C:\\outside\\link-in.ts', 'file', 'C:\\workspace\\inside.ts');
+  const context = await contextFor([folder('Workspace', 'C:\\workspace')], 'win32', access);
 
   await assert.rejects(
     () =>
       logicalPathFromProviderLocation(
         context,
-        { uriScheme: 'file', lexicalAbsolutePath: '/outside/secret.ts' },
+        { uriScheme: 'file', lexicalAbsolutePath: 'C:\\outside\\secret.ts' },
         access,
       ),
     (error: unknown) => {
       assert.ok(error instanceof WorkspaceBoundaryError);
       assert.equal(error.code, 'PATH_OUTSIDE_WORKSPACE');
-      assert.equal(error.message.includes('/outside'), false);
+      assert.equal(error.message.includes('C:\\outside'), false);
       assert.equal(error.message.includes('secret.ts'), false);
       return true;
     },
@@ -388,7 +388,7 @@ test('provider errors remain safe and never echo physical paths', async () => {
     () =>
       logicalPathFromProviderLocation(
         context,
-        { uriScheme: 'untitled', lexicalAbsolutePath: '/outside/secret.ts' },
+        { uriScheme: 'untitled', lexicalAbsolutePath: 'C:\\outside\\secret.ts' },
         access,
       ),
     'PATH_OUTSIDE_WORKSPACE',
@@ -397,7 +397,7 @@ test('provider errors remain safe and never echo physical paths', async () => {
     () =>
       logicalPathFromProviderLocation(
         context,
-        { uriScheme: 'file', lexicalAbsolutePath: '/outside/link-in.ts' },
+        { uriScheme: 'file', lexicalAbsolutePath: 'C:\\outside\\link-in.ts' },
         access,
       ),
     'PATH_OUTSIDE_WORKSPACE',
@@ -409,5 +409,5 @@ test('the shared Node adapter performs host stat and native canonicalization', a
   assert.equal(await systemWorkspacePathAccess.entryType(currentDirectory), 'directory');
   const canonical = await systemWorkspacePathAccess.realpath(currentDirectory);
   assert.equal(path.isAbsolute(canonical), true);
-  assert.equal(hostPathPlatform, process.platform === 'win32' ? 'win32' : 'posix');
+  assert.equal(hostPathPlatform, 'win32');
 });

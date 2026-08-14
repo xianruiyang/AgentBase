@@ -1,5 +1,8 @@
 #![forbid(unsafe_code)]
 
+#[cfg(not(windows))]
+compile_error!("sgy is maintained and supported only on Windows");
+
 pub mod cache;
 pub mod defaults_output;
 pub mod diagnostics;
@@ -911,24 +914,6 @@ mod tests {
         assert_eq!(help.wrapper_exit_code(), 0);
     }
 
-    #[cfg(unix)]
-    #[test]
-    fn preserves_non_utf8_native_token_on_unix() {
-        use std::os::unix::ffi::OsStringExt;
-
-        let opaque = OsString::from_vec(vec![0xff, b'a']);
-        let invocation = parse_invocation_from(vec![
-            OsString::from("sgy"),
-            OsString::from("exec"),
-            OsString::from("--"),
-            OsString::from("run"),
-            opaque.clone(),
-        ])
-        .expect("non-UTF-8 native token must stay opaque");
-        assert_eq!(invocation.user_argv[1], opaque);
-    }
-
-    #[cfg(windows)]
     #[test]
     fn preserves_unpaired_surrogate_native_token_on_windows() {
         use std::os::windows::ffi::OsStringExt;

@@ -404,41 +404,11 @@ pub fn validate_cache_id(cache_id: &str) -> Result<(), CacheError> {
 }
 
 pub fn default_cache_root() -> Result<PathBuf, CacheError> {
-    #[cfg(windows)]
-    {
-        env::var_os("LOCALAPPDATA")
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-            .map(|root| root.join("sgy").join("cache").join("v1"))
-            .ok_or(CacheError::Environment("LOCALAPPDATA is not set"))
-    }
-    #[cfg(target_os = "macos")]
-    {
-        env::var_os("HOME")
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-            .map(|root| root.join("Library").join("Caches").join("sgy").join("v1"))
-            .ok_or(CacheError::Environment("HOME is not set"))
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        if let Some(root) = env::var_os("XDG_CACHE_HOME").filter(|value| !value.is_empty()) {
-            return Ok(PathBuf::from(root).join("sgy").join("v1"));
-        }
-        env::var_os("HOME")
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-            .map(|root| root.join(".cache").join("sgy").join("v1"))
-            .ok_or(CacheError::Environment(
-                "XDG_CACHE_HOME and HOME are not set",
-            ))
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        Err(CacheError::Environment(
-            "no default cache root for this platform",
-        ))
-    }
+    env::var_os("LOCALAPPDATA")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .map(|root| root.join("sgy").join("cache").join("v1"))
+        .ok_or(CacheError::Environment("LOCALAPPDATA is not set"))
 }
 
 fn read_metadata(path: &Path) -> Result<MetadataTimes, CacheError> {
@@ -499,23 +469,12 @@ fn anticipate_canonical_path(path: &Path) -> Result<PathBuf, CacheError> {
 fn create_private_directory(path: &Path) -> Result<(), CacheError> {
     fs::create_dir_all(path).map_err(|source| io_error("create cache directory", path, source))?;
     ensure_safe_directory(path)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o700))
-            .map_err(|source| io_error("set cache directory permissions", path, source))?;
-    }
     Ok(())
 }
 
 pub(super) fn open_private_lock(path: &Path) -> Result<File, CacheError> {
     let mut options = OpenOptions::new();
     options.read(true).write(true).create(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
     let file = options
         .open(path)
         .map_err(|source| io_error("open cache lock", path, source))?;
@@ -557,16 +516,10 @@ fn is_plain_file(metadata: &fs::Metadata) -> bool {
     !is_windows_reparse(metadata)
 }
 
-#[cfg(windows)]
 fn is_windows_reparse(metadata: &fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
     metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-}
-
-#[cfg(not(windows))]
-const fn is_windows_reparse(_metadata: &fs::Metadata) -> bool {
-    false
 }
 
 fn read_directory(path: &Path) -> Result<Vec<PathBuf>, CacheError> {
@@ -630,13 +583,8 @@ fn is_lock_contended(error: &io::Error) -> bool {
     if error.kind() == io::ErrorKind::WouldBlock {
         return true;
     }
-    #[cfg(windows)]
-    {
-        const ERROR_LOCK_VIOLATION: i32 = 33;
-        error.raw_os_error() == Some(ERROR_LOCK_VIOLATION)
-    }
-    #[cfg(not(windows))]
-    false
+    const ERROR_LOCK_VIOLATION: i32 = 33;
+    error.raw_os_error() == Some(ERROR_LOCK_VIOLATION)
 }
 
 fn remove_committed_entry(root: &Path, path: &Path) -> Result<bool, CacheError> {

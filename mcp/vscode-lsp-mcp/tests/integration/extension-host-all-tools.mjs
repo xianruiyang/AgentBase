@@ -23,7 +23,6 @@ import {
   assertToolOutput,
   decodeYamlText,
   ensureRuntimeDirectory,
-  systemRuntimePrimitives,
 } from '@simplechat/vscode-lsp-mcp-protocol';
 import {
   ensureSecureRuntimeDirectory,
@@ -94,29 +93,19 @@ const extensionTestsPath = path.join(
   'stage-e-extension-host.js',
 );
 
-const runtimePlatform = () => {
-  if (process.platform === 'win32' || process.platform === 'linux' || process.platform === 'darwin') {
-    return process.platform;
-  }
-  throw new Error(`Unsupported P6-004 platform: ${process.platform}.`);
+if (process.platform !== 'win32') {
+  throw new Error('P6-004 is maintained only on Windows.');
+}
+const platform = 'win32';
+const windowsSecurity = {
+  ensureSecureRuntimeDirectory,
+  verifySecureRegistryFile,
 };
-
-const platform = runtimePlatform();
-const windowsSecurity = platform === 'win32'
-  ? {
-      ensureSecureRuntimeDirectory,
-      verifySecureRegistryFile,
-    }
-  : undefined;
-const unixUid = platform === 'win32' || typeof process.getuid !== 'function'
-  ? undefined
-  : process.getuid();
 const runtimeLayout = await ensureRuntimeDirectory({
   platform,
   environment: process.env,
-  ...(unixUid === undefined ? {} : { uid: unixUid }),
-  ...(windowsSecurity === undefined ? {} : { windowsSecurity }),
-}, systemRuntimePrimitives);
+  windowsSecurity,
+});
 
 const hostPaths = (key) => ({
   ready: path.join(controlRoot, `${key}-ready.json`),

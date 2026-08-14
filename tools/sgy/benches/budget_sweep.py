@@ -35,7 +35,7 @@ def run(argv: list[str], cwd: Path, environment: dict[str, str]) -> bytes:
         env=environment,
         stdin=subprocess.DEVNULL,
         capture_output=True,
-        creationflags=(subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0),
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
     if completed.returncode != 0 or not completed.stdout:
         raise RuntimeError(
@@ -69,6 +69,8 @@ def text_retention(document: dict[str, Any], truth: list[dict[str, Any]]) -> dic
 
 
 def main() -> int:
+    if os.name != "nt":
+        raise SystemExit("sgy benchmarks are maintained only on Windows")
     args = parse_args()
     engine = args.engine.resolve(strict=True)
     sgy = args.sgy.resolve(strict=True)
@@ -82,14 +84,8 @@ def main() -> int:
     environment = os.environ.copy()
     isolated = output / "isolated-budget-environment"
     isolated.mkdir(exist_ok=True)
-    if os.name == "nt":
-        environment["APPDATA"] = str(isolated / "appdata")
-        environment["LOCALAPPDATA"] = str(isolated / "localappdata")
-    elif os.sys.platform == "darwin":
-        environment["HOME"] = str(isolated / "home")
-    else:
-        environment["XDG_CONFIG_HOME"] = str(isolated / "config")
-        environment["XDG_CACHE_HOME"] = str(isolated / "cache")
+    environment["APPDATA"] = str(isolated / "appdata")
+    environment["LOCALAPPDATA"] = str(isolated / "localappdata")
 
     qwen = Tokenizer.from_pretrained(benchmark.QWEN_REPO, revision=benchmark.QWEN_REVISION)
     cl100k = tiktoken.get_encoding("cl100k_base")

@@ -14,10 +14,6 @@ From an extracted release directory:
 install.cmd doctor --json
 ```
 
-```sh
-./install.sh doctor --json
-```
-
 To probe document-scoped language providers, provide the public workspace ID and a logical workspace path. The logical path uses the same `<root-alias>/<relative-path>` form as MCP tools and is not a physical path.
 
 ```powershell
@@ -60,4 +56,4 @@ Each file is limited to 256 KiB, and only five managed doctor logs are retained.
 
 ## Advanced runtime override
 
-`--runtime-root <dir>` inspects an existing alternate runtime registry. Security checks still apply: on Windows every registration file must pass the installed native ACL verifier; on Linux/macOS ownership and mode `0600` are required. The override does not enable an insecure test mode.
+`--runtime-root <dir>` inspects an existing alternate runtime registry. Every registration file must still pass the installed Windows native ACL verifier; the override does not enable an insecure test mode.

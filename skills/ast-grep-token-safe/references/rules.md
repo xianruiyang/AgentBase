@@ -2,7 +2,7 @@
 
 仅在编写、调试 pattern/YAML rule 或 rewrite 时读取。
 
-以下 PowerShell 示例中的 `$Sgy` 指向 `<skill_dir>\scripts\bin\windows-x86_64\sgy.exe`；Linux 使用 `bash '<skill_dir>/scripts/sgy.sh'` 替换 `& $Sgy`。
+以下 PowerShell 示例中的 `$Sgy` 指向 `<skill_dir>\scripts\bin\windows-x86_64\sgy.exe`。
 
 ## Pattern
 

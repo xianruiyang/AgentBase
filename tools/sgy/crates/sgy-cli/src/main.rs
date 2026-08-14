@@ -812,14 +812,8 @@ fn engine_version_for_metadata(prepared: &sgy_core::prepare::PreparedInvocation)
         .unwrap_or_else(|| "unknown".to_owned())
 }
 
-#[cfg(windows)]
 fn output_path_key(path: &Path) -> String {
     path.to_string_lossy().to_lowercase()
-}
-
-#[cfg(not(windows))]
-fn output_path_key(path: &Path) -> OsString {
-    path.as_os_str().to_os_string()
 }
 
 fn execute_raw_profile(

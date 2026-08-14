@@ -17,20 +17,17 @@ import {
 } from '../../scripts/install-core.mjs';
 import { parseArguments } from '../../scripts/install.mjs';
 
-test('default install and configuration roots stay separate on every supported host family', () => {
+test('default install and configuration roots are Windows-only and stay separate', () => {
   const environment = {
     LOCALAPPDATA: 'C:\\Users\\sample\\AppData\\Local',
     APPDATA: 'C:\\Users\\sample\\AppData\\Roaming',
-    XDG_DATA_HOME: '/home/sample/.data',
-    XDG_CONFIG_HOME: '/home/sample/.config-custom',
   };
   const windows = defaultRoots({ platform: 'win32', environment, homeDirectory: 'C:\\Users\\sample' });
-  const linux = defaultRoots({ platform: 'linux', environment, homeDirectory: '/home/sample' });
-  const mac = defaultRoots({ platform: 'darwin', environment, homeDirectory: '/Users/sample' });
   assert.notEqual(windows.installRoot, windows.configRoot);
-  assert.deepEqual(linux, mac);
   assert.doesNotThrow(() => assertSeparatedRoots(windows.installRoot, windows.configRoot));
-  assert.doesNotThrow(() => assertSeparatedRoots(linux.installRoot, linux.configRoot));
+  assert.throws(() => defaultRoots({ platform: 'unsupported', environment }), {
+    code: 'UNSUPPORTED_PLATFORM',
+  });
 });
 
 test('Windows Code CLI discovery prefers executable launchers over the extensionless shell script', () => {
@@ -40,7 +37,9 @@ test('Windows Code CLI discovery prefers executable launchers over the extension
     'C:\\Program Files\\Microsoft VS Code\\bin\\code.exe',
   ];
   assert.deepEqual(orderLocatedCodeCliPaths(located, 'win32'), [located[1], located[2], located[0]]);
-  assert.deepEqual(orderLocatedCodeCliPaths(located, 'linux'), located);
+  assert.throws(() => orderLocatedCodeCliPaths(located, 'unsupported'), {
+    code: 'UNSUPPORTED_PLATFORM',
+  });
 });
 
 test('managed roots reject filesystem/home roots and overlapping configuration', () => {

@@ -3,7 +3,6 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import {
-  chmod,
   copyFile,
   mkdir,
   mkdtemp,
@@ -344,7 +343,7 @@ const stageExtension = async ({ stageRoot, configuration }) => {
   serverManifest.version = configuration.version;
   serverManifest.private = true;
   serverManifest.engines = configuration.manifests.workspace.engines;
-  serverManifest.bin = { 'vscode-lsp-mcp': './bin/vscode-lsp-mcp' };
+  serverManifest.bin = { 'vscode-lsp-mcp': './dist/cli.js' };
   serverManifest.dependencies = {
     [win32SecurityName]: configuration.version,
   };
@@ -360,17 +359,11 @@ const stageExtension = async ({ stageRoot, configuration }) => {
       win32Security: configuration.version,
     }),
     writeFile(
-      path.join(binRoot, 'vscode-lsp-mcp'),
-      '#!/usr/bin/env sh\nSCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec node "$SCRIPT_DIR/../dist/cli.js" "$@"\n',
-      'utf8',
-    ),
-    writeFile(
       path.join(binRoot, 'vscode-lsp-mcp.cmd'),
       '@echo off\r\nnode "%~dp0..\\dist\\cli.js" %*\r\n',
       'utf8',
     ),
   ]);
-  await chmod(path.join(binRoot, 'vscode-lsp-mcp'), 0o755);
   return { extensionStage, serverStage };
 };
 
@@ -401,13 +394,7 @@ const buildInstallerArtifacts = async (destination) => {
       '@echo off\r\nnode "%~dp0install.mjs" %*\r\n',
       'utf8',
     ),
-    writeFile(
-      path.join(destination, 'install.sh'),
-      '#!/usr/bin/env sh\nSCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec node "$SCRIPT_DIR/install.mjs" "$@"\n',
-      'utf8',
-    ),
   ]);
-  await chmod(path.join(destination, 'install.sh'), 0o755);
 };
 
 const withSourceDateEpoch = async (action) => {
@@ -469,7 +456,6 @@ const buildReleasePass = async ({ destination, configuration, passRoot }) => {
     ['installer-node', 'install.mjs', path.join(destination, 'install.mjs')],
     ['installer-powershell', 'install.ps1', path.join(destination, 'install.ps1')],
     ['installer-cmd', 'install.cmd', path.join(destination, 'install.cmd')],
-    ['installer-posix', 'install.sh', path.join(destination, 'install.sh')],
   ].map(async ([type, name, filePath]) => {
     const bytes = await readFile(filePath);
     return { type, name, bytes: bytes.length, sha256: sha256(bytes) };
@@ -495,12 +481,10 @@ const buildReleasePass = async ({ destination, configuration, passRoot }) => {
     },
     entryPoints: {
       extension: 'extension/dist/extension.js',
-      server: 'vscode-lsp-mcp-server/bin/vscode-lsp-mcp',
       serverWindows: 'vscode-lsp-mcp-server/bin/vscode-lsp-mcp.cmd',
       installerNode: 'install.mjs',
       installerWindows: 'install.ps1',
       installerWindowsCmd: 'install.cmd',
-      installerPosix: 'install.sh',
       documentation: `vscode-lsp-mcp-docs/README.md`,
       license: 'LICENSE',
       notice: 'NOTICE',
@@ -681,7 +665,6 @@ const validateRelease = async ({ destination, manifest, verificationRoot }) => {
     'vscode-lsp-mcp-server/NOTICE',
     'vscode-lsp-mcp-server/THIRD_PARTY_NOTICES.md',
     'vscode-lsp-mcp-server/docs/security.md',
-    'vscode-lsp-mcp-server/bin/vscode-lsp-mcp',
     'vscode-lsp-mcp-server/bin/vscode-lsp-mcp.cmd',
     `vscode-lsp-mcp-server/${nativeRelative}`,
   ]) {
@@ -770,7 +753,7 @@ const validateRelease = async ({ destination, manifest, verificationRoot }) => {
   assert.equal(health.content[0]?.type, 'text');
   const healthResponse = decodeYamlText(health.content[0].text);
   assert.equal(healthResponse.ok, true);
-  for (const type of ['installer-node', 'installer-powershell', 'installer-cmd', 'installer-posix']) {
+  for (const type of ['installer-node', 'installer-powershell', 'installer-cmd']) {
     assert.ok(manifest.artifacts.some((artifact) => artifact.type === type), `Release is missing ${type}.`);
   }
   const installerProbe = spawnSync(process.execPath, [path.join(destination, 'install.mjs'), '--help'], {

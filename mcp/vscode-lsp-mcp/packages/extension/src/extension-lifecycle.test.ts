@@ -223,7 +223,6 @@ test('started lifecycle accepts a real authenticated native pipe health request'
     },
     createTransport: (endpoint) => createExtensionTransportServer({
       endpoint,
-      platform: 'win32',
     }),
     mutationHandler: (_context, workspace, request) => {
       mutationWorkspace = workspace;
@@ -290,7 +289,6 @@ test('native pipe accept loop resumes after all four connection slots were occup
     },
     createTransport: (endpoint) => createExtensionTransportServer({
       endpoint,
-      platform: 'win32',
     }),
   });
   const clients: BridgeClientSession[] = [];

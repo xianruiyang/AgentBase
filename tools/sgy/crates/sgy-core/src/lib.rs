@@ -1,5 +1,8 @@
 #![forbid(unsafe_code)]
 
+#[cfg(not(windows))]
+compile_error!("sgy is maintained and supported only on Windows");
+
 pub mod adapters;
 pub mod aggregate;
 pub mod batch;

@@ -325,11 +325,8 @@ export class ExtensionRegistrationService {
         this.#options.currentUserSid,
       );
       server = await this.#options.createTransport(endpoint);
-    } catch (error) {
-      const reasonCode: UnavailableReasonCode = error instanceof RuntimeSecurityError &&
-          error.reason === 'endpointPathTooLong'
-        ? 'endpoint_path_too_long'
-        : 'transport_start_failed';
+    } catch {
+      const reasonCode: UnavailableReasonCode = 'transport_start_failed';
       const record: RegistrationRecord = Object.freeze({
         ...common,
         kind: 'unavailable',
@@ -560,10 +557,10 @@ export class ExtensionRegistrationService {
 }
 
 const runtimePlatform = (): RuntimePlatform => {
-  if (process.platform === 'win32' || process.platform === 'linux' || process.platform === 'darwin') {
-    return process.platform;
+  if (process.platform === 'win32') {
+    return 'win32';
   }
-  throw new RuntimeSecurityError('unsupportedPlatform', 'The extension host platform is unsupported.');
+  throw new RuntimeSecurityError('unsupportedPlatform', 'The extension host requires Windows.');
 };
 
 export interface VscodeLifecycleHost {
@@ -606,26 +603,20 @@ export const createSystemExtensionRegistrationService = async (
     ? configuredProviderTimeoutMs
     : PROVIDER_DEFAULT_TIMEOUT_MS;
   const platform = runtimePlatform();
-  const windowsInfo = platform === 'win32' ? ensureSecureRuntimeDirectory() : undefined;
-  const windowsSecurity = platform === 'win32'
-    ? {
-        ensureSecureRuntimeDirectory: () => ensureSecureRuntimeDirectory(),
-        verifySecureRegistryFile,
-      }
-    : undefined;
-  const uid = platform === 'win32' || typeof process.getuid !== 'function'
-    ? undefined
-    : process.getuid();
+  const windowsInfo = ensureSecureRuntimeDirectory();
+  const windowsSecurity = {
+    ensureSecureRuntimeDirectory: () => ensureSecureRuntimeDirectory(),
+    verifySecureRegistryFile,
+  };
   const layout = await ensureRuntimeDirectory({
     platform,
     environment: process.env,
-    ...(uid === undefined ? {} : { uid }),
-    ...(windowsSecurity === undefined ? {} : { windowsSecurity }),
-  }, systemRuntimePrimitives);
+    windowsSecurity,
+  });
   const registry = new RegistrationStore({
     layout,
     primitives: systemRuntimePrimitives,
-    ...(windowsSecurity === undefined ? {} : { windowsSecurity }),
+    windowsSecurity,
   });
   const providerHost = {
     executeCommand: (command: string, ...args: readonly unknown[]) =>
@@ -752,7 +743,7 @@ export const createSystemExtensionRegistrationService = async (
       (await symbolsHandler(context, request, signal)) ??
       (await symbolInfoHandler(context, request, signal)) ??
       referencesDiagnosticsHandler(context, request, signal),
-    ...(windowsInfo === undefined ? {} : { currentUserSid: windowsInfo.currentUserSid }),
+    currentUserSid: windowsInfo.currentUserSid,
     readWorkspace: () => {
       const folders = (vscode.workspace.workspaceFolders ?? []).map((folder) => ({
         name: folder.name,
@@ -769,8 +760,6 @@ export const createSystemExtensionRegistrationService = async (
     },
     createTransport: (endpoint) => createExtensionTransportServer({
       endpoint,
-      platform,
-      ...(uid === undefined ? {} : { unixUid: uid }),
     }),
   });
 };

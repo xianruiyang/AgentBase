@@ -17,7 +17,7 @@ sgy capabilities
 | checksum mismatch | 确认 ZIP 与 `.sha256` 来自同一发布批次；不要重新生成 checksum 绕过失败 |
 | target does not match host | 下载与 OS/架构一致的 target；不要强制安装交叉目标 |
 | unexpected/unsafe ZIP member | 丢弃归档并从受控发布源重新取得；安装器不会部分提取 |
-| 安装成功但找不到 `sgy` | Windows 新开终端；Unix 确认 `$HOME/.local/bin` 或 `--path-dir` 已在 PATH |
+| 安装成功但找不到 `sgy` | 新开 Windows 终端，使用户 PATH 更新生效 |
 | 升级失败 | 安装器应恢复旧 `current`；用 `Status`/`status` 和 `sgy --version` 验证，不手工删除 state |
 | 卸载后目录仍存在 | 检查是否有未知用户文件；安装器只删除受管成员 |
 

@@ -85,32 +85,3 @@ fn large_jsonl_dual_stream_cache_and_context_remain_bounded() {
         .expect("cache metadata");
     assert!(!metadata.contains("SHOULD_NOT_EXIST"));
 }
-
-#[cfg(unix)]
-#[test]
-fn read_only_cache_root_fails_closed_without_partial_entries() {
-    use std::os::unix::fs::PermissionsExt;
-
-    let directory = tempdir().expect("permission directory");
-    let workspace = directory.path().join("workspace");
-    let cache_parent = directory.path().join("cache-parent");
-    let cache_root = cache_parent.join("cache");
-    fs::create_dir(&workspace).expect("workspace");
-    fs::create_dir(&cache_parent).expect("cache parent");
-    fs::set_permissions(&cache_parent, fs::Permissions::from_mode(0o500))
-        .expect("read-only cache parent");
-    let result = CacheStore::open(&cache_root, Some(&workspace), CacheLimits::default());
-    assert!(
-        result.is_err(),
-        "read-only cache parent unexpectedly accepted a cache root"
-    );
-    assert_eq!(
-        fs::read_dir(&cache_parent)
-            .expect("inspect cache parent")
-            .count(),
-        0,
-        "permission failure exposed a partial cache entry"
-    );
-    fs::set_permissions(&cache_parent, fs::Permissions::from_mode(0o700))
-        .expect("restore cleanup permission");
-}

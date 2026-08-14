@@ -443,41 +443,12 @@ fn sgy(cwd: &Path, cache: &Path) -> Command {
     command
 }
 
-#[cfg(windows)]
 fn configure_isolated_environment(command: &mut Command, root: &Path) {
     command.env("LOCALAPPDATA", root).env("APPDATA", root);
 }
 
-#[cfg(target_os = "macos")]
-fn configure_isolated_environment(command: &mut Command, root: &Path) {
-    command.env("HOME", root).env("XDG_CONFIG_HOME", root);
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn configure_isolated_environment(command: &mut Command, root: &Path) {
-    command
-        .env("XDG_CACHE_HOME", root)
-        .env("XDG_CONFIG_HOME", root)
-        .env("HOME", root);
-}
-
-#[cfg(windows)]
 fn platform_cache_root(environment_root: &Path) -> PathBuf {
     environment_root.join("sgy").join("cache").join("v1")
-}
-
-#[cfg(target_os = "macos")]
-fn platform_cache_root(environment_root: &Path) -> PathBuf {
-    environment_root
-        .join("Library")
-        .join("Caches")
-        .join("sgy")
-        .join("v1")
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn platform_cache_root(environment_root: &Path) -> PathBuf {
-    environment_root.join("sgy").join("v1")
 }
 
 fn assert_equivalent_structured(native: &Output, wrapped: &Output) {

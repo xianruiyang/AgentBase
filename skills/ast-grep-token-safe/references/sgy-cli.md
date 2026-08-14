@@ -15,9 +15,8 @@
 | 平台 | 启动器 | 二进制 |
 | --- | --- | --- |
 | Windows x86_64 | 直接调用 `scripts/bin/windows-x86_64/sgy.exe` | 同左 |
-| Linux x86_64 GNU | `scripts/sgy.sh` | `scripts/bin/linux-x86_64/sgy` |
 
-完整 hash 位于 `scripts/runtime-manifest.yml`；同源快照、两平台原生构建 manifest、归档校验和与 RustSec 结果位于 `scripts/provenance/`，并由 `release-record.json` 汇总。许可证、目标平台第三方许可与 SBOM 位于 `scripts/legal/`。sgy 不包含 ast-grep、Node、Python 或语言运行时。
+完整 hash 位于 `scripts/runtime-manifest.yml`；源码版本、Windows 原生构建 manifest、归档校验和与 RustSec 结果位于 `scripts/provenance/`，并由 `release-record.json` 汇总。许可证、Windows 目标第三方许可与 SBOM 位于 `scripts/legal/`。sgy 不包含 ast-grep、Node、Python 或语言运行时。
 
 Windows 不使用 PowerShell `.ps1` 中转 `exec/defaults`：PowerShell 会吞掉独立的 `--` 参数终止标记，破坏 sgy 的 native argv 边界。直接调用 exe 可保持分隔符。
 
@@ -44,7 +43,7 @@ sgy <schema|capabilities|doctor> ...
 ```text
 --engine PATH
 --cwd PATH
---profile token-safe|lossless|files|custom
+--profile token-safe|locations|lossless|files|custom
 --cache auto|on|off
 --max-detail-results N
 --max-text-chars N
@@ -76,6 +75,7 @@ sgy <schema|capabilities|doctor> ...
 | Profile | 使用条件 |
 | --- | --- |
 | `token-safe` | 默认；模型查看搜索/扫描结果 |
+| `locations` | 只需完整文件与 0-based 起止范围，不需正文、捕获或规则诊断 |
 | `files` | 先只看文件集合和计数，快速收窄范围 |
 | `lossless` | JSON value 等价 round-trip、未知字段或完整审计 |
 | `custom` | 已知必要字段，显式 keep/prune |
@@ -95,6 +95,8 @@ results: []
 ```
 
 `complete: false` 只表示模型可见详情不完整，不表示扫描不完整。lossless YAML 通常不比 compact JSON 短；节省来自投影、汇总和预算。
+
+`locations` 仍使用 `sgy.context/v1` 包络和相同的 cache/截断合同，但以 JSON 兼容的安全 YAML 1.2 紧凑输出，`results` 项为 `file:start_line:start_column-end_line:end_column`。位置保持 ast-grep 的 0-based、end-exclusive 语义；需要其他字段时不要用此 profile。
 
 ## Cache 与后处理
 

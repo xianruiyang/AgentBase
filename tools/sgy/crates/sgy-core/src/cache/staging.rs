@@ -680,23 +680,12 @@ fn hash_file(path: &Path) -> Result<SourceSnapshot, CacheError> {
 fn create_private_file(path: &Path) -> Result<File, CacheError> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
     options
         .open(path)
         .map_err(|source| io_error("create private cache file", path, source))
 }
 
 fn set_private_directory_permissions(_path: &Path) -> Result<(), CacheError> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(_path, fs::Permissions::from_mode(0o700))
-            .map_err(|source| io_error("set cache staging permissions", _path, source))?;
-    }
     Ok(())
 }
 
@@ -727,14 +716,6 @@ fn format_time(value: SystemTime) -> Result<String, CacheError> {
     Ok(humantime::format_rfc3339(value).to_string())
 }
 
-#[cfg(unix)]
-fn sync_directory(path: &Path) -> Result<(), CacheError> {
-    File::open(path)
-        .and_then(|directory| directory.sync_all())
-        .map_err(|source| io_error("sync cache directory", path, source))
-}
-
-#[cfg(not(unix))]
 fn sync_directory(_path: &Path) -> Result<(), CacheError> {
     Ok(())
 }

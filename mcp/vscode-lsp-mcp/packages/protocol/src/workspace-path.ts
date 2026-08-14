@@ -10,7 +10,7 @@ declare const rootAliasBrand: unique symbol;
 
 export type LogicalPath = string & { readonly [logicalPathBrand]: true };
 export type RootAlias = string & { readonly [rootAliasBrand]: true };
-export type PathPlatform = 'posix' | 'win32';
+export type PathPlatform = 'win32';
 export type PathEntryType = 'directory' | 'file' | 'missing' | 'other';
 
 export interface WorkspacePathAccess {
@@ -53,7 +53,10 @@ export const systemWorkspacePathAccess: WorkspacePathAccess = Object.freeze({
   realpath: realpathNative,
 });
 
-export const hostPathPlatform: PathPlatform = process.platform === 'win32' ? 'win32' : 'posix';
+if (process.platform !== 'win32') {
+  throw new Error('Workspace path handling requires Windows.');
+}
+export const hostPathPlatform: PathPlatform = 'win32';
 
 export interface WorkspaceFolderPathInput {
   readonly name: string;
@@ -97,8 +100,7 @@ const fail = (code: WorkspaceBoundaryErrorCode, message: string): never => {
   throw new WorkspaceBoundaryError(code, message);
 };
 
-const platformPath = (platform: PathPlatform): path.PlatformPath =>
-  platform === 'win32' ? path.win32 : path.posix;
+const platformPath = (): path.PlatformPath => path.win32;
 
 const compareCodePoints = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
@@ -120,13 +122,13 @@ const removeTrailingSeparators = (value: string, pathApi: path.PlatformPath): st
   return normalized.slice(0, end);
 };
 
-export const toPathComparisonKey = (absolutePath: string, platform: PathPlatform): string => {
-  const pathApi = platformPath(platform);
+export const toPathComparisonKey = (absolutePath: string): string => {
+  const pathApi = platformPath();
   if (!pathApi.isAbsolute(absolutePath)) {
     fail('INVALID_ARGUMENT', 'An internal filesystem path must be absolute.');
   }
   const normalized = removeTrailingSeparators(absolutePath, pathApi);
-  return platform === 'win32' ? normalized.replaceAll('/', '\\').toLowerCase() : normalized;
+  return normalized.replaceAll('/', '\\').toLowerCase();
 };
 
 export const normalizeRootAliasBase = (name: string): string => {
@@ -239,7 +241,7 @@ export const createWorkspacePathContext = async (
   if (folders.length === 0) {
     fail('WORKSPACE_UNAVAILABLE', 'A usable workspace requires at least one file root.');
   }
-  const pathApi = platformPath(platform);
+  const pathApi = platformPath();
   const roots: RootBeforeAlias[] = [];
   const canonicalKeys = new Set<string>();
 
@@ -270,7 +272,7 @@ export const createWorkspacePathContext = async (
     if (!pathApi.isAbsolute(canonicalAbsolutePath)) {
       fail('WORKSPACE_UNAVAILABLE', 'A canonical workspace root must be absolute.');
     }
-    const canonicalComparisonKey = toPathComparisonKey(canonicalAbsolutePath, platform);
+    const canonicalComparisonKey = toPathComparisonKey(canonicalAbsolutePath);
     if (canonicalKeys.has(canonicalComparisonKey)) {
       fail('WORKSPACE_UNAVAILABLE', 'Duplicate canonical workspace roots are not usable.');
     }
@@ -280,7 +282,7 @@ export const createWorkspacePathContext = async (
       folderIndex,
       lexicalAbsolutePath,
       canonicalAbsolutePath,
-      lexicalComparisonKey: toPathComparisonKey(lexicalAbsolutePath, platform),
+      lexicalComparisonKey: toPathComparisonKey(lexicalAbsolutePath),
       canonicalComparisonKey,
       aliasBase: normalizeRootAliasBase(folder.name),
     });
@@ -324,7 +326,7 @@ const hasUnpairedSurrogate = (value: string): boolean => {
 const windowsDevicePattern =
   /^(?:aux|clock\$|com(?:[1-9¹²³])|con|conin\$|conout\$|lpt(?:[1-9¹²³])|nul|prn)(?:\..*)?$/iu;
 
-const assertLogicalSegments = (value: string, platform: PathPlatform): readonly string[] => {
+const assertLogicalSegments = (value: string): readonly string[] => {
   if (
     value.length === 0 ||
     value.startsWith('/') ||
@@ -342,10 +344,7 @@ const assertLogicalSegments = (value: string, platform: PathPlatform): readonly 
     if (segment === '' || segment === '.' || segment === '..') {
       fail('INVALID_ARGUMENT', 'file contains a forbidden path segment.');
     }
-    if (
-      platform === 'win32' &&
-      (segment.includes(':') || /[. ]$/u.test(segment) || windowsDevicePattern.test(segment))
-    ) {
+    if (segment.includes(':') || /[. ]$/u.test(segment) || windowsDevicePattern.test(segment)) {
       fail('INVALID_ARGUMENT', 'file contains a path segment that is unsafe on Windows.');
     }
   }
@@ -363,7 +362,7 @@ export const parseLogicalPath = (
   context: WorkspacePathContext,
   value: string,
 ): ParsedLogicalPath => {
-  const allSegments = assertLogicalSegments(value, context.platform);
+  const allSegments = assertLogicalSegments(value);
   let root: InternalWorkspaceRoot;
   let segments: readonly string[];
   if (context.roots.length === 1) {
@@ -399,7 +398,7 @@ const relativeWithin = (
   platform: PathPlatform,
   allowEqual: boolean,
 ): string | undefined => {
-  const pathApi = platformPath(platform);
+  const pathApi = platformPath();
   const relative = pathApi.relative(rootComparisonKey, targetComparisonKey);
   if (relative === '') {
     return allowEqual ? '' : undefined;
@@ -455,12 +454,12 @@ export const resolveLogicalPath = async (
   options: ResolveLogicalPathOptions = {},
 ): Promise<InternalResolvedWorkspacePath> => {
   const parsed = parseLogicalPath(context, value);
-  const pathApi = platformPath(context.platform);
+  const pathApi = platformPath();
   const lexicalAbsolutePath = pathApi.resolve(
     parsed.root.lexicalAbsolutePath,
     ...parsed.segments,
   );
-  const lexicalKey = toPathComparisonKey(lexicalAbsolutePath, context.platform);
+  const lexicalKey = toPathComparisonKey(lexicalAbsolutePath);
   if (
     relativeWithin(parsed.root.lexicalComparisonKey, lexicalKey, context.platform, false) ===
     undefined
@@ -479,7 +478,7 @@ export const resolveLogicalPath = async (
       await safeRealpath(access, lexicalAbsolutePath),
       pathApi,
     );
-    const canonicalKey = toPathComparisonKey(canonicalVerificationPath, context.platform);
+    const canonicalKey = toPathComparisonKey(canonicalVerificationPath);
     if (
       relativeWithin(
         parsed.root.canonicalComparisonKey,
@@ -509,7 +508,7 @@ export const resolveLogicalPath = async (
       await safeRealpath(access, parent),
       pathApi,
     );
-    const canonicalKey = toPathComparisonKey(canonicalVerificationPath, context.platform);
+    const canonicalKey = toPathComparisonKey(canonicalVerificationPath);
     if (
       relativeWithin(
         parsed.root.canonicalComparisonKey,
@@ -559,7 +558,7 @@ export const logicalPathFromProviderLocation = async (
   if (location.uriScheme !== 'file') {
     fail('PATH_OUTSIDE_WORKSPACE', 'Provider location is not a local workspace file.');
   }
-  const pathApi = platformPath(context.platform);
+  const pathApi = platformPath();
   if (!pathApi.isAbsolute(location.lexicalAbsolutePath)) {
     fail('PATH_OUTSIDE_WORKSPACE', 'Provider location is not an absolute file path.');
   }
@@ -571,8 +570,8 @@ export const logicalPathFromProviderLocation = async (
     await safeRealpath(access, lexicalAbsolutePath),
     pathApi,
   );
-  const lexicalKey = toPathComparisonKey(lexicalAbsolutePath, context.platform);
-  const canonicalKey = toPathComparisonKey(canonicalAbsolutePath, context.platform);
+  const lexicalKey = toPathComparisonKey(lexicalAbsolutePath);
+  const canonicalKey = toPathComparisonKey(canonicalAbsolutePath);
   const candidates: ProviderRootCandidate[] = [];
 
   for (const root of context.roots) {

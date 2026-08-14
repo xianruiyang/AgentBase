@@ -31,7 +31,6 @@ test('Windows transport requires the secure native factory and caps sessions at 
     byteMode: true as const, firstInstance: true as const, maxInstances: 4,
   }) };
   const server = await createExtensionTransportServer({
-    platform: 'win32',
     endpoint: { kind: 'namedPipe', address: '\\\\.\\pipe\\vscode-lsp-mcp-test' },
     windowsFactory: {
       create: (received) => {
@@ -46,26 +45,12 @@ test('Windows transport requires the secure native factory and caps sessions at 
 
 test('Windows has no Node pipe fallback when the secure adapter is unavailable', async () => {
   await assert.rejects(createExtensionTransportServer({
-    platform: 'win32',
     endpoint: { kind: 'namedPipe', address: '\\\\.\\pipe\\vscode-lsp-mcp-test' },
     windowsFactory: null,
   }), (error: unknown) =>
     error instanceof ExtensionTransportHostError && error.reason === 'secureAdapterUnavailable');
   await assert.rejects(createExtensionTransportServer({
-    platform: 'win32', endpoint: { kind: 'unix', address: '/tmp/test.sock' },
+    endpoint: { kind: 'unsupported', address: 'invalid' } as never,
   }), (error: unknown) =>
     error instanceof ExtensionTransportHostError && error.reason === 'endpointMismatch');
-});
-
-test('Unix transport validates endpoint kind and forwards owner uid', async () => {
-  let received: readonly [string, number] | undefined;
-  const server = await createExtensionTransportServer({
-    platform: 'linux', endpoint: { kind: 'unix', address: '/tmp/vlm/test.sock' }, unixUid: 42,
-    unixFactory: (address, uid) => {
-      received = [address, uid];
-      return Promise.resolve(fakeServer);
-    },
-  });
-  assert.equal(server, fakeServer);
-  assert.deepEqual(received, ['/tmp/vlm/test.sock', 42]);
 });

@@ -13,7 +13,7 @@
 - 控制结果数量和上下文体积，适合 LLM 使用。
 - MCP 协议和内部机器通道使用严格 JSON，面向 LLM 的返回正文统一使用 YAML。
 - 保留无交互 VS Code command/task 执行能力。
-- 支持 Windows，同时保持 Linux 和 macOS 可移植性。
+- 只维护 Windows 宿主与 Windows 原生发布链。
 
 ## 2. 非目标
 
@@ -81,7 +81,7 @@ vscode-lsp-mcp/
 └── dist/               # 构建产物，不提交临时输出
 ```
 
-业务、协议和跨平台实现使用 TypeScript，采用 npm workspaces。唯一例外是 `packages/win32-security` 中基于稳定 Node-API ABI 的可审计 Windows 原生适配器：它只负责创建带显式 DACL 和 `PIPE_REJECT_REMOTE_CLIENTS` 的 Named Pipe、异步收发原始字节以及创建/校验运行时目录 ACL，不解析业务协议。MCP Server 使用官方 MCP SDK；VS Code 插件仅使用公开 Extension API 和公开内置 Provider Commands；公共 protocol 包集中封装稳定 DTO、严格 JSON 机器传输和 YAML 文本输出。
+业务与协议实现使用 TypeScript，采用 npm workspaces。`packages/win32-security` 中基于稳定 Node-API ABI 的可审计 Windows 原生适配器只负责创建带显式 DACL 和 `PIPE_REJECT_REMOTE_CLIENTS` 的 Named Pipe、异步收发原始字节以及创建/校验运行时目录 ACL，不解析业务协议。MCP Server 使用官方 MCP SDK；VS Code 插件仅使用公开 Extension API 和公开内置 Provider Commands；公共 protocol 包集中封装稳定 DTO、严格 JSON 机器传输和 YAML 文本输出。
 
 ## 5. 工作区发现与 IPC
 
@@ -108,20 +108,19 @@ vscode-lsp-mcp/
 
 ### 5.2 本地传输
 
-- Windows 使用 `\\.\pipe\vscode-lsp-mcp-<userScopeHash>-<instanceId>` Named Pipe；Linux/macOS 使用短文件名 Unix Domain Socket。Unix 端点的完整 UTF-8 路径不得超过 100 bytes，超限时切换到受保护的短 fallback 目录，仍超限则关闭实例并报告 unavailable。
-- 运行时根优先使用 Windows `%LOCALAPPDATA%\vscode-lsp-mcp\run`、Linux `$XDG_RUNTIME_DIR/vscode-lsp-mcp`、macOS `$TMPDIR/vscode-lsp-mcp-<uidHash>`；Linux 缺少合格 XDG 目录或任一 Unix 路径过长时回退到 `/tmp/vlm-<uidHash>`。每个候选目录都必须先验证所有者和权限，不能因为目录“可写”就接受。
+- 本地传输使用 `\\.\pipe\vscode-lsp-mcp-<userScopeHash>-<instanceId>` Named Pipe，运行时根使用 `%LOCALAPPDATA%\vscode-lsp-mcp\run`；目录与记录必须通过 Windows ACL 校验，不能因为目录“可写”就接受。
 - 每帧为 4-byte unsigned big-endian 长度加 UTF-8 JSON object；长度必须为 `1..16777216`，UTF-8 必须可严格解码，JSON 必须拒绝重复键和未知判别字段。换行不参与分帧。
 - 连接首帧必须是 `hello`，包含精确协议版本、`instanceId`、`workspaceId`、256-bit 随机 base64url token 和客户端 nonce；响应 `helloAck` 必须回显身份与 nonce，但不得回显 token。比较 token 使用恒定时间逻辑，失败立即关闭连接且不向公开响应泄露原因。
 - 插件以同目录临时文件、flush、原子 rename 发布判别联合注册记录。可用记录包含协议版本、实例/工作区/代次、Extension Host PID 与启动指纹、端点、token、alias/规范根、VS Code 版本和 `updatedAt`；不可用记录只保留身份、心跳和清理后的 reason code。正常 MCP 响应不得透传这些字段。
-- 心跳间隔 10 秒，60 秒未更新即成为 stale candidate 并从 `list_workspaces` 排除。握手成功是存活真源；PID/启动指纹只用于避免 PID 复用误判。握手失败且进程指纹失效时立即删除记录；否则隔离，连续 5 分钟无有效心跳与握手后仅删除记录和确认无人监听的自有 UDS，绝不终止进程。
+- 心跳间隔 10 秒，60 秒未更新即成为 stale candidate 并从 `list_workspaces` 排除。握手成功是存活真源；PID/启动指纹只用于避免 PID 复用误判。握手失败且进程指纹失效时立即删除记录；否则隔离，连续 5 分钟无有效心跳与握手后仅删除失效记录，绝不终止进程。
 - MCP Server 在每次 workspace 列举/路由前扫描注册目录，并用目录 watcher 加防抖优化；断线后重新发现，采用有限退避。断线中的请求返回 `WORKSPACE_DISCONNECTED`；只读调用可由调用方显式重试，preview/apply 和 command 不得静默重放。
 
 ### 5.3 安全边界
 
-- Unix 运行时目录必须属于当前 euid 且模式为 `0700`，注册文件为 `0600`，socket 为 `0600`，创建阶段使用 `umask 077`。Windows 运行时目录和记录使用受保护 DACL，只授权当前用户 SID 与 `SYSTEM`；Named Pipe 使用同一 DACL 并设置 `PIPE_REJECT_REMOTE_CLIENTS`。
+- Windows 运行时目录和记录使用受保护 DACL，只授权当前用户 SID 与 `SYSTEM`；Named Pipe 使用同一 DACL 并设置 `PIPE_REJECT_REMOTE_CLIENTS`。
 - Node/libuv 默认 Named Pipe 创建路径不会传入上述显式安全描述符，也不会设置拒绝远程客户端标志，因此 Windows 服务端必须使用随组件构建的 `win32-security` Node-API 适配器；MCP Server 客户端仍可使用 `node:net` 连接。适配器、ACL 验证或架构匹配失败时关闭该实例并报告 unavailable；不得把服务端降级为普通 `node:net` Named Pipe，也不得把随机名称或握手 token 当作 OS 访问控制的替代品。
-- 公共逻辑路径只接受 `/` 分隔的相对路径，拒绝空路径、首尾 `/`、`//`、`.`/`..` 段、反斜杠、NUL/控制字符、URI/绝对路径；Windows 还拒绝 drive/UNC、ADS `:`、设备名和尾随点/空格。语法错误映射 `INVALID_ARGUMENT`，多根未知 alias 映射 `ROOT_NOT_FOUND`。
-- 双端使用同一 protocol 路径库执行：逻辑路径解析 -> alias 精确查找 -> 根 URI -> lexical absolute -> `realpath.native`（不存在目标则取最近存在父目录）-> 平台比较键 -> 组件边界归属。Windows 比较键统一分隔符并大小写不敏感；其他平台保持 POSIX 大小写语义。归属判断必须使用路径组件/`relative` 结果，不得用字符串前缀。
+- 公共逻辑路径只接受 `/` 分隔的相对路径，拒绝空路径、首尾 `/`、`//`、`.`/`..` 段、反斜杠、NUL/控制字符、URI/绝对路径、drive/UNC、ADS `:`、设备名和尾随点/空格。语法错误映射 `INVALID_ARGUMENT`，多根未知 alias 映射 `ROOT_NOT_FOUND`。
+- 双端使用同一 protocol 路径库执行：逻辑路径解析 -> alias 精确查找 -> 根 URI -> lexical absolute -> `realpath.native`（不存在目标则取最近存在父目录）-> Windows 大小写不敏感比较键 -> 组件边界归属。归属判断必须使用路径组件/`relative` 结果，不得用字符串前缀。
 - 根本身可为 symlink，但登记时即固定其规范真实路径。目标 symlink/junction 只有在解析后仍位于所选根内时才允许；即使逃逸目标落入另一个 workspace root，也必须以 `PATH_OUTSIDE_WORKSPACE` 拒绝，不能跨 alias 接受。新建目标校验最近存在父目录，并在 apply 前由 Extension 再校验一次。
 - MCP Server 的校验是早期拒绝，Extension 的校验是权威边界；两侧任何不一致都按更严格结果失败。Provider 返回的工作区外只读位置从候选集中丢弃并给出清理后的 warning；任何写入候选只要含一个越界位置，整个 preview/apply 以 `PATH_OUTSIDE_WORKSPACE` 拒绝。
 - 物理位置反向映射到嵌套 roots 时选择规范路径最长的最具体根，相同长度再按 alias 字典序；找不到归属时不得返回绝对路径或 URI。
@@ -312,7 +311,6 @@ WorkspaceEdit 和 TextEdit 中共同组成一次操作的编辑列表不是候�
 - 命令白名单、workspace trust、`${input:...}` / `${command:...}`、hard deny 和闭合 argument Schema。
 - Process/Shell task DAG、非零 exit、background/custom 拒绝、timeout terminate 与 command 不可取消状态。
 - IPC 注册清理、随机令牌、严格 hello、stale lease 和 comparison-and-delete。
-- Unix runtime/socket owner/mode、UDS path bytes 上限和 crash 后 stale socket。
 - Windows Named Pipe DACL、普通第二用户拒绝、远程客户端拒绝，以及 Node-API adapter 失败时无不安全降级。
 
 ### 11.2 Extension Host 集成测试
@@ -346,7 +344,7 @@ WorkspaceEdit 和 TextEdit 中共同组成一次操作的编辑列表不是候�
 ### 阶段 A：骨架与连接
 
 - 建立 npm workspace、公共协议、插件和 MCP Server。
-- 实现实例注册、Named Pipe/Unix Socket、workspace discovery 和 health check。
+- 实现实例注册、Named Pipe、workspace discovery 和 health check。
 - 完成多工作区与 Windows 路径测试。
 
 验收：Codex 能稳定列出工作区并完成健康检查，VS Code 重启后不会永久保留失效实例。

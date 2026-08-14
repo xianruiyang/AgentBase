@@ -5,10 +5,8 @@ import {
   HIERARCHY_BRIDGE_METHODS,
   IPC_HEALTH_TIMEOUT_MS,
   RegistrationStore,
-  cleanupStaleUnixSocket,
   buildCandidateCollection,
   compareTextOrdinal,
-  connectNodeRawByte,
   decideRegistrationCleanup,
   ensureRuntimeDirectory,
   matchesLogicalGlobs,
@@ -405,7 +403,6 @@ export interface WorkspaceRouterOptions {
   readonly now?: () => number;
   readonly primitives: RuntimePrimitives;
   readonly registry: RegistrationStore;
-  readonly unixUid?: number;
 }
 
 interface ProbeResult {
@@ -552,25 +549,7 @@ export class WorkspaceRouter {
     if (decision !== 'delete') {
       return;
     }
-    const deleted = await this.#options.registry.comparisonAndDelete(registrationComparison(record));
-    if (!deleted || record.endpoint.kind !== 'unix' || this.#options.unixUid === undefined) {
-      return;
-    }
-    await cleanupStaleUnixSocket({
-      endpoint: record.endpoint.address,
-      expectedEndpoint: record.endpoint.address,
-      expectedUid: this.#options.unixUid,
-      hasValidRegistration: false,
-      canConnect: async () => {
-        try {
-          const raw = await connectNodeRawByte(record.endpoint.address, 250);
-          await raw.close();
-          return true;
-        } catch {
-          return false;
-        }
-      },
-    });
+    await this.#options.registry.comparisonAndDelete(registrationComparison(record));
   }
 
   async #inspect(
@@ -1316,37 +1295,30 @@ export class WorkspaceRouter {
 }
 
 const runtimePlatform = (): RuntimePlatform => {
-  if (process.platform === 'win32' || process.platform === 'linux' || process.platform === 'darwin') {
-    return process.platform;
+  if (process.platform === 'win32') {
+    return 'win32';
   }
-  throw new Error('Unsupported MCP server platform.');
+  throw new Error('The MCP server requires Windows.');
 };
 
 export const createSystemWorkspaceRouter = async (): Promise<WorkspaceRouter> => {
   const platform = runtimePlatform();
-  const windowsSecurity: WindowsRuntimeSecurityBoundary | undefined = platform === 'win32'
-    ? {
-        ensureSecureRuntimeDirectory: () => ensureSecureRuntimeDirectory(),
-        verifySecureRegistryFile,
-      }
-    : undefined;
-  const unixUid = platform === 'win32' || typeof process.getuid !== 'function'
-    ? undefined
-    : process.getuid();
+  const windowsSecurity: WindowsRuntimeSecurityBoundary = {
+    ensureSecureRuntimeDirectory: () => ensureSecureRuntimeDirectory(),
+    verifySecureRegistryFile,
+  };
   const layout = await ensureRuntimeDirectory({
     platform,
     environment: process.env,
-    ...(unixUid === undefined ? {} : { uid: unixUid }),
-    ...(windowsSecurity === undefined ? {} : { windowsSecurity }),
-  }, systemRuntimePrimitives);
+    windowsSecurity,
+  });
   const registry = new RegistrationStore({
     layout,
     primitives: systemRuntimePrimitives,
-    ...(windowsSecurity === undefined ? {} : { windowsSecurity }),
+    windowsSecurity,
   });
   return new WorkspaceRouter({
     registry,
     primitives: systemRuntimePrimitives,
-    ...(unixUid === undefined ? {} : { unixUid }),
   });
 };

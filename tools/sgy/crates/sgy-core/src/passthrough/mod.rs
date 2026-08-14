@@ -244,28 +244,6 @@ pub fn run_tty(request: ProcessRequest) -> Result<TtyOutcome, PassthroughError> 
     run_tty_platform(command, &request)
 }
 
-#[cfg(unix)]
-fn run_tty_platform(
-    mut command: Command,
-    request: &ProcessRequest,
-) -> Result<TtyOutcome, PassthroughError> {
-    let mut child = command.spawn().map_err(|source| PassthroughError::Spawn {
-        program: request.program.clone(),
-        source,
-    })?;
-    let (native_status, cancellation) = supervise_tty_child(
-        &mut child,
-        &request.cancellation,
-        request.poll_interval,
-        request.grace_period,
-    )?;
-    Ok(TtyOutcome {
-        native_status,
-        cancellation,
-    })
-}
-
-#[cfg(windows)]
 fn run_tty_platform(
     mut command: Command,
     request: &ProcessRequest,
@@ -288,17 +266,6 @@ fn run_tty_platform(
     Ok(TtyOutcome {
         native_status,
         cancellation,
-    })
-}
-
-#[cfg(not(any(unix, windows)))]
-fn run_tty_platform(
-    _command: Command,
-    request: &ProcessRequest,
-) -> Result<TtyOutcome, PassthroughError> {
-    Err(PassthroughError::Spawn {
-        program: request.program.clone(),
-        source: io::Error::new(io::ErrorKind::Unsupported, "TTY platform is unsupported"),
     })
 }
 
@@ -581,19 +548,6 @@ fn terminate_group(
     if let Some(status) = wait_group(child, poll_interval, grace_period)? {
         return Ok((status, TerminationStage::Graceful));
     }
-    #[cfg(unix)]
-    {
-        use command_group::{Signal, UnixChildExt};
-        child
-            .signal(Signal::SIGTERM)
-            .map_err(|source| PassthroughError::Io {
-                operation: "send SIGTERM to LSP process group",
-                source,
-            })?;
-        if let Some(status) = wait_group(child, poll_interval, grace_period)? {
-            return Ok((status, TerminationStage::Terminate));
-        }
-    }
     child.kill().map_err(|source| PassthroughError::Io {
         operation: "kill passthrough process group",
         source,
@@ -605,38 +559,12 @@ fn terminate_group(
     Ok((status, TerminationStage::Kill))
 }
 
-#[cfg(unix)]
-fn send_group_graceful(
-    child: &GroupChild,
-    reason: CancellationKind,
-) -> Result<(), PassthroughError> {
-    use command_group::{Signal, UnixChildExt};
-    let signal = if reason == CancellationKind::CtrlC {
-        Signal::SIGINT
-    } else {
-        Signal::SIGTERM
-    };
-    child.signal(signal).map_err(|source| PassthroughError::Io {
-        operation: "send graceful signal to passthrough process group",
-        source,
-    })
-}
-
-#[cfg(windows)]
 fn send_group_graceful(
     _child: &GroupChild,
     _reason: CancellationKind,
 ) -> Result<(), PassthroughError> {
     // Console Ctrl+C/Break is broadcast to wrapper and child. The Job Object is terminated
     // after the bounded grace period if the native server does not exit.
-    Ok(())
-}
-
-#[cfg(not(any(unix, windows)))]
-fn send_group_graceful(
-    _child: &GroupChild,
-    _reason: CancellationKind,
-) -> Result<(), PassthroughError> {
     Ok(())
 }
 
@@ -660,104 +588,8 @@ fn wait_group(
     }
 }
 
-#[cfg(unix)]
-fn supervise_tty_child(
-    child: &mut std::process::Child,
-    cancellation: &CancellationToken,
-    poll_interval: Duration,
-    grace_period: Duration,
-) -> Result<(ExitStatus, Option<CancellationReport>), PassthroughError> {
-    loop {
-        if let Some(reason) = cancellation.reason() {
-            if let Some(status) = wait_child(child, poll_interval, grace_period)? {
-                return Ok((
-                    status,
-                    Some(CancellationReport {
-                        reason,
-                        final_stage: TerminationStage::Graceful,
-                    }),
-                ));
-            }
-            use command_group::{Signal, UnixChildExt};
-            child
-                .signal(Signal::SIGTERM)
-                .map_err(|source| PassthroughError::Io {
-                    operation: "send SIGTERM to interactive child",
-                    source,
-                })?;
-            if let Some(status) = wait_child(child, poll_interval, grace_period)? {
-                return Ok((
-                    status,
-                    Some(CancellationReport {
-                        reason,
-                        final_stage: TerminationStage::Terminate,
-                    }),
-                ));
-            }
-            child.kill().map_err(|source| PassthroughError::Io {
-                operation: "kill interactive child",
-                source,
-            })?;
-            let status = child.wait().map_err(|source| PassthroughError::Io {
-                operation: "wait after interactive child kill",
-                source,
-            })?;
-            return Ok((
-                status,
-                Some(CancellationReport {
-                    reason,
-                    final_stage: TerminationStage::Kill,
-                }),
-            ));
-        }
-        if let Some(status) = child.try_wait().map_err(|source| PassthroughError::Io {
-            operation: "wait for interactive child",
-            source,
-        })? {
-            let cancellation = cancellation_from_exit_status(&status);
-            return Ok((status, cancellation));
-        }
-        thread::sleep(poll_interval);
-    }
-}
-
-#[cfg(unix)]
-fn wait_child(
-    child: &mut std::process::Child,
-    poll_interval: Duration,
-    timeout: Duration,
-) -> Result<Option<ExitStatus>, PassthroughError> {
-    let deadline = Instant::now() + timeout;
-    loop {
-        if let Some(status) = child.try_wait().map_err(|source| PassthroughError::Io {
-            operation: "wait during interactive cancellation",
-            source,
-        })? {
-            return Ok(Some(status));
-        }
-        if Instant::now() >= deadline {
-            return Ok(None);
-        }
-        thread::sleep(poll_interval);
-    }
-}
-
-#[cfg(unix)]
-fn spawn_group(command: &mut Command) -> io::Result<GroupChild> {
-    command.group_spawn()
-}
-
-#[cfg(windows)]
 fn spawn_group(command: &mut Command) -> io::Result<GroupChild> {
     command.group().kill_on_drop(true).spawn()
-}
-
-#[cfg(not(any(unix, windows)))]
-fn spawn_group(_command: &mut Command) -> io::Result<GroupChild> {
-    Err(io::Error::new(
-        io::ErrorKind::Unsupported,
-        "process groups are unsupported on this platform",
-    ))
 }
 
 fn visible_exit_code(native_status: ExitStatus, cancellation: Option<CancellationReport>) -> i32 {
@@ -767,12 +599,6 @@ fn visible_exit_code(native_status: ExitStatus, cancellation: Option<Cancellatio
     if let Some(code) = native_status.code() {
         return code;
     }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::ExitStatusExt;
-        native_status.signal().map_or(126, |signal| 128 + signal)
-    }
-    #[cfg(not(unix))]
     126
 }
 

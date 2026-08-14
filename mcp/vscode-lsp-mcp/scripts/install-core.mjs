@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
-  chmod,
   copyFile,
   lstat,
   mkdir,
@@ -66,33 +65,26 @@ const parseVersion = (value) => {
   return match.slice(1, 4).map(Number);
 };
 
-export const currentTarget = (platform = process.platform, architecture = process.arch) =>
-  `${platform}-${architecture}`;
+export const currentTarget = (platform = process.platform, architecture = process.arch) => {
+  if (platform !== 'win32') {
+    fail('UNSUPPORTED_PLATFORM', 'vscode-lsp-mcp is maintained only on Windows.');
+  }
+  return `${platform}-${architecture}`;
+};
 
 export const defaultRoots = ({
   platform = process.platform,
   environment = process.env,
   homeDirectory = os.homedir(),
 } = {}) => {
-  if (platform === 'win32') {
-    const dataBase = environment.LOCALAPPDATA ?? path.join(homeDirectory, 'AppData', 'Local');
-    const configBase = environment.APPDATA ?? path.join(homeDirectory, 'AppData', 'Roaming');
-    return {
-      installRoot: path.join(dataBase, 'SimpleChat', COMPONENT_ID),
-      configRoot: path.join(configBase, 'SimpleChat', COMPONENT_ID),
-    };
+  if (platform !== 'win32') {
+    fail('UNSUPPORTED_PLATFORM', 'vscode-lsp-mcp is maintained only on Windows.');
   }
+  const dataBase = environment.LOCALAPPDATA ?? path.join(homeDirectory, 'AppData', 'Local');
+  const configBase = environment.APPDATA ?? path.join(homeDirectory, 'AppData', 'Roaming');
   return {
-    installRoot: path.join(
-      environment.XDG_DATA_HOME ?? path.join(homeDirectory, '.local', 'share'),
-      'simplechat',
-      COMPONENT_ID,
-    ),
-    configRoot: path.join(
-      environment.XDG_CONFIG_HOME ?? path.join(homeDirectory, '.config'),
-      'simplechat',
-      COMPONENT_ID,
-    ),
+    installRoot: path.join(dataBase, 'SimpleChat', COMPONENT_ID),
+    configRoot: path.join(configBase, 'SimpleChat', COMPONENT_ID),
   };
 };
 
@@ -145,12 +137,15 @@ export const realPathMatchesManagedLocation = ({
   canonicalParent,
   platform = process.platform,
 }) => {
-  const pathApi = platform === 'win32' ? path.win32 : path.posix;
+  if (platform !== 'win32') {
+    fail('UNSUPPORTED_PLATFORM', 'vscode-lsp-mcp is maintained only on Windows.');
+  }
+  const pathApi = path.win32;
   const expected = pathApi.resolve(candidate);
   const resolvedActual = pathApi.resolve(actual);
-  if (platform !== 'win32') return resolvedActual === expected;
   return pathApi.dirname(resolvedActual).toLowerCase() ===
-    pathApi.resolve(canonicalParent).toLowerCase();
+      pathApi.resolve(canonicalParent).toLowerCase() &&
+    pathApi.basename(resolvedActual).toLowerCase() === pathApi.basename(expected).toLowerCase();
 };
 
 const assertRealPathMatches = async (candidate) => {
@@ -344,7 +339,6 @@ export const extractServerArchive = async (archivePath, destination) => {
     `${SERVER_ARCHIVE_ROOT}/package.json`,
     `${SERVER_ARCHIVE_ROOT}/versions.json`,
     `${SERVER_ARCHIVE_ROOT}/dist/cli.js`,
-    `${SERVER_ARCHIVE_ROOT}/bin/vscode-lsp-mcp`,
     `${SERVER_ARCHIVE_ROOT}/bin/vscode-lsp-mcp.cmd`,
     `${SERVER_ARCHIVE_ROOT}/node_modules/@simplechat/vscode-lsp-mcp-win32-security/build/Release/win32_security.node`,
   ];
@@ -441,16 +435,16 @@ const ensureLaunchers = async (installRoot) => {
   const files = {
     'vscode-lsp-mcp.cjs': launcherSource,
     'vscode-lsp-mcp.cmd': '@echo off\r\nnode "%~dp0vscode-lsp-mcp.cjs" %*\r\n',
-    'vscode-lsp-mcp': '#!/usr/bin/env sh\nSCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec node "$SCRIPT_DIR/vscode-lsp-mcp.cjs" "$@"\n',
   };
   for (const [name, contents] of Object.entries(files)) {
     await atomicWrite(path.join(binRoot, name), Buffer.from(contents, 'utf8'));
   }
-  await chmod(path.join(binRoot, 'vscode-lsp-mcp'), 0o755);
 };
 
 export const orderLocatedCodeCliPaths = (candidates, platform = process.platform) => {
-  if (platform !== 'win32') return [...candidates];
+  if (platform !== 'win32') {
+    fail('UNSUPPORTED_PLATFORM', 'vscode-lsp-mcp is maintained only on Windows.');
+  }
   const executablePriority = (candidate) => {
     switch (path.extname(candidate).toLowerCase()) {
       case '.cmd': return 0;
@@ -484,7 +478,7 @@ const deriveCodeExecutable = async (candidate) => {
   };
   const deriveFromPath = async (resolved) => {
     if (!await pathExists(resolved)) return undefined;
-    if (process.platform === 'win32' && /\.(?:cmd|bat)$/iu.test(resolved)) {
+    if (/\.(?:cmd|bat)$/iu.test(resolved)) {
       const productRoot = path.resolve(path.dirname(resolved), '..');
       const codeExe = path.join(productRoot, 'Code.exe');
       if (await pathExists(codeExe)) {
@@ -497,7 +491,7 @@ const deriveCodeExecutable = async (candidate) => {
       }
       fail('CODE_CLI_UNSUPPORTED', `Cannot derive Code.exe from ${resolved}.`);
     }
-    if (process.platform === 'win32' && path.basename(resolved).toLowerCase() === 'code.exe') {
+    if (path.basename(resolved).toLowerCase() === 'code.exe') {
       const cliEntry = await findCliEntry(path.dirname(resolved));
       return {
         command: resolved,
@@ -512,9 +506,7 @@ const deriveCodeExecutable = async (candidate) => {
     if (resolved === undefined) fail('CODE_CLI_NOT_FOUND', `VS Code CLI does not exist: ${candidate}`);
     return resolved;
   }
-  const locator = process.platform === 'win32'
-    ? spawnSync('where.exe', [candidate], { encoding: 'utf8', windowsHide: true })
-    : spawnSync('which', [candidate], { encoding: 'utf8' });
+  const locator = spawnSync('where.exe', [candidate], { encoding: 'utf8', windowsHide: true });
   if (locator.error || locator.status !== 0) fail('CODE_CLI_NOT_FOUND', `VS Code CLI was not found: ${candidate}`);
   const locatedPaths = locator.stdout.split(/\r?\n/u).map((value) => value.trim()).filter(Boolean);
   for (const line of orderLocatedCodeCliPaths(locatedPaths)) {

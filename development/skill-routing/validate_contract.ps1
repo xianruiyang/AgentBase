@@ -299,7 +299,7 @@ $sgyReleaseRecordPath = Join-Path $sgyScriptsRoot "provenance\release-record.jso
 $sgyRuntimeManifest = Get-Content -LiteralPath $sgyRuntimeManifestPath -Raw -Encoding UTF8
 $sgyReleaseRecord = Get-Content -LiteralPath $sgyReleaseRecordPath -Raw -Encoding UTF8 | ConvertFrom-Json
 Assert-True ($sgyReleaseRecord.schema -eq "sgy.skill-runtime-release/v1") "sgy release record has an unsupported schema"
-Assert-True ($sgyReleaseRecord.version -eq "0.1.0") "sgy release record version does not match the skill runtime"
+Assert-True ($sgyReleaseRecord.version -eq "0.1.1") "sgy release record version does not match the skill runtime"
 Assert-True ($sgyReleaseRecord.pathBase -eq "scripts") "sgy release record paths must be relative to the skill scripts directory"
 Assert-True ($sgyReleaseRecord.source.revision -match '^sha256:[0-9a-f]{64}$') "sgy release record has an invalid source revision"
 Assert-True ($sgyRuntimeManifest.Contains("source_revision: $($sgyReleaseRecord.source.revision)")) "sgy runtime manifest does not identify its source revision"
@@ -321,7 +321,10 @@ Assert-True ([int]$sgyReleaseRecord.rustsec.advisoryCount -gt 0) "sgy RustSec au
 Assert-True ([int]$sgyReleaseRecord.rustsec.dependencyCount -gt 0) "sgy RustSec audit did not record scanned dependencies"
 
 $sgyTargets = @($sgyReleaseRecord.targets)
-Assert-True ($sgyTargets.Count -eq 2) "sgy release record must contain exactly the two supported native targets"
+Assert-True ($sgyTargets.Count -eq 1) "sgy release record must contain exactly the supported Windows target"
+Assert-True ($sgyTargets[0].target -eq "x86_64-pc-windows-msvc") "sgy release record contains a non-Windows target"
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $sgyScriptsRoot "sgy.sh"))) "sgy skill keeps the retired non-Windows launcher"
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $sgyScriptsRoot "bin\linux-x86_64\sgy"))) "sgy skill keeps the retired Linux runtime"
 $sgyScriptsPrefix = [IO.Path]::GetFullPath($sgyScriptsRoot).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 foreach ($sgyTarget in $sgyTargets) {
     Assert-True ($sgyTarget.nativeBuild.status -eq "passed") "sgy target is missing passed native build evidence: $($sgyTarget.target)"

@@ -147,39 +147,10 @@ pub fn project_config_path(launch_cwd: &Path) -> PathBuf {
 
 #[must_use]
 pub fn default_user_config_path() -> Option<PathBuf> {
-    #[cfg(windows)]
-    {
-        env::var_os("APPDATA")
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-            .map(|root| root.join("sgy").join("config.yml"))
-    }
-    #[cfg(target_os = "macos")]
-    {
-        env::var_os("HOME")
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-            .map(|root| {
-                root.join("Library")
-                    .join("Application Support")
-                    .join("sgy")
-                    .join("config.yml")
-            })
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        if let Some(root) = env::var_os("XDG_CONFIG_HOME").filter(|value| !value.is_empty()) {
-            return Some(PathBuf::from(root).join("sgy").join("config.yml"));
-        }
-        env::var_os("HOME")
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-            .map(|root| root.join(".config").join("sgy").join("config.yml"))
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        None
-    }
+    env::var_os("APPDATA")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .map(|root| root.join("sgy").join("config.yml"))
 }
 
 pub fn load_standard_config(launch_cwd: &Path) -> Result<LoadedConfigStack, ConfigError> {

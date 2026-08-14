@@ -2,7 +2,7 @@
 
 ## Supported release
 
-The currently verified binary release is `win32-x64`. The installer includes POSIX entry scripts for lifecycle testing and future targets, but Linux, macOS, and Windows ARM64 are not release-signoff targets yet.
+The maintained binary release target is `win32-x64`; non-Windows platforms are outside this project's build, installation, test, and release scope.
 
 A fresh Windows machine needs:
 

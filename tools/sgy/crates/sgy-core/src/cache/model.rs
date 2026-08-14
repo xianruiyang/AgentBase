@@ -266,24 +266,12 @@ pub fn hash_argv(tokens: &[OsString]) -> String {
     hex_lower(&hasher.finalize())
 }
 
-#[cfg(unix)]
-fn os_token_bytes(token: &OsStr) -> Vec<u8> {
-    use std::os::unix::ffi::OsStrExt;
-    token.as_bytes().to_vec()
-}
-
-#[cfg(windows)]
 fn os_token_bytes(token: &OsStr) -> Vec<u8> {
     use std::os::windows::ffi::OsStrExt;
     token
         .encode_wide()
         .flat_map(u16::to_le_bytes)
         .collect::<Vec<_>>()
-}
-
-#[cfg(not(any(unix, windows)))]
-fn os_token_bytes(token: &OsStr) -> Vec<u8> {
-    token.to_string_lossy().as_bytes().to_vec()
 }
 
 pub(crate) fn hex_lower(bytes: &[u8]) -> String {

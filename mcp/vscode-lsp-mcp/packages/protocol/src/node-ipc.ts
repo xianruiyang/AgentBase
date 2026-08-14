@@ -1,6 +1,5 @@
 import net from 'node:net';
-import { secureUnixSocketAfterBind } from './runtime-directory.js';
-import { BridgeTransportError, type RawByteConnection, type RawByteServer } from './ipc-session.js';
+import { BridgeTransportError, type RawByteConnection } from './ipc-session.js';
 
 interface ReadWaiter {
   readonly resolve: (value: Uint8Array | null) => void;
@@ -99,105 +98,6 @@ class NodeSocketRawConnection implements RawByteConnection {
     });
   }
 }
-
-class NodeSocketRawServer implements RawByteServer {
-  readonly #server: net.Server;
-  readonly #connections: RawByteConnection[] = [];
-  readonly #waiters: Array<{
-    readonly resolve: (connection: RawByteConnection) => void;
-    readonly reject: (error: Error) => void;
-  }> = [];
-  #closed = false;
-
-  constructor(server: net.Server) {
-    this.#server = server;
-    server.on('connection', (socket) => {
-      const connection = new NodeSocketRawConnection(socket);
-      const waiter = this.#waiters.shift();
-      if (waiter === undefined) {
-        this.#connections.push(connection);
-      } else {
-        waiter.resolve(connection);
-      }
-    });
-    server.once('error', () => {
-      const error = new BridgeTransportError(
-        'disconnected',
-        'IPC server failed.',
-        'notStarted',
-      );
-      for (const waiter of this.#waiters.splice(0)) {
-        waiter.reject(error);
-      }
-    });
-  }
-
-  accept(): Promise<RawByteConnection> {
-    const connection = this.#connections.shift();
-    if (connection !== undefined) {
-      return Promise.resolve(connection);
-    }
-    if (this.#closed) {
-      return Promise.reject(new BridgeTransportError(
-        'disconnected',
-        'IPC server is closed.',
-        'notStarted',
-      ));
-    }
-    return new Promise((resolve, reject) => this.#waiters.push({ resolve, reject }));
-  }
-
-  async close(): Promise<void> {
-    if (this.#closed) {
-      return;
-    }
-    this.#closed = true;
-    const error = new BridgeTransportError(
-      'disconnected',
-      'IPC server is closed.',
-      'notStarted',
-    );
-    for (const waiter of this.#waiters.splice(0)) {
-      waiter.reject(error);
-    }
-    for (const connection of this.#connections.splice(0)) {
-      await connection.close().catch(() => undefined);
-    }
-    await new Promise<void>((resolve) => this.#server.close(() => resolve()));
-  }
-}
-
-const listen = (server: net.Server, address: string): Promise<void> =>
-  new Promise((resolve, reject) => {
-    const onError = (): void => reject(new BridgeTransportError(
-      'disconnected',
-      'IPC endpoint bind failed.',
-      'notStarted',
-    ));
-    server.once('error', onError);
-    server.listen({ path: address, exclusive: true }, () => {
-      server.off('error', onError);
-      resolve();
-    });
-  });
-
-export const createUnixRawByteServer = async (
-  address: string,
-  expectedUid: number,
-): Promise<RawByteServer> => {
-  if (process.platform === 'win32') {
-    throw new Error('Unix socket servers are not available on Windows.');
-  }
-  const server = net.createServer({ allowHalfOpen: false, pauseOnConnect: false });
-  try {
-    await listen(server, address);
-    await secureUnixSocketAfterBind(address, expectedUid);
-    return new NodeSocketRawServer(server);
-  } catch (error) {
-    await new Promise<void>((resolve) => server.close(() => resolve())).catch(() => undefined);
-    throw error;
-  }
-};
 
 export const connectNodeRawByte = (
   address: string,

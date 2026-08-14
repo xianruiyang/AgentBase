@@ -47,7 +47,7 @@ export type TaskConfigurationReadResult =
   | { readonly status: 'failed'; readonly issue: string };
 
 export interface TaskDiscoveryHost<TTask = unknown> {
-  readonly platform: 'win32' | 'linux' | 'darwin';
+  readonly platform: 'win32';
   fetchTasks(): PromiseLike<readonly TaskCandidate<TTask>[]>;
   readTaskConfiguration(root: InternalWorkspaceRoot): PromiseLike<TaskConfigurationReadResult>;
 }
@@ -185,10 +185,9 @@ const sameNames = (left: readonly string[], right: readonly string[]): boolean =
 
 const effectiveConfiguration = (
   raw: Record<string, unknown> | undefined,
-  platform: TaskDiscoveryHost['platform'],
 ): Record<string, unknown> | undefined => {
   if (raw === undefined) return undefined;
-  const overrideName = platform === 'win32' ? 'windows' : platform === 'darwin' ? 'osx' : 'linux';
+  const overrideName = 'windows';
   const override = raw[overrideName];
   if (override === undefined) return raw;
   return Object.freeze({ ...raw, ...asRecord(override, `task.${overrideName}`) });
@@ -236,7 +235,7 @@ const rootForCandidate = <TTask>(
   if (candidate.scopeKind !== 'folder' || candidate.scopePath === undefined) return undefined;
   let key: string;
   try {
-    key = toPathComparisonKey(candidate.scopePath, context.platform);
+    key = toPathComparisonKey(candidate.scopePath);
   } catch {
     return undefined;
   }
@@ -431,7 +430,7 @@ export class TaskDiscoveryPreflight<TTask = unknown> {
       }
       let effectiveRaw: Record<string, unknown> | undefined;
       try {
-        effectiveRaw = effectiveConfiguration(rawMatches[0], this.#host.platform);
+        effectiveRaw = effectiveConfiguration(rawMatches[0]);
       } catch (error) {
         return completionUnverifiable(
           'The platform-specific task configuration is malformed.',
@@ -518,11 +517,10 @@ export class TaskDiscoveryPreflight<TTask = unknown> {
 }
 
 const taskHostPlatform = (): TaskDiscoveryHost['platform'] => {
-  if (process.platform === 'win32' || process.platform === 'linux' ||
-      process.platform === 'darwin') {
-    return process.platform;
+  if (process.platform === 'win32') {
+    return 'win32';
   }
-  throw new Error('The Extension Host platform is unsupported for task discovery.');
+  throw new Error('Task discovery requires Windows.');
 };
 
 export const createVscodeTaskDiscoveryHost = (

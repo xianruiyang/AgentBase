@@ -1,12 +1,12 @@
 import { Buffer } from 'node:buffer';
 import { constants } from 'node:fs';
-import { chmod, lstat, open, readdir, rename, unlink } from 'node:fs/promises';
+import { lstat, open, readdir, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { toStrictJson } from './codec.js';
 import type { JsonObject, JsonValue } from './dto.js';
 import { assertAuthToken, createAuthToken, IPC_PROTOCOL_VERSION, parseStrictJson } from './ipc-protocol.js';
 import type { RuntimePrimitives } from './runtime.js';
-import { flushDirectoryBestEffort, RuntimeSecurityError, type RuntimeDirectoryLayout, type WindowsRuntimeSecurityBoundary } from './runtime-directory.js';
+import { RuntimeSecurityError, type RuntimeDirectoryLayout, type WindowsRuntimeSecurityBoundary } from './runtime-directory.js';
 import { isInstanceId, isWorkspaceId, type InstanceId, type WorkspaceId } from './workspace-identity.js';
 
 export const REGISTRY_VERSION = 1 as const;
@@ -22,14 +22,13 @@ export const UNAVAILABLE_REASON_CODES = [
   'duplicate_canonical_root',
   'cross_host_unavailable',
   'runtime_security_failed',
-  'endpoint_path_too_long',
   'transport_start_failed',
 ] as const;
 
 export type UnavailableReasonCode = (typeof UNAVAILABLE_REASON_CODES)[number];
 
 export interface RegistrationEndpoint {
-  readonly kind: 'namedPipe' | 'unix';
+  readonly kind: 'namedPipe';
   readonly address: string;
 }
 
@@ -177,7 +176,7 @@ const parseEndpoint = (value: JsonValue | undefined): RegistrationEndpoint => {
   const object = objectValue(value);
   exactKeys(object, ['kind', 'address']);
   const kind = requiredString(object, 'kind', 16);
-  if (kind !== 'namedPipe' && kind !== 'unix') {
+  if (kind !== 'namedPipe') {
     throw new RegistryError('invalidRecord', 'Registration endpoint kind is invalid.');
   }
   return Object.freeze({ kind, address: requiredString(object, 'address', 512) });
@@ -391,26 +390,7 @@ export class RegistrationStore {
   }
 
   async #verifySecureFile(filePath: string): Promise<void> {
-    if (this.#layout.platform === 'win32') {
-      if (this.#windowsSecurity?.verifySecureRegistryFile(filePath) !== true) {
-        throw new RegistryError('unsafeRecord', 'Registration file security is invalid.');
-      }
-      return;
-    }
-    let metadata;
-    try {
-      metadata = await lstat(filePath);
-    } catch {
-      throw new RegistryError('ioFailure', 'Registration file could not be inspected.');
-    }
-    const uid = typeof process.getuid === 'function' ? process.getuid() : undefined;
-    if (
-      uid === undefined ||
-      !metadata.isFile() ||
-      metadata.isSymbolicLink() ||
-      metadata.uid !== uid ||
-      (metadata.mode & 0o777) !== 0o600
-    ) {
+    if (this.#windowsSecurity?.verifySecureRegistryFile(filePath) !== true) {
       throw new RegistryError('unsafeRecord', 'Registration file security is invalid.');
     }
   }
@@ -433,12 +413,8 @@ export class RegistrationStore {
       await handle.sync();
       await handle.close();
       handle = undefined;
-      if (this.#layout.platform !== 'win32') {
-        await chmod(temporaryPath, 0o600);
-      }
       await rename(temporaryPath, finalPath);
       await this.#verifySecureFile(finalPath);
-      await flushDirectoryBestEffort(this.#layout.registrations);
     } catch (error) {
       await handle?.close().catch(() => undefined);
       await unlink(temporaryPath).catch(() => undefined);
@@ -539,7 +515,6 @@ export class RegistrationStore {
     }
     try {
       await unlink(filePath);
-      await flushDirectoryBestEffort(this.#layout.registrations);
       return true;
     } catch {
       return false;

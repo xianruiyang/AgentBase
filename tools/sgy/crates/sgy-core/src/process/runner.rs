@@ -60,7 +60,6 @@ impl ProcessRequest {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TerminationStage {
     Graceful,
-    Terminate,
     Kill,
 }
 
@@ -71,34 +70,13 @@ pub struct CancellationReport {
 }
 
 pub(crate) fn cancellation_from_exit_status(status: &ExitStatus) -> Option<CancellationReport> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::ExitStatusExt;
-
-        let reason = match status.signal() {
-            Some(signal_hook::consts::signal::SIGINT) => Some(CancellationKind::CtrlC),
-            Some(signal_hook::consts::signal::SIGTERM) => Some(CancellationKind::Termination),
-            _ => None,
-        };
-        if let Some(reason) = reason {
-            return Some(CancellationReport {
-                reason,
-                final_stage: TerminationStage::Graceful,
-            });
-        }
+    const STATUS_CONTROL_C_EXIT: i32 = -1_073_741_510;
+    if status.code() == Some(STATUS_CONTROL_C_EXIT) {
+        return Some(CancellationReport {
+            reason: CancellationKind::CtrlC,
+            final_stage: TerminationStage::Graceful,
+        });
     }
-    #[cfg(windows)]
-    {
-        const STATUS_CONTROL_C_EXIT: i32 = -1_073_741_510;
-        if status.code() == Some(STATUS_CONTROL_C_EXIT) {
-            return Some(CancellationReport {
-                reason: CancellationKind::CtrlC,
-                final_stage: TerminationStage::Graceful,
-            });
-        }
-    }
-    #[cfg(not(any(unix, windows)))]
-    let _ = status;
     None
 }
 
@@ -157,14 +135,6 @@ impl ProcessOutcome {
         if let Some(code) = self.native_status.code() {
             return code;
         }
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::ExitStatusExt;
-            self.native_status
-                .signal()
-                .map_or(126, |signal| 128 + signal)
-        }
-        #[cfg(not(unix))]
         126
     }
 }
@@ -353,22 +323,8 @@ impl Drop for ChildGuard {
     }
 }
 
-#[cfg(windows)]
 fn spawn_group(command: &mut Command) -> io::Result<GroupChild> {
     command.group().kill_on_drop(true).spawn()
-}
-
-#[cfg(unix)]
-fn spawn_group(command: &mut Command) -> io::Result<GroupChild> {
-    command.group_spawn()
-}
-
-#[cfg(not(any(unix, windows)))]
-fn spawn_group(_command: &mut Command) -> io::Result<GroupChild> {
-    Err(io::Error::new(
-        io::ErrorKind::Unsupported,
-        "process groups are unsupported on this platform",
-    ))
 }
 
 type PumpError = (&'static str, io::Error);
@@ -501,20 +457,6 @@ fn terminate(
         return Ok((status, TerminationStage::Graceful));
     }
 
-    #[cfg(unix)]
-    {
-        use command_group::{Signal, UnixChildExt};
-        child
-            .signal(Signal::SIGTERM)
-            .map_err(|source| ProcessError::Io {
-                operation: "send SIGTERM to process group",
-                source,
-            })?;
-        if let Some(status) = wait_until(child, poll_interval, grace_period)? {
-            return Ok((status, TerminationStage::Terminate));
-        }
-    }
-
     child.kill().map_err(|source| ProcessError::Io {
         operation: "kill process group",
         source,
@@ -526,31 +468,11 @@ fn terminate(
     Ok((status, TerminationStage::Kill))
 }
 
-#[cfg(unix)]
-fn send_graceful(child: &GroupChild, reason: CancellationKind) -> Result<(), ProcessError> {
-    use command_group::{Signal, UnixChildExt};
-    let signal = if reason == CancellationKind::CtrlC {
-        Signal::SIGINT
-    } else {
-        Signal::SIGTERM
-    };
-    child.signal(signal).map_err(|source| ProcessError::Io {
-        operation: "send graceful signal to process group",
-        source,
-    })
-}
-
-#[cfg(windows)]
 fn send_graceful(_child: &GroupChild, _reason: CancellationKind) -> Result<(), ProcessError> {
     // A real console Ctrl+C is broadcast by Windows to both wrapper and child. We deliberately
     // keep the child in the same console group, wait for that event to take effect, then terminate
     // the kill-on-close Job Object if it does not exit. Programmatic cancellation has no safe
     // targeted console event and therefore uses the same bounded grace window before escalation.
-    Ok(())
-}
-
-#[cfg(not(any(unix, windows)))]
-fn send_graceful(_child: &GroupChild, _reason: CancellationKind) -> Result<(), ProcessError> {
     Ok(())
 }
 

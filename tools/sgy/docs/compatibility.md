@@ -37,10 +37,4 @@ sgy 的基本契约是“显式原生 argv 优先，缺省时做安全补全”�
 
 当前固定基线为 ast-grep 0.42.0；Windows x86_64 还精确验证了 0.41.1 与 0.44.1。支持声明只覆盖这三个精确版本，不把中间未运行版本推断为兼容。未知命令继续使用 raw fallback，不能据此宣称其全部语义已认证。
 
-| 平台 | 当前证据 |
-| --- | --- |
-| Windows x86_64 MSVC | 三版本真实 run/scan/rewrite/cache、TTY/LSP、确定性 release、PowerShell 5.1 安装生命周期 |
-| Linux x86_64 GNU | 0.42.0 真实 run/cache/process、TTY/LSP/协议测试、原生 release、symlink 安装、失败升级回滚与卸载闭环 |
-| macOS x86_64/arm64 | 当前源码 target check 与脚本协议；原生运行未签署，第一版暂不发布 |
-
-构建成功或交叉 `cargo check` 不能替代目标平台的原生链接、启动、TTY/LSP 和安装—卸载 smoke。最终发布范围以 release checklist 的原生证据为准；当前只有 Windows x86_64 与 Linux x86_64 可进入第一版分发。
+唯一维护平台是 Windows x86_64 MSVC，现有证据覆盖三版本真实 run/scan/rewrite/cache、TTY/LSP、确定性 release 和 PowerShell 5.1 安装生命周期。其他平台不进入构建、测试、安装或发布范围。

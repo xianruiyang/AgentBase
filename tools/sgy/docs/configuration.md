@@ -8,11 +8,7 @@
 显式 ast-grep argv > 显式 sgy 参数 > 当前目录 .sgy.yml > 用户配置 > 内置默认值
 ```
 
-用户配置位置：
-
-- Windows：`%APPDATA%\sgy\config.yml`
-- Linux：`$XDG_CONFIG_HOME/sgy/config.yml`，未设置时为 `$HOME/.config/sgy/config.yml`
-- macOS：`$HOME/Library/Application Support/sgy/config.yml`
+用户配置位置为 `%APPDATA%\sgy\config.yml`。
 
 项目配置只读取启动目录中的 `.sgy.yml`，不会向父目录递归搜索。两个配置文件都必须声明 `schema: sgy.config/v1`，大小不超过 64 KiB，并使用不含 tag、anchor 或 alias 的安全 YAML。
 

@@ -9,30 +9,6 @@
       "runner": "windows-latest",
       "artifact": "zip",
       "verification": "native-required"
-    },
-    {
-      "os": "linux",
-      "arch": "x86_64",
-      "triple": "x86_64-unknown-linux-gnu",
-      "runner": "ubuntu-latest",
-      "artifact": "zip",
-      "verification": "native-required"
-    },
-    {
-      "os": "macos",
-      "arch": "x86_64",
-      "triple": "x86_64-apple-darwin",
-      "runner": "macos-15-intel",
-      "artifact": "zip",
-      "verification": "native-required"
-    },
-    {
-      "os": "macos",
-      "arch": "aarch64",
-      "triple": "aarch64-apple-darwin",
-      "runner": "macos-15",
-      "artifact": "zip",
-      "verification": "native-required"
     }
   ]
 }

@@ -68,7 +68,6 @@ const createInstalledFixture = async (root, version) => {
     })}\n`),
     writeFile(path.join(installRoot, 'bin', 'vscode-lsp-mcp.cjs'), 'fixture'),
     writeFile(path.join(installRoot, 'bin', 'vscode-lsp-mcp.cmd'), 'fixture'),
-    writeFile(path.join(installRoot, 'bin', 'vscode-lsp-mcp'), 'fixture'),
     writeFile(path.join(configRoot, 'config.json'), '{"schemaVersion":1}\n'),
   ]);
   return { installRoot, configRoot };
