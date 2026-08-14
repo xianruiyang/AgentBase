@@ -5,7 +5,7 @@ VS Code LSP MCP is a local bridge with three trust boundaries: MCP stdio, an aut
 ## Enforced boundaries
 
 - MCP stdout contains protocol JSON only. Diagnostic logs and startup failures use files or stderr, never mixed prose on stdout.
-- Workspace routing uses opaque public IDs and logical `<root-alias>/<relative-path>` values. Physical roots, IPC endpoints, process IDs, tokens, and nonces are not returned through MCP.
+- Workspace routing uses opaque public IDs and logical root-relative values for single-root workspaces or `<root-alias>/<relative-path>` values for multi-root workspaces. Physical roots, IPC endpoints, process IDs, tokens, and nonces are not returned through MCP.
 - Logical paths reject absolute paths, traversal, invalid aliases, and unsafe resolution outside the registered root.
 - On Windows, Extension Host registrations are protected and verified with native ACL checks. IPC uses authenticated local Named Pipes with bounded handshakes, request sizes, and timeouts.
 - Registration and doctor data redact authentication material and physical paths. Doctor is read-only and retains at most five 256 KiB managed JSONL logs.

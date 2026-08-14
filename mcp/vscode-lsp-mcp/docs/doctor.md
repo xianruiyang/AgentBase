@@ -14,7 +14,7 @@ From an extracted release directory:
 install.cmd doctor --json
 ```
 
-To probe document-scoped language providers, provide the public workspace ID and a logical workspace path. The logical path uses the same `<root-alias>/<relative-path>` form as MCP tools and is not a physical path.
+To probe document-scoped language providers, provide the public workspace ID and a logical workspace path. Use a root-relative path for a single-root workspace and `<root-alias>/<relative-path>` for a multi-root workspace; neither form is a physical path. The command below shows the multi-root form.
 
 ```powershell
 .\install.ps1 doctor --workspace-id <workspace-id> --file root/src/example.ts --json

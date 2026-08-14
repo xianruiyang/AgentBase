@@ -343,15 +343,69 @@
         "ast-grep-token-safe"
       ],
       "forbidden_skills": [
-        "symbol-structure-workflow"
-      ],
-      "forbidden_skills": [
         "symbol-structure-workflow",
         "task-table-manager"
       ],
       "expected_change_governance_references": [],
       "expected_behavior_tags": [],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "ast-syntactic-definition-range",
+      "kind": "positive",
+      "request": "已知函数名，需要取得声明或定义的完整语法范围与正文边界；文本候选不足以可靠判断边界，但不要求从调用位置解析真实符号身份。",
+      "expected_skills": [
+        "ast-grep-token-safe"
+      ],
+      "forbidden_skills": [
+        "symbol-structure-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "semantic-definition-from-use-site",
+      "kind": "positive",
+      "request": "从这个重载调用位置确认编译器实际解析到哪个定义，并读取该真实符号的签名；同名文本或语法范围不能证明结论。",
+      "expected_skills": [
+        "symbol-structure-workflow"
+      ],
+      "forbidden_skills": [
+        "ast-grep-token-safe",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "workspace-symbols-conditional-search",
+      "kind": "positive",
+      "request": "名称已知但文件未知；当前是索引已就绪的小型工作区，受限文本候选仍不能消歧，需要选择低成本方式取得真实符号候选。不要把 workspace_symbols 一概禁用。",
+      "expected_skills": [
+        "symbol-structure-workflow"
+      ],
+      "forbidden_skills": [
+        "ast-grep-token-safe",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "literal-text-search",

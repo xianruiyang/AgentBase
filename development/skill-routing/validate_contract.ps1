@@ -63,6 +63,7 @@ $projectAgentsContent = Get-Content -LiteralPath $projectAgentsPath -Raw -Encodi
 $combinedInstructionBytes = $globalItem.Length + $projectAgentsItem.Length
 Assert-True ($combinedInstructionBytes -le 28672) "AgentBase global and project AGENTS.md files use $combinedInstructionBytes bytes; keep at least 4 KiB below Codex's default 32 KiB project instruction limit"
 Assert-True ($projectAgentsContent.Contains("本仓库文件本身不创建 Git 外部写授权")) "Project AGENTS.md must not treat repository text as self-granted Git external-write authorization"
+Assert-True ($projectAgentsContent.Contains("用户针对该次发布的明确同意")) "Project AGENTS.md must require fresh user approval for every Codex Publish"
 
 $requiredGlobalFragments = @(
     '`must` 表示必须执行'
@@ -177,6 +178,15 @@ foreach ($skill in $requiredSkills) {
     Assert-True ($shortLength -ge 25 -and $shortLength -le 64) "short_description for $skill must be 25-64 characters; got $shortLength"
     Assert-True ($promptMatch.Groups["value"].Value.Contains('$' + $skill)) "default_prompt must explicitly reference the skill token: $skill"
 }
+
+$symbolSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\symbol-structure-workflow\SKILL.md") -Raw -Encoding UTF8
+$symbolLspProtocolContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\symbol-structure-workflow\references\lsp-query-protocol.md") -Raw -Encoding UTF8
+$astSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\ast-grep-token-safe\SKILL.md") -Raw -Encoding UTF8
+Assert-True ($astSkillContent.Contains('声明/定义的完整语法范围')) "ast-grep-token-safe must own syntactic declaration and definition ranges"
+Assert-True ($astSkillContent.Contains('真实定义/实现身份')) "ast-grep-token-safe must defer semantic definition identity to LSP or the compiler"
+Assert-True ($symbolSkillContent.Contains('单根工作区使用根相对路径')) "symbol-structure-workflow must distinguish single-root logical paths"
+Assert-True ($symbolSkillContent.Contains('多根工作区使用 `<root-alias>/<relative-path>`')) "symbol-structure-workflow must distinguish multi-root logical paths"
+Assert-True ($symbolLspProtocolContent.Contains('条件性低优先级入口，不是全局禁用项')) "symbol-structure-workflow must keep workspace_symbols conditionally available"
 
 $routingCommonPath = Join-Path $PSScriptRoot "routing_evaluation_common.ps1"
 $routingCommonContent = Get-Content -LiteralPath $routingCommonPath -Raw -Encoding UTF8

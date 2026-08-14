@@ -95,8 +95,8 @@ Replace the placeholder with the actual resolved path; TOML does not expand Powe
 
 ## Workspace and path identity
 
-Call `list_workspaces` first. A workspace is selected with its opaque `workspaceId`, not a physical root. Files use `<root-alias>/<relative-path>`, for example `root/src/index.ts`.
+Call `list_workspaces` first. A workspace is selected with its opaque `workspaceId`, not a physical root. In a single-root workspace, files are root-relative and must not include the returned root alias, for example `src/index.ts`. In a multi-root workspace, files use `<root-alias>/<relative-path>`, for example `root/src/index.ts`.
 
-Paths are workspace-relative, slash-separated logical identifiers. Do not send drive letters, UNC paths, `..`, encoded traversal, or physical absolute paths. Multi-root windows can have several aliases; use the alias returned by `list_workspaces`.
+Paths are slash-separated logical identifiers. Do not send drive letters, UNC paths, `..`, encoded traversal, or physical absolute paths. Multi-root windows can have several aliases; use the alias returned by `list_workspaces`.
 
 Positions and ranges use 1-based lines and columns. Range ends are exclusive. Result windows use 1-based inclusive `resultStart`/`resultEnd`, default to 20 items, and contain at most 100 items.

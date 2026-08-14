@@ -1,6 +1,6 @@
 # AgentBase
 
-本项目集中维护候选全局 `AGENTS.md`、可移植 Codex 关键设置与自定义子代理、关键 skill、对应开发工程以及实际依赖的 MCP/CLI。所有改动先进入本目录真源，通过静态合同、隔离路由策略评估和发布沙箱验证后，再由用户明确决定是否发布到 Codex。
+本项目集中维护候选全局 `AGENTS.md`、可移植 Codex 关键设置与自定义子代理、关键 skill、对应开发工程以及实际依赖的 MCP/CLI。所有改动先进入本目录真源，通过静态合同、隔离路由策略评估和发布沙箱验证后，再由用户逐次明确决定是否发布到 Codex。
 
 ## 真源与安装副本
 
@@ -134,7 +134,7 @@ PowerShell 7、支持 `--max-results` 的 `fd`、Python 3.11+、Node.js `>=22.9 
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot (Get-Location).Path
 ```
 
-只有用户明确决定加载时，才对精确指定的 Codex 根目录执行发布。推荐的插件模式只管理全局 `AGENTS.md`；显式选择可移植设置时再管理 `config.toml` 与三个自定义子代理，skill 与 hooks 由已安装的 `agentbase-core` 插件承担：
+每次对精确指定的 Codex 根目录执行正式发布前，都必须取得用户针对该次发布的明确同意；Git 维护、此前发布、验证或只读状态结果都不构成本次发布授权。推荐的插件模式只管理全局 `AGENTS.md`；显式选择可移植设置时再管理 `config.toml` 与三个自定义子代理，skill 与 hooks 由已安装的 `agentbase-core` 插件承担：
 
 ```powershell
 & '.\development\plugin-packaging\build_plugin.ps1' -ProjectRoot (Get-Location).Path

@@ -31,7 +31,7 @@ MCP client --stdio--> local server --authenticated local IPC--> VS Code companio
                                                                +--> active VS Code language providers
 ```
 
-The server uses opaque workspace IDs and logical `<root-alias>/<relative-path>` paths. Physical workspace roots, IPC endpoints, and authentication material are not part of MCP responses.
+The server uses opaque workspace IDs and logical paths: root-relative paths for single-root workspaces, and `<root-alias>/<relative-path>` for multi-root workspaces. Physical workspace roots, IPC endpoints, and authentication material are not part of MCP responses.
 
 ## License and third parties
 

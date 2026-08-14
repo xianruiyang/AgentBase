@@ -6,4 +6,4 @@ dependencies:
   tools:
     - type: "mcp"
       value: "vscode-lsp-mcp"
-      description: "提供 VS Code 工作区中的定义、引用、类型、诊断、重命名与 Code Action"
+      description: "提供 VS Code 工作区中从用法解析的真实定义、引用、类型、诊断、重命名与 Code Action"

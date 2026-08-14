@@ -1,15 +1,16 @@
 ---
 name: ast-grep-token-safe
-description: 使用 skill 内置的 Windows x86_64 sgy 驱动原生 ast-grep，以有界 Token-Safe YAML 完成结构化代码搜索、规则扫描、pattern 调试、结果缓存/后处理和安全批量改写。用于按语法结构定位调用、声明或控制流，编写/调试 pattern 或 YAML rule，预览与应用 rewrite，或文本搜索无法可靠表达结构关系时；不用于单纯字符串、注释、日志文案、文件名搜索，也不替代 LSP 的定义、引用、类型和安全重命名。
+description: 使用 skill 内置的 Windows x86_64 sgy 驱动原生 ast-grep，以有界 Token-Safe YAML 完成结构化代码搜索、规则扫描、pattern 调试、结果缓存/后处理和安全批量改写。用于按语法结构定位调用、声明/定义范围或控制流，编写/调试 pattern 或 YAML rule，预览与应用 rewrite，或文本搜索无法可靠表达结构关系时；不用于单纯字符串、注释、日志文案、文件名搜索，也不替代 LSP 对真实定义身份、精确引用、类型和安全重命名的裁决。
 ---
 
 # ast-grep 低 Token 工作流
 
 ## 选择工具
 
-- 语法结构搜索和局部语法改写使用 ast-grep。
+- 语法结构搜索、声明/定义的完整语法范围和局部语法改写使用 ast-grep。
 - 字符串、注释、日志、文件名使用 `rg`/`fd`。
-- 定义、引用、类型、继承和安全 rename 使用 LSP/编译器。
+- 已知名称先用受限 `rg` 缩小候选；唯一候选配合定向读取已足够时不升级 AST。
+- 从用法解析真实定义/实现身份、精确引用、类型、继承和安全 rename 使用 LSP/编译器。
 - 先限定语言、目录和 glob；不要从仓库根目录无界扫描。
 - 编写 pattern、YAML rule 或 rewrite 时按需读取 [references/rules.md](references/rules.md)。使用 cache、后处理、LSP/TTY 或特殊输出时读取 [references/sgy-cli.md](references/sgy-cli.md)。
 

@@ -63,6 +63,8 @@ The repeatable sandbox test covers default preservation, explicit settings and c
 
 ## Publish on another Windows machine
 
+Every invocation that publishes to a real Codex root requires the user's explicit approval for that publication. Git maintenance, an earlier publication approval, successful validation, or a read-only status result does not carry that approval forward.
+
 Install and sign in to Codex first. Then clone or copy the repository, run the Windows host preparation above, review `global/config.toml`, generate a detached routing capsule and refresh current evidence with an evaluator that can read only that capsule, and choose one delivery mode.
 
 For the recommended plugin route, build the package with the official validator, install `agentbase-core` from the repo-scoped `agentbase-local` marketplace, and publish only the project-managed global payload:
