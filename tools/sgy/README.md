@@ -8,7 +8,7 @@ ast-grep 原生输出 → 可选完整缓存 → YAML profile → 模型上下�
 
 ## 当前状态
 
-- 当前版本：`sgy 0.1.0`。
+- 当前版本：`sgy 0.1.1`。
 - 当前固定验证引擎：`ast-grep 0.42.0`。
 - 精确验证的 ast-grep 版本：`0.41.1`、`0.42.0`、`0.44.1`；不外推为连续版本范围。
 - Windows x86_64 与 Linux x86_64 已完成真实引擎、协议、release 和安装生命周期；macOS x86_64/arm64 原生运行仍未签署，因此第一版暂不发布 macOS 包。
@@ -53,11 +53,14 @@ sgy exec --profile lossless --cache off -- run -p 'foo($A)' -l ts src
 | Profile | 用途 | 模型上下文建议 |
 | --- | --- | --- |
 | `token-safe` | 默认；投影必要字段、聚合、省略和截断 | 默认使用 |
+| `locations` | 仅保留每条命中的 0-based 文件与起止位置，并紧凑序列化 | 已知只需定位、不需正文或捕获 |
 | `lossless` | JSON value 与 YAML value 等价，保留未知字段 | 机器 round-trip 或完整审计 |
 | `files` | 只关注命中文件与计数 | 先收窄范围 |
 | `custom` | 显式 `--keep-fields`/`--prune-fields` | 已知字段需求 |
 
 默认 Token-Safe 基线是 40 条详情、每个文本字段 400 字符、24 KiB YAML 软预算。它们只影响输出；不会向 ast-grep 注入结果上限。完整 benchmark 显示 lossless YAML 本身通常比 compact JSON 更耗 Token，节省来自 Token-Safe 投影和预算。
+
+`locations` 沿用同一 `_sgy.total/shown/omitted/files/complete/cache` 完整性合同，`results` 项格式为 `file:start_line:start_column-end_line:end_column`。输出采用 JSON 兼容的安全 YAML 1.2 紧凑表示；不要在仍需正文、metaVariables、rule 或 severity 时使用。
 
 ## 文档
 

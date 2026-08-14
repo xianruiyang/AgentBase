@@ -357,6 +357,7 @@ fn wrapper_subcommand(name: &'static str, about: &'static str) -> Command {
                 .value_name("PROFILE")
                 .value_parser(PossibleValuesParser::new([
                     "token-safe",
+                    "locations",
                     "lossless",
                     "files",
                     "custom",
@@ -637,6 +638,7 @@ fn explicit_options(matches: &ArgMatches) -> ExplicitOptions {
             .get_one::<String>("profile")
             .and_then(|value| match value.as_str() {
                 "token-safe" => Some(Profile::TokenSafe),
+                "locations" => Some(Profile::Locations),
                 "lossless" => Some(Profile::Lossless),
                 "files" => Some(Profile::Files),
                 "custom" => Some(Profile::Custom),

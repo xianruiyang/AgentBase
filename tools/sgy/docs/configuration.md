@@ -29,7 +29,7 @@ max_text_chars: 400
 max_context_bytes: 24576
 ```
 
-`profile: custom` 时还可以使用 `keep_fields` 和 `prune_fields`。项目配置禁止 `engine`、`cwd` 和 `cache`，未知字段也会被拒绝；因此仓库内配置不能选择可执行文件、扩大工作目录、开启 cache 写入或指定输出路径。
+`profile` 可选 `token-safe`、`locations`、`lossless`、`files` 或 `custom`；`profile: custom` 时还可以使用 `keep_fields` 和 `prune_fields`。项目配置禁止 `engine`、`cwd` 和 `cache`，未知字段也会被拒绝；因此仓库内配置不能选择可执行文件、扩大工作目录、开启 cache 写入或指定输出路径。
 
 用户配置额外允许：
 
@@ -62,4 +62,3 @@ sgy defaults [wrapper options] -- <ast-grep argv...>
 `doctor` 全部必要检查通过时退出 0；发现配置、路径、engine、版本、cache 权限或 YAML 问题时仍输出 `sgy.doctor/v1`，并退出 1。wrapper 自身无法编码或写出诊断时使用保留的 120–127 错误码。
 
 cache root 已存在时，doctor 会在其中创建并立即删除一个临时探针文件；root 尚未创建时不会在其父目录试写，而是明确报告权限尚未验证。
-

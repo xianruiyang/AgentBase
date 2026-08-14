@@ -217,12 +217,55 @@ fn profiles_formats_and_cache_failure_policy_are_end_to_end() {
         .output()
         .expect("custom profile");
     assert_eq!(custom.status.code(), Some(0));
+    let custom_bytes = custom.stdout.len();
     let custom = yaml(&custom.stdout);
     assert_eq!(custom[0]["_sgy"]["profile"], "custom");
     assert_eq!(custom[0]["_sgy"]["complete"], true);
     assert!(custom[0]["_sgy"].get("cache").is_none());
     assert_eq!(custom[0]["results"][1]["ordinal"], 1);
     assert!(custom[0]["results"][0].get("text").is_none());
+
+    let locations = exec_command(&workspace, &cache_root)
+        .args([
+            "--profile",
+            "locations",
+            "--cache",
+            "off",
+            "--",
+            "run",
+            "--fixture-matches=2",
+        ])
+        .output()
+        .expect("locations profile");
+    assert_eq!(locations.status.code(), Some(0));
+    assert!(locations.stdout.len() < custom_bytes);
+    let locations = yaml(&locations.stdout);
+    assert_eq!(locations[0]["_sgy"]["profile"], "locations");
+    assert_eq!(locations[0]["_sgy"]["complete"], true);
+    assert_eq!(
+        locations[0]["results"],
+        serde_json::json!(["src/0.ts:0:0-0:5", "src/1.ts:1:0-1:5"])
+    );
+
+    let limited_locations = exec_command(&workspace, &cache_root)
+        .args([
+            "--profile",
+            "locations",
+            "--max-detail-results",
+            "1",
+            "--",
+            "run",
+            "--fixture-matches=2",
+        ])
+        .output()
+        .expect("limited locations profile");
+    assert_eq!(limited_locations.status.code(), Some(0));
+    let limited_locations = yaml(&limited_locations.stdout);
+    assert_eq!(limited_locations[0]["_sgy"]["total"], 2);
+    assert_eq!(limited_locations[0]["_sgy"]["shown"], 1);
+    assert_eq!(limited_locations[0]["_sgy"]["omitted"], 1);
+    assert_eq!(limited_locations[0]["_sgy"]["complete"], false);
+    assert!(limited_locations[0]["_sgy"]["cache"].is_string());
 
     for native_format in ["--json=compact", "--format=sarif"] {
         let formatted = exec_command(&workspace, &cache_root)

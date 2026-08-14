@@ -1,8 +1,8 @@
 use serde_json::{json, Value};
 use sgy_core::codec::{ByteSpan, SourceRecord};
 use sgy_core::profile::{
-    project_custom, project_custom_record, project_sarif_token_safe, project_token_safe,
-    project_token_safe_record, FieldPathError, FieldPaths, RecordShape,
+    project_custom, project_custom_record, project_location_record, project_sarif_token_safe,
+    project_token_safe, project_token_safe_record, FieldPathError, FieldPaths, RecordShape,
 };
 
 fn native_range() -> Value {
@@ -11,6 +11,26 @@ fn native_range() -> Value {
         "start": {"line": 1, "column": 2},
         "end": {"line": 1, "column": 12}
     })
+}
+
+#[test]
+fn location_projection_is_compact_zero_based_and_keeps_unknowns_explicit() {
+    let projected = project_token_safe(
+        7,
+        &json!({
+            "file": "src/main.ts",
+            "range": native_range(),
+            "text": "function body"
+        }),
+    );
+    let location = project_location_record(&projected);
+    assert_eq!(location.ordinal, 7);
+    assert_eq!(location.shape, RecordShape::Match);
+    assert_eq!(location.value, "src/main.ts:1:2-1:12");
+
+    let unknown = project_location_record(&project_token_safe(8, &json!({"future": true})));
+    assert_eq!(unknown.value["_sgy_result"], 8);
+    assert_eq!(unknown.value["_sgy_unknown"], true);
 }
 
 #[test]

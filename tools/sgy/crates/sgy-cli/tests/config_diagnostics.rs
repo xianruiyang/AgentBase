@@ -76,6 +76,26 @@ fn schema_and_capabilities_are_bounded_and_do_not_need_an_engine() {
 }
 
 #[test]
+fn project_config_accepts_locations_profile() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    fs::write(
+        temp.path().join(".sgy.yml"),
+        "schema: sgy.config/v1\nprofile: locations\n",
+    )
+    .expect("project config");
+    let output = isolated_command(temp.path())
+        .args(["defaults", "--", "scan", "src"])
+        .output()
+        .expect("defaults");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(yaml(&output.stdout)["settings"]["profile"], "locations");
+}
+
+#[test]
 fn defaults_uses_explicit_project_user_builtin_priority_with_source_metadata() {
     let temp = tempfile::tempdir().expect("tempdir");
     fs::write(

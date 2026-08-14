@@ -57,7 +57,7 @@ sgy exec --yaml-out results.yml -- run -p 'foo($A)' -l ts src
 ```text
 --engine PATH
 --cwd PATH
---profile token-safe|lossless|files|custom
+--profile token-safe|locations|lossless|files|custom
 --cache auto|on|off
 --max-detail-results N
 --max-text-chars N
@@ -86,6 +86,14 @@ results: []
 - `complete: false` 表示详情或文本被省略/截断；不要把可见列表当作全部结果。
 - 出现 `cache` 时按 [缓存文档](cache.md) 精确取回，不要重新无界扫描。
 - `lossless` 不生成 Token-Safe envelope；其目标是值等价，不是低 Token。
+
+只需完整命中集合的文件和起止位置时使用 `locations`：
+
+```powershell
+sgy exec --profile locations --cache off -- run -p 'function $F($$$A) { $$$B }' -l ts src
+```
+
+它保留相同完整性包络，把每项压成 0-based `file:start_line:start_column-end_line:end_column`，并输出 JSON 兼容的紧凑安全 YAML。若仍需正文、捕获或规则诊断，继续使用 `token-safe` 或 `custom`。
 
 ## 先预览 effective argv
 

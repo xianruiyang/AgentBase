@@ -52,7 +52,7 @@ pub fn render_config_schema() -> Result<Vec<u8>, DiagnosticError> {
                 "schema": {"const": "sgy.config/v1"},
                 "engine": {"type": "string", "minLength": 1},
                 "cwd": {"type": "string", "minLength": 1},
-                "profile": {"enum": ["token-safe", "lossless", "files", "custom"]},
+                "profile": {"enum": ["token-safe", "locations", "lossless", "files", "custom"]},
                 "native_defaults": {"type": "boolean"},
                 "cache": {"enum": ["auto", "on", "off"]},
                 "max_detail_results": {"type": "integer", "minimum": 1, "maximum": 4294967295_u64},

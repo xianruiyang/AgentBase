@@ -88,6 +88,30 @@ impl ContextAggregator {
         )
     }
 
+    /// Adds one compact location record while retaining aggregation keys from
+    /// the complete Token-Safe source projection.
+    pub fn push_location(
+        &mut self,
+        token_safe: &ProjectedRecord,
+        displayed: ProjectedRecord,
+    ) -> Result<(), AggregateError> {
+        if self.profile != Profile::Locations {
+            return Err(self.profile_operation("push_location"));
+        }
+        if token_safe.ordinal != displayed.ordinal {
+            return Err(AggregateError::NativeOrder {
+                expected: token_safe.ordinal,
+                actual: displayed.ordinal,
+            });
+        }
+        self.push_detail(
+            token_safe.ordinal,
+            RecordGroups::from_projected(&token_safe.value),
+            displayed,
+            has_replacement(token_safe),
+        )
+    }
+
     /// Adds one source record to the files profile without retaining detail.
     pub fn push_file(&mut self, token_safe: &ProjectedRecord) -> Result<(), AggregateError> {
         if self.profile != Profile::Files {

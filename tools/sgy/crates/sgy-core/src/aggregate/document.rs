@@ -8,7 +8,7 @@ use crate::{
         fit_context_budget, BudgetError, BudgetReport, BudgetSettings, ContextBudgetCandidate,
         GroupDimension,
     },
-    codec::{write_yaml_document, CodecError},
+    codec::{write_compact_yaml_document, write_yaml_document, CodecError},
     invocation::Profile,
     profile::ProjectedRecord,
 };
@@ -81,7 +81,7 @@ impl ContextDocument {
     pub fn complete(&self) -> bool {
         match self.profile {
             Profile::Files => self.total == 0,
-            Profile::TokenSafe | Profile::Custom => {
+            Profile::TokenSafe | Profile::Locations | Profile::Custom => {
                 self.omitted() == 0
                     && !self.records.iter().any(|record| {
                         has_true_marker(&record.value, "_sgy_unknown")
@@ -118,7 +118,7 @@ impl ContextDocument {
         let mut root = Map::new();
         root.insert("_sgy".to_owned(), Value::Object(metadata));
         match self.profile {
-            Profile::TokenSafe | Profile::Custom => {
+            Profile::TokenSafe | Profile::Locations | Profile::Custom => {
                 root.insert(
                     "results".to_owned(),
                     Value::Array(
@@ -139,7 +139,11 @@ impl ContextDocument {
     }
 
     pub fn write_yaml(&self, output: &mut impl Write) -> Result<u64, CodecError> {
-        write_yaml_document(&self.to_value(), output, false)
+        if self.profile == Profile::Locations {
+            write_compact_yaml_document(&self.to_value(), output)
+        } else {
+            write_yaml_document(&self.to_value(), output, false)
+        }
     }
 
     #[must_use]
@@ -231,13 +235,14 @@ impl ContextBudgetCandidate for ContextDocument {
         match (self.profile, dimension) {
             (Profile::Files, GroupDimension::File) => self.groups.file.trim_lowest_visible(),
             (Profile::Files, GroupDimension::Severity | GroupDimension::Rule) => false,
-            (Profile::TokenSafe | Profile::Custom, GroupDimension::Severity) => {
-                self.groups.severity.trim_lowest_visible()
-            }
-            (Profile::TokenSafe | Profile::Custom, GroupDimension::Rule) => {
+            (
+                Profile::TokenSafe | Profile::Locations | Profile::Custom,
+                GroupDimension::Severity,
+            ) => self.groups.severity.trim_lowest_visible(),
+            (Profile::TokenSafe | Profile::Locations | Profile::Custom, GroupDimension::Rule) => {
                 self.groups.rule.trim_lowest_visible()
             }
-            (Profile::TokenSafe | Profile::Custom, GroupDimension::File) => {
+            (Profile::TokenSafe | Profile::Locations | Profile::Custom, GroupDimension::File) => {
                 self.groups.file.trim_lowest_visible()
             }
             (Profile::Lossless, _) => false,
@@ -258,6 +263,15 @@ impl ContextBudgetCandidate for ContextDocument {
             return self.cache_id.is_some();
         }
         self.records.iter().any(|record| {
+            if self.profile == Profile::Locations {
+                return record.value.as_str().is_some_and(|value| !value.is_empty())
+                    || self.cache_id.is_some()
+                        && record
+                            .value
+                            .get("_sgy_result")
+                            .and_then(Value::as_u64)
+                            .is_some();
+            }
             let root = record.value.as_object();
             let direct = root
                 .and_then(|value| value.get("file"))

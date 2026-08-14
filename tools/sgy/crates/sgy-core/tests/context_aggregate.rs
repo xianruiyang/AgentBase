@@ -3,7 +3,7 @@ use sgy_core::{
     aggregate::{AggregateError, ContextAggregator, MAX_AGGREGATION_KEYS, MAX_GROUP_ENTRIES},
     budget::BudgetSettings,
     invocation::Profile,
-    profile::{project_token_safe, ProjectedRecord},
+    profile::{project_location_record, project_token_safe, ProjectedRecord},
 };
 
 fn native_match(file: &str, text: &str) -> Value {
@@ -90,6 +90,41 @@ fn small_token_safe_context_has_fixed_envelope_and_no_overflow() {
     assert_eq!(outcome.document.total(), 3);
     assert_eq!(outcome.document.shown(), 3);
     assert_eq!(outcome.document.omitted(), 0);
+}
+
+#[test]
+fn locations_context_keeps_completeness_and_uses_compact_safe_yaml() {
+    let mut aggregate =
+        ContextAggregator::new(Profile::Locations, roomy_settings(40)).expect("aggregator");
+    for (ordinal, native) in [
+        native_match("src/a.ts", "first"),
+        native_match("src/b.ts", "second"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let token_safe = projected(ordinal as u64, native);
+        aggregate
+            .push_location(&token_safe, project_location_record(&token_safe))
+            .expect("location");
+    }
+
+    let outcome = aggregate.finish().expect("finish");
+    let value = outcome.document.to_value();
+    assert_eq!(value["_sgy"]["profile"], "locations");
+    assert_eq!(value["_sgy"]["complete"], true);
+    assert_eq!(
+        value["results"],
+        json!(["src/a.ts:0:1-0:2", "src/b.ts:0:1-0:2"])
+    );
+
+    let mut encoded = Vec::new();
+    outcome
+        .document
+        .write_yaml(&mut encoded)
+        .expect("compact YAML");
+    assert_eq!(encoded.first(), Some(&b'{'));
+    assert!(!encoded.windows(7).any(|window| window == b"\"text\""));
 }
 
 #[test]

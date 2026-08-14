@@ -12,6 +12,7 @@ pub enum WrapperCommand {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Profile {
     TokenSafe,
+    Locations,
     Lossless,
     Files,
     Custom,
@@ -22,6 +23,7 @@ impl Profile {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::TokenSafe => "token-safe",
+            Self::Locations => "locations",
             Self::Lossless => "lossless",
             Self::Files => "files",
             Self::Custom => "custom",

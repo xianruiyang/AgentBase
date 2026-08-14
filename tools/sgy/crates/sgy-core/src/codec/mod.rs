@@ -10,7 +10,8 @@ pub use json::{parse_single_json, JsonLines, SourceRecord};
 pub use transcode::{transcode_lossless, JsonInputKind, TranscodeStats};
 pub use yaml::{
     parse_yaml_config_documents_with_limits, parse_yaml_documents,
-    parse_yaml_documents_with_limits, write_yaml_document, YamlParseLimits,
+    parse_yaml_documents_with_limits, write_compact_yaml_document, write_yaml_document,
+    YamlParseLimits,
 };
 
 use thiserror::Error;

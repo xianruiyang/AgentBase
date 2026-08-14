@@ -5,8 +5,8 @@ mod projector;
 
 pub use paths::{FieldPathError, FieldPaths};
 pub use projector::{
-    project_sarif_token_safe, project_sarif_token_safe_record, project_token_safe,
-    project_token_safe_record, ProjectedRecord, RecordShape,
+    project_location_record, project_sarif_token_safe, project_sarif_token_safe_record,
+    project_token_safe, project_token_safe_record, ProjectedRecord, RecordShape,
 };
 
 use serde_json::Value;

@@ -38,6 +38,25 @@ pub fn write_yaml_document(
     Ok(writer.bytes)
 }
 
+/// Writes one compact JSON document. JSON is a strict subset of the safe YAML
+/// 1.2 surface accepted by this codec, so location-only context can avoid the
+/// indentation and repeated field overhead of block YAML without adding a
+/// second output language.
+pub fn write_compact_yaml_document(
+    value: &Value,
+    output: &mut impl Write,
+) -> Result<u64, CodecError> {
+    let encoded =
+        serde_json::to_vec(value).map_err(|error| CodecError::Encode(error.to_string()))?;
+    output.write_all(&encoded).map_err(CodecError::OutputIo)?;
+    output.write_all(b"\n").map_err(CodecError::OutputIo)?;
+    usize_to_u64(
+        encoded.len().checked_add(1).ok_or_else(|| {
+            CodecError::Encode("compact YAML output byte count overflow".to_owned())
+        })?,
+    )
+}
+
 /// Parses emitted YAML back into generic JSON values while rejecting advanced YAML features.
 pub fn parse_yaml_documents(input: &[u8]) -> Result<Vec<Value>, CodecError> {
     parse_yaml_documents_with_limits(input, YamlParseLimits::default())
@@ -449,7 +468,7 @@ fn expect_event(
 mod tests {
     use serde_json::json;
 
-    use super::{parse_yaml_documents, write_yaml_document};
+    use super::{parse_yaml_documents, write_compact_yaml_document, write_yaml_document};
     use crate::codec::CodecError;
 
     #[test]
@@ -488,6 +507,21 @@ mod tests {
         assert!(yaml.windows(6).any(|window| window == b"\\u2028"));
         assert_eq!(
             parse_yaml_documents(&yaml).expect("parse escaped YAML"),
+            vec![expected]
+        );
+    }
+
+    #[test]
+    fn compact_json_is_accepted_as_the_same_safe_yaml_value() {
+        let expected = json!({
+            "_sgy": {"profile": "locations", "complete": true},
+            "results": ["src/main.ts:1:2-3:4"]
+        });
+        let mut yaml = Vec::new();
+        let bytes = write_compact_yaml_document(&expected, &mut yaml).expect("compact YAML");
+        assert_eq!(usize::try_from(bytes).expect("byte count"), yaml.len());
+        assert_eq!(
+            parse_yaml_documents(&yaml).expect("parse compact YAML"),
             vec![expected]
         );
     }

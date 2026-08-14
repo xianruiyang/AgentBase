@@ -318,6 +318,7 @@ fn parse_config(value: Value, scope: ConfigScope, path: &Path) -> Result<BasicCo
     }
     let profile = match string_field(object, "profile", scope, path)? {
         Some("token-safe") => Some(Profile::TokenSafe),
+        Some("locations") => Some(Profile::Locations),
         Some("lossless") => Some(Profile::Lossless),
         Some("files") => Some(Profile::Files),
         Some("custom") => Some(Profile::Custom),

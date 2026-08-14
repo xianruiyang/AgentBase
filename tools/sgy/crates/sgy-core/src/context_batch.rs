@@ -28,8 +28,8 @@ use crate::{
     invocation::Profile,
     process::{run, ProcessError, ProcessOutcome, ProcessRequest},
     profile::{
-        project_custom_record, project_sarif_token_safe_record, project_token_safe_record,
-        FieldPaths,
+        project_custom_record, project_location_record, project_sarif_token_safe_record,
+        project_token_safe_record, FieldPaths,
     },
 };
 
@@ -226,6 +226,10 @@ pub fn run_profile_batch(
             };
             match profile {
                 Profile::TokenSafe => aggregator.push_token_safe(token_safe)?,
+                Profile::Locations => {
+                    let displayed = project_location_record(&token_safe);
+                    aggregator.push_location(&token_safe, displayed)?;
+                }
                 Profile::Files => aggregator.push_file(&token_safe)?,
                 Profile::Custom => {
                     let displayed = project_custom_record(

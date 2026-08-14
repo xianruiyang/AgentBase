@@ -23,6 +23,30 @@ impl ProjectedRecord {
     }
 }
 
+/// Compresses one recognized Token-Safe match/finding into a display-only,
+/// 0-based `file:start_line:start_column-end_line:end_column` locator.
+/// Opaque records remain explicit unknown stubs so completeness is never
+/// inferred from a shape that sgy could not interpret.
+#[must_use]
+pub fn project_location_record(token_safe: &ProjectedRecord) -> ProjectedRecord {
+    let value = if token_safe.is_opaque_unknown() {
+        token_safe.value.clone()
+    } else {
+        location_value(&token_safe.value).unwrap_or_else(|| {
+            let mut stub = Map::new();
+            stub.insert("_sgy_result".to_owned(), Value::from(token_safe.ordinal));
+            stub.insert("_sgy_unknown".to_owned(), Value::Bool(true));
+            stub.insert("json_type".to_owned(), Value::String("object".to_owned()));
+            Value::Object(stub)
+        })
+    };
+    ProjectedRecord {
+        ordinal: token_safe.ordinal,
+        shape: token_safe.shape,
+        value,
+    }
+}
+
 #[must_use]
 pub fn project_token_safe(ordinal: u64, native: &Value) -> ProjectedRecord {
     let Some(mapping) = native.as_object() else {
@@ -191,6 +215,21 @@ fn project_position(value: &Value) -> Option<Value> {
     projected.insert("line".to_owned(), Value::from(line));
     projected.insert("column".to_owned(), Value::from(column));
     Some(Value::Object(projected))
+}
+
+fn location_value(value: &Value) -> Option<Value> {
+    let native = value.as_object()?;
+    let file = native.get("file")?.as_str()?;
+    let range = native.get("range")?.as_object()?;
+    let start = range.get("start")?.as_object()?;
+    let end = range.get("end")?.as_object()?;
+    let start_line = start.get("line")?.as_u64()?;
+    let start_column = start.get("column")?.as_u64()?;
+    let end_line = end.get("line")?.as_u64()?;
+    let end_column = end.get("column")?.as_u64()?;
+    Some(Value::String(format!(
+        "{file}:{start_line}:{start_column}-{end_line}:{end_column}"
+    )))
 }
 
 fn project_meta_variables(value: &Value) -> Option<Value> {
