@@ -8,7 +8,7 @@ description: 在 PowerShell/Codex 中以可定位、有限且低重复的格式�
 1. 先用准确目标路径、`-g`、`-t`、`.rgignore` 和排除目录缩小范围；不要同时搜索源码及其生成、镜像、缓存或旧版副本，除非任务需要比较。
 2. 每条输出匹配正文的命令必须显式且只选择一个文件身份参数：多文件、目录、glob 或文件数未知时使用 `--heading`；单个已知文件使用 `--no-filename`。
 3. `-M 240 --max-columns-preview` 只限制单行宽度，绝不能替代 `--heading` 或 `--no-filename`；不得只写宽度参数而省略文件身份参数。
-4. 每条未知规模的正文命令还必须以 `Select-Object -First 80` 限制总行数；文件身份、单行宽度、总行数是三项独立且同时成立的约束。
+4. 候选集合是否完整会改变判断时，使用内置 `scripts/rg_receipt.py` 按匹配记录读取 `N+1` 条并检查 `_rg.complete`；达到上限的普通 `Select-Object` 输出不能证明全集完整。
 5. `-l`、`rg --files` 和仅检查退出码时不使用文件身份参数。候选文件列表默认限制为 40 行，`rg --files` 默认限制为 60 行。
 6. 预计命中文件很多时先用 `-l`，范围已小时直接搜索，避免扫描两次。
 7. `-m N` 只限制每个文件，不能替代全局 `Select-Object -First N`；仅在不需要完整查看单文件命中时使用。
@@ -25,6 +25,16 @@ description: 在 PowerShell/Codex 中以可定位、有限且低重复的格式�
 | 文件枚举 | `--files` | 60 行 |
 
 ## 正文模板
+
+需要判断候选全集时优先使用回执入口；它只接收检索和范围参数，不接收会破坏完整性的 `-m/--max-count`、上下文、replacement、preprocessor 或其他输出模式：
+
+```powershell
+python.exe '<skill-dir>\scripts\rg_receipt.py' `
+    --cwd '<root>' --limit 40 -- `
+    -n -F -e 'TargetText' -g '*.cpp' -g '*.h' .
+```
+
+`_rg.complete: true` 只证明本次 pattern、路径和 glob 范围内的文本记录完整；`text_complete` 单独表示可见行正文是否截短。`complete: false` 时先缩小范围，不从可见项推断唯一候选。普通源码阅读不需要集合完整性时仍使用以下直接模板。
 
 已知文本优先使用 `-F`，多个条件各用一个完整的 `-e`：
 

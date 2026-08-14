@@ -1,5 +1,7 @@
 use std::{
     ffi::{OsStr, OsString},
+    fs::{self, File},
+    io::{BufReader, Read},
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -14,6 +16,7 @@ use crate::{
 
 pub const CACHE_INDEX_SCHEMA: &str = "sgy.cache-index/v1";
 pub const CACHE_METADATA_SCHEMA: &str = "sgy.cache-metadata/v1";
+const MAX_FINGERPRINT_FILE_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SourceFormat {
@@ -102,6 +105,7 @@ pub struct CacheAudit {
     pub injected: Vec<String>,
     pub profile: Profile,
     pub cache_mode: CacheMode,
+    pub source_fingerprints: Vec<SourceFingerprint>,
 }
 
 impl CacheAudit {
@@ -126,7 +130,100 @@ impl CacheAudit {
             injected,
             profile,
             cache_mode,
+            source_fingerprints: Vec::new(),
         }
+    }
+
+    #[must_use]
+    pub fn with_source_fingerprints(mut self, fingerprints: Vec<SourceFingerprint>) -> Self {
+        self.source_fingerprints = fingerprints;
+        self
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceFingerprint {
+    pub file: String,
+    pub bytes: u64,
+    pub sha256: String,
+}
+
+impl SourceFingerprint {
+    pub fn capture(workspace: &Path, requested: &Path) -> Result<Self, crate::cache::CacheError> {
+        let canonical_workspace = fs::canonicalize(workspace)
+            .map_err(|source| super::io_error("canonicalize cache workspace", workspace, source))?;
+        let candidate = if requested.is_absolute() {
+            requested.to_path_buf()
+        } else {
+            canonical_workspace.join(requested)
+        };
+        let canonical = fs::canonicalize(&candidate).map_err(|source| {
+            super::io_error("canonicalize fingerprint source", &candidate, source)
+        })?;
+        let relative = canonical
+            .strip_prefix(&canonical_workspace)
+            .map_err(|_| crate::cache::CacheError::UnsafePath(canonical.clone()))?;
+        if !canonical.is_file() {
+            return Err(crate::cache::CacheError::Verification(format!(
+                "fingerprint source is not a file: {}",
+                canonical.display()
+            )));
+        }
+        let declared_bytes = fs::metadata(&canonical)
+            .map_err(|source| super::io_error("read fingerprint metadata", &canonical, source))?
+            .len();
+        if declared_bytes > MAX_FINGERPRINT_FILE_BYTES {
+            return Err(crate::cache::CacheError::Verification(format!(
+                "fingerprint source exceeds {MAX_FINGERPRINT_FILE_BYTES} bytes: {}",
+                canonical.display()
+            )));
+        }
+        let mut input =
+            BufReader::new(File::open(&canonical).map_err(|source| {
+                super::io_error("open fingerprint source", &canonical, source)
+            })?);
+        let mut hasher = Sha256::new();
+        let mut bytes = 0_u64;
+        let mut buffer = [0_u8; 64 * 1024];
+        loop {
+            let count = input
+                .read(&mut buffer)
+                .map_err(|source| super::io_error("hash fingerprint source", &canonical, source))?;
+            if count == 0 {
+                break;
+            }
+            bytes =
+                bytes
+                    .checked_add(u64::try_from(count).map_err(|error| {
+                        crate::cache::CacheError::Verification(error.to_string())
+                    })?)
+                    .ok_or_else(|| {
+                        crate::cache::CacheError::Verification(
+                            "fingerprint source size overflow".to_owned(),
+                        )
+                    })?;
+            if bytes > MAX_FINGERPRINT_FILE_BYTES {
+                return Err(crate::cache::CacheError::Verification(format!(
+                    "fingerprint source changed above {MAX_FINGERPRINT_FILE_BYTES} bytes while reading: {}",
+                    canonical.display()
+                )));
+            }
+            hasher.update(&buffer[..count]);
+        }
+        Ok(Self {
+            file: path_text(relative),
+            bytes,
+            sha256: hex_lower(&hasher.finalize()),
+        })
+    }
+
+    #[must_use]
+    pub fn to_value(&self) -> Value {
+        serde_json::json!({
+            "file": self.file,
+            "bytes": self.bytes,
+            "sha256": self.sha256,
+        })
     }
 }
 

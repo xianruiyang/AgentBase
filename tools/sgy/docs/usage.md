@@ -6,7 +6,7 @@
 sgy exec [wrapper options] -- <ast-grep argv...>
 sgy defaults [wrapper options] -- <ast-grep argv...>
 sgy cache <get|query|info|remove|gc> ...
-sgy process <validate|select|filter|count|group|sort|dedupe|merge|to-jsonl|from-jsonl> ...
+sgy process <validate|select|filter|count|group|sort|dedupe|merge|to-jsonl|from-jsonl|containing|group-locations> ...
 sgy <schema|capabilities|doctor> ...
 ```
 
@@ -59,6 +59,7 @@ sgy exec --yaml-out results.yml -- run -p 'foo($A)' -l ts src
 --cwd PATH
 --profile token-safe|locations|lossless|files|custom
 --cache auto|on|off
+--fingerprint-file PATH
 --max-detail-results N
 --max-text-chars N
 --max-context-bytes N
@@ -134,6 +135,16 @@ sgy process merge --source 'file=lossless.yml' --source 'cache=01H...' --on-conf
 ```
 
 `filter` 只做字段与 JSON value 相等比较，`select` 只做字段投影；二者都不执行表达式或代码。`sort`/`dedupe`/`merge` 对大输入使用稳定外部排序。
+
+已知源码位置需要完整语法边界时，先用 `--cache on --fingerprint-file <file>` 在执行前固定需要复用的源码，再按 0-based 行列投影最小包含范围；只有确需正文时才加 `--include-text`：
+
+```powershell
+sgy process containing --cache-id <ID> --file src/app.ts --line 42 --column 8
+sgy process containing --cache-id <ID> --file src/app.ts --line 42 --column 8 --include-text
+sgy process group-locations --cache-id <ID> --file src/app.ts --limit 40
+```
+
+`containing` 只在 cache 的节点集合内做几何包含；并列最小项全部保留，不声明真实符号身份。位置投影只接受执行前已登记 fingerprint、且执行结束与查询时整文件哈希均一致的源码；旧 cache、未登记文件或任意位置变化都会要求重扫。`group-locations` 让路径只出现一次，适合同文件多目标复用；分页回执中的 `complete/next_offset` 只描述投影视图。
 
 ## 诊断与退出码
 

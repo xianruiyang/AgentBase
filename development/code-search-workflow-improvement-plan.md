@@ -1,6 +1,6 @@
 # 代码搜索流程低 Token 改进方案
 
-> 状态：待用户裁决；本文只描述候选方案，不改变当前工具、skill 或 Codex 安装状态。
+> 状态：已获用户批准并在项目真源实施；尚未发布到 Codex，安装状态保持不变。
 >
 > 取舍顺序：先保证定位完整性和结论质量，在此基础上降低模型可见 Token，再在前两项不变差时提升速度。
 
@@ -374,8 +374,29 @@ provider: {status: completed, elapsedMs: 1619, attempts: 1}
 7. **按实测决定 P4**：只有 `document_symbols` 在目标环境中经常可用、完整范围能稳定替代一次 AST 查询时才实施；否则保留为候选，不为接口完整性扩张协议。
 8. **发布前验证**：按影响范围运行组件测试；skill 触发或策略变化后再运行静态合同和独立隔离路由评估。每次发布到 Codex 仍单独取得用户明确同意。
 
-## 9. 建议裁决
+## 9. 原建议裁决
 
 建议批准 P0、P1、P1b、P2 和对应跨工具 benchmark 作为第一批：它们直接修复完整性或减少语法定位输出，且不依赖 LSP 环境稳定。P3 作为第二批，价值在于让条件性 LSP 路由有实测依据。P4 暂不承诺实施，先用 P3 的真实回执和第一批 benchmark 判断它能否稳定替代 AST 调用。
 
 这套顺序保留当前工具分层，也把新增长期职责控制在各自 owner 内：`rg-token-safe` 负责文本结果完整性，`sgy` 负责结构结果投影，`vscode-lsp-mcp` 负责语义 Provider 事实，`symbol-structure-workflow` 只负责选择。这样能在不增加平行搜索规则源的前提下，优先取得最大 Token 收益。
+
+## 10. 实施结果
+
+用户随后批准全部改进项，P0–P5 均已进入对应正式 owner：
+
+- `rg-token-safe` 的 `rg_receipt.py` 以匹配/文件记录执行 N+1 读取，分开报告查询完整性和单行正文完整性，并拒绝会破坏回执的内部结果上限与输出模式。
+- `sgy 0.1.2` 增加 `process containing`、`process group-locations` 和显式 `--fingerprint-file`；位置复用要求执行前、提交和查询时整文件一致，旧 cache 或未登记文件不能静默使用。
+- `symbol-structure-workflow` 按单目标、多目标、真实身份、当前 Provider 观察和复用机会动态路由，不写固定毫秒阈值或 `workspace_symbols` 全局禁令。
+- `vscode-lsp-mcp` 的 workspace/document symbol 查询透传当前调用的 `status/elapsedMs/attempts`；`document_symbols` 支持分页前 ordinal exact 名称/完整路径过滤及默认关闭的 1-based、end-exclusive 完整范围。
+- `development/code-search-benchmark` 提供只分析、不执行搜索的统一核算入口，把 skill、命令、成功前全部结果、失败回退、冷/热耗时和复用目标数计入端到端成本。
+
+升级后在同一真实 TypeScript 文件上进行了三次重复观察；`sgy` 使用同一完整 `method_definition` cache 和整文件 fingerprint：
+
+| 场景 | 路径 | 结果 Token | 含首次 skill 的总 Token | warm 总 Token | 中位耗时 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 单个 76 行方法 | `rg` 完整性定位 + 固定后读 90 行 | 1,100 | 2,550 | 1,238 | 191.28 ms |
+| 单个 76 行方法 | `rg` 定位 + `sgy containing` | 1,013 | 5,843 | 1,148 | 418.58 ms |
+| 同文件三个方法 | `rg` 定位 + 三次固定后读 90 行 | 3,008 | 4,529 | 3,217 | 204.44 ms |
+| 同文件三个方法 | 一次 cache + 三次 `sgy containing` | 2,312 | 7,157 | 2,462 | 548.24 ms |
+
+该样本直接支持动态路由而非统一升级：单目标冷路径的 AST 固定成本明显不值，已加载能力或同文件多目标时精确投影分别减少约 7.3% 和 23.5% warm 可见 Token，但仍比 `rg` 慢。质量、Token、速度的取舍顺序保持不变；这些耗时只属于本次环境观察，不构成跨项目阈值。

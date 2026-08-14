@@ -200,6 +200,124 @@ fn process_reads_verified_cache_results_without_reexecuting_ast_grep() {
 }
 
 #[test]
+fn location_projection_selects_smallest_current_range_and_groups_one_scan() {
+    let directory = tempdir().expect("temporary directory");
+    let workspace = directory.path().join("workspace");
+    let cache_root = directory.path().join("cache-root");
+    let source_dir = workspace.join("src");
+    fs::create_dir_all(&source_dir).expect("source directory");
+    let source = source_dir.join("target.ts");
+    fs::write(
+        &source,
+        b"line-0\nline-1\nline-2\nline-3\nline-4\nline-5\nline-6\n",
+    )
+    .expect("source fixture");
+
+    let mut exec = Command::new(env!("CARGO_BIN_EXE_sgy"));
+    exec.current_dir(&workspace).args([
+        "exec",
+        "--engine",
+        env!("CARGO_BIN_EXE_sgy-native-fixture"),
+        "--cache",
+        "on",
+        "--fingerprint-file",
+        "src/target.ts",
+        "--profile",
+        "files",
+        "--",
+        "run",
+        "--fixture-matches=3",
+        "--fixture-source-backed=src/target.ts",
+    ]);
+    configure_cache_environment(&mut exec, &cache_root);
+    let generated = exec.output().expect("generate location cache");
+    assert!(
+        generated.status.success(),
+        "{}",
+        String::from_utf8_lossy(&generated.stderr)
+    );
+    let cache_id = yaml(&generated.stdout)[0]["_sgy"]["cache"]
+        .as_str()
+        .expect("cache id")
+        .to_owned();
+
+    let containing = process(&workspace, &cache_root)
+        .args([
+            "containing",
+            "--cache-id",
+            &cache_id,
+            "--file",
+            "src/target.ts",
+            "--line",
+            "3",
+            "--column",
+            "0",
+            "--include-text",
+        ])
+        .env("PATH", "")
+        .output()
+        .expect("select containing location");
+    assert!(
+        containing.status.success(),
+        "{}",
+        String::from_utf8_lossy(&containing.stderr)
+    );
+    let containing = &yaml(&containing.stdout)[0];
+    assert_eq!(containing["_sgy"]["candidates"], 3);
+    assert_eq!(containing["_sgy"]["selected"], 1);
+    assert_eq!(containing["_sgy"]["selection_complete"], true);
+    assert_eq!(containing["_sgy"]["source_verified_records"], 1);
+    assert_eq!(containing["results"][0]["ordinal"], 2);
+    assert_eq!(containing["results"][0]["range"]["start"]["line"], 2);
+    assert_eq!(containing["results"][0]["range"]["end"]["line"], 5);
+    assert_eq!(containing["results"][0]["text"], "line-2\nline-3\nline-4\n");
+
+    let grouped = process(&workspace, &cache_root)
+        .args(["group-locations", "--cache-id", &cache_id, "--limit", "2"])
+        .env("PATH", "")
+        .output()
+        .expect("group cached locations");
+    assert!(
+        grouped.status.success(),
+        "{}",
+        String::from_utf8_lossy(&grouped.stderr)
+    );
+    let grouped = &yaml(&grouped.stdout)[0];
+    assert_eq!(grouped["_sgy"]["total"], 3);
+    assert_eq!(grouped["_sgy"]["shown"], 2);
+    assert_eq!(grouped["_sgy"]["complete"], false);
+    assert_eq!(grouped["_sgy"]["next_offset"], 2);
+    assert_eq!(grouped["results"][0]["file"], "src/target.ts");
+    assert_eq!(
+        grouped["results"][0]["ranges"],
+        json!(["0:0-7:0", "1:0-6:0"])
+    );
+
+    fs::write(
+        &source,
+        b"line-0\nline-1\nline-2\nline-3\nline-4\nline-5\nchanged-outside-selection\n",
+    )
+    .expect("mutate source outside the selected range");
+    let stale = process(&workspace, &cache_root)
+        .args([
+            "containing",
+            "--cache-id",
+            &cache_id,
+            "--file",
+            "src/target.ts",
+            "--line",
+            "3",
+            "--column",
+            "0",
+        ])
+        .output()
+        .expect("reject stale cache");
+    assert_eq!(stale.status.code(), Some(125));
+    assert!(stale.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&stale.stderr).contains("changed; rerun ast-grep"));
+}
+
+#[test]
 fn merge_uses_verified_cache_cwd_and_engine_provenance_for_conflicts() {
     let directory = tempdir().expect("temporary directory");
     let workspace = directory.path().join("workspace");

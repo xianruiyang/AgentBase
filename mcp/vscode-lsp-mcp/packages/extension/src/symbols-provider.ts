@@ -32,6 +32,7 @@ interface ProviderPoint {
 
 interface ProviderRange {
   readonly start: ProviderPoint;
+  readonly end: ProviderPoint;
 }
 
 interface ProviderLocation {
@@ -73,6 +74,12 @@ interface DocumentCandidate {
   readonly path: readonly string[];
   readonly line: number;
   readonly column: number;
+  readonly range?: {
+    readonly startLine: number;
+    readonly startColumn: number;
+    readonly endLine: number;
+    readonly endColumn: number;
+  };
   readonly snippet?: string;
 }
 
@@ -120,35 +127,51 @@ const parseDocumentParams = (value: unknown): DocumentBridgeParams | undefined =
     : undefined;
 };
 
-const pointFromRange = (value: unknown): ProviderPoint | undefined => {
-  const range = asRecord(value);
-  const start = range === undefined ? undefined : asRecord(range.start);
-  if (start === undefined ||
-      !Number.isSafeInteger(start.line) || (start.line as number) < 0 ||
-      (start.line as number) >= Number.MAX_SAFE_INTEGER ||
-      !Number.isSafeInteger(start.character) || (start.character as number) < 0 ||
-      (start.character as number) >= Number.MAX_SAFE_INTEGER) {
+const pointFromValue = (value: unknown): ProviderPoint | undefined => {
+  const point = asRecord(value);
+  if (point === undefined ||
+      !Number.isSafeInteger(point.line) || (point.line as number) < 0 ||
+      (point.line as number) >= Number.MAX_SAFE_INTEGER ||
+      !Number.isSafeInteger(point.character) || (point.character as number) < 0 ||
+      (point.character as number) >= Number.MAX_SAFE_INTEGER) {
     return undefined;
   }
-  return { line: start.line as number, character: start.character as number };
+  return { line: point.line as number, character: point.character as number };
+};
+
+const rangeFromValue = (value: unknown): ProviderRange | undefined => {
+  const range = asRecord(value);
+  const start = pointFromValue(range?.start);
+  const end = pointFromValue(range?.end);
+  if (start === undefined || end === undefined ||
+      end.line < start.line ||
+      (end.line === start.line && end.character < start.character)) {
+    return undefined;
+  }
+  return { start, end };
+};
+
+const pointFromRange = (value: unknown): ProviderPoint | undefined => {
+  const range = asRecord(value);
+  return pointFromValue(range?.start);
 };
 
 const locationFromValue = (value: unknown): ProviderLocation | undefined => {
   const location = asRecord(value);
   const rawUri = location?.uri;
   const uri = asRecord(rawUri);
-  const point = pointFromRange(location?.range);
+  const range = rangeFromValue(location?.range);
   if (
     uri === undefined ||
     typeof uri.scheme !== 'string' ||
     typeof uri.fsPath !== 'string' ||
-    point === undefined
+    range === undefined
   ) {
     return undefined;
   }
   return {
     uri: { scheme: uri.scheme, fsPath: uri.fsPath },
-    range: { start: point },
+    range,
     rawUri,
   };
 };
@@ -180,6 +203,18 @@ const isValidDocumentPoint = (
   point: ProviderPoint,
 ): boolean => point.line < lines.length && point.character <= (lines[point.line]?.length ?? -1);
 
+const isValidDocumentRange = (
+  lines: readonly string[],
+  range: ProviderRange,
+): boolean => isValidDocumentPoint(lines, range.start) && isValidDocumentPoint(lines, range.end);
+
+const publicRange = (range: ProviderRange) => Object.freeze({
+  startLine: range.start.line + 1,
+  startColumn: range.start.character + 1,
+  endLine: range.end.line + 1,
+  endColumn: range.end.character + 1,
+});
+
 const mapBounded = async <T, R>(
   values: readonly T[],
   limit: number,
@@ -199,9 +234,15 @@ const mapBounded = async <T, R>(
   return Object.freeze(results);
 };
 
+const providerObservation = <T>(result: ProviderInvocationResult<T>) => Object.freeze({
+  status: result.status,
+  elapsedMs: result.elapsedMs,
+  attempts: result.attempts,
+});
+
 const bridgeStatus = <T>(result: ProviderInvocationResult<T>): JsonValue | undefined => {
   if (result.status === 'completed') return undefined;
-  return { status: result.status };
+  return { status: result.status, provider: providerObservation(result) };
 };
 
 const workspaceAdapter: ProviderCommandAdapter<WorkspaceProviderInput, readonly unknown[]> = {
@@ -324,6 +365,7 @@ export class SymbolsProviderBridge {
     return {
       status: 'completed',
       candidates,
+      provider: providerObservation(invocation),
       ...(publicWarnings === undefined ? {} : { warnings: publicWarnings }),
     } as unknown as JsonValue;
   }
@@ -368,6 +410,7 @@ export class SymbolsProviderBridge {
       const name = nonEmptyText(record.name);
       const kind = publicKind(record.kind);
       const selection = pointFromRange(record.selectionRange);
+      const fullRange = rangeFromValue(record.range);
       if (name !== undefined && kind !== undefined && selection !== undefined && Array.isArray(record.children)) {
         const path = Object.freeze([...current.parentPath, name]);
         if (!isValidDocumentPoint(lines, selection)) {
@@ -392,6 +435,9 @@ export class SymbolsProviderBridge {
           path,
           line,
           column: selection.character + 1,
+          ...(fullRange === undefined || !isValidDocumentRange(lines, fullRange)
+            ? {}
+            : { range: publicRange(fullRange) }),
           ...(snippet === undefined ? {} : { snippet }),
         }));
         for (let index = record.children.length - 1; index >= 0; index -= 1) {
@@ -439,6 +485,9 @@ export class SymbolsProviderBridge {
         path: Object.freeze([name]),
         line,
         column: location.range.start.character + 1,
+        ...(isValidDocumentRange(lines, location.range)
+          ? { range: publicRange(location.range) }
+          : {}),
         ...(snippet === undefined ? {} : { snippet }),
       }));
     }
@@ -446,6 +495,7 @@ export class SymbolsProviderBridge {
     return {
       status: 'completed',
       candidates: Object.freeze(candidates),
+      provider: providerObservation(invocation),
       ...(publicWarnings === undefined ? {} : { warnings: publicWarnings }),
     } as unknown as JsonValue;
   }

@@ -156,6 +156,9 @@ export interface DocumentSymbolsInput extends ResultWindowInput {
   readonly file: string;
   readonly kinds?: readonly SymbolKind[];
   readonly maxDepth?: number;
+  readonly nameEquals?: string;
+  readonly pathEquals?: readonly string[];
+  readonly includeRange?: boolean;
   readonly contextLines?: number;
 }
 
@@ -301,6 +304,13 @@ export interface Collection<T> {
   readonly results: readonly T[];
   readonly available: number;
   readonly warnings?: readonly string[];
+  readonly provider?: ProviderObservation;
+}
+
+export interface ProviderObservation {
+  readonly status: 'completed' | 'unavailable' | 'notReady' | 'cancelled' | 'timedOut' | 'failed';
+  readonly elapsedMs: number;
+  readonly attempts: number;
 }
 
 export interface Workspace {
@@ -336,6 +346,7 @@ export interface DocumentSymbol {
   readonly path: readonly string[];
   readonly line: number;
   readonly column: number;
+  readonly range?: Range;
   readonly snippet?: string;
 }
 
@@ -612,6 +623,7 @@ interface ToolErrorBase<C extends ErrorCode, R extends boolean> {
   readonly message: string;
   readonly retryable: R;
   readonly action?: string;
+  readonly provider?: ProviderObservation;
 }
 
 type ToolErrorWithoutDetails<C extends ErrorCode, R extends boolean> = ToolErrorBase<C, R> & {

@@ -18,12 +18,14 @@ test('workspace symbol bridge responses are strict, logical, and frozen', () => 
       snippet: 'class Widget {}',
     }],
     warnings: ['provider_candidate_invalid'],
+    provider: { status: 'completed', elapsedMs: 12, attempts: 1 },
   });
   assert.equal(parsed.status, 'completed');
   if (parsed.status === 'completed') {
     assert.equal(parsed.candidates[0]?.file, 'src/widget.ts');
     assert.equal(Object.isFrozen(parsed), true);
     assert.equal(Object.isFrozen(parsed.candidates), true);
+    assert.deepEqual(parsed.provider, { status: 'completed', elapsedMs: 12, attempts: 1 });
   }
 
   assert.throws(() => parseWorkspaceSymbolBridgeResponse({
@@ -45,11 +47,18 @@ test('document symbol bridge preserves complete paths and rejects malformed coor
       path: ['Widget', 'run'],
       line: 4,
       column: 5,
+      range: { startLine: 4, startColumn: 1, endLine: 8, endColumn: 2 },
     }],
   });
   assert.equal(parsed.status, 'completed');
   if (parsed.status === 'completed') {
     assert.deepEqual(parsed.candidates[0]?.path, ['Widget', 'run']);
+    assert.deepEqual(parsed.candidates[0]?.range, {
+      startLine: 4,
+      startColumn: 1,
+      endLine: 8,
+      endColumn: 2,
+    });
   }
   assert.throws(() => parseDocumentSymbolBridgeResponse({
     status: 'completed',
@@ -69,4 +78,15 @@ test('symbol bridge terminal statuses contain no provider internals', () => {
     () => parseWorkspaceSymbolBridgeResponse({ status: 'failed', command: 'private.command' }),
     /unknown field/u,
   );
+  assert.deepEqual(parseWorkspaceSymbolBridgeResponse({
+    status: 'timedOut',
+    provider: { status: 'timedOut', elapsedMs: 90_000, attempts: 2 },
+  }), {
+    status: 'timedOut',
+    provider: { status: 'timedOut', elapsedMs: 90_000, attempts: 2 },
+  });
+  assert.throws(() => parseWorkspaceSymbolBridgeResponse({
+    status: 'failed',
+    provider: { status: 'completed', elapsedMs: 1, attempts: 1 },
+  }), /status must match/u);
 });

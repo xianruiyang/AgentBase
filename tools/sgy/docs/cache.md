@@ -8,7 +8,7 @@
 | `on` | 成功处理后始终提交完整原生输出 |
 | `off` | 不创建 cache；省略内容之后不能由 cache 取回 |
 
-cache 在 Token-Safe 投影前保存原生 JSON/JSONL 字节和索引。它不是第二次 ast-grep 扫描，也不受 40/400/24 KiB 模型上下文预算影响。提交 cache 时会对已发现的引擎执行有界版本探测并记录实际 `ast-grep ...` 版本；仅在探测失败时使用 `unknown`。
+cache 在 Token-Safe 投影前保存原生 JSON/JSONL 字节和索引。它不是第二次 ast-grep 扫描，也不受 40/400/24 KiB 模型上下文预算影响。提交 cache 时会对已发现的引擎执行有界版本探测并记录实际 `ast-grep ...` 版本；仅在探测失败时使用 `unknown`。需要后续位置投影的源码必须在 `exec` 时显式重复 `--fingerprint-file <PATH>`；sgy 在启动引擎前取整文件哈希、提交前复核，最多 256 个文件、每个 64 MiB。
 
 默认位置为 `%LOCALAPPDATA%\sgy\cache\v1`。
 
@@ -35,7 +35,11 @@ sgy cache get 01HXXXXXXXXXXXXXXXXXXXXXXX --result 12 --field /text
 ```powershell
 sgy process count --cache-id 01HXXXXXXXXXXXXXXXXXXXXXXX
 sgy process group --cache-id 01HXXXXXXXXXXXXXXXXXXXXXXX --field file
+sgy process containing --cache-id 01HXXXXXXXXXXXXXXXXXXXXXXX --file src/app.ts --line 42 --column 8
+sgy process group-locations --cache-id 01HXXXXXXXXXXXXXXXXXXXXXXX --file src/app.ts --limit 40
 ```
+
+位置投影只接受原生 ast-grep cache，并沿用其 workspace 根和 0-based、end-exclusive range。它在返回正文或位置前复核登记文件的整文件哈希与 cache 记录；未登记 fingerprint、执行期间变化或查询前变化都必须重新执行原扫描，不能把旧 cache 当作当前结构。
 
 ## 维护与隐私
 

@@ -193,6 +193,22 @@ test('normalization applies explicit defaults without mutating caller input', ()
     resultStart: 1,
     resultEnd: 20,
   });
+  assert.deepEqual(normalizeToolInput('document_symbols', {
+    workspaceId: 'workspace-1',
+    file: 'src/widget.ts',
+    nameEquals: 'run',
+    pathEquals: ['Widget', 'run'],
+    includeRange: true,
+  }), {
+    workspaceId: 'workspace-1',
+    file: 'src/widget.ts',
+    nameEquals: 'run',
+    pathEquals: ['Widget', 'run'],
+    includeRange: true,
+    contextLines: 0,
+    resultStart: 1,
+    resultEnd: 20,
+  });
   assert.deepEqual(normalizeToolInput('get_references', {
     workspaceId: 'workspace-1',
     file: 'src/widget.ts',
@@ -309,6 +325,37 @@ test('normalization applies explicit defaults without mutating caller input', ()
       retainOutputLog: false,
     },
   );
+});
+
+test('symbol observations and optional document ranges remain schema-bounded', () => {
+  const provider = { status: 'completed', elapsedMs: 17, attempts: 1 } as const;
+  assert.doesNotThrow(() => assertToolOutput('document_symbols', {
+    ok: true,
+    data: {
+      results: [{
+        kind: 'method',
+        path: ['Widget', 'run'],
+        line: 2,
+        column: 3,
+        range: { startLine: 2, startColumn: 3, endLine: 2, endColumn: 11 },
+      }],
+      available: 1,
+      provider,
+    },
+  }));
+  assert.doesNotThrow(() => assertToolOutput('workspace_symbols', {
+    ok: false,
+    error: {
+      code: 'PROVIDER_TIMEOUT',
+      message: 'Timed out.',
+      retryable: true,
+      provider: { status: 'timedOut', elapsedMs: 90_000, attempts: 2 },
+    },
+  }));
+  assert.throws(() => assertToolOutput('workspace_symbols', {
+    ok: true,
+    data: { results: [], available: 0, provider: { ...provider, elapsedMs: -1 } },
+  }), ProtocolValidationError);
 });
 
 test('cross-field validation rejects invalid windows, ranges, globs, and diagnostic scope', () => {

@@ -64,7 +64,7 @@ pub fn command() -> Command {
                 ),
         )
         .after_help(
-            "Operational syntax: sgy <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: sgy <schema|capabilities|doctor> ...\nCache syntax: sgy cache <get|query|info|remove|gc> ...\nProcess syntax: sgy process <validate|select|filter|count|group|sort|dedupe|merge|to-jsonl|from-jsonl> ...",
+            "Operational syntax: sgy <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: sgy <schema|capabilities|doctor> ...\nCache syntax: sgy cache <get|query|info|remove|gc> ...\nProcess syntax: sgy process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...",
         )
 }
 
@@ -112,6 +112,58 @@ fn process_subcommand() -> Command {
                         .value_name("PATH")
                         .required(true),
                 ),
+        )
+        .subcommand(
+            process_cache_args(
+                Command::new("containing")
+                    .about("Select the smallest cached ranges containing one 0-based position"),
+            )
+            .arg(
+                Arg::new("file")
+                    .long("file")
+                    .value_name("PATH")
+                    .required(true),
+            )
+            .arg(
+                Arg::new("line")
+                    .long("line")
+                    .value_name("N")
+                    .required(true)
+                    .value_parser(clap::value_parser!(u64)),
+            )
+            .arg(
+                Arg::new("column")
+                    .long("column")
+                    .value_name("N")
+                    .required(true)
+                    .value_parser(clap::value_parser!(u64)),
+            )
+            .arg(
+                Arg::new("include-text")
+                    .long("include-text")
+                    .action(ArgAction::SetTrue),
+            ),
+        )
+        .subcommand(
+            process_cache_args(
+                Command::new("group-locations")
+                    .about("Group verified cached locations without repeating file paths"),
+            )
+            .arg(Arg::new("file").long("file").value_name("PATH"))
+            .arg(
+                Arg::new("offset")
+                    .long("offset")
+                    .value_name("N")
+                    .default_value("0")
+                    .value_parser(clap::value_parser!(usize)),
+            )
+            .arg(
+                Arg::new("limit")
+                    .long("limit")
+                    .value_name("N")
+                    .default_value("40")
+                    .value_parser(clap::value_parser!(u64).range(1..=1000)),
+            ),
         )
         .subcommand(
             process_source_args(
@@ -174,6 +226,15 @@ fn process_source_args(command: Command) -> Command {
                 .value_name("ID")
                 .conflicts_with("input"),
         )
+}
+
+fn process_cache_args(command: Command) -> Command {
+    command.arg(
+        Arg::new("cache-id")
+            .long("cache-id")
+            .value_name("ID")
+            .required(true),
+    )
 }
 
 fn cache_subcommand() -> Command {
@@ -293,6 +354,17 @@ pub enum ProcessAction {
     Group {
         field: String,
     },
+    Containing {
+        file: String,
+        line: u64,
+        column: u64,
+        include_text: bool,
+    },
+    GroupLocations {
+        file: Option<String>,
+        offset: usize,
+        limit: usize,
+    },
     Sort {
         by: String,
         descending: bool,
@@ -371,6 +443,14 @@ fn wrapper_subcommand(name: &'static str, about: &'static str) -> Command {
                 .long("cache")
                 .value_name("MODE")
                 .value_parser(PossibleValuesParser::new(["auto", "on", "off"])),
+        )
+        .arg(
+            Arg::new("fingerprint-file")
+                .long("fingerprint-file")
+                .value_name("PATH")
+                .help("Snapshot one source file before execution for verified cache reuse")
+                .action(ArgAction::Append)
+                .value_parser(clap::value_parser!(PathBuf)),
         )
         .arg(
             Arg::new("max-detail-results")
@@ -573,6 +653,26 @@ fn parse_process_command(matches: &ArgMatches) -> Result<ProcessCommand, CliPars
         "group" => ProcessAction::Group {
             field: required("field")?,
         },
+        "containing" => ProcessAction::Containing {
+            file: required("file")?,
+            line: values
+                .get_one::<u64>("line")
+                .copied()
+                .ok_or(CliParseError::MissingDelimiter)?,
+            column: values
+                .get_one::<u64>("column")
+                .copied()
+                .ok_or(CliParseError::MissingDelimiter)?,
+            include_text: values.get_flag("include-text"),
+        },
+        "group-locations" => ProcessAction::GroupLocations {
+            file: values.get_one::<String>("file").cloned(),
+            offset: values.get_one::<usize>("offset").copied().unwrap_or(0),
+            limit: values
+                .get_one::<u64>("limit")
+                .and_then(|value| usize::try_from(*value).ok())
+                .unwrap_or(40),
+        },
         "sort" => ProcessAction::Sort {
             by: required("by")?,
             descending: values.get_flag("descending"),
@@ -655,6 +755,10 @@ fn explicit_options(matches: &ArgMatches) -> ExplicitOptions {
                 "off" => Some(sgy_core::cache::CacheMode::Off),
                 _ => None,
             }),
+        fingerprint_files: matches
+            .get_many::<PathBuf>("fingerprint-file")
+            .map(|values| values.cloned().collect())
+            .unwrap_or_default(),
         max_detail_results: matches.get_one::<u32>("max-detail-results").copied(),
         max_text_chars: matches.get_one::<u32>("max-text-chars").copied(),
         max_context_bytes: matches.get_one::<u64>("max-context-bytes").copied(),
@@ -702,6 +806,10 @@ mod tests {
             "custom",
             "--cache",
             "off",
+            "--fingerprint-file",
+            "src/a.ts",
+            "--fingerprint-file",
+            "src/b.ts",
             "--max-detail-results",
             "20",
             "--max-text-chars",
@@ -754,6 +862,13 @@ mod tests {
         assert_eq!(
             invocation.explicit.cache_mode,
             Some(sgy_core::cache::CacheMode::Off)
+        );
+        assert_eq!(
+            invocation.explicit.fingerprint_files,
+            vec![
+                Path::new("src/a.ts").to_path_buf(),
+                Path::new("src/b.ts").to_path_buf()
+            ]
         );
         assert_eq!(invocation.explicit.max_detail_results, Some(20));
         assert_eq!(invocation.explicit.max_text_chars, Some(120));
@@ -899,6 +1014,54 @@ mod tests {
             CliAction::Process(ProcessCommand {
                 input: ProcessInput::Cache("01ARZ3NDEKTSV4RRFFQ69G5FAV".to_owned()),
                 action: ProcessAction::Count,
+            })
+        );
+        assert_eq!(
+            parse_cli_from(os_args(&[
+                "sgy",
+                "process",
+                "containing",
+                "--cache-id",
+                "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                "--file",
+                "src/a.ts",
+                "--line",
+                "12",
+                "--column",
+                "3",
+                "--include-text",
+            ]))
+            .expect("process containing"),
+            CliAction::Process(ProcessCommand {
+                input: ProcessInput::Cache("01ARZ3NDEKTSV4RRFFQ69G5FAV".to_owned()),
+                action: ProcessAction::Containing {
+                    file: "src/a.ts".to_owned(),
+                    line: 12,
+                    column: 3,
+                    include_text: true,
+                },
+            })
+        );
+        assert_eq!(
+            parse_cli_from(os_args(&[
+                "sgy",
+                "process",
+                "group-locations",
+                "--cache-id",
+                "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                "--offset",
+                "2",
+                "--limit",
+                "5",
+            ]))
+            .expect("process grouped locations"),
+            CliAction::Process(ProcessCommand {
+                input: ProcessInput::Cache("01ARZ3NDEKTSV4RRFFQ69G5FAV".to_owned()),
+                action: ProcessAction::GroupLocations {
+                    file: None,
+                    offset: 2,
+                    limit: 5,
+                },
             })
         );
     }

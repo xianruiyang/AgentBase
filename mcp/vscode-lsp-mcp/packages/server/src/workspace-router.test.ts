@@ -465,9 +465,13 @@ test('symbol routes apply public filtering, stable ordering, depth, context, and
       connect: () => Promise.resolve(new FakeSession((method: string, params: JsonObject) => {
         calls.push({ method, params });
         if (method === 'symbols.workspace') {
-          if (params.query === 'Timeout') return { status: 'timedOut' };
+          if (params.query === 'Timeout') return {
+            status: 'timedOut',
+            provider: { status: 'timedOut', elapsedMs: 90_000, attempts: 2 },
+          };
           return {
             status: 'completed',
+            provider: { status: 'completed', elapsedMs: 17, attempts: 1 },
             candidates: [
               { name: 'widgetFactory', kind: 'class', file: 'src/factory.ts', line: 3, column: 1 },
               { name: 'Widget', kind: 'class', file: 'src/widget.ts', line: 2, column: 7 },
@@ -480,9 +484,10 @@ test('symbol routes apply public filtering, stable ordering, depth, context, and
         if (method === 'symbols.document') {
           return {
             status: 'completed',
+            provider: { status: 'completed', elapsedMs: 23, attempts: 1 },
             candidates: [
-              { kind: 'class', path: ['Widget'], line: 1, column: 7, snippet: 'class Widget {' },
-              { kind: 'method', path: ['Widget', 'run'], line: 2, column: 3, snippet: '  run() {}' },
+              { kind: 'class', path: ['Widget'], line: 1, column: 7, range: { startLine: 1, startColumn: 1, endLine: 5, endColumn: 2 }, snippet: 'class Widget {' },
+              { kind: 'method', path: ['Widget', 'run'], line: 2, column: 3, range: { startLine: 2, startColumn: 3, endLine: 2, endColumn: 11 }, snippet: '  run() {}' },
               { kind: 'field', path: ['Widget', 'value'], line: 3, column: 3 },
               { kind: 'method', path: ['Widget', 'Inner', 'deep'], line: 4, column: 5 },
             ],
@@ -506,6 +511,7 @@ test('symbol routes apply public filtering, stable ordering, depth, context, and
     if (workspace.ok) {
       assert.equal(workspace.data.available, 2);
       assert.deepEqual(workspace.data.results.map(({ name }) => name), ['Widget', 'widgetFactory']);
+      assert.deepEqual(workspace.data.provider, { status: 'completed', elapsedMs: 17, attempts: 1 });
     }
     assert.deepEqual(calls[0], {
       method: 'symbols.workspace',
@@ -517,20 +523,25 @@ test('symbol routes apply public filtering, stable ordering, depth, context, and
       file: 'src/widget.ts',
       kinds: ['class', 'method'],
       maxDepth: 1,
+      nameEquals: 'run',
+      pathEquals: ['Widget', 'run'],
+      includeRange: true,
       contextLines: 1,
-      resultStart: 2,
-      resultEnd: 2,
+      resultStart: 1,
+      resultEnd: 1,
     });
     assert.equal(document.ok, true);
     if (document.ok) {
-      assert.equal(document.data.available, 2);
+      assert.equal(document.data.available, 1);
       assert.deepEqual(document.data.results, [{
         kind: 'method',
         path: ['Widget', 'run'],
         line: 2,
         column: 3,
+        range: { startLine: 2, startColumn: 3, endLine: 2, endColumn: 11 },
         snippet: '  run() {}',
       }]);
+      assert.deepEqual(document.data.provider, { status: 'completed', elapsedMs: 23, attempts: 1 });
     }
     assert.deepEqual(calls[1], {
       method: 'symbols.document',
@@ -542,7 +553,14 @@ test('symbol routes apply public filtering, stable ordering, depth, context, and
       query: 'Timeout',
     });
     assert.equal(timedOut.ok, false);
-    if (!timedOut.ok) assert.equal(timedOut.error.code, 'PROVIDER_TIMEOUT');
+    if (!timedOut.ok) {
+      assert.equal(timedOut.error.code, 'PROVIDER_TIMEOUT');
+      assert.deepEqual(timedOut.error.provider, {
+        status: 'timedOut',
+        elapsedMs: 90_000,
+        attempts: 2,
+      });
+    }
   } finally {
     await state.dispose();
   }

@@ -17,7 +17,7 @@ use super::{
     io_error,
     model::{hex_lower, CACHE_INDEX_SCHEMA, CACHE_METADATA_SCHEMA},
     store::ensure_safe_file,
-    CacheEntryLease, CacheError, CacheIndexRecord, CacheStore, SourceFormat,
+    CacheEntryLease, CacheError, CacheIndexRecord, CacheStore, SourceFingerprint, SourceFormat,
 };
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -51,6 +51,7 @@ pub struct VerifiedCache {
     index: IndexDescriptor,
     record_count: u64,
     source_document: Option<Value>,
+    source_fingerprints: Vec<SourceFingerprint>,
 }
 
 #[derive(Clone, Debug)]
@@ -147,6 +148,7 @@ impl VerifiedCache {
         expect_text(metadata_root, "cache_id", expected_id)?;
         expect_text(metadata_root, "state", "committed")?;
         validate_metadata_shape(metadata_root)?;
+        let source_fingerprints = parse_source_fingerprints(metadata_root)?;
 
         let source_metadata = object_field(metadata_root, "source")?;
         let source_format = SourceFormat::parse(text_field(source_metadata, "format")?)?;
@@ -189,6 +191,7 @@ impl VerifiedCache {
             index,
             record_count: expected_records,
             source_document,
+            source_fingerprints,
         })
     }
 
@@ -210,6 +213,14 @@ impl VerifiedCache {
     #[must_use]
     pub const fn record_count(&self) -> u64 {
         self.record_count
+    }
+
+    #[must_use]
+    pub fn source_fingerprint(&self, file: &str) -> Option<&SourceFingerprint> {
+        let target = normalize_fingerprint_file(file);
+        self.source_fingerprints
+            .iter()
+            .find(|fingerprint| normalize_fingerprint_file(&fingerprint.file) == target)
     }
 
     pub fn iter_records(&self) -> Result<CacheIndexIter, CacheError> {
@@ -381,7 +392,50 @@ fn validate_metadata_shape(root: &Map<String, Value>) -> Result<(), CacheError> 
             "metadata process.failure must be a string".to_owned(),
         ));
     }
+    let _ = parse_source_fingerprints(root)?;
     Ok(())
+}
+
+fn parse_source_fingerprints(
+    root: &Map<String, Value>,
+) -> Result<Vec<SourceFingerprint>, CacheError> {
+    let Some(raw) = root.get("source_fingerprints") else {
+        return Ok(Vec::new());
+    };
+    let values = raw.as_array().ok_or_else(|| {
+        CacheError::Verification("metadata source_fingerprints must be an array".to_owned())
+    })?;
+    if values.len() > 256 {
+        return Err(CacheError::Verification(
+            "metadata source_fingerprints exceeds 256 entries".to_owned(),
+        ));
+    }
+    let mut fingerprints = Vec::with_capacity(values.len());
+    let mut seen = std::collections::BTreeSet::new();
+    for value in values {
+        let mapping = object(value, "source fingerprint")?;
+        let file = text_field(mapping, "file")?.to_owned();
+        let normalized = normalize_fingerprint_file(&file);
+        if normalized.is_empty() || !seen.insert(normalized) {
+            return Err(CacheError::Verification(
+                "metadata source_fingerprints contains an invalid or duplicate file".to_owned(),
+            ));
+        }
+        fingerprints.push(SourceFingerprint {
+            file,
+            bytes: u64_field(mapping, "bytes")?,
+            sha256: hash_field(mapping, "sha256")?.to_owned(),
+        });
+    }
+    Ok(fingerprints)
+}
+
+fn normalize_fingerprint_file(file: &str) -> String {
+    let normalized = file.replace('\\', "/");
+    normalized
+        .strip_prefix("./")
+        .unwrap_or(&normalized)
+        .to_ascii_lowercase()
 }
 
 const MAX_INDEX_HEADER_BYTES: u64 = 1024 * 1024;

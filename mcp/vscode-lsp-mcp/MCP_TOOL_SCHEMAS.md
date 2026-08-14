@@ -21,7 +21,7 @@
 
 - 不返回实际 Provider 身份，因为 VS Code Provider Command 通常不能可靠提供该信息。
 - 不返回请求中已有的 `workspaceId`、工具名、操作类型和参数回显。
-- 不返回 `requestId`、耗时、连接实例 ID、文档哈希、缓存时间戳等内部诊断字段。
+- 不返回 `requestId`、连接实例 ID、文档哈希、缓存时间戳等内部诊断字段；符号查询只公开当前 Provider 调用的紧凑耗时/尝试回执，供本任务升降级使用。
 - 不输出值为 `null`、`false`、空字符串或空数组的可选字段。
 - 不为统一 DTO 强迫无关工具返回空字段。
 - 能由同一响应其他字段直接推导的值不重复返回。
@@ -95,6 +95,7 @@ available: 46
 - `includeGlobs` 和 `excludeGlobs` 匹配使用 `/` 的工作区逻辑路径。第一版只支持 `*`、`?`、`**` 和字符类 `[...]`；先应用 include，再应用 exclude；不支持或无效的模式返回 `INVALID_ARGUMENT`。
 - `contextLines: 0` 不输出 `snippet`；大于 0 时，snippet 包含命中行及其前后最多 N 行，遇文件边界截断。服务端必须在截取前统一换行符，不能返回工作区外内容。
 - `document_symbols.maxDepth` 省略表示不限制深度，`0` 只返回顶层符号。调用/类型层级的 `maxDepth: 0` 只返回根节点。
+- `document_symbols.nameEquals` 比较 `path` 最后一项，`pathEquals` 比较完整路径；均为 ordinal exact 且在结果窗口前执行。`includeRange` 默认关闭。
 - `execute_command.target.taskRoot` 在单根或 taskName 全工作区唯一时可以省略；存在多个同名 task 候选时必须提供，否则返回 `INVALID_ARGUMENT`，不得静默选择。
 
 ## 3. 结果 Envelope
@@ -164,12 +165,19 @@ ToolError:
   message: string
   retryable: boolean
   action?: string
+  provider?: ProviderObservation
   details?: ErrorDetails object # 仅允许第 5.1 节按 code 冻结的对象分支
 
 Collection<T>:
   results: T[]
   available: integer >= 0
   warnings?: string[]
+  provider?: ProviderObservation
+
+ProviderObservation:
+  status: completed | unavailable | notReady | cancelled | timedOut | failed
+  elapsedMs: integer >= 0
+  attempts: integer >= 0
 
 Range:
   startLine: integer >= 1
@@ -223,6 +231,7 @@ DocumentSymbol:
   path: string[]
   line: integer >= 1
   column: integer >= 1
+  range?: Range
   snippet?: string
 
 HoverInfo:
@@ -518,7 +527,7 @@ CommandFailedDetails:
 | `health_check` | Check the server, VS Code bridge, and optional document activation. | `Collection<HealthResult>` | `R=true,D=false,I=true,O=false` |
 | `get_capabilities` | Check which semantic operations are usable for a workspace or document. | `Collection<Capability>` | `R=true,D=false,I=true,O=false` |
 | `workspace_symbols` | Search workspace symbols by name and return bounded navigation candidates. | `Collection<SymbolHit>` | `R=true,D=false,I=true,O=false` |
-| `document_symbols` | Return a document symbol outline as a bounded flat list with symbol paths. | `Collection<DocumentSymbol>` | `R=true,D=false,I=true,O=false` |
+| `document_symbols` | Return a bounded document outline with exact path/name filters and optional full ranges. | `Collection<DocumentSymbol>` | `R=true,D=false,I=true,O=false` |
 | `symbol_info` | Query selected semantic information at one source position. | `Collection<SymbolInfoResult>` | `R=true,D=false,I=true,O=false` |
 | `get_references` | Find semantic references at one source position. | `Collection<ReferenceHit>` | `R=true,D=false,I=true,O=false` |
 | `get_call_hierarchy` | Return bounded incoming or outgoing call hierarchy entries. | `Collection<CallHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
@@ -626,7 +635,7 @@ CommandFailedDetails:
 }
 ```
 
-输出：`Collection<SymbolHit>`。按匹配质量、名称、文件和位置稳定排序。
+输出：`Collection<SymbolHit>`。按匹配质量、名称、文件和位置稳定排序；成功集合和预期 Provider 失败可携带本次调用的 `ProviderObservation`，不能据此推断长期性能。
 
 ### 6.6 `document_symbols`
 
@@ -639,6 +648,9 @@ CommandFailedDetails:
     "file": { "type": "string", "minLength": 1 },
     "kinds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/SymbolKind" } },
     "maxDepth": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "nameEquals": { "type": "string", "minLength": 1 },
+    "pathEquals": { "type": "array", "minItems": 1, "maxItems": 101, "items": { "type": "string", "minLength": 1 } },
+    "includeRange": { "type": "boolean", "default": false },
     "contextLines": { "type": "integer", "minimum": 0, "maximum": 5, "default": 0 },
     "resultStart": { "type": "integer", "minimum": 1, "default": 1 },
     "resultEnd": { "type": "integer", "minimum": 1 }
@@ -648,7 +660,7 @@ CommandFailedDetails:
 }
 ```
 
-输出：`Collection<DocumentSymbol>`。结果按文档符号树前序排列；`path` 在窗口切片后仍完整表达结构，不返回可推导的名称、深度或父节点 ID。
+输出：`Collection<DocumentSymbol>`。精确名称/路径过滤先于窗口，重复名称全部保留；结果按文档符号树前序排列。`path` 在窗口切片后仍完整表达结构，不返回可推导的名称、深度或父节点 ID。`includeRange: true` 时范围使用 1-based、end-exclusive 坐标；缺失项给出 `provider_range_unavailable`，范围仍须由源码读回验收。集合携带当前 Provider 调用观察。
 
 ### 6.7 `symbol_info`
 

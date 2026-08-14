@@ -523,6 +523,8 @@ fn is_known_schema(schema: &str) -> bool {
             | "sgy.cache-query/v1"
             | "sgy.process.collection/v1"
             | "sgy.process.merged-record/v1"
+            | "sgy.process.containing/v1"
+            | "sgy.process.grouped-locations/v1"
             | VALIDATE_SCHEMA
             | COUNT_SCHEMA
             | GROUP_SCHEMA
@@ -565,7 +567,9 @@ fn validate_known_schema(
         | COUNT_SCHEMA
         | GROUP_SCHEMA
         | "sgy.process.collection/v1"
-        | "sgy.process.merged-record/v1" => Ok(()),
+        | "sgy.process.merged-record/v1"
+        | "sgy.process.containing/v1"
+        | "sgy.process.grouped-locations/v1" => Ok(()),
         _ => Ok(()),
     }
 }

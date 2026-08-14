@@ -38,6 +38,7 @@ import {
   type HierarchyBridgeKind,
   type HierarchySymbol,
   type JsonObject,
+  type ProviderObservation,
   type RegistrationRecord,
   type ReferenceHit,
   type RuntimePlatform,
@@ -96,15 +97,22 @@ const semanticFailure = (
 
 const providerStatusFailure = (
   status: 'unavailable' | 'notReady' | 'cancelled' | 'timedOut' | 'failed' | 'positionOutOfRange',
+  provider?: ProviderObservation,
 ): SemanticToolFailure => {
   if (status === 'timedOut') {
-    return semanticFailure({ code: 'PROVIDER_TIMEOUT', message: 'The semantic provider timed out.', retryable: true });
+    return semanticFailure({
+      code: 'PROVIDER_TIMEOUT',
+      message: 'The semantic provider timed out.',
+      retryable: true,
+      ...(provider === undefined ? {} : { provider }),
+    });
   }
   if (status === 'positionOutOfRange') {
     return semanticFailure({
       code: 'POSITION_OUT_OF_RANGE',
       message: 'The requested symbol position is outside the document.',
       retryable: false,
+      ...(provider === undefined ? {} : { provider }),
     });
   }
   return semanticFailure({
@@ -113,6 +121,7 @@ const providerStatusFailure = (
         ? 'The requested semantic provider is unavailable.'
         : 'The requested semantic provider could not produce a result.',
       retryable: false,
+      ...(provider === undefined ? {} : { provider }),
     });
 };
 
@@ -954,7 +963,7 @@ export class WorkspaceRouter {
       });
     }
     if (response.status !== 'completed') {
-      return providerStatusFailure(response.status);
+      return providerStatusFailure(response.status, response.provider);
     }
 
     const kinds = input.kinds === undefined ? undefined : new Set(input.kinds);
@@ -977,7 +986,13 @@ export class WorkspaceRouter {
       resultEnd: input.resultEnd ?? ((input.resultStart ?? 1) + 19),
       ...(response.warnings === undefined ? {} : { warnings: response.warnings }),
     });
-    return Object.freeze({ ok: true, data: collection });
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        ...collection,
+        ...(response.provider === undefined ? {} : { provider: response.provider }),
+      }),
+    });
   }
 
   async symbolInfo(
@@ -1172,7 +1187,7 @@ export class WorkspaceRouter {
       });
     }
     if (response.status !== 'completed') {
-      return providerStatusFailure(response.status);
+      return providerStatusFailure(response.status, response.provider);
     }
 
     const kinds = input.kinds === undefined ? undefined : new Set(input.kinds);
@@ -1181,18 +1196,46 @@ export class WorkspaceRouter {
       normalize: (candidate): DocumentSymbol => candidate,
       filter: (candidate) =>
         (kinds === undefined || kinds.has(candidate.kind)) &&
-        (maxDepth === undefined || candidate.path.length - 1 <= maxDepth),
+        (maxDepth === undefined || candidate.path.length - 1 <= maxDepth) &&
+        (input.nameEquals === undefined || candidate.path.at(-1) === input.nameEquals) &&
+        (input.pathEquals === undefined ||
+          (candidate.path.length === input.pathEquals.length &&
+            candidate.path.every((part, index) => part === input.pathEquals?.[index]))),
       dedupeKey: (candidate) => JSON.stringify([
         candidate.path,
         candidate.kind,
         candidate.line,
         candidate.column,
+        candidate.range ?? null,
       ]),
       resultStart: input.resultStart ?? 1,
       resultEnd: input.resultEnd ?? ((input.resultStart ?? 1) + 19),
       ...(response.warnings === undefined ? {} : { warnings: response.warnings }),
     });
-    return Object.freeze({ ok: true, data: collection });
+    const rangeUnavailable = input.includeRange === true &&
+      collection.results.some((candidate) => candidate.range === undefined);
+    const warnings = Object.freeze([
+      ...(collection.warnings ?? []),
+      ...(rangeUnavailable ? ['provider_range_unavailable'] : []),
+    ]);
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        results: Object.freeze(collection.results.map((candidate): DocumentSymbol => Object.freeze({
+          kind: candidate.kind,
+          path: candidate.path,
+          line: candidate.line,
+          column: candidate.column,
+          ...(input.includeRange === true && candidate.range !== undefined
+            ? { range: candidate.range }
+            : {}),
+          ...(candidate.snippet === undefined ? {} : { snippet: candidate.snippet }),
+        }))),
+        available: collection.available,
+        ...(warnings.length === 0 ? {} : { warnings }),
+        ...(response.provider === undefined ? {} : { provider: response.provider }),
+      }),
+    });
   }
 
   async #connectWorkspaceRecord(

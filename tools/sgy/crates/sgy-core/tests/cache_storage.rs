@@ -13,7 +13,8 @@ use serde_json::{json, Value};
 use sgy_core::{
     cache::{
         default_cache_root, hash_argv, validate_cache_id, CacheAudit, CacheError, CacheIndexRecord,
-        CacheLimits, CacheMode, CacheProcess, CacheQuery, CacheStore, CommittedCache, SourceFormat,
+        CacheLimits, CacheMode, CacheProcess, CacheQuery, CacheStore, CommittedCache,
+        SourceFingerprint, SourceFormat,
     },
     codec::{parse_single_json, parse_yaml_documents, ByteSpan, JsonLines},
     invocation::Profile,
@@ -114,6 +115,67 @@ fn sha256(bytes: &[u8]) -> String {
 
 fn fixed_now() -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_secs(2_000_000_000)
+}
+
+#[test]
+fn source_fingerprints_bind_cache_reuse_to_unchanged_workspace_files() {
+    let fixture = Fixture::new();
+    let store = fixture.store(CacheLimits::default());
+    let source_dir = fixture.workspace.join("src");
+    fs::create_dir(&source_dir).expect("source directory");
+    let source = source_dir.join("a.ts");
+    fs::write(&source, b"function a() {}\n").expect("source");
+    let args = vec![OsString::from("run")];
+    let fingerprint =
+        SourceFingerprint::capture(&fixture.workspace, Path::new("src/a.ts")).expect("fingerprint");
+    let audit = CacheAudit::from_argv(
+        "ast-grep",
+        "0.44.1",
+        &fixture.workspace,
+        &args,
+        &args,
+        Vec::new(),
+        Profile::Locations,
+        CacheMode::On,
+    )
+    .with_source_fingerprints(vec![fingerprint.clone()]);
+    let raw = b"{\"file\":\"src/a.ts\",\"text\":\"function a() {}\"}\n";
+    let mut changed = store
+        .begin(SourceFormat::JsonLines, audit.clone(), fixed_now())
+        .expect("staging");
+    changed
+        .stage_source(Cursor::new(raw))
+        .expect("native source");
+    for record in JsonLines::new(BufReader::new(Cursor::new(raw))) {
+        changed
+            .add_source_record(&record.expect("record"))
+            .expect("index");
+    }
+    fs::write(&source, b"function changed() {}\n").expect("mutate source");
+    assert!(matches!(
+        changed.commit(CacheProcess::completed(0), fixed_now()),
+        Err(CacheError::Verification(message)) if message.contains("changed during ast-grep")
+    ));
+
+    fs::write(&source, b"function a() {}\n").expect("restore source");
+    let mut stable = store
+        .begin(SourceFormat::JsonLines, audit, fixed_now())
+        .expect("stable staging");
+    stable
+        .stage_source(Cursor::new(raw))
+        .expect("native source");
+    for record in JsonLines::new(BufReader::new(Cursor::new(raw))) {
+        stable
+            .add_source_record(&record.expect("record"))
+            .expect("index");
+    }
+    let committed = stable
+        .commit(CacheProcess::completed(0), fixed_now())
+        .expect("stable commit");
+    let verified = store
+        .open_verified(&committed.cache_id, fixed_now())
+        .expect("verified cache");
+    assert_eq!(verified.source_fingerprint("SRC\\A.TS"), Some(&fingerprint));
 }
 
 #[test]

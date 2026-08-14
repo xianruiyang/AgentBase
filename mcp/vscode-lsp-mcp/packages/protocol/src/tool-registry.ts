@@ -61,7 +61,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'document_symbols',
-    description: 'Return a document symbol outline as a bounded flat list with symbol paths.',
+    description: 'Return a bounded document outline with exact path/name filters and optional full ranges.',
     readOnly: true,
     destructive: false,
     idempotent: true,

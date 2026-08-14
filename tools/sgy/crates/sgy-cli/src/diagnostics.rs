@@ -89,7 +89,7 @@ pub fn render_capabilities() -> Result<Vec<u8>, DiagnosticError> {
             "native": ["exec", "defaults"],
             "inspection": ["schema", "capabilities", "doctor"],
             "cache": ["get", "query", "info", "remove", "gc"],
-            "process": ["validate", "select", "filter", "count", "group", "sort", "dedupe", "merge", "to-jsonl", "from-jsonl"]
+            "process": ["validate", "select", "filter", "count", "group", "sort", "dedupe", "merge", "to-jsonl", "from-jsonl", "containing", "group-locations"]
         },
         "config": {
             "schema": config::CONFIG_SCHEMA,

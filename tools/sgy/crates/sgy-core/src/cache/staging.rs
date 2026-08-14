@@ -191,6 +191,7 @@ impl CacheStaging {
             .ok_or_else(|| CacheError::Verification("cache source is missing".to_owned()))?;
         self.finish_record_spool()?;
         self.validate_source_and_index(&source)?;
+        self.verify_source_fingerprints()?;
 
         let gc_lock = self.store.acquire_gc_lock()?;
         let selected_id = self.store.available_id_locked(&self.cache_id)?;
@@ -555,6 +556,14 @@ impl CacheStaging {
             "user_argv_sha256".to_owned(),
             Value::String(self.audit.user_argv_sha256.clone()),
         );
+
+        let source_fingerprints = Value::Array(
+            self.audit
+                .source_fingerprints
+                .iter()
+                .map(super::SourceFingerprint::to_value)
+                .collect(),
+        );
         invocation.insert(
             "effective_argv_sha256".to_owned(),
             Value::String(self.audit.effective_argv_sha256.clone()),
@@ -623,6 +632,7 @@ impl CacheStaging {
         metadata.insert("engine".to_owned(), Value::Object(engine));
         metadata.insert("cwd".to_owned(), Value::String(path_text(&self.audit.cwd)));
         metadata.insert("invocation".to_owned(), Value::Object(invocation));
+        metadata.insert("source_fingerprints".to_owned(), source_fingerprints);
         metadata.insert("source".to_owned(), Value::Object(source_value));
         metadata.insert("process".to_owned(), Value::Object(process_value));
 
@@ -636,6 +646,20 @@ impl CacheStaging {
         output
             .sync_all()
             .map_err(|source| io_error("sync cache metadata", &path, source))
+    }
+
+    fn verify_source_fingerprints(&self) -> Result<(), CacheError> {
+        for expected in &self.audit.source_fingerprints {
+            let actual =
+                super::SourceFingerprint::capture(&self.audit.cwd, Path::new(&expected.file))?;
+            if &actual != expected {
+                return Err(CacheError::Verification(format!(
+                    "fingerprint source {:?} changed during ast-grep execution",
+                    expected.file
+                )));
+            }
+        }
+        Ok(())
     }
 }
 

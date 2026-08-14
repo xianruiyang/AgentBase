@@ -55,18 +55,24 @@ sgy exec [wrapper options] -- <原生 ast-grep argv...>
 2. 已知只需每条命中的文件和完整起止范围、不需正文、捕获或规则诊断时，使用 `--profile locations`；其结果为 0-based 紧凑位置串。
 3. 读取 `_sgy.total/files/shown/omitted/complete`；`complete: false` 表示详情或文本被省略，不能从可见列表推断全部结果。
 4. 先利用文件/规则汇总缩小范围；需要遗漏详情时，用 `_sgy.cache` 进行分页查询，不要重新无界扫描。
-5. 需要完整机器 round-trip 或未知字段时才用 `--profile lossless`，并通过 `--yaml-out` 写本地文件；不要把完整 lossless/cache 输出倾倒到模型上下文。
-6. 默认 40 条详情、单文本 400 字符、约 24 KiB 上下文预算只限制可见 YAML，不限制 ast-grep 的扫描或写入集合。
-7. 显式 SARIF 可由 Token-Safe 提取 finding；只有完整 SARIF 审计才使用 lossless。
+5. 已有准确源码位置但边界不稳时，用 `--cache on --fingerprint-file <file>` 建立可验证 cache，再使用 `process containing`；同文件多个目标复用同一 cache，需浏览多个范围时用 `group-locations`，不要把整份 locations 列表交给模型。
+6. 需要完整机器 round-trip 或未知字段时才用 `--profile lossless`，并通过 `--yaml-out` 写本地文件；不要把完整 lossless/cache 输出倾倒到模型上下文。
+7. 默认 40 条详情、单文本 400 字符、约 24 KiB 上下文预算只限制可见 YAML，不限制 ast-grep 的扫描或写入集合。
+8. 显式 SARIF 可由 Token-Safe 提取 finding；只有完整 SARIF 审计才使用 lossless。
 
 常用取回与聚合：
 
 ```powershell
+& $Sgy exec --cwd '<repo>' --cache on --fingerprint-file src/a.ts --profile locations -- run --kind function_declaration -l ts src/a.ts
 & $Sgy cache query <ID> --file src/a.ts --limit 20
 & $Sgy cache get <ID> --result 12
 & $Sgy process count --cache-id <ID>
 & $Sgy process group --cache-id <ID> --field file
+& $Sgy process containing --cache-id <ID> --file src/a.ts --line 42 --column 8 --include-text
+& $Sgy process group-locations --cache-id <ID> --file src/a.ts --limit 40
 ```
+
+位置参数和返回 range 均为 0-based、end-exclusive。`containing` 并列时返回全部最小项，且只证明当前 AST 查询集合内的语法包含；源码变化会被拒绝并要求重扫。正文可能较大，只在它能替代后续定向读取时请求。
 
 ## Rewrite 安全门
 

@@ -41,6 +41,7 @@ pub struct ExplicitOptions {
     pub meta_out: Option<PathBuf>,
     pub profile: Option<Profile>,
     pub cache_mode: Option<CacheMode>,
+    pub fingerprint_files: Vec<PathBuf>,
     pub max_detail_results: Option<u32>,
     pub max_text_chars: Option<u32>,
     pub max_context_bytes: Option<u64>,

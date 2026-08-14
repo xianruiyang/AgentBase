@@ -6,7 +6,8 @@ mod staging;
 mod store;
 
 pub use model::{
-    hash_argv, CacheAudit, CacheIndexRecord, CacheLimits, CacheMode, CacheProcess, SourceFormat,
+    hash_argv, CacheAudit, CacheIndexRecord, CacheLimits, CacheMode, CacheProcess,
+    SourceFingerprint, SourceFormat,
 };
 pub use reader::{CacheIndexIter, CacheQuery, CacheQueryResult, CachedResult, VerifiedCache};
 pub use staging::{CacheStaging, CommittedCache};

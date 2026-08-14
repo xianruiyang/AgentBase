@@ -7,7 +7,7 @@
 | `list_workspaces` | 很低 | 本轮确定需要 LSP；调用一次并复用 |
 | `health_check` | 低 | 首次激活或故障诊断，不在每次查询前调用 |
 | `get_capabilities` | 中 | 兼容性调查；结果仅作弱提示 |
-| `document_symbols` | 低-中 | 已知文件，需要可复用的语义大纲或嵌套路径 |
+| `document_symbols` | 环境敏感，低-中 | 已知文件，需要可复用大纲，或精确过滤/完整范围能省掉后续边界查询 |
 | `symbol_info` | 中 | 需要 hover、定义、类型、实现或签名；只请求所需 kind |
 | `get_diagnostics` | 低-中 | 读取已发布诊断；指定文件 |
 | `workspace_symbols` | 环境敏感，中-高 | 名称已知但文件未知，低成本候选无法消歧，且当前 Provider 与索引成本可接受 |
@@ -17,7 +17,9 @@
 
 集合默认取 1–20 项、`contextLines: 0`。大型工作区排除 Saved、Binaries、缓存和源码镜像；不要删除或阻断 UE 编译所需的 Intermediate 生成内容。
 
-名称已知但文件未知时，通常先用受限 rg/AST 缩小候选；项目较小、索引已就绪或当前语言 Provider 的实测成本可接受，且语义候选能减少消歧时，可以直接或升级使用 `workspace_symbols`。它是条件性低优先级入口，不是全局禁用项；当前环境一旦超时、不可用或成本明显失衡，本任务内降级且不重复探测。单个已知声明的正文不默认请求全文件 `document_symbols`，只有大纲能被后续判断复用时才承担其成本。
+名称已知但文件未知时，通常先用受限 rg/AST 缩小候选；项目较小、索引已就绪或当前语言 Provider 的实测成本可接受，且语义候选能减少消歧时，可以直接或升级使用 `workspace_symbols`。它是条件性低优先级入口，不是全局禁用项。`workspace_symbols` 与 `document_symbols` 的 `provider` 只记录当前调用的 `status/elapsedMs/attempts`；当前环境一旦超时、不可用或成本明显失衡，本任务内降级且不重复探测，不能把一次观察写成跨项目能力结论。
+
+单个已知声明的正文不默认请求全文件大纲。确需 `document_symbols` 时，可用 ordinal exact 的 `nameEquals` 或完整 `pathEquals` 在分页前过滤；同名或重载匹配全部保留。只有能替代下一次 AST/定向边界查询时才设置 `includeRange: true`；返回范围为 1-based、end-exclusive 的 Provider 观察，缺失或不可靠时读回源码并降级 AST，不能由名称或范围声明语义唯一。
 
 ## 精确引用
 

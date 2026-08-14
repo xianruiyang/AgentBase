@@ -39,6 +39,7 @@ const collectionSchema = (itemDefinition: string): JsonSchema =>
       results: { type: 'array', items: schemaRef(itemDefinition) },
       available: { type: 'integer', minimum: 0 },
       warnings: nonEmptyStringArray(),
+      provider: schemaRef('ProviderObservation'),
     },
     ['results', 'available'],
   );
@@ -58,16 +59,26 @@ const errorProperties = (
   code: ErrorCode,
   retryable: boolean,
   details?: JsonSchema,
+  includeProvider = false,
 ): Record<string, unknown> => ({
   code: { const: code },
   message: nonEmptyString(),
   retryable: { const: retryable },
   action: nonEmptyString(),
   ...(details === undefined ? {} : { details }),
+  ...(includeProvider ? { provider: schemaRef('ProviderObservation') } : {}),
 });
 
 const simpleErrorSchema = (code: ErrorCode, retryable: boolean): JsonSchema =>
-  objectSchema(errorProperties(code, retryable), ['code', 'message', 'retryable']);
+  objectSchema(
+    errorProperties(
+      code,
+      retryable,
+      undefined,
+      code === 'PROVIDER_UNAVAILABLE' || code === 'PROVIDER_TIMEOUT',
+    ),
+    ['code', 'message', 'retryable'],
+  );
 
 const detailedErrorSchema = (
   code: ErrorCode,
@@ -202,6 +213,14 @@ export const PUBLIC_SCHEMA_DEFS: Record<string, JsonSchema> = {
   SymbolKind: { enum: [...SYMBOL_KINDS] },
   CapabilityName: { enum: [...CAPABILITY_NAMES] },
   Range: rangeSchema,
+  ProviderObservation: objectSchema(
+    {
+      status: { enum: ['completed', 'unavailable', 'notReady', 'cancelled', 'timedOut', 'failed'] },
+      elapsedMs: { type: 'integer', minimum: 0 },
+      attempts: { type: 'integer', minimum: 0 },
+    },
+    ['status', 'elapsedMs', 'attempts'],
+  ),
   Workspace: objectSchema(
     {
       workspaceId: nonEmptyString(),
@@ -249,6 +268,7 @@ export const PUBLIC_SCHEMA_DEFS: Record<string, JsonSchema> = {
       path: nonEmptyStringArray(),
       line: positionInteger(),
       column: positionInteger(),
+      range: schemaRef('Range'),
       snippet: nonEmptyString(),
     },
     ['kind', 'path', 'line', 'column'],

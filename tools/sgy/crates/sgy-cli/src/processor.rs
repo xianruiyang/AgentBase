@@ -18,6 +18,8 @@ use thiserror::Error;
 
 use crate::{ProcessAction, ProcessCommand, ProcessInput};
 
+mod location_projection;
+
 #[derive(Debug, Error)]
 pub enum ProcessCommandError {
     #[error(transparent)]
@@ -94,6 +96,32 @@ fn execute_staged(
             launch_cwd,
             output,
             limits,
+        ),
+        ProcessAction::Containing {
+            file,
+            line,
+            column,
+            include_text,
+        } => location_projection::execute_containing(
+            &command.input,
+            file,
+            *line,
+            *column,
+            *include_text,
+            launch_cwd,
+            output,
+        ),
+        ProcessAction::GroupLocations {
+            file,
+            offset,
+            limit,
+        } => location_projection::execute_grouped_locations(
+            &command.input,
+            file.as_deref(),
+            *offset,
+            *limit,
+            launch_cwd,
+            output,
         ),
         ProcessAction::ToJsonl => execute_to_jsonl(&command.input, launch_cwd, output, limits),
         ProcessAction::FromJsonl => execute_from_jsonl(&command.input, output, limits),
@@ -357,6 +385,8 @@ fn basic_operation(action: &ProcessAction) -> Result<Operation, ProcessError> {
         ProcessAction::Sort { .. }
         | ProcessAction::Dedupe { .. }
         | ProcessAction::Merge { .. }
+        | ProcessAction::Containing { .. }
+        | ProcessAction::GroupLocations { .. }
         | ProcessAction::ToJsonl
         | ProcessAction::FromJsonl => Err(ProcessError::InvalidArgument(
             "operation is not a basic YAML processor".to_owned(),

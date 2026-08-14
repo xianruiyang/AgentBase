@@ -190,6 +190,7 @@ fn preflight_passthrough(
             if explicit.yaml_out.is_some()
                 || explicit.artifact_out.is_some()
                 || explicit.stderr_yaml.is_some()
+                || !explicit.fingerprint_files.is_empty()
                 || projection_or_budget
                 || explicit.cache_mode == Some(CacheMode::On)
             {
@@ -202,6 +203,7 @@ fn preflight_passthrough(
         Some(PassthroughChannel::Lsp) => {
             if explicit.yaml_out.is_some()
                 || explicit.artifact_out.is_some()
+                || !explicit.fingerprint_files.is_empty()
                 || projection_or_budget
                 || explicit.cache_mode == Some(CacheMode::On)
             {
@@ -916,6 +918,14 @@ fn prepare_cache_plan(
     engine: &sgy_core::engine::DiscoveredEngine,
 ) -> CachePlan {
     let mode = prepared.defaults.settings.cache_mode;
+    if !prepared.invocation.explicit.fingerprint_files.is_empty() && mode != CacheMode::On {
+        return CachePlan::unavailable(
+            CacheMode::On,
+            sgy_core::cache::CacheError::Verification(
+                "--fingerprint-file requires effective cache=on".to_owned(),
+            ),
+        );
+    }
     if mode == CacheMode::Off {
         return CachePlan::off();
     }
@@ -948,6 +958,38 @@ fn prepare_cache_plan(
         prepared.defaults.settings.profile,
         mode,
     );
+    let mut fingerprints = Vec::new();
+    if prepared.invocation.explicit.fingerprint_files.len() > 256 {
+        return CachePlan::unavailable(
+            CacheMode::On,
+            sgy_core::cache::CacheError::Verification(
+                "--fingerprint-file accepts at most 256 files".to_owned(),
+            ),
+        );
+    }
+    for file in &prepared.invocation.explicit.fingerprint_files {
+        match sgy_core::cache::SourceFingerprint::capture(&prepared.settings.child_cwd.path, file) {
+            Ok(fingerprint) => {
+                if fingerprints
+                    .iter()
+                    .any(|existing: &sgy_core::cache::SourceFingerprint| {
+                        existing.file.eq_ignore_ascii_case(&fingerprint.file)
+                    })
+                {
+                    return CachePlan::unavailable(
+                        CacheMode::On,
+                        sgy_core::cache::CacheError::Verification(format!(
+                            "duplicate fingerprint source {:?}",
+                            fingerprint.file
+                        )),
+                    );
+                }
+                fingerprints.push(fingerprint);
+            }
+            Err(error) => return CachePlan::unavailable(CacheMode::On, error),
+        }
+    }
+    let audit = audit.with_source_fingerprints(fingerprints);
     CachePlan::ready(store, audit)
 }
 

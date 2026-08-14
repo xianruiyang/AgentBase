@@ -142,6 +142,23 @@ fn main() -> io::Result<()> {
         .or_else(|| args.iter().any(|arg| arg == "--json").then_some("pretty"));
     let format = format_flag(&args);
     if let Some(count) = numeric_flag(&args, "--fixture-matches=") {
+        let source_backed = args
+            .iter()
+            .find_map(|arg| arg.strip_prefix("--fixture-source-backed="))
+            .map(|path| {
+                let bytes = fs::read(path)?;
+                let mut starts = vec![0_usize];
+                for (index, byte) in bytes.iter().enumerate() {
+                    if *byte == b'\n' {
+                        starts.push(index + 1);
+                    }
+                }
+                if starts.last().copied() != Some(bytes.len()) {
+                    starts.push(bytes.len());
+                }
+                Ok::<_, io::Error>((path.replace('\\', "/"), bytes, starts))
+            })
+            .transpose()?;
         let text_chars = numeric_flag(&args, "--fixture-text-chars=").unwrap_or(24);
         let metadata = args
             .iter()
@@ -150,13 +167,35 @@ fn main() -> io::Result<()> {
         let replacements = args.iter().any(|arg| arg == "--fixture-replacements");
         let records: Vec<serde_json::Value> = (0..count)
             .map(|ordinal| {
+                let (file, start_line, end_line, end_column, text) =
+                    if let Some((path, bytes, starts)) = source_backed.as_ref() {
+                        let line_count = starts.len().saturating_sub(1);
+                        let start_line = ordinal;
+                        let end_line = line_count.saturating_sub(ordinal);
+                        assert!(
+                            start_line < end_line,
+                            "source-backed fixture needs more lines"
+                        );
+                        let text =
+                            String::from_utf8(bytes[starts[start_line]..starts[end_line]].to_vec())
+                                .expect("source-backed fixture must be UTF-8");
+                        (path.clone(), start_line, end_line, 0, text)
+                    } else {
+                        (
+                            format!("src/{}.ts", ordinal % 3),
+                            ordinal,
+                            ordinal,
+                            5,
+                            format!("match-{ordinal}-{}", "x".repeat(text_chars)),
+                        )
+                    };
                 let mut record = json!({
-                    "file": format!("src/{}.ts", ordinal % 3),
+                    "file": file,
                     "range": {
-                        "start": {"line": ordinal, "column": 0},
-                        "end": {"line": ordinal, "column": 5},
+                        "start": {"line": start_line, "column": 0},
+                        "end": {"line": end_line, "column": end_column},
                     },
-                    "text": format!("match-{ordinal}-{}", "x".repeat(text_chars)),
+                    "text": text,
                     "metaVariables": {"single": {"A": {"text": format!("capture-{ordinal}")}}},
                     "ruleId": format!("rule-{}", ordinal % 2),
                     "severity": if ordinal % 2 == 0 { "warning" } else { "error" },

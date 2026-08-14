@@ -34,7 +34,7 @@ sgy defaults [wrapper options] -- <ast-grep argv...>
 ```text
 sgy exec [wrapper options] -- <ast-grep argv...>
 sgy cache <get|query|info|remove|gc> ...
-sgy process <validate|select|filter|count|group|sort|dedupe|merge|to-jsonl|from-jsonl> ...
+sgy process <validate|select|filter|count|group|sort|dedupe|merge|to-jsonl|from-jsonl|containing|group-locations> ...
 sgy <schema|capabilities|doctor> ...
 ```
 
@@ -45,6 +45,7 @@ sgy <schema|capabilities|doctor> ...
 --cwd PATH
 --profile token-safe|locations|lossless|files|custom
 --cache auto|on|off
+--fingerprint-file PATH
 --max-detail-results N
 --max-text-chars N
 --max-context-bytes N
@@ -115,7 +116,11 @@ sgy cache gc
 ```text
 sgy process count --cache-id <ID>
 sgy process group --cache-id <ID> --field file
+sgy process containing --cache-id <ID> --file src/app.ts --line 42 --column 8 [--include-text]
+sgy process group-locations --cache-id <ID> [--file src/app.ts] --offset 0 --limit 40
 ```
+
+位置投影前，原扫描必须使用 `--cache on --fingerprint-file <file>`；多文件可重复该参数，最多 256 项。`containing` 在完整 cache 结果中返回覆盖目标 0-based 行列的最小范围；并列最小项不会被伪装成唯一。`--include-text` 才返回完整缓存正文。`group-locations` 按文件分组范围，适合同一次扫描服务同文件多个目标。两者会复核执行前、执行后和查询时的整文件身份；缺少 fingerprint 或 stale 时必须重扫。它们只证明 cache 节点集合内的语法边界，不证明真实符号身份。
 
 处理文件时先生成 lossless YAML，再传 `--input`：
 

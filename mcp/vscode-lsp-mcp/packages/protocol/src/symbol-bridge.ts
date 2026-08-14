@@ -1,6 +1,8 @@
 import {
   SYMBOL_KINDS,
   type DocumentSymbol,
+  type ProviderObservation,
+  type Range,
   type SymbolHit,
   type SymbolKind,
 } from './dto.js';
@@ -18,9 +20,11 @@ export type SymbolBridgeResponse<T> =
       readonly status: 'completed';
       readonly candidates: readonly T[];
       readonly warnings?: readonly string[];
+      readonly provider?: ProviderObservation;
     }
   | {
       readonly status: 'unavailable' | 'notReady' | 'cancelled' | 'timedOut' | 'failed';
+      readonly provider?: ProviderObservation;
     };
 
 const symbolKindSet = new Set<string>(SYMBOL_KINDS);
@@ -71,6 +75,49 @@ const position = (value: Record<string, unknown>, key: string, label: string): n
   return field as number;
 };
 
+const nonNegativeInteger = (value: unknown, label: string): number => {
+  if (!Number.isSafeInteger(value) || (value as number) < 0) {
+    throw new TypeError(`${label} must be a non-negative safe integer.`);
+  }
+  return value as number;
+};
+
+const parseProviderObservation = (
+  value: unknown,
+  responseStatus: SymbolBridgeResponse<unknown>['status'],
+): ProviderObservation | undefined => {
+  if (value === undefined) return undefined;
+  const record = asRecord(value, 'symbol bridge provider observation');
+  assertExactFields(record, ['status', 'elapsedMs', 'attempts'], 'symbol bridge provider observation');
+  if (record.status !== responseStatus) {
+    throw new TypeError('Symbol bridge provider observation status must match the response status.');
+  }
+  return Object.freeze({
+    status: responseStatus,
+    elapsedMs: nonNegativeInteger(record.elapsedMs, 'symbol bridge provider observation.elapsedMs'),
+    attempts: nonNegativeInteger(record.attempts, 'symbol bridge provider observation.attempts'),
+  });
+};
+
+const parseRange = (value: unknown, label: string): Range | undefined => {
+  if (value === undefined) return undefined;
+  const record = asRecord(value, label);
+  assertExactFields(record, ['startLine', 'startColumn', 'endLine', 'endColumn'], label);
+  const parsed = Object.freeze({
+    startLine: position(record, 'startLine', label),
+    startColumn: position(record, 'startColumn', label),
+    endLine: position(record, 'endLine', label),
+    endColumn: position(record, 'endColumn', label),
+  });
+  if (
+    parsed.endLine < parsed.startLine ||
+    (parsed.endLine === parsed.startLine && parsed.endColumn < parsed.startColumn)
+  ) {
+    throw new TypeError(`${label} must be ordered.`);
+  }
+  return parsed;
+};
+
 const symbolKind = (value: Record<string, unknown>, label: string): SymbolKind => {
   const field = value.kind;
   if (typeof field !== 'string' || !symbolKindSet.has(field)) {
@@ -116,7 +163,7 @@ const parseWorkspaceCandidate = (value: unknown, index: number): SymbolHit => {
 const parseDocumentCandidate = (value: unknown, index: number): DocumentSymbol => {
   const label = `document symbol candidate ${index}`;
   const record = asRecord(value, label);
-  assertExactFields(record, ['kind', 'path', 'line', 'column', 'snippet'], label);
+  assertExactFields(record, ['kind', 'path', 'line', 'column', 'range', 'snippet'], label);
   const rawPath = record.path;
   if (!Array.isArray(rawPath) || rawPath.length === 0) {
     throw new TypeError(`${label}.path must be a non-empty array.`);
@@ -128,11 +175,13 @@ const parseDocumentCandidate = (value: unknown, index: number): DocumentSymbol =
     return entry;
   }));
   const snippet = optionalString(record, 'snippet', label);
+  const range = parseRange(record.range, `${label}.range`);
   return Object.freeze({
     kind: symbolKind(record, label),
     path,
     line: position(record, 'line', label),
     column: position(record, 'column', label),
+    ...(range === undefined ? {} : { range }),
     ...(snippet === undefined ? {} : { snippet }),
   });
 };
@@ -165,22 +214,28 @@ const parseResponse = <T>(
   const record = asRecord(value, 'symbol bridge response');
   const status = record.status;
   if (status === 'completed') {
-    assertExactFields(record, ['status', 'candidates', 'warnings'], 'symbol bridge response');
+    assertExactFields(record, ['status', 'candidates', 'warnings', 'provider'], 'symbol bridge response');
     if (!Array.isArray(record.candidates)) {
       throw new TypeError('Completed symbol bridge response must contain candidates.');
     }
     const warnings = parseWarnings(record.warnings);
+    const provider = parseProviderObservation(record.provider, status);
     return Object.freeze({
       status,
       candidates: Object.freeze(record.candidates.map(parseCandidate)),
       ...(warnings === undefined ? {} : { warnings }),
+      ...(provider === undefined ? {} : { provider }),
     });
   }
   if (typeof status !== 'string' || !terminalStatuses.has(status)) {
     throw new TypeError('Symbol bridge response status is invalid.');
   }
-  assertExactFields(record, ['status'], 'symbol bridge response');
-  return Object.freeze({ status }) as SymbolBridgeResponse<T>;
+  assertExactFields(record, ['status', 'provider'], 'symbol bridge response');
+  const provider = parseProviderObservation(record.provider, status as SymbolBridgeResponse<T>['status']);
+  return Object.freeze({
+    status,
+    ...(provider === undefined ? {} : { provider }),
+  }) as SymbolBridgeResponse<T>;
 };
 
 export const parseWorkspaceSymbolBridgeResponse = (

@@ -115,6 +115,8 @@ test('workspace symbol bridge maps logical locations, coordinates, snippets, and
       new Set(result.warnings),
       new Set(['provider_candidate_outside_workspace', 'provider_candidate_invalid']),
     );
+    assert.equal(result.provider?.status, 'completed');
+    assert.equal(result.provider?.attempts, 1);
   }
   assert.deepEqual(host.calls[0]?.args, ['Widget']);
 });
@@ -125,10 +127,12 @@ test('document symbol bridge flattens hierarchical and flat providers in preorde
     {
       name: 'Widget',
       kind: 4,
+      range: { start: position(0, 0), end: position(2, 1) },
       selectionRange: range(0, 6),
       children: [{
         name: 'run',
         kind: 5,
+        range: { start: position(1, 2), end: position(1, 10) },
         selectionRange: range(1, 2),
         children: [],
       }],
@@ -156,6 +160,7 @@ test('document symbol bridge flattens hierarchical and flat providers in preorde
         path: ['Widget'],
         line: 1,
         column: 7,
+        range: { startLine: 1, startColumn: 1, endLine: 3, endColumn: 2 },
         snippet: 'class Widget {\n  run() {}',
       },
       {
@@ -163,6 +168,7 @@ test('document symbol bridge flattens hierarchical and flat providers in preorde
         path: ['Widget', 'run'],
         line: 2,
         column: 3,
+        range: { startLine: 2, startColumn: 3, endLine: 2, endColumn: 11 },
         snippet: 'class Widget {\n  run() {}\n}',
       },
       {
@@ -170,10 +176,12 @@ test('document symbol bridge flattens hierarchical and flat providers in preorde
         path: ['loose'],
         line: 4,
         column: 7,
+        range: { startLine: 4, startColumn: 7, endLine: 4, endColumn: 8 },
         snippet: '}\nconst loose = 1;',
       },
     ]);
     assert.deepEqual(result.warnings, ['provider_candidate_invalid']);
+    assert.equal(result.provider?.status, 'completed');
   }
   assert.equal(host.calls[0]?.args[0], host.document.uri);
 });
@@ -187,5 +195,8 @@ test('symbol bridge preserves provider unavailability instead of returning an em
     request(SYMBOL_BRIDGE_METHODS.workspace, { query: 'Widget', contextLines: 0 }),
     new AbortController().signal,
   );
-  assert.deepEqual(parseWorkspaceSymbolBridgeResponse(raw), { status: 'unavailable' });
+  const result = parseWorkspaceSymbolBridgeResponse(raw);
+  assert.equal(result.status, 'unavailable');
+  assert.equal(result.provider?.status, 'unavailable');
+  assert.equal(result.provider?.attempts, 1);
 });
