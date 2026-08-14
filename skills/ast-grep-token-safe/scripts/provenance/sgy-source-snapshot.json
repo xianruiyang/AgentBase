@@ -1,6 +1,6 @@
 {
   "schema": "sgy.source-snapshot/v1",
-  "sourceRevision": "sha256:db44e075b5778d33a364389f77fa84f8ac18ddd5850a52eeca8403a3a1182f36",
+  "sourceRevision": "sha256:ca18b3ba31582ed789eb3efb9f915d68aaf5e8b2838582cd487c8ff56d614e4f",
   "algorithm": "sha256(path + NUL + size + NUL + fileSha256 + LF), paths sorted ordinal",
   "root": ".",
   "excludedRoots": [
@@ -8,7 +8,7 @@
     "dist",
     "target"
   ],
-  "fileCount": 175,
+  "fileCount": 176,
   "files": [
     {
       "path": ".cargo/config.toml",
@@ -18,12 +18,12 @@
     {
       "path": "Cargo.lock",
       "size": 28517,
-      "sha256": "131d77d1db86af3442ee4c839962a1823b38d76168b47ece178c6e13704f7c40"
+      "sha256": "3411f3ea4ee8d28279a4e92500852b5ef286278d3fdf4d52a1c165400b7e4296"
     },
     {
       "path": "Cargo.toml",
       "size": 1094,
-      "sha256": "27e5391a99a103ce1eb54e3765e8ac42a1037d2ec2845711152159553ea1bd76"
+      "sha256": "efaa48dc780c9ddc5c221abd87e720b8b18b6a7981019199371e948f0a694bd2"
     },
     {
       "path": "LICENSE",
@@ -48,7 +48,7 @@
     {
       "path": "README.md",
       "size": 3347,
-      "sha256": "937a1004278d8ced3c73a261d52fb19748bfea9ea38dd4841aa50101d9ea1c55"
+      "sha256": "6bffbb29add0441ceaf6967ce401929ab5d2a9d422b9635b492a4b5339cc3b65"
     },
     {
       "path": "benches/README.md",
@@ -97,23 +97,28 @@
     },
     {
       "path": "crates/sgy-cli/src/diagnostics.rs",
-      "size": 15471,
-      "sha256": "1ed229f5b66f3bc6f209c15f54a69ad64ff6ffb6e9f6359774bab5504c9aaec7"
+      "size": 15504,
+      "sha256": "cd069afd68bfed9549cc21edabaf95d2dd4df79d831d6bdad58ce72d551b39bb"
     },
     {
       "path": "crates/sgy-cli/src/lib.rs",
-      "size": 30551,
-      "sha256": "de897f35fda97a7ed2e8fcfd3160ccff01f1b06c6c44e6b9b7394f293a85602e"
+      "size": 36034,
+      "sha256": "d11ad4532fcd563f1f0305b70aea13f36a784d0e85552b45b7dbf05ef9857b95"
     },
     {
       "path": "crates/sgy-cli/src/main.rs",
-      "size": 34118,
-      "sha256": "6bb10dacea2ee1f6daf8c3ec731ffa6c64f94d511087be1f176fb709689c6302"
+      "size": 35909,
+      "sha256": "75ceb80ec7807616c87a43c1cb57c8900c0fb07f164e0b68acc5cc8b3c328c5f"
     },
     {
       "path": "crates/sgy-cli/src/processor.rs",
-      "size": 12569,
-      "sha256": "5b47d7a84ff2bf8ebacce1f1ee21a28a6994e83af2de1b2b98f5eae57e1c282c"
+      "size": 13336,
+      "sha256": "f319ea7e252a126d2aaba1202942be07a9ae4e1d6071bd7b57de0b6e6176fa11"
+    },
+    {
+      "path": "crates/sgy-cli/src/processor/location_projection.rs",
+      "size": 15279,
+      "sha256": "34940ad8c5b7d7c7046dce05f70cf0fad4fcbd8c253f85a9198a14dbd6cda372"
     },
     {
       "path": "crates/sgy-cli/tests/cache_cli.rs",
@@ -142,8 +147,8 @@
     },
     {
       "path": "crates/sgy-cli/tests/helpers/native_fixture.rs",
-      "size": 11316,
-      "sha256": "bfd4874488a79deea7e8d46b89bd43a481c73e1789413e46f0b719b10f09e92d"
+      "size": 13106,
+      "sha256": "7a4332b979596db06edce935bc01f814f9932309f0dd5464349f36b9c32a4a0b"
     },
     {
       "path": "crates/sgy-cli/tests/package_boundary.rs",
@@ -157,8 +162,8 @@
     },
     {
       "path": "crates/sgy-cli/tests/process_cli.rs",
-      "size": 12821,
-      "sha256": "721441c7cfdd7cc7fc1d63c1b47c8f4362d1b72aaad3ef6344d5221f4641d262"
+      "size": 16708,
+      "sha256": "b00339b91c4e24bc326ca340e3dc3fef8ee3edc82138f9c61c6666875c766b97"
     },
     {
       "path": "crates/sgy-cli/tests/raw_artifact_adapter.rs",
@@ -287,23 +292,23 @@
     },
     {
       "path": "crates/sgy-core/src/cache/mod.rs",
-      "size": 2358,
-      "sha256": "4be1fc535c90adb8aa7853f4327dd0cabeb4353e4a61b9679e585ed9a6040d0d"
+      "size": 2381,
+      "sha256": "0cb5b17162dfbfbe6e8dab16a368473575f30d10730f738dce31f921777137c4"
     },
     {
       "path": "crates/sgy-core/src/cache/model.rs",
-      "size": 8161,
-      "sha256": "3270d10de831dd485162cf0aacdf9e76c6b08b1a755015087c58008094ee41e0"
+      "size": 11849,
+      "sha256": "db8c0b8c26e449d0ee2e7d2f70929d6ddbe21b24b96bbdae813173e38786a0cf"
     },
     {
       "path": "crates/sgy-core/src/cache/reader.rs",
-      "size": 30311,
-      "sha256": "b6b585cf5518ad8ac075cc7491925d2b54ddafd961f1c7abd814cc297ce94424"
+      "size": 32342,
+      "sha256": "510a715379ba7380bcfc54bd941a7fee327d9416719dd0d102d3a3f43c4c3e4b"
     },
     {
       "path": "crates/sgy-core/src/cache/staging.rs",
-      "size": 28286,
-      "sha256": "46aae3c9e660da105fe55b2af0bb90680793aa3b2245be566530a09e5ebc1051"
+      "size": 29167,
+      "sha256": "588e392af18ec32e3fae43686d838e6d2df82ee4723ced93ed92709e637d0de1"
     },
     {
       "path": "crates/sgy-core/src/cache/store.rs",
@@ -352,8 +357,8 @@
     },
     {
       "path": "crates/sgy-core/src/invocation.rs",
-      "size": 1420,
-      "sha256": "069cb4d2a0f0f9c1511d87a43cdb65c0ba8ca0232e50065c0bed1a2539641f19"
+      "size": 1461,
+      "sha256": "324ca579532f25ff79173127336ad0e8abda6c6f8b2c2c88832f7e5c3ad0744f"
     },
     {
       "path": "crates/sgy-core/src/lib.rs",
@@ -402,8 +407,8 @@
     },
     {
       "path": "crates/sgy-core/src/processors/mod.rs",
-      "size": 22457,
-      "sha256": "24fdf9e55acd3667e1f4ce736b84f7753e3aec648cfb1bf267c2e5f4b140edc9"
+      "size": 22631,
+      "sha256": "49fff3a580e7721bc7a36706e5e9a2e6172c552e4dd72c97a63d1f0a5debca6f"
     },
     {
       "path": "crates/sgy-core/src/profile/mod.rs",
@@ -427,8 +432,8 @@
     },
     {
       "path": "crates/sgy-core/tests/cache_storage.rs",
-      "size": 28636,
-      "sha256": "fbf4ffd8a86487e76a1effd720e0f89ba534cab9ab37a638c9077ad2a7e2d1c7"
+      "size": 30985,
+      "sha256": "75ad96eefc347bad98d9ad1afb0da569f9281fcb2512a9ea810f4bf1dc3ea911"
     },
     {
       "path": "crates/sgy-core/tests/codec_lossless.rs",
@@ -497,8 +502,8 @@
     },
     {
       "path": "docs/cache.md",
-      "size": 2264,
-      "sha256": "14e43d7857679d0aefb60bc57006b5764d34a21fbc2cda3d23c0776cb6b2269d"
+      "size": 2982,
+      "sha256": "b456800c11a068cff8e2ac16a66df4a000b52b6bf8152c3f2f032fa5d1adbfc7"
     },
     {
       "path": "docs/compatibility.md",
@@ -527,8 +532,8 @@
     },
     {
       "path": "docs/release-checklist.md",
-      "size": 2882,
-      "sha256": "7bf968d54d8b9fe21db568742a53e2423390ce39f0cc21cd6fc6aa454357504e"
+      "size": 2979,
+      "sha256": "0338e82b7c93694a4fe84903e69b0b64cc577b6943acf088340725ec3918db61"
     },
     {
       "path": "docs/security.md",
@@ -542,13 +547,13 @@
     },
     {
       "path": "docs/usage.md",
-      "size": 5537,
-      "sha256": "c618c0d95d9dcff236f69b633b5824336d7b33c66b8ae9b76689f6408dd69189"
+      "size": 6538,
+      "sha256": "13e59c0add91ef803232d1e9e454b196db95d5841b79d739102fc1889b1a8857"
     },
     {
       "path": "fuzz/Cargo.lock",
       "size": 23998,
-      "sha256": "c591566b8991f4991003437740dbb940923d26a6f7cb611f64cddb7c48ac19b5"
+      "sha256": "3bbf60a57eeba6552eff2a8ff381a2ccfdfc2ceab80006e052d5f084e0e0f3fb"
     },
     {
       "path": "fuzz/Cargo.toml",

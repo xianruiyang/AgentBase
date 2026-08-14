@@ -1,14 +1,14 @@
 {
   "schema": "sgy.release/v1",
   "name": "sgy",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "target": "x86_64-pc-windows-msvc",
-  "archive": "sgy-0.1.1-x86_64-pc-windows-msvc.zip",
+  "archive": "sgy-0.1.2-x86_64-pc-windows-msvc.zip",
   "binary": "sgy.exe",
   "source": {
-    "revision": "sha256:db44e075b5778d33a364389f77fa84f8ac18ddd5850a52eeca8403a3a1182f36",
-    "sourceDateEpoch": 0,
-    "cargoLockSha256": "131d77d1db86af3442ee4c839962a1823b38d76168b47ece178c6e13704f7c40"
+    "revision": "sha256:ca18b3ba31582ed789eb3efb9f915d68aaf5e8b2838582cd487c8ff56d614e4f",
+    "sourceDateEpoch": 1786703241,
+    "cargoLockSha256": "3411f3ea4ee8d28279a4e92500852b5ef286278d3fdf4d52a1c165400b7e4296"
   },
   "build": {
     "rustc": "rustc 1.85.0 (4d91de4e4 2025-02-17)",
@@ -32,13 +32,13 @@
   "files": [
     {
       "path": "sgy.exe",
-      "bytes": 1870336,
-      "sha256": "e61b5ddec6fbda2b9222e6e1256b8ad84975290e69c6870a27086840e1bcbee6"
+      "bytes": 1955840,
+      "sha256": "892d6ebd99b271cb6535bd93352646a2d699d4df3cd6607489b9f37241f7ba9f"
     },
     {
       "path": "README.md",
       "bytes": 3347,
-      "sha256": "937a1004278d8ced3c73a261d52fb19748bfea9ea38dd4841aa50101d9ea1c55"
+      "sha256": "6bffbb29add0441ceaf6967ce401929ab5d2a9d422b9635b492a4b5339cc3b65"
     },
     {
       "path": "LICENSE",
@@ -68,7 +68,7 @@
     {
       "path": "sbom.spdx.json",
       "bytes": 29046,
-      "sha256": "7b8426f09ee3f29ab04a24825cf703138800d1c119cf5b24dbff2842ea39ad4e"
+      "sha256": "ed9261d385a64458ab890f21c3c42704431724003efd0c0fdd4b6f22bf12323c"
     }
   ]
 }
