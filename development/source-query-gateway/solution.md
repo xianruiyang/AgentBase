@@ -85,13 +85,24 @@
 
 当前裁决是保留实现分支、停止无可比收益的 candidate-only 追跑，并撤销“已达收益边缘”和采纳准备状态。用户要求冻结的旧 control 不具备当前 identity；若不允许一次新的同 identity control/candidate 对照，本分支只能保留方向性证据，不能完成 `AC-SQG-004` 的因果收益声明。只有质量、总 Token、速度依次满足并由用户明确采纳，才另行更新总体项目、正式 skill 和发布候选；实际发布仍需当次用户明确同意。
 
-## SOL-SQG-008 将 sgy 收敛为独立 Windows CLI
+## SOL-SQG-008 将迁移前 sgy 原子收敛为独立 srcq Windows CLI
 
 - 状态: planned
-- 解决: GAP-SQG-004
-- 满足: DES-SQG-011, UDES-SQG-009
+- 解决: GAP-SQG-004, GAP-SQG-005
+- 满足: DES-SQG-011, UDES-SQG-009, UDES-SQG-010
 - 依赖: SOL-SQG-005, SOL-SQG-006
 
-沿用 `tools/sgy/scripts/install-sgy.ps1` 作为唯一生命周期入口，补齐当前 `0.2.0` 正式归档、校验和、manifest、来源和安装验证。安装态固定为用户级受管目录与唯一 PATH 项，验证覆盖全新安装、状态读回、幂等重装、可恢复升级、保留无关 PATH 的卸载、默认保留 cache、显式删除 cache，以及新进程中的 `sgy --version` 和 `sgy doctor`。
+以当前 `tools/sgy` 和已验证安装器作为迁移输入，在安装发布前原子更新为 `tools/srcq`、`srcq.exe`、`%LOCALAPPDATA%\Programs\srcq\current`、srcq 安装状态、归档、包名、manifest、来源、文档和验证。安装态固定为用户级受管目录与唯一 PATH 项，验证覆盖全新安装、状态读回、幂等重装、可恢复升级、保留无关 PATH 的卸载、默认保留 cache、显式删除 cache，以及新进程中的 `srcq --version` 和 `srcq doctor`。不保留 `sgy.exe` 兼容别名或旧受管安装轨道。
 
-候选 skill 改为直接调用 PATH 中的 `sgy.exe`，并验证缺失、错误版本和同名遮蔽时只返回安装、升级或重启恢复动作。主线采纳时先安装并读回主机 CLI，再更新消费者，最后删除候选与正式 skill 内置二进制及其 runtime manifest、来源和许可副本；部署与插件 payload 不再复制 sgy，也不保留私有 fallback。预期结果是安装、升级或卸载一次即可穿透所有消费者，同时只有 `tools/sgy` 维护运行时来源和生命周期。
+候选 skill 改为直接调用 PATH 中的 `srcq.exe`，并验证缺失、错误版本和同名遮蔽时只返回安装、升级或重启恢复动作。主线采纳时先安装并读回主机 CLI，再更新消费者，最后删除候选与正式 skill 内置二进制及其 runtime manifest、来源和许可副本；部署与插件 payload 不再复制 srcq/sgy，也不保留私有 fallback。预期结果是安装、升级或卸载一次即可穿透所有消费者，同时只有 `tools/srcq` 维护运行时来源和生命周期。
+
+## SOL-SQG-009 渐进暴露 LSP 语义查询并保留 srcq 只读降级路线
+
+- 状态: planned
+- 解决: GAP-SQG-006
+- 满足: AC-SQG-005, DES-SQG-012, UDES-SQG-011
+- 依赖: SOL-SQG-006, SOL-SQG-008
+
+保留 `vscode-lsp-mcp` 内部完整的 18 工具注册、精确 Schema、安全标注和独立验证，但先验证 Codex 原生延迟目录是否让未用 LSP 任务不承担全量工具定义，且单项语义查询只展开当前操作。skill 只持久化最小升级和停止原则，具体 LSP 命令与参数按需读取，不默认先跑 health、capabilities 或工具全览。
+
+验收使用无 LSP、单项 LSP 和多阶段 LSP 三类真实 Codex 路径，同时记录活动工具定义、Input/Output/cached Token、回合、耗时和质量。原生延迟发现达标时直接保留 MCP，不新增万能调度工具或 CLI LSP 入口。若它不能稳定降低实际上下文或因发现回合使总成本不降，则实现 `srcq lsp` 作为模型侧只读入口，复用同一 VS Code companion、认证 IPC、协议验证和 Provider 事实。MCP 可继续作为其他客户端适配器；rename、Code Action、format、command 和 debug 不迁入 Source Query Gateway。

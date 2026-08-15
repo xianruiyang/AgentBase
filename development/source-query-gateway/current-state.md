@@ -69,12 +69,35 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 当前候选 `candidate-skill/source-query` 和正式 `ast-grep-token-safe` 仍各自携带 `scripts/bin/windows-x86_64/sgy.exe` 及运行时来源材料；项目源码已是 `sgy 0.2.0`，正式 skill 内置记录仍是 `0.1.2`。因此“可独立安装”的机制已经存在，但消费者和发布合同尚未迁移到唯一 PATH 运行时。
 
+## OBS-SQG-008 LSP 工具注册完整但模型侧已观察到延迟发现
+
+- 状态: partially_verified
+- 关联: AC-SQG-002, AC-SQG-005, DES-SQG-012, UDES-SQG-011
+
+`vscode-lsp-mcp` 当前在一次 `tools/list` 中固定返回 18 个工具；按真实 MCP 公开字段序列化的工具定义合计为 `15,747` 字符。这是可观测的工具合同尺寸，不等于经 tokenizer 和客户端序列化后的实际 Token。
+
+当前 Codex 任务的主工具定义没有直接展开这 18 个 LSP 工具，但它们仍可从宿主的延迟工具目录被查找和调用。这证明 Codex 运行时具备渐进发现机制，但尚未证明未用 LSP 任务的实际 Input Token 已排除全量 Schema，也未证明单项发现不会展开其他工具或因新增回合抵消收益。
+
+## GAP-SQG-005 srcq 正式命名尚未迁移
+
+- 状态: open
+- 关联: DES-SQG-011, UDES-SQG-009, UDES-SQG-010, OBS-SQG-007
+
+用户已确认正式产品名为 Source Query Gateway、唯一命令为 `srcq.exe`，但当前源码目录、Cargo 包、安装脚本、安装目录、状态、归档、候选 skill 和历史证据仍使用 `sgy`。这些是尚未执行的产品身份迁移，不能以文档目标名称推断已实现。迁移需要在正式安装发布前原子完成，不保留 `sgy.exe` 别名或双轨受管运行时。
+
+## GAP-SQG-006 LSP 渐进暴露收益尚未验证
+
+- 状态: open
+- 关联: AC-SQG-005, DES-SQG-012, UDES-SQG-011, OBS-SQG-008
+
+当前只能证明“有延迟目录”，不能证明它在真实 Codex 调用链中降低总 Token。需要在同一客户端与项目身份下比较无 LSP、单项 LSP 和多阶段 LSP 路径的活动工具定义、总 Token、缓存输入、回合、耗时和质量。原生延迟发现达标时不应新增 CLI LSP 入口；不达标时才实现 `srcq lsp` 只读降级路线。
+
 ## GAP-SQG-004 独立安装入口尚未成为消费者唯一运行时
 
 - 状态: open
 - 关联: DES-SQG-011, UDES-SQG-009, OBS-SQG-007
 
-安装器已满足基础生命周期，但候选 skill、正式 skill 和部署合同仍会复制或验证 skill 内置 sgy，形成两个可独立变化的运行时来源。必须先完成当前 `sgy 0.2.0` 正式 Windows release 与用户级安装验证，再让候选消费者只调用 PATH 中的 `sgy.exe`，最后删除 skill payload 内置副本和对应同步合同；缺失或版本不符时应给出安装、升级和重启恢复动作，而不是静默 fallback。
+安装器已满足迁移前基础生命周期，但候选 skill、正式 skill 和部署合同仍会复制或验证 skill 内置 sgy，形成两个可独立变化的运行时来源。必须先完成 `sgy` 到 `srcq` 的原子命名迁移和 srcq 正式 Windows release 与用户级安装验证，再让候选消费者只调用 PATH 中的 `srcq.exe`，最后删除 skill payload 内置副本和对应同步合同；缺失或版本不符时应给出安装、升级和重启恢复动作，而不是静默 fallback。
 
 ## GAP-SQG-003 当前候选缺少身份一致的完成证据
 

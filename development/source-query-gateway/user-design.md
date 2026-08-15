@@ -10,7 +10,7 @@
 - 来源: 用户要求要么裁撤现有包装，要么认真做成统一包装
 - 关联: REQ-SQG-001
 
-直接扩展现有 sgy，由它统一承载 rg、fd 与 ast-grep 的模型侧包装能力，不继续维护质量不足或职责重复的独立包装协议。
+以现有 sgy 实现为成熟基线构建统一包装，由正式 Source Query Gateway 承载 rg、fd 与 ast-grep 的模型侧包装能力，不继续维护质量不足或职责重复的独立包装协议。历史实现和实验仍可使用 `sgy` 标识，正式产品与命令身份按 UDES-SQG-010 原子迁移。
 
 ## UDES-SQG-002 完整兼容原生命令
 
@@ -68,10 +68,26 @@ fd 返回大量共享目录前缀时，在确实更短的条件下使用可还�
 
 隔离 agent 测试流程及其全部输入、执行器和结果只在 AgentBase 仓库的开发边界内维护，不嵌入发布 skill、sgy 运行时或 Codex 安装目录。
 
-## UDES-SQG-009 sgy 作为正常 Windows 命令安装和卸载
+## UDES-SQG-009 srcq 作为正常 Windows 命令安装和卸载
 
 - 状态: confirmed
-- 来源: 用户明确要求 sgy 具备正常安装和卸载能力，并能像 Python 一样在 PowerShell 中直接调用
+- 来源: 用户明确要求统一网关具备正常安装和卸载能力，并能像 Python 一样在 PowerShell 中直接调用；后续确认正式命令为 `srcq.exe`
 - 关联: REQ-SQG-001, AC-SQG-001, CON-SQG-002
 
-sgy 应作为独立的 Windows 用户级 CLI 安装并进入用户 `PATH`，使 PowerShell、Codex 与其他消费者都能直接调用 `sgy.exe`，不依赖项目目录、Codex 根目录或某个 skill 的私有路径。正式生命周期必须覆盖安装、状态查询、升级和卸载；升级失败可恢复，卸载只移除安装器管理的文件与 `PATH` 项，不破坏无关用户状态。skill 不再捆绑或回退到另一份私有 sgy 运行时。
+srcq 应作为独立的 Windows 用户级 CLI 安装并进入用户 `PATH`，使 PowerShell、Codex 与其他消费者都能直接调用 `srcq.exe`，不依赖项目目录、Codex 根目录或某个 skill 的私有路径。正式生命周期必须覆盖安装、状态查询、升级和卸载；升级失败可恢复，卸载只移除安装器管理的文件与 `PATH` 项，不破坏无关用户状态。skill 不再捆绑或回退到另一份私有 srcq/sgy 运行时。
+
+## UDES-SQG-010 正式产品和命令使用 srcq
+
+- 状态: confirmed
+- 来源: 用户确认产品名为 Source Query Gateway、唯一命令为 `srcq.exe`，当时限定为先讨论需求与设计
+- 关联: REQ-SQG-001, CON-SQG-002
+
+正式产品名为 `Source Query Gateway`，唯一对外命令为 `srcq.exe`。当前 `sgy` 仅是尚未迁移的实现与历史证据身份；正式迁移应在安装发布前原子更新可执行文件、安装目录、状态、包、归档、skill、文档和验证，不保留 `sgy.exe` 兼容别名或双轨运行时。
+
+## UDES-SQG-011 LSP 能力渐进展示
+
+- 状态: confirmed
+- 来源: 用户明确要求 `vscode-lsp-mcp` 不再常驻展示全部工具，改为按真实需要渐进展示，必要时可采用类似 srcq 的形式或合并进 srcq
+- 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-005
+
+未使用 LSP 的任务不展示全量语义工具合同；进入 LSP 后也只展示当前缺失能力，不为了了解工具范围而一次展开全部定义。优先验证 Codex 宿主原生延迟工具发现；若它不能稳定降低实际上下文成本，候选设计可把只读 LSP 源码语义查询合并到 `srcq lsp`，但不因此将重命名应用、Code Action 应用、格式化应用、命令执行或调试控制并入源码查询职责。
