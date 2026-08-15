@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -26,17 +27,17 @@ def normalized_text(data: bytes) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sgy", required=True, type=Path)
+    parser.add_argument("--srcq", required=True, type=Path)
     parser.add_argument(
         "--expected-version",
         help="allow only the release version line to differ from the frozen AST baseline",
     )
     args = parser.parse_args()
     if sys.platform != "win32":
-        raise SystemExit("the sgy AST baseline is maintained only on Windows")
-    executable = args.sgy.resolve()
+        raise SystemExit("the Source Query Gateway AST baseline is maintained only on Windows")
+    executable = args.srcq.resolve()
     if not executable.is_file():
-        raise SystemExit(f"sgy executable does not exist: {executable}")
+        raise SystemExit(f"srcq executable does not exist: {executable}")
     differences = []
     for filename, command in COMMANDS.items():
         completed = subprocess.run(
@@ -46,8 +47,11 @@ def main() -> int:
             check=False,
         )
         expected = normalized_text((ROOT / filename).read_bytes())
+        expected = expected.replace("sgy.exe", "srcq.exe").replace(".sgy.yml", ".srcq.yml")
+        expected = expected.replace("SGY_", "SRCQ_")
+        expected = re.sub(r"(?<!_)\bsgy\b(?!\.)", "srcq", expected)
         if filename == "version.txt" and args.expected_version:
-            expected = f"sgy {args.expected_version}\n"
+            expected = f"srcq {args.expected_version}\n"
         if filename == "capabilities.yaml" and args.expected_version:
             expected = expected.replace(
                 '  "version": "0.1.2"\n',
@@ -71,7 +75,7 @@ def main() -> int:
         print(json.dumps({"ok": False, "differences": differences}, ensure_ascii=False, indent=2))
         return 1
     version = args.expected_version or "0.1.2"
-    print(f'{{"ok":true,"baseline":"sgy-0.1.2-ast","subjectVersion":"{version}"}}')
+    print(f'{{"ok":true,"baseline":"sgy-0.1.2-ast","subject":"srcq","subjectVersion":"{version}"}}')
     return 0
 
 

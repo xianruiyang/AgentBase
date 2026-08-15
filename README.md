@@ -44,10 +44,8 @@ AgentBase 只维护 Windows 宿主。项目自有 skill 运行时、MCP、CLI、
 | `delivery-workflow` | 项目内建立 | 以 Markdown 文档为语义真源组织用户确认需求与设计、可修订模型产物和执行反馈；`workctl` 只辅助快照来源、索引、查询和视图 |
 | `task-table-manager` | 项目内建立 | 以文档合同管理任务、三类依赖、状态、结果摘要、证据映射和恢复上下文；`taskctl` 只辅助存储和查询，不签发执行或产品通过 |
 | `reasoning-governor` | 从 `task-table-manager` 的线程深度脚本拆分建源 | 读取和切换当前线程 next-turn 推理深度；模型自主切换只由 active Goal 续跑 |
-| `symbol-structure-workflow` | 历史 SymbolStructureWorkflow 工程 | 在文本、AST、LSP 和编辑工具间分层路由，并声明 `vscode-lsp-mcp` 依赖 |
-| `ast-grep-token-safe` | 历史 SymbolStructureWorkflow 工程 | 使用内置 `sgy` 做 Token-Safe AST 搜索与改写 |
-| `rg-token-safe` | 已审查规则迁入 | 有界、可定位、低重复的正文搜索 |
-| `fd-usage` | 已审查规则迁入 | 有界文件/目录发现，区分 pattern、path 和对象类型 |
+| `source-query` | 统一源码查询网关工程 | 按证据成本选择直接读取、原生 rg/fd、`srcq`、AST 与渐进 LSP；详细协议按需加载 |
+| `symbol-structure-workflow` | 历史 SymbolStructureWorkflow 工程 | 安全组织语义重命名、Code Action、格式化、task/command 和调试等编辑器操作 |
 | `powershell-usage` | 已审查规则迁入 | 以 PowerShell 7 为基线的 Windows 命令、路径、编码与退出码规则 |
 | `change-governance` | 全局条件性治理规则拆分建源 | 复杂根因、职责/入口、迁移、共享门禁和跨契约审计 |
 | `cpp-engineering-rules` | 已审查规则迁入 | C++ 职责、公开接口、include、PCH 与 unity build |
@@ -57,21 +55,21 @@ AgentBase 只维护 Windows 宿主。项目自有 skill 运行时、MCP、CLI、
 
 | 目录 | 对应 Skill | 职责 |
 | --- | --- | --- |
-| `mcp/vscode-lsp-mcp` | `symbol-structure-workflow` | MCP server、VS Code companion、共享协议、安全组件、测试与独立发布工程 |
-| `tools/sgy` | `ast-grep-token-safe` | 构建 skill 内置 `sgy` 的 Rust workspace、测试、fuzz、安装与发布工程 |
+| `mcp/vscode-lsp-mcp` | `source-query`、`symbol-structure-workflow` | MCP server、VS Code companion、共享协议、安全组件、测试与独立发布工程 |
+| `tools/srcq` | `source-query` | Source Query Gateway 的 Rust workspace、测试、fuzz、Windows 安装与独立发布工程 |
 | `development/codex-event-logger` | `codex-event-logger` | hook 设计资料；正式运行脚本仍在 skill 真源 |
 | `development/codex-qq-hook` | `codex-qq-hook` | Webhook 辅助程序和开发说明；正式运行脚本仍在 skill 真源 |
 | `development/responsibility-lifecycle.md` | 全局规则、`change-governance`、`delivery-workflow`、`task-table-manager` | 权威职责形成、消费者接入、后续影响传播与证据时效的设计分析 |
-| `development/code-search-workflow-improvement-plan.md` | `rg-token-safe`、`ast-grep-token-safe`、`symbol-structure-workflow`、`vscode-lsp-mcp` | 代码搜索既有改进记录、真实 Codex 成本证据与冻结对照 |
+| `development/source-query-gateway` | `source-query`、`symbol-structure-workflow`、`srcq`、`vscode-lsp-mcp` | 统一源码查询的需求、设计、任务、实现验证和受监控 Codex 成本证据 |
 | `development/skill-routing` | 全局规则与全部关键 skill | 静态触发合同、脱离仓库的路由评估 capsule 与结果判定 |
 | `development/plugin-packaging` | 合同声明的全部 skill | 生成经过滤的 `agentbase-core` 本地插件包及插件内 hooks |
 | `development/codex-deployment` | 全局规则、可移植设置、hooks、自定义子代理与全部关键 skill | 校验、可选设置安装、带备份发布和可验证回滚 |
 
-`vscode-lsp-mcp` 保持独立发布真源：它已有 `release:build` 和 `release:verify`，且还包含 VS Code companion 与安装生命周期。插件包不复制 MCP，也不创建第二套安装入口；`symbol-structure-workflow/agents/openai.yaml` 只声明对 `vscode-lsp-mcp` 的工具依赖。旧的 `vscode-mcp` 与 `ast-mcp` 不属于当前权威依赖。
+`vscode-lsp-mcp` 保持独立发布真源：它已有 `release:build` 和 `release:verify`，且还包含 VS Code companion 与安装生命周期。插件包不复制 MCP，也不创建第二套安装入口；`source-query` 与 `symbol-structure-workflow` 只声明工具依赖。旧的 `vscode-mcp` 与 `ast-mcp` 不属于当前权威依赖。
 
-skill 内置的 Windows x86_64 `sgy 0.1.2` 由 `tools/sgy` 的受签署源码版本生成。`scripts/runtime-manifest.yml` 记录安装二进制 hash，`scripts/provenance/release-record.json` 汇总源码 revision、Cargo.lock、Windows 原生 manifest、归档校验和、构建环境和 RustSec 结果；静态合同会把这些记录与实际文件逐项读回，不再只信任手工填写的 hash。
+`srcq.exe` 不进入 skill 或 Codex payload。`tools/srcq` 是唯一源码、构建、测试、安装器和 release owner；Windows 用户级安装器维护安装、状态、升级、卸载和唯一 PATH 项，消费者只调用 PATH 中的正式命令。AST 的 `_sgy`/`sgy.*` 标识仅作为既有数据协议继续兼容，不构成旧命令或第二运行时。
 
-许可按组件独立生效：`mcp/vscode-lsp-mcp` 使用 Apache-2.0，`tools/sgy` 使用 MIT OR Apache-2.0。仓库根目前没有统一 `LICENSE`，因此不能把组件许可证外推为整个 AgentBase 的授权；对外整体分发前仍需由权利人明确选择根级许可证。
+许可按组件独立生效：`mcp/vscode-lsp-mcp` 使用 Apache-2.0，`tools/srcq` 使用 MIT OR Apache-2.0。仓库根目前没有统一 `LICENSE`，因此不能把组件许可证外推为整个 AgentBase 的授权；对外整体分发前仍需由权利人明确选择根级许可证。
 
 ## 路由策略验证与执行验证
 
@@ -127,7 +125,7 @@ PowerShell 7、支持 `--max-results` 的 `fd`、Python 3.11+、Node.js `>=22.9 
 
 ## 校验、发布与回滚
 
-仓库级持续验证入口是 [`.github/workflows/validate.yml`](.github/workflows/validate.yml)：Windows 项目合同 job 覆盖部署与 skill 回归测试，`vscode-lsp-mcp` job 执行完整 Windows 发布门禁，`sgy-windows` job 执行 Windows 原生构建、已签署运行时完整性检查、真实 ast-grep smoke 和 RustSec。CI 是持续门禁，不替代本地发布前对当前工作区执行的最小充分验证。
+仓库级持续验证入口是 [`.github/workflows/validate.yml`](.github/workflows/validate.yml)：Windows 项目合同 job 覆盖部署与 skill 回归测试，`vscode-lsp-mcp` job 执行完整 Windows 发布门禁，`srcq-windows` job 执行 Windows workspace 测试、原生 release、安装生命周期、真实 ast-grep smoke 和 RustSec。CI 是持续门禁，不替代本地发布前对当前工作区执行的最小充分验证。
 
 部署入口默认校验全局规则、合同声明的全部 skill、当前隔离路由策略证据、可移植设置、hooks 模板、自定义子代理和 MCP 独立发布入口：
 

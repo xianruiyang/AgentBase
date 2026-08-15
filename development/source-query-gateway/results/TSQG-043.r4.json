@@ -1,0 +1,78 @@
+{
+  "changed_files": [
+    "tools/srcq/Cargo.toml",
+    "tools/srcq/Cargo.lock",
+    "tools/srcq/crates/srcq-cli/**",
+    "tools/srcq/crates/srcq-core/**",
+    "tools/srcq/tools/srcq-release/**",
+    "tools/srcq/scripts/install-srcq.ps1",
+    "tools/srcq/scripts/test-install-srcq.ps1",
+    "tools/srcq/scripts/build-release.ps1",
+    "tools/srcq/README.md",
+    "tools/srcq/docs/**",
+    "development/source-query-gateway/ast-baseline/compare_ast_baseline.py",
+    "development/source-query-gateway/candidate-skill/source-query/**",
+    "development/source-query-gateway/verify_candidate_payload.py",
+    "development/source-query-gateway/current-state.md",
+    "development/source-query-gateway/design.md"
+  ],
+  "evidence_for": [
+    "UDES-SQG-006",
+    "UDES-SQG-009",
+    "UDES-SQG-010",
+    "DES-SQG-001",
+    "DES-SQG-011"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "note": "Windows 用户级生命周期与新进程 PATH 读回",
+      "ref": "tools/srcq/scripts/test-install-srcq.ps1"
+    },
+    {
+      "kind": "test",
+      "note": "迁移前 AST 数据与命令合同等价",
+      "ref": "development/source-query-gateway/ast-baseline/compare_ast_baseline.py"
+    },
+    {
+      "kind": "test",
+      "note": "候选 Skill 不含私有运行时和开发资产",
+      "ref": "development/source-query-gateway/verify_candidate_payload.py"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "Source Query Gateway 的仓库运行时、Rust 包与可执行文件、Windows release、安装状态和候选消费者已原子迁移到 srcq；迁移前 AST 数据协议保持可读，未提供 sgy.exe 别名或第二运行时。",
+  "outputs": [
+    "tools/srcq 是唯一运行时源码、构建、测试、安装器和发布 owner",
+    "srcq.exe 归档与 Install/Status/Upgrade/Uninstall 生命周期可用",
+    "候选 Skill 只消费 PATH srcq，私有 sgy 运行时已退出",
+    "迁移前 AST help/schema/capabilities 在命令与环境前缀规范化后等价"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:b1c1b9ea19571a7bbd9448f2acb30be65cf77254e6cf2745486e9e4fe81bf4a0",
+    "CON-SQG-002": "sha256:fd5ad79f19a584827b89c9b831166884608e15a6a5e1e1415c051bb38a8fea68",
+    "DES-SQG-001": "sha256:dd30bacd390267a07dbbb9d8204e3fea716db2bc96c8c190f862f8ffd0e6dc92",
+    "DES-SQG-011": "sha256:a4222c5aadabec21fb1289ff84cf6f2d66b5fde809d3687f6c344312d96add2d",
+    "REQ-SQG-001": "sha256:a6931770a456d333b141b289170b92667d10de8d37f65ad5907dfd3bf96dd2f0",
+    "SOL-SQG-007": "sha256:2e14f3169f98c45a096c65a6e3aa5c99666d3909641f564106a1cf987ac2a868",
+    "UDES-SQG-001": "sha256:4faa23546fdc8ab9bcc59bedb4840c4f3f89442b0ae979d78a10333f78d57463",
+    "UDES-SQG-002": "sha256:3ac33a06a297df0ca8e41aaa9357676ccc320a1629f1de90efcb7d16356c2347",
+    "UDES-SQG-005": "sha256:1d80a6ccb980074fd1e40303dfb48ad3398948c18acfe68b1aa9e7f3c5deade9",
+    "UDES-SQG-006": "sha256:fab04044d87c076f30a8d8e7b872f6d00e40b9a0c460bf5981f044906a07ff59",
+    "UDES-SQG-009": "sha256:de059e7644de16f13a662da3885167e4930e2790fe136c237ae1185e5c2619ef",
+    "UDES-SQG-010": "sha256:42707e160673637b4a48b8841f0c96cba2e3afcd6088fcc0db25bcc692657f16"
+  },
+  "task_id": "TSQG-043",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "cargo check -p srcq-cli 通过",
+    "cargo test -p srcq-cli --lib：29 项通过",
+    "cargo test -p srcq-cli --test query_gateway_real：15 项通过",
+    "build-release.ps1 生成 srcq-0.2.0-x86_64-pc-windows-msvc.zip 并读回 srcq 0.2.0",
+    "test-install-srcq.ps1 覆盖幂等安装、Status、新进程 PATH、失败升级恢复、恶意包/篡改拒绝、正常升级和卸载，结果通过",
+    "AST baseline compare 对 srcq 通过",
+    "candidate Skill quick_validate 与 5 文件 payload 校验通过"
+  ]
+}

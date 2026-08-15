@@ -1,0 +1,9 @@
+interface:
+  display_name: "Source Query"
+  short_description: "按证据成本选择文本、结构、符号和完整性的最低充分查询路径"
+  default_prompt: "使用 $source-query 以最低充分成本定位并验证所需源码。"
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "vscode-lsp-mcp"
+      description: "按需提供 VS Code Provider 的真实定义、引用、类型、层级与诊断；修改能力仍受独立授权约束"

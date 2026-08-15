@@ -1,4 +1,0 @@
-interface:
-  display_name: "ast-grep Token Safe"
-  short_description: "内置 sgy，以低 Token YAML 完成 AST 搜索与安全改写"
-  default_prompt: "使用 $ast-grep-token-safe 的内置 sgy，以 Token-Safe YAML 搜索、分析并安全改写代码。"

@@ -2,7 +2,7 @@
 
 ## 1. 文档职责
 
-本文件只安排 [requirements.md](requirements.md)、[user-design.md](user-design.md) 与 [design.md](design.md) 已定义的候选分支工作，不创建总体项目需求。P0—P5 的历史 sgy 实现已形成，但后续实现变化、正式 `srcq` 命名决策、LSP 渐进暴露需求与语义投影反例使 P3、P4、P5 及 P6 完成证据重新打开；主线采纳与 Codex 发布仍待用户分别授权。
+本文件只安排 [requirements.md](requirements.md)、[user-design.md](user-design.md) 与 [design.md](design.md) 已定义的源码查询工作，不创建总体项目需求。P0—P5 的实现、正式 `srcq` 身份、消费者迁移与 LSP 渐进入口已经闭环；P6 的同身份收益证据仍受用户冻结旧 control 的决定约束。项目接入已由用户的完整实现请求授权，Codex 发布仍须逐次另行同意。
 
 ## 2. 推进原则
 
@@ -168,9 +168,9 @@ P5 闭环：查询规则只有一个低成本入口，AST 设计保持，重复�
 | TSQG-061 | 运行 detached skill 路由和行为评估 | TSQG-050, TSQG-052, TSQG-056 | 分支评估证据 | 首次路由、简单非触发、AST/LSP 边界、单项渐进发现和写入安全满足独立 oracle |
 | TSQG-062 | 通过正式 monitor 运行真实 Codex 隔离对照 | TSQG-006, TSQG-060, TSQG-061 | 原始事件、环境差异、Input/cached/Output/reasoning/耗时/质量与 audit 结果 | identity 相同的历史基线直接复用；只运行受影响对照，短任务与多查询任务分别报告，失败与回退不丢弃 |
 | TSQG-063 | 裁决保留、收紧或退出 | TSQG-062 | 收益边缘结论 | 质量先通过；固定成本无收益则收紧触发，压缩收益不抵成本则不宣称优化完成 |
-| TSQG-064 | 请求主线采纳与当次 Codex 发布授权 | TSQG-063 | 用户裁决 | 只有用户确认后才更新总体需求、README、正式 skill 和安装态；Git 按既有授权另行维护 |
+| TSQG-064 | 请求当次 Codex 发布授权 | TSQG-063 | 用户裁决 | 项目真源已实现；只有用户针对本次明确确认后才安装 PATH srcq 并增量发布，Git 按既有授权另行维护 |
 
-P6 当前停在受控收益证据边界：供应链、独立路由和 candidate-only 影响验证已完成，失败与 oracle 争议也已保留并修正；旧 control 按用户要求不重跑，且与当前 Codex、工作区、候选和 corpus identity 不同。继续运行 candidate-only 不能关闭 `AC-SQG-004`，因此 TSQG-062 等待用户决定是否允许一次新的同 identity 对照；TSQG-063、TSQG-064 随之保持未开始。是否进入主线和发布仍由用户单独确认。
+P6 当前停在受控收益证据边界：供应链、独立路由、正式消费者与 candidate-only 影响验证已完成，失败与 oracle 争议也已保留并修正；旧 control 按用户要求不重跑，且与当前 Codex、工作区、候选和 corpus identity 不同。继续运行 candidate-only 不能关闭 `AC-SQG-004`，因此 TSQG-062 等待用户决定是否允许一次新的同 identity 对照；TSQG-063 随之保持未开始。项目主线已按用户完整实现请求接入，Codex 发布仍由 TSQG-064 和逐次授权单独决定。
 
 ## 5. 停止条件
 

@@ -2,7 +2,7 @@
 
 ## 1. 职责与生效边界
 
-本文件只说明分支满足验收且用户决定采纳后，如何把现行查询职责收敛到一个正式入口。它不是迁移授权；当前正式 skill、全局规则、Codex 安装态和 `rg_receipt.py` 保持有效。实际迁移与发布必须在同一次采纳变更中完成并重新验证消费者，避免候选与旧入口长期共同决定行为。
+本文件记录已经进入项目真源的职责迁移及尚未取得授权的 Codex 安装边界。项目正式 Skill、全局候选规则、CI 与部署合同已收敛；实际 Codex 根目录仍保持原安装态，必须在用户针对当次发布明确同意后才增量更新。
 
 ## 2. 权威职责映射
 
@@ -10,18 +10,18 @@
 | --- | --- | --- |
 | `fd-usage` | 文件与目录发现、pattern/path 区分、有界原生快路径 | 删除旧 skill |
 | `rg-token-safe` | 文本定位、范围与输出预算、全集和不存在证明 | 删除旧 skill 与 `rg_receipt.py` |
-| `ast-grep-token-safe` | AST argv、profile、cache、process、rewrite 与安全边界 | 语义迁入按需 `references/ast.md` 后删除旧 skill；sgy AST 命令保持 |
-| skill 内置 `sgy.exe` 与运行时来源副本 | 迁移到 `tools/sgy` 维护的独立 Windows 安装生命周期 | 先安装并验证 PATH 中的正式 CLI，再删除所有 skill 私有副本；不保留 fallback |
-| `symbol-structure-workflow` | 文本、AST 与 LSP 的成本升级边界 | 只保留真实符号语义、LSP 协议及修改裁决，不再重复前三类工具协议 |
+| `ast-grep-token-safe` | AST argv、profile、cache、process、rewrite 与安全边界 | 语义迁入按需 `references/ast.md` 后删除旧 skill；`srcq` 保持既有 AST 行为 |
+| skill 内置 `sgy.exe` 与运行时来源副本 | 迁移到 `tools/srcq` 维护的独立 Windows 安装生命周期 | 只允许 PATH 中的正式 `srcq.exe`；不保留私有 fallback |
+| `symbol-structure-workflow` | 旧的查询与编辑混合职责 | 只保留语义重命名、Code Action、格式化、task/command 和调试等编辑器操作；只读查询归 `source-query` |
 | `powershell-usage` | Windows shell 语法与执行安全 | 保留；不承担源码查询路由 |
 
 ## 3. 原子迁移步骤
 
-1. 从 `tools/sgy` 的同一受验证源码身份构建 `sgy 0.2.0` Windows release，通过正式安装器完成全新安装、状态、升级、卸载、PATH 和新进程 `sgy --version`/`sgy doctor` 读回。
-2. 构建只含运行规则和引用的候选 skill payload，确认不含 sgy 二进制、runtime manifest、来源/许可副本或开发测试资产；候选只调用 PATH 中的 `sgy.exe`。
-3. 更新 `global/AGENTS.md` 的查询路由，使其只引用统一 skill 的成本升级边界；更新 `symbol-structure-workflow` 的消费者关系。
-4. 删除三个被替代 skill、`rg_receipt.py` 及其内置 sgy，清理触发用例、校验器和文档中的旧正式入口引用，不保留别名、私有二进制或兼容 fallback。
-5. 刷新独立路由和行为证据，验证简单快路径、全集、fd tree、AST、LSP、写入安全、缺失/错误版本恢复动作及相近非触发。
-6. 由用户确认当次发布后增量安装不含二进制的 skill payload；读回主机 sgy 安装状态和 payload 清单，并在重启后的新任务中验证指令链。
+1. `tools/srcq` 作为唯一运行时 owner 构建 Windows release；正式安装器覆盖全新安装、状态、升级、卸载、PATH 和新进程 `srcq --version`/`srcq doctor` 读回。
+2. `source-query` payload 固定为 `SKILL.md`、metadata 与三份按需引用，不含二进制、runtime manifest、来源/许可副本或开发测试资产；只调用 PATH 中的 `srcq.exe`。
+3. `global/AGENTS.md` 只保留证据层级短路由；查询协议归 `source-query`，编辑器写操作归 `symbol-structure-workflow`。
+4. 删除三个被替代 skill、`rg_receipt.py` 及内置运行时；部署和插件合同必须移除受管旧副本，不保留别名、私有二进制或兼容 fallback。
+5. 独立路由、行为和 LSP 渐进证据覆盖简单快路径、全集、fd tree、AST、LSP、写入安全、缺失/错误版本恢复动作及相近非触发。
+6. Codex 发布仍逐次请求用户确认；发布前读回主机 `srcq` 安装态，发布后核对 payload 清单，并在新任务中验证新指令链。
 
 任一步无法同时退出旧决定路径时，停止采纳，不把候选叠加为第二套长期规则。

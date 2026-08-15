@@ -1,0 +1,48 @@
+{
+  "changed_files": [
+    "development/code-search-benchmark/corpus/lsp-progressive-v1.json",
+    "development/code-search-benchmark/experiment.py",
+    "development/code-search-benchmark/tests/test_experiment.py",
+    "development/source-query-gateway/evidence/lsp-progressive-v1.json"
+  ],
+  "evidence_for": [
+    "AC-SQG-004",
+    "AC-SQG-005",
+    "UDES-SQG-011",
+    "DES-SQG-010",
+    "DES-SQG-012",
+    "SOL-SQG-009"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "benchmark",
+      "note": "真实隔离 Codex 渐进 LSP 结果与独立审计摘要",
+      "ref": "development/source-query-gateway/evidence/lsp-progressive-v1.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "冻结了 no-LSP、单项 LSP 与多阶段 LSP 三类真实隔离 Codex 查询的完整 usage、工具事件、耗时和质量基线。",
+  "outputs": [
+    "三案实际总 Token 分别为 112858、173459、207743",
+    "活动 MCP 工具严格为 0、2、3 个",
+    "独立 detached auditor 完成 capsule、usage、质量与工具路径复核"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-004": "sha256:e4eb30c0328c947301730daa0f698aee02322191aa1b3dfed5380f2959f9cf52",
+    "AC-SQG-005": "sha256:ae702359593cfe82daaf3d398501f8f881d7874429d8c86e6fa03f056ee9de47",
+    "DES-SQG-010": "sha256:ab05eac7e406e952d37f476bc95330527c0207ac2e46b3f1ec75e9c2236fee03",
+    "DES-SQG-012": "sha256:b180036454f320fe16eb175f5468b499aa314377eb3f8614eec96c35dac080a9",
+    "SOL-SQG-009": "sha256:394504d8b3d278490f2e258750ae115172cefc951889f05a0f5aeeaa19e7b916",
+    "UDES-SQG-011": "sha256:ed5c527845e84181630f5cab5c5039d6f3979d0dcbc610131223878749843ed2"
+  },
+  "task_id": "TSQG-054",
+  "task_revision": 1,
+  "unresolved": [
+    "每案一次策略拒绝的只读命令均已恢复，不影响 MCP 路径结论；相对收益仍需同 identity control。"
+  ],
+  "verification": [
+    "三次执行均 exit 0、usage 完整、无 MCP 失败、无写工具",
+    "独立审计校验 experiment/capsule identity 与逐案 oracle"
+  ]
+}

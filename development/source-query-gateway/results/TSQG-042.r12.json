@@ -41,7 +41,7 @@
     "UDES-SQG-005": "sha256:1d80a6ccb980074fd1e40303dfb48ad3398948c18acfe68b1aa9e7f3c5deade9"
   },
   "task_id": "TSQG-042",
-  "task_revision": 1,
+  "task_revision": 2,
   "unresolved": [
     "宿主未安装 cargo-audit，未声称刷新 advisory scan"
   ],

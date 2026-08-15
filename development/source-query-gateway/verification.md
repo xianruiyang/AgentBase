@@ -10,19 +10,23 @@
 | --- | --- | --- |
 | P0 backend 合同 | `backend-contract/tests` | 版本、模式表、fixture、语义分类通过 |
 | AST 精确版本 | P0 ast-grep 0.41.1/0.42.0/0.44.1 矩阵 | 30 项通过 |
-| sgy Rust workspace 历史基线 | `cargo ci-test` | 稀疏回执改动前全部非 ignored 测试通过；当前按影响范围复核 sgy-cli 与 release owner，未机械重跑无关 workspace 测试 |
+| srcq Rust workspace 历史基线 | `cargo ci-test` | 稀疏回执改动前全部非 ignored 测试通过；当前按影响范围复核 srcq-cli 与 release owner，未机械重跑无关 workspace 测试 |
 | Rust workspace 当前格式 | `cargo fmt --all` | 通过 |
-| rg/fd 当前定向单元 | `cargo test -p sgy-cli --lib` | 29 项通过；含 `--receipt auto|full` 参数合同 |
-| rg/fd 当前真实集成 | `cargo test -p sgy-cli --test query_gateway_real` | 15 项通过；新增各 view 证据单元、summary 终止和完整默认查询不落 snapshot 回归 |
-| sgy-cli 当前静态质量 | `cargo clippy -p sgy-cli --all-targets --all-features -- -D warnings`、`cargo fmt --all -- --check` | 通过 |
-| release helper | `cargo test -p sgy-release`、`cargo clippy -p sgy-release --all-targets -- -D warnings` | 4 项通过；manifest 读回 workspace 0.2.0 与 ast-grep/rg/fd 三引擎声明 |
+| rg/fd 当前定向单元 | `cargo test -p srcq-cli --lib` | 29 项通过；含 `--receipt auto|full` 参数合同 |
+| rg/fd 当前真实集成 | `cargo test -p srcq-cli --test query_gateway_real` | 15 项通过；新增各 view 证据单元、summary 终止和完整默认查询不落 snapshot 回归 |
+| srcq-cli 当前静态质量 | `cargo clippy -p srcq-cli --all-targets --all-features -- -D warnings`、`cargo fmt --all -- --check` | 通过 |
+| release helper | `cargo test -p srcq-release`、`cargo clippy -p srcq-release --all-targets -- -D warnings` | 4 项通过；manifest 读回 workspace 0.2.0 与 ast-grep/rg/fd 三引擎声明 |
 | backend 候选矩阵 | `backend-contract/verify_candidate.py` | 29 个模式样本、7 个原生 oracle 通过 |
 | AST 候选非回退 | `ast-baseline/compare_ast_baseline.py --expected-version 0.2.0` | 仅 release version 可变，其余冻结输出逐字一致 |
 | 候选 skill | skill-creator `quick_validate.py` | 有效 |
-| 候选 payload | `verify_candidate_payload.py` | 14 个允许文件，当前二进制 hash `fcec9aa2…e230` 一致，无开发资产泄漏 |
-| Windows 安装生命周期 | `tools/sgy/scripts/test-install-sgy.ps1`，0.1.1 → 0.2.0 | 安装、幂等、失败回滚、恶意包/篡改拒绝、升级和卸载全部通过 |
+| 候选 payload | `verify_candidate_payload.py` | 5 个允许文件，无二进制、私有运行时或开发资产泄漏 |
+| Windows 安装生命周期 | `tools/srcq/scripts/test-install-srcq.ps1`，0.1.1 → 0.2.0 | 安装、幂等、失败回滚、恶意包/篡改拒绝、升级和卸载全部通过 |
 | 完整短查询按需 snapshot 机制 | 同一 release 查询、25 个唯一 argv、A-B-B-A，本机进程总耗时 | 旧实现 4115.9/3918.1 ms 且每轮落 25 个 snapshot；当前实现 3870.5/3875.3 ms 且 0 snapshot，均值少 144.1 ms（3.59%） |
-| 当前 detached 路由 | `evidence/routing-result-v15.json` | 当前候选 21/21；首次选择只读取短路由与 skill frontmatter，详细协议按需披露 |
+| 正式 Skill 静态校验 | skill-creator `quick_validate.py` | `source-query` 与 `symbol-structure-workflow` 均有效；前者恰为 5 个协议文件 |
+| 正式 detached 路由 | `development/skill-routing/evidence/current.json` | 65/65 首次路由、65/65 行为策略、13/13 治理引用独立通过；首次选择只读取全局短路由与 skill frontmatter |
+| 原生 LSP 渐进路径 | `evidence/lsp-progressive-v1.json` | no-LSP、单项与多阶段三案均按预期只调用 0/2/3 个 MCP 能力，质量通过、usage 完整；独立审计结论为 `pass_with_execution_caveat` |
+| 正式部署合同 | `manage_agentbase.ps1 -Action Validate`、`test_manage_agentbase.ps1` | 11 个 Skill、增量发布/回滚、旧入口退出、测试资产和私有运行时排除通过 |
+| 插件 payload | 隔离 `build_plugin.ps1 -SkipOfficialValidation` | 11 个 Skill；`source-query` 恰为 5 文件且无 `.exe` |
 | benchmark owner 定向回归 | `development/code-search-benchmark/tests/test_experiment.py` | 受影响 case 选择、candidate-only 调度、回答合同、capsule canonical hash、identity 与超时保留通过 |
 | 当前 candidate-only 全量审计 | `evidence/audit-result-v12.json` | 12 次中 11 次 usage 完整，完整 run 合计 1,004,033 Token；1 次 TLS 超时原样保留，无 control |
 | 关系 case 受影响审计 | `evidence/relation-audit-v1.json`、`evidence/relation-audit-v2.json` | 保留规则取得全部源码证据；更强规则增加 Token 而未改善 prompt 必答内容，已退出 |
@@ -38,4 +42,4 @@
 
 新的 advisory scan 未运行，因为当前授权环境未安装 `cargo-audit`；候选 release record 已明确记录该限制。
 
-当前轮已经运行真实独立 agent 路由和 candidate-only 总 Token 监控，并通过 detached auditor 复算 capsule、usage 与质量。关系 case 的审计分歧进一步证明结构化 oracle 的 supporting facts 不能自动变成最终答案必答项，corpus `2026-08-15.2` 已显式修正该边界。由于没有当前 identity 的 control，且新 corpus 尚无完整双环境运行，这些证据只证明当前行为、失败路径和测试机制，不证明相对收益。
+当前轮已经运行真实独立 agent 路由、candidate-only 总 Token 监控和 LSP 渐进调用，并通过 detached auditor 复算 capsule、usage 与质量。LSP 三案只证明候选侧的按需行为和绝对成本；每案均有一次只读命令被策略拒绝后恢复，是执行质量提示而非 MCP 失败。关系 case 的审计分歧进一步证明结构化 oracle 的 supporting facts 不能自动变成最终答案必答项，corpus `2026-08-15.2` 已显式修正该边界。由于没有当前 identity 的 control，且新 corpus 尚无完整双环境运行，这些证据只证明当前行为、失败路径和测试机制，不证明相对收益。

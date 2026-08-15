@@ -56,6 +56,10 @@ jobs:
           $pluginRootPath = [IO.Path]::GetFullPath([string]$pluginRoot).TrimEnd('\')
           $runtimeArtifacts = @(Get-ChildItem -LiteralPath $pluginRootPath -Recurse -Force | Where-Object { $relative = $_.FullName.Substring($pluginRootPath.Length + 1); $relative -match '(?i)(^|[\\/])(__pycache__|node_modules|target|dist)([\\/]|$)' -or $_.Extension -in @('.pyc', '.pyo', '.log', '.tmp') })
           if ($runtimeArtifacts.Count -ne 0) { throw "Plugin package contains a runtime artifact: $($runtimeArtifacts[0].FullName)" }
+          $sourceQueryRoot = Join-Path $pluginRootPath 'skills\source-query'
+          if (-not (Test-Path -LiteralPath (Join-Path $sourceQueryRoot 'SKILL.md') -PathType Leaf)) { throw 'Plugin package omitted source-query' }
+          $privateQueryRuntime = @(Get-ChildItem -LiteralPath $sourceQueryRoot -Recurse -File | Where-Object Extension -eq '.exe')
+          if ($privateQueryRuntime.Count -ne 0) { throw 'Plugin package contains a private source-query runtime' }
 
       - name: Run skill regression tests
         run: |
@@ -94,8 +98,8 @@ jobs:
       - name: Run complete Windows release verification
         run: npm run verify:release
 
-  sgy-windows:
-    name: sgy Windows native release gate
+  srcq-windows:
+    name: srcq Windows native release gate
     runs-on: windows-latest
     timeout-minutes: 40
     defaults:
@@ -111,55 +115,39 @@ jobs:
           rustup toolchain install 1.85.0 --profile minimal --component clippy,rustfmt
           npm install --global @ast-grep/cli@0.44.1
 
-      - name: Verify signed source snapshot
+      - name: Run native workspace tests
+        working-directory: tools/srcq
+        run: cargo test --workspace --locked
+
+      - name: Build, verify and install native Windows releases
+        working-directory: tools/srcq
         run: |
-          $snapshotPath = Join-Path $env:RUNNER_TEMP 'sgy-source-snapshot.json'
-          & .\tools\sgy\scripts\new-source-snapshot.ps1 -Output $snapshotPath | Out-Null
-          $actual = Get-Content -LiteralPath $snapshotPath -Raw -Encoding UTF8 | ConvertFrom-Json
-          $release = Get-Content -LiteralPath '.\skills\ast-grep-token-safe\scripts\provenance\release-record.json' -Raw -Encoding UTF8 | ConvertFrom-Json
-          if ($actual.sourceRevision -ne $release.source.revision) {
-            throw "sgy source snapshot changed: $($actual.sourceRevision)"
+          $outputV1 = Join-Path $env:RUNNER_TEMP 'srcq-release-v1'
+          $outputV2 = Join-Path $env:RUNNER_TEMP 'srcq-release-v2'
+          & .\scripts\build-release.ps1 -Clean -Version 0.2.0 -SourceRevision $env:GITHUB_SHA -SourceDateEpoch 0 -OutDir $outputV1
+          & .\scripts\build-release.ps1 -Clean -Version 0.2.1 -SourceRevision $env:GITHUB_SHA -SourceDateEpoch 0 -OutDir $outputV2
+          $archiveV1 = Get-ChildItem -LiteralPath $outputV1 -Filter '*.zip' -File | Select-Object -First 1
+          $archiveV2 = Get-ChildItem -LiteralPath $outputV2 -Filter '*.zip' -File | Select-Object -First 1
+          if (-not $archiveV1 -or -not $archiveV2) { throw 'srcq release archives are missing' }
+          foreach ($archive in @($archiveV1, $archiveV2)) {
+            $checksum = Get-Content -LiteralPath ($archive.FullName + '.sha256') -Raw -Encoding UTF8
+            $archiveHash = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            if (-not $checksum.StartsWith($archiveHash, [StringComparison]::Ordinal)) { throw "srcq checksum does not match $($archive.Name)" }
           }
-          "SGY_SOURCE_REVISION=$($release.source.revision)" | Out-File -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Build and verify native Windows release
-        working-directory: tools/sgy
-        run: |
-          $outputRoot = Join-Path $env:RUNNER_TEMP 'sgy-release-windows'
-          & .\scripts\build-release.ps1 -Clean -SourceRevision $env:SGY_SOURCE_REVISION -SourceDateEpoch 0 -OutDir $outputRoot
-          $release = Get-Content -LiteralPath '..\..\skills\ast-grep-token-safe\scripts\provenance\release-record.json' -Raw -Encoding UTF8 | ConvertFrom-Json
-          $target = @($release.targets | Where-Object target -eq 'x86_64-pc-windows-msvc')[0]
-          $archive = Join-Path $outputRoot $target.archive
-          $checksum = Get-Content -LiteralPath ($archive + '.sha256') -Raw -Encoding UTF8
-          $manifestName = [IO.Path]::GetFileNameWithoutExtension([string]$target.archive) + '.manifest.json'
-          $generatedManifest = Get-Content -LiteralPath (Join-Path $outputRoot $manifestName) -Raw -Encoding UTF8 | ConvertFrom-Json
-          $builtBinary = '.\target\release-build\x86_64-pc-windows-msvc\x86_64-pc-windows-msvc\release\sgy.exe'
-          $installedBinary = '..\..\skills\ast-grep-token-safe\scripts\bin\windows-x86_64\sgy.exe'
-          $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-          if (-not $checksum.StartsWith($archiveHash, [StringComparison]::Ordinal)) { throw 'Windows release checksum sidecar does not match its archive' }
-          if ($generatedManifest.source.revision -ne $release.source.revision) { throw 'Windows release manifest has the wrong source revision' }
-          if ($generatedManifest.target -ne $target.target) { throw 'Windows release manifest has the wrong target' }
-          if ((Get-FileHash -LiteralPath $installedBinary -Algorithm SHA256).Hash.ToLowerInvariant() -ne $target.binary.sha256) { throw 'Windows skill runtime hash changed' }
-          & $builtBinary --version
-          if ($LASTEXITCODE -ne 0) { throw 'Windows rebuilt binary did not start' }
-          & $installedBinary --version
-          if ($LASTEXITCODE -ne 0) { throw 'Windows skill runtime did not start' }
-
-      - name: Run Windows runtime against ast-grep 0.44.1
-        run: |
-          $runtime = (Resolve-Path -LiteralPath '.\skills\ast-grep-token-safe\scripts\bin\windows-x86_64\sgy.exe').Path
           $engine = Join-Path ((npm root --global).Trim()) '@ast-grep\cli\ast-grep.exe'
           if (-not (Test-Path -LiteralPath $engine -PathType Leaf)) { throw "Native ast-grep executable is missing: $engine" }
-          $fixture = Join-Path $env:RUNNER_TEMP 'sgy-runtime-fixture'
+          & .\scripts\test-install-srcq.ps1 -ArchiveV1 $archiveV1.FullName -ArchiveV2 $archiveV2.FullName -Engine $engine -ExpectedVersionV1 0.2.0 -ExpectedVersionV2 0.2.1
+          $runtime = '.\target\release-build\x86_64-pc-windows-msvc\x86_64-pc-windows-msvc\release\srcq.exe'
+          $fixture = Join-Path $env:RUNNER_TEMP 'srcq-runtime-fixture'
           New-Item -ItemType Directory -Path $fixture | Out-Null
           [IO.File]::WriteAllText((Join-Path $fixture 'sample.ts'), 'console.log(value);', [Text.UTF8Encoding]::new($false))
           & $runtime doctor --engine $engine --cwd $fixture
-          if ($LASTEXITCODE -ne 0) { throw 'sgy doctor failed' }
+          if ($LASTEXITCODE -ne 0) { throw 'srcq doctor failed' }
           & $runtime exec --engine $engine --cwd $fixture -- run -p 'console.log($A)' -l ts .
-          if ($LASTEXITCODE -ne 0) { throw 'sgy real-engine smoke failed' }
+          if ($LASTEXITCODE -ne 0) { throw 'srcq real-engine smoke failed' }
 
       - name: Audit Rust dependencies
         uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: tools/sgy
+          working-directory: tools/srcq

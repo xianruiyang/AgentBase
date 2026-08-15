@@ -1,6 +1,6 @@
 # 代码搜索流程既有改进与成本记录
 
-> 状态：本文件保留既有方案、实现和真实 Codex 成本证据；尚未发布到 Codex，安装状态保持不变。
+> 状态：历史记录。后续需求、设计、当前实现与验收由 [`source-query-gateway`](source-query-gateway/requirements.md) 承担；本文中的旧 Skill/sgy 路径只解释当时样本，不是当前入口。Codex 安装状态仍由逐次发布授权决定。
 >
 > 取舍顺序：先保证定位完整性和结论质量，在此基础上降低模型可见 Token，再在前两项不变差时提升速度。
 
@@ -40,7 +40,7 @@
 
 ## 3. 当前基线与证据边界
 
-当前职责分层见 [`symbol-structure-workflow`](../skills/symbol-structure-workflow/SKILL.md)、[`rg-token-safe`](../skills/rg-token-safe/SKILL.md)、[`ast-grep-token-safe`](../skills/ast-grep-token-safe/SKILL.md) 和 [`vscode-lsp-mcp`](../mcp/vscode-lsp-mcp/README.md)。现有规则已经做到：已知名称或文件先用受限 `rg`，边界不稳时升级 AST，只有真实身份、类型、精确引用或安全重命名才升级 LSP。
+当时职责由 `rg-token-safe`、`ast-grep-token-safe`、`symbol-structure-workflow` 和 `vscode-lsp-mcp` 分担；前三者的只读查询职责后来收敛到当前 [`source-query`](../skills/source-query/SKILL.md)，本节仅保留迁移前基线语义。
 
 本轮研究得到以下定向样本。Token 使用 `o200k` 统计模型可见结果，不包含 skill 首次加载、命令参数和失败回退成本；耗时只代表当时机器、工作区和 Provider 状态，不能直接外推成全局阈值。
 

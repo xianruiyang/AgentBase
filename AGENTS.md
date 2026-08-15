@@ -50,7 +50,7 @@ must: 修改 `global/config.toml`、`global/hooks.template.json`、`global/agent
 & (Join-Path (Get-Location).Path 'development\codex-deployment\manage_agentbase.ps1') -Action Validate -ProjectRoot (Get-Location).Path
 ```
 
-should: 修改 `mcp/vscode-lsp-mcp` 或 `tools/sgy` 时，先运行其 README 或清单定义的受影响模块验证；只有公共契约或发布范围受影响时才运行完整验证
+should: 修改 `mcp/vscode-lsp-mcp` 或 `tools/srcq` 时，先运行其 README 或清单定义的受影响模块验证；只有公共契约或发布范围受影响时才运行完整验证
 
 must: 每次使用正式部署入口向实际 Codex 根目录执行 `Publish` 前，必须取得用户针对该次发布的明确同意；Git 维护或远端同步授权、此前的发布授权、验证完成、状态查询以及用户未反对都不得继承或替代该次同意。新的多 skill 部署在插件包通过官方校验且目标环境已单独验证插件安装后使用 `Plugin` 模式，已有直接安装仅在尚未完成迁移时使用 `DirectCompatibility`，两者不得同时启用；一次正式发布产生的一份回滚备份是有效部署资产，不再另建手工备份：
 

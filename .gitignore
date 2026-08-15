@@ -36,7 +36,7 @@ mcp/vscode-lsp-mcp/tests/fixtures/**/obj/
 # Generated build outputs
 **/dist/
 **/target/
-tools/sgy/fuzz/artifacts/
+tools/srcq/fuzz/artifacts/
 
 # Runtime logs
 **/runtimeLogs/

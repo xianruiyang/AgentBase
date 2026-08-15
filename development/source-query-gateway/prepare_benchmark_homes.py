@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import shutil
 
@@ -13,20 +14,25 @@ REMOVED_SEARCH_SKILLS = {
     "rg-token-safe",
     "symbol-structure-workflow",
 }
-OLD_ROUTE = "should: 文本内容搜索先用受限 `rg`；直接读取正文时，多文件显式使用 `--heading`、单个已知文件显式使用 `--no-filename`，`--no-heading` 只用于不进入模型上下文的逐行机器消费；文件发现使用受限 `fd`；只有文本不能可靠表达语法结构时升级 AST，只有结论依赖真实符号身份时升级 LSP"
+OLD_ROUTE = "should: 文本内容搜索先用受限 `rg`；文件发现使用受限 `fd`；只有文本不能可靠表达语法结构时升级 AST，只有结论依赖真实符号身份时升级 LSP"
 
 
 def config_text(lsp_server: str | None) -> str:
     lines = [
         'model = "gpt-5.6-sol"',
         'model_reasoning_effort = "medium"',
-        'service_tier = "default"',
+        'service_tier = "fast"',
         'project_doc_max_bytes = 65536',
         'sandbox_mode = "read-only"',
         '',
         '[features]',
         'hooks = false',
         'multi_agent = false',
+        'plugins = false',
+        'remote_plugin = false',
+        'recommended_plugins = false',
+        'apps = false',
+        'browser_use = false',
     ]
     if lsp_server:
         escaped = lsp_server.replace("\\", "\\\\").replace('"', '\\"')
@@ -42,10 +48,13 @@ def config_text(lsp_server: str | None) -> str:
     return "\n".join(lines) + "\n"
 
 
-def copy_common(installed: Path, target: Path, lsp_server: str | None) -> None:
+def copy_common(installed: Path, target: Path, lsp_server: str | None, include_other_skills: bool) -> None:
     if target.exists():
         raise SystemExit(f"target must not already exist: {target}")
     target.mkdir(parents=True)
+    auth = installed / "auth.json"
+    if auth.is_file():
+        os.link(auth, target / "auth.json")
     agents = (installed / "AGENTS.md").read_text(encoding="utf-8")
     if agents.count(OLD_ROUTE) != 1:
         raise SystemExit("installed AGENTS.md does not contain exactly one frozen source-query route")
@@ -53,10 +62,14 @@ def copy_common(installed: Path, target: Path, lsp_server: str | None) -> None:
     (target / "config.toml").write_text(config_text(lsp_server), encoding="utf-8")
     skills_target = target / "skills"
     skills_target.mkdir()
-    for source in sorted((installed / "skills").iterdir(), key=lambda item: item.name.lower()):
-        if not source.is_dir() or source.name in REMOVED_SEARCH_SKILLS or source.name == "source-query":
-            continue
-        shutil.copytree(source, skills_target / source.name)
+    system_skills = installed / "skills" / ".system"
+    if system_skills.is_dir():
+        shutil.copytree(system_skills, skills_target / ".system")
+    if include_other_skills:
+        for source in sorted((installed / "skills").iterdir(), key=lambda item: item.name.lower()):
+            if not source.is_dir() or source.name == ".system" or source.name in REMOVED_SEARCH_SKILLS or source.name == "source-query":
+                continue
+            shutil.copytree(source, skills_target / source.name)
 
 
 def main() -> int:
@@ -65,12 +78,13 @@ def main() -> int:
     parser.add_argument("--control", required=True, type=Path)
     parser.add_argument("--candidate", required=True, type=Path)
     parser.add_argument("--vscode-lsp-server")
+    parser.add_argument("--minimal", action="store_true", help="exclude unrelated installed skills from both frozen environments")
     args = parser.parse_args()
     installed = args.installed_codex_home.resolve()
     control = args.control.resolve()
     candidate = args.candidate.resolve()
-    copy_common(installed, control, args.vscode_lsp_server)
-    copy_common(installed, candidate, args.vscode_lsp_server)
+    copy_common(installed, control, args.vscode_lsp_server, not args.minimal)
+    copy_common(installed, candidate, args.vscode_lsp_server, not args.minimal)
     candidate_agents = (candidate / "AGENTS.md").read_text(encoding="utf-8")
     candidate_route = (ROOT / "candidate-global-route.txt").read_text(encoding="utf-8").strip()
     (candidate / "AGENTS.md").write_text(candidate_agents.replace(OLD_ROUTE, candidate_route), encoding="utf-8")

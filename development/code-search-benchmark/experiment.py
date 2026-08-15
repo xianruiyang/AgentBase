@@ -22,7 +22,7 @@ CAPSULE_SCHEMA = "agentbase.source-query-audit-capsule/v1"
 CORPUS_SCHEMA = "agentbase.source-query-corpus/v1"
 CAPSULE_HASH_SCHEME = "sha256-canonical-json-without-capsule_sha256"
 SECRET_OR_STATE_NAMES = {
-    "auth.json", "cap_sid", "installation_id", "history.jsonl", "models_cache.json",
+    ".sandbox_migration", "auth.json", "cap_sid", "installation_id", "history.jsonl", "models_cache.json",
 }
 STATE_SUFFIXES = {".sqlite", ".sqlite-shm", ".sqlite-wal"}
 STATE_DIRECTORIES = {"cache", "logs", "tmp", ".tmp", ".sandbox", ".sandbox-bin", "sessions", "archived_sessions", "thread-writer-locks"}
@@ -331,10 +331,16 @@ def parse_events(path: Path) -> dict[str, Any]:
         for event in events
         if event.get("type") == "item.completed" and event.get("item", {}).get("type") == "agent_message"
     ]
+    completed_items = [event.get("item", {}) for event in events if event.get("type") == "item.completed"]
+    item_type_counts: dict[str, int] = {}
+    for item in completed_items:
+        item_type = str(item.get("type", "unknown"))
+        item_type_counts[item_type] = item_type_counts.get(item_type, 0) + 1
     tools = [
-        event.get("item", {})
-        for event in events
-        if event.get("type") == "item.completed" and event.get("item", {}).get("type") in {"command_execution", "mcp_tool_call"}
+        item
+        for item in completed_items
+        if item.get("type") in {"command_execution", "mcp_tool_call", "web_search", "tool_search"}
+        or str(item.get("type", "")).endswith("_tool_call")
     ]
     usage = turns[-1].get("usage", {}) if turns else {}
     required = {"input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens"}
@@ -342,6 +348,7 @@ def parse_events(path: Path) -> dict[str, Any]:
     return {
         "event_count": len(events), "invalid_json_lines": invalid_lines, "usage_complete": complete,
         "usage": usage, "final_answer": messages[-1] if messages else "", "tool_items": tools,
+        "completed_item_type_counts": item_type_counts,
     }
 
 

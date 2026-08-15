@@ -142,6 +142,20 @@ try {
     if ($installedProjectOnlyArtifacts.Count -ne 0) {
         throw "Default publish copied project-only tests or benchmarks into the Codex skill payload"
     }
+    if (-not (Test-Path -LiteralPath (Join-Path $codexRoot "skills\source-query\SKILL.md") -PathType Leaf)) {
+        throw "Default publish omitted the formal source-query skill"
+    }
+    foreach ($retiredSkill in @("ast-grep-token-safe", "fd-usage", "rg-token-safe")) {
+        if (Test-Path -LiteralPath (Join-Path (Join-Path $codexRoot "skills") $retiredSkill)) {
+            throw "Default publish retained a retired query skill: $retiredSkill"
+        }
+    }
+    $queryRuntimeArtifacts = @(Get-ChildItem -LiteralPath (Join-Path $codexRoot "skills\source-query") -Recurse -Force -File | Where-Object {
+        $_.Extension -eq '.exe' -or $_.Name -in @('sgy.exe', 'srcq.exe')
+    })
+    if ($queryRuntimeArtifacts.Count -ne 0) {
+        throw "Default publish copied a private source-query runtime"
+    }
     $defaultStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
     if (-not [bool]$defaultStatus.managed_payload_formally_published) {
         throw "Status did not recognize the current direct-compatibility publish"

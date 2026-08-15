@@ -1,0 +1,39 @@
+{
+  "changed_files": [
+    "development/source-query-gateway/candidate-skill/source-query/references/ast.md",
+    "development/source-query-gateway/ast-baseline/compare_ast_baseline.py",
+    "tools/srcq/docs/compatibility.md"
+  ],
+  "evidence_for": [
+    "UDES-SQG-006",
+    "DES-SQG-001",
+    "DES-SQG-008"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "ref": "development/source-query-gateway/ast-baseline/compare_ast_baseline.py"
+    },
+    {
+      "kind": "contract",
+      "ref": "development/source-query-gateway/candidate-skill/source-query/references/ast.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "AST 查询与改写协议已在 srcq 命令前缀下迁入按需引用，保留迁移前 _sgy/sgy.* 数据协议、profile、cache、process、rewrite 和安全边界。",
+  "outputs": [
+    "srcq AST 按需引用",
+    "迁移前 AST 数据协议兼容说明",
+    "命令与环境前缀规范化的冻结比较器"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {},
+  "task_id": "TSQG-051",
+  "task_revision": 2,
+  "unresolved": [],
+  "verification": [
+    "compare_ast_baseline.py 对 srcq release 通过",
+    "srcq-cli 29 个单元测试与 15 个真实 rg/fd 集成测试通过",
+    "候选 Skill quick_validate 通过"
+  ]
+}

@@ -11,21 +11,21 @@
 | in_progress | 0 |
 | review | 0 |
 | blocked | 1 |
-| done | 27 |
+| done | 31 |
 | retired | 0 |
 
 ## 复核与结果
 
 - 需复核任务：0
-- 当前可读取结果：27
-- 含验证结果：27
-- 含未决结果：4
-- 合同修订后陈旧结果：3
+- 当前可读取结果：31
+- 含验证结果：31
+- 含未决结果：7
+- 合同修订后陈旧结果：0
 
 ## 上游状态
 
 - 用户确认快照：protected
-- 可修订上游未决：4
+- 可修订上游未决：2
 - 延后讨论项：1
 
 ## 任务
@@ -53,12 +53,16 @@
 | TSQG-040 | done | codex-root | 复核 AST 公开入口 | TSQG-011:hard, TSQG-023:hard, TSQG-032:hard | results/TSQG-040.r4.json | 1 |
 | TSQG-041 | done | codex-root | 裁决 AST 公共原语复用 | TSQG-040:hard | results/TSQG-041.r4.json | 1 |
 | TSQG-042 | done | codex-root | 完成三后端诊断、来源与 Windows CLI 生命周期 | TSQG-022:hard, TSQG-032:hard, TSQG-041:hard | results/TSQG-042.r12.json | 2 |
-| TSQG-050 | done | codex-root | 建立只消费 PATH sgy 的统一查询候选 skill | TSQG-023:hard, TSQG-033:hard, TSQG-042:hard | results/TSQG-050.r4.json | 2 |
-| TSQG-051 | done | codex-root | 迁入 AST skill 语义 | TSQG-050:hard | results/TSQG-051.r4.json | 1 |
-| TSQG-052 | done | codex-root | 准备消费者原子迁移 | TSQG-050:hard, TSQG-051:hard | results/TSQG-052.r4.json | 1 |
-| TSQG-053 | done | codex-root | 形成独立 sgy 发布与精简 skill payload | TSQG-052:hard | results/TSQG-053.r16.json | 2 |
+| TSQG-043 | done | codex-root | 原子迁移 Source Query Gateway 正式身份 | TSQG-042:hard | results/TSQG-043.r4.json | 1 |
+| TSQG-050 | done | codex-root | 建立只消费 PATH srcq 的统一查询候选 skill | TSQG-023:hard, TSQG-033:hard, TSQG-043:hard | results/TSQG-050.r8.json | 3 |
+| TSQG-051 | done | codex-root | 迁入 AST skill 语义 | TSQG-050:hard | results/TSQG-051.r8.json | 2 |
+| TSQG-052 | done | codex-root | 迁移正式消费者并退出旧入口 | TSQG-043:hard, TSQG-050:hard, TSQG-051:hard | results/TSQG-052.r7.json | 2 |
+| TSQG-053 | done | codex-root | 闭环独立 srcq 发布与精简 Skill payload | TSQG-052:hard | results/TSQG-053.r19.json | 3 |
+| TSQG-054 | done | codex-root | 冻结 LSP 渐进暴露基线 | TSQG-050:hard | results/TSQG-054.r3.json | 1 |
+| TSQG-055 | done | codex-root | 验证 Codex 原生延迟 MCP 工具发现 | TSQG-054:hard | results/TSQG-055.r3.json | 1 |
+| TSQG-056 | done | codex-root | 闭环 LSP 渐进模型入口 | TSQG-055:hard, TSQG-043:hard | results/TSQG-056.r3.json | 1 |
 | TSQG-060 | done | codex-root | 运行候选影响验证 | TSQG-053:hard | results/TSQG-060.r12.json | 1 |
 | TSQG-061 | done | codex-root | 运行 detached 路由行为评估 | TSQG-050:hard, TSQG-052:hard | results/TSQG-061.r10.json | 1 |
 | TSQG-062 | blocked | codex-root | 运行受监控 Codex 对照 | TSQG-006:hard, TSQG-060:hard, TSQG-061:hard | — | 1 |
 | TSQG-063 | todo | — | 裁决候选收益边缘 | TSQG-062:hard | — | 1 |
-| TSQG-064 | todo | — | 请求主线采纳与发布裁决 | TSQG-063:hard | — | 1 |
+| TSQG-064 | todo | — | 请求当次 Codex 发布裁决 | TSQG-063:hard | — | 2 |

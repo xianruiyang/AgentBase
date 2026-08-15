@@ -70,6 +70,14 @@ class ExperimentTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(["extra"], result["unexpected"])
 
+    def test_environment_tree_excludes_codex_runtime_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "AGENTS.md").write_text("rules", encoding="utf-8")
+            (root / ".sandbox_migration").write_text("v2", encoding="utf-8")
+            (root / "state_5.sqlite").write_bytes(b"state")
+            self.assertEqual({"AGENTS.md": MODULE.sha256_file(root / "AGENTS.md")}, MODULE.environment_tree(root))
+
     def test_corpus_snapshot_rejects_changed_oracle_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -123,6 +131,25 @@ class ExperimentTests(unittest.TestCase):
             slow_error = root / "slow.stderr"
             slow = MODULE.monitor_command([sys.executable, str(script), "slow"], root, os.environ.copy(), slow_output, slow_error, 1)
             self.assertTrue(slow["timed_out"])
+
+    def test_event_parser_records_progressive_tool_item_types(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "events.jsonl"
+            events = [
+                {"type": "item.completed", "item": {"type": "command_execution", "command": "rg"}},
+                {"type": "item.completed", "item": {"type": "mcp_tool_call", "tool": "symbol_info"}},
+                {"type": "item.completed", "item": {"type": "agent_message", "text": "done"}},
+                {"type": "turn.completed", "usage": {
+                    "input_tokens": 10,
+                    "cached_input_tokens": 4,
+                    "output_tokens": 3,
+                    "reasoning_output_tokens": 1,
+                }},
+            ]
+            path.write_text("\n".join(json.dumps(event) for event in events) + "\n", encoding="utf-8")
+            parsed = MODULE.parse_events(path)
+            self.assertEqual(2, len(parsed["tool_items"]))
+            self.assertEqual({"command_execution": 1, "mcp_tool_call": 1, "agent_message": 1}, parsed["completed_item_type_counts"])
 
 
 if __name__ == "__main__":

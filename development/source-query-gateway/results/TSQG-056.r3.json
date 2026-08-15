@@ -1,0 +1,52 @@
+{
+  "changed_files": [
+    "skills/source-query/SKILL.md",
+    "skills/source-query/references/lsp.md",
+    "skills/symbol-structure-workflow/SKILL.md",
+    "skills/symbol-structure-workflow/references/editor-operations.md"
+  ],
+  "evidence_for": [
+    "AC-SQG-001",
+    "AC-SQG-005",
+    "UDES-SQG-011",
+    "UDES-SQG-012",
+    "DES-SQG-012",
+    "SOL-SQG-009"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "benchmark",
+      "note": "原生方案达标，故无需 srcq lsp",
+      "ref": "development/source-query-gateway/evidence/lsp-progressive-v1.json"
+    },
+    {
+      "kind": "contract",
+      "note": "只读查询、渐进发现与职责边界",
+      "ref": "skills/source-query/references/lsp.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "采用 Codex 原生延迟 MCP 目录作为唯一 LSP 渐进模型入口；不新增 srcq lsp，查询与编辑器写操作职责保持分离。",
+  "outputs": [
+    "source-query 只按当前缺失证据发现最小 LSP 读取能力",
+    "symbol-structure-workflow 独立承担 rename、Code Action、format、command 与 debug",
+    "未形成第二套 LSP Provider 或 CLI 入口"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:b1c1b9ea19571a7bbd9448f2acb30be65cf77254e6cf2745486e9e4fe81bf4a0",
+    "AC-SQG-005": "sha256:ae702359593cfe82daaf3d398501f8f881d7874429d8c86e6fa03f056ee9de47",
+    "DES-SQG-012": "sha256:b180036454f320fe16eb175f5468b499aa314377eb3f8614eec96c35dac080a9",
+    "SOL-SQG-009": "sha256:394504d8b3d278490f2e258750ae115172cefc951889f05a0f5aeeaa19e7b916",
+    "UDES-SQG-011": "sha256:ed5c527845e84181630f5cab5c5039d6f3979d0dcbc610131223878749843ed2",
+    "UDES-SQG-012": "sha256:d42a0d0827662f241e45236c9fbd22c723ba9d079382b30f777137e97f5e8b59"
+  },
+  "task_id": "TSQG-056",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "source-query 与 symbol-structure-workflow quick_validate 通过",
+    "路由静态合同覆盖查询、写入与非触发边界",
+    "真实三案未调用 rename、Code Action、format、command 或 debug"
+  ]
+}

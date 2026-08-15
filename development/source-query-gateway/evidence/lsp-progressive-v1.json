@@ -1,0 +1,16 @@
+{
+  "schema": "agentbase.source-query-lsp-progressive-evidence/v1",
+  "evaluated_at_utc": "2026-08-15T10:22:36.959Z",
+  "experiment_identity": "7d0a26ab4622f5b0d28b093c0adab052e657b309941d22d92fa36abf66b49da0",
+  "capsule_sha256": "8c5525a3e6861b5286df7f662693728400b6750bbca014b4ca0b045740000f2f",
+  "isolation": "detached-capsule",
+  "input_declaration": "Auditor read only the designated capsule and wrote only its result; repository, conversation, other results and hidden expectations were not accessed.",
+  "cases": [
+    {"id":"lsp-progressive-none","mcp_tools":[],"actual_total_tokens":112858,"elapsed_ms":35886,"quality":"pass"},
+    {"id":"lsp-progressive-single","mcp_tools":["list_workspaces","symbol_info"],"actual_total_tokens":173459,"elapsed_ms":44621,"quality":"pass"},
+    {"id":"lsp-progressive-multistage","mcp_tools":["list_workspaces","symbol_info","get_references"],"actual_total_tokens":207743,"elapsed_ms":51002,"quality":"pass"}
+  ],
+  "audit_status": "pass_with_execution_caveat",
+  "execution_caveat": "Each run recovered from one policy-declined read-only command; no MCP call failed, no timeout or write occurred, and all usage was complete.",
+  "proof_scope": "Proves candidate-side native progressive LSP behavior and absolute token/time cost only; it does not prove causal savings against an old control."
+}

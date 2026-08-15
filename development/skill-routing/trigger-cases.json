@@ -4,16 +4,14 @@
   "global_max_bytes": 20480,
   "skill_main_max_bytes": 8192,
   "required_skills": [
-    "ast-grep-token-safe",
     "change-governance",
     "codex-event-logger",
     "codex-qq-hook",
     "cpp-engineering-rules",
     "delivery-workflow",
-    "fd-usage",
     "powershell-usage",
     "reasoning-governor",
-    "rg-token-safe",
+    "source-query",
     "symbol-structure-workflow",
     "task-table-manager",
     "understand-space"
@@ -73,6 +71,9 @@
     "specified-local-implementation",
     "one-off-generated-artifact",
     "literal-text-search",
+    "complete-known-name-position-list",
+    "known-small-definition-range",
+    "known-implementation-reading",
     "bounded-file-discovery",
     "powershell-command-authoring",
     "current-context-is-sufficient",
@@ -109,6 +110,7 @@
         "codex-qq-hook",
         "cpp-engineering-rules",
         "powershell-usage",
+        "source-query",
         "symbol-structure-workflow",
         "task-table-manager",
         "understand-space"
@@ -181,6 +183,7 @@
         "change-governance"
       ],
       "forbidden_skills": [
+        "source-query",
         "symbol-structure-workflow",
         "task-table-manager"
       ],
@@ -236,8 +239,7 @@
       "request": "长期交付执行中，当前证据推翻了一个已完成公共契约的部分内容并要求修正。请保持用户确认目标不变，沿语义关系、任务消费关系和实际系统找出直接与间接消费者，修订、退出或重验所有受影响结果后再判断完成。",
       "expected_skills": [
         "change-governance",
-        "delivery-workflow",
-        "task-table-manager"
+        "delivery-workflow"
       ],
       "forbidden_skills": [],
       "expected_change_governance_references": [
@@ -340,7 +342,7 @@
       "kind": "positive",
       "request": "用 ast-grep pattern 查找所有把 await 表达式作为第二个实参的 send 调用，并先预览结构化改写；工具已经明确，不需要再在文本、AST 与 LSP 间裁决，也不需要符号身份。",
       "expected_skills": [
-        "ast-grep-token-safe"
+        "source-query"
       ],
       "forbidden_skills": [
         "symbol-structure-workflow",
@@ -355,7 +357,7 @@
       "kind": "positive",
       "request": "已知函数名，需要取得声明或定义的完整语法范围与正文边界；文本候选不足以可靠判断边界，但不要求从调用位置解析真实符号身份。",
       "expected_skills": [
-        "ast-grep-token-safe"
+        "source-query"
       ],
       "forbidden_skills": [
         "symbol-structure-workflow",
@@ -374,10 +376,10 @@
       "kind": "positive",
       "request": "从这个重载调用位置确认编译器实际解析到哪个定义，并读取该真实符号的签名；同名文本或语法范围不能证明结论。",
       "expected_skills": [
-        "symbol-structure-workflow"
+        "source-query"
       ],
       "forbidden_skills": [
-        "ast-grep-token-safe",
+        "symbol-structure-workflow",
         "task-table-manager"
       ],
       "expected_change_governance_references": [],
@@ -393,10 +395,10 @@
       "kind": "positive",
       "request": "名称已知但文件未知；当前是索引已就绪的小型工作区，受限文本候选仍不能消歧，需要选择低成本方式取得真实符号候选。不要把 workspace_symbols 一概禁用。",
       "expected_skills": [
-        "symbol-structure-workflow"
+        "source-query"
       ],
       "forbidden_skills": [
-        "ast-grep-token-safe",
+        "symbol-structure-workflow",
         "task-table-manager"
       ],
       "expected_change_governance_references": [],
@@ -411,12 +413,9 @@
       "id": "literal-text-search",
       "kind": "negative",
       "request": "在源码中用 rg 查找字面量 FEATURE_DISABLED，输出需要保留文件定位并限制行数。",
-      "expected_skills": [
-        "rg-token-safe"
-      ],
+      "expected_skills": [],
       "forbidden_skills": [
-        "ast-grep-token-safe",
-        "fd-usage",
+        "source-query",
         "symbol-structure-workflow"
       ],
       "expected_change_governance_references": [],
@@ -424,15 +423,66 @@
       "forbidden_behavior_tags": []
     },
     {
-      "id": "bounded-file-discovery",
-      "kind": "positive",
-      "request": "使用 fd 从项目根目录有界查找名称为 package.json 的文件，最多返回 20 个。",
+      "id": "complete-known-name-position-list",
+      "kind": "boundary",
+      "request": "已知一个没有同名歧义的方法名称；在限定的正式源码范围内列出定义和直接调用位置。完整文本查询及每个命中的局部上下文足以区分定义与调用，不需要类型、重载解析或语义重命名。",
       "expected_skills": [
-        "fd-usage"
+        "source-query"
       ],
       "forbidden_skills": [
-        "ast-grep-token-safe",
-        "rg-token-safe",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "known-small-definition-range",
+      "kind": "boundary",
+      "request": "已知一个无同名歧义的小型函数；完整文本查询和一段有界正文已清晰显示定义起止与函数体字面量。返回完整定义范围和指定字面量，不需要重载、类型或语法改写裁决。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
+        "symbol-structure-workflow",
+        "powershell-usage"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "known-implementation-reading",
+      "kind": "boundary",
+      "request": "已知组件和动作名，用完整文本查询定位它的唯一实现，然后阅读有界正文概括结果区间、候选选择和源码失效行为。不编写 AST pattern，不按语法结构查询。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
+        "symbol-structure-workflow",
+        "powershell-usage"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "bounded-file-discovery",
+      "kind": "negative",
+      "request": "使用 fd 从项目根目录有界查找名称为 package.json 的文件，最多返回 20 个。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
         "symbol-structure-workflow"
       ],
       "expected_change_governance_references": [],
@@ -461,7 +511,6 @@
         "symbol-structure-workflow"
       ],
       "forbidden_skills": [
-        "ast-grep-token-safe",
         "task-table-manager"
       ],
       "expected_change_governance_references": [],
@@ -595,7 +644,7 @@
     {
       "id": "vertical-validation-closure-selection",
       "kind": "behavior",
-      "request": "长期任务图已有确认目标、方案、关键依赖和验收方式，多个任务都可执行。请只判断下一项工作：一个任务延续当前目标链并能在完成后产生可验证用户结果，另外两个会新开平级分支。说明选择倾向以及不能跳过的质量边界，不执行任务。",
+      "request": "长期任务表已有确认目标、方案、关键依赖和验收方式，多个任务都可执行。请查询任务表中的当前任务及上下游产出，只判断下一项工作：一个任务延续当前目标链并能在完成后产生可验证用户结果，另外两个会新开平级分支。说明选择倾向以及不能跳过的质量边界，不执行任务。",
       "expected_skills": [
         "task-table-manager"
       ],
@@ -805,6 +854,7 @@
       "expected_skills": [],
       "forbidden_skills": [
         "cpp-engineering-rules",
+        "source-query",
         "symbol-structure-workflow"
       ],
       "expected_change_governance_references": [],
@@ -817,12 +867,9 @@
       "id": "known-file-content-search",
       "kind": "negative",
       "request": "在已经确定的 config.toml 文件中查找字符串 model_provider，并限制输出。",
-      "expected_skills": [
-        "rg-token-safe"
-      ],
+      "expected_skills": [],
       "forbidden_skills": [
-        "ast-grep-token-safe",
-        "fd-usage",
+        "source-query",
         "symbol-structure-workflow"
       ],
       "expected_change_governance_references": [],
@@ -835,6 +882,7 @@
       "request": "把已指定 JSON 文件中的 x 字段从 1 精确改成 2；对象、字段和值都已确认，不需要计算位置关系。",
       "expected_skills": [],
       "forbidden_skills": [
+        "source-query",
         "symbol-structure-workflow",
         "understand-space"
       ],
@@ -977,7 +1025,7 @@
       "kind": "positive",
       "request": "用 AST pattern 查找 TypeScript 中满足指定调用形状的代码，并给出批量 rewrite 预览；不要应用修改，也不需要判断重载或真实符号身份。",
       "expected_skills": [
-        "ast-grep-token-safe"
+        "source-query"
       ],
       "forbidden_skills": [
         "change-governance",
@@ -993,7 +1041,7 @@
     },
     {
       "id": "event-log-explicit-history-request",
-      "kind": "positive",
+      "kind": "negative",
       "request": "请追溯我上周在这个项目里某次 Codex 对话的用户输入、Goal 和文件操作；先有界列出候选 turn，不要扫描全部日志。",
       "expected_skills": [
         "codex-event-logger"
@@ -1009,13 +1057,11 @@
     },
     {
       "id": "fd-full-path-directory-discovery",
-      "kind": "positive",
+      "kind": "negative",
       "request": "使用 fd 按完整路径查找名称为 Generated 的目录，固定搜索基准并限制最多 20 个结果。",
-      "expected_skills": [
-        "fd-usage"
-      ],
+      "expected_skills": [],
       "forbidden_skills": [
-        "rg-token-safe"
+        "source-query"
       ],
       "expected_change_governance_references": [],
       "expected_behavior_tags": [
@@ -1043,15 +1089,16 @@
     },
     {
       "id": "mixed-cpp-powershell-review",
-      "kind": "positive",
+      "kind": "boundary",
       "request": "只读审查这个已知 C++ 头文件的 include、自包含性和前置声明，并用 PowerShell 7 读取相关构建配置；不要修改代码，也不做跨文件语义重命名。",
       "expected_skills": [
-        "cpp-engineering-rules",
-        "powershell-usage"
+        "cpp-engineering-rules"
       ],
       "forbidden_skills": [
         "change-governance",
-        "symbol-structure-workflow"
+        "source-query",
+        "symbol-structure-workflow",
+        "powershell-usage"
       ],
       "expected_change_governance_references": [],
       "expected_behavior_tags": [

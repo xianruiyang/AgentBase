@@ -36,7 +36,7 @@ The files under `global/agents/` follow the [official Codex custom-agent schema]
 
 ## Prepare a Windows host
 
-PowerShell 7, `fd`, Python 3, Node.js LTS, and ast-grep are host prerequisites, not part of the AgentBase payload. Codex on Windows prefers `pwsh.exe` when it is available, but the Codex package does not install it; a clean Windows host can otherwise run commands through the older system shell. AgentBase therefore standardizes on PowerShell 7, requires an `fd` build that supports `--max-results`, Python 3.11+, Node.js `>=22.9 <27`, and the precisely verified ast-grep 0.44.1 runtime used by the bundled `sgy` workflow.
+PowerShell 7, `fd`, Python 3, Node.js LTS, ast-grep and the independently installed `srcq.exe` are host prerequisites, not part of the AgentBase payload. Codex on Windows prefers `pwsh.exe` when it is available, but the Codex package does not install it; a clean Windows host can otherwise run commands through the older system shell. AgentBase therefore standardizes on PowerShell 7, requires an `fd` build that supports `--max-results`, Python 3.11+, Node.js `>=22.9 <27` and ast-grep 0.44.1。`srcq` 必须从 `tools/srcq` 的受验证 Windows release 通过 `scripts/install-srcq.ps1` 安装到用户 PATH；skill、插件和 Codex 发布不会复制或回退到私有二进制。
 
 When the user asks Codex to prepare, reproduce, or deploy AgentBase on a new Windows machine, that request authorizes installation of these prerequisites through the project entry point. Run it before Validate or Publish:
 

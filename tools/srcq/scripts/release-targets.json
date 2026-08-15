@@ -1,0 +1,14 @@
+{
+  "schema": "srcq.release-targets/v1",
+  "rust": "1.85.0",
+  "targets": [
+    {
+      "os": "windows",
+      "arch": "x86_64",
+      "triple": "x86_64-pc-windows-msvc",
+      "runner": "windows-latest",
+      "artifact": "zip",
+      "verification": "native-required"
+    }
+  ]
+}

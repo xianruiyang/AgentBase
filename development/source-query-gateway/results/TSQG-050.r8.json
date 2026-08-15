@@ -1,0 +1,44 @@
+{
+  "changed_files": [
+    "development/source-query-gateway/candidate-skill/source-query/SKILL.md",
+    "development/source-query-gateway/candidate-skill/source-query/agents/openai.yaml",
+    "development/source-query-gateway/candidate-skill/source-query/references/rg-fd.md",
+    "development/source-query-gateway/candidate-skill/source-query/references/ast.md",
+    "development/source-query-gateway/candidate-skill/source-query/references/lsp.md",
+    "development/source-query-gateway/verify_candidate_payload.py"
+  ],
+  "evidence_for": [
+    "AC-SQG-002",
+    "AC-SQG-005",
+    "UDES-SQG-009",
+    "UDES-SQG-012",
+    "UDES-SQG-013"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "skill",
+      "ref": "development/source-query-gateway/candidate-skill/source-query/SKILL.md"
+    },
+    {
+      "kind": "test",
+      "ref": "development/source-query-gateway/verify_candidate_payload.py"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "候选 source-query Skill 已收敛为一个精炼入口，按需加载 rg/fd、AST 和 LSP 引用，只调用用户 PATH 中的 srcq.exe，不包含私有运行时或开发资产。",
+  "outputs": [
+    "5 文件 source-query 候选 payload",
+    "PATH srcq 唯一运行时与失败恢复边界",
+    "渐进 LSP 按需引用"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {},
+  "task_id": "TSQG-050",
+  "task_revision": 3,
+  "unresolved": [],
+  "verification": [
+    "skill-creator quick_validate 通过",
+    "verify_candidate_payload.py：5 个允许文件、无二进制/脚本/测试/benchmark/provenance、PATH srcq 声明通过",
+    "安装生命周期测试的新 PowerShell 进程可从受管 PATH 解析 srcq"
+  ]
+}

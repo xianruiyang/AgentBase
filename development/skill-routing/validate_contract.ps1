@@ -98,7 +98,7 @@ $requiredGlobalFragments = @(
     '新一轮调试前只清理会干扰当前判断且目标范围明确的旧日志'
     '工作流程的目标、阶段、状态、依赖、完成和例外由文档定义'
     'CLI、脚本、索引、缓存和生成视图只辅助编辑、查询、压缩和机械校验'
-    '`--no-heading` 只用于不进入模型上下文的逐行机器消费'
+    '全集、不存在证明、未知大结果、分页或压缩使用 PATH 中的 `srcq.exe`'
     '写错对象、破坏数据、并发覆盖、资源无界、缺少解释必需输入或混用查询快照'
     '其余可解析偏差只诊断'
 )
@@ -117,14 +117,14 @@ $duplicateRules = Get-Content -LiteralPath $globalPath -Encoding UTF8 |
 Assert-True (@($duplicateRules).Count -eq 0) "Global AGENTS.md contains duplicate normative rules"
 
 $descriptionBoundaryFragments = @{
-    "ast-grep-token-safe" = "不用于单纯字符串"
+    "source-query" = "不用于已知文件或名称的少量文本"
     "change-governance" = "不用于规格已完整"
     "codex-event-logger" = "当前上下文充分"
     "codex-qq-hook" = "状态查询不得创建或改写配置"
     "delivery-workflow" = "不用于规格已完整的单轮实现"
-    "powershell-usage" = "不用于没有 PowerShell 命令"
+    "powershell-usage" = "不用于单条精确只读"
     "reasoning-governor" = "没有 active Goal 时不用于模型自主切换"
-    "symbol-structure-workflow" = "普通字符串"
+    "symbol-structure-workflow" = "不用于只读文本"
     "task-table-manager" = "不用于单轮修改"
     "understand-space" = "不因正文偶然出现空间词触发"
 }
@@ -180,14 +180,19 @@ foreach ($skill in $requiredSkills) {
     Assert-True ($promptMatch.Groups["value"].Value.Contains('$' + $skill)) "default_prompt must explicitly reference the skill token: $skill"
 }
 
+$sourceQueryRoot = Join-Path $ProjectRoot "skills\source-query"
+$sourceQueryContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "SKILL.md") -Raw -Encoding UTF8
+$sourceQueryAstContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "references\ast.md") -Raw -Encoding UTF8
+$sourceQueryLspContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "references\lsp.md") -Raw -Encoding UTF8
 $symbolSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\symbol-structure-workflow\SKILL.md") -Raw -Encoding UTF8
-$symbolLspProtocolContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\symbol-structure-workflow\references\lsp-query-protocol.md") -Raw -Encoding UTF8
-$astSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\ast-grep-token-safe\SKILL.md") -Raw -Encoding UTF8
-Assert-True ($astSkillContent.Contains('声明/定义的完整语法范围')) "ast-grep-token-safe must own syntactic declaration and definition ranges"
-Assert-True ($astSkillContent.Contains('真实定义/实现身份')) "ast-grep-token-safe must defer semantic definition identity to LSP or the compiler"
-Assert-True ($symbolSkillContent.Contains('单根工作区使用根相对路径')) "symbol-structure-workflow must distinguish single-root logical paths"
-Assert-True ($symbolSkillContent.Contains('多根工作区使用 `<root-alias>/<relative-path>`')) "symbol-structure-workflow must distinguish multi-root logical paths"
-Assert-True ($symbolLspProtocolContent.Contains('条件性低优先级入口，不是全局禁用项')) "symbol-structure-workflow must keep workspace_symbols conditionally available"
+Assert-True ($sourceQueryContent.Contains('PATH 中的 `srcq.exe`')) "source-query must use the installed PATH runtime"
+Assert-True ($sourceQueryContent.Contains('不搜索项目构建目录、Skill、插件或 Codex 缓存中的私有副本')) "source-query must not discover private runtime copies"
+Assert-True ($sourceQueryAstContent.Contains('声明/定义范围') -or $sourceQueryAstContent.Contains('完整范围')) "source-query must own syntactic declaration and definition ranges"
+Assert-True ($sourceQueryAstContent.Contains('`_sgy.total/files/shown/omitted/complete/cache`')) "source-query must preserve the stable AST result protocol"
+Assert-True ($sourceQueryLspContent.Contains('单根工作区的 `file` 使用根相对路径')) "source-query must distinguish single-root logical paths"
+Assert-True ($sourceQueryLspContent.Contains('多根才使用 `<root-alias>/<relative-path>`')) "source-query must distinguish multi-root logical paths"
+Assert-True ($sourceQueryLspContent.Contains('在小项目、热索引或高效 Provider 下可以直接使用')) "source-query must keep workspace_symbols conditionally available"
+Assert-True ($symbolSkillContent.Contains('这些由 source-query 承担')) "symbol-structure-workflow must delegate read-only source queries"
 
 $routingCommonPath = Join-Path $PSScriptRoot "routing_evaluation_common.ps1"
 $routingCommonContent = Get-Content -LiteralPath $routingCommonPath -Raw -Encoding UTF8
@@ -304,80 +309,31 @@ Assert-True ($eventLoggerSkillContent.Contains('read_codex_turn_log.py')) "codex
 Assert-True (-not $eventLoggerSkillContent.Contains('Get-Content -Raw')) "codex-event-logger SKILL.md contains an unbounded raw read"
 Assert-True (Test-Path -LiteralPath (Join-Path $eventLoggerRoot "tests\test_event_logger.py") -PathType Leaf) "codex-event-logger is missing its regression tests"
 
-$sgyScriptsRoot = Join-Path $ProjectRoot "skills\ast-grep-token-safe\scripts"
-$sgyRuntimeManifestPath = Join-Path $sgyScriptsRoot "runtime-manifest.yml"
-$sgyReleaseRecordPath = Join-Path $sgyScriptsRoot "provenance\release-record.json"
-$sgyRuntimeManifest = Get-Content -LiteralPath $sgyRuntimeManifestPath -Raw -Encoding UTF8
-$sgyReleaseRecord = Get-Content -LiteralPath $sgyReleaseRecordPath -Raw -Encoding UTF8 | ConvertFrom-Json
-Assert-True ($sgyReleaseRecord.schema -eq "sgy.skill-runtime-release/v1") "sgy release record has an unsupported schema"
-Assert-True ($sgyReleaseRecord.version -match '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') "sgy release record has an invalid version"
-Assert-True ($sgyRuntimeManifest -match "(?m)^version: $([regex]::Escape([string]$sgyReleaseRecord.version))$") "sgy runtime manifest version does not match the release record"
-Assert-True ($sgyReleaseRecord.pathBase -eq "scripts") "sgy release record paths must be relative to the skill scripts directory"
-Assert-True ($sgyReleaseRecord.source.revision -match '^sha256:[0-9a-f]{64}$') "sgy release record has an invalid source revision"
-Assert-True ($sgyRuntimeManifest.Contains("source_revision: $($sgyReleaseRecord.source.revision)")) "sgy runtime manifest does not identify its source revision"
-Assert-True ($sgyRuntimeManifest.Contains("release_record: provenance/release-record.json")) "sgy runtime manifest does not link its release record"
-
-$sgySnapshotPath = Join-Path $sgyScriptsRoot ([string]$sgyReleaseRecord.source.snapshot)
-$sgySnapshot = Get-Content -LiteralPath $sgySnapshotPath -Raw -Encoding UTF8 | ConvertFrom-Json
-Assert-True ($sgySnapshot.schema -eq "sgy.source-snapshot/v1") "sgy source snapshot has an unsupported schema"
-Assert-True ($sgySnapshot.sourceRevision -eq $sgyReleaseRecord.source.revision) "sgy source snapshot revision does not match the release record"
-Assert-True ([int]$sgySnapshot.fileCount -eq [int]$sgyReleaseRecord.source.fileCount) "sgy source snapshot file count does not match the release record"
-
-$sgyCargoLockPath = Join-Path $ProjectRoot ([string]$sgyReleaseRecord.rustsec.projectLockfile)
-$sgyCargoLockHash = (Get-FileHash -LiteralPath $sgyCargoLockPath -Algorithm SHA256).Hash.ToLowerInvariant()
-Assert-True ($sgyCargoLockHash -eq [string]$sgyReleaseRecord.source.cargoLockSha256) "sgy Cargo.lock does not match the signed release source"
-Assert-True ($sgyReleaseRecord.rustsec.status -eq "passed") "sgy RustSec audit is not signed as passed"
-Assert-True ($sgyReleaseRecord.rustsec.cargoAuditArchiveSha256 -match '^[0-9a-f]{64}$') "sgy RustSec tool archive hash is invalid"
-Assert-True ($sgyReleaseRecord.rustsec.advisoryDbRevision -match '^[0-9a-f]{40}$') "sgy RustSec advisory database revision is invalid"
-Assert-True ([int]$sgyReleaseRecord.rustsec.advisoryCount -gt 0) "sgy RustSec audit did not record a non-empty advisory database"
-Assert-True ([int]$sgyReleaseRecord.rustsec.dependencyCount -gt 0) "sgy RustSec audit did not record scanned dependencies"
-
-$sgyTargets = @($sgyReleaseRecord.targets)
-Assert-True ($sgyTargets.Count -eq 1) "sgy release record must contain exactly the supported Windows target"
-Assert-True ($sgyTargets[0].target -eq "x86_64-pc-windows-msvc") "sgy release record contains a non-Windows target"
-Assert-True (-not (Test-Path -LiteralPath (Join-Path $sgyScriptsRoot "sgy.sh"))) "sgy skill keeps the retired non-Windows launcher"
-Assert-True (-not (Test-Path -LiteralPath (Join-Path $sgyScriptsRoot "bin\linux-x86_64\sgy"))) "sgy skill keeps the retired Linux runtime"
-$sgyScriptsPrefix = [IO.Path]::GetFullPath($sgyScriptsRoot).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-foreach ($sgyTarget in $sgyTargets) {
-    Assert-True ($sgyTarget.nativeBuild.status -eq "passed") "sgy target is missing passed native build evidence: $($sgyTarget.target)"
-    Assert-True ($sgyTarget.archiveSha256 -match '^[0-9a-f]{64}$') "sgy target has an invalid archive hash: $($sgyTarget.target)"
-
-    $sgyBinaryPath = [IO.Path]::GetFullPath((Join-Path $sgyScriptsRoot ([string]$sgyTarget.binary.path)))
-    $sgyManifestPath = [IO.Path]::GetFullPath((Join-Path $sgyScriptsRoot ([string]$sgyTarget.manifest)))
-    Assert-True ($sgyBinaryPath.StartsWith($sgyScriptsPrefix, [StringComparison]::OrdinalIgnoreCase)) "sgy binary path escapes the skill scripts directory: $($sgyTarget.binary.path)"
-    Assert-True ($sgyManifestPath.StartsWith($sgyScriptsPrefix, [StringComparison]::OrdinalIgnoreCase)) "sgy provenance path escapes the skill scripts directory: $($sgyTarget.manifest)"
-    Assert-True (Test-Path -LiteralPath $sgyBinaryPath -PathType Leaf) "sgy release binary is missing: $($sgyTarget.binary.path)"
-    Assert-True (Test-Path -LiteralPath $sgyManifestPath -PathType Leaf) "sgy target provenance manifest is missing: $($sgyTarget.manifest)"
-
-    $sgyBinaryItem = Get-Item -LiteralPath $sgyBinaryPath
-    $sgyBinaryHash = (Get-FileHash -LiteralPath $sgyBinaryPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    Assert-True ([UInt64]$sgyBinaryItem.Length -eq [UInt64]$sgyTarget.binary.bytes) "sgy binary size does not match its release record: $($sgyTarget.target)"
-    Assert-True ($sgyBinaryHash -eq [string]$sgyTarget.binary.sha256) "sgy binary hash does not match its release record: $($sgyTarget.target)"
-    Assert-True ($sgyRuntimeManifest.Contains("sha256: $sgyBinaryHash")) "sgy runtime manifest does not contain the installed binary hash: $($sgyTarget.target)"
-    Assert-True ($sgyRuntimeManifest.Contains("archive_sha256: $($sgyTarget.archiveSha256)")) "sgy runtime manifest does not contain the archive hash: $($sgyTarget.target)"
-
-    $sgyTargetManifest = Get-Content -LiteralPath $sgyManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    Assert-True ($sgyTargetManifest.schema -eq "sgy.release/v1") "sgy target provenance manifest has an unsupported schema: $($sgyTarget.target)"
-    Assert-True ($sgyTargetManifest.version -eq $sgyReleaseRecord.version) "sgy target provenance version does not match the release record: $($sgyTarget.target)"
-    Assert-True ($sgyTargetManifest.target -eq $sgyTarget.target) "sgy target provenance identifies a different target: $($sgyTarget.target)"
-    Assert-True ($sgyTargetManifest.archive -eq $sgyTarget.archive) "sgy target archive name does not match its provenance: $($sgyTarget.target)"
-    Assert-True ($sgyTargetManifest.source.revision -eq $sgyReleaseRecord.source.revision) "sgy target provenance source does not match the release record: $($sgyTarget.target)"
-    Assert-True ($sgyTargetManifest.source.cargoLockSha256 -eq $sgyReleaseRecord.source.cargoLockSha256) "sgy target provenance Cargo.lock does not match the release record: $($sgyTarget.target)"
-    $sgyManifestBinary = @($sgyTargetManifest.files | Where-Object { $_.path -eq [IO.Path]::GetFileName($sgyBinaryPath) })
-    Assert-True ($sgyManifestBinary.Count -eq 1) "sgy target provenance does not contain exactly one runtime binary: $($sgyTarget.target)"
-    Assert-True ($sgyManifestBinary[0].sha256 -eq $sgyBinaryHash) "sgy target provenance binary hash does not match the installed runtime: $($sgyTarget.target)"
-    Assert-True ([UInt64]$sgyManifestBinary[0].bytes -eq [UInt64]$sgyBinaryItem.Length) "sgy target provenance binary size does not match the installed runtime: $($sgyTarget.target)"
+$expectedSourceQueryFiles = @(
+    'SKILL.md',
+    'agents\openai.yaml',
+    'references\ast.md',
+    'references\lsp.md',
+    'references\rg-fd.md'
+)
+$actualSourceQueryFiles = @(Get-ChildItem -LiteralPath $sourceQueryRoot -Recurse -File | ForEach-Object {
+    $_.FullName.Substring($sourceQueryRoot.Length + 1)
+})
+Assert-True ($actualSourceQueryFiles.Count -eq $expectedSourceQueryFiles.Count) "source-query payload must contain only its five protocol files"
+foreach ($relativePath in $expectedSourceQueryFiles) {
+    Assert-True ($actualSourceQueryFiles -contains $relativePath) "source-query payload is missing $relativePath"
 }
-
-$rgSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\rg-token-safe\SKILL.md") -Raw -Encoding UTF8
-Assert-True ($rgSkillContent.Contains('进入模型上下文的正文不得使用 `--no-heading`')) "rg-token-safe must reserve --no-heading for machine-only output"
-Assert-True ($rgSkillContent.Contains('多文件、目录、glob 或文件数未知时使用 `--heading`')) "rg-token-safe must prefer heading output for model-readable multi-file matches"
+foreach ($retiredSkill in @('ast-grep-token-safe', 'fd-usage', 'rg-token-safe')) {
+    $retiredSkillEntry = Join-Path (Join-Path (Join-Path $ProjectRoot 'skills') $retiredSkill) 'SKILL.md'
+    Assert-True (-not (Test-Path -LiteralPath $retiredSkillEntry -PathType Leaf)) "Retired query skill is still a formal entry: $retiredSkill"
+}
+$srcqRoot = Join-Path $ProjectRoot 'tools\srcq'
+Assert-True (Test-Path -LiteralPath (Join-Path $srcqRoot 'Cargo.toml') -PathType Leaf) "srcq source package is missing"
+Assert-True (Test-Path -LiteralPath (Join-Path $srcqRoot 'scripts\install-srcq.ps1') -PathType Leaf) "srcq lifecycle installer is missing"
 
 $powerShellSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\powershell-usage\SKILL.md") -Raw -Encoding UTF8
-Assert-True ($powerShellSkillContent.Contains('--heading -M 240 --max-columns-preview')) "powershell-usage rg example is missing bounded file identity and width options"
-Assert-True ($powerShellSkillContent.Contains('Select-Object -First 80')) "powershell-usage rg example is missing its total line limit"
 Assert-True ($powerShellSkillContent.Contains('PowerShell 7（`pwsh`）')) "powershell-usage does not declare its PowerShell 7 baseline"
-Assert-True ($powerShellSkillContent.Contains('项目环境初始化入口一次性完成')) "powershell-usage does not delegate host verification to environment initialization"
+Assert-True ($powerShellSkillContent.Contains('普通任务不重复探测版本')) "powershell-usage does not delegate host verification to environment initialization"
 Assert-True (-not $powerShellSkillContent.Contains('$PSVersionTable.PSVersion')) "powershell-usage performs redundant per-command host version detection"
 Assert-True (-not $powerShellSkillContent.Contains('Windows PowerShell 5.1')) "powershell-usage keeps obsolete Windows PowerShell 5.1 guidance"
 
@@ -385,6 +341,9 @@ $symbolMetadataPath = Join-Path $ProjectRoot "skills\symbol-structure-workflow\a
 $symbolMetadata = Get-Content -LiteralPath $symbolMetadataPath -Raw -Encoding UTF8
 Assert-True ($symbolMetadata -match '(?m)^\s{4}- type:\s*"mcp"\s*$') "symbol-structure-workflow must declare an MCP tool dependency"
 Assert-True ($symbolMetadata -match '(?m)^\s{6}value:\s*"vscode-lsp-mcp"\s*$') "symbol-structure-workflow MCP dependency must target vscode-lsp-mcp"
+$sourceQueryMetadata = Get-Content -LiteralPath (Join-Path $sourceQueryRoot 'agents\openai.yaml') -Raw -Encoding UTF8
+Assert-True ($sourceQueryMetadata -match '(?m)^\s{4}- type:\s*"mcp"\s*$') "source-query must declare an MCP tool dependency"
+Assert-True ($sourceQueryMetadata -match '(?m)^\s{6}value:\s*"vscode-lsp-mcp"\s*$') "source-query MCP dependency must target vscode-lsp-mcp"
 
 $spaceSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\understand-space\SKILL.md") -Raw -Encoding UTF8
 $spaceTransformReference = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\understand-space\references\frame-transform-verification.md") -Raw -Encoding UTF8
@@ -420,7 +379,7 @@ $workflowPath = Join-Path $ProjectRoot ".github\workflows\validate.yml"
 $workflowContent = Get-Content -LiteralPath $workflowPath -Raw -Encoding UTF8
 Assert-True ($workflowContent.Contains("npm run verify:release")) "Repository CI does not run the vscode-lsp-mcp release gate"
 Assert-True ($workflowContent.Contains("rustsec/audit-check@")) "Repository CI does not run the RustSec gate"
-Assert-True ($workflowContent.Contains("sgy-windows:")) "Repository CI is missing the Windows sgy native gate"
+Assert-True ($workflowContent.Contains("srcq-windows:")) "Repository CI is missing the Windows srcq native gate"
 Assert-True ($workflowContent.Contains("validate_routing_results.ps1") -and $workflowContent.Contains("evidence\current.json")) "Repository CI does not validate current routing-policy evidence"
 Assert-True ($workflowContent.Contains("test_routing_fingerprint.ps1")) "Repository CI does not verify line-ending-neutral routing fingerprints"
 Assert-True ($workflowContent.Contains("test_routing_capsule.ps1")) "Repository CI does not verify the detached routing capsule boundary"

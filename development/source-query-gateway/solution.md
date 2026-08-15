@@ -55,20 +55,20 @@
 - 满足: DES-SQG-001, DES-SQG-002, DES-SQG-009
 - 依赖: SOL-SQG-003, SOL-SQG-004
 
-用 P0 oracle 复核 AST 全部当前入口，只在序列化和行为等价时让 AST 复用公共原语；统一读取三个后端的精确版本、缺失、输出不兼容、透传和发布来源，但不统一它们不同的 cache、serializer 或副作用语义。sgy workspace package version 是默认 release、README、Cargo metadata、release helper、SBOM 与运行时版本的唯一来源；显式构建覆盖只制作被调用方主动声明的版本，不能承担候选日常版本真源。当前源码、Windows release、来源、许可证、manifest、payload 与安装 smoke 已统一到 `0.2.0` 并通过影响验证；仅新的 advisory scan 因宿主没有 `cargo-audit` 而未刷新。
+用 P0 oracle 复核 AST 全部当前入口，只在序列化和行为等价时让 AST 复用公共原语；统一读取三个后端的精确版本、缺失、输出不兼容、透传和发布来源，但不统一它们不同的 cache、serializer 或副作用语义。srcq workspace package version 是默认 release、README、Cargo metadata、release helper、SBOM 与运行时版本的唯一来源；显式构建覆盖只制作被调用方主动声明的版本，不能承担日常版本真源。当前源码、Windows release、来源、许可证、manifest、payload 与安装 smoke 已统一到 `0.2.0` 并通过影响验证；仅新的 advisory scan 因宿主没有 `cargo-audit` 而未刷新。
 
 任何非必要 AST 公开行为变化都使方案回到公共边界裁决。最终证据必须分别覆盖权威 owner 和三个实际后端，不能用 rg/fd 通过推断 AST 仍有效。
 
-## SOL-SQG-006 建立候选统一 skill 并完成旧入口退出准备
+## SOL-SQG-006 建立统一 skill 并退出旧入口
 
-- 状态: implemented
+- 状态: verified
 - 解决: GAP-SQG-002
 - 满足: DES-SQG-008, DES-SQG-009
 - 依赖: SOL-SQG-003, SOL-SQG-004, SOL-SQG-005
 
-在分支验证范围内建立一个精炼的候选源码查询 skill，保留一次精确文件名、已知文件内少量文本和天然有界读取的原生快路径；只有全集、不存在证明、大结果压缩、目录树、AST、缓存或分页确实需要时才承担网关成本，真实符号身份改变结论时才升级 LSP。AST 现有规则完整迁入按需引用后，再准备退出旧 skill 与 rg Python wrapper 的消费者差异。
+正式 `source-query` 保留一次精确文件名、已知文件内少量文本和天然有界读取的原生快路径；只有全集、不存在证明、大结果压缩、目录树、AST、缓存或分页确实需要时才承担网关成本，真实符号身份改变结论时才升级 LSP。AST 规则已完整迁入按需引用，旧三个查询 skill、rg Python wrapper 与私有运行时已经退出。
 
-候选通过独立路由、相近非触发、AST/LSP 边界和写入安全证据前，不改写正式 skill。迁移完成必须证明当前消费者接入、旧同责决定路径退出、无悬空引用且 payload 不含 benchmark 资产。
+正式 payload 只含一个主文件、metadata 与三份按需引用；插件和直接兼容部署合同禁止复制二进制、测试或 benchmark 资产。Codex 安装态仍由逐次发布授权决定，不由项目真源变化自动更新。
 
 ## SOL-SQG-007 以当前候选身份的隔离总成本证据裁决采纳
 
@@ -83,26 +83,26 @@
 
 当前供应链与 detached 路由已刷新；candidate-only 全量 monitor 保留了一次 TLS 超时和 usage 缺失，受影响关系补测又暴露出 oracle 将 supporting facts 静默升级为必答字段的问题。回答合同现已在 corpus 中显式化，继续加重全局回答规则既增加 Token 又没有改善用户实际必答内容，因此该变体已退出。
 
-当前裁决是保留实现分支、停止无可比收益的 candidate-only 追跑，并撤销“已达收益边缘”和采纳准备状态。用户要求冻结的旧 control 不具备当前 identity；若不允许一次新的同 identity control/candidate 对照，本分支只能保留方向性证据，不能完成 `AC-SQG-004` 的因果收益声明。只有质量、总 Token、速度依次满足并由用户明确采纳，才另行更新总体项目、正式 skill 和发布候选；实际发布仍需当次用户明确同意。
+当前裁决是停止无可比收益的 candidate-only 追跑，并撤销“已达收益边缘”的结论。用户随后明确要求完整实现，因此项目真源和正式 Skill 可以接入已验证职责；这不补足被用户冻结的旧 control，也不构成 `AC-SQG-004` 的因果收益声明。质量、总 Token、速度的最终收益仍须同 identity 对照或用户明确接受方向性证据后才能裁决；实际发布仍需当次用户明确同意。
 
 ## SOL-SQG-008 将迁移前 sgy 原子收敛为独立 srcq Windows CLI
 
-- 状态: planned
+- 状态: verified
 - 解决: GAP-SQG-004, GAP-SQG-005
 - 满足: DES-SQG-011, UDES-SQG-009, UDES-SQG-010
 - 依赖: SOL-SQG-005, SOL-SQG-006
 
-以当前 `tools/sgy` 和已验证安装器作为迁移输入，在安装发布前原子更新为 `tools/srcq`、`srcq.exe`、`%LOCALAPPDATA%\Programs\srcq\current`、srcq 安装状态、归档、包名、manifest、来源、文档和验证。安装态固定为用户级受管目录与唯一 PATH 项，验证覆盖全新安装、状态读回、幂等重装、可恢复升级、保留无关 PATH 的卸载、默认保留 cache、显式删除 cache，以及新进程中的 `srcq --version` 和 `srcq doctor`。不保留 `sgy.exe` 兼容别名或旧受管安装轨道。
+仓库运行时 owner 已原子更新为 `tools/srcq`、`srcq.exe`、`%LOCALAPPDATA%\Programs\srcq\current`、srcq 安装状态、归档、包名、manifest、来源、文档和验证。安装态固定为用户级受管目录与唯一 PATH 项，验证覆盖全新安装、状态读回、幂等重装、可恢复升级、保留无关 PATH 的卸载、默认保留 cache、显式删除 cache，以及新进程中的 `srcq --version` 和 `srcq doctor`。没有 `sgy.exe` 兼容别名或旧受管安装轨道。
 
-候选 skill 改为直接调用 PATH 中的 `srcq.exe`，并验证缺失、错误版本和同名遮蔽时只返回安装、升级或重启恢复动作。主线采纳时先安装并读回主机 CLI，再更新消费者，最后删除候选与正式 skill 内置二进制及其 runtime manifest、来源和许可副本；部署与插件 payload 不再复制 srcq/sgy，也不保留私有 fallback。预期结果是安装、升级或卸载一次即可穿透所有消费者，同时只有 `tools/srcq` 维护运行时来源和生命周期。
+正式 skill 直接调用 PATH 中的 `srcq.exe`，缺失、错误版本和同名遮蔽时只返回安装、升级或重启恢复动作。Skill 内置二进制及其 runtime manifest、来源和许可副本已删除；部署与插件 payload 不复制 srcq/sgy，也不保留私有 fallback。安装、升级或卸载一次即可穿透所有消费者，只有 `tools/srcq` 维护运行时来源和生命周期。
 
-## SOL-SQG-009 渐进暴露 LSP 语义查询并保留 srcq 只读降级路线
+## SOL-SQG-009 采用原生渐进 LSP 语义查询
 
-- 状态: planned
+- 状态: verified
 - 解决: GAP-SQG-006
 - 满足: AC-SQG-005, DES-SQG-012, UDES-SQG-011
 - 依赖: SOL-SQG-006, SOL-SQG-008
 
-保留 `vscode-lsp-mcp` 内部完整的 18 工具注册、精确 Schema、安全标注和独立验证，但先验证 Codex 原生延迟目录是否让未用 LSP 任务不承担全量工具定义，且单项语义查询只展开当前操作。skill 只持久化最小升级和停止原则，具体 LSP 命令与参数按需读取，不默认先跑 health、capabilities 或工具全览。
+`vscode-lsp-mcp` 内部继续维护完整的 18 工具注册、精确 Schema、安全标注和独立验证；Codex 模型侧使用宿主原生延迟目录。Skill 只持久化最小升级和停止原则，具体 LSP 命令与参数按需读取，不默认先跑 health、capabilities 或工具全览。
 
-验收使用无 LSP、单项 LSP 和多阶段 LSP 三类真实 Codex 路径，同时记录活动工具定义、Input/Output/cached Token、回合、耗时和质量。原生延迟发现达标时直接保留 MCP，不新增万能调度工具或 CLI LSP 入口。若它不能稳定降低实际上下文或因发现回合使总成本不降，则实现 `srcq lsp` 作为模型侧只读入口，复用同一 VS Code companion、认证 IPC、协议验证和 Provider 事实。MCP 可继续作为其他客户端适配器；rename、Code Action、format、command 和 debug 不迁入 Source Query Gateway。
+无 LSP、单项 LSP 和多阶段 LSP 三类真实 Codex 路径分别只调用 0、2、3 个必要 MCP 能力，质量、完整 usage 与独立审计通过。因此保留 MCP，不新增万能调度工具或 `srcq lsp`；后者只在未来宿主行为回退且同身份实测不达标时重开。rename、Code Action、format、command 和 debug 继续由 `symbol-structure-workflow` 承担，不迁入 Source Query Gateway。相对总 Token 收益仍与整体同身份 control 一并受 SOL-SQG-007 的证据边界约束。

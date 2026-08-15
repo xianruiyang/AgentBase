@@ -2,21 +2,21 @@
 
 ## 1. 文档职责与状态
 
-本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的候选模型设计，状态为 `implementation_revision`。历史候选完成过 backend、skill、payload、独立路由与受监控模型实验，但后续实现变化和新反例已经使“收益边缘已验证”的结论失效；当前仍只属于本分支，不改变 AgentBase 总体需求、正式 skill 或 Codex 安装态。
+本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的模型设计，状态为 `implemented_evidence_deferred`。srcq 运行时、安装生命周期、正式 Skill、消费者退出和原生 LSP 渐进入口已实现；同身份收益证据仍受 DCR-SQG-001 约束，且项目变化不表示 Codex 安装态已经发布。
 
 ## 2. 设计结论
 
-以现有 `tools/sgy` 为实现基线，用同一个 Windows 原生二进制承载 AST、rg 与 fd，但以现有 AST 设计为锚点：AST 的公开命令和行为合同保持不变，rg/fd 作为新的并列命令域接入。正式产品名为 `Source Query Gateway`、唯一命令为 `srcq.exe`；`sgy` 只标识迁移前实现和历史证据。内部只抽取已经能证明相同的进程、预算、完整性、产物和发布职责，不要求各 backend 共享同一种表面命令或结果记录。
+由迁移前 `tools/sgy` 演化的 `tools/srcq` 用同一个 Windows 原生二进制承载 AST、rg 与 fd，并以既有 AST 设计为锚点：AST 的公开命令和行为合同保持不变，rg/fd 作为并列命令域接入。正式产品名为 `Source Query Gateway`、唯一命令为 `srcq.exe`；`sgy` 只标识迁移前实现、历史证据和为读取旧产物保留的数据协议。内部只抽取已经能证明相同的进程、预算、完整性、产物和发布职责，不要求各 backend 共享同一种表面命令或结果记录。
 
 该网关只是满足 `REQ-SQG-001` 的候选手段。所有接口统一、兼容矩阵和结构优化最终都必须证明模型先取得正确且充分的内容，再降低完整查找链的总 Token，并在前两项不退化时降低耗时；否则不能以工具实现完整代替根本需求达成。
 
-| 命令域 | 原生 owner | 迁移前已验证入口（TSQG-043 后只替换为 `srcq` 命令前缀） |
+| 命令域 | 原生 owner | 当前入口 |
 | --- | --- | --- |
-| AST | ast-grep | 保持 `sgy exec/defaults/cache/process/schema/capabilities/doctor` 现有合同 |
-| rg | ripgrep | 新增 `sgy rg <exec|defaults|doctor> ... -- <rg argv...>` |
-| fd | fd | 新增 `sgy fd <exec|defaults|doctor> ... -- <fd argv...>` |
+| AST | ast-grep | `srcq exec/defaults/cache/process/schema/capabilities/doctor`，数据协议保持迁移前合同 |
+| rg | ripgrep | `srcq rg <exec|defaults|doctor> ... -- <rg argv...>` |
+| fd | fd | `srcq fd <exec|defaults|doctor> ... -- <fd argv...>` |
 
-VS Code companion 与 Language Provider 继续拥有真实符号身份、类型、精确引用、层级和诊断事实；模型侧入口按 DES-SQG-012 在 Codex 原生延迟 MCP 发现与 `srcq lsp` 之间用实测裁决。安全重命名、Code Action、格式化、命令执行和调试控制不属于 Source Query Gateway。PowerShell 继续负责 Windows 命令语言。网关不替模型选择查询语义，不签发副作用授权，也不判断任务完成。
+VS Code companion 与 Language Provider 继续拥有真实符号身份、类型、精确引用、层级和诊断事实；模型侧已由真实三案裁决采用 Codex 原生延迟 MCP 发现，不新增 `srcq lsp`。安全重命名、Code Action、格式化、命令执行和调试控制不属于 Source Query Gateway。PowerShell 继续负责 Windows 命令语言。网关不替模型选择查询语义，不签发副作用授权，也不判断任务完成。
 
 ## 3. 职责与接口
 
@@ -32,7 +32,7 @@ AST 继续使用当前强制 `--` argv 边界、透明参数数组、默认 JSON
 
 - 满足: AC-SQG-001, AC-SQG-002, UDES-SQG-001, UDES-SQG-005
 
-`tools/sgy` 维护一个内部公共执行包络，可包含引擎发现、cwd、参数数组、stdin/TTY、stdout/stderr 捕获、超时、退出状态、结果 spool、查询身份、上下文预算、诊断、artifact 和发布来源。每项抽取都必须先证明三个命令域具有相同生命周期和失败语义；否则留在 backend 内。
+`tools/srcq` 维护一个内部公共执行包络，可包含引擎发现、cwd、参数数组、stdin/TTY、stdout/stderr 捕获、超时、退出状态、结果 spool、查询身份、上下文预算、诊断、artifact 和发布来源。每项抽取都必须先证明三个命令域具有相同生命周期和失败语义；否则留在 backend 内。
 
 公共 Rust 类型不等于公共序列化格式。AST 继续输出现有 `_sgy` 和结果 schema；rg/fd 可以复用相同字段语义，但由各自 serializer 保留文本匹配、路径和 AST 节点的差异。
 
@@ -40,7 +40,7 @@ AST 继续使用当前强制 `--` argv 边界、透明参数数组、默认 JSON
 
 - 满足: AC-SQG-001, UDES-SQG-002, UDES-SQG-005
 
-所有 `--` 后 token 均以参数数组保留值、顺序和重复项，不经 shell 拼接。AST 沿用现有 `sgy defaults`；rg/fd 的 `defaults` 只展示原始 argv、为机器读取追加的参数、抑制原因和最终 argv，不启动底层引擎。
+所有 `--` 后 token 均以参数数组保留值、顺序和重复项，不经 shell 拼接。AST 沿用迁移前 `defaults` 行为并由 `srcq defaults` 提供；rg/fd 的 `defaults` 只展示原始 argv、为机器读取追加的参数、抑制原因和最终 argv，不启动底层引擎。
 
 每个受支持精确版本维护完整命令矩阵，并把公开模式分为：可安全结构化、只可有界文本、应写显式产物、必须原样透传。不能结构化不等于不兼容；显式原生选项优先，包装只追加已证明不改变查询或副作用集合的机器输出选项。
 
@@ -116,7 +116,7 @@ benchmark owner、语料、测试代码、fixtures、原始事件和审计结果
 
 同一生命周期入口提供 `Install`、`Status`、以新归档执行的可恢复升级以及 `Uninstall`。安装和升级在提交前验证归档校验和、成员集合、目标架构、逐文件 hash 与实际 `srcq --version`；升级采用 staging 和失败恢复。卸载依据安装状态只删除受管文件和由安装器增加的 `PATH` 项，配置与 cache 默认保留，只有显式请求才删除 cache。新增 PATH 只保证后续进程可见，部署和文档必须要求重启 Codex 或重新打开终端。
 
-候选转正时先原子完成 `sgy` 到 `srcq` 的产品身份迁移，再安装并验证主机 CLI、让消费者改用 `srcq.exe`，最后从 skill payload 删除内置二进制、runtime manifest、来源和许可副本。缺失、版本不受支持或命令身份无法确认时返回安装或升级恢复动作，不保留 `sgy.exe` 别名或 skill 私有副本作为 fallback；否则会重新形成两个版本源并破坏穿透式更新。
+产品身份迁移、隔离安装验证、正式 Skill 消费者接入和私有运行时退出已经完成。正式发布前必须先验证目标主机的 PATH 安装态；缺失、版本不受支持或命令身份无法确认时返回安装、升级或开启新终端的恢复动作，不保留 `sgy.exe` 别名或 skill 私有副本作为 fallback；否则会重新形成两个版本源并破坏穿透式更新。
 
 ## DES-SQG-012 LSP 语义查询渐进暴露与 srcq 降级路线
 
@@ -130,11 +130,11 @@ benchmark owner、语料、测试代码、fixtures、原始事件和审计结果
 
 ## 4. 版本与迁移边界
 
-首个候选以 ripgrep 15.1.0、fd 10.4.2 和当前 sgy 已验证的 ast-grep 0.41.1、0.42.0、0.44.1 建立 Windows 精确版本矩阵，不外推连续版本范围。完整兼容表示该精确版本所有公开模式都可通过相应命令域调用并保持原生语义，不表示所有模式都能结构化压缩。迁移前 sgy workspace package version 是候选版本的唯一默认来源；TSQG-043 将同一职责原子迁入 srcq workspace。构建参数只允许显式制作另一个已声明版本，不能长期用覆盖值掩盖源码、README、SBOM、release helper 与运行时版本不一致。
+当前以 ripgrep 15.1.0、fd 10.4.2 和迁移前已验证的 ast-grep 0.41.1、0.42.0、0.44.1 建立 Windows 精确版本矩阵，不外推连续版本范围。完整兼容表示该精确版本所有公开模式都可通过相应命令域调用并保持原生语义，不表示所有模式都能结构化压缩。`tools/srcq/Cargo.toml` 的 workspace package version 是当前候选版本的唯一默认来源；构建参数只允许显式制作另一个已声明版本，不能长期用覆盖值掩盖源码、README、SBOM、release helper 与运行时版本不一致。
 
 | 当前对象 | 分支目标 |
 | --- | --- |
-| `tools/sgy` | 迁移前实现与历史证据位置；原子迁移完成后退出 |
+| `sgy` 历史标识 | 只用于迁移前实现、冻结数据协议与历史证据；不再对应仓库运行时目录或可执行入口 |
 | `tools/srcq` | 保持 AST 合同并承载 rg/fd 命令域；作为独立 Windows CLI 的唯一源码、安装器和发布 owner |
 | `rg_receipt.py` | rg 命令域完成真实替代后删除 |
 | `rg-token-safe`、`fd-usage` | 消费者与路由证据闭环后由统一 skill 取代 |
@@ -164,4 +164,4 @@ benchmark owner、语料、测试代码、fixtures、原始事件和审计结果
 
 ## 6. 设计完成判定
 
-设计完成仍要求 rg/fd 全部公开模式有持久分类，各视图按自身语义单元给出正确总量、分页与完整性，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项未退化；`sgy` 到 `srcq` 的命名与运行时迁移原子完成，srcq 的安装、状态、升级、卸载、PATH、身份读回和旧内置运行时退出形成单一生命周期；LSP 工具渐进暴露在无 LSP、单项 LSP 与多阶段 LSP 三类真实 Codex 路径中证明未降低质量且降低完整链路 Token，不成立时完成 `srcq lsp` 只读降级路线而不迁入编辑器修改职责；并由当前候选身份下的独立路由与隔离模型证据按 `AC-SQG-001`、`AC-SQG-002`、`AC-SQG-003` 顺序证明达到收益边缘。当前的历史实现与 candidate-only 证据不覆盖新增命名和 LSP 渐进暴露设计；同 identity control/candidate 收益证据仍受用户冻结 control 的既有决定约束，因此不得进入 `validated_pending_user_adoption`。消费者迁移、旧同责入口退出、总体项目接入与 Codex 发布仍必须等待用户明确采纳和当次发布授权。
+实现闭环要求 rg/fd 全部公开模式有持久分类，各视图按自身语义单元给出正确总量、分页与完整性，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项未退化；`sgy` 到 `srcq` 的命名与运行时迁移原子完成，srcq 的安装、状态、升级、卸载、PATH、身份读回和旧内置运行时退出形成单一生命周期；LSP 工具渐进暴露在无 LSP、单项 LSP 与多阶段 LSP 三类真实 Codex 路径中保持质量并只展开必要能力，不达标时才重开 `srcq lsp` 只读降级路线。上述实现、消费者迁移、旧入口退出和项目接入已经完成。当前 identity 的独立路由与隔离模型证据仍未包含可比 control，因此不能按 `AC-SQG-001`、`AC-SQG-002`、`AC-SQG-003` 宣称达到收益边缘；Codex 发布还必须取得当次明确授权。

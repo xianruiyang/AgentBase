@@ -2,14 +2,14 @@
 
 ## 1. 文档职责
 
-本文件记录相对 [requirements.md](requirements.md)、[user-design.md](user-design.md) 和 [design.md](design.md) 的当前直接观察、已经闭环的实现边界与剩余差距。观察对象是当前 AgentBase 分支工作树；总体项目、正式 skill 与 Codex 安装态仍未采纳本分支。历史测试只按其冻结候选身份保留，不自动覆盖后续源码、skill 或 payload。
+本文件记录相对 [requirements.md](requirements.md)、[user-design.md](user-design.md) 和 [design.md](design.md) 的当前直接观察、已经闭环的实现边界与剩余差距。观察对象是当前 AgentBase 工作树；项目正式入口已迁移，实际 Codex 安装态仍须取得当次发布同意。历史测试只按其冻结候选身份保留，不自动覆盖后续源码、skill 或 payload。
 
-## OBS-SQG-001 sgy 已承载三个并列命令域
+## OBS-SQG-001 srcq 已承载三个并列命令域
 
 - 状态: verified
 - 关联: DES-SQG-001, DES-SQG-002, DES-SQG-003
 
-候选 `sgy 0.2.0` 保留原 AST 顶层命令，并增加可直接调用但不进入 AST help/schema 的 `sgy rg exec/defaults/doctor` 与 `sgy fd exec/defaults/doctor`。rg/fd 原生 argv 保留顺序、重复、空值和 Windows 非 UTF 参数，机器参数插入原生命令 `--` 之前；不能安全结构化的调用可用 raw、artifact 或 passthrough 保持原生字节和副作用语义。
+当前 `srcq 0.2.0` 保留迁移前 AST 顶层命令，并提供不进入 AST help/schema 的 `srcq rg exec/defaults/doctor` 与 `srcq fd exec/defaults/doctor`。rg/fd 原生 argv 保留顺序、重复、空值和 Windows 非 UTF 参数，机器参数插入原生命令 `--` 之前；不能安全结构化的调用可用 raw、artifact 或 passthrough 保持原生字节和副作用语义。迁移前 `_sgy` 与 `sgy.*` 数据协议继续保留以读取既有 AST 产物，但仓库不提供 `sgy.exe` 命令别名。
 
 29 个 ripgrep 15.1.0 与 fd 10.4.2 公开模式样本均有唯一分类，7 个 raw/artifact oracle 已逐字回放。`defaults` 只解释参数和模式，不发现或启动引擎。
 
@@ -29,16 +29,14 @@ fd 会冻结对象类型并为每个显式根建立可逆 trie；只有估算 To
 - 状态: verified
 - 关联: DES-SQG-001, DES-SQG-009
 
-P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilities 已对 `0.2.0` 候选逐字复核，唯一允许差异是 release version 字段。完整 sgy workspace 测试已运行一次且通过；P0 的 ast-grep 0.41.1、0.42.0、0.44.1 真实矩阵共 30 项通过。公共改动只复用了进程输出上限，没有迁移 AST serializer、cache、profile、fingerprint、process 或 rewrite 合同。
+P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilities 已作为迁移前 oracle；比较器只规范化正式命令、配置和环境前缀后，对 `srcq` 当前 release 逐项通过。`_sgy` 与 `sgy.*` 数据协议、serializer、cache、profile、fingerprint、process 和 rewrite 合同保持不变。P0 的 ast-grep 0.41.1、0.42.0、0.44.1 真实矩阵仍作为精确版本基线。
 
 ## OBS-SQG-004 候选 skill 与当前 payload 已重建
 
 - 状态: verified
 - 关联: DES-SQG-008, DES-SQG-009, CON-SQG-003
 
-分支内 `candidate-skill/source-query` 用一个精炼主文件按“原生快路径 → rg/fd 网关 → AST → LSP”升级，详细 rg/fd 与 AST 协议按需读取。skill 的静态结构此前通过验证，测试资产排除合同不变。
-
-当前 Windows release、来源记录、SBOM、manifest 与 candidate payload 已从同一 `0.2.0` workspace 版本重建：二进制 SHA-256 为 `fcec9aa20b0ccaf27729451399d5ca46e962be21830438af210aea95a314e230`，archive SHA-256 为 `0d75a224c62e7b9861a8806743a2423ab5cdcbc3e431c119a0e32001dbcc6733`，source revision 为 `sha256:3722e37b103a4428c2b6cc9ad656664893c5c694f1a18fb5ad3a79ebedb0c910`。payload 校验确认 14 个运行文件且没有测试、fixture、benchmark、runner、corpus、result 或 audit 资产；AST 冻结差异和 Windows 安装生命周期通过。宿主没有 `cargo-audit`，因此仍只能记录既有审计继承依据与限制，不声称完成新的 advisory scan。
+正式 `skills/source-query` 用一个精炼主文件按“原生快路径 → rg/fd 网关 → AST → LSP”升级，详细 rg/fd、AST 与 LSP 协议按需读取。正式 payload 只有 `SKILL.md`、`agents/openai.yaml` 和三份按需引用；私有 `sgy.exe`、runtime manifest、来源与许可副本已经退出，消费者只调用用户 PATH 中的 `srcq.exe`。`candidate-skill/source-query` 仅作为隔离 benchmark 输入保留；测试、fixture、runner、corpus、result 和 audit 资产仍由项目开发目录承担。
 
 ## OBS-SQG-005 benchmark owner 已具备隔离运行合同
 
@@ -52,7 +50,7 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 - 状态: partially_verified
 - 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004
 
-当前候选的 detached 路由结果 [routing-result-v15.json](evidence/routing-result-v15.json) 覆盖 21 个首次路由、非触发、跨根、关系端点、行数预算、AST、LSP、分页和写入安全场景，21/21 符合独立 oracle。评估 capsule 已把首次选择与按需引用分层，避免把详细协议预加载给 evaluator。
+正式 detached 路由结果 [current.json](../skill-routing/evidence/current.json) 覆盖 65 个首次路由、65 个行为策略和 13 个治理引用场景，三阶段均符合独立 oracle；简单已知读取保持不触发高级 Skill，AST/LSP、分页、写入安全与编辑器操作职责分离。评估 capsule 把首次选择、行为和按需引用分层，避免把详细协议预加载给 evaluator。早期 21-case 候选结果仅作为历史证据保留。
 
 当前轮完整 candidate-only monitor 覆盖六类真实查询各两次；12 次中 11 次有完整 usage，完整 run 的 input 为 `998,139`、output 为 `5,894`、实际总 Token 为 `1,004,033`，全体 wall time 为 `560,744 ms`。`ue-command-dispatch-submit` 的一次运行在已经取得源码证据后遇到 TLS 重连并超时，没有 final answer 与 usage；它保留为真实失败，不能从聚合删除或补跑替换。因此该组数据不是十二次完整总量，也没有 control，不能与历史数字作因果比较。
 
@@ -60,44 +58,44 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 用户要求冻结且不重跑的五-skill 消融历史记录仍为实际总 Token `1,157,111`、耗时 `508,509 ms`、核心语义 12/12、严格整体 11/12。它缺少当前 experiment 的完整 identity，只能继续作为历史现实依据。由于当前候选的投影、快照、版本和发布身份已改变，旧候选相对该记录的 `0.91%` Token 与 `20.43%` 耗时方向差不能证明当前实现已达收益边缘；TSQG-061—063 已据此重开。
 
-## OBS-SQG-007 sgy 已有独立 Windows 安装生命周期
+## OBS-SQG-007 srcq 已有独立 Windows 安装生命周期
 
 - 状态: verified
 - 关联: DES-SQG-011, UDES-SQG-009
 
-`tools/sgy/scripts/install-sgy.ps1` 已能从受校验归档安装到默认 `%LOCALAPPDATA%\Programs\sgy\current`，增加唯一用户 `PATH` 项，并提供 `Status`、重复安装、可恢复升级和 `Uninstall`。安装会验证归档 SHA-256、精确成员集合、目标架构、逐文件 hash 和二进制版本；卸载依据状态只移除受管成员和安装器增加的 PATH 项，默认保留 cache。该生命周期已有测试和安装 smoke，能够承接独立 Windows CLI 职责。
+`tools/srcq/scripts/install-srcq.ps1` 从 `srcq.release/v1` 受校验归档安装到默认 `%LOCALAPPDATA%\Programs\srcq\current`，维护唯一用户 `PATH` 项，并显式提供 `Install`、`Status`、`Upgrade` 和 `Uninstall`。安装会验证归档 SHA-256、精确成员集合、目标架构、逐文件 hash 和 `srcq --version`；升级使用 staging、旧版本备份与失败恢复；卸载依据 `srcq.install/v1` 状态只移除受管成员和安装器增加的 PATH 项，默认保留 cache。
 
-当前候选 `candidate-skill/source-query` 和正式 `ast-grep-token-safe` 仍各自携带 `scripts/bin/windows-x86_64/sgy.exe` 及运行时来源材料；项目源码已是 `sgy 0.2.0`，正式 skill 内置记录仍是 `0.1.2`。因此“可独立安装”的机制已经存在，但消费者和发布合同尚未迁移到唯一 PATH 运行时。
+隔离生命周期测试覆盖幂等安装、状态读回、新 PowerShell 进程 PATH 解析、升级提交失败回滚、恶意 ZIP 与篡改状态拒绝、正常升级、保留并发 PATH 修改、未知安装文件、用户配置和默认 cache，以及显式 cache 清理。候选 skill 已退出私有运行时；正式旧 skill 与部署合同仍待消费者迁移。
 
-## OBS-SQG-008 LSP 工具注册完整但模型侧已观察到延迟发现
+## OBS-SQG-008 LSP 原生渐进发现已经通过候选侧实测
 
-- 状态: partially_verified
+- 状态: verified
 - 关联: AC-SQG-002, AC-SQG-005, DES-SQG-012, UDES-SQG-011
 
 `vscode-lsp-mcp` 当前在一次 `tools/list` 中固定返回 18 个工具；按真实 MCP 公开字段序列化的工具定义合计为 `15,747` 字符。这是可观测的工具合同尺寸，不等于经 tokenizer 和客户端序列化后的实际 Token。
 
-当前 Codex 任务的主工具定义没有直接展开这 18 个 LSP 工具，但它们仍可从宿主的延迟工具目录被查找和调用。这证明 Codex 运行时具备渐进发现机制，但尚未证明未用 LSP 任务的实际 Input Token 已排除全量 Schema，也未证明单项发现不会展开其他工具或因新增回合抵消收益。
+隔离真实 Codex 三案分别覆盖不需要 LSP、只需符号身份和随后新增精确引用需要。实际 MCP 调用严格为 0、`list_workspaces + symbol_info`、`list_workspaces + symbol_info + get_references`；三案答案质量、usage、退出码和独立 capsule 哈希审计均通过，总 Token 分别为 `112,858`、`173,459`、`207,743`。这证明当前候选使用宿主原生延迟目录即可按必要证据逐级展开，不需要新增 `srcq lsp` 第二入口；数据只证明候选侧行为和绝对成本，不与旧 control 拼成因果收益。
 
-## GAP-SQG-005 srcq 正式命名尚未迁移
+## GAP-SQG-005 srcq 正式命名已经迁移
 
-- 状态: open
+- 状态: resolved
 - 关联: DES-SQG-011, UDES-SQG-009, UDES-SQG-010, OBS-SQG-007
 
-用户已确认正式产品名为 Source Query Gateway、唯一命令为 `srcq.exe`，但当前源码目录、Cargo 包、安装脚本、安装目录、状态、归档、候选 skill 和历史证据仍使用 `sgy`。这些是尚未执行的产品身份迁移，不能以文档目标名称推断已实现。迁移需要在正式安装发布前原子完成，不保留 `sgy.exe` 别名或双轨受管运行时。
+当前源码目录、Cargo 包、可执行文件、安装脚本、默认安装目录、状态、归档、release manifest、候选 skill 和验证入口均已使用 Source Query Gateway / `srcq`。迁移前历史证据和冻结 AST 数据协议保留 `sgy` 身份；它们不提供可执行别名、安装 fallback 或第二运行时。正式旧 skill 和部署消费者的退出由 GAP-SQG-004 单独跟踪。
 
-## GAP-SQG-006 LSP 渐进暴露收益尚未验证
+## GAP-SQG-006 LSP 渐进暴露路径已经闭环
 
-- 状态: open
+- 状态: resolved
 - 关联: AC-SQG-005, DES-SQG-012, UDES-SQG-011, OBS-SQG-008
 
-当前只能证明“有延迟目录”，不能证明它在真实 Codex 调用链中降低总 Token。需要在同一客户端与项目身份下比较无 LSP、单项 LSP 和多阶段 LSP 路径的活动工具定义、总 Token、缓存输入、回合、耗时和质量。原生延迟发现达标时不应新增 CLI LSP 入口；不达标时才实现 `srcq lsp` 只读降级路线。
+真实隔离三案已经证明 LSP 能力按证据需要从 0 到单项再到多阶段展开，未发生无关 MCP 调用或失败。由于需求允许原生延迟发现达标时不新增 CLI，本分支不实现 `srcq lsp`；未来只有宿主行为回退且同身份实测证明总成本或可靠性不达标时才重开该设计。
 
-## GAP-SQG-004 独立安装入口尚未成为消费者唯一运行时
+## GAP-SQG-004 独立安装入口已成为项目消费者唯一运行时
 
-- 状态: open
+- 状态: resolved
 - 关联: DES-SQG-011, UDES-SQG-009, OBS-SQG-007
 
-安装器已满足迁移前基础生命周期，但候选 skill、正式 skill 和部署合同仍会复制或验证 skill 内置 sgy，形成两个可独立变化的运行时来源。必须先完成 `sgy` 到 `srcq` 的原子命名迁移和 srcq 正式 Windows release 与用户级安装验证，再让候选消费者只调用 PATH 中的 `srcq.exe`，最后删除 skill payload 内置副本和对应同步合同；缺失或版本不符时应给出安装、升级和重启恢复动作，而不是静默 fallback。
+`tools/srcq` 是唯一运行时 owner；正式 `source-query`、CI、插件与直接兼容部署合同只消费 PATH 中的 `srcq.exe`。三个旧查询 Skill、Python rg wrapper、内置 sgy 与其同步/签署合同已经退出；缺失或版本不符时只给出安装、升级和开启新终端的恢复动作。实际 Codex 根目录是否更新仍由逐次发布授权独立决定。
 
 ## GAP-SQG-003 当前候选缺少身份一致的完成证据
 
@@ -106,9 +104,9 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 当前后端、AST 冻结、候选 payload、独立路由和 candidate-only 监控均已有直接证据，但 corpus 回答合同刚刚修正，完整运行又有一次 usage 缺失，且用户要求冻结的 control 与当前 Codex、工作区、候选及 corpus identity 不同。继续单独重跑 candidate 不会产生可比较收益结论；只有用户允许一次同 identity 的 control/candidate 对照，或明确接受不形成当前因果收益结论，才能关闭该差距。在此之前不得恢复收益边缘、主线采纳或发布完成判断。
 
-## GAP-SQG-002 主线迁移仍由用户采纳决定
+## GAP-SQG-002 项目主线迁移已实施
 
-- 状态: deferred
+- 状态: resolved
 - 关联: CON-SQG-001, DES-SQG-008
 
-[migration-candidate.md](migration-candidate.md) 已定义旧 skill、Python rg wrapper、全局路由和消费者的原子迁移方式；当前没有改动或删除这些正式入口。只有收益证据达到根本需求且用户确认采纳后，才可实施主线迁移；发布到 Codex 仍需当次单独确认。
+[migration-candidate.md](migration-candidate.md) 记录了旧 skill、Python rg wrapper、全局路由和消费者的原子迁移；当前项目真源已完成迁移，Skill、静态合同、三阶段 detached 路由、部署与插件 payload 验证通过。Codex 安装态没有随项目修改自动变化，仍需用户针对当次发布明确同意。

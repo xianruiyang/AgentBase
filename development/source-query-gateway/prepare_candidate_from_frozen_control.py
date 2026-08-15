@@ -7,7 +7,7 @@ import shutil
 
 
 ROOT = Path(__file__).resolve().parent
-OLD_ROUTE = "should: 文本内容搜索先用受限 `rg`；直接读取正文时，多文件显式使用 `--heading`、单个已知文件显式使用 `--no-filename`，`--no-heading` 只用于不进入模型上下文的逐行机器消费；文件发现使用受限 `fd`；只有文本不能可靠表达语法结构时升级 AST，只有结论依赖真实符号身份时升级 LSP"
+OLD_ROUTE = "should: 文本内容搜索先用受限 `rg`；文件发现使用受限 `fd`；只有文本不能可靠表达语法结构时升级 AST，只有结论依赖真实符号身份时升级 LSP"
 SECURE_LINKS = {"auth.json", ".env"}
 
 

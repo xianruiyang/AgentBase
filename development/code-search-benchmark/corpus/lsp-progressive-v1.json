@@ -1,0 +1,87 @@
+{
+  "schema": "agentbase.source-query-corpus/v1",
+  "version": "2026-08-15.3",
+  "created_utc": "2026-08-15T00:00:00Z",
+  "workspace_roles": {
+    "agentbase": {
+      "repository": "AgentBase",
+      "commit": "ba856e294fcc8886b3c6068c9b83bdb346741510",
+      "snapshot_scope": "listed-oracle-files",
+      "note": "The experiment builder additionally freezes the complete workspace tree and dirty patch."
+    }
+  },
+  "cases": [
+    {
+      "id": "lsp-progressive-none",
+      "workspace_role": "agentbase",
+      "language": "typescript",
+      "prompt": "定位 ToolOutputDataMap 中 document_symbols 字段的正式源码相对路径和 1-based 行号。只返回路径、行号和字段类型，答案不超过两行。",
+      "answer_max_lines": 2,
+      "answer_contract": {
+        "required": ["正式源码相对路径", "document_symbols 的 1-based 行号", "Collection<DocumentSymbol> 类型"],
+        "supporting": ["该任务不依赖真实符号身份或 Provider 事实"]
+      },
+      "oracle": {
+        "kind": "source-field-location",
+        "source": {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts", "sha256": "e1d1918ff87e9bbf91c2bf3add816e8af69e34f6181e3c8467df8ade5c7a825c"},
+        "owner": "ToolOutputDataMap",
+        "field": "document_symbols",
+        "line": 694,
+        "type": "Collection<DocumentSymbol>",
+        "expected_lsp_operations": []
+      }
+    },
+    {
+      "id": "lsp-progressive-single",
+      "workspace_role": "agentbase",
+      "language": "typescript",
+      "prompt": "使用当前活跃 TypeScript Language Provider，在 mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts 第 310 行 ProviderObservation 标识符处确认 hover 与 definition。返回 hover 签名和定义位置，答案不超过三行。",
+      "answer_max_lines": 3,
+      "answer_contract": {
+        "required": ["Language Provider 返回的 hover 签名", "Language Provider 返回的 definition 相对路径与 1-based 行号"],
+        "supporting": ["只发现并调用当前所需的定点符号信息能力"]
+      },
+      "oracle": {
+        "kind": "provider-hover-definition",
+        "source": {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts", "sha256": "e1d1918ff87e9bbf91c2bf3add816e8af69e34f6181e3c8467df8ade5c7a825c"},
+        "position": {"line": 310, "column": 18, "column_semantics": "1-based UTF-16"},
+        "hover": "interface ProviderObservation",
+        "definition": {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts", "line": 310, "column": 18},
+        "expected_lsp_operations": ["symbol_info"]
+      }
+    },
+    {
+      "id": "lsp-progressive-multistage",
+      "workspace_role": "agentbase",
+      "language": "typescript",
+      "prompt": "使用当前活跃 TypeScript Language Provider，先确认 mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts 第 310 行 ProviderObservation 的定义身份，再列出 mcp/vscode-lsp-mcp 范围内该符号的全部精确引用。返回定义和按路径、行号排序的引用，并声明完整性，答案不超过十四行。",
+      "answer_max_lines": 14,
+      "answer_contract": {
+        "required": ["ProviderObservation 的 Provider 定义身份", "九个精确引用位置", "绑定查询范围内的完整性声明"],
+        "supporting": ["先 symbol_info 后 get_references 的渐进操作顺序"]
+      },
+      "oracle": {
+        "kind": "provider-definition-and-complete-references",
+        "sources": [
+          {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts", "sha256": "e1d1918ff87e9bbf91c2bf3add816e8af69e34f6181e3c8467df8ade5c7a825c"},
+          {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/symbol-bridge.ts", "sha256": "90924c67ea96ccce99753135370f3e19dea3f3259b32fb5ca68df086cc625d1f"},
+          {"path": "mcp/vscode-lsp-mcp/packages/server/src/workspace-router.ts", "sha256": "58b83779a564436e502222356b9911014dce993682fb0a69b1b68122e77a3184"}
+        ],
+        "position": {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts", "line": 310, "column": 18},
+        "references": [
+          {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts", "line": 307, "column": 23},
+          {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts", "line": 310, "column": 18},
+          {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts", "line": 626, "column": 23},
+          {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/symbol-bridge.ts", "line": 4, "column": 8},
+          {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/symbol-bridge.ts", "line": 23, "column": 27},
+          {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/symbol-bridge.ts", "line": 27, "column": 27},
+          {"path": "mcp/vscode-lsp-mcp/packages/protocol/src/symbol-bridge.ts", "line": 88, "column": 4},
+          {"path": "mcp/vscode-lsp-mcp/packages/server/src/workspace-router.ts", "line": 41, "column": 8},
+          {"path": "mcp/vscode-lsp-mcp/packages/server/src/workspace-router.ts", "line": 100, "column": 14}
+        ],
+        "complete_within": "mcp/vscode-lsp-mcp at the bound workspace snapshot",
+        "expected_lsp_operations": ["symbol_info", "get_references"]
+      }
+    }
+  ]
+}

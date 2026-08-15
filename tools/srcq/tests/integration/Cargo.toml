@@ -1,0 +1,28 @@
+[package]
+name = "srcq-integration-tests"
+description = "Real ast-grep process and cache integration verification for srcq"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "srcq-integration-driver"
+path = "../../crates/srcq-cli/src/main.rs"
+
+[[bin]]
+name = "srcq-slow-engine"
+path = "src/bin/slow_engine.rs"
+
+[dependencies]
+srcq-cli = { path = "../../crates/srcq-cli" }
+srcq-core = { path = "../../crates/srcq-core" }
+
+[dev-dependencies]
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

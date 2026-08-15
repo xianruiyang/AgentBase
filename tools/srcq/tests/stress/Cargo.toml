@@ -1,0 +1,20 @@
+[package]
+name = "srcq-stress-tests"
+description = "Large-result, backpressure, cache concurrency, and security gates for srcq"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "srcq-stress-engine"
+path = "src/bin/stress_engine.rs"
+
+[dev-dependencies]
+srcq-core = { path = "../../crates/srcq-core" }
+serde_json.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
