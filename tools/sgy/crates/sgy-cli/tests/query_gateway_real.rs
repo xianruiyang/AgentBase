@@ -66,7 +66,7 @@ fn rg_groups_and_resumes_the_same_exact_snapshot() {
     );
     let first = yaml(&first.stdout);
     assert_eq!(first["_sgy"]["result_total"], 3);
-    assert_eq!(first["_sgy"]["display_complete"], false);
+    assert_eq!(first["_sgy"]["complete"]["display"], false);
     let snapshot = first["_sgy"]["query_snapshot"]
         .as_str()
         .expect("snapshot id");
@@ -79,6 +79,8 @@ fn rg_groups_and_resumes_the_same_exact_snapshot() {
             "auto",
             "--limit",
             "1",
+            "--receipt",
+            "full",
             "--snapshot",
             snapshot,
             "--after",
@@ -95,7 +97,7 @@ fn rg_groups_and_resumes_the_same_exact_snapshot() {
     let second = yaml(&second.stdout);
     assert_eq!(second["_sgy"]["query_snapshot"], snapshot);
     assert_eq!(second["_sgy"]["offset"], 1);
-    assert_eq!(second["_sgy"]["view"], first["_sgy"]["view"]);
+    assert_eq!(second["_sgy"]["view"], "grouped");
 }
 
 #[test]
@@ -104,7 +106,17 @@ fn rg_records_view_is_executable_and_keeps_content() {
     let local = tempfile::tempdir().expect("local app data");
     let output = sgy(directory.path(), local.path())
         .args([
-            "rg", "exec", "--view", "records", "--", "-n", "-F", "alpha", ".",
+            "rg",
+            "exec",
+            "--view",
+            "records",
+            "--receipt",
+            "full",
+            "--",
+            "-n",
+            "-F",
+            "alpha",
+            ".",
         ])
         .output()
         .expect("records query");
@@ -119,6 +131,62 @@ fn rg_records_view_is_executable_and_keeps_content() {
 }
 
 #[test]
+fn default_receipt_is_sparse_and_full_receipt_keeps_diagnostics() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let sparse = sgy(directory.path(), local.path())
+        .args(["rg", "exec", "--", "-F", "beta", "src/a.ts"])
+        .output()
+        .expect("sparse receipt");
+    assert!(sparse.status.success());
+    let sparse = yaml(&sparse.stdout);
+    assert_eq!(sparse["_sgy"]["schema"], "sgy.query.result/v2");
+    assert_eq!(sparse["_sgy"]["result_total"], 1);
+    assert_eq!(sparse["_sgy"]["complete"]["result"], true);
+    assert_eq!(sparse["_sgy"]["complete"]["display"], true);
+    assert_eq!(sparse["_sgy"]["complete"]["content"], true);
+    for omitted in [
+        "backend",
+        "engine_version",
+        "mode",
+        "view",
+        "native_exit",
+        "query_snapshot",
+        "displayed",
+        "omitted",
+        "offset",
+        "next_cursor",
+        "stdout_bytes",
+        "stderr_bytes",
+    ] {
+        assert!(
+            sparse["_sgy"].get(omitted).is_none(),
+            "default receipt unexpectedly contains {omitted}"
+        );
+    }
+
+    let full = sgy(directory.path(), local.path())
+        .args([
+            "rg",
+            "exec",
+            "--receipt",
+            "full",
+            "--",
+            "-F",
+            "beta",
+            "src/a.ts",
+        ])
+        .output()
+        .expect("full receipt");
+    assert!(full.status.success());
+    let full = yaml(&full.stdout);
+    assert_eq!(full["_sgy"]["schema"], "sgy.query.result/v1");
+    assert_eq!(full["_sgy"]["backend"], "rg");
+    assert!(full["_sgy"]["engine_version"].is_string());
+    assert!(full["_sgy"]["query_snapshot"].is_string());
+}
+
+#[test]
 fn rg_no_match_is_complete_and_keeps_native_exit_one() {
     let directory = fixture();
     let local = tempfile::tempdir().expect("local app data");
@@ -129,7 +197,8 @@ fn rg_no_match_is_complete_and_keeps_native_exit_one() {
     assert_eq!(output.status.code(), Some(1));
     let document = yaml(&output.stdout);
     assert_eq!(document["_sgy"]["result_total"], 0);
-    assert_eq!(document["_sgy"]["result_complete"], true);
+    assert_eq!(document["_sgy"]["complete"]["result"], true);
+    assert_eq!(document["_sgy"]["native_exit"], 1);
 }
 
 #[test]
@@ -142,7 +211,7 @@ fn fd_auto_tree_is_complete_and_print0_requires_artifact() {
         .expect("fd tree");
     assert!(output.status.success());
     let document = yaml(&output.stdout);
-    assert_eq!(document["_sgy"]["result_complete"], true);
+    assert_eq!(document["_sgy"]["complete"]["result"], true);
     assert!(
         document["_sgy"]["result_total"]
             .as_u64()
@@ -302,8 +371,10 @@ fn help_is_bounded_unless_raw_or_artifact_is_explicit() {
         .expect("bounded help");
     assert!(output.status.success());
     let document = yaml(&output.stdout);
+    assert_eq!(document["_sgy"]["schema"], "sgy.query.bounded-text/v2");
     assert_eq!(document["_sgy"]["displayed_lines"], 3);
-    assert_eq!(document["_sgy"]["display_complete"], false);
+    assert_eq!(document["_sgy"]["complete"]["display"], false);
+    assert!(document["_sgy"].get("backend").is_none());
 }
 
 #[test]
@@ -346,7 +417,17 @@ fn native_option_delimiter_keeps_dash_prefixed_patterns_positional() {
     let directory = fixture();
     let local = tempfile::tempdir().expect("local app data");
     let rg = sgy(directory.path(), local.path())
-        .args(["rg", "exec", "--", "-F", "--", "-needle", "."])
+        .args([
+            "rg",
+            "exec",
+            "--receipt",
+            "full",
+            "--",
+            "-F",
+            "--",
+            "-needle",
+            ".",
+        ])
         .output()
         .expect("dash rg pattern");
     assert!(
@@ -359,7 +440,18 @@ fn native_option_delimiter_keeps_dash_prefixed_patterns_positional() {
     assert_eq!(rg["_sgy"]["mode"], "RG-SEARCH-TEXT");
 
     let fd = sgy(directory.path(), local.path())
-        .args(["fd", "exec", "--view", "flat", "--", "--", "-dash", "."])
+        .args([
+            "fd",
+            "exec",
+            "--view",
+            "flat",
+            "--receipt",
+            "full",
+            "--",
+            "--",
+            "-dash",
+            ".",
+        ])
         .output()
         .expect("dash fd pattern");
     assert!(
@@ -382,7 +474,8 @@ fn native_error_is_bounded_and_never_reported_as_a_complete_empty_query() {
         .expect("invalid rg pattern");
     assert_eq!(output.status.code(), Some(2));
     let document = yaml(&output.stdout);
-    assert_eq!(document["_sgy"]["result_complete"], false);
+    assert_eq!(document["_sgy"]["complete"]["result"], false);
+    assert_eq!(document["_sgy"]["native_exit"], 2);
     assert!(
         output.stderr.len() < 2_000,
         "stderr must remain model-visible bounded"
@@ -396,7 +489,17 @@ fn explicit_rg_json_files_and_count_modes_remain_usable() {
     let local = tempfile::tempdir().expect("local app data");
     let json_output = sgy(directory.path(), local.path())
         .args([
-            "rg", "exec", "--", "--json", "--sort", "path", "-F", "alpha", ".",
+            "rg",
+            "exec",
+            "--receipt",
+            "full",
+            "--",
+            "--json",
+            "--sort",
+            "path",
+            "-F",
+            "alpha",
+            ".",
         ])
         .output()
         .expect("json");
@@ -425,7 +528,17 @@ fn explicit_rg_json_files_and_count_modes_remain_usable() {
 
     let files_output = sgy(directory.path(), local.path())
         .args([
-            "rg", "exec", "--view", "files", "--", "--files", "--sort", "path", ".",
+            "rg",
+            "exec",
+            "--view",
+            "files",
+            "--receipt",
+            "full",
+            "--",
+            "--files",
+            "--sort",
+            "path",
+            ".",
         ])
         .output()
         .expect("files");
@@ -438,6 +551,8 @@ fn explicit_rg_json_files_and_count_modes_remain_usable() {
         .args([
             "rg",
             "exec",
+            "--receipt",
+            "full",
             "--",
             "--count-matches",
             "--sort",

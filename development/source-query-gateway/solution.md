@@ -22,7 +22,7 @@
 - 满足: DES-SQG-001, DES-SQG-002, DES-SQG-004, DES-SQG-005
 - 依赖: SOL-SQG-001
 
-逐项比较进程、cwd、argv、stdin/TTY、stdout/stderr、退出、spool、snapshot、cursor、预算、诊断和 artifact 的生命周期与失败语义；只把三个后端真正相同的职责提取为内部原语。AST 命令、serializer、cache、profile 和 fingerprint 保持原位，rg/fd 使用新的 EvidenceSignature 与 renderer 注册。
+逐项比较进程、cwd、argv、stdin/TTY、stdout/stderr、退出、spool、snapshot、cursor、预算、诊断和 artifact 的生命周期与失败语义；只把三个后端真正相同的职责提取为内部原语。AST 命令、serializer、cache、profile 和 fingerprint 保持原位，rg/fd 使用新的 EvidenceSignature 与 renderer 注册。完整执行元数据由 snapshot owner 持有，默认模型回执只投影总量和三类完整性，异常与分页字段按状态出现；完整诊断由显式 `--receipt full` 返回，不建立第二套事实源。
 
 验证以冻结 AST oracle 无差异为先，并覆盖 rg/fd 的 0/1/N/N+1、native error、转换失败、截断、snapshot 和精确 cursor。不能证明同责的实现留在 backend，不以代码复用率作为验收条件。
 

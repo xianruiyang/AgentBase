@@ -139,6 +139,14 @@ fn gateway_operation_subcommand(name: &'static str, backend: &'static str) -> Co
                 .value_parser(clap::value_parser!(u64).range(1..=1_000_000)),
         )
         .arg(
+            Arg::new("receipt")
+                .long("receipt")
+                .value_name("DETAIL")
+                .default_value("auto")
+                .value_parser(PossibleValuesParser::new(["auto", "full"]))
+                .help("Structured result receipt detail"),
+        )
+        .arg(
             Arg::new("artifact-out")
                 .long("artifact-out")
                 .value_name("PATH")
@@ -441,6 +449,7 @@ pub struct GatewayCommand {
     pub view: String,
     pub limit: usize,
     pub max_text_chars: usize,
+    pub receipt: String,
     pub artifact_out: Option<PathBuf>,
     pub snapshot: Option<String>,
     pub after: Option<String>,
@@ -818,6 +827,12 @@ fn parse_gateway_command(
             .flatten()
             .and_then(|value| usize::try_from(*value).ok())
             .unwrap_or(240),
+        receipt: values
+            .try_get_one::<String>("receipt")
+            .ok()
+            .flatten()
+            .cloned()
+            .unwrap_or_else(|| "auto".to_owned()),
         artifact_out: values
             .try_get_one::<PathBuf>("artifact-out")
             .ok()
@@ -1207,10 +1222,30 @@ mod tests {
         assert_eq!(GatewayOperation::Exec, command.operation);
         assert_eq!(7, command.limit);
         assert_eq!("grouped", command.view);
+        assert_eq!("auto", command.receipt);
         assert_eq!(
             os_args(&["-e", "a b", "-g", "*.rs", "-e", "a b", "", "--", "tail"]),
             command.native_argv
         );
+    }
+
+    #[test]
+    fn parses_explicit_full_gateway_receipt() {
+        let action = parse_cli_from(os_args(&[
+            "sgy",
+            "rg",
+            "exec",
+            "--receipt",
+            "full",
+            "--",
+            "needle",
+            ".",
+        ]))
+        .expect("rg full receipt");
+        assert!(matches!(
+            action,
+            CliAction::Gateway(command) if command.receipt == "full"
+        ));
     }
 
     #[test]

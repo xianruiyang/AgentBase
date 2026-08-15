@@ -17,11 +17,11 @@ description: 不用于查询 sgy 自身源码、文档或协议内容，也不�
 
 ## sgy 入口
 
-运行时为 `<skill_dir>\scripts\bin\windows-x86_64\sgy.exe`：`sgy rg exec [wrapper options] -- <rg argv...>` 或 `sgy fd exec [wrapper options] -- <fd argv...>`。常用 wrapper 选项仅为 `--cwd PATH`、`--view VIEW`、`--limit N` 和 `--max-text-chars N`；默认 `auto`。rg view 为 `auto|grouped|records|locations|files|summary|lossless|raw`，fd view 为 `auto|tree|flat|summary|lossless|raw`。结构化结果是单行紧凑 JSON，`_sgy` 报告原生退出、总量、展示量、完整性和续页。
+运行时为 `<skill_dir>\scripts\bin\windows-x86_64\sgy.exe`：`sgy rg exec [wrapper options] -- <rg argv...>` 或 `sgy fd exec [wrapper options] -- <fd argv...>`。常用 wrapper 选项仅为 `--cwd PATH`、`--view VIEW`、`--limit N` 和 `--max-text-chars N`；默认 `auto`。rg view 为 `auto|grouped|records|locations|files|summary|lossless|raw`，fd view 为 `auto|tree|flat|summary|lossless|raw`。结构化结果是单行紧凑 JSON；默认读取 `_sgy.result_total` 与 `_sgy.complete.result|display|content`，分页时再读取同层的 snapshot/cursor 字段。只有诊断或机器消费者确需 backend、引擎版本、mode、view、字节数等信息时使用 `--receipt full`。
 
 `exec` 已校验后端精确版本；只在它报告引擎或版本异常时运行 `sgy <rg|fd> doctor`。不要把 `doctor`、`defaults` 或 help 作为查询前置步骤。wrapper help 是 `sgy <rg|fd> exec --help`，原生 help 是 `sgy <rg|fd> exec -- --help`。
 
-普通查询保持默认预算；只有 `_sgy.content_complete=false` 且缺失正文会改变结论时才提高 `--max-text-chars`，只有 `display_complete=false` 时才续页。以 `-` 开头的 rg pattern 使用原生 `-e VALUE`，不要用原生 `--` 终止后再追加选项。rg/fd wrapper 选项不适用于 AST 的 `sgy exec`。
+普通查询保持默认预算；只有 `_sgy.complete.content=false` 且缺失正文会改变结论时才提高 `--max-text-chars`，只有 `_sgy.complete.display=false` 时才续页。以 `-` 开头的 rg pattern 使用原生 `-e VALUE`，不要用原生 `--` 终止后再追加选项。rg/fd wrapper 选项不适用于 AST 的 `sgy exec`。
 
 ## 结果边界
 

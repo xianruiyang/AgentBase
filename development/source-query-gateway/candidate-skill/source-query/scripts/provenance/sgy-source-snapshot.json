@@ -1,6 +1,6 @@
 {
   "schema": "sgy.source-snapshot/v1",
-  "sourceRevision": "sha256:5415fbd594339f0e4a8fbe99d25121957a01a16a879f2a5426391b69f765a097",
+  "sourceRevision": "sha256:6ef03651a39719bbcecf41a9148807d901149a7cd16646af216daf7b9a2fd4a0",
   "algorithm": "sha256(path + NUL + size + NUL + fileSha256 + LF), paths sorted ordinal",
   "root": ".",
   "excludedRoots": [
@@ -47,8 +47,8 @@
     },
     {
       "path": "README.md",
-      "size": 4396,
-      "sha256": "acaa970bf4ff9dead03f3da6c299b8639f92aed3b8b1f18f6a4babe4b1b00cb8"
+      "size": 4648,
+      "sha256": "07e68cd88c9b50536630ecfcfc519b26398d49422ca1bcef962daeb8ac22e059"
     },
     {
       "path": "benches/README.md",
@@ -102,8 +102,8 @@
     },
     {
       "path": "crates/sgy-cli/src/lib.rs",
-      "size": 45783,
-      "sha256": "5978d4a55e8bdf4c4c673aca66d0de709ea1896737d711455f927640b990a34b"
+      "size": 46785,
+      "sha256": "bd84a56d92d9f1d1d744fb3b28d07e67f2caf2ae26ac72a5f31b81197f056f48"
     },
     {
       "path": "crates/sgy-cli/src/main.rs",
@@ -122,8 +122,8 @@
     },
     {
       "path": "crates/sgy-cli/src/query_gateway.rs",
-      "size": 80253,
-      "sha256": "9cda9bc5339ae8b13dc88294f81647561f8af4c5e6730dbf9ae355e6efdfcf73"
+      "size": 83142,
+      "sha256": "3ef6adaba9f10041b62a34b415f49dad3884ed561d7b53a508e137693e3dcf32"
     },
     {
       "path": "crates/sgy-cli/tests/cache_cli.rs",
@@ -172,8 +172,8 @@
     },
     {
       "path": "crates/sgy-cli/tests/query_gateway_real.rs",
-      "size": 14887,
-      "sha256": "32c09e52840b79df66b7a5cf4b9406f7e51099821adafd759708f717bfb4325a"
+      "size": 17662,
+      "sha256": "4e20ff4ec9db14dde95e4244abf23f33abd4339d37da132681604fb1b2c79c3f"
     },
     {
       "path": "crates/sgy-cli/tests/raw_artifact_adapter.rs",
@@ -542,8 +542,8 @@
     },
     {
       "path": "docs/query-gateway.md",
-      "size": 3921,
-      "sha256": "10fc435e70ed082cbf9d01a1705547abe26cabfc8401833438f31bebc131a342"
+      "size": 4422,
+      "sha256": "e7cc51d346d3ee9693b5ae0dad9c87243798fd9cf4aa77b26e40f0612f60e49b"
     },
     {
       "path": "docs/release-checklist.md",

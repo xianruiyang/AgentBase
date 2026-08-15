@@ -6,7 +6,7 @@
   "archive": "sgy-0.2.0-x86_64-pc-windows-msvc.zip",
   "binary": "sgy.exe",
   "source": {
-    "revision": "sha256:5415fbd594339f0e4a8fbe99d25121957a01a16a879f2a5426391b69f765a097",
+    "revision": "sha256:6ef03651a39719bbcecf41a9148807d901149a7cd16646af216daf7b9a2fd4a0",
     "sourceDateEpoch": 0,
     "cargoLockSha256": "092420ea7d0bda015fe0f012e9cbcb70ee6469213e4b240be7d5968aba653c5f"
   },
@@ -32,13 +32,13 @@
   "files": [
     {
       "path": "sgy.exe",
-      "bytes": 2258432,
-      "sha256": "1eebdffaefe46794dd906d06339b0d70b5a6e3e598f803af86b6170bd78e3a18"
+      "bytes": 2269696,
+      "sha256": "7292af3101a75d7b6c71ce4fc3adf3753c186b0a95a2fc1a1de95cf2989bb21d"
     },
     {
       "path": "README.md",
-      "bytes": 4396,
-      "sha256": "acaa970bf4ff9dead03f3da6c299b8639f92aed3b8b1f18f6a4babe4b1b00cb8"
+      "bytes": 4648,
+      "sha256": "07e68cd88c9b50536630ecfcfc519b26398d49422ca1bcef962daeb8ac22e059"
     },
     {
       "path": "LICENSE",

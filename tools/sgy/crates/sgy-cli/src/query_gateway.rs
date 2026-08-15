@@ -10,7 +10,7 @@ use std::{
     time::SystemTime,
 };
 
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 use sgy_core::{
     codec::write_yaml_document,
     process::{run, CancellationToken, PreparedOutput, ProcessRequest, StdinMode},
@@ -212,6 +212,7 @@ fn execute_defaults(
         "mode":mode.id,
         "handling":handling_name(mode.handling),
         "view":command.view,
+        "receipt":command.receipt,
         "user_argv":os_args_json(&command.native_argv)?,
         "injected_argv":os_args_json(&injected)?,
         "effective_argv":os_args_json(&effective)?,
@@ -230,6 +231,13 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
         &command.view,
         command.artifact_out.is_some(),
     )?;
+    if command.receipt == "full"
+        && (mode.handling == Handling::Passthrough || command.view == "raw")
+    {
+        return Err(GatewayError::input(
+            "--receipt full requires a model-visible structured or bounded-text result",
+        ));
+    }
     if command.native_argv.iter().any(|arg| arg.to_str().is_none())
         && command.view != "raw"
         && command.artifact_out.is_none()
@@ -412,16 +420,72 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
             _ => false,
         },
     };
-    root.insert("_sgy".to_owned(), json!({
-        "schema":"sgy.query.result/v1","backend":backend_name(command.backend),"mode":mode.id,
-        "engine_version":snapshot.engine_version,"query_snapshot":snapshot.id,
-        "view":chosen_view,"native_exit":snapshot.native_exit,"result_total":total,"displayed":displayed,
-        "omitted":total.saturating_sub(end),"result_complete":result_complete,"display_complete":end >= total,
-        "content_complete":content_complete,
-        "offset":offset,"next_cursor":next,"stdout_bytes":snapshot.stdout.len(),"stderr_bytes":snapshot.stderr.len()
-    }));
+    root.insert(
+        "_sgy".to_owned(),
+        structured_receipt(
+            command,
+            mode,
+            &snapshot,
+            &chosen_view,
+            total,
+            displayed,
+            offset,
+            next.as_deref(),
+            result_complete,
+            content_complete,
+        ),
+    );
     emit_compact_json(&Value::Object(root))?;
     Ok(snapshot.native_exit)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn structured_receipt(
+    command: &GatewayCommand,
+    mode: Mode,
+    snapshot: &Snapshot,
+    chosen_view: &str,
+    total: usize,
+    displayed: usize,
+    offset: usize,
+    next_cursor: Option<&str>,
+    result_complete: bool,
+    content_complete: bool,
+) -> Value {
+    let end = offset.saturating_add(displayed);
+    let display_complete = end >= total;
+    if command.receipt == "full" {
+        return json!({
+            "schema":"sgy.query.result/v1","backend":backend_name(command.backend),"mode":mode.id,
+            "engine_version":snapshot.engine_version,"query_snapshot":snapshot.id,
+            "view":chosen_view,"native_exit":snapshot.native_exit,"result_total":total,"displayed":displayed,
+            "omitted":total.saturating_sub(end),"result_complete":result_complete,"display_complete":display_complete,
+            "content_complete":content_complete,
+            "offset":offset,"next_cursor":next_cursor,"stdout_bytes":snapshot.stdout.len(),"stderr_bytes":snapshot.stderr.len()
+        });
+    }
+
+    let mut receipt = Map::new();
+    receipt.insert("schema".to_owned(), json!("sgy.query.result/v2"));
+    receipt.insert("result_total".to_owned(), json!(total));
+    receipt.insert(
+        "complete".to_owned(),
+        json!({
+            "result":result_complete,
+            "display":display_complete,
+            "content":content_complete
+        }),
+    );
+    if snapshot.native_exit != 0 {
+        receipt.insert("native_exit".to_owned(), json!(snapshot.native_exit));
+    }
+    if !display_complete {
+        receipt.insert("displayed".to_owned(), json!(displayed));
+        receipt.insert("omitted".to_owned(), json!(total.saturating_sub(end)));
+        receipt.insert("query_snapshot".to_owned(), json!(snapshot.id));
+        receipt.insert("next_cursor".to_owned(), json!(next_cursor));
+    }
+    Value::Object(receipt)
 }
 
 fn emit_compact_json(value: &Value) -> Result<(), GatewayError> {
@@ -1794,9 +1858,35 @@ fn emit_bounded_text(
         .iter()
         .take(command.limit)
         .all(|line| line.chars().count() <= command.max_text_chars);
-    emit_yaml(
-        &json!({"_sgy":{"schema":"sgy.query.bounded-text/v1","backend":backend_name(command.backend),"mode":mode.id,"native_exit":captured.native_exit,"total_lines":lines.len(),"displayed_lines":displayed.len(),"omitted_lines":lines.len().saturating_sub(displayed.len()),"display_complete":displayed.len() == lines.len(),"text_complete":text_complete},"lines":displayed}),
-    )
+    let display_complete = displayed.len() == lines.len();
+    let receipt = if command.receipt == "full" {
+        json!({
+            "schema":"sgy.query.bounded-text/v1","backend":backend_name(command.backend),
+            "mode":mode.id,"native_exit":captured.native_exit,"total_lines":lines.len(),
+            "displayed_lines":displayed.len(),"omitted_lines":lines.len().saturating_sub(displayed.len()),
+            "display_complete":display_complete,"text_complete":text_complete
+        })
+    } else {
+        let mut receipt = Map::new();
+        receipt.insert("schema".to_owned(), json!("sgy.query.bounded-text/v2"));
+        receipt.insert("total_lines".to_owned(), json!(lines.len()));
+        receipt.insert(
+            "complete".to_owned(),
+            json!({"display":display_complete,"content":text_complete}),
+        );
+        if captured.native_exit != 0 {
+            receipt.insert("native_exit".to_owned(), json!(captured.native_exit));
+        }
+        if !display_complete {
+            receipt.insert("displayed_lines".to_owned(), json!(displayed.len()));
+            receipt.insert(
+                "omitted_lines".to_owned(),
+                json!(lines.len().saturating_sub(displayed.len())),
+            );
+        }
+        Value::Object(receipt)
+    };
+    emit_yaml(&json!({"_sgy":receipt,"lines":displayed}))
 }
 
 fn escape_segment(value: &str) -> String {

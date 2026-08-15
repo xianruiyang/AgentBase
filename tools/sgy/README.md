@@ -54,11 +54,12 @@ sgy exec --profile lossless --cache off -- run -p 'foo($A)' -l ts src
 ```powershell
 sgy rg exec --view auto --limit 80 -- -n -F 'needle' -g '*.cpp' .
 sgy fd exec --view auto --limit 80 -- -t f 'CommandDispatch' .
+sgy rg exec --receipt full -- -n -F 'needle' .
 sgy rg defaults --view grouped -- -n -F 'needle' .
 sgy fd doctor
 ```
 
-普通 rg 搜索和 fd 路径结果先完整进入有界快照，再投影或分页。响应中的 `query_snapshot` 与 `next_cursor` 必须原样用于下一页；backend、cwd、原生 argv、引擎版本、snapshot 或实际 view 不匹配时拒绝续页。结果集合、投影内容和当前展示的完整性分别报告。二进制/NUL 模式要求 `--artifact-out`，fd exec/batch 直接透传，help、统计和其他显式文本报告默认有界。详见 [rg/fd 查询网关](docs/query-gateway.md)。
+普通 rg 搜索和 fd 路径结果先完整进入有界快照，再投影或分页。默认 v2 回执只固定返回总量与结果、展示、正文三类完整性；非零退出和分页字段只在发生时出现，backend、引擎版本、mode、view、字节数等诊断保留在内部快照，显式 `--receipt full` 才进入模型可见结果。分页响应中的 `query_snapshot` 与 `next_cursor` 必须原样用于下一页；backend、cwd、原生 argv、引擎版本、snapshot 或实际 view 不匹配时拒绝续页。二进制/NUL 模式要求 `--artifact-out`，fd exec/batch 直接透传，help、统计和其他显式文本报告默认有界。详见 [rg/fd 查询网关](docs/query-gateway.md)。
 
 ## Profile
 

@@ -7,7 +7,7 @@ sgy <rg|fd> <exec|defaults> [wrapper options] -- <native argv...>
 sgy <rg|fd> doctor [--engine PATH] [--cwd PATH]
 ```
 
-`exec/defaults` 的 wrapper 选项是 `--engine PATH`、`--cwd PATH`、`--view VIEW`、`--limit N`、`--max-text-chars N`、`--artifact-out PATH`、`--snapshot SHA256` 和 `--after CURSOR`。rg view 为 `auto|grouped|records|locations|files|summary|lossless|raw`；fd view 为 `auto|tree|flat|summary|lossless|raw`。`--max-items` 与 `--max-line-length` 是前述两项预算的迁移别名；没有 `--max-bytes` wrapper 选项。wrapper help 使用 `sgy <rg|fd> exec --help`，原生 help 使用 `sgy <rg|fd> exec -- --help`。
+`exec/defaults` 的 wrapper 选项是 `--engine PATH`、`--cwd PATH`、`--view VIEW`、`--limit N`、`--max-text-chars N`、`--receipt auto|full`、`--artifact-out PATH`、`--snapshot SHA256` 和 `--after CURSOR`。rg view 为 `auto|grouped|records|locations|files|summary|lossless|raw`；fd view 为 `auto|tree|flat|summary|lossless|raw`。`--max-items` 与 `--max-line-length` 是前述两项预算的迁移别名；没有 `--max-bytes` wrapper 选项。wrapper help 使用 `sgy <rg|fd> exec --help`，原生 help 使用 `sgy <rg|fd> exec -- --help`。
 
 `--` 后的值、顺序、重复项和空参数原样交给对应原生引擎；sgy 不用 shell 重建命令。为取得机器表示而增加的参数插在原生参数终止符之前，不能把负号开头的 pattern 或 path 重新解释成选项。`defaults` 只返回用户 argv、注入项、最终 argv、模式和处理类别，不查找或启动引擎。`exec` 与 `doctor` 只支持 ripgrep 15.1.0 和 fd 10.4.2 的精确版本读回。
 
@@ -24,7 +24,7 @@ rg/fd 的结构化查询结果使用单行紧凑 JSON；JSON 同时是可由现�
 
 ## 完整性与快照
 
-结构化执行对 stdout 设置 256 MiB、stderr 设置 16 MiB 的硬捕获上限；超过上限会终止整个原生进程组并返回 wrapper 错误。成功捕获保存为最多 32 份本机快照。输出分别报告原生退出、结果总数、展示数、省略数、底层结果集合完整性、当前投影内容完整性和当前展示完整性；rg 无匹配继续返回原生 exit 1 和完整空集合，原生错误不能伪装成完整空结果。
+结构化执行对 stdout 设置 256 MiB、stderr 设置 16 MiB 的硬捕获上限；超过上限会终止整个原生进程组并返回 wrapper 错误。成功捕获保存为最多 32 份本机快照。默认 `auto` 使用 `sgy.query.result/v2`：`result_total` 与 `complete.result|display|content` 始终显式返回，非零 `native_exit` 只在发生时返回，`displayed`、`omitted`、`query_snapshot` 和 `next_cursor` 只在当前页未展示完时返回。backend、mode、引擎版本、实际 view、offset、字节数及完整快照身份仍由内部持有；只有诊断或机器消费者显式指定 `--receipt full` 时，才返回原 `sgy.query.result/v1` 全量回执。rg 无匹配继续返回原生 exit 1 和完整空集合，原生错误不能伪装成完整空结果。有界文本同样默认使用 v2 稀疏回执，完整模式保留 v1 字段；raw、artifact 与 passthrough 保持各自原生或清单合同。
 
 首个不完整页返回 `query_snapshot` 与 `next_cursor`。续页必须再次提供相同原生 argv、cwd、backend 和引擎，并传入：
 

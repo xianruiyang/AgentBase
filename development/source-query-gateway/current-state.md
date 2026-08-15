@@ -18,7 +18,7 @@
 - 状态: verified
 - 关联: DES-SQG-004, DES-SQG-005, DES-SQG-006, DES-SQG-007
 
-rg/fd 结构化结果分别表达原生退出、结果/正文/显示完整性、总量、展示量、快照和精确游标。查询先有界捕获到不可变 snapshot，再从同一身份投影；游标绑定 query、snapshot、实际 view 与 offset，未知或混用游标被局部拒绝。进程 stdout/stderr 有独立上限，超限时终止进程组；snapshot 数量与文件完整性也有上限和 hash 校验。
+rg/fd 结构化结果分别表达原生退出、结果/正文/显示完整性、总量、展示量、快照和精确游标。默认 v2 模型回执固定显式返回总量与三类完整性，只在非零退出或分页时增加必要字段；backend、引擎版本、mode、view、offset 和字节数继续由内部 snapshot 持有，显式 `--receipt full` 才返回完整 v1 诊断回执。查询先有界捕获到不可变 snapshot，再从同一身份投影；游标绑定 query、snapshot、实际 view 与 offset，未知或混用游标被局部拒绝。进程 stdout/stderr 有独立上限，超限时终止进程组；snapshot 数量与文件完整性也有上限和 hash 校验。
 
 fd 会冻结对象类型并为每个显式根建立可逆 trie；只有估算 Token 确实低于 flat 时 auto 才选 tree。rg 普通 batch 消费原生 JSON 事件，grouped、records、locations、files、summary 与 lossless 均在相同证据签名内选择；count、vimgrep 和特殊模式使用独立严格解析或透传。
 
@@ -36,7 +36,7 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 分支内 `candidate-skill/source-query` 用一个精炼主文件按“原生快路径 → rg/fd 网关 → AST → LSP”升级，详细 rg/fd 与 AST 协议按需读取。skill 静态校验通过。候选 payload 共 14 个文件，只含规则、引用、Windows 二进制、runtime/release 来源和许可证；自动检查确认不含 test、fixture、benchmark、runner、corpus、result 或 audit 资产。
 
-候选二进制 SHA-256 为 `1eebdffaefe46794dd906d06339b0d70b5a6e3e598f803af86b6170bd78e3a18`，发布 archive SHA-256 为 `17015e64868b25e7f6c5b4866ab6e19f35f0e3fac25acf0e14a41d3c6c6b10c1`。安装、重复安装、失败升级回滚、恶意 ZIP、篡改状态、升级、卸载和用户配置/缓存保护测试通过。宿主没有 `cargo-audit`，因此本候选只记录既有审计继承依据与限制，不声称完成新的 advisory scan。
+候选二进制 SHA-256 为 `7292af3101a75d7b6c71ce4fc3adf3753c186b0a95a2fc1a1de95cf2989bb21d`，发布 archive SHA-256 为 `286a8659f1570d570392300c883892b6c792240ae082356b3548e422addfd949`。当前增量验证覆盖 sgy-cli 29 项单元、12 项真实 rg/fd 集成、29 个 backend 模式与 7 个原生 oracle，AST 冻结公开合同无差异；稀疏回执改动后未重跑完整 workspace、安装生命周期或独立 agent 对照。宿主没有 `cargo-audit`，因此本候选只记录既有审计继承依据与限制，不声称完成新的 advisory scan。
 
 ## OBS-SQG-005 benchmark owner 已具备隔离运行合同
 

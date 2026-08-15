@@ -10,10 +10,11 @@
 | --- | --- | --- |
 | P0 backend 合同 | `backend-contract/tests` | 版本、模式表、fixture、语义分类通过 |
 | AST 精确版本 | P0 ast-grep 0.41.1/0.42.0/0.44.1 矩阵 | 30 项通过 |
-| sgy Rust workspace | `cargo ci-test` | 全部非 ignored 测试通过；含 rg/fd 真实集成与约 59 秒压力测试 |
-| Rust 静态质量 | `cargo fmt --all`、`cargo lint` | 通过 |
-| rg/fd 定向单元 | `cargo test -p sgy-cli --lib` | 28 项通过 |
-| rg/fd 真实集成 | `cargo test -p sgy-cli --test query_gateway_real` | 11 项通过 |
+| sgy Rust workspace 历史基线 | `cargo ci-test` | 稀疏回执改动前全部非 ignored 测试通过；本次按影响范围未重跑全 workspace |
+| Rust workspace 历史静态质量 | `cargo fmt --all`、`cargo lint` | 稀疏回执改动前通过；当前改动由下列 sgy-cli 定向静态质量覆盖 |
+| rg/fd 当前定向单元 | `cargo test -p sgy-cli --lib` | 29 项通过；含 `--receipt auto|full` 参数合同 |
+| rg/fd 当前真实集成 | `cargo test -p sgy-cli --test query_gateway_real` | 12 项通过；覆盖稀疏/完整回执、分页、无匹配、原生错误和 fd |
+| sgy-cli 当前静态质量 | `cargo clippy -p sgy-cli --all-targets --all-features -- -D warnings`、`cargo fmt --all -- --check` | 通过 |
 | backend 候选矩阵 | `backend-contract/verify_candidate.py` | 29 个模式样本、7 个原生 oracle 通过 |
 | AST 候选非回退 | `ast-baseline/compare_ast_baseline.py --expected-version 0.2.0` | 仅 release version 可变，其余冻结输出逐字一致 |
 | 候选 skill | skill-creator `quick_validate.py` | 有效 |
@@ -30,3 +31,5 @@
 最终候选的唯一格式失败是一条九行答案超过八行限制；历史严格整体同为 11/12，故没有质量退化。更低 Token 的中间候选曾降低核心或严格质量，已按质量优先退出。主线消费者迁移、旧 skill 退出和真实 Codex 安装态尚未执行，也不由本记录授权。
 
 新的 advisory scan 未运行，因为当前授权环境未安装 `cargo-audit`；候选 release record 已明确记录该限制。
+
+本次没有运行真实独立 agent 路由或总 Token 对照，因用户明确要求先完成实现。直接候选查询中，同一 3 条结果的默认稀疏响应为 955 字符，`--receipt full` 为 1237 字符；该字符差只证明回执投影确实缩短，不替代端到端 Token 证据。
