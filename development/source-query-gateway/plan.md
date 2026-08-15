@@ -12,6 +12,7 @@
 - 只抽取已证明相同的内部职责；公共抽象导致 AST 行为变化或 backend 语义丢失时立即回退设计。
 - 受影响模块先做定向验证；公共协议、发布合同或正式分发范围改变时才扩大。
 - 历史结果按 [benchmark-protocol.md](benchmark-protocol.md) 的身份边界冻结复用；不能证明同一 experiment identity 时只作为现实依据，不拼接为新对照。
+- sgy 作为独立 Windows CLI 只安装一份；先验证安装态并让消费者改用 PATH 入口，再退出 skill 内置运行时，不保留双版本 fallback。
 
 ## 3. 现实依据
 
@@ -138,20 +139,20 @@ P3 闭环：rg 能完成全部位置与不存在证明，压缩重复路径且�
 | --- | --- | --- | --- | --- |
 | TSQG-040 | 用 P0 oracle 复核 AST 当前公开入口 | TSQG-011, TSQG-023, TSQG-032 | AST 非回退差异报告 | `sgy exec/defaults/cache/process/schema/capabilities/doctor`、profile、TTY/LSP 与 rewrite 均无非预期变化 |
 | TSQG-041 | 仅在序列化与行为等价时让 AST 复用公共内部原语 | TSQG-040 | 最小共享实现或保留独立的裁决 | 共享有证据；无法证明同责时不为减少代码强行合并 |
-| TSQG-042 | 完成三命令域的诊断、单一版本来源和发布来源读回 | TSQG-022, TSQG-032, TSQG-041 | capability/doctor 与 release 证据 | workspace、README、metadata、helper、SBOM、manifest 与运行时版本一致；缺失引擎、错误版本、输出不兼容和透传状态可区分，AST 现有诊断合同不变 |
+| TSQG-042 | 完成三命令域诊断、单一版本来源和 Windows CLI 生命周期 | TSQG-022, TSQG-032, TSQG-041 | capability/doctor、release 与安装生命周期证据 | workspace、README、metadata、helper、SBOM、manifest 与运行时版本一致；全新安装、状态、幂等重装、可恢复升级、卸载、PATH 与新进程读回通过；缺失引擎、错误版本、输出不兼容和透传状态可区分，AST 现有诊断合同不变 |
 
-P4 闭环：同一 sgy 二进制完成 fd、rg 与 AST 真实任务；rg/fd 共享合适的基础设施，AST 继续使用原有设计和安全合同。
+P4 闭环：同一 sgy 二进制完成 fd、rg 与 AST 真实任务；rg/fd 共享合适的基础设施，AST 继续使用原有设计和安全合同；该二进制可通过唯一 Windows 生命周期入口正常安装、升级、查询和卸载。
 
 ### P5 Skill、消费者与重复入口退出
 
 | ID | 任务 | 依赖 | 产出 | 验证与闭环 |
 | --- | --- | --- | --- | --- |
-| TSQG-050 | 建立精炼的统一查询 skill 和按需 backend 引用 | TSQG-023, TSQG-033, TSQG-042 | 候选 skill | 简单快路径、完整性、tree、AST、LSP 边界和 PowerShell 非触发路由通过 |
+| TSQG-050 | 建立精炼的统一查询 skill 和按需 backend 引用 | TSQG-023, TSQG-033, TSQG-042 | 只调用 PATH 中 sgy.exe 的候选 skill | 简单快路径、完整性、tree、AST、LSP 边界和 PowerShell 非触发路由通过；缺失、错误版本或 PATH 尚未刷新时只给安装、升级或重启恢复动作 |
 | TSQG-051 | 将现有 AST skill 语义原样迁入按需引用 | TSQG-050 | AST 规则等价映射 | sgy 命令、profile、cache、process、rewrite 和安全边界无丢项；独立行为证据等价 |
-| TSQG-052 | 更新消费者并退出已被替代的 rg/fd wrapper 与旧 skill | TSQG-050, TSQG-051 | 唯一职责方向 | 不删除 sgy AST 命令；仓库不存在同责 Python wrapper、重复规则或悬空引用 |
-| TSQG-053 | 更新分支内发布候选清单与供应链材料 | TSQG-052 | 候选 runtime manifest、来源、许可证和部署差异 | 二进制 hash、源码 revision、archive 与真实运行读回一致；payload 不含 tests、fixtures、benchmark、runner、corpus、结果或 audit 资产，旧直接安装副本被移除 |
+| TSQG-052 | 更新消费者并退出已被替代的 rg/fd wrapper、旧 skill 与内置 sgy | TSQG-050, TSQG-051 | 唯一职责与运行时方向 | 保留 sgy AST 命令；先验证 PATH 运行时再删除同责 Python wrapper、重复规则和 skill 内置 sgy，不存在私有 fallback 或悬空引用 |
+| TSQG-053 | 更新分支内 sgy 发布与候选 payload 合同 | TSQG-052 | 独立 sgy Windows release、安装状态和不含二进制的 skill payload | 二进制 hash、源码 revision、archive、安装状态与真实运行读回一致；skill payload 不含 sgy、tests、fixtures、benchmark、runner、corpus、结果或 audit 资产，旧直接安装副本被移除 |
 
-P5 闭环：查询规则只有一个低成本入口，AST 设计保持，重复的 rg/fd 包装职责退出；总体项目仍未因此自动采纳分支。
+P5 闭环：查询规则只有一个低成本入口，AST 设计保持，重复的 rg/fd 包装职责退出；sgy 只由 Windows 安装器维护一份，skill 和插件不再复制运行时；总体项目仍未因此自动采纳分支。
 
 ### P6 质量、Token、速度与采纳裁决
 
@@ -174,3 +175,4 @@ P6 当前停在受控收益证据边界：供应链、独立路由和 candidate-
 - 真实 Codex 质量退化时先修正质量；质量相同但总 Token 高于冻结消融且无必要证据收益时，继续收紧或退出，不以速度补偿。
 - control/candidate 出现 allowlist 外环境差异、subject 接触对照信息、monitor 干预答案、usage 缺失或 audit capsule 不完整时，该实验停止且不得进入收益聚合。
 - Plugin 或 DirectCompatibility 候选 payload 中出现测试、fixture、benchmark、runner、corpus、原始结果或审计资产时停止发布，不以它们位于 skill 子目录为理由保留。
+- sgy 未通过正式安装、状态、升级、卸载与新进程 PATH 读回，或任一消费者仍依赖 skill 内置副本时，停止运行时迁移与发布，不增加双版本 fallback。

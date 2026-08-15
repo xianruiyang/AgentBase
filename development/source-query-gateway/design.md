@@ -108,18 +108,28 @@ benchmark owner、语料、测试代码、fixtures、原始事件和审计结果
 
 历史结果按 experiment identity 只读登记。相同身份可直接复用，不为期待不同结果而重跑；候选实现或唯一差异改变时只运行受影响对照。身份不等或存在额外环境差异时，结果只能作为方向性现实依据，不能拼成因果结论。
 
+## DES-SQG-011 sgy 是独立安装的唯一 Windows 运行时
+
+- 满足: AC-SQG-001, UDES-SQG-001, UDES-SQG-005, UDES-SQG-009, CON-SQG-002
+
+`tools/sgy` 是源码、构建、测试、安装器和发布来源的唯一 owner；正式 release 以受校验的 Windows x86_64 归档安装到 `%LOCALAPPDATA%\Programs\sgy\current`，由安装器维护唯一用户 `PATH` 项。PowerShell、统一查询 skill 和其他消费者只通过 `sgy.exe` 调用同一运行时，不从项目 `target/`、Codex 根目录、插件缓存或其他 skill 目录寻找二进制。
+
+同一生命周期入口提供 `Install`、`Status`、以新归档执行的可恢复升级以及 `Uninstall`。安装和升级在提交前验证归档校验和、成员集合、目标架构、逐文件 hash 与实际 `sgy --version`；升级采用 staging 和失败恢复。卸载依据安装状态只删除受管文件和由安装器增加的 `PATH` 项，配置与 cache 默认保留，只有显式请求才删除 cache。新增 PATH 只保证后续进程可见，部署和文档必须要求重启 Codex 或重新打开终端。
+
+候选转正时先安装并验证主机 CLI，再让消费者改用 `sgy.exe`，最后从 skill payload 删除内置二进制、runtime manifest、来源和许可副本。缺失、版本不受支持或命令身份无法确认时返回安装或升级恢复动作，不保留 skill 私有副本作为 fallback；否则会重新形成两个版本源并破坏穿透式更新。
+
 ## 4. 版本与迁移边界
 
 首个候选以 ripgrep 15.1.0、fd 10.4.2 和当前 sgy 已验证的 ast-grep 0.41.1、0.42.0、0.44.1 建立 Windows 精确版本矩阵，不外推连续版本范围。完整兼容表示该精确版本所有公开模式都可通过相应命令域调用并保持原生语义，不表示所有模式都能结构化压缩。sgy workspace package version 是候选版本的唯一默认来源；构建参数只允许显式制作另一个已声明版本，不能长期用覆盖值掩盖源码、README、SBOM、release helper 与运行时版本不一致。
 
 | 当前对象 | 分支目标 |
 | --- | --- |
-| `tools/sgy` | 保持 AST 正式入口并增加 rg/fd 命令域 |
+| `tools/sgy` | 保持 AST 正式入口并增加 rg/fd 命令域；作为独立 Windows CLI 的唯一源码、安装器和发布 owner |
 | `rg_receipt.py` | rg 命令域完成真实替代后删除 |
 | `rg-token-safe`、`fd-usage` | 消费者与路由证据闭环后由统一 skill 取代 |
 | `ast-grep-token-safe` | 语义原样迁入按需 AST 引用后退出；sgy 命令不迁移 |
 | `symbol-structure-workflow` | 保留，只维护查询与 LSP 的升级边界 |
-| 现有 sgy runtime、cache 与发布记录 | 原位沿用，不复制、不建立第二状态源 |
+| sgy Windows 运行时 | 通过正式安装器在用户级位置只安装一份并进入 `PATH`；消费者接入后退出 skill 内置副本 |
 | `development/code-search-benchmark` | 分支实施后扩展为唯一隔离运行、监控、汇总和复核入口；不复制临时 runner |
 | Codex Plugin/DirectCompatibility payload | 只接收运行时规则、skill 与工具；测试、benchmark 和审计资产始终排除 |
 
@@ -136,7 +146,8 @@ benchmark owner、语料、测试代码、fixtures、原始事件和审计结果
 | 基准 agent 受对照输出或协调方干预 | 新鲜 subject、单向监控、冻结 capsule 与独立 audit |
 | 环境差异被误归因给候选 | 环境树 hash、允许差异清单、只读项目快照和身份不等即降级结论 |
 | 测试资产增加 Codex 运行时体积或 Token | 测试 owner 固定在 development，共享 payload 过滤并清理旧受管理副本 |
+| PATH 中的 sgy 缺失、被同名程序遮蔽或版本漂移 | 安装状态、`sgy --version`、`sgy doctor` 与发布身份读回；不回退到 skill 私有副本，PATH 变化后重启消费者进程 |
 
 ## 6. 设计完成判定
 
-设计完成仍要求 rg/fd 全部公开模式有持久分类，各视图按自身语义单元给出正确总量、分页与完整性，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项未退化，并由当前候选身份下的独立路由与隔离模型证据按 `AC-SQG-001`、`AC-SQG-002`、`AC-SQG-003` 顺序证明达到收益边缘。当前已完成实现反例修正、供应链重建、独立路由和 candidate-only 影响验证，并修正了 benchmark 回答合同与 capsule 哈希；同 identity control/candidate 收益证据仍受用户冻结 control 的既有决定约束，因此不得进入 `validated_pending_user_adoption`。消费者迁移、旧同责入口退出、总体项目接入与 Codex 发布仍必须等待用户明确采纳和当次发布授权。
+设计完成仍要求 rg/fd 全部公开模式有持久分类，各视图按自身语义单元给出正确总量、分页与完整性，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项未退化；sgy 的安装、状态、升级、卸载、PATH、身份读回和旧内置运行时退出形成单一生命周期；并由当前候选身份下的独立路由与隔离模型证据按 `AC-SQG-001`、`AC-SQG-002`、`AC-SQG-003` 顺序证明达到收益边缘。当前已完成实现反例修正、供应链重建、独立路由和 candidate-only 影响验证，并修正了 benchmark 回答合同与 capsule 哈希；同 identity control/candidate 收益证据仍受用户冻结 control 的既有决定约束，因此不得进入 `validated_pending_user_adoption`。消费者迁移、旧同责入口退出、总体项目接入与 Codex 发布仍必须等待用户明确采纳和当次发布授权。

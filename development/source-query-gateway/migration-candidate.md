@@ -11,15 +11,17 @@
 | `fd-usage` | 文件与目录发现、pattern/path 区分、有界原生快路径 | 删除旧 skill |
 | `rg-token-safe` | 文本定位、范围与输出预算、全集和不存在证明 | 删除旧 skill 与 `rg_receipt.py` |
 | `ast-grep-token-safe` | AST argv、profile、cache、process、rewrite 与安全边界 | 语义迁入按需 `references/ast.md` 后删除旧 skill；sgy AST 命令保持 |
+| skill 内置 `sgy.exe` 与运行时来源副本 | 迁移到 `tools/sgy` 维护的独立 Windows 安装生命周期 | 先安装并验证 PATH 中的正式 CLI，再删除所有 skill 私有副本；不保留 fallback |
 | `symbol-structure-workflow` | 文本、AST 与 LSP 的成本升级边界 | 只保留真实符号语义、LSP 协议及修改裁决，不再重复前三类工具协议 |
 | `powershell-usage` | Windows shell 语法与执行安全 | 保留；不承担源码查询路由 |
 
 ## 3. 原子迁移步骤
 
-1. 以候选 skill 和 `sgy 0.2.0` 构建正式 payload，确认仅含运行规则、引用、二进制、许可证和来源材料。
-2. 更新 `global/AGENTS.md` 的查询路由，使其只引用统一 skill 的成本升级边界；更新 `symbol-structure-workflow` 的消费者关系。
-3. 删除三个被替代 skill 与 `rg_receipt.py`，同步删除触发用例、校验器和文档中的旧正式入口引用，不保留别名或兼容分支。
-4. 刷新独立路由和行为证据，验证简单快路径、全集、fd tree、AST、LSP、写入安全及相近非触发。
-5. 由用户确认当次发布后增量安装；读回 payload 清单与运行时版本，并在新任务中验证指令链。
+1. 从 `tools/sgy` 的同一受验证源码身份构建 `sgy 0.2.0` Windows release，通过正式安装器完成全新安装、状态、升级、卸载、PATH 和新进程 `sgy --version`/`sgy doctor` 读回。
+2. 构建只含运行规则和引用的候选 skill payload，确认不含 sgy 二进制、runtime manifest、来源/许可副本或开发测试资产；候选只调用 PATH 中的 `sgy.exe`。
+3. 更新 `global/AGENTS.md` 的查询路由，使其只引用统一 skill 的成本升级边界；更新 `symbol-structure-workflow` 的消费者关系。
+4. 删除三个被替代 skill、`rg_receipt.py` 及其内置 sgy，清理触发用例、校验器和文档中的旧正式入口引用，不保留别名、私有二进制或兼容 fallback。
+5. 刷新独立路由和行为证据，验证简单快路径、全集、fd tree、AST、LSP、写入安全、缺失/错误版本恢复动作及相近非触发。
+6. 由用户确认当次发布后增量安装不含二进制的 skill payload；读回主机 sgy 安装状态和 payload 清单，并在重启后的新任务中验证指令链。
 
 任一步无法同时退出旧决定路径时，停止采纳，不把候选叠加为第二套长期规则。

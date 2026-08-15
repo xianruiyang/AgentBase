@@ -84,3 +84,14 @@
 当前供应链与 detached 路由已刷新；candidate-only 全量 monitor 保留了一次 TLS 超时和 usage 缺失，受影响关系补测又暴露出 oracle 将 supporting facts 静默升级为必答字段的问题。回答合同现已在 corpus 中显式化，继续加重全局回答规则既增加 Token 又没有改善用户实际必答内容，因此该变体已退出。
 
 当前裁决是保留实现分支、停止无可比收益的 candidate-only 追跑，并撤销“已达收益边缘”和采纳准备状态。用户要求冻结的旧 control 不具备当前 identity；若不允许一次新的同 identity control/candidate 对照，本分支只能保留方向性证据，不能完成 `AC-SQG-004` 的因果收益声明。只有质量、总 Token、速度依次满足并由用户明确采纳，才另行更新总体项目、正式 skill 和发布候选；实际发布仍需当次用户明确同意。
+
+## SOL-SQG-008 将 sgy 收敛为独立 Windows CLI
+
+- 状态: planned
+- 解决: GAP-SQG-004
+- 满足: DES-SQG-011, UDES-SQG-009
+- 依赖: SOL-SQG-005, SOL-SQG-006
+
+沿用 `tools/sgy/scripts/install-sgy.ps1` 作为唯一生命周期入口，补齐当前 `0.2.0` 正式归档、校验和、manifest、来源和安装验证。安装态固定为用户级受管目录与唯一 PATH 项，验证覆盖全新安装、状态读回、幂等重装、可恢复升级、保留无关 PATH 的卸载、默认保留 cache、显式删除 cache，以及新进程中的 `sgy --version` 和 `sgy doctor`。
+
+候选 skill 改为直接调用 PATH 中的 `sgy.exe`，并验证缺失、错误版本和同名遮蔽时只返回安装、升级或重启恢复动作。主线采纳时先安装并读回主机 CLI，再更新消费者，最后删除候选与正式 skill 内置二进制及其 runtime manifest、来源和许可副本；部署与插件 payload 不再复制 sgy，也不保留私有 fallback。预期结果是安装、升级或卸载一次即可穿透所有消费者，同时只有 `tools/sgy` 维护运行时来源和生命周期。

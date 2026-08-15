@@ -60,6 +60,22 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 用户要求冻结且不重跑的五-skill 消融历史记录仍为实际总 Token `1,157,111`、耗时 `508,509 ms`、核心语义 12/12、严格整体 11/12。它缺少当前 experiment 的完整 identity，只能继续作为历史现实依据。由于当前候选的投影、快照、版本和发布身份已改变，旧候选相对该记录的 `0.91%` Token 与 `20.43%` 耗时方向差不能证明当前实现已达收益边缘；TSQG-061—063 已据此重开。
 
+## OBS-SQG-007 sgy 已有独立 Windows 安装生命周期
+
+- 状态: verified
+- 关联: DES-SQG-011, UDES-SQG-009
+
+`tools/sgy/scripts/install-sgy.ps1` 已能从受校验归档安装到默认 `%LOCALAPPDATA%\Programs\sgy\current`，增加唯一用户 `PATH` 项，并提供 `Status`、重复安装、可恢复升级和 `Uninstall`。安装会验证归档 SHA-256、精确成员集合、目标架构、逐文件 hash 和二进制版本；卸载依据状态只移除受管成员和安装器增加的 PATH 项，默认保留 cache。该生命周期已有测试和安装 smoke，能够承接独立 Windows CLI 职责。
+
+当前候选 `candidate-skill/source-query` 和正式 `ast-grep-token-safe` 仍各自携带 `scripts/bin/windows-x86_64/sgy.exe` 及运行时来源材料；项目源码已是 `sgy 0.2.0`，正式 skill 内置记录仍是 `0.1.2`。因此“可独立安装”的机制已经存在，但消费者和发布合同尚未迁移到唯一 PATH 运行时。
+
+## GAP-SQG-004 独立安装入口尚未成为消费者唯一运行时
+
+- 状态: open
+- 关联: DES-SQG-011, UDES-SQG-009, OBS-SQG-007
+
+安装器已满足基础生命周期，但候选 skill、正式 skill 和部署合同仍会复制或验证 skill 内置 sgy，形成两个可独立变化的运行时来源。必须先完成当前 `sgy 0.2.0` 正式 Windows release 与用户级安装验证，再让候选消费者只调用 PATH 中的 `sgy.exe`，最后删除 skill payload 内置副本和对应同步合同；缺失或版本不符时应给出安装、升级和重启恢复动作，而不是静默 fallback。
+
 ## GAP-SQG-003 当前候选缺少身份一致的完成证据
 
 - 状态: open

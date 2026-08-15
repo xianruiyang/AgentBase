@@ -67,3 +67,11 @@ fd 返回大量共享目录前缀时，在确实更短的条件下使用可还�
 - 关联: REQ-SQG-001, AC-SQG-004, CON-SQG-003
 
 隔离 agent 测试流程及其全部输入、执行器和结果只在 AgentBase 仓库的开发边界内维护，不嵌入发布 skill、sgy 运行时或 Codex 安装目录。
+
+## UDES-SQG-009 sgy 作为正常 Windows 命令安装和卸载
+
+- 状态: confirmed
+- 来源: 用户明确要求 sgy 具备正常安装和卸载能力，并能像 Python 一样在 PowerShell 中直接调用
+- 关联: REQ-SQG-001, AC-SQG-001, CON-SQG-002
+
+sgy 应作为独立的 Windows 用户级 CLI 安装并进入用户 `PATH`，使 PowerShell、Codex 与其他消费者都能直接调用 `sgy.exe`，不依赖项目目录、Codex 根目录或某个 skill 的私有路径。正式生命周期必须覆盖安装、状态查询、升级和卸载；升级失败可恢复，卸载只移除安装器管理的文件与 `PATH` 项，不破坏无关用户状态。skill 不再捆绑或回退到另一份私有 sgy 运行时。

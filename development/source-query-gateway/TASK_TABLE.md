@@ -20,12 +20,12 @@
 - 当前可读取结果：27
 - 含验证结果：27
 - 含未决结果：4
-- 合同修订后陈旧结果：0
+- 合同修订后陈旧结果：3
 
 ## 上游状态
 
 - 用户确认快照：protected
-- 可修订上游未决：3
+- 可修订上游未决：4
 - 延后讨论项：1
 
 ## 任务
@@ -52,11 +52,11 @@
 | TSQG-033 | done | codex-root | 消除候选对 Python rg 回执的依赖 | TSQG-030:hard, TSQG-032:hard | results/TSQG-033.r4.json | 1 |
 | TSQG-040 | done | codex-root | 复核 AST 公开入口 | TSQG-011:hard, TSQG-023:hard, TSQG-032:hard | results/TSQG-040.r4.json | 1 |
 | TSQG-041 | done | codex-root | 裁决 AST 公共原语复用 | TSQG-040:hard | results/TSQG-041.r4.json | 1 |
-| TSQG-042 | done | codex-root | 完成三后端诊断与来源 | TSQG-022:hard, TSQG-032:hard, TSQG-041:hard | results/TSQG-042.r12.json | 1 |
-| TSQG-050 | done | codex-root | 建立统一查询候选 skill | TSQG-023:hard, TSQG-033:hard, TSQG-042:hard | results/TSQG-050.r4.json | 1 |
+| TSQG-042 | done | codex-root | 完成三后端诊断、来源与 Windows CLI 生命周期 | TSQG-022:hard, TSQG-032:hard, TSQG-041:hard | results/TSQG-042.r12.json | 2 |
+| TSQG-050 | done | codex-root | 建立只消费 PATH sgy 的统一查询候选 skill | TSQG-023:hard, TSQG-033:hard, TSQG-042:hard | results/TSQG-050.r4.json | 2 |
 | TSQG-051 | done | codex-root | 迁入 AST skill 语义 | TSQG-050:hard | results/TSQG-051.r4.json | 1 |
 | TSQG-052 | done | codex-root | 准备消费者原子迁移 | TSQG-050:hard, TSQG-051:hard | results/TSQG-052.r4.json | 1 |
-| TSQG-053 | done | codex-root | 形成候选供应链 payload | TSQG-052:hard | results/TSQG-053.r16.json | 1 |
+| TSQG-053 | done | codex-root | 形成独立 sgy 发布与精简 skill payload | TSQG-052:hard | results/TSQG-053.r16.json | 2 |
 | TSQG-060 | done | codex-root | 运行候选影响验证 | TSQG-053:hard | results/TSQG-060.r12.json | 1 |
 | TSQG-061 | done | codex-root | 运行 detached 路由行为评估 | TSQG-050:hard, TSQG-052:hard | results/TSQG-061.r10.json | 1 |
 | TSQG-062 | blocked | codex-root | 运行受监控 Codex 对照 | TSQG-006:hard, TSQG-060:hard, TSQG-061:hard | — | 1 |
