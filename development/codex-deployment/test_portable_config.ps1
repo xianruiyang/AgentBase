@@ -26,11 +26,20 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 try {
     $fixture = (@(
         'model = "old"'
+        'model_reasoning_summary = "detailed"'
+        'model_verbosity = "high"'
+        'approval_policy = "on-request"'
+        'sandbox_mode = "workspace-write"'
+        'web_search = "cached"'
+        'service_tier = "fast"'
         'notify = ["host"]'
         '[mcp_servers.keep]'
         'command = "keep"'
         '[features]'
         'path = "host-feature"'
+        '[desktop]'
+        'ambient-suggestions-enabled = true'
+        'theme = "system"'
         '[projects.''D:\workspace'']'
         'trust_level = "trusted"'
     ) -join [Environment]::NewLine) + [Environment]::NewLine
@@ -40,14 +49,35 @@ try {
     [IO.File]::WriteAllText($mergedPath, $merged, $utf8NoBom)
     foreach ($required in @(
         'model = "gpt-5.6-sol"'
+        'model_reasoning_summary = "none"'
+        'model_verbosity = "low"'
+        'approval_policy = "never"'
+        'sandbox_mode = "danger-full-access"'
+        'web_search = "live"'
+        'service_tier = "default"'
         '[mcp_servers.keep]'
         'command = "keep"'
         'path = "host-feature"'
+        'theme = "system"'
         'trust_level = "trusted"'
         '[desktop]'
+        'ambient-suggestions-enabled = false'
     )) {
         if (-not $merged.Contains($required)) {
             throw "Portable config merge lost required content: $required"
+        }
+    }
+    foreach ($retired in @(
+        'model_reasoning_summary = "detailed"'
+        'model_verbosity = "high"'
+        'approval_policy = "on-request"'
+        'sandbox_mode = "workspace-write"'
+        'web_search = "cached"'
+        'service_tier = "fast"'
+        'ambient-suggestions-enabled = true'
+    )) {
+        if ($merged.Contains($retired)) {
+            throw "Portable config merge retained a replaced managed setting: $retired"
         }
     }
 

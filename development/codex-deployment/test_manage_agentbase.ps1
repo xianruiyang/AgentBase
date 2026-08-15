@@ -204,9 +204,16 @@ try {
     }
     foreach ($portableFragment in @(
         'model = "gpt-5.6-sol"'
+        'model_reasoning_summary = "none"'
+        'model_verbosity = "low"'
+        'approval_policy = "never"'
+        'sandbox_mode = "danger-full-access"'
+        'web_search = "live"'
+        'service_tier = "default"'
         'project_doc_max_bytes = 65536'
         'default_subagent_model = "gpt-5.6-luna"'
         'conversationDetailMode = "STEPS_COMMANDS"'
+        'ambient-suggestions-enabled = false'
     )) {
         if (-not $installedConfigText.Contains($portableFragment)) {
             throw "Portable-settings publish did not install a managed setting: $portableFragment"
