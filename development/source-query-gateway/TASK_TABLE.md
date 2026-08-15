@@ -6,26 +6,26 @@
 
 | 状态 | 数量 |
 | --- | ---: |
-| todo | 4 |
+| todo | 1 |
 | claimed | 0 |
 | in_progress | 0 |
 | review | 0 |
 | blocked | 0 |
-| done | 26 |
+| done | 29 |
 | retired | 0 |
 
 ## 复核与结果
 
 - 需复核任务：0
-- 当前可读取结果：26
-- 含验证结果：26
+- 当前可读取结果：29
+- 含验证结果：29
 - 含未决结果：1
 - 合同修订后陈旧结果：0
 
 ## 上游状态
 
 - 用户确认快照：protected
-- 可修订上游未决：2
+- 可修订上游未决：1
 - 延后讨论项：0
 
 ## 任务
@@ -58,7 +58,7 @@
 | TSQG-052 | done | codex-root | 准备消费者原子迁移 | TSQG-050:hard, TSQG-051:hard | results/TSQG-052.r4.json | 1 |
 | TSQG-053 | done | codex-root | 形成候选供应链 payload | TSQG-052:hard | results/TSQG-053.r4.json | 1 |
 | TSQG-060 | done | codex-root | 运行候选影响验证 | TSQG-053:hard | results/TSQG-060.r4.json | 1 |
-| TSQG-061 | todo | — | 运行 detached 路由行为评估 | TSQG-050:hard, TSQG-052:hard | — | 1 |
-| TSQG-062 | todo | — | 运行受监控 Codex 对照 | TSQG-006:hard, TSQG-060:hard, TSQG-061:hard | — | 1 |
-| TSQG-063 | todo | — | 裁决候选收益边缘 | TSQG-062:hard | — | 1 |
+| TSQG-061 | done | codex-root | 运行 detached 路由行为评估 | TSQG-050:hard, TSQG-052:hard | results/TSQG-061.r4.json | 1 |
+| TSQG-062 | done | codex-root | 运行受监控 Codex 对照 | TSQG-006:hard, TSQG-060:hard, TSQG-061:hard | results/TSQG-062.r3.json | 1 |
+| TSQG-063 | done | codex-root | 裁决候选收益边缘 | TSQG-062:hard | results/TSQG-063.r3.json | 1 |
 | TSQG-064 | todo | — | 请求主线采纳与发布裁决 | TSQG-063:hard | — | 1 |

@@ -23,7 +23,8 @@ SECRET_OR_STATE_NAMES = {
     "auth.json", "cap_sid", "installation_id", "history.jsonl", "models_cache.json",
 }
 STATE_SUFFIXES = {".sqlite", ".sqlite-shm", ".sqlite-wal"}
-MAX_ENV_FILES = 5_000
+STATE_DIRECTORIES = {"cache", "logs", "tmp", ".tmp", ".sandbox", ".sandbox-bin", "sessions", "archived_sessions", "thread-writer-locks"}
+MAX_ENV_FILES = 50_000
 READ_ONLY_PREFIX = (
     "这是只读源码查找基准。不得修改文件、配置、进程或外部状态；"
     "不得访问其他测试环境、历史答案、聚合结果或隐藏 oracle。请根据当前环境自主完成下列任务。\n\n"
@@ -89,7 +90,7 @@ def environment_tree(root: Path) -> dict[str, str]:
         relative = path.relative_to(root).as_posix()
         if path.name in SECRET_OR_STATE_NAMES or path.name.endswith(tuple(STATE_SUFFIXES)):
             continue
-        if any(part in {"cache", "logs", "tmp"} for part in path.relative_to(root).parts):
+        if any(part in STATE_DIRECTORIES for part in path.relative_to(root).parts):
             continue
         entries[relative] = sha256_file(path)
         if len(entries) > MAX_ENV_FILES:
@@ -138,6 +139,23 @@ def balanced_schedule(case_ids: list[str], repetitions: int, seed: int) -> list[
     return schedule
 
 
+def selected_schedule(case_ids: list[str], repetitions: int, seed: int, environments: list[str]) -> list[dict[str, Any]]:
+    if not environments or any(name not in {"control", "candidate"} for name in environments):
+        raise ExperimentError("run_environments must contain control and/or candidate")
+    if len(set(environments)) != len(environments):
+        raise ExperimentError("run_environments contains duplicates")
+    if set(environments) == {"control", "candidate"}:
+        return balanced_schedule(case_ids, repetitions, seed)
+    if repetitions < 1:
+        raise ExperimentError("repetitions must be positive")
+    environment = environments[0]
+    return [
+        {"case_id": case_id, "environment": environment, "ordinal": ordinal}
+        for case_id in case_ids
+        for ordinal in range(1, repetitions + 1)
+    ]
+
+
 def validate_corpus_snapshot(corpus: dict[str, Any], workspaces: dict[str, dict[str, Any]]) -> None:
     if corpus.get("schema") != "agentbase.source-query-corpus/v1":
         raise ExperimentError("unsupported corpus schema")
@@ -165,6 +183,17 @@ def validate_corpus_snapshot(corpus: dict[str, Any], workspaces: dict[str, dict[
                 raise ExperimentError(f"corpus source is stale: {case_id}/{source['path']}")
 
 
+def resolve_path_prepend(home: Path, value: str, name: str) -> Path:
+    path_prepend = (home / value).resolve()
+    try:
+        path_prepend.relative_to(home)
+    except ValueError as error:
+        raise ExperimentError(f"path_prepend escapes codex home: {name}") from error
+    if not path_prepend.is_dir():
+        raise ExperimentError(f"path_prepend is not a directory: {name}")
+    return path_prepend
+
+
 def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
     config = json.loads(config_path.read_text(encoding="utf-8"))
     corpus_path = Path(config["corpus"]).resolve()
@@ -177,7 +206,8 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
     environments = {}
     trees = {}
     for name in ("control", "candidate"):
-        home = Path(config["environments"][name]["codex_home"]).resolve()
+        raw_environment = config["environments"][name]
+        home = Path(raw_environment["codex_home"]).resolve()
         tree = environment_tree(home)
         trees[name] = tree
         environments[name] = {
@@ -185,11 +215,15 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
             "tree_sha256": sha256_bytes(canonical_bytes(tree)),
             "auth_mode": "inherited-secure-environment",
         }
+        if raw_environment.get("path_prepend"):
+            path_prepend = resolve_path_prepend(home, str(raw_environment["path_prepend"]), name)
+            environments[name]["path_prepend"] = str(path_prepend)
     diff = environment_diff(trees["control"], trees["candidate"], config["allowed_differences"])
     if not diff["ok"]:
         raise ExperimentError(f"environment difference outside allowlist: {diff['unexpected']}")
     output.mkdir(parents=True, exist_ok=False)
     (output / "environment-diff.json").write_text(json.dumps(diff, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (output / "environment-trees.json").write_text(json.dumps(trees, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
     case_ids = [case["id"] for case in corpus["cases"]]
     codex = dict(config["codex"])
     codex["observed_version"] = run_capture([codex["executable"], "--version"], Path.cwd()).decode("utf-8", errors="replace").strip()
@@ -205,7 +239,13 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
         "environments": environments,
         "allowed_differences": config["allowed_differences"],
         "environment_diff_sha256": sha256_file(output / "environment-diff.json"),
-        "schedule": balanced_schedule(case_ids, int(config["repetitions"]), int(config["seed"])),
+        "environment_trees_sha256": sha256_file(output / "environment-trees.json"),
+        "schedule": selected_schedule(
+            case_ids,
+            int(config["repetitions"]),
+            int(config["seed"]),
+            list(config.get("run_environments", ["control", "candidate"])),
+        ),
         "timeout_seconds": int(config["timeout_seconds"]),
         "network_policy": config["network_policy"],
         "runner": {"schema": EXPERIMENT_SCHEMA, "source_sha256": sha256_file(Path(__file__)), "python": sys.version},
@@ -306,16 +346,20 @@ def run_experiment(experiment_path: Path) -> dict[str, Any]:
         stderr_path = runs_root / f"{run_id}.stderr.txt"
         codex = experiment["codex"]
         argv = [
-            codex["executable"], "exec", "--json", "--ephemeral", "--sandbox", "read-only",
+            codex["executable"], "exec", "--json", "--ephemeral", "--sandbox", codex.get("sandbox", "read-only"),
             "-c", 'approval_policy="never"', "-m", codex["model"],
             "-c", f'model_reasoning_effort="{codex["reasoning_effort"]}"',
             "-c", f'service_tier="{codex["service_tier"]}"',
         ]
+        for override in codex.get("extra_config", []):
+            argv.extend(["-c", str(override)])
         if "project_doc_max_bytes" in codex:
             argv.extend(["-c", f'project_doc_max_bytes={int(codex["project_doc_max_bytes"])}'])
         argv.extend(["--cd", str(workspace), "--color", "never", READ_ONLY_PREFIX + case["prompt"]])
         env = os.environ.copy()
         env["CODEX_HOME"] = environment["codex_home"]
+        if environment.get("path_prepend"):
+            env["PATH"] = environment["path_prepend"] + os.pathsep + env.get("PATH", "")
         monitored = monitor_command(argv, workspace, env, stdout_path, stderr_path, experiment["timeout_seconds"])
         parsed = parse_events(stdout_path)
         usage = parsed["usage"]

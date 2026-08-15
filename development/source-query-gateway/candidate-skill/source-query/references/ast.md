@@ -12,7 +12,30 @@ sgy process <validate|select|filter|count|group|containing|group-locations|sort|
 sgy <schema|capabilities|doctor> ...
 ```
 
-- 先限定语言、目录、glob 和准确 pattern/rule。默认使用 token-safe；只需文件与完整 0-based、end-exclusive 范围时用 locations；需要正文、捕获或诊断时保留默认；只有机器 round-trip、未知字段或完整审计使用 lossless。
+`sgy exec` 的 wrapper 选项必须放在第一个 `--` 前，原生 ast-grep 参数放在其后；不要把 rg/fd 的 `--view`、`--limit` 或 snapshot 选项用于 AST。常用 wrapper 选项为：
+
+```text
+--engine PATH
+--cwd PATH
+--profile token-safe|locations|lossless|files|custom
+--cache auto|on|off
+--fingerprint-file PATH
+--max-detail-results N
+--max-text-chars N
+--max-context-bytes N
+--keep-fields PATHS
+--prune-fields PATHS
+--yaml-out PATH
+--stderr-yaml PATH
+--meta-out PATH
+--artifact-out PATH
+--no-native-defaults
+--strict
+```
+
+wrapper help 使用 `sgy exec --help`；原生 help 使用 `sgy exec -- run --help`。只在既有命令报告引擎、版本或协议异常时运行 `sgy doctor`、`sgy schema` 或 `sgy capabilities`，不要把探测命令作为查询前置步骤。
+
+- 已知名称且文本定位后能用有界读取可靠取得完整实现时，不使用 AST。只有边界、关系或语法身份不能由文本可靠确定时，才先限定语言、目录、glob 和准确 pattern/rule。默认使用 token-safe；只需文件与完整 0-based、end-exclusive 范围时用 locations；需要正文、捕获或诊断时保留默认；只有机器 round-trip、未知字段或完整审计使用 lossless。
 - 读取 `_sgy.total/files/shown/omitted/complete/cache`；可见详情不完整时不得从其外推全集。
 - 已有位置但语法边界仍不稳时，才用 `--cache on` 和目标文件 fingerprint 建立完整 cache，再执行 `process containing`；同文件多目标复用一份 cache。源码身份变化时重扫。
 - pattern 是目标语言语法；元变量、关系、constraints、context/selector 和 rule 只在结构要求需要时增加。调试先收窄到单文件或 stdin，再检查语言、解析、元变量和 strictness。

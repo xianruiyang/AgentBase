@@ -2,7 +2,7 @@
 
 ## 1. 文档职责与状态
 
-本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的候选模型设计，状态为 `implemented_pending_benefit_evidence`。backend、候选 skill 与发布 payload 已实现并通过分层质量验证，但端到端模型收益尚待 P6 隔离实验；它仍只属于本分支，不改变 AgentBase 总体需求或正式入口。
+本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的候选模型设计，状态为 `validated_pending_user_adoption`。backend、候选 skill、发布 payload、独立路由与受监控模型实验均已闭环；它仍只属于本分支，不改变 AgentBase 总体需求、正式 skill 或 Codex 安装态。
 
 ## 2. 设计结论
 
@@ -80,9 +80,9 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根分配稳定短
 
 - 满足: AC-SQG-002, AC-SQG-003, UDES-SQG-001
 
-候选最终只保留一个精炼的源码查询 skill，主文件说明触发边界、backend 选择、完整性和写入安全，rg、fd 与 AST 的详细协议按需读取。AST 部分以现有 `ast-grep-token-safe` 合同为语义来源，迁移只改变文档归属，不改变 sgy 用法和安全边界；只有独立路由与行为证据证明等价后才退出旧 skill。
+候选最终只保留一个精炼的高级源码查询 skill；普通文件、文本、全集、不存在证明和已知实现读取由全局短路由直接完成，只有 AST、高级 rg/fd 协议或参数诊断才加载 skill，rg/fd 与 AST 的详细协议继续按需读取。AST 部分以现有 `ast-grep-token-safe` 合同为语义来源，迁移只改变文档归属，不改变 sgy 用法和安全边界；只有独立路由与行为证据证明等价后才退出旧 skill。
 
-一次精确文件名发现、已知文件内少量文本定位或天然有界的直接读取继续使用受限原生快路径。需要全集或不存在证明、大结果压缩、目录树、AST、缓存或分页时才承担 skill 和网关成本。LSP 只在真实符号语义会改变结论时升级。
+一次精确文件名发现、已知文件内少量文本定位或天然有界的直接读取继续使用受限原生快路径；全集、不存在证明、大结果压缩和目录树使用 PATH 中的 sgy rg/fd，但不因此加载 skill。只有实际需要 AST、缓存、分页、产物或特殊模式时才承担 skill 成本。LSP 只在真实符号语义会改变结论时升级。
 
 ## DES-SQG-009 安全与故障边界
 
@@ -137,4 +137,4 @@ benchmark owner、语料、测试代码、fixtures、原始事件和审计结果
 
 ## 6. 设计完成判定
 
-只有 rg/fd 全部公开模式有持久分类，结果完整性可复核，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项不退化，消费者与旧同责入口完成迁移，并且 `DES-SQG-010` 的受控隔离证据依次证明 `AC-SQG-001` 的质量充分、`AC-SQG-002` 的端到端总 Token 收益和 `AC-SQG-003` 的速度取舍时，本设计才可由 `proposed` 进入待主线采纳状态。该状态仍不自动修改总体项目或授权发布。
+rg/fd 全部公开模式已有持久分类，结果完整性可复核，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项未退化；独立路由与隔离模型证据也已按 `AC-SQG-001`、`AC-SQG-002`、`AC-SQG-003` 的顺序达到当前授权证据下的收益边缘。因此本设计进入 `validated_pending_user_adoption`。消费者迁移、旧同责入口退出、总体项目接入与 Codex 发布仍必须等待用户明确采纳和当次发布授权，不能由该状态自动触发。

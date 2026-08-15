@@ -420,8 +420,18 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
         "content_complete":content_complete,
         "offset":offset,"next_cursor":next,"stdout_bytes":snapshot.stdout.len(),"stderr_bytes":snapshot.stderr.len()
     }));
-    emit_yaml(&Value::Object(root))?;
+    emit_compact_json(&Value::Object(root))?;
     Ok(snapshot.native_exit)
+}
+
+fn emit_compact_json(value: &Value) -> Result<(), GatewayError> {
+    let mut bytes = serde_json::to_vec(value)
+        .map_err(|error| GatewayError::input(format!("cannot serialize query result: {error}")))?;
+    bytes.push(b'\n');
+    io::stdout()
+        .lock()
+        .write_all(&bytes)
+        .map_err(|error| GatewayError::io("cannot write query result", error))
 }
 
 fn validate_view(backend: GatewayBackend, view: &str) -> Result<(), GatewayError> {
@@ -429,6 +439,7 @@ fn validate_view(backend: GatewayBackend, view: &str) -> Result<(), GatewayError
         GatewayBackend::Rg => [
             "auto",
             "grouped",
+            "records",
             "locations",
             "files",
             "summary",
@@ -480,7 +491,7 @@ fn validate_mode_view(
         }
         (GatewayBackend::Rg, _, _) => matches!(
             view,
-            "auto" | "grouped" | "locations" | "files" | "summary" | "lossless" | "raw"
+            "auto" | "grouped" | "records" | "locations" | "files" | "summary" | "lossless" | "raw"
         ),
         _ => false,
     };

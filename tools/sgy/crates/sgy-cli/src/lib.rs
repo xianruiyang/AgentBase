@@ -75,17 +75,34 @@ fn gateway_backend_subcommand(name: &'static str, engine_name: &'static str) -> 
     Command::new(name)
         .about(format!("Token-safe {engine_name} gateway"))
         .subcommand_required(true)
-        .subcommand(gateway_operation_subcommand("exec", true))
-        .subcommand(gateway_operation_subcommand("defaults", true))
+        .subcommand(gateway_operation_subcommand("exec", name))
+        .subcommand(gateway_operation_subcommand("defaults", name))
         .subcommand(
             Command::new("doctor")
                 .about("Diagnose the exact native engine without searching")
                 .arg(gateway_engine_arg())
                 .arg(gateway_cwd_arg()),
         )
+        .after_help(
+            "Wrapper options belong before --; native arguments belong after --.\nUse `sgy <backend> exec -- --help` for native engine help.",
+        )
 }
 
-fn gateway_operation_subcommand(name: &'static str, _native_required: bool) -> Command {
+fn gateway_operation_subcommand(name: &'static str, backend: &'static str) -> Command {
+    let views = match backend {
+        "rg" => vec![
+            "auto",
+            "grouped",
+            "records",
+            "locations",
+            "files",
+            "summary",
+            "lossless",
+            "raw",
+        ],
+        "fd" => vec!["auto", "tree", "flat", "summary", "lossless", "raw"],
+        _ => unreachable!("gateway backend is fixed by command construction"),
+    };
     let native = Arg::new("native")
         .value_name("NATIVE_ARGV")
         .value_parser(OsStringValueParser::new())
@@ -99,20 +116,26 @@ fn gateway_operation_subcommand(name: &'static str, _native_required: bool) -> C
             Arg::new("view")
                 .long("view")
                 .value_name("VIEW")
-                .default_value("auto"),
+                .default_value("auto")
+                .value_parser(PossibleValuesParser::new(views))
+                .help("Result projection"),
         )
         .arg(
             Arg::new("limit")
                 .long("limit")
+                .visible_alias("max-items")
                 .value_name("N")
                 .default_value("80")
+                .help("Maximum records displayed in this page")
                 .value_parser(clap::value_parser!(u64).range(1..=10000)),
         )
         .arg(
             Arg::new("max-text-chars")
                 .long("max-text-chars")
+                .visible_alias("max-line-length")
                 .value_name("N")
                 .default_value("240")
+                .help("Maximum displayed characters per text field")
                 .value_parser(clap::value_parser!(u64).range(1..=1_000_000)),
         )
         .arg(
@@ -718,6 +741,10 @@ pub fn parse_cli_from(
             .iter()
             .skip(3)
             .any(|value| value == OsStr::new(NATIVE_DELIMITER))
+            && !raw
+                .iter()
+                .skip(3)
+                .any(|value| value == OsStr::new("--help") || value == OsStr::new("-h"))
         {
             return Err(CliParseError::MissingDelimiter);
         }
@@ -1184,6 +1211,40 @@ mod tests {
             os_args(&["-e", "a b", "-g", "*.rs", "-e", "a b", "", "--", "tail"]),
             command.native_argv
         );
+    }
+
+    #[test]
+    fn gateway_help_does_not_require_a_native_delimiter() {
+        let error = parse_cli_from(os_args(&["sgy", "rg", "exec", "--help"]))
+            .expect_err("wrapper help exits through clap");
+        assert!(matches!(
+            error,
+            CliParseError::Clap(error)
+                if error.kind() == clap::error::ErrorKind::DisplayHelp
+        ));
+    }
+
+    #[test]
+    fn gateway_accepts_budget_aliases_without_leaking_them_to_native_argv() {
+        let action = parse_cli_from(os_args(&[
+            "sgy",
+            "rg",
+            "exec",
+            "--max-items",
+            "7",
+            "--max-line-length",
+            "120",
+            "--",
+            "needle",
+            ".",
+        ]))
+        .expect("rg gateway aliases");
+        let CliAction::Gateway(command) = action else {
+            panic!("expected gateway")
+        };
+        assert_eq!(7, command.limit);
+        assert_eq!(120, command.max_text_chars);
+        assert_eq!(os_args(&["needle", "."]), command.native_argv);
     }
 
     #[test]

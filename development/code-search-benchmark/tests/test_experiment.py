@@ -17,6 +17,16 @@ SPEC.loader.exec_module(MODULE)
 
 
 class ExperimentTests(unittest.TestCase):
+    def test_candidate_path_prepend_is_scoped_to_the_recorded_home(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            runtime = home / "skills" / "source-query" / "bin"
+            runtime.mkdir(parents=True)
+            resolved = MODULE.resolve_path_prepend(home.resolve(), "skills/source-query/bin", "candidate")
+            self.assertEqual(runtime.resolve(), resolved)
+            with self.assertRaisesRegex(MODULE.ExperimentError, "escapes codex home"):
+                MODULE.resolve_path_prepend(home.resolve(), "../outside", "candidate")
+
     def test_two_repetition_schedule_is_balanced(self) -> None:
         schedule = MODULE.balanced_schedule(["a", "b"], 2, 7)
         for case_id in ("a", "b"):
@@ -27,6 +37,12 @@ class ExperimentTests(unittest.TestCase):
                 ["control", "candidate", "candidate", "control"],
                 ["candidate", "control", "control", "candidate"],
             ])
+
+    def test_candidate_only_schedule_does_not_rerun_frozen_control(self) -> None:
+        schedule = MODULE.selected_schedule(["a", "b"], 2, 7, ["candidate"])
+        self.assertEqual(4, len(schedule))
+        self.assertTrue(all(item["environment"] == "candidate" for item in schedule))
+        self.assertEqual([1, 2], [item["ordinal"] for item in schedule if item["case_id"] == "a"])
 
     def test_environment_diff_rejects_unlisted_change(self) -> None:
         result = MODULE.environment_diff({"same": "1", "extra": "a"}, {"same": "1", "extra": "b"}, ["skills/**"])

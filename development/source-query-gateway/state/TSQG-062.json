@@ -1,1 +1,11 @@
-{"blocked_reason":"","next_action":"","note":"","owner":null,"result_ref":null,"revision":1,"schema":"task.state","status":"todo","task_id":"TSQG-062"}
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "",
+  "owner": "codex-root",
+  "result_ref": "results/TSQG-062.r3.json",
+  "revision": 3,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "TSQG-062"
+}

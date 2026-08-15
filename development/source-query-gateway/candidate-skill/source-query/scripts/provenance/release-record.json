@@ -4,8 +4,8 @@
   "recordedDate": "2026-08-15",
   "pathBase": "scripts",
   "source": {
-    "revision": "sha256:47c02bb684c6957735844b5abc2f3a56b52b7fc2c2f62bc21528f226dc9b71e5",
-    "gitBaseCommit": "790a2c7c6187db4c4766c8656fe54e237a16aee0",
+    "revision": "sha256:5415fbd594339f0e4a8fbe99d25121957a01a16a879f2a5426391b69f765a097",
+    "gitBaseCommit": "c1833a007ee29521ffda7c2fb3ca718d879916dc",
     "snapshot": "provenance/sgy-source-snapshot.json",
     "sourceDateEpoch": 0,
     "cargoLockSha256": "092420ea7d0bda015fe0f012e9cbcb70ee6469213e4b240be7d5968aba653c5f",
@@ -25,12 +25,12 @@
     {
       "target": "x86_64-pc-windows-msvc",
       "archive": "sgy-0.2.0-x86_64-pc-windows-msvc.zip",
-      "archiveSha256": "9c6d1ba36c082299bde5a61cc4df59c4c79e0ba17cbc0cc3b91ebc9a4a75c5a1",
+      "archiveSha256": "17015e64868b25e7f6c5b4866ab6e19f35f0e3fac25acf0e14a41d3c6c6b10c1",
       "manifest": "provenance/windows-x86_64.manifest.json",
       "binary": {
         "path": "bin/windows-x86_64/sgy.exe",
-        "bytes": 2250752,
-        "sha256": "126f68cd1ffbd9c272833cc66ac36e6723f96d511b02f282fe90fd976c51392b"
+        "bytes": 2258432,
+        "sha256": "1eebdffaefe46794dd906d06339b0d70b5a6e3e598f803af86b6170bd78e3a18"
       },
       "nativeBuild": {
         "status": "passed",

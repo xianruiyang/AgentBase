@@ -59,6 +59,11 @@ fn rg_groups_and_resumes_the_same_exact_snapshot() {
         "{}",
         String::from_utf8_lossy(&first.stderr)
     );
+    assert_eq!(
+        String::from_utf8_lossy(&first.stdout).lines().count(),
+        1,
+        "structured query results use one compact JSON line"
+    );
     let first = yaml(&first.stdout);
     assert_eq!(first["_sgy"]["result_total"], 3);
     assert_eq!(first["_sgy"]["display_complete"], false);
@@ -91,6 +96,26 @@ fn rg_groups_and_resumes_the_same_exact_snapshot() {
     assert_eq!(second["_sgy"]["query_snapshot"], snapshot);
     assert_eq!(second["_sgy"]["offset"], 1);
     assert_eq!(second["_sgy"]["view"], first["_sgy"]["view"]);
+}
+
+#[test]
+fn rg_records_view_is_executable_and_keeps_content() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let output = sgy(directory.path(), local.path())
+        .args([
+            "rg", "exec", "--view", "records", "--", "-n", "-F", "alpha", ".",
+        ])
+        .output()
+        .expect("records query");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let document = yaml(&output.stdout);
+    assert_eq!(document["_sgy"]["view"], "records");
+    assert_eq!(document["records"].as_array().expect("records").len(), 3);
 }
 
 #[test]

@@ -7,7 +7,11 @@ sgy <rg|fd> <exec|defaults> [wrapper options] -- <native argv...>
 sgy <rg|fd> doctor [--engine PATH] [--cwd PATH]
 ```
 
+`exec/defaults` 的 wrapper 选项是 `--engine PATH`、`--cwd PATH`、`--view VIEW`、`--limit N`、`--max-text-chars N`、`--artifact-out PATH`、`--snapshot SHA256` 和 `--after CURSOR`。rg view 为 `auto|grouped|records|locations|files|summary|lossless|raw`；fd view 为 `auto|tree|flat|summary|lossless|raw`。`--max-items` 与 `--max-line-length` 是前述两项预算的迁移别名；没有 `--max-bytes` wrapper 选项。wrapper help 使用 `sgy <rg|fd> exec --help`，原生 help 使用 `sgy <rg|fd> exec -- --help`。
+
 `--` 后的值、顺序、重复项和空参数原样交给对应原生引擎；sgy 不用 shell 重建命令。为取得机器表示而增加的参数插在原生参数终止符之前，不能把负号开头的 pattern 或 path 重新解释成选项。`defaults` 只返回用户 argv、注入项、最终 argv、模式和处理类别，不查找或启动引擎。`exec` 与 `doctor` 只支持 ripgrep 15.1.0 和 fd 10.4.2 的精确版本读回。
+
+rg/fd 的结构化查询结果使用单行紧凑 JSON；JSON 同时是可由现有安全 YAML 读取器解析的 YAML 1.2 子集。AST 输出和特殊模式的原生透传、产物或有界文本合同不改变。
 
 ## 处理类别
 

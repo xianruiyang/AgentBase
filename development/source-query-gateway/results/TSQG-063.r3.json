@@ -1,0 +1,55 @@
+{
+  "changed_files": [
+    "candidate-global-route.txt",
+    "candidate-skill/source-query/**",
+    "current-state.md",
+    "design.md",
+    "plan.md",
+    "solution.md"
+  ],
+  "evidence_for": [
+    "REQ-SQG-001",
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-003"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "independent-routing",
+      "ref": "development/source-query-gateway/evidence/routing-result-v13.json"
+    },
+    {
+      "kind": "independent-audit",
+      "ref": "development/source-query-gateway/evidence/audit-result-v11.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "保留 v11 候选并停止追加规则：质量与冻结历史记录持平，方向性少 10,510 Token、快 103.906 秒；更低成本但质量不足的候选全部退出。",
+  "outputs": [
+    "candidate-global-route.txt",
+    "candidate-skill/source-query",
+    "current-state.md",
+    "design.md",
+    "plan.md",
+    "solution.md"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:edefa68fe1e105b5bcb1d32724315d480083f4fad7a27b129787b8ca2cdc2224",
+    "AC-SQG-002": "sha256:9431f26723ac18686507f57487f1c8ad3991aa0c2e37fe44a1bc9bc62d48ce9f",
+    "AC-SQG-003": "sha256:dd62ea72b87d1869e8ed85483f7c071873844544c058c11969c24788e76617cc",
+    "AC-SQG-004": "sha256:c6b2799ece418f7f7ee4e37ab22e15a9a8cb724731def5b0853335f00aa542b1",
+    "CON-SQG-001": "sha256:e224215fe1492c484306b35827babb9f11e1efd0915b35feabd3cee660081eb3",
+    "CON-SQG-002": "sha256:fd5ad79f19a584827b89c9b831166884608e15a6a5e1e1415c051bb38a8fea68",
+    "CON-SQG-003": "sha256:56b350a9ceb81ce73d6d6376f9bd1ac81785ac08e374219f6ba36e0ddb956ef0",
+    "REQ-SQG-001": "sha256:3be96a1ab34b2f80f823730a8a8c941e20578a6bec36b12fe87346f502ce869b"
+  },
+  "task_id": "TSQG-063",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "最终 detached 路由 21/21 通过",
+    "最终独立模型审计质量不低于历史记录",
+    "按质量、Token、速度顺序淘汰中间候选"
+  ]
+}

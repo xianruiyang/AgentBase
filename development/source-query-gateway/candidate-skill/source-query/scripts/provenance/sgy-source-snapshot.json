@@ -1,6 +1,6 @@
 {
   "schema": "sgy.source-snapshot/v1",
-  "sourceRevision": "sha256:47c02bb684c6957735844b5abc2f3a56b52b7fc2c2f62bc21528f226dc9b71e5",
+  "sourceRevision": "sha256:5415fbd594339f0e4a8fbe99d25121957a01a16a879f2a5426391b69f765a097",
   "algorithm": "sha256(path + NUL + size + NUL + fileSha256 + LF), paths sorted ordinal",
   "root": ".",
   "excludedRoots": [
@@ -102,8 +102,8 @@
     },
     {
       "path": "crates/sgy-cli/src/lib.rs",
-      "size": 43663,
-      "sha256": "ff66bad3d0f3381fcfd549faf6a000e923e595ada1c903350926d2d129e6a335"
+      "size": 45783,
+      "sha256": "5978d4a55e8bdf4c4c673aca66d0de709ea1896737d711455f927640b990a34b"
     },
     {
       "path": "crates/sgy-cli/src/main.rs",
@@ -122,8 +122,8 @@
     },
     {
       "path": "crates/sgy-cli/src/query_gateway.rs",
-      "size": 79834,
-      "sha256": "4bc537236dc5d85f3aec37e38c49da8ad23ebbb883a43696b0bff777157eb2cb"
+      "size": 80253,
+      "sha256": "9cda9bc5339ae8b13dc88294f81647561f8af4c5e6730dbf9ae355e6efdfcf73"
     },
     {
       "path": "crates/sgy-cli/tests/cache_cli.rs",
@@ -172,8 +172,8 @@
     },
     {
       "path": "crates/sgy-cli/tests/query_gateway_real.rs",
-      "size": 14074,
-      "sha256": "99b2d836e0e680435bd630b3bb54fea6c608e5f0bd79d46f5cb5910c49e5d134"
+      "size": 14887,
+      "sha256": "32c09e52840b79df66b7a5cf4b9406f7e51099821adafd759708f717bfb4325a"
     },
     {
       "path": "crates/sgy-cli/tests/raw_artifact_adapter.rs",
@@ -542,8 +542,8 @@
     },
     {
       "path": "docs/query-gateway.md",
-      "size": 3174,
-      "sha256": "3c20045ca0c815e9cd8809ed04d2a982c171ad9bf53c41e7fa8a12fc8fd1b8ae"
+      "size": 3921,
+      "sha256": "10fc435e70ed082cbf9d01a1705547abe26cabfc8401833438f31bebc131a342"
     },
     {
       "path": "docs/release-checklist.md",
@@ -712,8 +712,8 @@
     },
     {
       "path": "scripts/test-install-sgy.ps1",
-      "size": 11609,
-      "sha256": "895522c0b2949a736a357866101ec7ada84b210cf4f9f4b725589f3fa2359fb4"
+      "size": 11760,
+      "sha256": "9d5c5f6236dc24d5e6777873a3629d6910cd5202b46f223fcf0826de695fec3e"
     },
     {
       "path": "tests/fixtures/codec/json-values/compact.json",

@@ -36,7 +36,7 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 分支内 `candidate-skill/source-query` 用一个精炼主文件按“原生快路径 → rg/fd 网关 → AST → LSP”升级，详细 rg/fd 与 AST 协议按需读取。skill 静态校验通过。候选 payload 共 14 个文件，只含规则、引用、Windows 二进制、runtime/release 来源和许可证；自动检查确认不含 test、fixture、benchmark、runner、corpus、result 或 audit 资产。
 
-候选二进制 SHA-256 为 `126f68cd1ffbd9c272833cc66ac36e6723f96d511b02f282fe90fd976c51392b`，发布 archive SHA-256 为 `9c6d1ba36c082299bde5a61cc4df59c4c79e0ba17cbc0cc3b91ebc9a4a75c5a1`。安装、重复安装、失败升级回滚、恶意 ZIP、篡改状态、升级、卸载和用户配置/缓存保护测试通过。宿主没有 `cargo-audit`，因此本候选只记录既有审计继承依据与限制，不声称完成新的 advisory scan。
+候选二进制 SHA-256 为 `1eebdffaefe46794dd906d06339b0d70b5a6e3e598f803af86b6170bd78e3a18`，发布 archive SHA-256 为 `17015e64868b25e7f6c5b4866ab6e19f35f0e3fac25acf0e14a41d3c6c6b10c1`。安装、重复安装、失败升级回滚、恶意 ZIP、篡改状态、升级、卸载和用户配置/缓存保护测试通过。宿主没有 `cargo-audit`，因此本候选只记录既有审计继承依据与限制，不声称完成新的 advisory scan。
 
 ## OBS-SQG-005 benchmark owner 已具备隔离运行合同
 
@@ -45,12 +45,14 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 现有 `development/code-search-benchmark` 已扩展为本项目唯一的 corpus、环境身份、`codex exec --json --ephemeral` monitor、A-B-B-A 调度、usage 汇总和 detached audit capsule owner。语料绑定来源文件 hash，环境只允许显式差异，失败和超时不被静默替换。历史安装态、收紧候选、五-skill 消融与裸环境数字以各自证据上限登记，不跨 identity 拼接。
 
-## GAP-SQG-001 独立模型行为与端到端收益尚待新候选实测
+## OBS-SQG-006 模型行为已收敛到当前收益边缘
 
-- 状态: open
+- 状态: verified
 - 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004
 
-静态 skill、backend oracle、AST 非回退和发布包验证只证明候选能力本身，不能证明模型会以最低充分成本选用它。还需 detached 路由/行为评估和受监控真实 Codex 对照，逐案确认质量后复算 input + output 总 Token，再在前两项不退化时比较耗时。
+最终 detached 路由评估覆盖 21 个首次路由、非触发、跨根、关系端点、行数预算、AST、LSP、分页和写入安全场景，21/21 符合 oracle。最终受监控候选运行覆盖六类真实查询各两次：独立审计确认核心语义 12/12、严格语义 12/12、格式 11/12、严格整体 11/12；总成本为 input `1,139,430`、cached input `843,776`、output `7,171`、reasoning output `2,953`、实际总 Token `1,146,601`、耗时 `404,603 ms`、31 次工具调用且无失败。
+
+用户要求冻结且不重跑的五-skill 消融历史记录为实际总 Token `1,157,111`、耗时 `508,509 ms`、核心语义 12/12、严格整体 11/12。最终候选在相同质量口径下方向性降低 `10,510` Token（`0.91%`）并减少 `103,906 ms`（`20.43%`）。历史记录缺少当前 experiment 的完整 identity，故该差额只支持当前授权证据边界内的保留裁决，不声称严格因果 A/B；候选迭代中更低成本但质量退化的版本已按质量优先退出。
 
 ## GAP-SQG-002 主线迁移仍由用户采纳决定
 

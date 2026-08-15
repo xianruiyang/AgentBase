@@ -1,0 +1,49 @@
+{
+  "changed_files": [
+    "../code-search-benchmark/**",
+    "evidence/**",
+    "verification.md"
+  ],
+  "evidence_for": [
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-003",
+    "AC-SQG-004"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "independent-audit",
+      "ref": "development/source-query-gateway/evidence/audit-result-v11.json"
+    },
+    {
+      "kind": "verification-summary",
+      "ref": "development/source-query-gateway/verification.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "受监控隔离实验完成六类任务各两次；最终候选核心与严格语义 12/12、严格整体 11/12，实际总 Token 1,146,601，耗时 404.603 秒，31 次工具调用且无失败。",
+  "outputs": [
+    "evidence/audit-result-v11.json",
+    "verification.md"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:edefa68fe1e105b5bcb1d32724315d480083f4fad7a27b129787b8ca2cdc2224",
+    "AC-SQG-002": "sha256:9431f26723ac18686507f57487f1c8ad3991aa0c2e37fe44a1bc9bc62d48ce9f",
+    "AC-SQG-003": "sha256:dd62ea72b87d1869e8ed85483f7c071873844544c058c11969c24788e76617cc",
+    "AC-SQG-004": "sha256:c6b2799ece418f7f7ee4e37ab22e15a9a8cb724731def5b0853335f00aa542b1",
+    "CON-SQG-001": "sha256:e224215fe1492c484306b35827babb9f11e1efd0915b35feabd3cee660081eb3",
+    "CON-SQG-002": "sha256:fd5ad79f19a584827b89c9b831166884608e15a6a5e1e1415c051bb38a8fea68",
+    "CON-SQG-003": "sha256:56b350a9ceb81ce73d6d6376f9bd1ac81785ac08e374219f6ba36e0ddb956ef0",
+    "REQ-SQG-001": "sha256:3be96a1ab34b2f80f823730a8a8c941e20578a6bec36b12fe87346f502ce869b",
+    "UDES-SQG-007": "sha256:8550290e06b1f91fa8d90d84ee6eeb13431d0cd4c46b297ca8efe688aacf00bc"
+  },
+  "task_id": "TSQG-062",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "12/12 usage 记录完整且 postflight identity 无差异",
+    "独立 audit capsule 隔离声明、ID 与 Token 恒等式通过",
+    "核心语义 12/12、严格语义 12/12、严格整体 11/12"
+  ]
+}
