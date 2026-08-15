@@ -28,7 +28,7 @@ must: 文档只更新被本次改动直接影响的事实，删除或改写已�
 
 ## 验证与发布
 
-must: 用户明确要求在新的 Windows 主机准备、复现或部署 AgentBase 时，主机前置安装属于该授权范围；先运行以下正式入口主动安装或升级缺失的 PowerShell 7、fd、Python 3、Node.js LTS 与已验证 ast-grep，并读回能力状态，完成后开启新 Codex 任务再继续发布：
+must: 用户明确要求在新的 Windows 主机准备、复现或部署 AgentBase 时，主机前置安装属于该授权范围；先运行以下正式入口主动安装或升级缺失的 PowerShell 7、fd、Python 3、Node.js LTS 与已验证 ast-grep，再按 `tools/srcq/docs/installation.md` 从受验证 Windows release 通过唯一安装器安装或升级 `srcq`，并分别读回基础能力与 `srcq` 安装状态；任一步骤修改 PATH 后，必须完全退出并重新启动 Codex 桌面宿主，再在新任务中继续发布：
 
 ```powershell
 & (Join-Path (Get-Location).Path 'development\codex-deployment\bootstrap_windows.ps1') -Action Install

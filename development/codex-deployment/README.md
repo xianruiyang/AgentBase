@@ -44,7 +44,7 @@ When the user asks Codex to prepare, reproduce, or deploy AgentBase on a new Win
 & '.\development\codex-deployment\bootstrap_windows.ps1' -Action Install
 ```
 
-The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerShell`, `sharkdp.fd`, `Python.Python.3.13`, and `OpenJS.NodeJS.LTS`, then uses that Node installation to install the exact npm package `@ast-grep/cli@0.44.1`. It changes only missing or unsupported prerequisites and reads back every resolved executable and version plus `fd --max-results` support. Use `-Action Check` for a read-only audit. If PowerShell or another PATH-providing prerequisite was installed, restart the ChatGPT desktop app or begin a new Codex task before continuing so the agent host sees the new commands.
+The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerShell`, `sharkdp.fd`, `Python.Python.3.13`, and `OpenJS.NodeJS.LTS`, then uses that Node installation to install the exact npm package `@ast-grep/cli@0.44.1`. It changes only missing or unsupported prerequisites and reads back every resolved executable and version plus `fd --max-results` support. Use `-Action Check` for a read-only audit. If PowerShell or another PATH-providing prerequisite was installed, fully exit and restart the Codex desktop host before continuing so the new process inherits the persisted PATH. Starting another task inside the same host does not prove that PATH was refreshed.
 
 Before publishing a payload that contains `source-query`, run the independent runtime owner's status entry and require `ready=true`, then run `srcq doctor`. The status command verifies the installed manifest, managed file hashes, binary version and unique PATH entry; `manage_agentbase.ps1` does not copy or repair that external runtime:
 
@@ -53,7 +53,7 @@ Before publishing a payload that contains `source-query`, run the independent ru
 srcq doctor
 ```
 
-When `Install` added PATH in the current task, use the exact `binary` returned by `Status` for the immediate doctor readback, then restart Codex before relying on command-name resolution.
+When `Install` added PATH in the current task, use the exact `binary` returned by `Status` for the immediate doctor readback, then fully exit and restart the Codex desktop host before relying on command-name resolution. A new task in the existing host is not a substitute for that process restart.
 
 ## Validate
 
