@@ -1,10 +1,10 @@
 {
-  "confirmation_ref": "thread:019ff8a4-0a27-7170-a10c-e3ede2267451 objective:complete requirements.md and user-design.md",
+  "confirmation_ref": "thread:019ff8a4-0a27-7170-a10c-e3ede2267451 request:continue complete requirements.md and user-design.md",
   "confirmed_by": "user",
-  "cycle_id": "cycle-001",
+  "cycle_id": "cycle-002",
   "documents": {
     "requirements": {
-      "fingerprint": "sha256:227fd4f049dec1772a4238ace281d7a35030309bec077ab24edc341863356a19",
+      "fingerprint": "sha256:d78ba24cdeb80b45099b50e12d8d87ded4cbdea00121aba0df1e4fe50cefcad8",
       "ids": [
         "AC-SQG-001",
         "AC-SQG-002",
@@ -18,7 +18,7 @@
       "path": "requirements.md"
     },
     "user_design": {
-      "fingerprint": "sha256:c2495469f1f0d204a25c80659b7f6a793211aa4f2473a8f2257cbb11616d4f9a",
+      "fingerprint": "sha256:32dbde16c2e37ddee56fb00d69f4069a1a33a890bf7ae6ca68a94ea9a5c08f97",
       "ids": [
         "UDES-SQG-001",
         "UDES-SQG-002",
@@ -32,7 +32,43 @@
       "path": "user-design.md"
     }
   },
-  "history": [],
+  "history": [
+    {
+      "confirmation_ref": "thread:019ff8a4-0a27-7170-a10c-e3ede2267451 objective:complete requirements.md and user-design.md",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-001",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:227fd4f049dec1772a4238ace281d7a35030309bec077ab24edc341863356a19",
+          "ids": [
+            "AC-SQG-001",
+            "AC-SQG-002",
+            "AC-SQG-003",
+            "AC-SQG-004",
+            "CON-SQG-001",
+            "CON-SQG-002",
+            "CON-SQG-003",
+            "REQ-SQG-001"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:c2495469f1f0d204a25c80659b7f6a793211aa4f2473a8f2257cbb11616d4f9a",
+          "ids": [
+            "UDES-SQG-001",
+            "UDES-SQG-002",
+            "UDES-SQG-003",
+            "UDES-SQG-004",
+            "UDES-SQG-005",
+            "UDES-SQG-006",
+            "UDES-SQG-007",
+            "UDES-SQG-008"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    }
+  ],
   "schema": "delivery.protected-baseline",
   "workflow_id": "source-query-gateway"
 }

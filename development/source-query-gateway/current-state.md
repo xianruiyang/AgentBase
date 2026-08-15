@@ -45,14 +45,18 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 - 状态: verified
 - 关联: DES-SQG-010, AC-SQG-004
 
-现有 `development/code-search-benchmark` 已扩展为本项目唯一的 corpus、环境身份、`codex exec --json --ephemeral` monitor、A-B-B-A 调度、usage 汇总和 detached audit capsule owner。语料绑定来源文件 hash，环境只允许显式差异，失败和超时不被静默替换。历史安装态、收紧候选、五-skill 消融与裸环境数字以各自证据上限登记，不跨 identity 拼接。
+现有 `development/code-search-benchmark` 已扩展为本项目唯一的 corpus、环境身份、`codex exec --json --ephemeral` monitor、A-B-B-A 调度、受影响 case 选择、usage 汇总和 detached audit capsule owner。语料绑定来源文件 hash，并用 `answer_contract.required` 区分 prompt 必答内容与只用于证明正确性的 supporting facts；环境只允许显式差异，失败和超时不被静默替换。capsule 声明可独立复算的规范化哈希算法。历史安装态、收紧候选、五-skill 消融与裸环境数字以各自证据上限登记，不跨 identity 拼接。
 
-## OBS-SQG-006 历史模型结果只保留为方向性输入
+## OBS-SQG-006 当前行为证据已刷新但没有形成收益对照
 
-- 状态: historical
+- 状态: partially_verified
 - 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004
 
-修正前 detached 路由评估覆盖 21 个首次路由、非触发、跨根、关系端点、行数预算、AST、LSP、分页和写入安全场景，21/21 符合当时 oracle；受监控候选运行覆盖六类真实查询各两次，核心语义 12/12、严格语义 12/12、格式与严格整体 11/12，总成本为 input `1,139,430`、output `7,171`、实际总 Token `1,146,601`、耗时 `404,603 ms`。这些数字绑定修正前二进制、skill 与规则身份。
+当前候选的 detached 路由结果 [routing-result-v15.json](evidence/routing-result-v15.json) 覆盖 21 个首次路由、非触发、跨根、关系端点、行数预算、AST、LSP、分页和写入安全场景，21/21 符合独立 oracle。评估 capsule 已把首次选择与按需引用分层，避免把详细协议预加载给 evaluator。
+
+当前轮完整 candidate-only monitor 覆盖六类真实查询各两次；12 次中 11 次有完整 usage，完整 run 的 input 为 `998,139`、output 为 `5,894`、实际总 Token 为 `1,004,033`，全体 wall time 为 `560,744 ms`。`ue-command-dispatch-submit` 的一次运行在已经取得源码证据后遇到 TLS 重连并超时，没有 final answer 与 usage；它保留为真实失败，不能从聚合删除或补跑替换。因此该组数据不是十二次完整总量，也没有 control，不能与历史数字作因果比较。
+
+关系 case 的受影响补测证明模型两次都取得定义、泛型承载字段和响应映射证据。最终保留路由的两次 run 共 `157,053` Token、`64,131 ms`；更强的回答规则变体增至 `170,824` Token、`61,916 ms`，仍未稳定复述 supporting relation，故已退出。独立 oracle 复核确认两次答案均满足原 prompt 的最小合同，把未复述 `mapping.type` 判作核心失败属于越过 prompt；corpus `2026-08-15.2` 已将必答内容与 supporting facts 显式分开。该修正还没有新的同 identity 全量运行。
 
 用户要求冻结且不重跑的五-skill 消融历史记录仍为实际总 Token `1,157,111`、耗时 `508,509 ms`、核心语义 12/12、严格整体 11/12。它缺少当前 experiment 的完整 identity，只能继续作为历史现实依据。由于当前候选的投影、快照、版本和发布身份已改变，旧候选相对该记录的 `0.91%` Token 与 `20.43%` 耗时方向差不能证明当前实现已达收益边缘；TSQG-061—063 已据此重开。
 
@@ -61,7 +65,7 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 - 状态: open
 - 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004
 
-当前定向测试只证明已发现的投影与无用 snapshot 机制得到修正，不证明所有受支持模式、AST 冻结合同、候选 payload、独立路由行为或端到端总 Token 已覆盖当前候选。必须先重建单一版本来源的候选供应链并完成受影响质量验证；真实独立 agent 对照仍按用户前序要求暂缓，未刷新前不得恢复收益边缘、主线采纳或发布完成判断。
+当前后端、AST 冻结、候选 payload、独立路由和 candidate-only 监控均已有直接证据，但 corpus 回答合同刚刚修正，完整运行又有一次 usage 缺失，且用户要求冻结的 control 与当前 Codex、工作区、候选及 corpus identity 不同。继续单独重跑 candidate 不会产生可比较收益结论；只有用户允许一次同 identity 的 control/candidate 对照，或明确接受不形成当前因果收益结论，才能关闭该差距。在此之前不得恢复收益边缘、主线采纳或发布完成判断。
 
 ## GAP-SQG-002 主线迁移仍由用户采纳决定
 

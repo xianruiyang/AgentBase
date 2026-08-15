@@ -1,11 +1,11 @@
 {
-  "blocked_reason": "",
-  "next_action": "",
-  "note": "reopened: 候选实现与 skill 已变化，既有受监控总 Token 结果只能作为历史输入",
-  "owner": null,
+  "blocked_reason": "用户冻结的旧 control 与当前 Codex、工作区、候选、runner 和 corpus identity 不同，且当前 corpus 回答合同已升级；AC-SQG-004 需要用户裁决是否允许一次新同 identity 对照",
+  "next_action": "等待 DCR-SQG-001 裁决：允许一次当前 identity control/candidate 对照，或接受本分支不形成当前因果收益结论",
+  "note": "candidate-only monitor、失败保留、capsule 与独立审计已完成；继续单跑 candidate 不产生可比较收益结论",
+  "owner": "codex-root",
   "result_ref": null,
-  "revision": 4,
+  "revision": 6,
   "schema": "task.state",
-  "status": "todo",
+  "status": "blocked",
   "task_id": "TSQG-062"
 }

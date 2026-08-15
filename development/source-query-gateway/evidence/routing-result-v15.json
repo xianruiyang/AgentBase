@@ -1,0 +1,27 @@
+{
+  "schema": "agentbase.source-query-routing-result/v1",
+  "isolation_statement": "Evaluated only the specified detached capsule; did not access the repository, other capsules or results, conversation history, hidden expectations, or execute case requests.",
+  "cases": [
+    {"id":"sqg-known-file","route":"native_fast","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-known-file-text","route":"native_fast","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-known-definition","route":"native_fast","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-exhaustive-text","route":"sgy_rgfd","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-absence","route":"sgy_rgfd","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-deep-tree","route":"sgy_rgfd","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-query-sgy-terms","route":"sgy_rgfd","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-authoritative-root","route":"sgy_rgfd","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-relation-endpoints","route":"native_fast","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-line-budget","route":"native_fast","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-rg-special","route":"sgy_rgfd","reference":"rg-fd","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-fd-exec","route":"sgy_rgfd","reference":"rg-fd","authorization_required":true,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-ast-call-shape","route":"sgy_ast","reference":"ast","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-containing","route":"sgy_ast","reference":"ast","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-rewrite","route":"sgy_ast","reference":"ast","authorization_required":true,"preview_required":true,"same_snapshot_required":false},
+    {"id":"sqg-overload","route":"lsp","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-exact-refs","route":"lsp","reference":"none","authorization_required":true,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-enough-evidence","route":"no_query","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-nonsource","route":"no_skill","reference":"none","authorization_required":false,"preview_required":false,"same_snapshot_required":false},
+    {"id":"sqg-large-page","route":"sgy_rgfd","reference":"rg-fd","authorization_required":false,"preview_required":false,"same_snapshot_required":true},
+    {"id":"sqg-ast-cache","route":"sgy_ast","reference":"ast","authorization_required":false,"preview_required":false,"same_snapshot_required":true}
+  ]
+}

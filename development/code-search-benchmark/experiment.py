@@ -19,6 +19,8 @@ from typing import Any
 EXPERIMENT_SCHEMA = "agentbase.source-query-experiment/v1"
 RESULT_SCHEMA = "agentbase.source-query-results/v1"
 CAPSULE_SCHEMA = "agentbase.source-query-audit-capsule/v1"
+CORPUS_SCHEMA = "agentbase.source-query-corpus/v1"
+CAPSULE_HASH_SCHEME = "sha256-canonical-json-without-capsule_sha256"
 SECRET_OR_STATE_NAMES = {
     "auth.json", "cap_sid", "installation_id", "history.jsonl", "models_cache.json",
 }
@@ -37,6 +39,11 @@ class ExperimentError(ValueError):
 
 def canonical_bytes(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def capsule_sha256(capsule: dict[str, Any]) -> str:
+    payload = {key: value for key, value in capsule.items() if key != "capsule_sha256"}
+    return sha256_bytes(canonical_bytes(payload))
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -156,8 +163,22 @@ def selected_schedule(case_ids: list[str], repetitions: int, seed: int, environm
     ]
 
 
+def selected_case_ids(corpus: dict[str, Any], requested: Any) -> list[str]:
+    available = [str(case["id"]) for case in corpus["cases"]]
+    if requested is None:
+        return available
+    if not isinstance(requested, list) or not requested or any(not isinstance(case_id, str) or not case_id for case_id in requested):
+        raise ExperimentError("case_ids must be a non-empty list of strings")
+    if len(set(requested)) != len(requested):
+        raise ExperimentError("case_ids contains duplicates")
+    unknown = [case_id for case_id in requested if case_id not in available]
+    if unknown:
+        raise ExperimentError(f"case_ids contains unknown cases: {unknown}")
+    return list(requested)
+
+
 def validate_corpus_snapshot(corpus: dict[str, Any], workspaces: dict[str, dict[str, Any]]) -> None:
-    if corpus.get("schema") != "agentbase.source-query-corpus/v1":
+    if corpus.get("schema") != CORPUS_SCHEMA:
         raise ExperimentError("unsupported corpus schema")
     seen = set()
     for case in corpus.get("cases", []):
@@ -165,6 +186,19 @@ def validate_corpus_snapshot(corpus: dict[str, Any], workspaces: dict[str, dict[
         if not case_id or case_id in seen:
             raise ExperimentError(f"invalid or duplicate corpus case: {case_id!r}")
         seen.add(case_id)
+        contract = case.get("answer_contract")
+        if not isinstance(contract, dict):
+            raise ExperimentError(f"case has no answer_contract: {case_id}")
+        required = contract.get("required")
+        supporting = contract.get("supporting", [])
+        if not isinstance(required, list) or not required or not all(isinstance(item, str) and item for item in required):
+            raise ExperimentError(f"invalid answer_contract.required: {case_id}")
+        if not isinstance(supporting, list) or not all(isinstance(item, str) and item for item in supporting):
+            raise ExperimentError(f"invalid answer_contract.supporting: {case_id}")
+        if len(set(required)) != len(required) or len(set(supporting)) != len(supporting) or set(required) & set(supporting):
+            raise ExperimentError(f"ambiguous answer_contract: {case_id}")
+        if not isinstance(case.get("answer_max_lines"), int) or case["answer_max_lines"] <= 0:
+            raise ExperimentError(f"invalid answer_max_lines: {case_id}")
         role = case.get("workspace_role")
         if role not in workspaces:
             raise ExperimentError(f"corpus role has no workspace: {role!r}")
@@ -224,7 +258,7 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     (output / "environment-diff.json").write_text(json.dumps(diff, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (output / "environment-trees.json").write_text(json.dumps(trees, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
-    case_ids = [case["id"] for case in corpus["cases"]]
+    case_ids = selected_case_ids(corpus, config.get("case_ids"))
     codex = dict(config["codex"])
     codex["observed_version"] = run_capture([codex["executable"], "--version"], Path.cwd()).decode("utf-8", errors="replace").strip()
     tool_versions = {}
@@ -238,6 +272,7 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
         "tool_versions": tool_versions,
         "environments": environments,
         "allowed_differences": config["allowed_differences"],
+        "selected_case_ids": case_ids,
         "environment_diff_sha256": sha256_file(output / "environment-diff.json"),
         "environment_trees_sha256": sha256_file(output / "environment-trees.json"),
         "schedule": selected_schedule(
@@ -389,13 +424,14 @@ def build_capsule(experiment_path: Path) -> dict[str, Any]:
         "schema": CAPSULE_SCHEMA,
         "isolation": "detached-capsule",
         "input_declaration": "auditor may read only this capsule and its designated output path",
+        "capsule_hash_scheme": CAPSULE_HASH_SCHEME,
         "experiment": experiment,
         "corpus": json.loads(corpus_path.read_text(encoding="utf-8")),
         "environment_diff": json.loads((root / "environment-diff.json").read_text(encoding="utf-8")),
         "summary": summary,
         "raw_file_sha256": raw_files,
     }
-    capsule["capsule_sha256"] = sha256_bytes(canonical_bytes(capsule))
+    capsule["capsule_sha256"] = capsule_sha256(capsule)
     (root / "audit-capsule.json").write_text(json.dumps(capsule, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return capsule
 

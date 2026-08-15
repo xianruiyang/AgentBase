@@ -22,7 +22,11 @@
 | 候选 payload | `verify_candidate_payload.py` | 14 个允许文件，当前二进制 hash `fcec9aa2…e230` 一致，无开发资产泄漏 |
 | Windows 安装生命周期 | `tools/sgy/scripts/test-install-sgy.ps1`，0.1.1 → 0.2.0 | 安装、幂等、失败回滚、恶意包/篡改拒绝、升级和卸载全部通过 |
 | 完整短查询按需 snapshot 机制 | 同一 release 查询、25 个唯一 argv、A-B-B-A，本机进程总耗时 | 旧实现 4115.9/3918.1 ms 且每轮落 25 个 snapshot；当前实现 3870.5/3875.3 ms 且 0 snapshot，均值少 144.1 ms（3.59%） |
-| 历史 detached 路由 | `evidence/routing-result-v13.json` | 旧候选 21/21；当前 skill/协议身份变化后只作历史输入 |
+| 当前 detached 路由 | `evidence/routing-result-v15.json` | 当前候选 21/21；首次选择只读取短路由与 skill frontmatter，详细协议按需披露 |
+| benchmark owner 定向回归 | `development/code-search-benchmark/tests/test_experiment.py` | 受影响 case 选择、candidate-only 调度、回答合同、capsule canonical hash、identity 与超时保留通过 |
+| 当前 candidate-only 全量审计 | `evidence/audit-result-v12.json` | 12 次中 11 次 usage 完整，完整 run 合计 1,004,033 Token；1 次 TLS 超时原样保留，无 control |
+| 关系 case 受影响审计 | `evidence/relation-audit-v1.json`、`evidence/relation-audit-v2.json` | 保留规则取得全部源码证据；更强规则增加 Token 而未改善 prompt 必答内容，已退出 |
+| 回答合同适用性审计 | `evidence/oracle-audit-v1.json` | 两次答案均满足 prompt 最小合同；未复述 supporting mapping type 不构成 core fail |
 | 历史隔离模型审计 | `evidence/audit-result-v11.json` | 旧候选核心与严格语义 12/12、格式与严格整体 11/12；不覆盖当前候选 |
 | 历史端到端成本 | `development/code-search-benchmark/experiment.py` monitor | 旧候选实际总 Token 1,146,601、404.603 s；不覆盖当前候选 |
 
@@ -30,8 +34,8 @@
 
 冻结五-skill 历史记录为实际总 Token 1,157,111、508.509 s、核心 12/12、严格整体 11/12；按用户要求未重跑。旧候选曾在同一质量口径下方向性少 10,510 Token、快 103.906 s，但历史记录缺少当前 manifest 的完整环境 identity，且当前二进制、skill 与回执协议已经变化，因此该差额不再支持当前候选完成或收益边缘判断。
 
-旧候选的唯一格式失败是一条九行答案超过八行限制；更低 Token 的中间候选曾降低核心或严格质量，已按质量优先退出。当前实现修正的直接反例、后端矩阵、AST 冻结、skill、payload、release 与安装生命周期已经通过，但 detached 行为与真实 Codex 总 Token 对照尚未刷新；主线消费者迁移、旧 skill 退出和真实 Codex 安装态也未执行。
+旧候选的唯一格式失败是一条九行答案超过八行限制；更低 Token 的中间候选曾降低核心或严格质量，已按质量优先退出。当前实现修正的直接反例、后端矩阵、AST 冻结、skill、payload、release、安装生命周期和 detached 路由已经通过。当前 candidate-only monitor 不能替代受控对照：一次真实超时缺少 usage，且用户冻结的旧 control 与当前 identity 不同；主线消费者迁移、旧 skill 退出和真实 Codex 安装态也未执行。
 
 新的 advisory scan 未运行，因为当前授权环境未安装 `cargo-audit`；候选 release record 已明确记录该限制。
 
-本次没有运行真实独立 agent 路由或总 Token 对照，因用户明确要求先完成实现。直接候选回归证明 summary/files/locations 的总量、页边界和续页身份已修正；A-B-B-A 本机机制测试证明完整默认查询不再建立无消费者 snapshot，并在该固定短查询样本上减少 3.59% 进程总耗时。这些只证明对应机制和局部资源成本，不替代端到端 Token 证据。
+当前轮已经运行真实独立 agent 路由和 candidate-only 总 Token 监控，并通过 detached auditor 复算 capsule、usage 与质量。关系 case 的审计分歧进一步证明结构化 oracle 的 supporting facts 不能自动变成最终答案必答项，corpus `2026-08-15.2` 已显式修正该边界。由于没有当前 identity 的 control，且新 corpus 尚无完整双环境运行，这些证据只证明当前行为、失败路径和测试机制，不证明相对收益。

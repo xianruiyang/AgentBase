@@ -1,6 +1,6 @@
 ---
 name: source-query
-description: 不用于查询 sgy 自身源码、文档或协议内容，也不用于普通文件/正文、全集/不存在证明或按已知名称读取完整实现；这些由全局查询内核完成。仅当当前动作本身必须调用 sgy 高级协议时使用：文本定位后仍不能可靠表达的 AST 结构/范围/控制流、rule/rewrite、cache/process，或 rg/fd 的分页、snapshot、raw、artifact、特殊原生模式与参数诊断。
+description: 仅用于当前动作必须调用 sgy 高级协议时：文本定位后仍不能可靠表达的 AST 结构/范围/控制流、rule/rewrite、cache/process，或 rg/fd 的分页、snapshot、raw、artifact、特殊原生模式与参数诊断。普通文件/正文、全集/不存在证明、已知实现和查询 sgy 术语由全局查询内核完成；它直接调用 sgy 也不触发本 skill。
 ---
 
 # Source Query

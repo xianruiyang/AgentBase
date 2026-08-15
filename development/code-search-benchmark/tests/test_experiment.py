@@ -44,6 +44,27 @@ class ExperimentTests(unittest.TestCase):
         self.assertTrue(all(item["environment"] == "candidate" for item in schedule))
         self.assertEqual([1, 2], [item["ordinal"] for item in schedule if item["case_id"] == "a"])
 
+    def test_selected_case_ids_supports_affected_only_runs(self) -> None:
+        corpus = {"cases": [{"id": "a"}, {"id": "b"}]}
+        self.assertEqual(["a", "b"], MODULE.selected_case_ids(corpus, None))
+        self.assertEqual(["b"], MODULE.selected_case_ids(corpus, ["b"]))
+        with self.assertRaisesRegex(MODULE.ExperimentError, "unknown cases"):
+            MODULE.selected_case_ids(corpus, ["missing"])
+        with self.assertRaisesRegex(MODULE.ExperimentError, "duplicates"):
+            MODULE.selected_case_ids(corpus, ["a", "a"])
+
+    def test_capsule_hash_declares_and_excludes_only_its_own_field(self) -> None:
+        capsule = {
+            "schema": MODULE.CAPSULE_SCHEMA,
+            "capsule_hash_scheme": MODULE.CAPSULE_HASH_SCHEME,
+            "payload": {"answer": 42},
+        }
+        digest = MODULE.capsule_sha256(capsule)
+        capsule["capsule_sha256"] = digest
+        self.assertEqual(digest, MODULE.capsule_sha256(capsule))
+        capsule["payload"]["answer"] = 43
+        self.assertNotEqual(digest, MODULE.capsule_sha256(capsule))
+
     def test_environment_diff_rejects_unlisted_change(self) -> None:
         result = MODULE.environment_diff({"same": "1", "extra": "a"}, {"same": "1", "extra": "b"}, ["skills/**"])
         self.assertFalse(result["ok"])
@@ -58,11 +79,27 @@ class ExperimentTests(unittest.TestCase):
                 "cases": [{
                     "id": "case",
                     "workspace_role": "agentbase",
+                    "answer_max_lines": 1,
+                    "answer_contract": {"required": ["path"], "supporting": []},
                     "oracle": {"kind": "source-relation", "source": {"path": "source.txt", "sha256": "0" * 64}},
                 }],
             }
             with self.assertRaisesRegex(MODULE.ExperimentError, "corpus source is stale"):
                 MODULE.validate_corpus_snapshot(corpus, {"agentbase": {"path": str(root)}})
+
+    def test_corpus_snapshot_requires_unambiguous_answer_contract(self) -> None:
+        corpus = {
+            "schema": MODULE.CORPUS_SCHEMA,
+            "cases": [{
+                "id": "case",
+                "workspace_role": "agentbase",
+                "answer_max_lines": 1,
+                "answer_contract": {"required": ["same"], "supporting": ["same"]},
+                "oracle": {"kind": "source-relation", "sources": []},
+            }],
+        }
+        with self.assertRaisesRegex(MODULE.ExperimentError, "ambiguous answer_contract"):
+            MODULE.validate_corpus_snapshot(corpus, {"agentbase": {"path": str(Path.cwd())}})
 
     def test_monitor_preserves_usage_and_timeout(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

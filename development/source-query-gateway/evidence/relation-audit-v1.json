@@ -1,0 +1,84 @@
+{
+  "schema": "agentbase.source-query-audit-result/v1",
+  "isolation_statement": "candidate-only 受影响补充实验；审计仅读取指定 audit-capsule.json，不能替换先前失败实验，也不能声称 control 因果收益。",
+  "capsule_sha256": {
+    "declared": "4f972b1d05b2da77822f257f0b681960259bb8740d75415b2a988b850ba3279e",
+    "raw_file_sha256": "3af3c667b70503ca344ebd7c821d12c8b9d23373c9d038ce263a49fe1423607a",
+    "matches_raw_file": false,
+    "status": "declared hash is present, but does not equal the capsule file SHA-256; no canonical self-hash rule is present in the capsule"
+  },
+  "experiment_identity": {
+    "capsule": "aa42c5f38e2d46dfa623c8c256e4ce09eabadd3c6cfab210b13b31bd4989ad63",
+    "summary": "aa42c5f38e2d46dfa623c8c256e4ce09eabadd3c6cfab210b13b31bd4989ad63",
+    "records_all_match": true,
+    "schedule_all_match": true
+  },
+  "integrity": {
+    "schema": true,
+    "isolation": true,
+    "corpus_binding_present": true,
+    "environment_diff_ok": true,
+    "postflight_failures_empty": true,
+    "schedule_record_bijection": true,
+    "run_ids_unique": true,
+    "ordinals_unique_and_complete": true,
+    "exit_and_timeout_ok": true,
+    "invalid_json_empty": true,
+    "usage_complete": true,
+    "usage_total_identity": true,
+    "reasoning_le_output_identity": true,
+    "raw_file_hash_entries_complete": true,
+    "capsule_hash_identity": false,
+    "overall": false
+  },
+  "aggregate": {
+    "runs": 2,
+    "unique_complete_runs": 2,
+    "input_tokens": 156019,
+    "cached_input_tokens": 99328,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 1034,
+    "reasoning_output_tokens": 497,
+    "total_tokens": 157053,
+    "elapsed_ms": 64131,
+    "tool_items": 4,
+    "failed_runs": 0,
+    "total_identity": "156019 + 1034 = 157053",
+    "reasoning_identity": "497 <= 1034"
+  },
+  "case_results": [
+    {
+      "case_id": "agentbase-provider-observation",
+      "environment": "candidate",
+      "runs": [
+        {
+          "run_id": "agentbase-provider-observation__candidate__1",
+          "ordinal": 1,
+          "raw": true,
+          "core": true,
+          "strict": true,
+          "format": true,
+          "judgment": "all pass",
+          "basis": "答案给出唯一 ProviderObservation 定义 dto.ts:310、Collection<T>.provider dto.ts:307、document_symbols: Collection<DocumentSymbol> dto.ts:694，且三行均在四行上限内。"
+        },
+        {
+          "run_id": "agentbase-provider-observation__candidate__2",
+          "ordinal": 2,
+          "raw": true,
+          "core": true,
+          "strict": false,
+          "format": true,
+          "judgment": "core content passes; strict relation completeness fails",
+          "basis": "答案给出三处正确路径/行号和 provider 字段，但未明确写出其 owner 为 Collection<T>，也未完整陈述 document_symbols 返回 Collection<DocumentSymbol> 的 provider 暴露关系；四行上限与相对路径格式满足。"
+        }
+      ],
+      "run_level": {"raw_pass": 2, "core_pass": 2, "strict_pass": 1, "format_pass": 2},
+      "case_judgment": "candidate 补充实验在核心事实上 2/2，通过严格关系表达 1/2。"
+    }
+  ],
+  "limitations": [
+    "这是 candidate-only 的受影响补充实验，仅有 agentbase-provider-observation 两次 candidate run；没有 control 对照，不能推断因果收益。",
+    "审计未读取仓库、其他 capsule/result、对话历史、候选设计讨论或隐藏期望，也未补跑 case。",
+    "capsule 未声明 capsule_sha256 的自哈希规范；因此只能报告声明值与原始文件 SHA-256 不一致，不能据此恢复未知规范下的有效自哈希。"
+  ]
+}

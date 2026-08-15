@@ -17,7 +17,7 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 
 ## 3. 版本化测试内容
 
-既有测试形成以下六个种子 case，原始 prompt 和历史 oracle 已去除机器绝对路径后固化在 [benchmark-corpus-seed.json](benchmark-corpus-seed.json)。正式 corpus 为每个 case 保存 prompt、工作区角色、答案长度、结构化事实关系 oracle 和适用源码快照；源码事实变化时创建新 corpus 版本，不改写旧结果。
+既有测试形成以下六个种子 case，原始 prompt 和历史 oracle 已去除机器绝对路径后固化在 [benchmark-corpus-seed.json](benchmark-corpus-seed.json)。正式 corpus 为每个 case 保存 prompt、工作区角色、答案长度、最小回答合同、结构化事实关系 oracle 和适用源码快照；源码事实或回答合同变化时创建新 corpus 版本，不改写旧结果。
 
 | Case ID | 工作区角色 | 查找目标 | 质量重点 |
 | --- | --- | --- | --- |
@@ -30,7 +30,7 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 
 这六项覆盖文件、文本、结构和语义关系，短答案与完整范围，单目标与全集，以及小型/大型项目。正式扩展优先补充 0/1/N/N+1、同文件多目标、重载/嵌套、工具失败回退和 LSP 快/慢/空/失败，不为增加数量复制等价任务。
 
-历史 runner 的正则 `required` 只作为旧结果的原始 oracle，不进入新正式 corpus。新 oracle 以结构化事实和关系表达，例如“字段属于哪一 DTO”“哪些行是定义、哪些是调用”；语言同义表达由 auditor 裁决，避免把 `[start,end)` 误判为不满足 `end-exclusive`。
+历史 runner 的正则 `required` 只作为旧结果的原始 oracle，不进入新正式 corpus。新 oracle 以结构化事实和关系表达，例如“字段属于哪一 DTO”“哪些行是定义、哪些是调用”；`answer_contract.required` 单独定义 prompt 必须显式回答的最小内容，`supporting` 只证明正确性或记录更强表达，不得被 auditor 静默升级为必答字段。语言同义表达由 auditor 裁决，避免把 `[start,end)` 误判为不满足 `end-exclusive`。
 
 ## 4. Experiment Identity
 
@@ -53,7 +53,7 @@ control 与 candidate 除允许差异外必须逐项相等。环境构建不得�
 3. 按预先记录的平衡顺序运行。两环境、每项两次时使用 A-B-B-A；更多重复使用预生成的平衡随机区块，不能查看中间结果后改变次数或顺序。
 4. monitor 启动一个无历史 subject，持续读取事件流并保存原始 JSONL、stderr、退出状态和 wall time。超时、事件损坏或进程异常作为该次真实失败保留；不得用静默重试替换记录。
 5. monitor 从最后一个 `turn.completed.usage` 记录 input、cached input、output、reasoning output，并保存完整工具调用顺序、失败和最终答案。它不判断质量。
-6. 全部 subject 结束后生成 detached audit capsule，只包含冻结 manifest、corpus/oracle、环境差异证明、原始文件 hash、规范化记录和答案，不包含凭据、候选讨论或既有结论。
+6. 全部 subject 结束后生成 detached audit capsule，只包含冻结 manifest、corpus/oracle、环境差异证明、原始文件 hash、规范化记录和答案，不包含凭据、候选讨论或既有结论；capsule 同时声明可独立复算的规范化哈希算法及排除字段。
 7. auditor 先核对缺项、重复、配对、事件/summary 一致性和计量恒等式，再按结构化语义 oracle 逐案裁决质量；oracle 缺陷与答案缺陷分别记录。
 8. 汇总器只纳入身份有效、记录完整的 run，依次比较质量、总 Token 和 wall time；报告总计、配对差、按 case 分布、失败/回退和适用统计范围，不用总均值掩盖异质性。
 
@@ -63,7 +63,7 @@ control 与 candidate 除允许差异外必须逐项相等。环境构建不得�
 - cached input 是 input 子集，reasoning output 是 output 子集，均单列但不重复相加。
 - wall time 从 subject 进程启动到退出，包含工具、失败、回退和外部服务等待。
 - 工具调用数、失败调用、MCP 调用、stdout/stderr 大小只解释机制，不替代总 Token。
-- raw oracle、严格语义和核心语义分开报告；发布裁决使用预先确认的严格语义合同。
+- raw oracle、回答合同、核心语义和额外观察分开报告；发布裁决只使用预先确认且不超过 prompt 的 `answer_contract.required`，支持事实未在答案复述不得回写为核心失败。
 - 质量任一适用 case 退化时先修正或判失败；质量同等时才比较 Token，Token 不变差时才比较速度。
 - 样本不足、环境告警、网络漂移或配对方差较大时降低因果与泛化结论，不临时追加有利样本。
 

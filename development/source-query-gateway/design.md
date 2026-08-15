@@ -139,4 +139,4 @@ benchmark owner、语料、测试代码、fixtures、原始事件和审计结果
 
 ## 6. 设计完成判定
 
-设计完成仍要求 rg/fd 全部公开模式有持久分类，各视图按自身语义单元给出正确总量、分页与完整性，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项未退化，并由当前候选身份下的独立路由与隔离模型证据按 `AC-SQG-001`、`AC-SQG-002`、`AC-SQG-003` 顺序证明达到收益边缘。当前已完成新反例的实现修正、当前供应链重建和受影响直接验证；独立行为与端到端收益证据仍需刷新，因此不得进入 `validated_pending_user_adoption`。消费者迁移、旧同责入口退出、总体项目接入与 Codex 发布仍必须等待用户明确采纳和当次发布授权。
+设计完成仍要求 rg/fd 全部公开模式有持久分类，各视图按自身语义单元给出正确总量、分页与完整性，fd tree 可逆，AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断和发布合同逐项未退化，并由当前候选身份下的独立路由与隔离模型证据按 `AC-SQG-001`、`AC-SQG-002`、`AC-SQG-003` 顺序证明达到收益边缘。当前已完成实现反例修正、供应链重建、独立路由和 candidate-only 影响验证，并修正了 benchmark 回答合同与 capsule 哈希；同 identity control/candidate 收益证据仍受用户冻结 control 的既有决定约束，因此不得进入 `validated_pending_user_adoption`。消费者迁移、旧同责入口退出、总体项目接入与 Codex 发布仍必须等待用户明确采纳和当次发布授权。

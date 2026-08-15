@@ -1,0 +1,65 @@
+{
+  "schema": "agentbase.source-query-oracle-audit/v1",
+  "isolation_statement": "仅审计指定 detached candidate-only capsule；未读取仓库、其他 capsule/result、对话或隐藏期望，未比较 control，未执行 case。",
+  "experiment_identity": "3a97098d1eaa00d54eab276154de50a08cb0310da004061e6cb1901cc6d6c0e9",
+  "case_id": "agentbase-provider-observation",
+  "prompt_contract": {
+    "required": [
+      "定位 ProviderObservation interface 的唯一定义",
+      "返回相对文件路径",
+      "返回 1-based 定义行号",
+      "指出 document_symbols 成功响应通过的 DTO 泛型字段名",
+      "答案不超过四行"
+    ],
+    "minimum_sufficient_answer": "相对路径 + ProviderObservation 定义行 310 + Collection<T>.provider 字段（及其行 307；可选引用 document_symbols mapping 行 694），不要求复述 mapping.type 或完整 owner/type 链。",
+    "explicitly_required_mapping_type": false
+  },
+  "oracle_analysis": {
+    "correctness_facts": [
+      "ProviderObservation 唯一定义在 dto.ts:310",
+      "Collection<T> 的 provider 字段在 dto.ts:307，类型为 ProviderObservation",
+      "ToolOutputDataMap.document_symbols 映射在 dto.ts:694，类型为 Collection<DocumentSymbol>",
+      "关系：document_symbols 返回 Collection<DocumentSymbol>，其 provider 字段暴露 ProviderObservation"
+    ],
+    "must_be_explicitly_repeated": [
+      "ProviderObservation 定义的路径与行号",
+      "暴露 ProviderObservation 的字段名 provider"
+    ],
+    "supporting_oracle_facts_not_required_in_final": [
+      "mapping.owner=ToolOutputDataMap",
+      "mapping.type=Collection<DocumentSymbol>",
+      "mapping 行号 694（可作为增强定位，但非 prompt 最小必答项）"
+    ]
+  },
+  "answer_assessments": [
+    {
+      "run_id": "agentbase-provider-observation__candidate__1",
+      "usable_evidence": true,
+      "tool_evidence_scope": "工具输出直接显示 dto.ts:307 Collection<T>.provider?: ProviderObservation、:310 interface 定义、:694 ToolOutputDataMap.document_symbols: Collection<DocumentSymbol>",
+      "answer": "`mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts:310` — `ProviderObservation` 唯一定义  \n`mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts:307` — `Collection<T>` 泛型字段：`provider`（`document_symbols` 映射见 `:694`）",
+      "answers_question": true,
+      "core_semantic_pass": true,
+      "strong_complete_relation_pass": false,
+      "reason": "满足 prompt 的最小合同：路径、ProviderObservation 定义行 310、Collection<T> 的 provider 字段及行 307；引用 :694 足以定位 mapping，但未在最终答案展开 mapping owner/type，因此不判为更强的完整关系表达。"
+    },
+    {
+      "run_id": "agentbase-provider-observation__candidate__2",
+      "usable_evidence": true,
+      "tool_evidence_scope": "工具输出直接显示 dto.ts:307 Collection<T>.provider?: ProviderObservation、:310 interface 定义、:694 ToolOutputDataMap.document_symbols: Collection<DocumentSymbol>",
+      "answer": "`mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts:310` — `ProviderObservation` 唯一定义。  \n`mcp/vscode-lsp-mcp/packages/protocol/src/dto.ts:307` — DTO 泛型 `Collection<T>` 的字段 `provider`（`document_symbols` 映射见 `:694`）。",
+      "answers_question": true,
+      "core_semantic_pass": true,
+      "strong_complete_relation_pass": false,
+      "reason": "满足 prompt 的最小合同：路径、ProviderObservation 定义行 310、Collection<T> 的 provider 字段及行 307；引用 :694 足以定位 mapping，但未在最终答案展开 mapping owner/type，因此不判为更强的完整关系表达。"
+    }
+  ],
+  "controversy": {
+    "prior_mapping_type_core_fail_is_overreach": true,
+    "conclusion": "若仅因 final_answer 未复述 mapping.type=Collection<DocumentSymbol> 就判 core fail，属于 oracle 过度外推。mapping.type 是支持关系的 oracle 事实和更强完整表达要求，不是 prompt 明确要求的最小输出字段；两次答案均有充分工具证据并回答了核心问题。",
+    "strict_interpretation": "若另设 stronger-complete-relation 维度，可将两次答案均判为未完整展开 ToolOutputDataMap.document_symbols -> Collection<DocumentSymbol> -> provider -> ProviderObservation，但这不应回写为 core fail。"
+  },
+  "limitations": [
+    "该裁决仅覆盖 capsule 内 provider-observation 案例；不推断 control、总体收益或其他案例。",
+    "未对仓库当前状态作独立复核，工具证据的适用范围限于 capsule 绑定的运行记录。"
+  ]
+}

@@ -1,11 +1,11 @@
 {
   "blocked_reason": "",
   "next_action": "",
-  "note": "reopened: 候选 skill 与回执协议在 detached 评估后变化，既有行为证据不覆盖当前身份",
-  "owner": null,
-  "result_ref": null,
-  "revision": 5,
+  "note": "reopened: 最终 detached 结果已更新为 routing-result-v15，且受保护 AC-SQG-002 已在 cycle-002 明确化",
+  "owner": "codex-root",
+  "result_ref": "results/TSQG-061.r10.json",
+  "revision": 10,
   "schema": "task.state",
-  "status": "todo",
+  "status": "done",
   "task_id": "TSQG-061"
 }
