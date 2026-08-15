@@ -1,11 +1,11 @@
 {
   "blocked_reason": "",
   "next_action": "",
-  "note": "",
-  "owner": "codex-root",
-  "result_ref": "results/TSQG-062.r3.json",
-  "revision": 3,
+  "note": "reopened: 候选实现与 skill 已变化，既有受监控总 Token 结果只能作为历史输入",
+  "owner": null,
+  "result_ref": null,
+  "revision": 4,
   "schema": "task.state",
-  "status": "done",
+  "status": "todo",
   "task_id": "TSQG-062"
 }

@@ -1,10 +1,10 @@
 {
   "blocked_reason": "",
   "next_action": "",
-  "note": "",
+  "note": "reopened: 补全本轮实际读取的传递 source_snapshot，并移除结果中的非路径通配符后重新记录",
   "owner": "codex-root",
-  "result_ref": "results/TSQG-060.r4.json",
-  "revision": 4,
+  "result_ref": "results/TSQG-060.r12.json",
+  "revision": 12,
   "schema": "task.state",
   "status": "done",
   "task_id": "TSQG-060"

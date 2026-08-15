@@ -676,7 +676,7 @@ dependencies = [
 
 [[package]]
 name = "sgy-cli"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "clap",
  "saphyr-parser",
@@ -689,7 +689,7 @@ dependencies = [
 
 [[package]]
 name = "sgy-contract-tests"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "proptest",
  "serde_json",
@@ -700,7 +700,7 @@ dependencies = [
 
 [[package]]
 name = "sgy-core"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "atomic-write-file",
  "command-group",
@@ -718,7 +718,7 @@ dependencies = [
 
 [[package]]
 name = "sgy-integration-tests"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "serde_json",
  "sgy-cli",
@@ -729,7 +729,7 @@ dependencies = [
 
 [[package]]
 name = "sgy-protocol-tests"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "portable-pty",
  "serde_json",
@@ -741,7 +741,7 @@ dependencies = [
 
 [[package]]
 name = "sgy-release"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "serde_json",
  "sha2",
@@ -749,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "sgy-stress-tests"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "serde_json",
  "sgy-core",

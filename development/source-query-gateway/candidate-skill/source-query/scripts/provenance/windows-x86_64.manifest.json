@@ -6,9 +6,9 @@
   "archive": "sgy-0.2.0-x86_64-pc-windows-msvc.zip",
   "binary": "sgy.exe",
   "source": {
-    "revision": "sha256:6ef03651a39719bbcecf41a9148807d901149a7cd16646af216daf7b9a2fd4a0",
+    "revision": "sha256:c15f6f9c7035e744848033523b4e5f9f21e89e460a9a62efa28df2de95abbbb0",
     "sourceDateEpoch": 0,
-    "cargoLockSha256": "092420ea7d0bda015fe0f012e9cbcb70ee6469213e4b240be7d5968aba653c5f"
+    "cargoLockSha256": "45eb3176fd0a03ce1b95fdab6439c25a972a402b3ce64addfdbb0809fc7ef56f"
   },
   "build": {
     "rustc": "rustc 1.85.0 (4d91de4e4 2025-02-17)",
@@ -24,21 +24,51 @@
       "0.44.1"
     ]
   },
+  "nativeEngineCompatibility": {
+    "astGrep": {
+      "executable": "ast-grep",
+      "bundled": false,
+      "verified": [
+        "0.41.1",
+        "0.42.0",
+        "0.44.1"
+      ]
+    },
+    "ripgrep": {
+      "executable": "rg.exe",
+      "bundled": false,
+      "verified": [
+        "15.1.0"
+      ]
+    },
+    "fd": {
+      "executable": "fd.exe",
+      "bundled": false,
+      "verified": [
+        "10.4.2"
+      ]
+    }
+  },
   "runtime": {
     "requiredExecutable": "ast-grep",
+    "requiredExecutables": [
+      "ast-grep",
+      "rg.exe",
+      "fd.exe"
+    ],
     "node": false,
     "python": false
   },
   "files": [
     {
       "path": "sgy.exe",
-      "bytes": 2269696,
-      "sha256": "7292af3101a75d7b6c71ce4fc3adf3753c186b0a95a2fc1a1de95cf2989bb21d"
+      "bytes": 2273280,
+      "sha256": "d88ff187626cecd8d3772678d3db3fd3ab27bfb085c0b158e3b100965c40e5cf"
     },
     {
       "path": "README.md",
-      "bytes": 4648,
-      "sha256": "07e68cd88c9b50536630ecfcfc519b26398d49422ca1bcef962daeb8ac22e059"
+      "bytes": 4785,
+      "sha256": "8bf9c14f88ed6128f982d6e02e9090fa1b7b3f99fe38ca68531e8dee2a8c7b9c"
     },
     {
       "path": "LICENSE",
@@ -68,7 +98,7 @@
     {
       "path": "sbom.spdx.json",
       "bytes": 29210,
-      "sha256": "5206001d82044ac176b47f9c4d22e7f484e9bf3e5c2821e0a3564fc53671a787"
+      "sha256": "90a3baf03221b4b99fc7e79bbfda3d5e4fa060330743be2ef05679df7f034cbe"
     }
   ]
 }

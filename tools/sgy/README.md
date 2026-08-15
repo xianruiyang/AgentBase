@@ -8,7 +8,7 @@ ast-grep 原生输出 → 可选完整缓存 → YAML profile → 模型上下�
 
 ## 当前状态
 
-- 当前版本：`sgy 0.1.2`。
+- 当前版本：`sgy 0.2.0`。
 - 当前固定验证引擎：`ast-grep 0.42.0`。
 - 精确验证的 ast-grep 版本：`0.41.1`、`0.42.0`、`0.44.1`；不外推为连续版本范围。
 - rg/fd 候选命令域精确验证 `ripgrep 15.1.0` 与 `fd 10.4.2`；29 个公开主模式均有持久分类，版本不匹配时执行入口局部拒绝，`doctor` 给出读回。
@@ -59,7 +59,7 @@ sgy rg defaults --view grouped -- -n -F 'needle' .
 sgy fd doctor
 ```
 
-普通 rg 搜索和 fd 路径结果先完整进入有界快照，再投影或分页。默认 v2 回执只固定返回总量与结果、展示、正文三类完整性；非零退出和分页字段只在发生时出现，backend、引擎版本、mode、view、字节数等诊断保留在内部快照，显式 `--receipt full` 才进入模型可见结果。分页响应中的 `query_snapshot` 与 `next_cursor` 必须原样用于下一页；backend、cwd、原生 argv、引擎版本、snapshot 或实际 view 不匹配时拒绝续页。二进制/NUL 模式要求 `--artifact-out`，fd exec/batch 直接透传，help、统计和其他显式文本报告默认有界。详见 [rg/fd 查询网关](docs/query-gateway.md)。
+普通 rg 搜索和 fd 路径结果先完整有界捕获，再按所选 view 的证据单元投影：文件按去重文件、位置按真实匹配、正文按匹配与上下文、摘要按完整集合。默认 v2 回执固定返回总量与结果、展示、正文三类完整性；非零退出和分页字段只在发生时出现，显式 `--receipt full` 才返回 backend、引擎版本、mode、view 和字节数等诊断。只有分页或 full 回执需要身份时才持久化快照；分页响应中的 `query_snapshot` 与 `next_cursor` 必须原样用于下一页，backend、cwd、原生 argv、引擎版本、snapshot 或实际 view 不匹配时拒绝续页。二进制/NUL 模式要求 `--artifact-out`，fd exec/batch 直接透传，help、统计和其他显式文本报告默认有界。详见 [rg/fd 查询网关](docs/query-gateway.md)。
 
 ## Profile
 

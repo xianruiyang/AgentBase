@@ -1,11 +1,11 @@
 {
   "blocked_reason": "",
   "next_action": "",
-  "note": "",
-  "owner": "codex-root",
-  "result_ref": "results/TSQG-063.r3.json",
-  "revision": 3,
+  "note": "reopened: 收益裁决依赖的候选身份与完成证据已失效",
+  "owner": null,
+  "result_ref": null,
+  "revision": 4,
   "schema": "task.state",
-  "status": "done",
+  "status": "todo",
   "task_id": "TSQG-063"
 }

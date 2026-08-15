@@ -6,26 +6,26 @@
 
 | 状态 | 数量 |
 | --- | ---: |
-| todo | 1 |
+| todo | 4 |
 | claimed | 0 |
 | in_progress | 0 |
 | review | 0 |
 | blocked | 0 |
-| done | 29 |
+| done | 26 |
 | retired | 0 |
 
 ## 复核与结果
 
 - 需复核任务：0
-- 当前可读取结果：29
-- 含验证结果：29
-- 含未决结果：1
+- 当前可读取结果：26
+- 含验证结果：26
+- 含未决结果：4
 - 合同修订后陈旧结果：0
 
 ## 上游状态
 
 - 用户确认快照：protected
-- 可修订上游未决：1
+- 可修订上游未决：2
 - 延后讨论项：0
 
 ## 任务
@@ -47,18 +47,18 @@
 | TSQG-022 | done | codex-root | 覆盖 fd 公开模式 | TSQG-002:hard, TSQG-020:hard | results/TSQG-022.r4.json | 1 |
 | TSQG-023 | done | codex-root | 验证 fd 自适应表示 | TSQG-005:hard, TSQG-021:hard | results/TSQG-023.r4.json | 1 |
 | TSQG-030 | done | codex-root | 实现 rg 命令闭环 | TSQG-002:hard, TSQG-011:hard, TSQG-012:hard | results/TSQG-030.r4.json | 1 |
-| TSQG-031 | done | codex-root | 实现 rg 自适应结果表示 | TSQG-005:hard, TSQG-030:hard | results/TSQG-031.r4.json | 1 |
+| TSQG-031 | done | codex-root | 实现 rg 自适应结果表示 | TSQG-005:hard, TSQG-030:hard | results/TSQG-031.r12.json | 1 |
 | TSQG-032 | done | codex-root | 覆盖 rg 公开模式 | TSQG-002:hard, TSQG-030:hard | results/TSQG-032.r4.json | 1 |
 | TSQG-033 | done | codex-root | 消除候选对 Python rg 回执的依赖 | TSQG-030:hard, TSQG-032:hard | results/TSQG-033.r4.json | 1 |
 | TSQG-040 | done | codex-root | 复核 AST 公开入口 | TSQG-011:hard, TSQG-023:hard, TSQG-032:hard | results/TSQG-040.r4.json | 1 |
 | TSQG-041 | done | codex-root | 裁决 AST 公共原语复用 | TSQG-040:hard | results/TSQG-041.r4.json | 1 |
-| TSQG-042 | done | codex-root | 完成三后端诊断与来源 | TSQG-022:hard, TSQG-032:hard, TSQG-041:hard | results/TSQG-042.r4.json | 1 |
+| TSQG-042 | done | codex-root | 完成三后端诊断与来源 | TSQG-022:hard, TSQG-032:hard, TSQG-041:hard | results/TSQG-042.r12.json | 1 |
 | TSQG-050 | done | codex-root | 建立统一查询候选 skill | TSQG-023:hard, TSQG-033:hard, TSQG-042:hard | results/TSQG-050.r4.json | 1 |
 | TSQG-051 | done | codex-root | 迁入 AST skill 语义 | TSQG-050:hard | results/TSQG-051.r4.json | 1 |
 | TSQG-052 | done | codex-root | 准备消费者原子迁移 | TSQG-050:hard, TSQG-051:hard | results/TSQG-052.r4.json | 1 |
-| TSQG-053 | done | codex-root | 形成候选供应链 payload | TSQG-052:hard | results/TSQG-053.r4.json | 1 |
-| TSQG-060 | done | codex-root | 运行候选影响验证 | TSQG-053:hard | results/TSQG-060.r4.json | 1 |
-| TSQG-061 | done | codex-root | 运行 detached 路由行为评估 | TSQG-050:hard, TSQG-052:hard | results/TSQG-061.r4.json | 1 |
-| TSQG-062 | done | codex-root | 运行受监控 Codex 对照 | TSQG-006:hard, TSQG-060:hard, TSQG-061:hard | results/TSQG-062.r3.json | 1 |
-| TSQG-063 | done | codex-root | 裁决候选收益边缘 | TSQG-062:hard | results/TSQG-063.r3.json | 1 |
+| TSQG-053 | done | codex-root | 形成候选供应链 payload | TSQG-052:hard | results/TSQG-053.r16.json | 1 |
+| TSQG-060 | done | codex-root | 运行候选影响验证 | TSQG-053:hard | results/TSQG-060.r12.json | 1 |
+| TSQG-061 | todo | — | 运行 detached 路由行为评估 | TSQG-050:hard, TSQG-052:hard | — | 1 |
+| TSQG-062 | todo | — | 运行受监控 Codex 对照 | TSQG-006:hard, TSQG-060:hard, TSQG-061:hard | — | 1 |
+| TSQG-063 | todo | — | 裁决候选收益边缘 | TSQG-062:hard | — | 1 |
 | TSQG-064 | todo | — | 请求主线采纳与发布裁决 | TSQG-063:hard | — | 1 |

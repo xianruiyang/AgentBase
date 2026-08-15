@@ -15,7 +15,7 @@ rg/fd 的结构化查询结果使用单行紧凑 JSON；JSON 同时是可由现�
 
 ## 处理类别
 
-- 普通 rg 搜索追加原生 `--json --color=never`，保留 path、match/context、行、绝对偏移、submatch 和正文；`grouped` 只压缩重复路径。
+- 普通 rg 搜索追加原生 `--json --color=never`，保留 path、match/context、行、绝对偏移、submatch 和正文；`grouped` 只压缩重复路径。投影先形成所选 view 的证据单元再分页：files 按去重匹配文件，locations 按匹配位置，grouped/records 按 match/context 记录，summary 对完整集合聚合且不产生续页。
 - rg 文件列表和 fd 普通路径追加 NUL 输出，完整解析后选择 flat/tree 或 files；fd tree 为每个显式根建立稳定别名，逐段可逆转义，保留类型、内部目录结果、重复计数和无法归根的 flat 项。
 - count、JSON、vimgrep 使用各自机器或稳定结构；`lossless` 保留完整原生 JSON 事件，其他 view 只投影声明的证据。显式 view 不适用于当前模式时局部拒绝，不静默换 view。
 - help/version/list-details/format/hyperlink/replace/passthru/pre/stats/quiet 等文本模式返回有界行；`--view raw` 或 `--artifact-out` 请求完整原生 stdout，stderr 在显式原生通道中保持，否则只转发有界诊断。
@@ -24,7 +24,7 @@ rg/fd 的结构化查询结果使用单行紧凑 JSON；JSON 同时是可由现�
 
 ## 完整性与快照
 
-结构化执行对 stdout 设置 256 MiB、stderr 设置 16 MiB 的硬捕获上限；超过上限会终止整个原生进程组并返回 wrapper 错误。成功捕获保存为最多 32 份本机快照。默认 `auto` 使用 `sgy.query.result/v2`：`result_total` 与 `complete.result|display|content` 始终显式返回，非零 `native_exit` 只在发生时返回，`displayed`、`omitted`、`query_snapshot` 和 `next_cursor` 只在当前页未展示完时返回。backend、mode、引擎版本、实际 view、offset、字节数及完整快照身份仍由内部持有；只有诊断或机器消费者显式指定 `--receipt full` 时，才返回原 `sgy.query.result/v1` 全量回执。rg 无匹配继续返回原生 exit 1 和完整空集合，原生错误不能伪装成完整空结果。有界文本同样默认使用 v2 稀疏回执，完整模式保留 v1 字段；raw、artifact 与 passthrough 保持各自原生或清单合同。
+结构化执行对 stdout 设置 256 MiB、stderr 设置 16 MiB 的硬捕获上限；超过上限会终止整个原生进程组并返回 wrapper 错误。成功捕获先保留在当前进程内；只有需要续页或显式 `--receipt full` 时才计算快照身份并持久化，最多保存 32 份。默认 `auto` 使用 `sgy.query.result/v2`：`result_total` 与 `complete.result|display|content` 始终显式返回，非零 `native_exit` 只在发生时返回，`displayed`、`omitted`、`query_snapshot` 和 `next_cursor` 只在当前 view 确有未展示证据时返回。backend、mode、引擎版本、实际 view、offset 和字节数由内部对象持有；只有诊断或机器消费者显式指定 `--receipt full` 时，才返回原 `sgy.query.result/v1` 全量回执并建立可读快照。rg 无匹配继续返回原生 exit 1 和完整空集合，原生错误不能伪装成完整空结果。有界文本同样默认使用 v2 稀疏回执，完整模式保留 v1 字段；raw、artifact 与 passthrough 保持各自原生或清单合同。
 
 首个不完整页返回 `query_snapshot` 与 `next_cursor`。续页必须再次提供相同原生 argv、cwd、backend 和引擎，并传入：
 

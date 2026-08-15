@@ -1,0 +1,55 @@
+{
+  "changed_files": [
+    "tools/sgy/crates/sgy-cli/src/query_gateway.rs",
+    "tools/sgy/crates/sgy-cli/tests/query_gateway_real.rs",
+    "tools/sgy/tools/sgy-release/src/main.rs",
+    "development/source-query-gateway/verification.md"
+  ],
+  "evidence_for": [
+    "AC-SQG-001",
+    "UDES-SQG-005"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "verification-summary",
+      "ref": "development/source-query-gateway/verification.md"
+    },
+    {
+      "kind": "current-state",
+      "ref": "development/source-query-gateway/current-state.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "当前候选的直接受影响行为、后端矩阵、AST 冻结合同、release、skill、payload 与安装生命周期通过；独立模型行为和总成本仍未刷新。",
+  "outputs": [
+    "sgy-cli 29 单元与 15 真实集成通过",
+    "29 个 backend 模式与 7 个原生 oracle 通过",
+    "AST 0.1.2 基线对当前 0.2.0 候选仅允许版本差并通过",
+    "release、skill、payload 与安装生命周期通过"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:edefa68fe1e105b5bcb1d32724315d480083f4fad7a27b129787b8ca2cdc2224",
+    "AC-SQG-002": "sha256:9431f26723ac18686507f57487f1c8ad3991aa0c2e37fe44a1bc9bc62d48ce9f",
+    "AC-SQG-003": "sha256:dd62ea72b87d1869e8ed85483f7c071873844544c058c11969c24788e76617cc",
+    "AC-SQG-004": "sha256:c6b2799ece418f7f7ee4e37ab22e15a9a8cb724731def5b0853335f00aa542b1",
+    "CON-SQG-001": "sha256:e224215fe1492c484306b35827babb9f11e1efd0915b35feabd3cee660081eb3",
+    "CON-SQG-002": "sha256:fd5ad79f19a584827b89c9b831166884608e15a6a5e1e1415c051bb38a8fea68",
+    "CON-SQG-003": "sha256:56b350a9ceb81ce73d6d6376f9bd1ac81785ac08e374219f6ba36e0ddb956ef0",
+    "REQ-SQG-001": "sha256:3be96a1ab34b2f80f823730a8a8c941e20578a6bec36b12fe87346f502ce869b",
+    "UDES-SQG-005": "sha256:1d80a6ccb980074fd1e40303dfb48ad3398948c18acfe68b1aa9e7f3c5deade9"
+  },
+  "task_id": "TSQG-060",
+  "task_revision": 1,
+  "unresolved": [
+    "TSQG-061 detached 行为证据尚未刷新",
+    "TSQG-062 当前候选总 Token 对照按用户前序要求暂缓",
+    "未运行新的 cargo-audit advisory scan"
+  ],
+  "verification": [
+    "cargo fmt、sgy-cli/sgy-release clippy -D warnings 通过",
+    "backend-contract verify_candidate --check-contract 通过",
+    "ast-baseline compare_ast_baseline --expected-version 0.2.0 通过",
+    "quick_validate、verify_candidate_payload 与 test-install-sgy 通过"
+  ]
+}

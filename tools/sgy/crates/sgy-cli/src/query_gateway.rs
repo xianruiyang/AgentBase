@@ -84,6 +84,15 @@ struct Snapshot {
     fd_types: BTreeMap<String, String>,
 }
 
+#[derive(Debug)]
+struct Projection {
+    value: Value,
+    displayed: usize,
+    total: usize,
+    view: String,
+    display_complete: bool,
+}
+
 pub fn execute(command: &GatewayCommand) -> i32 {
     match execute_inner(command) {
         Ok(code) => code,
@@ -335,7 +344,8 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
     let version = version.lines().next().unwrap_or("unknown").to_owned();
     let query_fingerprint =
         query_fingerprint(command.backend, engine, cwd, &command.native_argv, &version);
-    let snapshot = if let Some(id) = command.snapshot.as_deref() {
+    let fresh_snapshot = command.snapshot.is_none();
+    let mut snapshot = if let Some(id) = command.snapshot.as_deref() {
         let loaded = load_snapshot(id)?;
         if loaded.query_fingerprint != query_fingerprint {
             return Err(GatewayError::input(
@@ -353,7 +363,7 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
         let effective = effective_argv(&command.native_argv, &injected);
         let captured = run_native(engine, cwd, effective)?;
         write_native_stderr(&captured.stderr, false, command.max_text_chars)?;
-        store_snapshot(
+        create_snapshot(
             command.backend,
             cwd,
             &command.native_argv,
@@ -368,7 +378,7 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
     if let Some(view) = cursor_view {
         rendering.view = view;
     }
-    let (value, displayed, total, chosen_view) = match command.backend {
+    let projection = match command.backend {
         GatewayBackend::Fd => render_fd(&rendering, cwd, &snapshot, offset)?,
         GatewayBackend::Rg
             if matches!(
@@ -386,15 +396,20 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
         }
         GatewayBackend::Rg => render_rg(&rendering, &snapshot, offset)?,
     };
-    let end = offset.saturating_add(displayed);
-    let next = (end < total).then(|| make_cursor(&snapshot.id, &chosen_view, end));
-    let mut root = value.as_object().cloned().unwrap_or_default();
+    let end = offset.saturating_add(projection.displayed);
+    let has_next = !projection.display_complete && end < projection.total;
+    if fresh_snapshot && (has_next || command.receipt == "full") {
+        ensure_snapshot_id(&mut snapshot)?;
+        persist_snapshot(&snapshot)?;
+    }
+    let next = has_next.then(|| make_cursor(&snapshot.id, &projection.view, end));
+    let mut root = projection.value.as_object().cloned().unwrap_or_default();
     let result_complete = match command.backend {
         GatewayBackend::Rg => matches!(snapshot.native_exit, 0 | 1),
         GatewayBackend::Fd => snapshot.native_exit == 0,
     };
     let content_complete = match command.backend {
-        GatewayBackend::Fd => chosen_view != "summary",
+        GatewayBackend::Fd => projection.view != "summary" || projection.total == 0,
         GatewayBackend::Rg
             if matches!(
                 mode.id,
@@ -405,19 +420,19 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
                     | "RG-COUNT-MATCHES"
             ) =>
         {
-            chosen_view != "summary"
+            projection.view != "summary" || projection.total == 0
         }
         GatewayBackend::Rg if mode.id == "RG-VIMGREP" => root
             .get("text_complete")
             .and_then(Value::as_bool)
-            .unwrap_or(chosen_view == "lossless"),
-        GatewayBackend::Rg => match chosen_view.as_str() {
+            .unwrap_or(projection.view == "lossless"),
+        GatewayBackend::Rg => match projection.view.as_str() {
             "lossless" => true,
             "grouped" | "records" => root
                 .get("text_complete")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
-            _ => false,
+            _ => projection.total == 0,
         },
     };
     root.insert(
@@ -426,12 +441,13 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
             command,
             mode,
             &snapshot,
-            &chosen_view,
-            total,
-            displayed,
+            &projection.view,
+            projection.total,
+            projection.displayed,
             offset,
             next.as_deref(),
             result_complete,
+            projection.display_complete,
             content_complete,
         ),
     );
@@ -450,10 +466,10 @@ fn structured_receipt(
     offset: usize,
     next_cursor: Option<&str>,
     result_complete: bool,
+    display_complete: bool,
     content_complete: bool,
 ) -> Value {
     let end = offset.saturating_add(displayed);
-    let display_complete = end >= total;
     if command.receipt == "full" {
         return json!({
             "schema":"sgy.query.result/v1","backend":backend_name(command.backend),"mode":mode.id,
@@ -1067,7 +1083,7 @@ fn snapshot_id(
     Ok(format!("{:x}", hasher.finalize())[..32].to_owned())
 }
 
-fn store_snapshot(
+fn create_snapshot(
     backend: GatewayBackend,
     cwd: &Path,
     native_argv: &[OsString],
@@ -1087,16 +1103,40 @@ fn store_snapshot(
     } else {
         BTreeMap::new()
     };
-    let id = snapshot_id(
-        &query_fingerprint,
-        &engine_version,
-        captured.native_exit,
-        &captured.stdout,
-        &captured.stderr,
-        &fd_types,
-    )?;
+    Ok(Snapshot {
+        id: String::new(),
+        query_fingerprint,
+        engine_version,
+        native_exit: captured.native_exit,
+        stdout: captured.stdout,
+        stderr: captured.stderr,
+        fd_types,
+    })
+}
+
+fn ensure_snapshot_id(snapshot: &mut Snapshot) -> Result<(), GatewayError> {
+    if snapshot.id.is_empty() {
+        snapshot.id = snapshot_id(
+            &snapshot.query_fingerprint,
+            &snapshot.engine_version,
+            snapshot.native_exit,
+            &snapshot.stdout,
+            &snapshot.stderr,
+            &snapshot.fd_types,
+        )?;
+    }
+    Ok(())
+}
+
+fn persist_snapshot(snapshot: &Snapshot) -> Result<(), GatewayError> {
+    if snapshot.id.is_empty() {
+        return Err(GatewayError::input(
+            "query snapshot identity was not finalized before persistence",
+        ));
+    }
     let root = spool_root()?;
-    let directory = root.join(&id);
+    let id = &snapshot.id;
+    let directory = root.join(id);
     if !directory.exists() {
         let nonce = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -1105,12 +1145,12 @@ fn store_snapshot(
         let staging = root.join(format!(".{id}.{}.{nonce}", std::process::id()));
         fs::create_dir(&staging)
             .map_err(|error| GatewayError::io("cannot stage query snapshot", error))?;
-        let metadata = json!({"schema":"sgy.query.snapshot/v1","id":id,"query_fingerprint":query_fingerprint,"engine_version":engine_version,"native_exit":captured.native_exit,"stdout_sha256":sha256_hex(&captured.stdout),"stderr_sha256":sha256_hex(&captured.stderr),"fd_types":&fd_types});
+        let metadata = json!({"schema":"sgy.query.snapshot/v1","id":id,"query_fingerprint":snapshot.query_fingerprint,"engine_version":snapshot.engine_version,"native_exit":snapshot.native_exit,"stdout_sha256":sha256_hex(&snapshot.stdout),"stderr_sha256":sha256_hex(&snapshot.stderr),"fd_types":&snapshot.fd_types});
         let metadata_bytes = serde_json::to_vec(&metadata).map_err(|error| {
             GatewayError::input(format!("cannot serialize query snapshot metadata: {error}"))
         })?;
-        fs::write(staging.join("stdout.bin"), &captured.stdout)
-            .and_then(|()| fs::write(staging.join("stderr.bin"), &captured.stderr))
+        fs::write(staging.join("stdout.bin"), &snapshot.stdout)
+            .and_then(|()| fs::write(staging.join("stderr.bin"), &snapshot.stderr))
             .and_then(|()| fs::write(staging.join("meta.json"), metadata_bytes))
             .map_err(|error| GatewayError::io("cannot write query snapshot", error))?;
         match fs::rename(&staging, &directory) {
@@ -1125,15 +1165,7 @@ fn store_snapshot(
         }
         prune_spool(&root)?;
     }
-    Ok(Snapshot {
-        id,
-        query_fingerprint,
-        engine_version,
-        native_exit: captured.native_exit,
-        stdout: captured.stdout,
-        stderr: captured.stderr,
-        fd_types,
-    })
+    Ok(())
 }
 
 fn prune_spool(root: &Path) -> Result<(), GatewayError> {
@@ -1316,8 +1348,20 @@ fn render_fd(
     cwd: &Path,
     snapshot: &Snapshot,
     offset: usize,
-) -> Result<(Value, usize, usize, String), GatewayError> {
+) -> Result<Projection, GatewayError> {
     let paths = parse_nul_paths(&snapshot.stdout)?;
+    if command.view == "summary" {
+        if offset != 0 {
+            return Err(GatewayError::input("summary view does not accept a cursor"));
+        }
+        return Ok(Projection {
+            value: json!({"summary":{"paths":paths.len()}}),
+            displayed: paths.len(),
+            total: paths.len(),
+            view: "summary".to_owned(),
+            display_complete: true,
+        });
+    }
     if offset > paths.len() {
         return Err(GatewayError::input(
             "cursor offset exceeds the snapshot result set",
@@ -1342,15 +1386,19 @@ fn render_fd(
         "lossless" => "lossless",
         "flat" => "flat",
         "tree" => "tree",
-        "summary" => "summary",
         other => other,
     };
     let value = match chosen {
         "tree" => tree,
-        "summary" => json!({"summary":{"paths":paths.len()}}),
         _ => flat,
     };
-    Ok((value, page.len(), paths.len(), chosen.to_owned()))
+    Ok(Projection {
+        value,
+        displayed: page.len(),
+        total: paths.len(),
+        view: chosen.to_owned(),
+        display_complete: end >= paths.len(),
+    })
 }
 
 fn parse_nul_paths(bytes: &[u8]) -> Result<Vec<String>, GatewayError> {
@@ -1710,8 +1758,20 @@ fn render_rg_files(
     command: &GatewayCommand,
     snapshot: &Snapshot,
     offset: usize,
-) -> Result<(Value, usize, usize, String), GatewayError> {
+) -> Result<Projection, GatewayError> {
     let files = parse_nul_paths(&snapshot.stdout)?;
+    if command.view == "summary" {
+        if offset != 0 {
+            return Err(GatewayError::input("summary view does not accept a cursor"));
+        }
+        return Ok(Projection {
+            value: json!({"summary":{"files":files.len()}}),
+            displayed: files.len(),
+            total: files.len(),
+            view: "summary".to_owned(),
+            display_complete: true,
+        });
+    }
     if offset > files.len() {
         return Err(GatewayError::input(
             "cursor offset exceeds the snapshot result set",
@@ -1719,24 +1779,25 @@ fn render_rg_files(
     }
     let end = files.len().min(offset.saturating_add(command.limit));
     let page = &files[offset..end];
-    let chosen = match command.view.as_str() {
-        "summary" => "summary",
-        "lossless" => "lossless",
-        _ => "files",
-    };
-    let value = if chosen == "summary" {
-        json!({"summary":{"files":files.len()}})
+    let chosen = if command.view == "lossless" {
+        "lossless"
     } else {
-        json!({"files":page})
+        "files"
     };
-    Ok((value, page.len(), files.len(), chosen.to_owned()))
+    Ok(Projection {
+        value: json!({"files":page}),
+        displayed: page.len(),
+        total: files.len(),
+        view: chosen.to_owned(),
+        display_complete: end >= files.len(),
+    })
 }
 
 fn render_rg_counts(
     command: &GatewayCommand,
     snapshot: &Snapshot,
     offset: usize,
-) -> Result<(Value, usize, usize, String), GatewayError> {
+) -> Result<Projection, GatewayError> {
     let text = std::str::from_utf8(&snapshot.stdout)
         .map_err(|_| GatewayError::input("rg count output was not UTF-8; use --artifact-out"))?;
     let mut records = Vec::new();
@@ -1753,6 +1814,18 @@ fn render_rg_counts(
         let path = parts.next();
         records.push(json!({"path":path,"count":count,"native":line}));
     }
+    if command.view == "summary" {
+        if offset != 0 {
+            return Err(GatewayError::input("summary view does not accept a cursor"));
+        }
+        return Ok(Projection {
+            value: json!({"summary":{"records":records.len(),"sum":records.iter().filter_map(|record| record["count"].as_u64()).sum::<u64>()}}),
+            displayed: records.len(),
+            total: records.len(),
+            view: "summary".to_owned(),
+            display_complete: true,
+        });
+    }
     if offset > records.len() {
         return Err(GatewayError::input(
             "cursor offset exceeds the snapshot result set",
@@ -1760,24 +1833,25 @@ fn render_rg_counts(
     }
     let end = records.len().min(offset.saturating_add(command.limit));
     let page = &records[offset..end];
-    let chosen = match command.view.as_str() {
-        "summary" => "summary",
-        "lossless" => "lossless",
-        _ => "counts",
-    };
-    let value = if chosen == "summary" {
-        json!({"summary":{"records":records.len(),"sum":records.iter().filter_map(|record| record["count"].as_u64()).sum::<u64>()}})
+    let chosen = if command.view == "lossless" {
+        "lossless"
     } else {
-        json!({"counts":page})
+        "counts"
     };
-    Ok((value, page.len(), records.len(), chosen.to_owned()))
+    Ok(Projection {
+        value: json!({"counts":page}),
+        displayed: page.len(),
+        total: records.len(),
+        view: chosen.to_owned(),
+        display_complete: end >= records.len(),
+    })
 }
 
 fn render_rg_vimgrep(
     command: &GatewayCommand,
     snapshot: &Snapshot,
     offset: usize,
-) -> Result<(Value, usize, usize, String), GatewayError> {
+) -> Result<Projection, GatewayError> {
     let text = std::str::from_utf8(&snapshot.stdout)
         .map_err(|_| GatewayError::input("rg vimgrep output was not UTF-8; use --artifact-out"))?;
     let mut records = Vec::new();
@@ -1790,6 +1864,18 @@ fn render_rg_vimgrep(
         let lossless = command.view == "lossless";
         records.push(json!({"path":path.replace('\\', "/"),"line":line_number,"column":column,"text":if lossless { body.to_owned() } else { truncate_chars(body, command.max_text_chars) },"text_complete":lossless || body.chars().count() <= command.max_text_chars}));
     }
+    if command.view == "summary" {
+        if offset != 0 {
+            return Err(GatewayError::input("summary view does not accept a cursor"));
+        }
+        return Ok(Projection {
+            value: json!({"summary":{"matches":records.len()},"text_complete":false}),
+            displayed: records.len(),
+            total: records.len(),
+            view: "summary".to_owned(),
+            display_complete: true,
+        });
+    }
     if offset > records.len() {
         return Err(GatewayError::input(
             "cursor offset exceeds the snapshot result set",
@@ -1797,22 +1883,26 @@ fn render_rg_vimgrep(
     }
     let end = records.len().min(offset.saturating_add(command.limit));
     let page = &records[offset..end];
-    let chosen = match command.view.as_str() {
-        "summary" => "summary",
-        "lossless" => "lossless",
-        _ => "locations",
+    let chosen = if command.view == "lossless" {
+        "lossless"
+    } else {
+        "locations"
     };
     let text_complete = records
         .iter()
         .all(|record| record["text_complete"].as_bool() == Some(true));
-    let value = if chosen == "summary" {
-        json!({"summary":{"matches":records.len()},"text_complete":false})
-    } else if chosen == "lossless" {
+    let value = if chosen == "lossless" {
         json!({"records":page,"text_complete":text_complete})
     } else {
         json!({"locations":page,"text_complete":text_complete})
     };
-    Ok((value, page.len(), records.len(), chosen.to_owned()))
+    Ok(Projection {
+        value,
+        displayed: page.len(),
+        total: records.len(),
+        view: chosen.to_owned(),
+        display_complete: end >= records.len(),
+    })
 }
 
 fn split_vimgrep(line: &str) -> Option<(&str, u64, u64, &str)> {
@@ -1915,7 +2005,7 @@ fn render_rg(
     command: &GatewayCommand,
     snapshot: &Snapshot,
     offset: usize,
-) -> Result<(Value, usize, usize, String), GatewayError> {
+) -> Result<Projection, GatewayError> {
     if command.view == "lossless" {
         let events = parse_rg_all_events(&snapshot.stdout)?;
         if offset > events.len() {
@@ -1924,14 +2014,77 @@ fn render_rg(
             ));
         }
         let end = events.len().min(offset.saturating_add(command.limit));
-        return Ok((
-            json!({"events":&events[offset..end]}),
-            end - offset,
-            events.len(),
-            "lossless".to_owned(),
-        ));
+        return Ok(Projection {
+            value: json!({"events":&events[offset..end]}),
+            displayed: end - offset,
+            total: events.len(),
+            view: "lossless".to_owned(),
+            display_complete: end >= events.len(),
+        });
     }
     let events = parse_rg_records(&snapshot.stdout)?;
+
+    if command.view == "summary" {
+        if offset != 0 {
+            return Err(GatewayError::input("summary view does not accept a cursor"));
+        }
+        let matches = events
+            .iter()
+            .filter(|event| event["type"] == "match")
+            .count();
+        return Ok(Projection {
+            value: json!({"summary":{"events":events.len(),"matches":matches,"files":events.iter().filter(|event| event["type"] == "match").filter_map(|event| event["path"].as_str()).collect::<BTreeSet<_>>().len()}}),
+            displayed: matches,
+            total: matches,
+            view: "summary".to_owned(),
+            display_complete: true,
+        });
+    }
+
+    if command.view == "files" {
+        let files = events
+            .iter()
+            .filter(|event| event["type"] == "match")
+            .filter_map(|event| event["path"].as_str())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        if offset > files.len() {
+            return Err(GatewayError::input(
+                "cursor offset exceeds the snapshot result set",
+            ));
+        }
+        let end = files.len().min(offset.saturating_add(command.limit));
+        return Ok(Projection {
+            value: json!({"files":&files[offset..end]}),
+            displayed: end - offset,
+            total: files.len(),
+            view: "files".to_owned(),
+            display_complete: end >= files.len(),
+        });
+    }
+
+    if command.view == "locations" {
+        let locations = events
+            .iter()
+            .filter(|event| event["type"] == "match")
+            .map(|event| json!({"path":event["path"],"line":event["line_number"],"absolute_offset":event["absolute_offset"],"submatches":event["submatches"]}))
+            .collect::<Vec<_>>();
+        if offset > locations.len() {
+            return Err(GatewayError::input(
+                "cursor offset exceeds the snapshot result set",
+            ));
+        }
+        let end = locations.len().min(offset.saturating_add(command.limit));
+        return Ok(Projection {
+            value: json!({"locations":&locations[offset..end]}),
+            displayed: end - offset,
+            total: locations.len(),
+            view: "locations".to_owned(),
+            display_complete: end >= locations.len(),
+        });
+    }
+
     if offset > events.len() {
         return Err(GatewayError::input(
             "cursor offset exceeds the snapshot result set",
@@ -1949,9 +2102,6 @@ fn render_rg(
                 "records"
             }
         }
-        "locations" => "locations",
-        "files" => "files",
-        "summary" => "summary",
         "grouped" => "grouped",
         "records" => "records",
         other => other,
@@ -1959,22 +2109,15 @@ fn render_rg(
     let value = match chosen {
         "grouped" => grouped,
         "records" => records,
-        "locations" => {
-            json!({"locations":page.iter().filter(|event| event["type"] == "match").map(|event| json!({"path":event["path"],"line":event["line_number"],"absolute_offset":event["absolute_offset"],"submatches":event["submatches"]})).collect::<Vec<_>>() })
-        }
-        "files" => {
-            let files = page
-                .iter()
-                .filter_map(|event| event["path"].as_str())
-                .collect::<BTreeSet<_>>();
-            json!({"files":files})
-        }
-        "summary" => {
-            json!({"summary":{"events":events.len(),"matches":events.iter().filter(|event| event["type"] == "match").count(),"files":events.iter().filter_map(|event| event["path"].as_str()).collect::<BTreeSet<_>>().len()}})
-        }
         _ => grouped,
     };
-    Ok((value, page.len(), events.len(), chosen.to_owned()))
+    Ok(Projection {
+        value,
+        displayed: page.len(),
+        total: events.len(),
+        view: chosen.to_owned(),
+        display_complete: end >= events.len(),
+    })
 }
 
 fn parse_rg_all_events(bytes: &[u8]) -> Result<Vec<Value>, GatewayError> {

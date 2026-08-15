@@ -1,10 +1,10 @@
 {
   "blocked_reason": "",
   "next_action": "",
-  "note": "",
+  "note": "reopened: summary 完整回执覆盖计数修正后候选二进制与供应链身份再次变化",
   "owner": "codex-root",
-  "result_ref": "results/TSQG-053.r4.json",
-  "revision": 4,
+  "result_ref": "results/TSQG-053.r16.json",
+  "revision": 16,
   "schema": "task.state",
   "status": "done",
   "task_id": "TSQG-053"

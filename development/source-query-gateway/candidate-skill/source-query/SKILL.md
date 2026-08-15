@@ -21,7 +21,7 @@ description: 不用于查询 sgy 自身源码、文档或协议内容，也不�
 
 `exec` 已校验后端精确版本；只在它报告引擎或版本异常时运行 `sgy <rg|fd> doctor`。不要把 `doctor`、`defaults` 或 help 作为查询前置步骤。wrapper help 是 `sgy <rg|fd> exec --help`，原生 help 是 `sgy <rg|fd> exec -- --help`。
 
-普通查询保持默认预算；只有 `_sgy.complete.content=false` 且缺失正文会改变结论时才提高 `--max-text-chars`，只有 `_sgy.complete.display=false` 时才续页。以 `-` 开头的 rg pattern 使用原生 `-e VALUE`，不要用原生 `--` 终止后再追加选项。rg/fd wrapper 选项不适用于 AST 的 `sgy exec`。
+普通查询保持默认预算；summary/files/locations 本来不含正文，需要正文时改用 grouped/records，不对这些 view 放大预算或续读摘要。只有正文 view 因截断而 `complete.content=false` 且缺失内容会改变结论时才提高 `--max-text-chars`，只有 `complete.display=false` 时才续页。以 `-` 开头的 rg pattern 使用原生 `-e VALUE`，不要用原生 `--` 终止后再追加选项。rg/fd wrapper 选项不适用于 AST 的 `sgy exec`。
 
 ## 结果边界
 

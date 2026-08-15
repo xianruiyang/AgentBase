@@ -1,0 +1,54 @@
+{
+  "changed_files": [
+    "development/source-query-gateway/candidate-skill/source-query/references/rg-fd.md",
+    "development/source-query-gateway/candidate-skill/source-query/scripts/runtime-manifest.yml",
+    "development/source-query-gateway/candidate-skill/source-query/scripts/provenance/release-record.json",
+    "development/source-query-gateway/candidate-skill/source-query/scripts/provenance/windows-x86_64.manifest.json"
+  ],
+  "evidence_for": [
+    "CON-SQG-003",
+    "DES-SQG-009"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "release-record",
+      "ref": "development/source-query-gateway/candidate-skill/source-query/scripts/provenance/release-record.json"
+    },
+    {
+      "kind": "payload-verifier",
+      "ref": "development/source-query-gateway/verify_candidate_payload.py"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "当前 Windows 候选 payload 已按新源码重建，来源、哈希、许可证和开发资产排除重新一致。",
+  "outputs": [
+    "sgy.exe sha256 d88ff187626cecd8d3772678d3db3fd3ab27bfb085c0b158e3b100965c40e5cf",
+    "release archive sha256 e443626a77f1b88b1196299970b040842ddbce366fb44cb53c6e3b3c54a0ae72",
+    "source revision sha256:c15f6f9c7035e744848033523b4e5f9f21e89e460a9a62efa28df2de95abbbb0",
+    "payload 14 个允许文件且不含测试或 benchmark 资产"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:edefa68fe1e105b5bcb1d32724315d480083f4fad7a27b129787b8ca2cdc2224",
+    "AC-SQG-002": "sha256:9431f26723ac18686507f57487f1c8ad3991aa0c2e37fe44a1bc9bc62d48ce9f",
+    "AC-SQG-003": "sha256:dd62ea72b87d1869e8ed85483f7c071873844544c058c11969c24788e76617cc",
+    "AC-SQG-004": "sha256:c6b2799ece418f7f7ee4e37ab22e15a9a8cb724731def5b0853335f00aa542b1",
+    "CON-SQG-001": "sha256:e224215fe1492c484306b35827babb9f11e1efd0915b35feabd3cee660081eb3",
+    "CON-SQG-002": "sha256:fd5ad79f19a584827b89c9b831166884608e15a6a5e1e1415c051bb38a8fea68",
+    "CON-SQG-003": "sha256:56b350a9ceb81ce73d6d6376f9bd1ac81785ac08e374219f6ba36e0ddb956ef0",
+    "DES-SQG-009": "sha256:7660649948c30aee0e683156d13a7e075d22ef017705f20553abb0c48dc1e092",
+    "REQ-SQG-001": "sha256:3be96a1ab34b2f80f823730a8a8c941e20578a6bec36b12fe87346f502ce869b",
+    "UDES-SQG-002": "sha256:384b2cf66ae1e2de765d43e0ec6259f0ec0277d4d604827f2d8ea6c992159a8d",
+    "UDES-SQG-005": "sha256:1d80a6ccb980074fd1e40303dfb48ad3398948c18acfe68b1aa9e7f3c5deade9"
+  },
+  "task_id": "TSQG-053",
+  "task_revision": 1,
+  "unresolved": [
+    "未运行新的 cargo-audit advisory scan"
+  ],
+  "verification": [
+    "verify_candidate_payload.py 通过：14 files",
+    "skill-creator quick_validate 通过",
+    "Windows 安装、幂等、回滚、恶意包与篡改拒绝、升级和卸载生命周期通过"
+  ]
+}

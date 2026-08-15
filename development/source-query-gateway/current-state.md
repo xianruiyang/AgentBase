@@ -2,7 +2,7 @@
 
 ## 1. 文档职责
 
-本文件记录相对 [requirements.md](requirements.md)、[user-design.md](user-design.md) 和 [design.md](design.md) 的当前直接观察、已经闭环的实现边界与剩余差距。观察对象是当前 AgentBase 分支工作树；总体项目、正式 skill 与 Codex 安装态仍未采纳本分支。
+本文件记录相对 [requirements.md](requirements.md)、[user-design.md](user-design.md) 和 [design.md](design.md) 的当前直接观察、已经闭环的实现边界与剩余差距。观察对象是当前 AgentBase 分支工作树；总体项目、正式 skill 与 Codex 安装态仍未采纳本分支。历史测试只按其冻结候选身份保留，不自动覆盖后续源码、skill 或 payload。
 
 ## OBS-SQG-001 sgy 已承载三个并列命令域
 
@@ -13,12 +13,14 @@
 
 29 个 ripgrep 15.1.0 与 fd 10.4.2 公开模式样本均有唯一分类，7 个 raw/artifact oracle 已逐字回放。`defaults` 只解释参数和模式，不发现或启动引擎。
 
-## OBS-SQG-002 查询结果具有有界快照和可验证完整性
+## OBS-SQG-002 查询结果按所选证据单元投影并按需持久化快照
 
 - 状态: verified
 - 关联: DES-SQG-004, DES-SQG-005, DES-SQG-006, DES-SQG-007
 
-rg/fd 结构化结果分别表达原生退出、结果/正文/显示完整性、总量、展示量、快照和精确游标。默认 v2 模型回执固定显式返回总量与三类完整性，只在非零退出或分页时增加必要字段；backend、引擎版本、mode、view、offset 和字节数继续由内部 snapshot 持有，显式 `--receipt full` 才返回完整 v1 诊断回执。查询先有界捕获到不可变 snapshot，再从同一身份投影；游标绑定 query、snapshot、实际 view 与 offset，未知或混用游标被局部拒绝。进程 stdout/stderr 有独立上限，超限时终止进程组；snapshot 数量与文件完整性也有上限和 hash 校验。
+直接反例曾证明旧实现先按 rg 原始 match/context 事件分页、再投影 files/locations/summary：`summary --limit 1` 为已经完整的摘要生成无意义续页；files 把匹配事件数当作文件数；带 context 的 locations 第一页可为空却声称已展示一项。当前实现改为先形成视图自己的证据单元，再计算总量与分页；summary 是终止视图，files 按去重后的匹配文件分页，locations 只按匹配位置分页。相应真实集成回归已覆盖普通 rg、fd、native files、count 和 vimgrep。
+
+默认 v2 回执仍固定显式返回总量与结果、显示、正文三类完整性，只在非零退出或真正需要分页时增加必要字段；backend、引擎版本、mode、view、offset 和字节数由内部对象持有，显式 `--receipt full` 才返回完整 v1 诊断回执。完整默认结果不再计算或持久化无消费者的 snapshot；只有续页或 full 回执需要身份时才计算 hash、原子持久化并返回精确 cursor。进程与持久 snapshot 的既有上限、hash 和混用拒绝仍保留。
 
 fd 会冻结对象类型并为每个显式根建立可逆 trie；只有估算 Token 确实低于 flat 时 auto 才选 tree。rg 普通 batch 消费原生 JSON 事件，grouped、records、locations、files、summary 与 lossless 均在相同证据签名内选择；count、vimgrep 和特殊模式使用独立严格解析或透传。
 
@@ -29,14 +31,14 @@ fd 会冻结对象类型并为每个显式根建立可逆 trie；只有估算 To
 
 P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilities 已对 `0.2.0` 候选逐字复核，唯一允许差异是 release version 字段。完整 sgy workspace 测试已运行一次且通过；P0 的 ast-grep 0.41.1、0.42.0、0.44.1 真实矩阵共 30 项通过。公共改动只复用了进程输出上限，没有迁移 AST serializer、cache、profile、fingerprint、process 或 rewrite 合同。
 
-## OBS-SQG-004 候选 skill 与发布 payload 已形成
+## OBS-SQG-004 候选 skill 与当前 payload 已重建
 
 - 状态: verified
 - 关联: DES-SQG-008, DES-SQG-009, CON-SQG-003
 
-分支内 `candidate-skill/source-query` 用一个精炼主文件按“原生快路径 → rg/fd 网关 → AST → LSP”升级，详细 rg/fd 与 AST 协议按需读取。skill 静态校验通过。候选 payload 共 14 个文件，只含规则、引用、Windows 二进制、runtime/release 来源和许可证；自动检查确认不含 test、fixture、benchmark、runner、corpus、result 或 audit 资产。
+分支内 `candidate-skill/source-query` 用一个精炼主文件按“原生快路径 → rg/fd 网关 → AST → LSP”升级，详细 rg/fd 与 AST 协议按需读取。skill 的静态结构此前通过验证，测试资产排除合同不变。
 
-候选二进制 SHA-256 为 `7292af3101a75d7b6c71ce4fc3adf3753c186b0a95a2fc1a1de95cf2989bb21d`，发布 archive SHA-256 为 `286a8659f1570d570392300c883892b6c792240ae082356b3548e422addfd949`。当前增量验证覆盖 sgy-cli 29 项单元、12 项真实 rg/fd 集成、29 个 backend 模式与 7 个原生 oracle，AST 冻结公开合同无差异；稀疏回执改动后未重跑完整 workspace、安装生命周期或独立 agent 对照。宿主没有 `cargo-audit`，因此本候选只记录既有审计继承依据与限制，不声称完成新的 advisory scan。
+当前 Windows release、来源记录、SBOM、manifest 与 candidate payload 已从同一 `0.2.0` workspace 版本重建：二进制 SHA-256 为 `fcec9aa20b0ccaf27729451399d5ca46e962be21830438af210aea95a314e230`，archive SHA-256 为 `0d75a224c62e7b9861a8806743a2423ab5cdcbc3e431c119a0e32001dbcc6733`，source revision 为 `sha256:3722e37b103a4428c2b6cc9ad656664893c5c694f1a18fb5ad3a79ebedb0c910`。payload 校验确认 14 个运行文件且没有测试、fixture、benchmark、runner、corpus、result 或 audit 资产；AST 冻结差异和 Windows 安装生命周期通过。宿主没有 `cargo-audit`，因此仍只能记录既有审计继承依据与限制，不声称完成新的 advisory scan。
 
 ## OBS-SQG-005 benchmark owner 已具备隔离运行合同
 
@@ -45,14 +47,21 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 现有 `development/code-search-benchmark` 已扩展为本项目唯一的 corpus、环境身份、`codex exec --json --ephemeral` monitor、A-B-B-A 调度、usage 汇总和 detached audit capsule owner。语料绑定来源文件 hash，环境只允许显式差异，失败和超时不被静默替换。历史安装态、收紧候选、五-skill 消融与裸环境数字以各自证据上限登记，不跨 identity 拼接。
 
-## OBS-SQG-006 模型行为已收敛到当前收益边缘
+## OBS-SQG-006 历史模型结果只保留为方向性输入
 
-- 状态: verified
+- 状态: historical
 - 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004
 
-最终 detached 路由评估覆盖 21 个首次路由、非触发、跨根、关系端点、行数预算、AST、LSP、分页和写入安全场景，21/21 符合 oracle。最终受监控候选运行覆盖六类真实查询各两次：独立审计确认核心语义 12/12、严格语义 12/12、格式 11/12、严格整体 11/12；总成本为 input `1,139,430`、cached input `843,776`、output `7,171`、reasoning output `2,953`、实际总 Token `1,146,601`、耗时 `404,603 ms`、31 次工具调用且无失败。
+修正前 detached 路由评估覆盖 21 个首次路由、非触发、跨根、关系端点、行数预算、AST、LSP、分页和写入安全场景，21/21 符合当时 oracle；受监控候选运行覆盖六类真实查询各两次，核心语义 12/12、严格语义 12/12、格式与严格整体 11/12，总成本为 input `1,139,430`、output `7,171`、实际总 Token `1,146,601`、耗时 `404,603 ms`。这些数字绑定修正前二进制、skill 与规则身份。
 
-用户要求冻结且不重跑的五-skill 消融历史记录为实际总 Token `1,157,111`、耗时 `508,509 ms`、核心语义 12/12、严格整体 11/12。最终候选在相同质量口径下方向性降低 `10,510` Token（`0.91%`）并减少 `103,906 ms`（`20.43%`）。历史记录缺少当前 experiment 的完整 identity，故该差额只支持当前授权证据边界内的保留裁决，不声称严格因果 A/B；候选迭代中更低成本但质量退化的版本已按质量优先退出。
+用户要求冻结且不重跑的五-skill 消融历史记录仍为实际总 Token `1,157,111`、耗时 `508,509 ms`、核心语义 12/12、严格整体 11/12。它缺少当前 experiment 的完整 identity，只能继续作为历史现实依据。由于当前候选的投影、快照、版本和发布身份已改变，旧候选相对该记录的 `0.91%` Token 与 `20.43%` 耗时方向差不能证明当前实现已达收益边缘；TSQG-061—063 已据此重开。
+
+## GAP-SQG-003 当前候选缺少身份一致的完成证据
+
+- 状态: open
+- 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004
+
+当前定向测试只证明已发现的投影与无用 snapshot 机制得到修正，不证明所有受支持模式、AST 冻结合同、候选 payload、独立路由行为或端到端总 Token 已覆盖当前候选。必须先重建单一版本来源的候选供应链并完成受影响质量验证；真实独立 agent 对照仍按用户前序要求暂缓，未刷新前不得恢复收益边缘、主线采纳或发布完成判断。
 
 ## GAP-SQG-002 主线迁移仍由用户采纳决定
 

@@ -1,6 +1,6 @@
 {
   "schema": "sgy.source-snapshot/v1",
-  "sourceRevision": "sha256:6ef03651a39719bbcecf41a9148807d901149a7cd16646af216daf7b9a2fd4a0",
+  "sourceRevision": "sha256:3722e37b103a4428c2b6cc9ad656664893c5c694f1a18fb5ad3a79ebedb0c910",
   "algorithm": "sha256(path + NUL + size + NUL + fileSha256 + LF), paths sorted ordinal",
   "root": ".",
   "excludedRoots": [
@@ -18,12 +18,12 @@
     {
       "path": "Cargo.lock",
       "size": 28526,
-      "sha256": "092420ea7d0bda015fe0f012e9cbcb70ee6469213e4b240be7d5968aba653c5f"
+      "sha256": "45eb3176fd0a03ce1b95fdab6439c25a972a402b3ce64addfdbb0809fc7ef56f"
     },
     {
       "path": "Cargo.toml",
       "size": 1094,
-      "sha256": "efaa48dc780c9ddc5c221abd87e720b8b18b6a7981019199371e948f0a694bd2"
+      "sha256": "00911fd822aaa4ac25ad438db3d2c7bb2e3e4d9a60bdec6c79dc3f36a56250df"
     },
     {
       "path": "LICENSE",
@@ -47,8 +47,8 @@
     },
     {
       "path": "README.md",
-      "size": 4648,
-      "sha256": "07e68cd88c9b50536630ecfcfc519b26398d49422ca1bcef962daeb8ac22e059"
+      "size": 4785,
+      "sha256": "8bf9c14f88ed6128f982d6e02e9090fa1b7b3f99fe38ca68531e8dee2a8c7b9c"
     },
     {
       "path": "benches/README.md",
@@ -122,8 +122,8 @@
     },
     {
       "path": "crates/sgy-cli/src/query_gateway.rs",
-      "size": 83142,
-      "sha256": "3ef6adaba9f10041b62a34b415f49dad3884ed561d7b53a508e137693e3dcf32"
+      "size": 87424,
+      "sha256": "01bc4b3c960047676a51b5062d07b8bb83cd15d99089430bde8cb0b2d818cd04"
     },
     {
       "path": "crates/sgy-cli/tests/cache_cli.rs",
@@ -172,8 +172,8 @@
     },
     {
       "path": "crates/sgy-cli/tests/query_gateway_real.rs",
-      "size": 17662,
-      "sha256": "4e20ff4ec9db14dde95e4244abf23f33abd4339d37da132681604fb1b2c79c3f"
+      "size": 22038,
+      "sha256": "a59881ecf81c79440216df625340564a126fb21461fdafa250d2bdd09aba95af"
     },
     {
       "path": "crates/sgy-cli/tests/raw_artifact_adapter.rs",
@@ -542,8 +542,8 @@
     },
     {
       "path": "docs/query-gateway.md",
-      "size": 4422,
-      "sha256": "e7cc51d346d3ee9693b5ae0dad9c87243798fd9cf4aa77b26e40f0612f60e49b"
+      "size": 4742,
+      "sha256": "e0d6e47dcc7dcca0d892dc2c04175c4cd58dd5006079890ef16e420612264ebc"
     },
     {
       "path": "docs/release-checklist.md",
@@ -902,8 +902,8 @@
     },
     {
       "path": "tools/sgy-release/src/main.rs",
-      "size": 29188,
-      "sha256": "374cb73a33f07f8ecc3cc93427d2d3e9d13a4be6e65fda4a4ba32a74720ce069"
+      "size": 29671,
+      "sha256": "23796bf1a4ba9ce442aae07f92371bc23f918fb64059ecc477ca99be693c668e"
     }
   ]
 }

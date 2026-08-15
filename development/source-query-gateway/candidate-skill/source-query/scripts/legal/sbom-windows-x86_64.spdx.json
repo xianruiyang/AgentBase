@@ -3,11 +3,11 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "sgy-0.2.0-x86_64-pc-windows-msvc",
-  "documentNamespace": "urn:sgy:spdx:0.2.0:x86_64-pc-windows-msvc:c04ccca3887a9536",
+  "documentNamespace": "urn:sgy:spdx:0.2.0:x86_64-pc-windows-msvc:6d8aab93a49c94d0",
   "creationInfo": {
     "created": "1970-01-01T00:00:00Z",
     "creators": [
-      "Tool: sgy-release-0.1.2"
+      "Tool: sgy-release-0.2.0"
     ]
   },
   "packages": [
@@ -364,7 +364,7 @@
     {
       "name": "sgy-core",
       "SPDXID": "SPDXRef-Package-0035-sgy-core",
-      "versionInfo": "0.1.2",
+      "versionInfo": "0.2.0",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",

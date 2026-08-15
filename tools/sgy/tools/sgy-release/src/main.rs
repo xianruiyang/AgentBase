@@ -10,6 +10,8 @@ use sha2::{Digest, Sha256};
 
 const FIXED_AST_GREP: &str = "0.42.0";
 const VERIFIED_AST_GREP: [&str; 3] = ["0.41.1", "0.42.0", "0.44.1"];
+const VERIFIED_RIPGREP: &str = "15.1.0";
+const VERIFIED_FD: &str = "10.4.2";
 
 fn main() {
     if let Err(error) = run() {
@@ -211,8 +213,14 @@ fn package(request: &PackageRequest) -> Result<PackageOutput, String> {
             "fixed": FIXED_AST_GREP,
             "verified": VERIFIED_AST_GREP
         },
+        "nativeEngineCompatibility": {
+            "astGrep": {"executable": "ast-grep", "bundled": false, "verified": VERIFIED_AST_GREP},
+            "ripgrep": {"executable": "rg.exe", "bundled": false, "verified": [VERIFIED_RIPGREP]},
+            "fd": {"executable": "fd.exe", "bundled": false, "verified": [VERIFIED_FD]}
+        },
         "runtime": {
             "requiredExecutable": "ast-grep",
+            "requiredExecutables": ["ast-grep", "rg.exe", "fd.exe"],
             "node": false,
             "python": false
         },

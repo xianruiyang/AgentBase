@@ -187,6 +187,148 @@ fn default_receipt_is_sparse_and_full_receipt_keeps_diagnostics() {
 }
 
 #[test]
+fn semantic_views_page_their_own_result_units() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+
+    let summary = sgy(directory.path(), local.path())
+        .args([
+            "rg", "exec", "--view", "summary", "--limit", "1", "--", "-n", "-F", "alpha", ".",
+        ])
+        .output()
+        .expect("summary query");
+    assert!(summary.status.success());
+    let summary = yaml(&summary.stdout);
+    assert_eq!(summary["summary"]["matches"], 3);
+    assert_eq!(summary["_sgy"]["result_total"], 3);
+    assert_eq!(summary["_sgy"]["complete"]["display"], true);
+    assert_eq!(summary["_sgy"]["complete"]["content"], false);
+    assert!(summary["_sgy"].get("next_cursor").is_none());
+
+    let full_summary = sgy(directory.path(), local.path())
+        .args([
+            "rg",
+            "exec",
+            "--view",
+            "summary",
+            "--limit",
+            "1",
+            "--receipt",
+            "full",
+            "--",
+            "-n",
+            "-F",
+            "alpha",
+            ".",
+        ])
+        .output()
+        .expect("full summary query");
+    assert!(full_summary.status.success());
+    let full_summary = yaml(&full_summary.stdout);
+    assert_eq!(full_summary["_sgy"]["displayed"], 3);
+    assert_eq!(full_summary["_sgy"]["omitted"], 0);
+    assert_eq!(full_summary["_sgy"]["display_complete"], true);
+    assert!(full_summary["_sgy"]["next_cursor"].is_null());
+
+    let files = sgy(directory.path(), local.path())
+        .args([
+            "rg", "exec", "--view", "files", "--limit", "1", "--", "-n", "-F", "alpha", ".",
+        ])
+        .output()
+        .expect("files query");
+    assert!(files.status.success());
+    let files = yaml(&files.stdout);
+    assert_eq!(files["_sgy"]["result_total"], 2);
+    assert_eq!(files["files"].as_array().expect("files").len(), 1);
+    assert!(files["_sgy"]["next_cursor"].is_string());
+
+    let locations = sgy(directory.path(), local.path())
+        .args([
+            "rg",
+            "exec",
+            "--view",
+            "locations",
+            "--limit",
+            "1",
+            "--",
+            "-n",
+            "-C",
+            "1",
+            "-F",
+            "alpha",
+            ".",
+        ])
+        .output()
+        .expect("locations query");
+    assert!(locations.status.success());
+    let locations = yaml(&locations.stdout);
+    assert_eq!(locations["_sgy"]["result_total"], 3);
+    assert_eq!(
+        locations["locations"].as_array().expect("locations").len(),
+        1
+    );
+}
+
+#[test]
+fn complete_sparse_queries_do_not_leave_unusable_snapshots() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let output = sgy(directory.path(), local.path())
+        .args(["rg", "exec", "--", "-F", "beta", "src/a.ts"])
+        .output()
+        .expect("complete sparse query");
+    assert!(output.status.success());
+    assert!(
+        !local.path().join("sgy/query-spool-v1").exists(),
+        "a complete sparse receipt exposes no cursor and should not persist a snapshot"
+    );
+}
+
+#[test]
+fn summary_views_are_terminal_across_structured_modes() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let cases = [
+        vec![
+            "fd", "exec", "--view", "summary", "--limit", "1", "--", ".", ".",
+        ],
+        vec![
+            "rg", "exec", "--view", "summary", "--limit", "1", "--", "--files", ".",
+        ],
+        vec![
+            "rg", "exec", "--view", "summary", "--limit", "1", "--", "-c", "-F", "alpha", ".",
+        ],
+        vec![
+            "rg",
+            "exec",
+            "--view",
+            "summary",
+            "--limit",
+            "1",
+            "--",
+            "--vimgrep",
+            "-F",
+            "alpha",
+            ".",
+        ],
+    ];
+    for args in cases {
+        let output = sgy(directory.path(), local.path())
+            .args(args)
+            .output()
+            .expect("summary mode");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let document = yaml(&output.stdout);
+        assert_eq!(document["_sgy"]["complete"]["display"], true);
+        assert!(document["_sgy"].get("next_cursor").is_none());
+    }
+}
+
+#[test]
 fn rg_no_match_is_complete_and_keeps_native_exit_one() {
     let directory = fixture();
     let local = tempfile::tempdir().expect("local app data");
