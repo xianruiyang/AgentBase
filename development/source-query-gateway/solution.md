@@ -22,7 +22,7 @@
 - 满足: DES-SQG-001, DES-SQG-002, DES-SQG-004, DES-SQG-005
 - 依赖: SOL-SQG-001
 
-逐项比较进程、cwd、argv、stdin/TTY、stdout/stderr、退出、spool、snapshot、cursor、预算、诊断和 artifact 的生命周期与失败语义；只把三个后端真正相同的职责提取为内部原语。AST 命令、serializer、cache、profile 和 fingerprint 保持原位，rg/fd 使用新的 EvidenceSignature 与 renderer 注册。完整执行事实先由内存对象持有，默认模型回执只投影总量和三类完整性，异常与分页字段按状态出现；只有分页或显式 `--receipt full` 产生 snapshot 消费者时才计算身份并持久化，避免为完整短查询建立不可访问状态。完整诊断仍来自同一事实对象，不建立第二套事实源。
+逐项比较进程、cwd、argv、stdin/TTY、stdout/stderr、退出、spool、snapshot、cursor、预算、诊断和 artifact 的生命周期与失败语义；只把三个后端真正相同的职责提取为内部原语。AST 命令、serializer、cache、profile 和 fingerprint 保持原位，rg/fd 使用新的 EvidenceSignature 与 renderer 注册。完整执行事实先由内存对象持有，只有分页或显式完整诊断产生 snapshot 消费者时才计算身份并持久化，避免为完整短查询建立不可访问状态；完整诊断仍来自同一事实对象，不建立第二套事实源。此前默认模型回执投影总量和三类完整性是已实现的阶段性边界，新的默认 model 投影由 SOL-SQG-010 取代。
 
 验证以冻结 AST oracle 无差异为先，并覆盖 rg/fd 的 0/1/N/N+1、native error、转换失败、截断、snapshot 和精确 cursor。不能证明同责的实现留在 backend，不以代码复用率作为验收条件。
 
@@ -106,3 +106,16 @@
 `vscode-lsp-mcp` 内部继续维护完整的 18 工具注册、精确 Schema、安全标注和独立验证；Codex 模型侧使用宿主原生延迟目录。Skill 只持久化最小升级和停止原则，具体 LSP 命令与参数按需读取，不默认先跑 health、capabilities 或工具全览。
 
 无 LSP、单项 LSP 和多阶段 LSP 三类真实 Codex 路径分别只调用 0、2、3 个必要 MCP 能力，质量、完整 usage 与独立审计通过。因此保留 MCP，不新增万能调度工具或 `srcq lsp`；后者只在未来宿主行为回退且同身份实测不达标时重开。rename、Code Action、format、command 和 debug 继续由 `symbol-structure-workflow` 承担，不迁入 Source Query Gateway。相对总 Token 收益仍与整体同身份 control 一并受 SOL-SQG-007 的证据边界约束。
+
+## SOL-SQG-010 分离模型证据、机器兼容与原生输出
+
+- 状态: proposed
+- 解决: GAP-SQG-007
+- 满足: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-007, UDES-SQG-003, UDES-SQG-004, UDES-SQG-006
+- 依赖: SOL-SQG-002, SOL-SQG-003, SOL-SQG-004, SOL-SQG-005, SOL-SQG-007
+
+保留当前内部 `EvidenceSignature`、退出、完整性、快照与诊断事实，新增统一 model renderer，只向模型输出干净的证据正文；正常成功和完整不带 envelope 或回执，只有截断、分页、错误、歧义与恢复需要才追加最短差异信息。现有稳定 JSON/YAML、完整 receipt、lossless、schema/capabilities 和 round-trip 能力归入显式 machine/diagnostic 视图；原生字节、TTY/LSP、写入与 artifact 继续走 native/artifact 视图。模式选择不得改变结果集合、顺序、位置、缓存或副作用。
+
+fd model renderer 使用可逆紧凑基数树并合并单子链；rg 按正文、位置、文件、count 的真实证据单元去除重复路径、类型、offset、submatch、native 与 summary；AST 保持 profile/cache/rewrite 和 machine schema，只让模型投影把源码正文表达一次，并按当前需求显示捕获。`doctor` 成功只给必要健康结论，偏差时才给 observed/expected、实际路径与恢复；`defaults` 只显示实际注入、抑制或不可推导差异。cache/process/artifact 的模型回执按同一准入规则审查，显式请求完整内容时不误删请求对象。
+
+实现先建立各输出族的字段—模型动作映射和 payload/machine round-trip oracle，再以实际 renderer 字符串做候选选择。验证先覆盖默认完整、无匹配、截断、分页、错误、机器兼容和 AST 写入非回退；随后只对受影响 corpus 运行真实隔离 Codex control/candidate，质量持平后比较端到端总 Token，再比较耗时。字符级样本只用于定位机制，不作为完成证据。

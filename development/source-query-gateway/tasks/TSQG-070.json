@@ -1,0 +1,43 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "model renderer",
+        "machine/native 边界"
+      ],
+      "id": "TSQG-068",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-070",
+  "mutation_scope": [
+    "tools/srcq/crates/srcq-cli/src/**",
+    "tools/srcq/crates/srcq-cli/tests/**"
+  ],
+  "outcome": "AST 和辅助命令默认只向模型展示当前有用内容，同时保持机器、缓存、写入、诊断与产物合同",
+  "outputs": [
+    "AST 去重 model 投影",
+    "doctor/defaults 稀疏输出",
+    "cache/process/artifact/error 的字段准入实现"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-SQG-010",
+    "DES-SQG-001",
+    "DES-SQG-004",
+    "UDES-SQG-003",
+    "UDES-SQG-006"
+  ],
+  "suggested_skills": [
+    "source-query",
+    "change-governance"
+  ],
+  "title": "收敛 AST 与辅助命令的模型证据格式",
+  "verification": [
+    "AST 结果、位置、profile、cache、process、rewrite、TTY/LSP 与 machine schema 非回退",
+    "普通辅助输出无可推导冗余",
+    "异常诊断仍含原因和恢复"
+  ]
+}

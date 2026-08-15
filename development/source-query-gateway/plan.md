@@ -185,7 +185,21 @@ P5 闭环：查询规则只有一个低成本入口，AST 设计保持，重复�
 | TSQG-065 | 逐项完成审计 | TSQG-062, TSQG-063 | 当前需求、用户设计、约束与证据边界的完成结论 | 逐项复核 24 个保护来源、当前结果、验证和未决项；不得用发布状态替代项目实现完成，也不得把项目完成当成发布授权 |
 | TSQG-064 | 请求当次 Codex 发布授权 | TSQG-065 | 用户裁决 | 项目真源已实现；只有用户针对本次明确确认后才安装 PATH srcq 并增量发布，Git 按既有授权另行维护 |
 
-P6 已在当前身份闭环：供应链、独立路由、正式消费者、失败路径、oracle 边界和 24 次同身份对照均已复核；TSQG-062 完成实验，TSQG-063 按质量持平、Token 和耗时下降保留候选并停止继续调优，TSQG-065 逐项确认需求和用户设计已由当前证据覆盖。旧五-skill control 仍按用户要求只作历史依据，未被重跑或拼接。项目主线已按用户完整实现请求接入；TSQG-064 只表示未来每次 Codex 发布仍需单独授权，不属于当前项目实现的未完成项。
+P6 已对上一冻结身份闭环：供应链、独立路由、正式消费者、失败路径、oracle 边界和 24 次同身份对照均已复核；TSQG-063 当时按质量持平、Token 和耗时下降保留候选。用户随后确认“模型默认输出应只含干净、有用的工具证据”，使输出身份和验收合同发生变化；旧五-skill control 仍按要求只作历史依据，P6 数字也只作为新一轮 control 候选，不证明 P7 已完成。TSQG-064 继续只表示未来每次 Codex 发布均需单独授权。
+
+### P7 模型可见输出收敛
+
+| ID | 任务 | 依赖 | 产出 | 验证与闭环 |
+| --- | --- | --- | --- | --- |
+| TSQG-067 | 冻结全部输出族与字段准入合同 | — | rg/fd/AST/doctor/defaults/cache/process/artifact/error 的输出清单、使用方与模型动作映射 | 每个 model 字段能指出会改变的判断、定位、续页或恢复；无法指出则移出默认视图；machine/native 请求对象不被误删 |
+| TSQG-068 | 建立共享 model/machine/native 输出边界 | TSQG-067 | 单一内部事实、payload-only model renderer、显式 machine renderer 与原生/产物通道 | 普通成功完整输出无 envelope/schema/receipt；异常仍可区分截断、分页、错误与快照，machine round-trip 和原生字节不退化 |
+| TSQG-069 | 收敛 fd 与 rg 的模型投影 | TSQG-068 | fd 紧凑基数树，rg 正文/位置/文件/count 紧凑格式 | 单子链合并、根和路径不重复；结果集合、顺序、位置、类型和上下文按 EvidenceSignature 可还原；实际 renderer 成本低于适用旧视图才采用 |
+| TSQG-070 | 收敛 AST 与辅助命令的模型投影 | TSQG-068 | AST payload 投影及 doctor/defaults/cache/process/artifact/error 的按需输出 | AST 正文不与重叠捕获重复，必要捕获仍可得；machine schema、cache、process、rewrite、TTY/LSP、诊断退出和 artifact 合同不退化 |
+| TSQG-071 | 更新消费者与按需协议 | TSQG-069, TSQG-070 | source-query 引用、help 与迁移说明 | Skill 不要求模型解析旧 envelope；显式 machine/diagnostic 入口可发现但不常驻，旧默认格式消费者完成迁移或明确退出 |
+| TSQG-072 | 运行影响范围验证与真实隔离对照 | TSQG-071 | 定向/性质/真实引擎结果与受影响 control/candidate audit | 先验收语义等价、round-trip、分页错误与 AST 非回退；只运行受输出身份影响的 corpus，质量持平后总 Token 下降，前两项不退化后耗时不恶化 |
+| TSQG-073 | 完成审计与采纳裁决 | TSQG-072 | GAP-SQG-007 完成结论及发布前状态 | 全部输出族无已知低收益常驻字段，证据覆盖新 identity；未达标则收紧或退出，不以局部字符下降声称完成 |
+
+P7 纵向闭环优先从一个真实查询族打通内部事实、干净 model 输出、异常续页、machine 兼容和实际消费者，再穿透到其他输出族；不得先铺开多套 serializer 后集中补兼容。当前阶段只完成需求、设计、现状和任务投影，TSQG-067 至 TSQG-073 均未实施。
 
 ## 5. 停止条件
 
@@ -193,6 +207,7 @@ P6 已在当前身份闭环：供应链、独立路由、正式消费者、失�
 - 原生命令不能在不改变语义的情况下结构化时使用透传或产物；仍有未分类模式时停止该版本的“完整兼容”声明。
 - 公共抽象迫使 backend 复制、丢失特有语义或新增第二状态源时，保留独立实现，不以形式统一为完成目标。
 - fd tree 不能机械还原路径或预计 Token 不低于 flat 时不选 tree。
+- 正常成功完整的 model 输出仍含 envelope、schema、固定 receipt、重复事实或不能说明模型动作收益的字段时，不得关闭 P7；不得用 machine 兼容需求迫使这些内容常驻模型上下文。
 - 真实 Codex 质量退化时先修正质量；质量相同但总 Token 高于冻结消融且无必要证据收益时，继续收紧或退出，不以速度补偿。
 - control/candidate 出现 allowlist 外环境差异、subject 接触对照信息、monitor 干预答案、usage 缺失或 audit capsule 不完整时，该实验停止且不得进入收益聚合。
 - Plugin 或 DirectCompatibility 候选 payload 中出现测试、fixture、benchmark、runner、corpus、原始结果或审计资产时停止发布，不以它们位于 skill 子目录为理由保留。

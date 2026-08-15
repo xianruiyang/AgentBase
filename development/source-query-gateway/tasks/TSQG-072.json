@@ -1,0 +1,45 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "已迁移的正式消费者",
+        "新输出协议"
+      ],
+      "id": "TSQG-071",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-072",
+  "mutation_scope": [
+    "tools/srcq/**",
+    "development/code-search-benchmark/**",
+    "development/source-query-gateway/evidence/**"
+  ],
+  "outcome": "新模型输出在质量充分的前提下降低端到端总 Token，并在前两项不退化后保持或改善耗时",
+  "outputs": [
+    "影响范围测试结果",
+    "新 identity 的 control/candidate 原始 usage",
+    "独立质量与总成本审计"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-SQG-010",
+    "DES-SQG-010",
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-003",
+    "AC-SQG-004"
+  ],
+  "suggested_skills": [
+    "source-query",
+    "token-usage-analysis"
+  ],
+  "title": "验证新输出身份并运行受影响隔离对照",
+  "verification": [
+    "语义等价、round-trip、分页错误、真实引擎与 AST 非回退通过",
+    "隔离 agent 质量持平后总 Token 下降",
+    "失败和反向样本完整保留"
+  ]
+}

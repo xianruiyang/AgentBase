@@ -1,10 +1,10 @@
 {
-  "confirmation_ref": "当前请求：完整实现 source-query-gateway requirements.md 与 user-design.md",
+  "confirmation_ref": "2026-08-15: 用户确认模型默认输出应为干净、简洁且只含当前有用的工具证据，并要求全面审查所有输出族",
   "confirmed_by": "user",
-  "cycle_id": "cycle-006",
+  "cycle_id": "cycle-007",
   "documents": {
     "requirements": {
-      "fingerprint": "sha256:efd4465b161ab07a1919645dc0d25652e585f89a1d98f19e5ae8928676eade33",
+      "fingerprint": "sha256:6726140e9290477e41486605bb266b4a389d88d7566243193d279abb2334e71a",
       "ids": [
         "AC-SQG-001",
         "AC-SQG-002",
@@ -21,7 +21,7 @@
       "path": "requirements.md"
     },
     "user_design": {
-      "fingerprint": "sha256:e5cd3a1933e3cabad08ab32626ad9c0ddf9aedaa908ea7ed1934897a57391cab",
+      "fingerprint": "sha256:abc729184911d7ab3f43f5bb4e62375c7097e185c73ed859b0c7261642a10871",
       "ids": [
         "UDES-SQG-001",
         "UDES-SQG-002",
@@ -193,6 +193,49 @@
       "documents": {
         "requirements": {
           "fingerprint": "sha256:76ded632a5e853c4bbe35e2bc53cb799c5d483e1b53dfd9a8c6945df5caae651",
+          "ids": [
+            "AC-SQG-001",
+            "AC-SQG-002",
+            "AC-SQG-003",
+            "AC-SQG-004",
+            "AC-SQG-005",
+            "AC-SQG-006",
+            "AC-SQG-007",
+            "CON-SQG-001",
+            "CON-SQG-002",
+            "CON-SQG-003",
+            "REQ-SQG-001"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:e5cd3a1933e3cabad08ab32626ad9c0ddf9aedaa908ea7ed1934897a57391cab",
+          "ids": [
+            "UDES-SQG-001",
+            "UDES-SQG-002",
+            "UDES-SQG-003",
+            "UDES-SQG-004",
+            "UDES-SQG-005",
+            "UDES-SQG-006",
+            "UDES-SQG-007",
+            "UDES-SQG-008",
+            "UDES-SQG-009",
+            "UDES-SQG-010",
+            "UDES-SQG-011",
+            "UDES-SQG-012",
+            "UDES-SQG-013"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "当前请求：完整实现 source-query-gateway requirements.md 与 user-design.md",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-006",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:efd4465b161ab07a1919645dc0d25652e585f89a1d98f19e5ae8928676eade33",
           "ids": [
             "AC-SQG-001",
             "AC-SQG-002",

@@ -1,0 +1,34 @@
+{
+  "dependencies": [],
+  "id": "TSQG-067",
+  "mutation_scope": [
+    "development/source-query-gateway/**",
+    "tools/srcq/**"
+  ],
+  "outcome": "每个默认模型输出字段都有会改变当前模型动作的直接理由，机器与原生消费者需求不再隐式进入默认 stdout",
+  "outputs": [
+    "全部输出族清单",
+    "字段到模型动作的准入映射",
+    "model/machine/native 边界 oracle"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-SQG-010",
+    "GAP-SQG-007",
+    "OBS-SQG-009",
+    "AC-SQG-002",
+    "AC-SQG-007",
+    "UDES-SQG-003"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "source-query"
+  ],
+  "title": "冻结全部模型可见输出族的字段准入合同",
+  "verification": [
+    "逐项复核 rg/fd/AST/doctor/defaults/cache/process/artifact/error",
+    "确认 model 字段均有直接消费者动作且 machine/native 请求对象完整"
+  ]
+}

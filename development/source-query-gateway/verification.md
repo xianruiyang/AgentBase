@@ -44,3 +44,9 @@
 新的 advisory scan 未运行，因为当前授权环境未安装 `cargo-audit`；候选 release record 已明确记录该限制。
 
 当前轮已经运行真实独立 agent 路由、LSP 渐进调用和当前身份的 control/candidate 总成本对照，并由 detached auditor 复算 capsule、usage 与质量。LSP 三案仍只证明候选侧按需行为与绝对成本；当前双环境实验则直接证明冻结六类 corpus 与身份下的相对收益。每个环境、case 和重复运行均为新鲜隔离 Codex，差异 allowlist 与前后 identity 读回通过；结论不得外推为其他模型、项目、Provider 或未来版本必然获得同等比例。candidate 有 4 次 hard tool failure、control 有 2 次，但 24 次运行与质量均完成；该差异作为后续可靠性观察保留，不阻断当前验收。
+
+## 4. 新模型输出设计的验证状态
+
+当前 `31.186%` Token 和 `20.126%` 耗时改善来自模型输出分面设计重新打开前的冻结 identity，可以作为后续 control 现实依据，但不覆盖 payload-only model renderer、fd 紧凑基数树、rg/AST 去重或辅助命令字段准入。OBS-SQG-009 的字符样本只直接证明现有格式存在可压缩机制，不证明端到端模型 Token 会按相同比例下降。
+
+新设计尚未实现，因此尚无可声明的定向测试、AST 非回退、机器 round-trip、消费者迁移或真实隔离 Codex 收益结果。完成 SOL-SQG-010 后应先按受影响输出族做最小充分验证，再通过既有 monitor 对新 identity 运行受影响 control/candidate；不能用重复运行旧 identity 或只比较 stdout 字符替代。

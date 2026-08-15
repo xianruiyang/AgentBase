@@ -6,7 +6,7 @@
 
 | 状态 | 数量 |
 | --- | ---: |
-| todo | 0 |
+| todo | 7 |
 | claimed | 0 |
 | in_progress | 0 |
 | review | 0 |
@@ -25,7 +25,7 @@
 ## 上游状态
 
 - 用户确认快照：protected
-- 可修订上游未决：0
+- 可修订上游未决：1
 - 延后讨论项：1
 
 ## 任务
@@ -68,3 +68,10 @@
 | TSQG-064 | retired | codex-root | 请求当次 Codex 发布裁决 | TSQG-065:hard | — | 3 |
 | TSQG-065 | done | codex-root | 逐项完成审计 | TSQG-062:hard, TSQG-063:hard | results/TSQG-065.r3.json | 1 |
 | TSQG-066 | done | codex-root | 强化 srcq 安装状态与 Codex 发布前置门禁 | TSQG-053:hard | results/TSQG-066.r6.json | 1 |
+| TSQG-067 | todo | — | 冻结全部模型可见输出族的字段准入合同 | — | — | 1 |
+| TSQG-068 | todo | — | 建立 model、machine 与 native 输出边界 | TSQG-067:hard | — | 1 |
+| TSQG-069 | todo | — | 收敛 fd 与 rg 的模型证据格式 | TSQG-068:hard | — | 1 |
+| TSQG-070 | todo | — | 收敛 AST 与辅助命令的模型证据格式 | TSQG-068:hard | — | 1 |
+| TSQG-071 | todo | — | 迁移模型输出消费者与按需协议 | TSQG-069:hard, TSQG-070:hard | — | 1 |
+| TSQG-072 | todo | — | 验证新输出身份并运行受影响隔离对照 | TSQG-071:hard | — | 1 |
+| TSQG-073 | todo | — | 审计模型输出收敛并裁决采纳 | TSQG-072:hard | — | 1 |

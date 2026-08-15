@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "",
+  "owner": null,
+  "result_ref": null,
+  "revision": 1,
+  "schema": "task.state",
+  "status": "todo",
+  "task_id": "TSQG-073"
+}

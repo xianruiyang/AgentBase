@@ -1,0 +1,46 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "输出族清单",
+        "字段准入映射",
+        "三输出面 oracle"
+      ],
+      "id": "TSQG-067",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-068",
+  "mutation_scope": [
+    "tools/srcq/crates/srcq-cli/src/**",
+    "tools/srcq/crates/srcq-cli/tests/**"
+  ],
+  "outcome": "srcq 从同一完整事实源生成干净模型证据、显式机器合同和原生或产物输出，不再共用一个折中 envelope",
+  "outputs": [
+    "payload-only model renderer",
+    "显式 machine renderer",
+    "native/artifact 分流",
+    "异常式回执"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-SQG-010",
+    "DES-SQG-004",
+    "DES-SQG-005",
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-007"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "source-query"
+  ],
+  "title": "建立 model、machine 与 native 输出边界",
+  "verification": [
+    "普通成功完整结果无 envelope/schema/固定 receipt",
+    "分页、截断、错误和歧义仍可恢复",
+    "machine round-trip 与原生字节保持"
+  ]
+}

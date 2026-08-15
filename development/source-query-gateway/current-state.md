@@ -29,7 +29,7 @@ fd 会冻结对象类型并为每个显式根建立可逆 trie；只有估算 To
 - 状态: verified
 - 关联: DES-SQG-001, DES-SQG-009
 
-P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilities 已作为迁移前 oracle；比较器只规范化正式命令、配置和环境前缀后，对 `srcq` 当前 release 逐项通过。`_sgy` 与 `sgy.*` 数据协议、serializer、cache、profile、fingerprint、process 和 rewrite 合同保持不变。P0 的 ast-grep 0.41.1、0.42.0、0.44.1 真实矩阵仍作为精确版本基线。
+P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilities 已作为迁移前 oracle；比较器只规范化正式命令、配置和环境前缀后，对 `srcq` 当前 release 逐项通过。`_sgy` 与 `sgy.*` 数据协议、machine serializer、cache、profile、fingerprint、process 和 rewrite 合同保持不变。P0 的 ast-grep 0.41.1、0.42.0、0.44.1 真实矩阵仍作为精确版本基线。该证据冻结机器兼容和 AST 语义，不要求新增 model renderer 逐字保持当前 YAML。
 
 ## OBS-SQG-004 候选 skill 与当前 payload 已重建
 
@@ -77,6 +77,22 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 `vscode-lsp-mcp` 当前在一次 `tools/list` 中固定返回 18 个工具；按真实 MCP 公开字段序列化的工具定义合计为 `15,747` 字符。这是可观测的工具合同尺寸，不等于经 tokenizer 和客户端序列化后的实际 Token。
 
 隔离真实 Codex 三案分别覆盖不需要 LSP、只需符号身份和随后新增精确引用需要。实际 MCP 调用严格为 0、`list_workspaces + symbol_info`、`list_workspaces + symbol_info + get_references`；三案答案质量、usage、退出码和独立 capsule 哈希审计均通过，总 Token 分别为 `112,858`、`173,459`、`207,743`。这证明当前候选使用宿主原生延迟目录即可按必要证据逐级展开，不需要新增 `srcq lsp` 第二入口；数据只证明候选侧行为和绝对成本，不与旧 control 拼成因果收益。
+
+## OBS-SQG-009 默认模型输出仍混入机器包络与重复事实
+
+- 状态: verified
+- 关联: AC-SQG-002, AC-SQG-007, DES-SQG-004, DES-SQG-005, DES-SQG-006, DES-SQG-007, UDES-SQG-003, UDES-SQG-004, UDES-SQG-006
+
+当前 `structured_receipt` 会为普通结构化查询固定加入 schema、`result_total` 和结果/展示/正文三类完整性；这些内部事实即使与调用语义无关也进入默认 stdout。fd tree 还固定输出 JSON 容器、空 `unmapped`、escape 说明和逐叶 `|file`，并且 trie 不合并单子链。真实小样本中 5 个文件的当前 tree 为 376 字符，flat 为 434 字符，而保持相同路径集合的紧凑基数文本为 101 字符；138 个文件样本中当前 tree 为 4,788 字符，紧凑基数文本为 3,564 字符。字符差只证明格式机制，不等同端到端 Token 收益。
+
+rg 的 counts 同时保留结构化路径/数量与重复 `native`，正文记录重复 kind、absolute offset、submatches、逐项正文完整性和根级统计；AST 默认 Token-Safe YAML 样本会同时展示完整 `text` 与重叠 metavariable 捕获。`doctor` 成功仍输出 schema、backend、完整引擎路径、cwd、observed/expected version；`defaults` 重复 user/injected/effective argv 及多项可推导状态。cache、process、artifact、schema/capabilities 和错误族尚未按“是否改变模型动作”统一审查。现有实现因此只完成内部可证明性与稀疏结构化回执，没有达到新增的“正常结果只含干净证据正文”合同。
+
+## GAP-SQG-007 模型证据输出尚未与机器和原生输出分离
+
+- 状态: open
+- 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-007, UDES-SQG-003, UDES-SQG-004, UDES-SQG-006, OBS-SQG-009
+
+当前共享内部事实直接投影为模型默认结构化 envelope，导致机器稳定性、诊断完整性和模型上下文成本由同一 serializer 折中；继续删除单个字段不能消除这种职责混用。需要保留一个完整事实源，同时建立 payload-only 的 model renderer、显式 machine renderer 和不进入普通上下文的 native/artifact 路径；随后按输出族完成字段准入、语义等价、异常恢复和真实隔离 Codex 受影响对照。该差距关闭前，既有 `31.186%` 收益只证明上一冻结身份，不能证明新设计已经实现或到达收益边缘。
 
 ## GAP-SQG-005 srcq 正式命名已经迁移
 
