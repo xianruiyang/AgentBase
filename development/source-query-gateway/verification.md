@@ -10,8 +10,8 @@
 | --- | --- | --- |
 | P0 backend 合同 | `backend-contract/tests` | 版本、模式表、fixture、语义分类通过 |
 | AST 精确版本 | P0 ast-grep 0.41.1/0.42.0/0.44.1 矩阵 | 30 项通过 |
-| srcq Rust workspace 历史基线 | `cargo ci-test` | 稀疏回执改动前全部非 ignored 测试通过；当前按影响范围复核 srcq-cli 与 release owner，未机械重跑无关 workspace 测试 |
-| Rust workspace 当前格式 | `cargo fmt --all` | 通过 |
+| srcq Rust workspace 当前门禁 | `cargo ci-test`、`cargo ci-build`、`cargo lint`、`cargo fmt-check` | 当前提交的全部 workspace、all-targets、all-features 非 ignored 测试、构建、Clippy `-D warnings` 与格式检查通过；覆盖 CLI、core、unit、integration、protocol、stress 和 release 包 |
+| 当前真实 ast-grep 0.44.1 | `SRCQ_AST_GREP=<native exe>`、`SRCQ_AST_GREP_EXPECTED_VERSION='ast-grep 0.44.1'` 后运行 workspace ignored 套件 | 15 项通过；覆盖 run/scan/rewrite、cache/process、LSP 字节透传、TTY、completion、new/test、失败/取消和 Windows Console Ctrl-C |
 | rg/fd 当前定向单元 | `cargo test -p srcq-cli --lib` | 29 项通过；含 `--receipt auto|full` 参数合同 |
 | rg/fd 当前真实集成 | `cargo test -p srcq-cli --test query_gateway_real` | 15 项通过；新增各 view 证据单元、summary 终止和完整默认查询不落 snapshot 回归 |
 | srcq-cli 当前静态质量 | `cargo clippy -p srcq-cli --all-targets --all-features -- -D warnings`、`cargo fmt --all -- --check` | 通过 |
@@ -38,7 +38,7 @@
 
 冻结五-skill 历史记录为实际总 Token 1,157,111、508.509 s、核心 12/12、严格整体 11/12；按用户要求未重跑。旧候选曾在同一质量口径下方向性少 10,510 Token、快 103.906 s，但历史记录缺少当前 manifest 的完整环境 identity，且当前二进制、skill 与回执协议已经变化，因此该差额不再支持当前候选完成或收益边缘判断。
 
-旧候选的唯一格式失败是一条九行答案超过八行限制；更低 Token 的中间候选曾降低核心或严格质量，已按质量优先退出。当前实现修正的直接反例、后端矩阵、AST 冻结、skill、payload、release、安装生命周期和 detached 路由已经通过。当前 candidate-only monitor 不能替代受控对照：一次真实超时缺少 usage，且用户冻结的旧 control 与当前 identity 不同；主线消费者迁移、旧 skill 退出和真实 Codex 安装态也未执行。
+旧候选的唯一格式失败是一条九行答案超过八行限制；更低 Token 的中间候选曾降低核心或严格质量，已按质量优先退出。当前实现修正的直接反例、完整 workspace、真实 ast-grep 0.44.1、后端矩阵、AST 冻结、skill、payload、release、安装生命周期和 detached 路由已经通过。当前 candidate-only monitor 不能替代受控对照：一次真实超时缺少 usage，且用户冻结的旧 control 与当前 identity 不同。项目真源中的消费者迁移和旧 skill 退出已经完成；实际 Codex 安装态尚未发布。
 
 新的 advisory scan 未运行，因为当前授权环境未安装 `cargo-audit`；候选 release record 已明确记录该限制。
 
