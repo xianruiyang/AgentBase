@@ -1,16 +1,18 @@
 {
-  "confirmation_ref": "2026-08-15: user confirmed progressive LSP exposure, srcq fallback boundary, and requested persistence",
+  "confirmation_ref": "2026-08-15: user requested completion of source-query-gateway requirements.md and user-design.md",
   "confirmed_by": "user",
-  "cycle_id": "cycle-004",
+  "cycle_id": "cycle-005",
   "documents": {
     "requirements": {
-      "fingerprint": "sha256:7ef57eb24ab22bc7a6b5c35e283052911f8e1c8e060aa478ecfad71dafd2323a",
+      "fingerprint": "sha256:76ded632a5e853c4bbe35e2bc53cb799c5d483e1b53dfd9a8c6945df5caae651",
       "ids": [
         "AC-SQG-001",
         "AC-SQG-002",
         "AC-SQG-003",
         "AC-SQG-004",
         "AC-SQG-005",
+        "AC-SQG-006",
+        "AC-SQG-007",
         "CON-SQG-001",
         "CON-SQG-002",
         "CON-SQG-003",
@@ -19,7 +21,7 @@
       "path": "requirements.md"
     },
     "user_design": {
-      "fingerprint": "sha256:d7523c16b3802c12953a55849ffc55793c181d6fd39e9b829dceb4966ca457e8",
+      "fingerprint": "sha256:e5cd3a1933e3cabad08ab32626ad9c0ddf9aedaa908ea7ed1934897a57391cab",
       "ids": [
         "UDES-SQG-001",
         "UDES-SQG-002",
@@ -31,7 +33,9 @@
         "UDES-SQG-008",
         "UDES-SQG-009",
         "UDES-SQG-010",
-        "UDES-SQG-011"
+        "UDES-SQG-011",
+        "UDES-SQG-012",
+        "UDES-SQG-013"
       ],
       "path": "user-design.md"
     }
@@ -138,6 +142,45 @@
             "UDES-SQG-007",
             "UDES-SQG-008",
             "UDES-SQG-009"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "2026-08-15: user confirmed progressive LSP exposure, srcq fallback boundary, and requested persistence",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-004",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:7ef57eb24ab22bc7a6b5c35e283052911f8e1c8e060aa478ecfad71dafd2323a",
+          "ids": [
+            "AC-SQG-001",
+            "AC-SQG-002",
+            "AC-SQG-003",
+            "AC-SQG-004",
+            "AC-SQG-005",
+            "CON-SQG-001",
+            "CON-SQG-002",
+            "CON-SQG-003",
+            "REQ-SQG-001"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:d7523c16b3802c12953a55849ffc55793c181d6fd39e9b829dceb4966ca457e8",
+          "ids": [
+            "UDES-SQG-001",
+            "UDES-SQG-002",
+            "UDES-SQG-003",
+            "UDES-SQG-004",
+            "UDES-SQG-005",
+            "UDES-SQG-006",
+            "UDES-SQG-007",
+            "UDES-SQG-008",
+            "UDES-SQG-009",
+            "UDES-SQG-010",
+            "UDES-SQG-011"
           ],
           "path": "user-design.md"
         }
