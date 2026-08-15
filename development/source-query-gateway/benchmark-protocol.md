@@ -2,7 +2,7 @@
 
 ## 1. 职责与状态
 
-本文件是统一源码查询网关分支的可重复基准合同，状态为 `proposed`。它固定测试对象、隔离角色、监控数据、对照顺序、质量复核和历史结果复用方式，不执行测试，也不授权发布。分支实施后扩展现有 `development/code-search-benchmark` 承担 runner、monitor、汇总与 capsule 生成；不得复制临时脚本形成第二入口，也不得把本协议或其实现放入 Codex payload。
+本文件是统一源码查询网关分支的可重复基准合同，状态为 `implemented`。它固定测试对象、隔离角色、监控数据、对照顺序、质量复核和历史结果复用方式，不执行测试，也不授权发布。`development/code-search-benchmark` 是 runner、monitor、汇总与 capsule 的唯一 owner；不得复制临时脚本形成第二入口，也不得把本协议或其实现放入 Codex payload。
 
 ## 2. 证据角色
 
@@ -45,6 +45,14 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 - runner、monitor、汇总器和 audit schema 版本。
 
 control 与 candidate 除允许差异外必须逐项相等。环境构建不得把凭据、数据库、历史、缓存、信任状态或临时 HOME 复制进结果；运行时凭据只通过既有安全入口使用。预检发现额外差异时停止实验，不让 agent 运行后再解释混杂。
+
+当前 srcq 迁移对照由 [prepare_benchmark_homes.py](prepare_benchmark_homes.py) 从同一个未迁移 Codex home 构建。control 保留旧的 rg/fd/AST 查询 skills 与 `symbol-structure-workflow`；candidate 只应用本次迁移 bundle：替换全局查询路由，退出 `ast-grep-token-safe`、`fd-usage`、`rg-token-safe`，从项目真源安装当前 `source-query` 和更新后的 `symbol-structure-workflow`，并只在 candidate 的私有 `bin` 中放入当前 `srcq.exe`。`powershell-usage`、其他 skills、系统 skill、模型配置和外部工具环境保持一致。允许差异必须逐文件限于这个 bundle，不能把整个 skills 目录列为通配差异。
+
+环境准备入口为：
+
+```powershell
+python -X utf8 development\source-query-gateway\prepare_benchmark_homes.py --installed-codex-home $env:USERPROFILE\.codex --control <control-home> --candidate <candidate-home> --srcq-exe <current-srcq.exe>
+```
 
 ## 5. 单次可重复流程
 

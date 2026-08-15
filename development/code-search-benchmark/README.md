@@ -1,8 +1,8 @@
 # 代码搜索收益基准
 
-本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule。两者不实现查询语义，也不进入 sgy 或 Codex 发布 payload。
+本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule。两者不实现查询语义，也不进入 srcq 或 Codex 发布 payload。
 
-正式语料在 `corpus/`。真实对照先由独立配置生成 experiment，预检 control/candidate 环境差异只包含 allowlist 后才运行：
+正式语料在 `corpus/`；`v2.json` 是绑定 srcq 正式身份与当前源码路径的现行六类语料，旧版本只服务历史结果复核。真实对照先由独立配置生成 experiment，预检 control/candidate 环境差异只包含 allowlist 后才运行：
 
 ```powershell
 python -X utf8 development\code-search-benchmark\experiment.py prepare --config <config.json> --output <new-output-dir>
