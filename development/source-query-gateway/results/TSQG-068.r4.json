@@ -1,0 +1,56 @@
+{
+  "changed_files": [
+    "tools/srcq/crates/srcq-core/src/invocation.rs",
+    "tools/srcq/crates/srcq-cli/src/lib.rs",
+    "tools/srcq/crates/srcq-cli/src/main.rs",
+    "tools/srcq/crates/srcq-cli/src/query_gateway.rs",
+    "tools/srcq/crates/srcq-cli/src/cache.rs",
+    "tools/srcq/crates/srcq-cli/src/processor.rs",
+    "tools/srcq/crates/srcq-cli/src/processor/location_projection.rs",
+    "tools/srcq/crates/srcq-cli/src/diagnostics.rs",
+    "tools/srcq/crates/srcq-cli/tests/model_output.rs"
+  ],
+  "evidence_for": [
+    "SOL-SQG-010",
+    "DES-SQG-004",
+    "DES-SQG-005",
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-007"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "implementation",
+      "ref": "tools/srcq/crates/srcq-cli/src/main.rs"
+    },
+    {
+      "kind": "test",
+      "ref": "tools/srcq/crates/srcq-cli/tests/model_output.rs"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "srcq 已建立显式 model、machine 与 native/artifact 输出边界：普通查询默认只输出模型所需证据，机器消费者可显式取得既有结构化合同，原生协议和文件产物不被模型投影污染；分页、截断和未知结构保留最短恢复信息。",
+  "outputs": [
+    "payload-only model renderer",
+    "显式 machine renderer",
+    "native/artifact 分流",
+    "异常式回执"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:b1c1b9ea19571a7bbd9448f2acb30be65cf77254e6cf2745486e9e4fe81bf4a0",
+    "AC-SQG-002": "sha256:2e60049c4b48151e592446cfa42a5b6aeccce763d0ce0c101556342266224da5",
+    "AC-SQG-007": "sha256:aca71625808c9d8b20c67aa9855d137f355f6852cb87b8d44c65074a62a2b828",
+    "DES-SQG-004": "sha256:76df3948cd1920e778444e25a4e60086c2cffff6bd660f2b3b2d5ca0f1b47448",
+    "DES-SQG-005": "sha256:bdb49c83386aa757dda60737a78bfcc738f89db932426e5f3bea506b5648e9db",
+    "SOL-SQG-010": "sha256:48f6cacf82a6c8af180bb8bcb4b84f7fbeade659f4b6545391baf6031a79ff87"
+  },
+  "task_id": "TSQG-068",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "srcq-cli lib 30 项、bin 2 项、model-output 1 项通过",
+    "query-gateway 16 项、process 7 项、cache 1 项通过",
+    "普通结果无 envelope，machine round-trip、分页、截断和原生 artifact 仍受回归覆盖"
+  ]
+}

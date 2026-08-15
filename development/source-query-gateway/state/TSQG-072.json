@@ -1,11 +1,11 @@
 {
   "blocked_reason": "",
   "next_action": "",
-  "note": "",
-  "owner": null,
-  "result_ref": null,
-  "revision": 1,
+  "note": "最终 candidate-only identity e32871ba9c0f8b19716e7b191260c29666939879215350baa4604d1bfd9c7ac4 已完成 12 次运行、detached 语义审计与确定性 capsule 验真：严格语义 12/12，总 Token 1,150,528、耗时 363.163 秒、48 次命令无失败；相对冻结历史仅作方向性比较。剩余波动无共享失败机制，当前达到收益边际。",
+  "owner": "codex-root",
+  "result_ref": "results/TSQG-072.r14.json",
+  "revision": 15,
   "schema": "task.state",
-  "status": "todo",
+  "status": "done",
   "task_id": "TSQG-072"
 }

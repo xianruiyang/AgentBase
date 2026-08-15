@@ -9,7 +9,7 @@
 | 角色 | 输入 | 允许动作 | 不得接触 |
 | --- | --- | --- | --- |
 | coordinator | 冻结 corpus、环境模板、候选差异、运行顺序 | 构建隔离环境、启动 monitor、汇总状态 | 运行中修改 subject prompt 或补救答案 |
-| subject | 单个 case、单个隔离环境、只读工作区 | 自主选择工具并回答 | 对照输出、聚合结果、历史对话和 hidden oracle |
+| subject | 单个 case、单个隔离环境、带只读任务合同的源码工作区 | 自主选择只读查询工具并回答 | 修改工作区或外部状态，对照输出、聚合结果、历史对话和 hidden oracle |
 | monitor | subject 进程、事件流、超时合同 | 捕获 JSONL/stderr/exit/usage/tool calls，超时终止 | 向 subject 发送中途信息或改变环境 |
 | auditor | detached audit capsule | 复算用量、核对环境差异、按语义 oracle 评质量 | 仓库、候选设计讨论、其他结果和未声明期望 |
 
@@ -22,7 +22,7 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 | Case ID | 工作区角色 | 查找目标 | 质量重点 |
 | --- | --- | --- | --- |
 | `agentbase-file-discovery-control` | AgentBase | 已知文件发现 | 唯一路径、无额外内容 |
-| `agentbase-rg-policy-sources` | AgentBase | 正式规则来源 | 排除测试/验证脚本、路径与规则关系 |
+| `agentbase-rg-policy-sources` | AgentBase | 统一 srcq 正式规则来源 | 排除测试/验证脚本、路径与规则关系 |
 | `agentbase-provider-observation` | AgentBase | TypeScript 定义与 DTO 暴露关系 | 唯一定义、字段、映射位置 |
 | `agentbase-sgy-containing-contract` | AgentBase | Rust 完整实现与位置投影合同 | 完整范围、坐标、最小包含、失效处理 |
 | `ue-command-dispatch-submit` | 大型 C++ 项目 | 生产定义及返回协议 | 完整定义范围、两个错误 code、排除替身 |
@@ -37,38 +37,44 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 每次实验先生成只读 manifest；下列任一字段变化都产生新的 experiment identity：
 
 - corpus schema、版本和内容 hash；
-- 每个工作区的仓库标识、commit/tree hash、dirty patch hash 和只读快照 hash；
-- Codex CLI 版本、模型、reasoning effort、service tier、sandbox、approval 和网络策略；
+- 每个工作区的仓库标识、声明的相对 identity scope、commit/tree hash、该范围 dirty patch hash 和快照 hash；
+- Codex CLI 绝对路径、文件大小、SHA-256、实际版本、模型、reasoning effort、service tier、sandbox、approval 和网络策略；
+- Token 用量字段语义、价格系数基准、适用模型族、价格来源日期和长上下文阈值；
 - 全局/项目规则、config、skill、插件、MCP、可执行工具版本及环境树 hash；
 - control/candidate 唯一允许差异清单及其内容 hash；
 - 重复次数、平衡顺序、随机种子、单回合超时和整体预算；
 - runner、monitor、汇总器和 audit schema 版本。
 
-control 与 candidate 除允许差异外必须逐项相等。环境构建不得把凭据、数据库、历史、缓存、信任状态或临时 HOME 复制进结果；运行时凭据只通过既有安全入口使用。预检发现额外差异时停止实验，不让 agent 运行后再解释混杂。
+正式独立基准固定使用正常速度 `service_tier = "default"`、`sandbox = "danger-full-access"` 和 `approval_policy = "never"`。full access 用于避免 Codex 路由层在真实查询进程启动前误拦截 `srcq` 等只读命令，不授权 subject 写入；prompt 仍明确禁止修改，运行前后身份读回负责发现越界副作用。Fast/Priority、其他 sandbox 或可覆盖上述身份的额外配置不得进入默认收益对照；环境准备器和 runner 都必须拒绝。若未来专门研究服务层级或 sandbox，须建立独立实验身份和结论，不能混入本基准。
 
-当前 srcq 迁移对照由 [prepare_benchmark_homes.py](prepare_benchmark_homes.py) 从同一个未迁移 Codex home 构建。control 保留旧的 rg/fd/AST 查询 skills 与 `symbol-structure-workflow`；candidate 只应用本次迁移 bundle：替换全局查询路由，退出 `ast-grep-token-safe`、`fd-usage`、`rg-token-safe`，从项目真源安装当前 `source-query` 和更新后的 `symbol-structure-workflow`，并只在 candidate 的私有 `bin` 中放入当前 `srcq.exe`。`powershell-usage`、其他 skills、系统 skill、模型配置和外部工具环境保持一致。允许差异必须逐文件限于这个 bundle，不能把整个 skills 目录列为通配差异。
+control 与 candidate 除允许差异外必须逐项相等。环境构建不得把数据库、历史、缓存或信任状态复制进结果；认证文件只可从既有安全 home 链接到隔离 home，不复制进实验结果或环境树。隔离 home 不得位于系统临时目录，避免 Codex 拒绝建立命令 helper；默认只复制当前对照的因果 skill 集与系统 skill，不加载会触发扫描上限或注入无关上下文的大型知识 skill。预检发现额外差异时停止实验，不让 agent 运行后再解释混杂。
+
+当前 srcq 迁移对照由 [prepare_benchmark_homes.py](prepare_benchmark_homes.py) 从同一个 Codex home 构建。初始迁移 control 保留旧的 rg/fd/AST 查询 skills，candidate 退出它们并从项目真源安装 `source-query`；增量对照则让两侧都保留基线 `source-query`，只替换 candidate 的当前版本。两种模式共同保留 `powershell-usage`、`symbol-structure-workflow` 与系统 skill；只有专门研究完整安装态时才显式复制其他 skills。候选二进制必须先通过真实 `srcq rg <native argv...>` 探针，再进入私有 `bin`。允许差异必须逐文件限于相应 bundle，不能把整个 skills 目录列为通配差异。正式 subject 会访问的每个工作区必须在两侧 `config.toml` 中以相同规范路径预登记为 trusted；不得依赖首次运行自动写入信任状态，否则冻结后的环境身份已变化，该批结果无效。
 
 环境准备入口为：
 
 ```powershell
-python -X utf8 development\source-query-gateway\prepare_benchmark_homes.py --installed-codex-home $env:USERPROFILE\.codex --control <control-home> --candidate <candidate-home> --srcq-exe <current-srcq.exe>
+python -X utf8 development\source-query-gateway\prepare_benchmark_homes.py --installed-codex-home $env:USERPROFILE\.codex --control $env:LOCALAPPDATA\AgentBase\benchmark-homes\<run-id>\control --candidate $env:LOCALAPPDATA\AgentBase\benchmark-homes\<run-id>\candidate --srcq-exe <current-srcq.exe> --trusted-project <workspace-a> --trusted-project <workspace-b>
 ```
 
 ## 5. 单次可重复流程
 
-1. coordinator 冻结 corpus、源码快照和候选差异，生成 manifest 与 hash；已登记且 identity 完全相同的历史基线直接复用。
-2. 为每个环境建立新的最小 Codex home 和只读工作区视图；预检工具、规则、skill、插件、MCP 和配置清单，确认差异恰好等于 allowlist。
-3. 按预先记录的平衡顺序运行。两环境、每项两次时使用 A-B-B-A；更多重复使用预生成的平衡随机区块，不能查看中间结果后改变次数或顺序。
-4. monitor 启动一个无历史 subject，持续读取事件流并保存原始 JSONL、stderr、退出状态和 wall time。超时、事件损坏或进程异常作为该次真实失败保留；不得用静默重试替换记录。
-5. monitor 从最后一个 `turn.completed.usage` 记录 input、cached input、output、reasoning output，并保存完整工具调用顺序、失败和最终答案。它不判断质量。
-6. 全部 subject 结束后生成 detached audit capsule，只包含冻结 manifest、corpus/oracle、环境差异证明、原始文件 hash、规范化记录和答案，不包含凭据、候选讨论或既有结论；capsule 同时声明可独立复算的规范化哈希算法及排除字段。
-7. auditor 先核对缺项、重复、配对、事件/summary 一致性和计量恒等式，再按结构化语义 oracle 逐案裁决质量；oracle 缺陷与答案缺陷分别记录。
-8. 汇总器只纳入身份有效、记录完整的 run，依次比较质量、总 Token 和 wall time；报告总计、配对差、按 case 分布、失败/回退和适用统计范围，不用总均值掩盖异质性。
+1. coordinator 冻结 corpus、候选差异、运行参数和工作区 identity scope；oracle 来源必须落在相应 scope 内，已登记且 identity 完全相同的历史基线才可复用。
+2. 为每个环境建立新的最小 Codex home；绑定真实 Codex 可执行文件身份，并用正式 sandbox、模型、推理深度和 PATH 各执行一次代表性版本命令。预检必须取得成功工具事件与完整 usage，并单独归档 setup Token；失败时不进入 subject 调度。
+3. 首次初始化完成后冻结环境树和声明范围内的源码快照，确认差异恰好等于 allowlist，再生成最终 manifest 与 hash。
+4. 按预先记录的平衡顺序运行。两环境、每项两次时使用 A-B-B-A；更多重复使用预生成的平衡随机区块，不能查看中间结果后改变次数或顺序。
+5. monitor 启动一个无历史 subject，持续读取事件流并保存原始 JSONL、stderr、退出状态和 wall time。超时、事件损坏或进程异常作为该次真实失败保留；不得用静默重试替换记录。
+6. monitor 从最后一个 `turn.completed.usage` 记录 input、cached input、cache write input（事件提供时）、output、reasoning output，并保存完整工具调用顺序、失败和最终答案。它校验非负整数与子集关系，但不判断质量；缺失 cache write 不得静默按零处理。
+7. 全部 subject 结束后生成 detached audit capsule，只包含冻结 manifest、corpus/oracle、环境差异证明、setup 与 subject 原始文件 hash、规范化记录和答案，不包含凭据、候选讨论或既有结论；capsule 同时声明可独立复算的规范化哈希算法及排除字段。
+8. auditor 先核对缺项、重复、配对、事件/summary 一致性和计量恒等式，再按结构化语义 oracle 逐案裁决质量；oracle 缺陷与答案缺陷分别记录。
+9. 汇总器只纳入身份有效、记录完整的 run，依次比较质量、总 Token 和 wall time；报告 subject-only、setup-only、including-setup、配对差、按 case 分布、失败/回退和适用统计范围，不用总均值掩盖异质性。
 
 ## 6. 计量与裁决
 
 - `actual_total_tokens = input_tokens + output_tokens`。
-- cached input 是 input 子集，reasoning output 是 output 子集，均单列但不重复相加。
+- cached input 与 cache write input 是 input 的分类；reasoning output 是 output 子集；`visible_output = output - reasoning output`，所有子项均单列但不重复相加。
+- 价格系数以短上下文普通输入 Token 为 `1`：当前 GPT-5.6 短上下文为 `1 / 0.1 / 1.25 / 6`，单次请求输入超过 272K 时整次请求为 `2 / 0.2 / 2.5 / 9`，顺序分别是普通输入、缓存读取、缓存写入、包含推理的输出。若改用该长上下文本身的普通输入为基准，输出系数是 `4.5`。
+- `turn.completed` 只能提供 subject 聚合用量，不能还原每次模型请求的上下文档位；cache write 字段也可能缺失。报告必须分别给出短/长场景、缓存写入已知时的精确值或未知时的上下界，并标明单位是价格等价量而非真实美元账单。
 - wall time 从 subject 进程启动到退出，包含工具、失败、回退和外部服务等待。
 - 工具调用数、失败调用、MCP 调用、stdout/stderr 大小只解释机制，不替代总 Token。
 - raw oracle、回答合同、核心语义和额外观察分开报告；发布裁决只使用预先确认且不超过 prompt 的 `answer_contract.required`，支持事实未在答案复述不得回写为核心失败。

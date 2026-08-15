@@ -514,7 +514,16 @@ def main() -> int:
                 "--",
                 *native_args,
             ]
-            token_safe_argv = [str(srcq), "exec", "--engine", str(engine), "--", *native_args]
+            token_safe_argv = [
+                str(srcq),
+                "exec",
+                "--output",
+                "machine",
+                "--engine",
+                str(engine),
+                "--",
+                *native_args,
+            ]
 
             direct, direct_timing = benchmark_command(
                 direct_argv, fixture_root, environment, args.warmups, args.samples
@@ -666,7 +675,7 @@ def main() -> int:
 
     defaults_probe_args = ast_grep_args("run", fixture_root / "small", fixture_root / "scan-rule.yml")
     defaults_output = subprocess.run(
-        [str(srcq), "defaults", "--", *defaults_probe_args],
+        [str(srcq), "defaults", "--output", "machine", "--", *defaults_probe_args],
         cwd=fixture_root,
         env=environment,
         capture_output=True,

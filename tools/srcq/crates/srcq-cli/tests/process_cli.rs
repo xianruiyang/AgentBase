@@ -168,6 +168,8 @@ fn process_reads_verified_cache_results_without_reexecuting_ast_grep() {
     let mut exec = Command::new(env!("CARGO_BIN_EXE_srcq"));
     exec.current_dir(&workspace).args([
         "exec",
+        "--output",
+        "machine",
         "--engine",
         env!("CARGO_BIN_EXE_srcq-native-fixture"),
         "--cache",
@@ -216,6 +218,8 @@ fn location_projection_selects_smallest_current_range_and_groups_one_scan() {
     let mut exec = Command::new(env!("CARGO_BIN_EXE_srcq"));
     exec.current_dir(&workspace).args([
         "exec",
+        "--output",
+        "machine",
         "--engine",
         env!("CARGO_BIN_EXE_srcq-native-fixture"),
         "--cache",
@@ -244,6 +248,8 @@ fn location_projection_selects_smallest_current_range_and_groups_one_scan() {
     let containing = process(&workspace, &cache_root)
         .args([
             "containing",
+            "--output",
+            "machine",
             "--cache-id",
             &cache_id,
             "--file",
@@ -273,7 +279,15 @@ fn location_projection_selects_smallest_current_range_and_groups_one_scan() {
     assert_eq!(containing["results"][0]["text"], "line-2\nline-3\nline-4\n");
 
     let grouped = process(&workspace, &cache_root)
-        .args(["group-locations", "--cache-id", &cache_id, "--limit", "2"])
+        .args([
+            "group-locations",
+            "--output",
+            "machine",
+            "--cache-id",
+            &cache_id,
+            "--limit",
+            "2",
+        ])
         .env("PATH", "")
         .output()
         .expect("group cached locations");
@@ -292,6 +306,39 @@ fn location_projection_selects_smallest_current_range_and_groups_one_scan() {
         grouped["results"][0]["ranges"],
         json!(["0:0-7:0", "1:0-6:0"])
     );
+
+    let model_containing = process(&workspace, &cache_root)
+        .args([
+            "containing",
+            "--cache-id",
+            &cache_id,
+            "--file",
+            "src/target.ts",
+            "--line",
+            "3",
+            "--column",
+            "0",
+            "--include-text",
+        ])
+        .env("PATH", "")
+        .output()
+        .expect("model containing location");
+    assert!(model_containing.status.success());
+    assert_eq!(
+        String::from_utf8(model_containing.stdout).expect("UTF-8 containing output"),
+        "src/target.ts:2:0-5:0\nline-2\nline-3\nline-4\n"
+    );
+
+    let model_grouped = process(&workspace, &cache_root)
+        .args(["group-locations", "--cache-id", &cache_id, "--limit", "2"])
+        .env("PATH", "")
+        .output()
+        .expect("model grouped locations");
+    assert!(model_grouped.status.success());
+    let model_grouped = String::from_utf8(model_grouped.stdout).expect("UTF-8 grouped output");
+    assert!(model_grouped.starts_with("src/target.ts\n  0:0-7:0\n  1:0-6:0\n"));
+    assert!(model_grouped.contains(&format!("@more shown=2 omitted=1 cache={cache_id} after=2")));
+    assert!(!model_grouped.contains("_sgy"));
 
     fs::write(
         &source,
@@ -328,6 +375,8 @@ fn merge_uses_verified_cache_cwd_and_engine_provenance_for_conflicts() {
         let mut exec = Command::new(env!("CARGO_BIN_EXE_srcq"));
         exec.current_dir(&workspace).args([
             "exec",
+            "--output",
+            "machine",
             "--engine",
             env!("CARGO_BIN_EXE_srcq-native-fixture"),
             "--cache",

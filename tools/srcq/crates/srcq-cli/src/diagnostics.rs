@@ -35,6 +35,7 @@ impl DiagnosticError {
 #[derive(Debug)]
 pub struct DoctorOutput {
     pub yaml: Vec<u8>,
+    pub model: Vec<u8>,
     pub ok: bool,
 }
 
@@ -98,7 +99,11 @@ pub fn render_capabilities() -> Result<Vec<u8>, DiagnosticError> {
         },
         "formats": {
             "input": ["json", "jsonl", "sarif", "safe_yaml"],
-            "context_output": "yaml-1.2-safe-subset",
+            "output": {
+                "model": "payload-only-text",
+                "machine": "yaml-1.2-safe-subset",
+                "native": "passthrough-or-artifact"
+            },
             "jsonl_round_trip": "common_data_model"
         },
         "yaml": {
@@ -168,8 +173,41 @@ pub fn run_doctor(
     });
     Ok(DoctorOutput {
         yaml: render(&document)?,
+        model: render_doctor_model(&document, ok),
         ok,
     })
+}
+
+fn render_doctor_model(document: &Value, ok: bool) -> Vec<u8> {
+    if ok {
+        return b"ok\n".to_vec();
+    }
+    let mut lines = Vec::new();
+    if let Some(checks) = document.get("checks").and_then(Value::as_object) {
+        for (name, check) in checks {
+            let Some(mapping) = check.as_object() else {
+                continue;
+            };
+            let status = mapping
+                .get("status")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            if matches!(status, "ok" | "writable" | "not_created" | "limited") {
+                continue;
+            }
+            let detail = mapping
+                .get("error")
+                .or_else(|| mapping.get("version"))
+                .or_else(|| mapping.get("path"))
+                .and_then(Value::as_str);
+            lines.push(match detail {
+                Some(detail) => format!("{name} {status}: {detail}"),
+                None => format!("{name} {status}"),
+            });
+        }
+    }
+    lines.push("retry: srcq doctor --output machine".to_owned());
+    format!("{}\n", lines.join("\n")).into_bytes()
 }
 
 fn diagnose_yaml() -> (Value, bool) {

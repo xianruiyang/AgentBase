@@ -9,6 +9,7 @@ use serde_json::{json, Map, Value};
 use srcq_core::{
     cache::{CacheIndexRecord, VerifiedCache},
     codec::{write_compact_yaml_document, write_yaml_document},
+    invocation::OutputFormat,
     processors::ProcessError,
 };
 
@@ -96,12 +97,18 @@ struct CachedLocation {
     range: SourceRange,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(super) struct ContainingOptions {
+    pub include_text: bool,
+    pub output_format: OutputFormat,
+}
+
 pub(super) fn execute_containing(
     input: &ProcessInput,
     file: &str,
     line: u64,
     column: u64,
-    include_text: bool,
+    options: ContainingOptions,
     launch_cwd: &Path,
     output: &mut impl Write,
 ) -> Result<(), ProcessCommandError> {
@@ -140,16 +147,28 @@ pub(super) fn execute_containing(
         .collect();
     let mut source_cache = BTreeMap::new();
     let mut results = Vec::new();
+    let mut model_lines = Vec::new();
     for selected in &selected {
         let text = verify_cached_location(&cache, selected, &mut source_cache)?;
+        model_lines.push(format!(
+            "{}:{}",
+            selected.file.replace('\\', "/"),
+            selected.range.compact()
+        ));
+        if options.include_text {
+            model_lines.push(text.trim_end_matches(['\r', '\n']).to_owned());
+        }
         let mut result = Map::new();
         result.insert("ordinal".to_owned(), Value::from(selected.id));
         result.insert("file".to_owned(), Value::String(selected.file.clone()));
         result.insert("range".to_owned(), selected.range.to_value());
-        if include_text {
+        if options.include_text {
             result.insert("text".to_owned(), Value::String(text));
         }
         results.push(Value::Object(result));
+    }
+    if options.output_format == OutputFormat::Model {
+        return write_model_lines(&model_lines, output);
     }
     let report = json!({
         "_sgy": {
@@ -161,7 +180,7 @@ pub(super) fn execute_containing(
             "selected": selected.len(),
             "selection_complete": true,
             "source_verified_records": selected.len(),
-            "text_included": include_text,
+            "text_included": options.include_text,
         },
         "results": results,
     });
@@ -174,6 +193,7 @@ pub(super) fn execute_grouped_locations(
     file: Option<&str>,
     offset: usize,
     limit: usize,
+    output_format: OutputFormat,
     launch_cwd: &Path,
     output: &mut impl Write,
 ) -> Result<(), ProcessCommandError> {
@@ -220,12 +240,30 @@ pub(super) fn execute_grouped_locations(
             grouped.push((location.file.clone(), vec![location.range.compact()]));
         }
     }
+    let shown = page.len();
+    let has_more = offset.saturating_add(shown) < total;
+    if output_format == OutputFormat::Model {
+        let mut lines = Vec::new();
+        for (path, ranges) in &grouped {
+            lines.push(path.replace('\\', "/"));
+            lines.extend(ranges.iter().map(|range| format!("  {range}")));
+        }
+        if has_more {
+            lines.push(format!(
+                "@more shown={shown} omitted={} cache={cache_id} after={}",
+                total.saturating_sub(offset.saturating_add(shown)),
+                offset.saturating_add(shown)
+            ));
+        }
+        if unprojectable > 0 {
+            lines.push(format!("@unprojectable {unprojectable}"));
+        }
+        return write_model_lines(&lines, output);
+    }
     let results: Vec<Value> = grouped
         .into_iter()
         .map(|(file, ranges)| json!({"file": file, "ranges": ranges}))
         .collect();
-    let shown = page.len();
-    let has_more = offset.saturating_add(shown) < total;
     let mut metadata = Map::new();
     metadata.insert(
         "schema".to_owned(),
@@ -253,6 +291,16 @@ pub(super) fn execute_grouped_locations(
     }
     let report = json!({"_sgy": metadata, "results": results});
     write_compact_yaml_document(&report, output).map_err(ProcessError::from)?;
+    Ok(())
+}
+
+fn write_model_lines(lines: &[String], output: &mut impl Write) -> Result<(), ProcessCommandError> {
+    if !lines.is_empty() {
+        output
+            .write_all(lines.join("\n").as_bytes())
+            .and_then(|()| output.write_all(b"\n"))
+            .map_err(ProcessCommandError::Output)?;
+    }
     Ok(())
 }
 

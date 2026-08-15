@@ -1,10 +1,10 @@
 {
-  "confirmation_ref": "2026-08-15: 用户确认模型默认输出应为干净、简洁且只含当前有用的工具证据，并要求全面审查所有输出族",
+  "confirmation_ref": "2026-08-16 当前对话：用户确认后端版本不得形成运行限制，并要求完善普通入口与 AST 升级方案计划",
   "confirmed_by": "user",
-  "cycle_id": "cycle-007",
+  "cycle_id": "cycle-012",
   "documents": {
     "requirements": {
-      "fingerprint": "sha256:6726140e9290477e41486605bb266b4a389d88d7566243193d279abb2334e71a",
+      "fingerprint": "sha256:2b619a82e98e567be99eaa37953fa66a28a96e73ef651b3e30258716bdb287d8",
       "ids": [
         "AC-SQG-001",
         "AC-SQG-002",
@@ -13,6 +13,7 @@
         "AC-SQG-005",
         "AC-SQG-006",
         "AC-SQG-007",
+        "AC-SQG-008",
         "CON-SQG-001",
         "CON-SQG-002",
         "CON-SQG-003",
@@ -21,7 +22,7 @@
       "path": "requirements.md"
     },
     "user_design": {
-      "fingerprint": "sha256:abc729184911d7ab3f43f5bb4e62375c7097e185c73ed859b0c7261642a10871",
+      "fingerprint": "sha256:3f52893f1af42f7e94dd40217bdf80f2b1ec8f0253634ea9fa4b6ff9ba27c0b4",
       "ids": [
         "UDES-SQG-001",
         "UDES-SQG-002",
@@ -35,7 +36,8 @@
         "UDES-SQG-010",
         "UDES-SQG-011",
         "UDES-SQG-012",
-        "UDES-SQG-013"
+        "UDES-SQG-013",
+        "UDES-SQG-014"
       ],
       "path": "user-design.md"
     }
@@ -267,6 +269,227 @@
             "UDES-SQG-011",
             "UDES-SQG-012",
             "UDES-SQG-013"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "2026-08-15: 用户确认模型默认输出应为干净、简洁且只含当前有用的工具证据，并要求全面审查所有输出族",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-007",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:6726140e9290477e41486605bb266b4a389d88d7566243193d279abb2334e71a",
+          "ids": [
+            "AC-SQG-001",
+            "AC-SQG-002",
+            "AC-SQG-003",
+            "AC-SQG-004",
+            "AC-SQG-005",
+            "AC-SQG-006",
+            "AC-SQG-007",
+            "CON-SQG-001",
+            "CON-SQG-002",
+            "CON-SQG-003",
+            "REQ-SQG-001"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:abc729184911d7ab3f43f5bb4e62375c7097e185c73ed859b0c7261642a10871",
+          "ids": [
+            "UDES-SQG-001",
+            "UDES-SQG-002",
+            "UDES-SQG-003",
+            "UDES-SQG-004",
+            "UDES-SQG-005",
+            "UDES-SQG-006",
+            "UDES-SQG-007",
+            "UDES-SQG-008",
+            "UDES-SQG-009",
+            "UDES-SQG-010",
+            "UDES-SQG-011",
+            "UDES-SQG-012",
+            "UDES-SQG-013"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "current-user-request-2026-08-15-intuitive-query-plan",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-008",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:b2704b3cb9bc9d7368de8930049296639ad8754b605f5d18906a2a9b6aaf4c7b",
+          "ids": [
+            "AC-SQG-001",
+            "AC-SQG-002",
+            "AC-SQG-003",
+            "AC-SQG-004",
+            "AC-SQG-005",
+            "AC-SQG-006",
+            "AC-SQG-007",
+            "AC-SQG-008",
+            "CON-SQG-001",
+            "CON-SQG-002",
+            "CON-SQG-003",
+            "REQ-SQG-001"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:62629faf7f04f9ba9f8434636aa9d928722812d9407d950028cd727cbedcd3fc",
+          "ids": [
+            "UDES-SQG-001",
+            "UDES-SQG-002",
+            "UDES-SQG-003",
+            "UDES-SQG-004",
+            "UDES-SQG-005",
+            "UDES-SQG-006",
+            "UDES-SQG-007",
+            "UDES-SQG-008",
+            "UDES-SQG-009",
+            "UDES-SQG-010",
+            "UDES-SQG-011",
+            "UDES-SQG-012",
+            "UDES-SQG-013"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "current-user-request-2026-08-15-srcq-exclusive-routing",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-009",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:2b619a82e98e567be99eaa37953fa66a28a96e73ef651b3e30258716bdb287d8",
+          "ids": [
+            "AC-SQG-001",
+            "AC-SQG-002",
+            "AC-SQG-003",
+            "AC-SQG-004",
+            "AC-SQG-005",
+            "AC-SQG-006",
+            "AC-SQG-007",
+            "AC-SQG-008",
+            "CON-SQG-001",
+            "CON-SQG-002",
+            "CON-SQG-003",
+            "REQ-SQG-001"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:7c1f2ae3dd40c919ce567d5a398be582c7077967b00a97ea5a3aff6373d6fba3",
+          "ids": [
+            "UDES-SQG-001",
+            "UDES-SQG-002",
+            "UDES-SQG-003",
+            "UDES-SQG-004",
+            "UDES-SQG-005",
+            "UDES-SQG-006",
+            "UDES-SQG-007",
+            "UDES-SQG-008",
+            "UDES-SQG-009",
+            "UDES-SQG-010",
+            "UDES-SQG-011",
+            "UDES-SQG-012",
+            "UDES-SQG-013"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "current-user-request-2026-08-15-upstream-source-fallback",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-010",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:2b619a82e98e567be99eaa37953fa66a28a96e73ef651b3e30258716bdb287d8",
+          "ids": [
+            "AC-SQG-001",
+            "AC-SQG-002",
+            "AC-SQG-003",
+            "AC-SQG-004",
+            "AC-SQG-005",
+            "AC-SQG-006",
+            "AC-SQG-007",
+            "AC-SQG-008",
+            "CON-SQG-001",
+            "CON-SQG-002",
+            "CON-SQG-003",
+            "REQ-SQG-001"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:f05f2dbb2d887d28bc479e78aca21c0931db6e394f393718174340274a2ed563",
+          "ids": [
+            "UDES-SQG-001",
+            "UDES-SQG-002",
+            "UDES-SQG-003",
+            "UDES-SQG-004",
+            "UDES-SQG-005",
+            "UDES-SQG-006",
+            "UDES-SQG-007",
+            "UDES-SQG-008",
+            "UDES-SQG-009",
+            "UDES-SQG-010",
+            "UDES-SQG-011",
+            "UDES-SQG-012",
+            "UDES-SQG-013",
+            "UDES-SQG-014"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "current-user-request-2026-08-15-source-upgrade-discussion-required",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-011",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:2b619a82e98e567be99eaa37953fa66a28a96e73ef651b3e30258716bdb287d8",
+          "ids": [
+            "AC-SQG-001",
+            "AC-SQG-002",
+            "AC-SQG-003",
+            "AC-SQG-004",
+            "AC-SQG-005",
+            "AC-SQG-006",
+            "AC-SQG-007",
+            "AC-SQG-008",
+            "CON-SQG-001",
+            "CON-SQG-002",
+            "CON-SQG-003",
+            "REQ-SQG-001"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:bc5a639a70c85401cb46f43600f3cc76113e3f7540f3aed7e73bc38bb40e82ab",
+          "ids": [
+            "UDES-SQG-001",
+            "UDES-SQG-002",
+            "UDES-SQG-003",
+            "UDES-SQG-004",
+            "UDES-SQG-005",
+            "UDES-SQG-006",
+            "UDES-SQG-007",
+            "UDES-SQG-008",
+            "UDES-SQG-009",
+            "UDES-SQG-010",
+            "UDES-SQG-011",
+            "UDES-SQG-012",
+            "UDES-SQG-013",
+            "UDES-SQG-014"
           ],
           "path": "user-design.md"
         }

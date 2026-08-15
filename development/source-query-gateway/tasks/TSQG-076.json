@@ -1,0 +1,45 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "renderer 候选",
+        "证据单元"
+      ],
+      "id": "TSQG-075",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-076",
+  "mutation_scope": [
+    "tools/srcq/**",
+    "development/source-query-gateway/**"
+  ],
+  "outcome": "普通查询无需模型预填输出上限，工具自行完整返回短结果并对大结果形成安全可续页窗口",
+  "outputs": [
+    "内部默认模型上下文预算",
+    "按证据单元分页",
+    "自带快照身份的精确 cursor"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-SQG-010",
+    "DES-SQG-004",
+    "DES-SQG-005",
+    "AC-SQG-002",
+    "AC-SQG-007",
+    "AC-SQG-008"
+  ],
+  "suggested_skills": [
+    "source-query",
+    "change-governance"
+  ],
+  "title": "内化默认上下文预算与精确续页",
+  "verification": [
+    "短结果无固定分页回执且完整返回",
+    "大结果不拆坏证据单元并可沿同一快照继续",
+    "显式预算覆盖与资源硬上限仍有效",
+    "未知、损坏或跨查询 cursor 被拒绝"
+  ]
+}

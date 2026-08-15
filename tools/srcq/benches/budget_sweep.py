@@ -120,6 +120,8 @@ def main() -> int:
                     [
                         str(srcq),
                         "exec",
+                        "--output",
+                        "machine",
                         "--engine",
                         str(engine),
                         "--cache",

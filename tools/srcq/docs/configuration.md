@@ -41,20 +41,20 @@ profile: token-safe
 
 ## 检查命令
 
-以下命令都输出有界安全 YAML：
+`schema` 和 `capabilities` 输出有界安全 YAML。`doctor` 与 `defaults` 默认输出最小 model 文本，显式 `--output machine` 时输出完整安全 YAML：
 
 ```text
 srcq schema
 srcq capabilities
-srcq doctor [--engine PATH] [--cwd PATH]
+srcq doctor [--output model|machine] [--engine PATH] [--cwd PATH]
 srcq defaults [wrapper options] -- <ast-grep argv...>
 ```
 
 - `schema` 输出 `sgy.config/v1` 的 JSON Schema 表达和项目/用户 scope 规则。
 - `capabilities` 输出 wrapper 命令、格式、安全 YAML、配置和协议能力；不查找或启动 engine。
-- `defaults` 加载配置并展示最终设置、每个设置的来源、注入项和 effective argv；不查找或启动 engine。
-- `doctor` 检查配置、工作目录、engine 路径与 `--version`、cache 位置/权限、安全 YAML 往返和 LSP/TTY 限制；不会执行真实扫描。
+- `defaults` 加载配置并计算最终设置、来源、注入项和 effective argv；model 只写分类与实际注入，machine 展示完整决策，不查找或启动 engine。
+- `doctor` 检查配置、工作目录、engine 路径与 `--version`、cache 位置/权限、安全 YAML 往返和 LSP/TTY 限制；model 成功只写 `ok`、失败只写失败项与恢复入口，machine 返回完整诊断；不会执行真实扫描。
 
-`doctor` 全部必要检查通过时退出 0；发现配置、路径、engine、版本、cache 权限或 YAML 问题时仍输出 `sgy.doctor/v1`，并退出 1。wrapper 自身无法编码或写出诊断时使用保留的 120–127 错误码。
+`doctor` 全部必要检查通过时退出 0；发现配置、路径、engine、版本、cache 权限或 YAML 问题时退出 1。完整 `sgy.doctor/v1` 通过 `--output machine` 取得。wrapper 自身无法编码或写出诊断时使用保留的 120–127 错误码。
 
 cache root 已存在时，doctor 会在其中创建并立即删除一个临时探针文件；root 尚未创建时不会在其父目录试写，而是明确报告权限尚未验证。

@@ -1,6 +1,6 @@
 # AST 查询与改写合同
 
-仅在文本不能可靠表达语法结构、声明/定义完整范围、控制流、rule 或 rewrite 时读取。AST 沿用 srcq 既有入口、profile、cache、fingerprint、process、TTY/LSP、artifact、诊断和退出合同，不使用 rg/fd 的 snapshot 代替 AST cache。
+仅在已经查看必要文本、但语法边界、候选歧义、控制流或结构关系仍不能可靠确定，或任务明确需要 rule/rewrite 时读取。“完整定义”是验收结果，不是 AST 触发词。AST 沿用 srcq 既有入口、profile、cache、fingerprint、process、TTY/LSP、artifact、诊断和退出合同，不使用 rg/fd 的 snapshot 代替 AST cache。
 
 ## 查询
 
@@ -17,6 +17,7 @@ srcq <schema|capabilities|doctor> ...
 ```text
 --engine PATH
 --cwd PATH
+--output model|machine
 --profile token-safe|locations|lossless|files|custom
 --cache auto|on|off
 --fingerprint-file PATH
@@ -35,10 +36,10 @@ srcq <schema|capabilities|doctor> ...
 
 wrapper help 使用 `srcq exec --help`；原生 help 使用 `srcq exec -- run --help`。只在既有命令报告引擎、版本或协议异常时运行 `srcq doctor`、`srcq schema` 或 `srcq capabilities`，不要把探测命令作为查询前置步骤。
 
-- 已知名称且文本定位后能用有界读取可靠取得完整实现时，不使用 AST。只有边界、关系或语法身份不能由文本可靠确定时，才先限定语言、目录、glob 和准确 pattern/rule。默认使用 token-safe；只需文件与完整 0-based、end-exclusive 范围时用 locations；需要正文、捕获或诊断时保留默认；只有机器 round-trip、未知字段或完整审计使用 lossless。
-- 读取 `_sgy.total/files/shown/omitted/complete/cache`；可见详情不完整时不得从其外推全集。
-- 已有位置但语法边界仍不稳时，才用 `--cache on` 和目标文件 fingerprint 建立完整 cache，再执行 `process containing`；同文件多目标复用一份 cache。源码身份变化时重扫。
-- pattern 是目标语言语法；元变量、关系、constraints、context/selector 和 rule 只在结构要求需要时增加。调试先收窄到单文件或 stdin，再检查语言、解析、元变量和 strictness。
+- 已知名称且文本定位后能用有界读取可靠取得完整实现时，不使用 AST。只有边界、关系或语法身份不能由文本可靠确定时，才先限定语言、目录、glob 和准确 pattern/rule。默认 token-safe model 每项只写文件、完整 0-based end-exclusive 范围与一次源码正文；只需范围时用 locations。`@more` 或 `@cut` 表示当前可见证据不完整，不得外推全集。
+- parser、完整捕获、未知字段、稳定 schema 或 round-trip 使用 `--output machine`；`--yaml-out`、lossless 与 custom 本身也选择 machine。普通 model 不读取 `_sgy`，machine 才按 `_sgy.total/files/shown/omitted/complete/cache` 裁决。
+- 已有位置但语法边界仍不稳时，才用 `--cache on` 和目标文件 fingerprint 建立完整 cache，再执行 `process containing`；`containing` 与 `group-locations` 默认返回无 envelope 的定位正文，程序消费时加 `--output machine`。`cache query` 同样默认 model，完整原生 result 用 `cache get`。同文件多目标复用一份 cache，源码身份变化时重扫。
+- pattern 是目标语言语法；元变量、关系、constraints、context/selector 和 rule 只在结构要求需要时增加。调试先收窄到单文件或 stdin，再检查语言、解析、元变量和 strictness。无匹配不是继续猜 pattern 的依据；先读取实际候选源码，只有新观察能说明语言、节点形状、限定名、修饰符或 strictness 为什么应改变时才再查询，否则采用文本证据或明确当前结构结论未证。
 - LSP 与交互模式透传协议或 TTY，不进入 YAML；未知未来命令使用原生有界 fallback，不猜测 schema。
 
 ## Rewrite

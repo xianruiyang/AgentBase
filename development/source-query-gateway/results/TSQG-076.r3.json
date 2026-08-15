@@ -1,0 +1,49 @@
+{
+  "changed_files": [
+    "tools/srcq/crates/srcq-cli/src/lib.rs",
+    "tools/srcq/crates/srcq-cli/src/query_gateway.rs",
+    "tools/srcq/crates/srcq-cli/tests/query_gateway_real.rs",
+    "tools/srcq/docs/query-gateway.md",
+    "tools/srcq/docs/model-output.md"
+  ],
+  "evidence_for": [
+    "SOL-SQG-010",
+    "AC-SQG-002",
+    "AC-SQG-007",
+    "AC-SQG-008"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "ref": "tools/srcq/crates/srcq-cli/tests/query_gateway_real.rs"
+    },
+    {
+      "kind": "contract",
+      "ref": "tools/srcq/docs/query-gateway.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "普通 model 查询采用内部 2048 estimated-token 软预算与 80 个证据单元页上限；工具只在完整证据单元边界截页并返回绑定同一 snapshot/view/offset 的精确 cursor，显式控制面仍可覆盖预算。",
+  "outputs": [
+    "内部默认模型预算",
+    "证据单元二分分页",
+    "同快照精确续页"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-002": "sha256:2e60049c4b48151e592446cfa42a5b6aeccce763d0ce0c101556342266224da5",
+    "AC-SQG-007": "sha256:aca71625808c9d8b20c67aa9855d137f355f6852cb87b8d44c65074a62a2b828",
+    "AC-SQG-008": "sha256:42b8b7122f8e1b575572947c1549a4436135695a13d7d0154c0734538b6551e5",
+    "DES-SQG-004": "sha256:e3bdbc5713f945c317af61e761c6305af9a1683877175648991df10c543ccc81",
+    "DES-SQG-005": "sha256:bdb49c83386aa757dda60737a78bfcc738f89db932426e5f3bea506b5648e9db",
+    "SOL-SQG-010": "sha256:dda548024d79daaff4c00847a143216774c38ed800e470e2f608943162bbdca8"
+  },
+  "task_id": "TSQG-076",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "集成回归以 32 estimated-token 预算证明分页不拆证据单元",
+    "精确 cursor 续页成功，损坏、跨查询与跨 view cursor 既有拒绝测试保持通过",
+    "短结果真实 smoke 不附固定回执，大结果只附 @more"
+  ]
+}

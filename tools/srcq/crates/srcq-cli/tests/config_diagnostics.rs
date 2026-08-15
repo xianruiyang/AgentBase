@@ -57,7 +57,7 @@ fn project_config_accepts_locations_profile() {
     )
     .expect("project config");
     let output = isolated_command(temp.path())
-        .args(["defaults", "--", "scan", "src"])
+        .args(["defaults", "--output", "machine", "--", "scan", "src"])
         .output()
         .expect("defaults");
     assert!(
@@ -85,7 +85,16 @@ fn defaults_uses_explicit_project_user_builtin_priority_with_source_metadata() {
     .expect("user config");
 
     let output = isolated_command(temp.path())
-        .args(["defaults", "--max-detail-results", "7", "--", "scan", "src"])
+        .args([
+            "defaults",
+            "--output",
+            "machine",
+            "--max-detail-results",
+            "7",
+            "--",
+            "scan",
+            "src",
+        ])
         .output()
         .expect("defaults");
     assert!(
@@ -134,6 +143,8 @@ fn doctor_separates_engine_config_cache_yaml_and_protocol_checks_without_scannin
     let output = isolated_command(temp.path())
         .args([
             "doctor",
+            "--output",
+            "machine",
             "--engine",
             env!("CARGO_BIN_EXE_srcq-native-fixture"),
         ])
@@ -159,7 +170,7 @@ fn doctor_separates_engine_config_cache_yaml_and_protocol_checks_without_scannin
 fn doctor_returns_structured_failure_when_engine_is_missing_or_config_is_invalid() {
     let temp = tempfile::tempdir().expect("tempdir");
     let missing = isolated_command(temp.path())
-        .arg("doctor")
+        .args(["doctor", "--output", "machine"])
         .env("PATH", "")
         .output()
         .expect("doctor missing engine");
@@ -173,6 +184,8 @@ fn doctor_returns_structured_failure_when_engine_is_missing_or_config_is_invalid
     let invalid = isolated_command(temp.path())
         .args([
             "doctor",
+            "--output",
+            "machine",
             "--engine",
             env!("CARGO_BIN_EXE_srcq-native-fixture"),
         ])
@@ -191,6 +204,8 @@ fn doctor_returns_structured_failure_when_engine_is_missing_or_config_is_invalid
     let bad_cwd = isolated_command(temp.path())
         .args([
             "doctor",
+            "--output",
+            "machine",
             "--engine",
             env!("CARGO_BIN_EXE_srcq-native-fixture"),
             "--cwd",

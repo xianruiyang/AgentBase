@@ -93,10 +93,19 @@ candidate-only 全量运行的 11 次完整 usage、一次 TLS 超时和关系 c
 
 六个 case 的两次聚合均同时降低 Token 与耗时，因此按质量、Token、速度顺序保留候选。单对仍受运行波动影响，不把 31.186% 外推到其他身份，也不为追逐单次波动继续增加规则或针对语料调优。
 
-### 3.6 对本计划的约束
+### 3.6 当前直觉入口身份的反向结果
+
+2026-08-16 在同一 `gpt-5.6-sol`、medium reasoning、default service tier、full access 和冻结 identity 下完成 24 次 A-B-B-A。candidate 必需/核心语义为 12/12，control 为 11/12；但 subject Token 从 `1,526,268` 增至 `2,845,522`（`+86.437%`），同 tier 耗时从 `504,290 ms` 增至 `830,366 ms`（`+64.660%`），工具调用从 75 增至 126。12 对中 10 对 candidate Token 更高；35 个 candidate 非零工具退出中，17 个为 rg 15.2.0 被精确版本门禁拒绝，另有普通文件入口猜测和已知函数上的 AST 无匹配试探。输入增量 `1,306,000` 远高于输出增量 `13,254`，证明当前首要问题是失败回合与上下文重放，不是继续压缩正常结果正文。
+
+该结果不推翻已完成的自适应 renderer、分页或三输出面；它推翻“当前候选可直接进入采纳”的判断。用户已经裁决后端版本不得形成运行限制，并继续选择外部适配；P9 先修正兼容准入、最小语法和 AST 升级边界，机制不变时不重跑。
+
+### 3.7 对本计划的约束
 
 - 统一包装必须减少完整模型路径，而不只是缩短 stdout；固定 skill 成本、失败和回退全部计入。
 - 简单文件/文本任务必须保留低固定成本路径；结构和 LSP 只在改变质量或能由复用抵消成本时升级。
+- 后端精确版本只标识测试证据，不形成运行许可；兼容由本次命令的实际能力、退出和输出合同裁决。
+- 常驻规则必须给出 `srcq fd` 与 `srcq rg` 两个普通入口的最小语法，不用一次 help、doctor 或 skill 加载换取省下的少量规则 Token。
+- “完整定义”不触发 AST；只有文本定位和有界读取仍不能充分证明边界或关系时升级，无新语法证据不得连续试探 pattern。
 - 不用首轮安装态、第二轮候选和消融之间的跨快照差额推导单一机制因果；它们只限定当前改进方向。
 - 新候选必须通过 [benchmark-protocol.md](benchmark-protocol.md) 的隔离、监控和独立审计流程；旧数据不因缺少完整 identity 被伪装成可逐字复现实验。
 
@@ -154,7 +163,7 @@ P3 闭环：rg 能完成全部位置与不存在证明，压缩重复路径且�
 | --- | --- | --- | --- | --- |
 | TSQG-040 | 用 P0 oracle 复核 AST 当前公开入口 | TSQG-011, TSQG-023, TSQG-032 | AST 非回退差异报告 | `sgy exec/defaults/cache/process/schema/capabilities/doctor`、profile、TTY/LSP 与 rewrite 均无非预期变化 |
 | TSQG-041 | 仅在序列化与行为等价时让 AST 复用公共内部原语 | TSQG-040 | 最小共享实现或保留独立的裁决 | 共享有证据；无法证明同责时不为减少代码强行合并 |
-| TSQG-042 | 完成三命令域诊断、单一版本来源和 Windows CLI 生命周期 | TSQG-022, TSQG-032, TSQG-041 | capability/doctor、release 与安装生命周期证据 | workspace、README、metadata、helper、SBOM、manifest 与运行时版本一致；全新安装、状态、幂等重装、可恢复升级、卸载、PATH 与新进程读回通过；缺失引擎、错误版本、输出不兼容和透传状态可区分，AST 现有诊断合同不变 |
+| TSQG-042 | 完成三命令域诊断、单一版本来源和 Windows CLI 生命周期 | TSQG-022, TSQG-032, TSQG-041 | capability/doctor、release 与安装生命周期证据 | workspace、README、metadata、helper、SBOM、manifest 与 srcq 运行时版本一致；全新安装、状态、幂等重装、可恢复升级、卸载、PATH 与新进程读回通过；缺失引擎、观察到的后端版本、输出不兼容和透传状态可区分，AST 现有诊断合同不变 |
 | TSQG-043 | 将迁移前 sgy 产品身份原子迁移为 Source Query Gateway / `srcq.exe` | TSQG-042 | `tools/srcq`、`srcq.exe`、安装目录/状态、归档、包名、skill 调用、文档与证据的唯一正式身份 | 当前 sgy 行为 oracle 在新命令下等价；发布 payload、PATH 和安装状态不含 `sgy.exe` 别名、第二运行时或旧受管安装遗留 |
 
 P4 闭环：同一 srcq 二进制在不改变已验证 sgy 行为合同的前提下完成 fd、rg 与 AST 真实任务；rg/fd 共享合适的基础设施，AST 继续使用原有设计和安全合同；正式产品身份、安装、升级、查询和卸载只剩 `srcq`，不存在 `sgy.exe` 双轨入口。
@@ -163,7 +172,7 @@ P4 闭环：同一 srcq 二进制在不改变已验证 sgy 行为合同的前提
 
 | ID | 任务 | 依赖 | 产出 | 验证与闭环 |
 | --- | --- | --- | --- | --- |
-| TSQG-050 | 建立精炼的统一查询 skill 和按需 backend 引用 | TSQG-023, TSQG-033, TSQG-043 | 只调用 PATH 中 srcq.exe 的候选 skill | 简单快路径、完整性、tree、AST、LSP 边界和 PowerShell 非触发路由通过；缺失、错误版本或 PATH 尚未刷新时只给安装、升级或重启恢复动作 |
+| TSQG-050 | 建立精炼的统一查询 skill 和按需 backend 引用 | TSQG-023, TSQG-033, TSQG-043 | 只调用 PATH 中 srcq.exe 的候选 skill | 简单快路径、完整性、tree、AST、LSP 边界和 PowerShell 非触发路由通过；srcq 缺失、安装身份错误或 PATH 尚未刷新时只给安装、升级或重启恢复动作 |
 | TSQG-051 | 将现有 AST skill 语义原样迁入按需引用 | TSQG-050 | AST 规则等价映射 | 迁移前 sgy 命令结构、profile、cache、process、rewrite 和安全边界在 srcq 命令前缀下无丢项；独立行为证据等价 |
 | TSQG-052 | 更新消费者并退出已被替代的 rg/fd wrapper、旧 skill 与内置 sgy | TSQG-050, TSQG-051 | 唯一职责与运行时方向 | 保留 AST 行为合同并统一为 srcq 命令；先验证 PATH 运行时再删除同责 Python wrapper、重复规则和 skill 内置 sgy，不存在私有 fallback 或悬空引用 |
 | TSQG-053 | 更新分支内 srcq 发布与候选 payload 合同 | TSQG-052 | 独立 srcq Windows release、安装状态和不含二进制的 skill payload | 二进制 hash、源码 revision、archive、安装状态与真实运行读回一致；skill payload 不含 srcq/sgy、tests、fixtures、benchmark、runner、corpus、结果或 audit 资产，旧直接安装副本被移除 |
@@ -199,15 +208,52 @@ P6 已对上一冻结身份闭环：供应链、独立路由、正式消费者�
 | TSQG-072 | 运行影响范围验证与真实隔离对照 | TSQG-071 | 定向/性质/真实引擎结果与受影响 control/candidate audit | 先验收语义等价、round-trip、分页错误与 AST 非回退；只运行受输出身份影响的 corpus，质量持平后总 Token 下降，前两项不退化后耗时不恶化 |
 | TSQG-073 | 完成审计与采纳裁决 | TSQG-072 | GAP-SQG-007 完成结论及发布前状态 | 全部输出族无已知低收益常驻字段，证据覆盖新 identity；未达标则收紧或退出，不以局部字符下降声称完成 |
 
-P7 纵向闭环优先从一个真实查询族打通内部事实、干净 model 输出、异常续页、machine 兼容和实际消费者，再穿透到其他输出族；不得先铺开多套 serializer 后集中补兼容。当前阶段只完成需求、设计、现状和任务投影，TSQG-067 至 TSQG-073 均未实施。
+P7 已完成 TSQG-067 至 TSQG-071，形成 model/machine/native 三输出面、干净默认正文、fd/rg/AST 与辅助命令投影及正式消费者迁移。用户检查真实输出后确认更上游的职责差距：普通调用仍要求模型预先编排 `exec`、argv 分隔、view、limit、heading 或预算，位置表示也尚未把 heading 与路径树作为统一结果后置候选。因此 TSQG-072 的旧输出 identity 对照暂停，已有原始运行只作调试输入，不进入完成裁决；TSQG-073 不启动，先进入 P8 重投影。
+
+### P8 查询意图入口与结果后置自适应投影
+
+| ID | 任务 | 依赖 | 产出 | 验证与闭环 |
+| --- | --- | --- | --- | --- |
+| TSQG-074 | 建立 srcq 统一接管的 rg/fd 原生直觉入口 | TSQG-071 | `srcq rg <rg argv...>`、`srcq fd <fd argv...>`、既有 srcq AST 入口与独立显式控制面 | 正式规则不再裸用 rg/fd/ast-grep；普通查询不需要 `exec`、`--`、view、limit、heading 或 receipt；原生 argv、退出和特殊模式不退化 |
+| TSQG-075 | 实现真实结果后的自适应 renderer 规划 | TSQG-074 | 原生等效文本、单行、heading、分组正文、路径树、路径树位置 heading 与 machine/native 候选选择器 | 只在 EvidenceSignature 等价时按实际模型文本成本选择；裸输出无预设优先级，同文件、多文件共享目录和离散单位置分别选择最低充分结构 |
+| TSQG-076 | 内化默认上下文预算与精确续页 | TSQG-075 | 无需模型预填 limit/text budget 的安全默认窗口、证据单元分页与 cursor | 短结果完整返回；大结果不拆坏证据单元，续页不混快照；显式预算仍可覆盖且资源硬上限不变 |
+| TSQG-077 | 迁移消费者并冻结用户可见输出身份 | TSQG-075, TSQG-076 | 精简后的全局路由、source-query 引用、CLI 文档、裸工具与旧普通格式配方退出记录和真实输出审查 | 所有 rg/fd/ast-grep 模型查询指向 srcq；常驻规则和普通 skill 不教授 heading/tree/view/limit/receipt 配方；用户审查默认输出后冻结 identity |
+| TSQG-072 | 运行新调用身份的影响验证与隔离对照 | TSQG-077 | 定向/性质/真实引擎结果与新 identity control/candidate audit | 先验收原生兼容、投影等价、分页、machine/native 与 AST 非回退；用户继续设置 Goal 后才恢复独立 Codex 测试 |
+| TSQG-073 | 完成审计与采纳裁决 | TSQG-072 | GAP-SQG-007 完成结论及发布前状态 | 质量持平后总 Token 下降，前两项不退化后再比较耗时；失败和无收益样本完整保留 |
+
+P8 按“所有底层搜索进入 srcq—调用只表达查询语义—工具取得真实结果—生成含原生等效文本在内的等价投影—选择最低充分表示—必要时精确续页”的单条纵向链推进。裸工具不是简单查询快路径，裸输出也只是内部 renderer 候选；路径树和 heading 同样不是模型必须选择的模式。显式控制只服务于调用方确实需要定向 model、machine、native 或 artifact 的场景。后端默认继续套壳调用已验证二进制；只有可重复的必要验收失败被定位到上游内部、外部适配方案已证明不足时，才暂停本链并形成源码升级建议，与用户讨论并取得该次明确同意后再按 DES-SQG-013 重投影，不预建休眠 fork 任务、提前拉取源码或以既有授权代替裁决。TSQG-072 保留原任务 ID，但其依赖和测试 identity 重投影到 TSQG-077 之后，不复用或拼接刚暂停的旧 candidate 运行。
+
+P8 的组件与消费者实现已经形成，但首次新 identity 对照由 OBS-SQG-010 证明未达到端到端成本目标；TSQG-072 保留失败证据而不完成，进入 P9 修正最早失效机制。
+
+### P9 版本无关兼容、最小语法与证据驱动升级
+
+| ID | 任务 | 依赖 | 产出 | 验证与闭环 |
+| --- | --- | --- | --- | --- |
+| TSQG-078 | 以实际输出能力取代后端版本许可 | TSQG-077 | 无版本拒绝的 rg/fd/AST 执行、解析与安全降级合同 | rg 15.1/15.2、fd/AST 现有矩阵、未来版本字符串、结构变化、错误与副作用模式通过；doctor 不因版本不同失败，转换失败不伪装为空结果 |
+| TSQG-079 | 固化普通查询最小语法和定向错误恢复 | TSQG-077 | 常驻 `srcq fd`/`srcq rg` 两个语法、无 skill 普通路径、CLI 一行修正 | 文件发现与文本定位无需 help/doctor/skill；错形一次获得唯一恢复，成功路径无新增元数据、别名或第二语法 |
+| TSQG-080 | 把 AST/LSP 升级改为证据缺口驱动 | TSQG-077 | 精炼后的全局路由、source-query 触发与 AST 空结果恢复合同 | 唯一已知函数走文本闭环；边界不明、同名/重载、结构关系和截断场景才升级；AST 无匹配不发生无新证据重试 |
+| TSQG-081 | 接入三项修正并冻结新 identity | TSQG-078, TSQG-079, TSQG-080 | 当前 srcq release 候选、正式规则/skill/文档、受影响 consumer 与 identity 清单 | 组件、真实后端、AST 基线、路由正反场景和发布 payload 影响闭合；用户审查普通成功与异常恢复输出后冻结 identity |
+| TSQG-072 | 只对变化后的身份运行影响验证与隔离对照 | TSQG-081 | 新 identity 的定向结果、原始 usage 与独立 audit | 不复用失败 candidate；先质量，再总 Token，最后同 tier 耗时；按 case 报告失败、回退和配对分布 |
+| TSQG-073 | 完成审计与采纳裁决 | TSQG-072 | GAP-SQG-007 完成结论及发布前状态 | 逐项复核版本无关兼容、普通低固定成本、证据驱动升级和端到端收益，未达标则继续收紧或退出 |
+
+P9 沿三条可独立验证的根因链推进，最后只在 TSQG-081 汇合：运行时 owner 负责后端能力与安全降级，常驻规则只承担普通命令所需的最小语法，source-query skill 只承担高级证据升级。三者不互相复制决定，也不新增别名、源码 fork 或模型侧展示参数。优先完成 TSQG-078，先恢复真实 Codex 环境中的普通查询；TSQG-079 与 TSQG-080 可在不依赖其实现细节时并行设计，但冻结身份前必须共同接入并验证。
+
+TSQG-078 至 TSQG-081 已完成版本无关执行、安全文本降级、唯一错形恢复、证据缺口升级、`srcq 0.3.1` Windows release、正式规则/skill、消费者和路由证据。TSQG-072 随后只运行变化后的 candidate，通过受影响小集合逐步消除权威源码副本污染、`srcq lsp` 猜测、隐藏行数 oracle 和普通文本任务的高级 skill 预加载，再冻结最终 identity `e32871ba9c0f8b19716e7b191260c29666939879215350baa4604d1bfd9c7ac4`。
+
+最终六类任务各两次均通过：质量 12/12，总 Token `1,150,528`，耗时 `363.163 s`，48 次命令无失败；确定性 capsule 校验和 detached 语义审计均通过。相对未重跑的五-skill 历史记录只作方向性观察：Token `-0.57%`、耗时 `-28.58%`，当前严格质量由 11/12 提升为 12/12。剩余重复间成本波动没有共享错误、失败回退或可归属的固定冗余，继续增加常驻规则会提高成本和过拟合风险；TSQG-073 因此采纳当前实现并关闭 GAP-SQG-007。实际 Codex 发布不在本计划完成结论内，仍需用户针对该次发布明确同意。
 
 ## 5. 停止条件
 
 - AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断或 release gate 任一发生非必要变化时，停止并回到设计裁决。
-- 原生命令不能在不改变语义的情况下结构化时使用透传或产物；仍有未分类模式时停止该版本的“完整兼容”声明。
+- 原生命令不能在不改变语义的情况下结构化时使用透传、产物或安全降级；不得用版本字符串拒绝可执行后端，仍有会误报成功、重复副作用或丢失原生语义的模式时停止兼容声明。
 - 公共抽象迫使 backend 复制、丢失特有语义或新增第二状态源时，保留独立实现，不以形式统一为完成目标。
 - fd tree 不能机械还原路径或预计 Token 不低于 flat 时不选 tree。
 - 正常成功完整的 model 输出仍含 envelope、schema、固定 receipt、重复事实或不能说明模型动作收益的字段时，不得关闭 P7；不得用 machine 兼容需求迫使这些内容常驻模型上下文。
+- 普通 rg/fd 查询仍要求模型先掌握 `exec`、argv 分隔、heading、tree、view、limit、receipt 或正文预算，或 renderer 在取得真实结果前按猜测固定格式时，不得关闭 P8。
+- 常驻规则没有给出 `srcq fd` 与 `srcq rg` 的最小语法，简单查询需要加载 skill/help/doctor，或 CLI 错形仍落入 AST 分隔错误、别名或 backend 猜测时，不得关闭 P9。
+- 已知名称仅因“完整定义”等请求措辞升级 AST，或 AST 无匹配后没有新增实际语法证据仍连续改写 pattern 时，不得关闭 P9。
+- 正式规则、skill 或文档仍允许模型裸用 rg、fd、ast-grep，或因查询简单直接绕过 srcq 时，不得关闭 P8；原生等效输出必须由 srcq 在真实候选比较后选择。
+- 外部适配遇到困难时先记录直接反例、根因和已排除方案；未满足 DES-SQG-013 的技术门槛不得提出源码升级，满足后也必须暂停、先与用户讨论并取得针对该次升级的明确同意，未获同意不得拉取、复制、内嵌或分叉源码，也不得继续堆叠 wrapper 特例或静默切换后端真源。
 - 真实 Codex 质量退化时先修正质量；质量相同但总 Token 高于冻结消融且无必要证据收益时，继续收紧或退出，不以速度补偿。
 - control/candidate 出现 allowlist 外环境差异、subject 接触对照信息、monitor 干预答案、usage 缺失或 audit capsule 不完整时，该实验停止且不得进入收益聚合。
 - Plugin 或 DirectCompatibility 候选 payload 中出现测试、fixture、benchmark、runner、corpus、原始结果或审计资产时停止发布，不以它们位于 skill 子目录为理由保留。

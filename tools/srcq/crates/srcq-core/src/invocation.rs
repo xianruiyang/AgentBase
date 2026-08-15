@@ -9,6 +9,23 @@ pub enum WrapperCommand {
     Defaults,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum OutputFormat {
+    #[default]
+    Model,
+    Machine,
+}
+
+impl OutputFormat {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Model => "model",
+            Self::Machine => "machine",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Profile {
     TokenSafe,
@@ -39,6 +56,7 @@ pub struct ExplicitOptions {
     pub artifact_out: Option<PathBuf>,
     pub stderr_yaml: Option<PathBuf>,
     pub meta_out: Option<PathBuf>,
+    pub output: OutputFormat,
     pub profile: Option<Profile>,
     pub cache_mode: Option<CacheMode>,
     pub fingerprint_files: Vec<PathBuf>,

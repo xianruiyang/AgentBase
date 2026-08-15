@@ -18,6 +18,7 @@ use srcq_core::{
 };
 
 use crate::{GatewayBackend, GatewayCommand, GatewayOperation};
+use srcq_core::invocation::OutputFormat;
 
 const MAX_STDOUT_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_STDERR_BYTES: u64 = 16 * 1024 * 1024;
@@ -58,6 +59,13 @@ impl GatewayError {
             code: 126,
         }
     }
+
+    fn conversion(context: &str, source: impl std::fmt::Display) -> Self {
+        Self {
+            message: format!("{context}: {source}"),
+            code: 124,
+        }
+    }
 }
 
 impl std::fmt::Display for GatewayError {
@@ -87,6 +95,7 @@ struct Snapshot {
 #[derive(Debug)]
 struct Projection {
     value: Value,
+    model: String,
     displayed: usize,
     total: usize,
     view: String,
@@ -116,7 +125,7 @@ fn execute_inner(command: &GatewayCommand) -> Result<i32, GatewayError> {
     }
     let engine = resolve_engine(command.backend, command.engine.as_deref())?;
     match command.operation {
-        GatewayOperation::Doctor => execute_doctor(command.backend, &engine, &cwd),
+        GatewayOperation::Doctor => execute_doctor(command, &engine, &cwd),
         GatewayOperation::Defaults => unreachable!("defaults returns before engine discovery"),
         GatewayOperation::Exec => execute_query(command, &engine, &cwd),
     }
@@ -180,23 +189,24 @@ fn resolve_engine(
     )))
 }
 
-fn execute_doctor(backend: GatewayBackend, engine: &Path, cwd: &Path) -> Result<i32, GatewayError> {
+fn execute_doctor(
+    command: &GatewayCommand,
+    engine: &Path,
+    cwd: &Path,
+) -> Result<i32, GatewayError> {
+    let backend = command.backend;
     let version = native_version(engine, cwd)?
         .lines()
         .next()
         .unwrap_or("unknown")
         .to_owned();
-    let expected = match backend {
-        GatewayBackend::Rg => "ripgrep 15.1.0",
-        GatewayBackend::Fd => "fd 10.4.2",
-    };
-    let ok = version
-        .lines()
-        .next()
-        .is_some_and(|line| line.trim().starts_with(expected));
-    let value = json!({"_sgy":{"schema":"sgy.query.doctor/v1","backend":backend_name(backend),"ok":ok},"engine":engine,"cwd":cwd,"observed_version":version.trim(),"expected_version":expected});
-    emit_yaml(&value)?;
-    Ok(if ok { 0 } else { 1 })
+    let value = json!({"_sgy":{"schema":"sgy.query.doctor/v1","backend":backend_name(backend),"ok":true},"engine":engine,"cwd":cwd,"observed_version":version.trim()});
+    if command.output == OutputFormat::Machine {
+        emit_yaml(&value)?;
+    } else {
+        emit_model_text("ok")?;
+    }
+    Ok(0)
 }
 
 fn execute_defaults(
@@ -227,7 +237,18 @@ fn execute_defaults(
         "effective_argv":os_args_json(&effective)?,
         "engine_started":false
     });
-    emit_yaml(&value)?;
+    if command.output == OutputFormat::Machine {
+        emit_yaml(&value)?;
+    } else {
+        let mut lines = vec![format!("{} {}", mode.id, handling_name(mode.handling))];
+        if !injected.is_empty() {
+            lines.push(format!("+ {}", os_args_json(&injected)?.join(" ")));
+        }
+        if injected.is_empty() {
+            lines.push("unchanged".to_owned());
+        }
+        emit_model_text(&lines.join("\n"))?;
+    }
     Ok(0)
 }
 
@@ -254,15 +275,6 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
     {
         return Err(GatewayError::input("native argv contains non-UTF-8 Windows text; use raw, artifact, or native passthrough mode"));
     }
-    let version = native_version(engine, cwd)?;
-    if !supported_version(command.backend, &version) {
-        return Err(GatewayError::input(format!(
-            "unsupported {} version: {}; run srcq {} doctor",
-            backend_name(command.backend),
-            version.lines().next().unwrap_or("unknown"),
-            backend_name(command.backend)
-        )));
-    }
     if mode.handling == Handling::Passthrough {
         if command.artifact_out.is_some()
             || command.snapshot.is_some()
@@ -277,7 +289,7 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
     }
     if mode.handling == Handling::Artifact {
         let Some(destination) = command.artifact_out.as_deref() else {
-            return Err(GatewayError::input(format!("{} requires --artifact-out because native bytes are not a safe model-visible text channel", mode.id)));
+            return Err(GatewayError::input(format!("{} requires the explicit artifact channel: srcq query {} exec --artifact-out PATH -- <native argv...>", mode.id, backend_name(command.backend))));
         };
         let prepared = PreparedOutput::prepare(destination).map_err(|error| GatewayError {
             message: error.to_string(),
@@ -291,9 +303,7 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
                 message: error.to_string(),
                 code: error.wrapper_exit_code(),
             })?;
-        emit_yaml(
-            &json!({"_sgy":{"schema":"sgy.query.artifact/v1","backend":backend_name(command.backend),"mode":mode.id},"artifact":prepared.path(),"bytes":bytes,"sha256":sha256_hex(&captured.stdout),"native_exit":captured.native_exit,"stderr_bytes":captured.stderr.len()}),
-        )?;
+        emit_artifact_result(command, mode, prepared.path(), bytes, &captured)?;
         return Ok(captured.native_exit);
     }
     if matches!(mode.handling, Handling::BoundedText)
@@ -327,8 +337,12 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
                     message: error.to_string(),
                     code: error.wrapper_exit_code(),
                 })?;
-            emit_yaml(
-                &json!({"_sgy":{"schema":"sgy.query.artifact/v1","backend":backend_name(command.backend),"mode":mode.id},"artifact":prepared.path(),"bytes":captured.stdout.len(),"sha256":sha256_hex(&captured.stdout),"native_exit":captured.native_exit}),
+            emit_artifact_result(
+                command,
+                mode,
+                prepared.path(),
+                captured.stdout.len() as u64,
+                &captured,
             )?;
         } else if command.view == "raw" {
             io::stdout()
@@ -336,16 +350,22 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
                 .write_all(&captured.stdout)
                 .map_err(|error| GatewayError::io("cannot write native stdout", error))?;
         } else {
-            emit_bounded_text(command, mode, &captured)?;
+            emit_bounded_text(command, mode, &captured.stdout, captured.native_exit)?;
         }
         return Ok(captured.native_exit);
     }
 
-    let version = version.lines().next().unwrap_or("unknown").to_owned();
+    let version = native_version(engine, cwd)?
+        .lines()
+        .next()
+        .unwrap_or("unknown")
+        .to_owned();
     let query_fingerprint =
         query_fingerprint(command.backend, engine, cwd, &command.native_argv, &version);
-    let fresh_snapshot = command.snapshot.is_none();
-    let mut snapshot = if let Some(id) = command.snapshot.as_deref() {
+    let inferred_snapshot = command.after.as_deref().map(cursor_snapshot).transpose()?;
+    let requested_snapshot = command.snapshot.as_deref().or(inferred_snapshot.as_deref());
+    let fresh_snapshot = requested_snapshot.is_none();
+    let mut snapshot = if let Some(id) = requested_snapshot {
         let loaded = load_snapshot(id)?;
         if loaded.query_fingerprint != query_fingerprint {
             return Err(GatewayError::input(
@@ -354,11 +374,6 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
         }
         loaded
     } else {
-        if command.after.is_some() {
-            return Err(GatewayError::input(
-                "--after requires --snapshot from the previous page",
-            ));
-        }
         let injected = injected_argv(command.backend, mode, &command.native_argv);
         let effective = effective_argv(&command.native_argv, &injected);
         let captured = run_native(engine, cwd, effective)?;
@@ -378,23 +393,37 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
     if let Some(view) = cursor_view {
         rendering.view = view;
     }
-    let projection = match command.backend {
-        GatewayBackend::Fd => render_fd(&rendering, cwd, &snapshot, offset)?,
+    let projection_result = match command.backend {
+        GatewayBackend::Fd => render_fd(&rendering, cwd, &snapshot, offset),
         GatewayBackend::Rg
             if matches!(
                 mode.id,
                 "RG-FILES" | "RG-FILES-WITH-MATCHES" | "RG-FILES-WITHOUT-MATCH"
             ) =>
         {
-            render_rg_files(&rendering, &snapshot, offset)?
+            render_rg_files(&rendering, &snapshot, offset)
         }
         GatewayBackend::Rg if matches!(mode.id, "RG-COUNT" | "RG-COUNT-MATCHES") => {
-            render_rg_counts(&rendering, &snapshot, offset)?
+            render_rg_counts(&rendering, &snapshot, offset)
         }
         GatewayBackend::Rg if mode.id == "RG-VIMGREP" => {
-            render_rg_vimgrep(&rendering, &snapshot, offset)?
+            render_rg_vimgrep(&rendering, &snapshot, offset)
         }
-        GatewayBackend::Rg => render_rg(&rendering, &snapshot, offset)?,
+        GatewayBackend::Rg => render_rg(&rendering, &snapshot, offset),
+    };
+    let projection = match projection_result {
+        Ok(projection) => projection,
+        Err(error) => {
+            if let Some(exit) =
+                try_model_native_fallback(command, mode, engine, cwd, &snapshot, fresh_snapshot)?
+            {
+                return Ok(exit);
+            }
+            return Err(GatewayError::conversion(
+                "cannot convert native query output",
+                error,
+            ));
+        }
     };
     let end = offset.saturating_add(projection.displayed);
     let has_next = !projection.display_complete && end < projection.total;
@@ -435,23 +464,45 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
             _ => projection.total == 0,
         },
     };
-    root.insert(
-        "_sgy".to_owned(),
-        structured_receipt(
-            command,
-            mode,
-            &snapshot,
-            &projection.view,
-            projection.total,
-            projection.displayed,
-            offset,
-            next.as_deref(),
-            result_complete,
-            projection.display_complete,
-            content_complete,
-        ),
-    );
-    emit_compact_json(&Value::Object(root))?;
+    let machine = command.output == OutputFormat::Machine
+        || command.receipt == "full"
+        || projection.view == "lossless";
+    if machine {
+        root.insert(
+            "_sgy".to_owned(),
+            structured_receipt(
+                command,
+                mode,
+                &snapshot,
+                &projection.view,
+                projection.total,
+                projection.displayed,
+                offset,
+                next.as_deref(),
+                result_complete,
+                projection.display_complete,
+                content_complete,
+            ),
+        );
+        emit_compact_json(&Value::Object(root))?;
+    } else {
+        let mut model = projection.model;
+        if let Some(cursor) = next.as_deref() {
+            push_model_line(
+                &mut model,
+                &format!(
+                    "@more shown={} omitted={} after={cursor}",
+                    projection.displayed,
+                    projection.total.saturating_sub(end)
+                ),
+            );
+        }
+        let cut = model_text_cut_count(command.backend, &projection.view, &root);
+        if cut > 0 {
+            push_model_line(&mut model, &format!("@cut text={cut}"));
+        }
+        emit_model_text(&model)?;
+    }
     Ok(snapshot.native_exit)
 }
 
@@ -512,6 +563,78 @@ fn emit_compact_json(value: &Value) -> Result<(), GatewayError> {
         .lock()
         .write_all(&bytes)
         .map_err(|error| GatewayError::io("cannot write query result", error))
+}
+
+fn emit_model_text(value: &str) -> Result<(), GatewayError> {
+    if value.is_empty() {
+        return Ok(());
+    }
+    let mut stdout = io::stdout().lock();
+    stdout
+        .write_all(value.as_bytes())
+        .and_then(|()| stdout.write_all(b"\n"))
+        .and_then(|()| stdout.flush())
+        .map_err(|error| GatewayError::io("cannot write model evidence", error))
+}
+
+fn push_model_line(output: &mut String, line: &str) {
+    if !output.is_empty() && !output.ends_with('\n') {
+        output.push('\n');
+    }
+    output.push_str(line);
+}
+
+fn model_text_cut_count(backend: GatewayBackend, view: &str, root: &Map<String, Value>) -> usize {
+    if backend != GatewayBackend::Rg || !matches!(view, "grouped" | "records" | "locations") {
+        return 0;
+    }
+    if let Some(count) = root
+        .get("text_truncated_records")
+        .and_then(Value::as_u64)
+        .and_then(|value| usize::try_from(value).ok())
+    {
+        return count;
+    }
+    root.get("locations")
+        .and_then(Value::as_array)
+        .map(|records| {
+            records
+                .iter()
+                .filter(|record| {
+                    record.get("text_complete").and_then(Value::as_bool) == Some(false)
+                })
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+fn emit_artifact_result(
+    command: &GatewayCommand,
+    mode: Mode,
+    path: &Path,
+    bytes: u64,
+    captured: &Captured,
+) -> Result<(), GatewayError> {
+    if command.output == OutputFormat::Machine || command.receipt == "full" {
+        return emit_yaml(&json!({
+            "_sgy":{"schema":"sgy.query.artifact/v1","backend":backend_name(command.backend),"mode":mode.id},
+            "artifact":path,
+            "bytes":bytes,
+            "sha256":sha256_hex(&captured.stdout),
+            "native_exit":captured.native_exit,
+            "stderr_bytes":captured.stderr.len()
+        }));
+    }
+    let normalized = path.to_string_lossy().replace('\\', "/");
+    let normalized = if let Some(rest) = normalized.strip_prefix("//?/UNC/") {
+        format!("//{rest}")
+    } else {
+        normalized
+            .strip_prefix("//?/")
+            .unwrap_or(&normalized)
+            .to_owned()
+    };
+    emit_model_text(&normalized)
 }
 
 fn validate_view(backend: GatewayBackend, view: &str) -> Result<(), GatewayError> {
@@ -1017,15 +1140,56 @@ fn native_version(engine: &Path, cwd: &Path) -> Result<String, GatewayError> {
         .map_err(|_| GatewayError::input("native --version was not UTF-8"))
 }
 
-fn supported_version(backend: GatewayBackend, version: &str) -> bool {
-    let expected = match backend {
-        GatewayBackend::Rg => "ripgrep 15.1.0",
-        GatewayBackend::Fd => "fd 10.4.2",
-    };
-    version
-        .lines()
-        .next()
-        .is_some_and(|line| line.trim().starts_with(expected))
+fn replay_safe_after_projection_failure(mode: Mode) -> bool {
+    matches!(
+        mode.id,
+        "FD-PATHS"
+            | "RG-SEARCH-TEXT"
+            | "RG-SEARCH-JSON"
+            | "RG-ONLY-MATCHING"
+            | "RG-SEARCH-ZIP"
+            | "RG-FILES"
+            | "RG-FILES-WITH-MATCHES"
+            | "RG-FILES-WITHOUT-MATCH"
+            | "RG-COUNT"
+            | "RG-COUNT-MATCHES"
+            | "RG-VIMGREP"
+    )
+}
+
+fn try_model_native_fallback(
+    command: &GatewayCommand,
+    mode: Mode,
+    engine: &Path,
+    cwd: &Path,
+    snapshot: &Snapshot,
+    fresh_snapshot: bool,
+) -> Result<Option<i32>, GatewayError> {
+    if command.output != OutputFormat::Model
+        || command.receipt == "full"
+        || !fresh_snapshot
+        || snapshot.stdout.is_empty()
+    {
+        return Ok(None);
+    }
+
+    if std::str::from_utf8(&snapshot.stdout).is_ok() && !snapshot.stdout.contains(&0) {
+        eprintln!("srcq: structured projection unavailable; returned bounded native output");
+        emit_bounded_text(command, mode, &snapshot.stdout, snapshot.native_exit)?;
+        return Ok(Some(snapshot.native_exit));
+    }
+
+    if !replay_safe_after_projection_failure(mode) {
+        return Ok(None);
+    }
+    let captured = run_native(engine, cwd, command.native_argv.clone())?;
+    if std::str::from_utf8(&captured.stdout).is_err() || captured.stdout.contains(&0) {
+        return Ok(None);
+    }
+    write_native_stderr(&captured.stderr, false, command.max_text_chars)?;
+    eprintln!("srcq: structured projection unavailable; returned bounded native output");
+    emit_bounded_text(command, mode, &captured.stdout, captured.native_exit)?;
+    Ok(Some(captured.native_exit))
 }
 
 fn query_fingerprint(
@@ -1319,6 +1483,14 @@ fn make_cursor(snapshot: &str, view: &str, offset: usize) -> String {
     format!("q1.{snapshot}.{view}.{offset}")
 }
 
+fn cursor_snapshot(cursor: &str) -> Result<String, GatewayError> {
+    let parts = cursor.split('.').collect::<Vec<_>>();
+    if parts.len() != 4 || parts[0] != "q1" || parts[1].is_empty() {
+        return Err(GatewayError::input("cursor identity is invalid"));
+    }
+    Ok(parts[1].to_owned())
+}
+
 fn parse_cursor(
     cursor: Option<&str>,
     snapshot: &str,
@@ -1356,6 +1528,7 @@ fn render_fd(
         }
         return Ok(Projection {
             value: json!({"summary":{"paths":paths.len()}}),
+            model: format!("paths {}", paths.len()),
             displayed: paths.len(),
             total: paths.len(),
             view: "summary".to_owned(),
@@ -1367,23 +1540,33 @@ fn render_fd(
             "cursor offset exceeds the snapshot result set",
         ));
     }
-    let end = paths.len().min(offset.saturating_add(command.limit));
+    let maximum_end = paths.len().min(offset.saturating_add(command.limit));
+    let roots = fd_roots(&command.native_argv, cwd);
+    let end = if command.output == OutputFormat::Model && command.view != "lossless" {
+        model_page_end(
+            offset,
+            maximum_end,
+            command.model_token_budget,
+            |candidate_end| {
+                let (model, _) = render_fd_model(
+                    command,
+                    &paths[offset..candidate_end],
+                    &roots,
+                    &snapshot.fd_types,
+                );
+                model_text_cost(&model)
+            },
+        )
+    } else {
+        maximum_end
+    };
     let page = &paths[offset..end];
     let flat = json!({"paths":page.iter().map(|path| json!({"path":path,"type":snapshot.fd_types.get(path).map(String::as_str).unwrap_or("unknown")})).collect::<Vec<_>>()});
-    let tree = render_fd_tree(
-        page,
-        &snapshot.fd_types,
-        &fd_roots(&command.native_argv, cwd),
-    );
+    let tree = render_fd_tree(page, &snapshot.fd_types, &roots);
+    let (model, model_view) = render_fd_model(command, page, &roots, &snapshot.fd_types);
     let chosen = match command.view.as_str() {
-        "auto" => {
-            if estimated_tokens(&tree) < estimated_tokens(&flat) {
-                "tree"
-            } else {
-                "flat"
-            }
-        }
         "lossless" => "lossless",
+        "auto" => model_view.as_str(),
         "flat" => "flat",
         "tree" => "tree",
         other => other,
@@ -1394,11 +1577,58 @@ fn render_fd(
     };
     Ok(Projection {
         value,
+        model,
         displayed: page.len(),
         total: paths.len(),
         view: chosen.to_owned(),
         display_complete: end >= paths.len(),
     })
+}
+
+fn render_fd_model(
+    command: &GatewayCommand,
+    page: &[String],
+    roots: &[FdRoot],
+    types: &BTreeMap<String, String>,
+) -> (String, String) {
+    let model_paths = fd_relative_model_paths(page, roots).unwrap_or_else(|| page.to_vec());
+    let model_types = model_paths
+        .iter()
+        .zip(page)
+        .map(|(model_path, source_path)| {
+            (
+                model_path.clone(),
+                types
+                    .get(source_path)
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_owned()),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let flat_model = render_fd_flat_model(&model_paths, &model_types);
+    let tree_model = fd_model_types_are_uniform(&model_paths, &model_types)
+        .then(|| render_path_tree_model(&model_paths))
+        .flatten();
+    let chosen = match command.view.as_str() {
+        "auto" => {
+            if tree_model.as_ref().is_some_and(|candidate| {
+                model_representation_key(candidate) < model_representation_key(&flat_model)
+            }) {
+                "tree"
+            } else {
+                "flat"
+            }
+        }
+        "lossless" => "lossless",
+        "flat" => "flat",
+        "tree" => "tree",
+        other => other,
+    };
+    let model = match chosen {
+        "tree" => tree_model.unwrap_or(flat_model),
+        _ => flat_model,
+    };
+    (model, chosen.to_owned())
 }
 
 fn parse_nul_paths(bytes: &[u8]) -> Result<Vec<String>, GatewayError> {
@@ -1651,6 +1881,20 @@ fn relative_to_root<'a>(path: &'a str, root: &str) -> Option<&'a str> {
         .map(|_| &path[prefix.len()..])
 }
 
+fn fd_relative_model_paths(paths: &[String], roots: &[FdRoot]) -> Option<Vec<String>> {
+    let [root] = roots else {
+        return None;
+    };
+    paths
+        .iter()
+        .map(|path| {
+            relative_to_root(path, &root.rendered)
+                .filter(|relative| !relative.is_empty())
+                .map(str::to_owned)
+        })
+        .collect()
+}
+
 fn insert_trie(root: &mut Trie, path: &str, kind: &str) {
     if path.is_empty() || path == "." {
         root.count += 1;
@@ -1717,6 +1961,161 @@ fn trie_lines(root: &Trie) -> Vec<String> {
     output
 }
 
+fn render_fd_flat_model(paths: &[String], types: &BTreeMap<String, String>) -> String {
+    let kinds = paths
+        .iter()
+        .map(|path| types.get(path).map(String::as_str).unwrap_or("unknown"))
+        .collect::<BTreeSet<_>>();
+    let include_kind = kinds.len() > 1;
+    paths
+        .iter()
+        .map(|path| {
+            if include_kind {
+                match types.get(path).map(String::as_str).unwrap_or("unknown") {
+                    "file" => path.clone(),
+                    "dir" => format!("{path}/"),
+                    kind => format!("{path}|{kind}"),
+                }
+            } else {
+                path.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn fd_model_types_are_uniform(paths: &[String], types: &BTreeMap<String, String>) -> bool {
+    paths
+        .iter()
+        .map(|path| types.get(path).map(String::as_str).unwrap_or("unknown"))
+        .collect::<BTreeSet<_>>()
+        .len()
+        <= 1
+}
+
+#[derive(Default)]
+struct OrderedPathNode {
+    terminal: bool,
+    annotations: Vec<String>,
+    children: Vec<(String, OrderedPathNode)>,
+}
+
+fn path_segments(path: &str) -> Vec<String> {
+    path.split('/')
+        .filter(|segment| !segment.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+fn insert_ordered_path(root: &mut OrderedPathNode, path: &str, annotations: &[String]) -> bool {
+    let segments = path_segments(path);
+    if segments.is_empty() {
+        return false;
+    }
+    let mut node = root;
+    for segment in segments {
+        let index = node
+            .children
+            .iter()
+            .position(|(name, _)| name == &segment)
+            .unwrap_or_else(|| {
+                node.children
+                    .push((segment.clone(), OrderedPathNode::default()));
+                node.children.len() - 1
+            });
+        node = &mut node.children[index].1;
+    }
+    if node.terminal {
+        return false;
+    }
+    node.terminal = true;
+    node.annotations.extend_from_slice(annotations);
+    true
+}
+
+fn render_ordered_path_annotations(entries: &[(String, Vec<String>)]) -> Option<String> {
+    if entries.is_empty() {
+        return None;
+    }
+    let mut root = OrderedPathNode::default();
+    for (path, annotations) in entries {
+        if !insert_ordered_path(&mut root, path, annotations) {
+            return None;
+        }
+    }
+    fn valid(node: &OrderedPathNode) -> bool {
+        (!node.terminal || node.children.is_empty())
+            && node.children.iter().all(|(_, child)| valid(child))
+    }
+    if !valid(&root) {
+        return None;
+    }
+    fn leaf_paths(node: &OrderedPathNode, prefix: &mut Vec<String>, output: &mut Vec<Vec<String>>) {
+        if node.terminal {
+            output.push(prefix.clone());
+        }
+        for (name, child) in &node.children {
+            prefix.push(name.clone());
+            leaf_paths(child, prefix, output);
+            prefix.pop();
+        }
+    }
+    let mut rendered_order = Vec::new();
+    leaf_paths(&root, &mut Vec::new(), &mut rendered_order);
+    let source_order = entries
+        .iter()
+        .map(|(path, _)| path_segments(path))
+        .collect::<Vec<_>>();
+    if rendered_order != source_order {
+        return None;
+    }
+    fn lines(node: &OrderedPathNode, depth: usize, output: &mut Vec<String>) {
+        for (name, child) in &node.children {
+            let mut chain = escape_segment(name);
+            let mut tail = child;
+            while !tail.terminal && tail.children.len() == 1 {
+                let (next_name, next) = &tail.children[0];
+                chain.push('/');
+                chain.push_str(&escape_segment(next_name));
+                tail = next;
+            }
+            let directory = !tail.children.is_empty();
+            output.push(format!(
+                "{}{}{}",
+                "  ".repeat(depth),
+                chain,
+                if directory { "/" } else { "" }
+            ));
+            for annotation in &tail.annotations {
+                output.push(format!("{}{}", "  ".repeat(depth + 1), annotation));
+            }
+            lines(tail, depth + 1, output);
+        }
+    }
+    let mut output = Vec::new();
+    lines(&root, 0, &mut output);
+    Some(output.join("\n"))
+}
+
+fn render_path_tree_model(paths: &[String]) -> Option<String> {
+    let entries = paths
+        .iter()
+        .map(|path| (path.clone(), Vec::new()))
+        .collect::<Vec<_>>();
+    render_ordered_path_annotations(&entries)
+}
+
+fn render_paths_adaptive_model(paths: &[String]) -> String {
+    let flat = paths.join("\n");
+    render_path_tree_model(paths)
+        .filter(|tree| model_representation_key(tree) < model_representation_key(&flat))
+        .unwrap_or(flat)
+}
+
+fn render_path_annotations(entries: &[(String, Vec<String>)]) -> Option<String> {
+    render_ordered_path_annotations(entries)
+}
+
 fn render_fd_tree(paths: &[String], types: &BTreeMap<String, String>, roots: &[FdRoot]) -> Value {
     let mut tries = roots
         .iter()
@@ -1766,6 +2165,7 @@ fn render_rg_files(
         }
         return Ok(Projection {
             value: json!({"summary":{"files":files.len()}}),
+            model: format!("files {}", files.len()),
             displayed: files.len(),
             total: files.len(),
             view: "summary".to_owned(),
@@ -1777,7 +2177,19 @@ fn render_rg_files(
             "cursor offset exceeds the snapshot result set",
         ));
     }
-    let end = files.len().min(offset.saturating_add(command.limit));
+    let maximum_end = files.len().min(offset.saturating_add(command.limit));
+    let end = if command.output == OutputFormat::Model && command.view != "lossless" {
+        model_page_end(
+            offset,
+            maximum_end,
+            command.model_token_budget,
+            |candidate_end| {
+                model_text_cost(&render_paths_adaptive_model(&files[offset..candidate_end]))
+            },
+        )
+    } else {
+        maximum_end
+    };
     let page = &files[offset..end];
     let chosen = if command.view == "lossless" {
         "lossless"
@@ -1786,6 +2198,7 @@ fn render_rg_files(
     };
     Ok(Projection {
         value: json!({"files":page}),
+        model: render_paths_adaptive_model(page),
         displayed: page.len(),
         total: files.len(),
         view: chosen.to_owned(),
@@ -1820,6 +2233,14 @@ fn render_rg_counts(
         }
         return Ok(Projection {
             value: json!({"summary":{"records":records.len(),"sum":records.iter().filter_map(|record| record["count"].as_u64()).sum::<u64>()}}),
+            model: format!(
+                "records {} sum {}",
+                records.len(),
+                records
+                    .iter()
+                    .filter_map(|record| record["count"].as_u64())
+                    .sum::<u64>()
+            ),
             displayed: records.len(),
             total: records.len(),
             view: "summary".to_owned(),
@@ -1831,7 +2252,19 @@ fn render_rg_counts(
             "cursor offset exceeds the snapshot result set",
         ));
     }
-    let end = records.len().min(offset.saturating_add(command.limit));
+    let maximum_end = records.len().min(offset.saturating_add(command.limit));
+    let end = if command.output == OutputFormat::Model && command.view != "lossless" {
+        model_page_end(
+            offset,
+            maximum_end,
+            command.model_token_budget,
+            |candidate_end| {
+                model_text_cost(&render_rg_counts_model(&records[offset..candidate_end]))
+            },
+        )
+    } else {
+        maximum_end
+    };
     let page = &records[offset..end];
     let chosen = if command.view == "lossless" {
         "lossless"
@@ -1840,11 +2273,39 @@ fn render_rg_counts(
     };
     Ok(Projection {
         value: json!({"counts":page}),
+        model: render_rg_counts_model(page),
         displayed: page.len(),
         total: records.len(),
         view: chosen.to_owned(),
         display_complete: end >= records.len(),
     })
+}
+
+fn render_rg_counts_model(records: &[Value]) -> String {
+    let flat = records
+        .iter()
+        .map(|record| {
+            let count = record["count"].as_u64().unwrap_or(0);
+            record["path"]
+                .as_str()
+                .map_or_else(|| count.to_string(), |path| format!("{path}:{count}"))
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let entries = records
+        .iter()
+        .map(|record| {
+            Some((
+                record["path"].as_str()?.replace('\\', "/"),
+                vec![record["count"].as_u64()?.to_string()],
+            ))
+        })
+        .collect::<Option<Vec<_>>>();
+    entries
+        .as_deref()
+        .and_then(render_path_annotations)
+        .filter(|tree| model_representation_key(tree) < model_representation_key(&flat))
+        .unwrap_or(flat)
 }
 
 fn render_rg_vimgrep(
@@ -1870,6 +2331,7 @@ fn render_rg_vimgrep(
         }
         return Ok(Projection {
             value: json!({"summary":{"matches":records.len()},"text_complete":false}),
+            model: format!("matches {}", records.len()),
             displayed: records.len(),
             total: records.len(),
             view: "summary".to_owned(),
@@ -1881,7 +2343,17 @@ fn render_rg_vimgrep(
             "cursor offset exceeds the snapshot result set",
         ));
     }
-    let end = records.len().min(offset.saturating_add(command.limit));
+    let maximum_end = records.len().min(offset.saturating_add(command.limit));
+    let end = if command.output == OutputFormat::Model && command.view != "lossless" {
+        model_page_end(
+            offset,
+            maximum_end,
+            command.model_token_budget,
+            |candidate_end| model_text_cost(&render_vimgrep_model(&records[offset..candidate_end])),
+        )
+    } else {
+        maximum_end
+    };
     let page = &records[offset..end];
     let chosen = if command.view == "lossless" {
         "lossless"
@@ -1898,11 +2370,67 @@ fn render_rg_vimgrep(
     };
     Ok(Projection {
         value,
+        model: render_vimgrep_model(page),
         displayed: page.len(),
         total: records.len(),
         view: chosen.to_owned(),
         display_complete: end >= records.len(),
     })
+}
+
+fn render_vimgrep_model(records: &[Value]) -> String {
+    let flat = records
+        .iter()
+        .map(|record| {
+            format!(
+                "{}:{}:{}:{}",
+                record["path"].as_str().unwrap_or("<unknown>"),
+                record["line"].as_u64().unwrap_or(0),
+                record["column"].as_u64().unwrap_or(0),
+                record["text"].as_str().unwrap_or("")
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut groups: Vec<(String, Vec<String>)> = Vec::new();
+    for record in records {
+        let path = record["path"]
+            .as_str()
+            .unwrap_or("<unknown>")
+            .replace('\\', "/");
+        if groups.last().is_none_or(|(current, _)| current != &path) {
+            groups.push((path, Vec::new()));
+        }
+        groups
+            .last_mut()
+            .expect("group was inserted")
+            .1
+            .push(format!(
+                "{}:{}:{}",
+                record["line"].as_u64().unwrap_or(0),
+                record["column"].as_u64().unwrap_or(0),
+                record["text"].as_str().unwrap_or("")
+            ));
+    }
+    let grouped = groups
+        .iter()
+        .flat_map(|(path, annotations)| {
+            std::iter::once(path.clone()).chain(
+                annotations
+                    .iter()
+                    .map(|annotation| format!("  {annotation}")),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut candidates = vec![flat, grouped];
+    if let Some(tree) = render_path_annotations(&groups) {
+        candidates.push(tree);
+    }
+    candidates
+        .into_iter()
+        .min_by_key(|candidate| model_representation_key(candidate))
+        .unwrap_or_default()
 }
 
 fn split_vimgrep(line: &str) -> Option<(&str, u64, u64, &str)> {
@@ -1934,25 +2462,54 @@ fn split_vimgrep(line: &str) -> Option<(&str, u64, u64, &str)> {
 fn emit_bounded_text(
     command: &GatewayCommand,
     mode: Mode,
-    captured: &Captured,
+    stdout: &[u8],
+    native_exit: i32,
 ) -> Result<(), GatewayError> {
-    let text = std::str::from_utf8(&captured.stdout)
+    let text = std::str::from_utf8(stdout)
         .map_err(|_| GatewayError::input("native output was not UTF-8; use --artifact-out"))?;
     let lines = text.lines().collect::<Vec<_>>();
+    let maximum_lines = lines.len().min(command.limit);
+    let displayed_lines = if command.output == OutputFormat::Model {
+        model_page_end(0, maximum_lines, command.model_token_budget, |end| {
+            model_text_cost(
+                &lines[..end]
+                    .iter()
+                    .map(|line| truncate_chars(line, command.max_text_chars))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            )
+        })
+    } else {
+        maximum_lines
+    };
     let displayed = lines
         .iter()
-        .take(command.limit)
+        .take(displayed_lines)
         .map(|line| truncate_chars(line, command.max_text_chars))
         .collect::<Vec<_>>();
     let text_complete = lines
         .iter()
-        .take(command.limit)
+        .take(displayed_lines)
         .all(|line| line.chars().count() <= command.max_text_chars);
     let display_complete = displayed.len() == lines.len();
+    if command.output == OutputFormat::Model && command.receipt != "full" {
+        let mut model = displayed.join("\n");
+        if !display_complete {
+            push_model_line(
+                &mut model,
+                &format!("@cut lines={}", lines.len().saturating_sub(displayed.len())),
+            );
+        }
+        let cut = displayed.iter().filter(|line| line.ends_with('…')).count();
+        if cut > 0 {
+            push_model_line(&mut model, &format!("@cut text={cut}"));
+        }
+        return emit_model_text(&model);
+    }
     let receipt = if command.receipt == "full" {
         json!({
             "schema":"sgy.query.bounded-text/v1","backend":backend_name(command.backend),
-            "mode":mode.id,"native_exit":captured.native_exit,"total_lines":lines.len(),
+            "mode":mode.id,"native_exit":native_exit,"total_lines":lines.len(),
             "displayed_lines":displayed.len(),"omitted_lines":lines.len().saturating_sub(displayed.len()),
             "display_complete":display_complete,"text_complete":text_complete
         })
@@ -1964,8 +2521,8 @@ fn emit_bounded_text(
             "complete".to_owned(),
             json!({"display":display_complete,"content":text_complete}),
         );
-        if captured.native_exit != 0 {
-            receipt.insert("native_exit".to_owned(), json!(captured.native_exit));
+        if native_exit != 0 {
+            receipt.insert("native_exit".to_owned(), json!(native_exit));
         }
         if !display_complete {
             receipt.insert("displayed_lines".to_owned(), json!(displayed.len()));
@@ -2016,6 +2573,7 @@ fn render_rg(
         let end = events.len().min(offset.saturating_add(command.limit));
         return Ok(Projection {
             value: json!({"events":&events[offset..end]}),
+            model: String::new(),
             displayed: end - offset,
             total: events.len(),
             view: "lossless".to_owned(),
@@ -2032,8 +2590,15 @@ fn render_rg(
             .iter()
             .filter(|event| event["type"] == "match")
             .count();
+        let files = events
+            .iter()
+            .filter(|event| event["type"] == "match")
+            .filter_map(|event| event["path"].as_str())
+            .collect::<BTreeSet<_>>()
+            .len();
         return Ok(Projection {
-            value: json!({"summary":{"events":events.len(),"matches":matches,"files":events.iter().filter(|event| event["type"] == "match").filter_map(|event| event["path"].as_str()).collect::<BTreeSet<_>>().len()}}),
+            value: json!({"summary":{"events":events.len(),"matches":matches,"files":files}}),
+            model: format!("matches {matches} files {files}"),
             displayed: matches,
             total: matches,
             view: "summary".to_owned(),
@@ -2057,6 +2622,17 @@ fn render_rg(
         let end = files.len().min(offset.saturating_add(command.limit));
         return Ok(Projection {
             value: json!({"files":&files[offset..end]}),
+            model: render_path_tree_model(
+                &files[offset..end]
+                    .iter()
+                    .map(|path| (*path).to_owned())
+                    .collect::<Vec<_>>(),
+            )
+            .filter(|tree| {
+                model_representation_key(tree)
+                    < model_representation_key(&files[offset..end].join("\n"))
+            })
+            .unwrap_or_else(|| files[offset..end].join("\n")),
             displayed: end - offset,
             total: files.len(),
             view: "files".to_owned(),
@@ -2075,9 +2651,28 @@ fn render_rg(
                 "cursor offset exceeds the snapshot result set",
             ));
         }
-        let end = locations.len().min(offset.saturating_add(command.limit));
+        let maximum_end = locations.len().min(offset.saturating_add(command.limit));
+        let match_events = events
+            .iter()
+            .filter(|event| event["type"] == "match")
+            .collect::<Vec<_>>();
+        let end = if command.output == OutputFormat::Model {
+            model_page_end(
+                offset,
+                maximum_end,
+                command.model_token_budget,
+                |candidate_end| {
+                    model_text_cost(&render_rg_locations_adaptive_model(
+                        &match_events[offset..candidate_end],
+                    ))
+                },
+            )
+        } else {
+            maximum_end
+        };
         return Ok(Projection {
             value: json!({"locations":&locations[offset..end]}),
+            model: render_rg_locations_adaptive_model(&match_events[offset..end]),
             displayed: end - offset,
             total: locations.len(),
             view: "locations".to_owned(),
@@ -2090,22 +2685,28 @@ fn render_rg(
             "cursor offset exceeds the snapshot result set",
         ));
     }
-    let end = events.len().min(offset.saturating_add(command.limit));
+    let maximum_end = events.len().min(offset.saturating_add(command.limit));
+    let end = if command.output == OutputFormat::Model {
+        model_page_end(
+            offset,
+            maximum_end,
+            command.model_token_budget,
+            |candidate_end| {
+                let (model, _) = render_rg_adaptive_model(
+                    &events[offset..candidate_end],
+                    &command.view,
+                    command.max_text_chars,
+                );
+                model_text_cost(&model)
+            },
+        )
+    } else {
+        maximum_end
+    };
     let page = &events[offset..end];
     let grouped = render_rg_grouped(page, command.max_text_chars);
     let records = render_rg_records(page, command.max_text_chars);
-    let chosen = match command.view.as_str() {
-        "auto" => {
-            if estimated_tokens(&grouped) <= estimated_tokens(&records) {
-                "grouped"
-            } else {
-                "records"
-            }
-        }
-        "grouped" => "grouped",
-        "records" => "records",
-        other => other,
-    };
+    let (model, chosen) = render_rg_adaptive_model(page, &command.view, command.max_text_chars);
     let value = match chosen {
         "grouped" => grouped,
         "records" => records,
@@ -2113,11 +2714,35 @@ fn render_rg(
     };
     Ok(Projection {
         value,
+        model,
         displayed: page.len(),
         total: events.len(),
         view: chosen.to_owned(),
         display_complete: end >= events.len(),
     })
+}
+
+fn render_rg_adaptive_model<'a>(
+    events: &[Value],
+    requested_view: &'a str,
+    max_chars: usize,
+) -> (String, &'a str) {
+    let records = render_rg_records_model(events, max_chars);
+    if requested_view == "records" {
+        return (records, "records");
+    }
+    let grouped = render_rg_grouped_model(events, max_chars);
+    let mut candidates = vec![(grouped, "grouped")];
+    if requested_view == "auto" {
+        candidates.push((records, "records"));
+    }
+    if let Some(tree) = render_rg_tree_grouped_model(events, max_chars) {
+        candidates.push((tree, "grouped"));
+    }
+    candidates
+        .into_iter()
+        .min_by_key(|(candidate, _)| model_representation_key(candidate))
+        .unwrap_or_else(|| (String::new(), requested_view))
 }
 
 fn parse_rg_all_events(bytes: &[u8]) -> Result<Vec<Value>, GatewayError> {
@@ -2201,6 +2826,169 @@ fn render_rg_records(events: &[Value], max_chars: usize) -> Value {
     json!({"records":records,"text_truncated_records":truncated,"text_complete":truncated == 0})
 }
 
+fn render_rg_grouped_model(events: &[Value], max_chars: usize) -> String {
+    let groups = rg_text_annotations(events, max_chars);
+    let mut lines = Vec::new();
+    for (path, annotations) in groups {
+        lines.push(path);
+        lines.extend(
+            annotations
+                .into_iter()
+                .map(|annotation| format!("  {annotation}")),
+        );
+    }
+    lines.join("\n")
+}
+
+fn rg_text_annotations(events: &[Value], max_chars: usize) -> Vec<(String, Vec<String>)> {
+    let mut groups: Vec<(String, Vec<String>)> = Vec::new();
+    for event in events {
+        let path = event["path"]
+            .as_str()
+            .unwrap_or("<unknown>")
+            .replace('\\', "/");
+        if groups.last().is_none_or(|(current, _)| current != &path) {
+            groups.push((path, Vec::new()));
+        }
+        let line = event["line_number"].as_u64().unwrap_or(0);
+        let separator = if event["type"] == "context" { '-' } else { ':' };
+        let text = truncate_chars(
+            event["text"]
+                .as_str()
+                .unwrap_or("")
+                .trim_end_matches(['\r', '\n']),
+            max_chars,
+        );
+        groups
+            .last_mut()
+            .expect("group was inserted")
+            .1
+            .push(format!("{line}{separator}{text}"));
+    }
+    groups
+}
+
+fn render_rg_tree_grouped_model(events: &[Value], max_chars: usize) -> Option<String> {
+    render_path_annotations(&rg_text_annotations(events, max_chars))
+}
+
+fn render_rg_records_model(events: &[Value], max_chars: usize) -> String {
+    events
+        .iter()
+        .map(|event| {
+            let path = event["path"]
+                .as_str()
+                .unwrap_or("<unknown>")
+                .replace('\\', "/");
+            let line = event["line_number"].as_u64().unwrap_or(0);
+            let separator = if event["type"] == "context" { '-' } else { ':' };
+            let text = truncate_chars(
+                event["text"]
+                    .as_str()
+                    .unwrap_or("")
+                    .trim_end_matches(['\r', '\n']),
+                max_chars,
+            );
+            format!("{path}{separator}{line}{separator}{text}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn render_rg_locations_model(events: &[&Value]) -> String {
+    events
+        .iter()
+        .map(|event| {
+            let path = event["path"]
+                .as_str()
+                .unwrap_or("<unknown>")
+                .replace('\\', "/");
+            let line = event["line_number"].as_u64().unwrap_or(0);
+            let ranges = event["submatches"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|range| {
+                    Some(format!(
+                        "{}-{}",
+                        range["start"].as_u64()?,
+                        range["end"].as_u64()?
+                    ))
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            if ranges.is_empty() {
+                format!("{path}:{line}")
+            } else {
+                format!("{path}:{line}:{ranges}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn rg_location_annotations(events: &[&Value]) -> Vec<(String, Vec<String>)> {
+    let mut groups: Vec<(String, Vec<String>)> = Vec::new();
+    for event in events {
+        let path = event["path"]
+            .as_str()
+            .unwrap_or("<unknown>")
+            .replace('\\', "/");
+        if groups.last().is_none_or(|(current, _)| current != &path) {
+            groups.push((path, Vec::new()));
+        }
+        let line = event["line_number"].as_u64().unwrap_or(0);
+        let ranges = event["submatches"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|range| {
+                Some(format!(
+                    "{}-{}",
+                    range["start"].as_u64()?,
+                    range["end"].as_u64()?
+                ))
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        let annotation = if ranges.is_empty() {
+            line.to_string()
+        } else {
+            format!("{line}:{ranges}")
+        };
+        groups
+            .last_mut()
+            .expect("group was inserted")
+            .1
+            .push(annotation);
+    }
+    groups
+}
+
+fn render_rg_locations_adaptive_model(events: &[&Value]) -> String {
+    let flat = render_rg_locations_model(events);
+    let groups = rg_location_annotations(events);
+    let grouped = groups
+        .iter()
+        .flat_map(|(path, annotations)| {
+            std::iter::once(path.clone()).chain(
+                annotations
+                    .iter()
+                    .map(|annotation| format!("  {annotation}")),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut candidates = vec![flat, grouped];
+    if let Some(tree) = render_path_annotations(&groups) {
+        candidates.push(tree);
+    }
+    candidates
+        .into_iter()
+        .min_by_key(|candidate| model_representation_key(candidate))
+        .unwrap_or_default()
+}
+
 fn truncate_chars(value: &str, max: usize) -> String {
     let mut chars = value.chars();
     let prefix = chars.by_ref().take(max).collect::<String>();
@@ -2223,12 +3011,7 @@ fn os_args_json(args: &[OsString]) -> Result<Vec<String>, GatewayError> {
         .collect()
 }
 
-fn estimated_tokens(value: &Value) -> usize {
-    let mut yaml = Vec::new();
-    if write_yaml_document(value, &mut yaml, false).is_err() {
-        return usize::MAX;
-    }
-    let text = String::from_utf8_lossy(&yaml);
+fn model_text_cost(text: &str) -> usize {
     let mut total = 0_usize;
     let mut ascii_word = 0_usize;
     for character in text.chars() {
@@ -2240,11 +3023,43 @@ fn estimated_tokens(value: &Value) -> usize {
             total += ascii_word.div_ceil(4);
             ascii_word = 0;
         }
-        if !character.is_whitespace() {
+        if character == '\n' || !character.is_whitespace() {
             total += 1;
         }
     }
     total + ascii_word.div_ceil(4)
+}
+
+fn model_representation_key(text: &str) -> (usize, usize) {
+    (model_text_cost(text), text.chars().count())
+}
+
+fn model_page_end(
+    offset: usize,
+    maximum_end: usize,
+    budget: usize,
+    mut cost: impl FnMut(usize) -> usize,
+) -> usize {
+    if offset >= maximum_end {
+        return offset;
+    }
+    let first = offset + 1;
+    if cost(first) > budget {
+        return first;
+    }
+    let mut best = first;
+    let mut low = first + 1;
+    let mut high = maximum_end;
+    while low <= high {
+        let middle = low + (high - low) / 2;
+        if cost(middle) <= budget {
+            best = middle;
+            low = middle + 1;
+        } else {
+            high = middle - 1;
+        }
+    }
+    best
 }
 
 fn emit_yaml(value: &Value) -> Result<(), GatewayError> {
@@ -2501,6 +3316,102 @@ mod tests {
         assert_eq!(escape_segment("  文 件|a\\b\t"), r"\s\s文 件\|a\\b\t");
         assert_eq!(escape_segment("plain name"), "plain name");
         assert_eq!(escape_segment("control\u{7}"), r"control\u{7}");
+    }
+
+    #[test]
+    fn model_tree_collapses_unary_chains_without_metadata() {
+        let paths = vec![
+            "A/A0".to_owned(),
+            "A/A1/F1".to_owned(),
+            "A/A2".to_owned(),
+            "B/B0/B1".to_owned(),
+        ];
+        assert_eq!(
+            render_path_tree_model(&paths).expect("reversible tree"),
+            "A/\n  A0\n  A1/F1\n  A2\nB/B0/B1"
+        );
+    }
+
+    #[test]
+    fn model_tree_preserves_native_depth_first_order_without_requiring_sorting() {
+        let paths = vec![
+            "src/processor/location.rs".to_owned(),
+            "src/processor.rs".to_owned(),
+            "tests/process.rs".to_owned(),
+        ];
+        assert_eq!(
+            render_path_tree_model(&paths).expect("order-preserving tree"),
+            "src/\n  processor/location.rs\n  processor.rs\ntests/process.rs"
+        );
+    }
+
+    #[test]
+    fn model_tree_rejects_prefix_reentry_that_would_reorder_evidence() {
+        let paths = vec!["A/one".to_owned(), "B/two".to_owned(), "A/three".to_owned()];
+        assert!(render_path_tree_model(&paths).is_none());
+    }
+
+    #[test]
+    fn fd_model_paths_remove_a_single_declared_root_only() {
+        let paths = vec![
+            "tools/srcq/docs/cache.md".to_owned(),
+            "tools/srcq/docs/usage.md".to_owned(),
+        ];
+        let single = vec![FdRoot {
+            alias: "R0".to_owned(),
+            rendered: "tools/srcq/docs".to_owned(),
+        }];
+        assert_eq!(
+            fd_relative_model_paths(&paths, &single),
+            Some(vec!["cache.md".to_owned(), "usage.md".to_owned()])
+        );
+        assert_eq!(
+            fd_relative_model_paths(
+                &paths,
+                &[
+                    single[0].clone(),
+                    FdRoot {
+                        alias: "R1".to_owned(),
+                        rendered: "skills".to_owned(),
+                    },
+                ]
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn fd_model_tree_requires_uniform_types() {
+        let paths = vec!["A/file".to_owned(), "A/dir".to_owned()];
+        let types = BTreeMap::from([
+            ("A/file".to_owned(), "file".to_owned()),
+            ("A/dir".to_owned(), "directory".to_owned()),
+        ]);
+        assert!(!fd_model_types_are_uniform(&paths, &types));
+        assert_eq!(
+            render_fd_flat_model(&paths, &types),
+            "A/file\nA/dir|directory"
+        );
+    }
+
+    #[test]
+    fn fd_mixed_file_and_directory_model_uses_only_a_directory_suffix() {
+        let paths = vec!["A/file".to_owned(), "A/dir".to_owned()];
+        let types = BTreeMap::from([
+            ("A/file".to_owned(), "file".to_owned()),
+            ("A/dir".to_owned(), "dir".to_owned()),
+        ]);
+        assert_eq!(render_fd_flat_model(&paths, &types), "A/file\nA/dir/");
+    }
+
+    #[test]
+    fn cursor_carries_the_snapshot_needed_for_model_continuation() {
+        let cursor = make_cursor("snapshot-id", "tree", 12);
+        assert_eq!(
+            cursor_snapshot(&cursor).expect("valid cursor"),
+            "snapshot-id"
+        );
+        assert!(cursor_snapshot("q1.invalid").is_err());
     }
 
     #[test]

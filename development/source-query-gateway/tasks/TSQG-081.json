@@ -1,0 +1,71 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "版本无关执行与安全降级"
+      ],
+      "id": "TSQG-078",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "普通最小语法与 CLI 定向恢复"
+      ],
+      "id": "TSQG-079",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "证据缺口驱动的 AST/LSP 路由"
+      ],
+      "id": "TSQG-080",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-081",
+  "mutation_scope": [
+    "global/AGENTS.md",
+    "skills/source-query/**",
+    "tools/srcq/**",
+    "development/codex-deployment/**",
+    "development/source-query-gateway/**",
+    "README.md"
+  ],
+  "outcome": "运行时、常驻规则与高级 Skill 使用同一版本无关兼容和证据升级设计，所有当前消费者接入后形成可供受控对照的新 identity",
+  "outputs": [
+    "当前 srcq Windows release 候选",
+    "精炼全局规则和统一 source-query Skill",
+    "消费者、安装、部署与 payload 影响闭环",
+    "用户审查后的新 experiment identity"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-SQG-010",
+    "SOL-SQG-012",
+    "SOL-SQG-013",
+    "SOL-SQG-014",
+    "GAP-SQG-007",
+    "DES-SQG-003",
+    "DES-SQG-008",
+    "DES-SQG-009",
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-007",
+    "AC-SQG-008"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "skill-creator",
+    "source-query"
+  ],
+  "title": "接入三项根因修正并冻结新测试 identity",
+  "verification": [
+    "受影响组件、真实后端版本、AST 基线和路由场景通过",
+    "当前消费者不含后端版本门禁、裸工具、第二语法或旧升级规则",
+    "Codex payload 不包含项目测试和 benchmark 资产",
+    "普通成功、错形恢复、解析降级和 AST 空结果输出经用户审查",
+    "只冻结身份，不把组件通过当作端到端收益成立"
+  ]
+}

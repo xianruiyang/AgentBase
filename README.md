@@ -44,7 +44,7 @@ AgentBase 只维护 Windows 宿主。项目自有 skill 运行时、MCP、CLI、
 | `delivery-workflow` | 项目内建立 | 以 Markdown 文档为语义真源组织用户确认需求与设计、可修订模型产物和执行反馈；`workctl` 只辅助快照来源、索引、查询和视图 |
 | `task-table-manager` | 项目内建立 | 以文档合同管理任务、三类依赖、状态、结果摘要、证据映射和恢复上下文；`taskctl` 只辅助存储和查询，不签发执行或产品通过 |
 | `reasoning-governor` | 从 `task-table-manager` 的线程深度脚本拆分建源 | 读取和切换当前线程 next-turn 推理深度；模型自主切换只由 active Goal 续跑 |
-| `source-query` | 统一源码查询网关工程 | 按证据成本选择直接读取、原生 rg/fd、`srcq`、AST 与渐进 LSP；详细协议按需加载 |
+| `source-query` | 统一源码查询网关工程 | 按证据成本选择直接读取、统一 `srcq` 文本/文件/AST 查询与渐进 LSP；详细协议按需加载 |
 | `symbol-structure-workflow` | 历史 SymbolStructureWorkflow 工程 | 安全组织语义重命名、Code Action、格式化、task/command 和调试等编辑器操作 |
 | `powershell-usage` | 已审查规则迁入 | 以 PowerShell 7 为基线的 Windows 命令、路径、编码与退出码规则 |
 | `change-governance` | 全局条件性治理规则拆分建源 | 复杂根因、职责/入口、迁移、共享门禁和跨契约审计 |

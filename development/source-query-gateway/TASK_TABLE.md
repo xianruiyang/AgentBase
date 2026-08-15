@@ -6,26 +6,26 @@
 
 | 状态 | 数量 |
 | --- | ---: |
-| todo | 7 |
+| todo | 0 |
 | claimed | 0 |
 | in_progress | 0 |
 | review | 0 |
 | blocked | 0 |
-| done | 35 |
+| done | 50 |
 | retired | 1 |
 
 ## 复核与结果
 
 - 需复核任务：0
-- 当前可读取结果：35
-- 含验证结果：35
-- 含未决结果：7
+- 当前可读取结果：50
+- 含验证结果：50
+- 含未决结果：8
 - 合同修订后陈旧结果：0
 
 ## 上游状态
 
 - 用户确认快照：protected
-- 可修订上游未决：1
+- 可修订上游未决：0
 - 延后讨论项：1
 
 ## 任务
@@ -68,10 +68,18 @@
 | TSQG-064 | retired | codex-root | 请求当次 Codex 发布裁决 | TSQG-065:hard | — | 3 |
 | TSQG-065 | done | codex-root | 逐项完成审计 | TSQG-062:hard, TSQG-063:hard | results/TSQG-065.r3.json | 1 |
 | TSQG-066 | done | codex-root | 强化 srcq 安装状态与 Codex 发布前置门禁 | TSQG-053:hard | results/TSQG-066.r6.json | 1 |
-| TSQG-067 | todo | — | 冻结全部模型可见输出族的字段准入合同 | — | — | 1 |
-| TSQG-068 | todo | — | 建立 model、machine 与 native 输出边界 | TSQG-067:hard | — | 1 |
-| TSQG-069 | todo | — | 收敛 fd 与 rg 的模型证据格式 | TSQG-068:hard | — | 1 |
-| TSQG-070 | todo | — | 收敛 AST 与辅助命令的模型证据格式 | TSQG-068:hard | — | 1 |
-| TSQG-071 | todo | — | 迁移模型输出消费者与按需协议 | TSQG-069:hard, TSQG-070:hard | — | 1 |
-| TSQG-072 | todo | — | 验证新输出身份并运行受影响隔离对照 | TSQG-071:hard | — | 1 |
-| TSQG-073 | todo | — | 审计模型输出收敛并裁决采纳 | TSQG-072:hard | — | 1 |
+| TSQG-067 | done | codex-root | 冻结全部模型可见输出族的字段准入合同 | — | results/TSQG-067.r3.json | 1 |
+| TSQG-068 | done | codex-root | 建立 model、machine 与 native 输出边界 | TSQG-067:hard | results/TSQG-068.r4.json | 1 |
+| TSQG-069 | done | codex-root | 收敛 fd 与 rg 的模型证据格式 | TSQG-068:hard | results/TSQG-069.r4.json | 1 |
+| TSQG-070 | done | codex-root | 收敛 AST 与辅助命令的模型证据格式 | TSQG-068:hard | results/TSQG-070.r4.json | 1 |
+| TSQG-071 | done | codex-root | 迁移模型输出消费者与按需协议 | TSQG-069:hard, TSQG-070:hard | results/TSQG-071.r4.json | 1 |
+| TSQG-072 | done | codex-root | 验证根因修正后的查询身份并运行受影响隔离对照 | TSQG-081:hard | results/TSQG-072.r14.json | 3 |
+| TSQG-073 | done | codex-root | 审计模型输出收敛并裁决采纳 | TSQG-072:hard | results/TSQG-073.r4.json | 1 |
+| TSQG-074 | done | codex-root | 建立 srcq 统一接管的 rg/fd 原生直觉入口 | TSQG-071:hard | results/TSQG-074.r3.json | 4 |
+| TSQG-075 | done | codex-root | 实现真实结果后的自适应模型投影 | TSQG-074:hard | results/TSQG-075.r3.json | 2 |
+| TSQG-076 | done | codex-root | 内化默认上下文预算与精确续页 | TSQG-075:hard | results/TSQG-076.r3.json | 1 |
+| TSQG-077 | done | codex-root | 迁移消费者并冻结 srcq 接管后的输出身份 | TSQG-075:hard, TSQG-076:hard | results/TSQG-077.r7.json | 2 |
+| TSQG-078 | done | codex-root | 以实际输出能力取代后端版本许可 | TSQG-077:hard | results/TSQG-078.r4.json | 1 |
+| TSQG-079 | done | codex-root | 固化普通查询最小语法与定向错误恢复 | TSQG-078:hard | results/TSQG-079.r4.json | 1 |
+| TSQG-080 | done | codex-root | 把 AST 与 LSP 升级改为证据缺口驱动 | TSQG-077:hard | results/TSQG-080.r4.json | 1 |
+| TSQG-081 | done | codex-root | 接入三项根因修正并冻结新测试 identity | TSQG-078:hard, TSQG-079:hard, TSQG-080:hard | results/TSQG-081.r4.json | 1 |

@@ -74,6 +74,7 @@
     "complete-known-name-position-list",
     "known-small-definition-range",
     "known-implementation-reading",
+    "ast-no-match-needs-source-evidence",
     "bounded-file-discovery",
     "powershell-command-authoring",
     "current-context-is-sufficient",
@@ -236,7 +237,7 @@
     {
       "id": "authority-change-impact-closure",
       "kind": "behavior",
-      "request": "长期交付执行中，当前证据推翻了一个已完成公共契约的部分内容并要求修正。请保持用户确认目标不变，沿语义关系、任务消费关系和实际系统找出直接与间接消费者，修订、退出或重验所有受影响结果后再判断完成。",
+      "request": "长期交付执行中，当前证据推翻了一个已完成公共契约的部分内容，用户已明确授权实施修正。请保持用户确认目标不变，沿语义关系、任务消费关系和实际系统找出直接与间接消费者，修订、退出或重验所有受影响结果后再判断完成。",
       "expected_skills": [
         "change-governance",
         "delivery-workflow"
@@ -372,6 +373,25 @@
       ]
     },
     {
+      "id": "ast-no-match-needs-source-evidence",
+      "kind": "boundary",
+      "request": "一次 AST pattern 查询没有匹配。请决定下一步：当前还没读取实际候选源码，不允许只改写 pattern 连续试探；先取得能改变语言、节点形状、限定名或 strictness 判断的源码证据，否则返回文本路径。只读处理。",
+      "expected_skills": [
+        "source-query"
+      ],
+      "forbidden_skills": [
+        "symbol-structure-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
       "id": "semantic-definition-from-use-site",
       "kind": "positive",
       "request": "从这个重载调用位置确认编译器实际解析到哪个定义，并读取该真实符号的签名；同名文本或语法范围不能证明结论。",
@@ -412,7 +432,7 @@
     {
       "id": "literal-text-search",
       "kind": "negative",
-      "request": "在源码中用 rg 查找字面量 FEATURE_DISABLED，输出需要保留文件定位并限制行数。",
+      "request": "在源码中通过 srcq 直接传入 rg 原生参数查找字面量 FEATURE_DISABLED；不要让我预先选择 heading、view、limit 或预算，工具按真实结果返回最低充分输出。",
       "expected_skills": [],
       "forbidden_skills": [
         "source-query",
@@ -426,10 +446,9 @@
       "id": "complete-known-name-position-list",
       "kind": "boundary",
       "request": "已知一个没有同名歧义的方法名称；在限定的正式源码范围内列出定义和直接调用位置。完整文本查询及每个命中的局部上下文足以区分定义与调用，不需要类型、重载解析或语义重命名。",
-      "expected_skills": [
-        "source-query"
-      ],
+      "expected_skills": [],
       "forbidden_skills": [
+        "source-query",
         "symbol-structure-workflow"
       ],
       "expected_change_governance_references": [],
@@ -479,7 +498,7 @@
     {
       "id": "bounded-file-discovery",
       "kind": "negative",
-      "request": "使用 fd 从项目根目录有界查找名称为 package.json 的文件，最多返回 20 个。",
+      "request": "通过 srcq 直接传入 fd 原生参数，从项目根目录查找名称为 package.json 的文件；普通查询不加载 source-query skill，也不预先选择树或平铺展示。",
       "expected_skills": [],
       "forbidden_skills": [
         "source-query",
@@ -1058,7 +1077,7 @@
     {
       "id": "fd-full-path-directory-discovery",
       "kind": "negative",
-      "request": "使用 fd 按完整路径查找名称为 Generated 的目录，固定搜索基准并限制最多 20 个结果。",
+      "request": "通过 srcq 直接传入 fd 的完整路径、目录和固定搜索基准原生参数，查找名称为 Generated 的目录；普通查询不加载 source-query skill。",
       "expected_skills": [],
       "forbidden_skills": [
         "source-query"
@@ -1090,7 +1109,7 @@
     {
       "id": "mixed-cpp-powershell-review",
       "kind": "boundary",
-      "request": "只读审查这个已知 C++ 头文件的 include、自包含性和前置声明，并用 PowerShell 7 读取相关构建配置；不要修改代码，也不做跨文件语义重命名。",
+      "request": "只读审查这个已知 C++ 头文件的 include、自包含性和前置声明，并用一条已经给定的精确 PowerShell 7 Get-Content 命令读取已知构建配置；不要编写或审查 PowerShell 命令，不要修改代码，也不做跨文件语义重命名。",
       "expected_skills": [
         "cpp-engineering-rules"
       ],

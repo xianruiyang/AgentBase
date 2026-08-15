@@ -1,14 +1,13 @@
 # srcq 排障
 
-先运行：
+先检查当前失败入口；只有 engine、配置或协议原因仍不清楚时运行：
 
 ```text
 srcq --version
 srcq doctor
-srcq capabilities
 ```
 
-`doctor` 输出 `sgy.doctor/v1`，逐项区分配置、workspace、engine、cache、YAML 和协议状态；它不会执行真实扫描。
+`doctor` 正常只输出 `ok`，失败只输出失败项和恢复入口；需要逐项区分配置、workspace、engine、cache、YAML 和协议状态时运行 `srcq doctor --output machine`。`capabilities` 只在能力合同本身未知时使用。它们都不会执行真实扫描。
 
 ## 安装问题
 
@@ -25,14 +24,14 @@ srcq capabilities
 
 - `engine_not_found`：安装 ast-grep，或向 `srcq doctor --engine <path>` / `srcq exec --engine <path> -- ...` 传绝对可执行文件。
 - `unexpected_version`：路径指向的可能不是 ast-grep；执行该文件的 `--version`，预期前缀为 `ast-grep `。
-- 无匹配：缺省 Token-Safe 在 ast-grep 返回 code 1 且 stdout/stderr 均为空时输出空上下文 YAML并保留 code 1；lossless 不生成 YAML。其他非零状态结合 stderr 判断，不要一概视为 no-match。
+- 无匹配：缺省 model 在 ast-grep 返回 code 1 且 stdout/stderr 均为空时保持空 stdout 和 code 1；machine Token-Safe 返回显式空集合；lossless 不生成 YAML。其他非零状态结合 stderr 判断，不要一概视为 no-match。
 - wrapper 120–127：检查 stderr；这一区间用于超时、转换、缓存、I/O、参数或协议边界错误。
 - LSP/TTY：这两类通道不产生 YAML。若 stdout 出现包装内容，应停止使用并报告协议污染。
 
 ## 配置、输出与 cache
 
 - 配置拒绝：执行 `srcq schema`，检查 `schema: sgy.config/v1`、scope、64 KiB 上限及未知字段。
-- `_sgy.complete=false`：详情或文本被省略；使用 `_sgy.cache` 分页取回，不能声称可见结果完整。
+- `@more`：query 路径原样传回自带 snapshot 身份的 after，cache 路径沿 cache/after 续读；`@cut`：当前显示有不可续读省略或截断，收窄查询、提高对应预算或改用 machine/artifact。machine 的 `_sgy.complete=false` 仍按 `_sgy.cache` 取回。
 - cache 权限：执行 `srcq doctor`；共享机器可临时使用 `--cache off`，但省略内容将不可恢复。
 - cache 损坏/过期：`cache info/query/get` 会拒绝 hash、TTL 或状态异常；重新运行有界查询，不直接读取内部文件。
 - YAML 太大：先用 `files` profile 或收窄目录/语言；不要把模型预算转成 ast-grep 扫描上限。

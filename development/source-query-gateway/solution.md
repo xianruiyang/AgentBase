@@ -50,12 +50,12 @@
 
 ## SOL-SQG-005 复核 AST 并收敛三后端诊断、版本与供应链
 
-- 状态: verified_with_advisory_limit
+- 状态: partially_superseded
 - 解决: 已闭环的 AST 非回退、诊断与候选供应链
 - 满足: DES-SQG-001, DES-SQG-002, DES-SQG-009
 - 依赖: SOL-SQG-003, SOL-SQG-004
 
-用 P0 oracle 复核 AST 全部当前入口，只在序列化和行为等价时让 AST 复用公共原语；统一读取三个后端的精确版本、缺失、输出不兼容、透传和发布来源，但不统一它们不同的 cache、serializer 或副作用语义。srcq workspace package version 是默认 release、README、Cargo metadata、release helper、SBOM 与运行时版本的唯一来源；显式构建覆盖只制作被调用方主动声明的版本，不能承担日常版本真源。当前源码、Windows release、来源、许可证、manifest、payload 与安装 smoke 已统一到 `0.2.0` 并通过影响验证；仅新的 advisory scan 因宿主没有 `cargo-audit` 而未刷新。
+用 P0 oracle 复核 AST 全部当前入口，只在序列化和行为等价时让 AST 复用公共原语；统一读取三个后端的版本身份、缺失、输出不兼容、透传和发布来源，但不统一它们不同的 cache、serializer 或副作用语义。srcq workspace package version 是默认 release、README、Cargo metadata、release helper、SBOM 与运行时版本的唯一来源；显式构建覆盖只制作被调用方主动声明的版本，不能承担日常版本真源。当前源码、Windows release、来源、许可证、manifest、payload 与安装 smoke 已统一到 `0.2.0` 并通过当时影响验证；仅新的 advisory scan 因宿主没有 `cargo-audit` 而未刷新。OBS-SQG-010 已推翻“精确后端版本可作运行门禁”的部分，AST 非回退与 srcq 自身供应链结论继续有效，后端运行兼容由 SOL-SQG-012 取代。
 
 任何非必要 AST 公开行为变化都使方案回到公共边界裁决。最终证据必须分别覆盖权威 owner 和三个实际后端，不能用 rg/fd 通过推断 AST 仍有效。
 
@@ -94,7 +94,7 @@
 
 仓库运行时 owner 已原子更新为 `tools/srcq`、`srcq.exe`、`%LOCALAPPDATA%\Programs\srcq\current`、srcq 安装状态、归档、包名、manifest、来源、文档和验证。安装态固定为用户级受管目录与唯一 PATH 项，验证覆盖全新安装、状态读回、幂等重装、可恢复升级、保留无关 PATH 的卸载、默认保留 cache、显式删除 cache，以及新进程中的 `srcq --version` 和 `srcq doctor`。没有 `sgy.exe` 兼容别名或旧受管安装轨道。
 
-正式 skill 直接调用 PATH 中的 `srcq.exe`，缺失、错误版本和同名遮蔽时只返回安装、升级或重启恢复动作。Skill 内置二进制及其 runtime manifest、来源和许可副本已删除；部署与插件 payload 不复制 srcq/sgy，也不保留私有 fallback。安装、升级或卸载一次即可穿透所有消费者，只有 `tools/srcq` 维护运行时来源和生命周期。
+正式 skill 直接调用 PATH 中的 `srcq.exe`，缺少 srcq、受管安装损坏、srcq 命令身份错误或同名遮蔽时只返回安装、升级或重启恢复动作；外部后端版本差异不触发安装恢复。Skill 内置二进制及其 runtime manifest、来源和许可副本已删除；部署与插件 payload 不复制 srcq/sgy，也不保留私有 fallback。安装、升级或卸载一次即可穿透所有消费者，只有 `tools/srcq` 维护运行时来源和生命周期。
 
 ## SOL-SQG-009 采用原生渐进 LSP 语义查询
 
@@ -107,15 +107,61 @@
 
 无 LSP、单项 LSP 和多阶段 LSP 三类真实 Codex 路径分别只调用 0、2、3 个必要 MCP 能力，质量、完整 usage 与独立审计通过。因此保留 MCP，不新增万能调度工具或 `srcq lsp`；后者只在未来宿主行为回退且同身份实测不达标时重开。rename、Code Action、format、command 和 debug 继续由 `symbol-structure-workflow` 承担，不迁入 Source Query Gateway。相对总 Token 收益仍与整体同身份 control 一并受 SOL-SQG-007 的证据边界约束。
 
-## SOL-SQG-010 分离模型证据、机器兼容与原生输出
+## SOL-SQG-010 以查询意图入口驱动自适应模型输出
 
-- 状态: proposed
+- 状态: verified
 - 解决: GAP-SQG-007
-- 满足: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-007, UDES-SQG-003, UDES-SQG-004, UDES-SQG-006
+- 满足: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-006, AC-SQG-007, AC-SQG-008, UDES-SQG-002, UDES-SQG-003, UDES-SQG-004, UDES-SQG-006, UDES-SQG-013
 - 依赖: SOL-SQG-002, SOL-SQG-003, SOL-SQG-004, SOL-SQG-005, SOL-SQG-007
 
-保留当前内部 `EvidenceSignature`、退出、完整性、快照与诊断事实，新增统一 model renderer，只向模型输出干净的证据正文；正常成功和完整不带 envelope 或回执，只有截断、分页、错误、歧义与恢复需要才追加最短差异信息。现有稳定 JSON/YAML、完整 receipt、lossless、schema/capabilities 和 round-trip 能力归入显式 machine/diagnostic 视图；原生字节、TTY/LSP、写入与 artifact 继续走 native/artifact 视图。模式选择不得改变结果集合、顺序、位置、缓存或副作用。
+保留当前内部 `EvidenceSignature`、退出、完整性、快照与诊断事实，由 srcq 统一接管 rg、fd 与 ast-grep，正式规则不再路由到裸工具。rg/fd 普通模型入口收敛为 `srcq <rg|fd> <native argv...>`：模型只表达查询对象、范围和原生语义，不再为普通查询携带 `exec`、argv 分隔、view、limit、heading、receipt 或正文预算。网关控制放在 backend 前的独立显式控制面；machine、native、artifact 和定向证据投影仍可覆盖自动规划。AST 继续沿用既有 `srcq exec/defaults/cache/process` 与强制 argv 边界，不为统一表面改写成熟合同。本方案明确取代 SOL-SQG-006 中面向模型的裸 rg/fd 快路径；已知文件正文的直接有界读取不属于底层搜索工具绕行。
 
-fd model renderer 使用可逆紧凑基数树并合并单子链；rg 按正文、位置、文件、count 的真实证据单元去除重复路径、类型、offset、submatch、native 与 summary；AST 保持 profile/cache/rewrite 和 machine schema，只让模型投影把源码正文表达一次，并按当前需求显示捕获。`doctor` 成功只给必要健康结论，偏差时才给 observed/expected、实际路径与恢复；`defaults` 只显示实际注入、抑制或不可推导差异。cache/process/artifact 的模型回执按同一准入规则审查，显式请求完整内容时不误删请求对象。
+统一 model planner 在取得真实结果后才选择表示，只向模型输出干净的证据正文；正常成功和完整不带 envelope 或回执，只有截断、分页、错误、歧义与恢复需要才追加最短差异信息。现有稳定 JSON/YAML、完整 receipt、lossless、schema/capabilities 和 round-trip 能力归入显式 machine/diagnostic 视图；原生字节、TTY/LSP、写入与 artifact 继续走 native/artifact 视图。模式选择不得改变结果集合、顺序、位置、缓存或副作用。
 
-实现先建立各输出族的字段—模型动作映射和 payload/machine round-trip oracle，再以实际 renderer 字符串做候选选择。验证先覆盖默认完整、无匹配、截断、分页、错误、机器兼容和 AST 写入非回退；随后只对受影响 corpus 运行真实隔离 Codex control/candidate，质量持平后比较端到端总 Token，再比较耗时。字符级样本只用于定位机制，不作为完成证据。
+fd model renderer 使用可逆紧凑基数树并合并单子链；rg 按正文、位置、文件、count 的真实证据单元生成原生等效文本、单行、文件 heading、分组正文、路径树以及“路径树 + 文件 heading + 位置叶子”等候选。同文件多位置先消除路径重复，多文件共享长目录时再压缩目录，离散单位置不强制树形；auto 只在 EvidenceSignature 相同后按实际模型文本成本选择，裸输出没有预设优先级。内部安全预算代替模型预填输出限制，短结果完整返回，大结果按证据单元分页并只给必要续点。AST 保持 profile/cache/rewrite 和 machine schema，只让模型投影把源码正文表达一次，并按当前需求显示捕获。`doctor` 成功只给必要健康结论，偏差时才给 observed/expected、实际路径与恢复；`defaults` 只显示实际注入、抑制或不可推导差异。cache/process/artifact 的模型回执按同一准入规则审查，显式请求完整内容时不误删请求对象。
+
+已完成的三输出面、字段准入、renderer、内部预算和精确分页继续保留。OBS-SQG-010 推翻了当前实现已可进入采纳对照的判断：后端版本拒绝、普通入口最小语法缺失和按请求措辞过早升级 AST 会制造失败回合。修订按 SOL-SQG-012 至 SOL-SQG-014 纵向闭环，随后迁移当前消费者并冻结新 identity；只有这些机制变化并通过影响验证后才恢复受监控隔离 Codex control/candidate。质量持平后比较端到端总 Token，再比较同 service tier 耗时；字符级样本只用于定位机制，不作为完成证据。
+
+## SOL-SQG-011 为真实后端阻塞保留条件性源码改造路线
+
+- 状态: conditional
+- 解决: 仅在外部适配被证据证明无法关闭 GAP-SQG-007 时启用
+- 满足: DES-SQG-013, UDES-SQG-014
+- 依赖: SOL-SQG-010
+
+当前方案仍以已安装的 rg、fd 与 ast-grep 二进制为执行后端，不拉取或内嵌上游源码。若实施中出现可重复的必要验收失败，先形成升级裁决包：固定复现、上游内部根因、外部适配方案及其失败证据、目标 revision、许可证与维护成本，并提交用户讨论。只有裁决确认源码级修改是满足目标的最低长期成本方案，且用户针对该次升级明确同意后，才允许拉取源码、重投影任务图并实施 Windows 定向补丁；未获同意时保持当前边界，不先行下载或建立 fork。
+
+改造后的后端仍封装在 `srcq.exe` 内部，不增加模型入口、用户安装入口或行为真源。实现必须固定来源与补丁身份，覆盖上游行为矩阵、srcq 投影、release manifest、SBOM、安装升级、漏洞响应和退出验证；能回到无补丁上游时删除分叉，不把临时 fork 永久固化为兼容负担。
+
+## SOL-SQG-012 以实际输出能力取代后端版本许可
+
+- 状态: verified
+- 解决: GAP-SQG-007
+- 满足: DES-SQG-003, DES-SQG-007, DES-SQG-009, DES-SQG-013, UDES-SQG-002, UDES-SQG-014
+- 依赖: SOL-SQG-010
+
+删除 rg、fd 与 ast-grep 精确版本的运行拒绝和 `doctor` 失败判断；版本只进入显式诊断、测试身份与证据上限。普通调用直接执行实际后端并按输出合同解析，成功时沿用当前自适应投影；输出不能安全结构化时，确认无副作用且可确定重放的读取模式在同一 srcq 调用内降级为原生文本，可能启动外部程序、写入或改变状态的模式执行前即进入 native/artifact，不得自动重复运行。转换失败、无匹配和原生错误继续分离，未知输出不能伪装成成功空结果。
+
+验证覆盖当前真实 rg 15.1 与 Codex PATH 中 rg 15.2、fd/ast-grep 已有矩阵、伪造未来版本字符串但同协议输出、结构字段变化、原生错误、只读降级和有副作用不重放。只有公开外部边界无法满足必要验收且根因位于上游内部时，才重新进入 SOL-SQG-011 的用户裁决；本轮不拉取源码。
+
+## SOL-SQG-013 固化普通查询的最小语法与定向恢复
+
+- 状态: verified
+- 解决: GAP-SQG-007
+- 满足: DES-SQG-003, DES-SQG-008, DES-SQG-009, AC-SQG-002, AC-SQG-008, UDES-SQG-013
+- 依赖: SOL-SQG-010
+
+全局常驻规则只增加完成普通查询不可缺少的 `srcq fd <fd argv...>` 与 `srcq rg <rg argv...>` 两个正式语法；简单文件发现和文本定位不加载 source-query skill，skill 继续只承载完整性、分页、特殊协议、AST 与 LSP 升级。CLI 对可识别的 `files`、`--files` 等错形返回指向唯一正式入口的一行修正，不再落入旧 AST 分隔符错误，也不新增别名、自动猜 backend 或第二语法。
+
+验证覆盖无 skill 的文件发现与文本定位、正确普通入口、错形一次恢复、rg/fd 原生同名参数、未知错形和 AST 旧入口；成功路径不得增加帮助、schema 或固定回执。独立路由只检验模型是否无需 help/doctor 即使用正确语法，不把具体 benchmark 答案写入规则。
+
+## SOL-SQG-014 以证据缺口裁决 AST 升级
+
+- 状态: verified
+- 解决: GAP-SQG-007
+- 满足: DES-SQG-001, DES-SQG-008, DES-SQG-009, AC-SQG-001, AC-SQG-002, AC-SQG-006, UDES-SQG-006, UDES-SQG-013
+- 依赖: SOL-SQG-010
+
+把“完整定义”从 AST 触发条件中移除：已知名称先用文本定位和有界源码读取，命中少且边界可由实际源码确认时立即闭环；文本证据仍不能可靠确定语法边界、候选有歧义、读取被截断，或任务确需结构关系、控制流、rule/rewrite 时才升级 AST，真实身份、重载、类型或精确引用需要语义裁决时升级 LSP。AST 无匹配后只有取得会改变 pattern 的实际语法证据才能再次查询，否则回到文本路径，不允许同一信息下连续试探。
+
+验证同时覆盖已知唯一函数完整定义、长或截断函数、同名/重载、宏或嵌套结构、跨结果结构关系、AST 空结果和 LSP 身份分歧；验收对象是质量、工具回合与端到端 Token，不以减少 AST 调用数量本身判定正确。

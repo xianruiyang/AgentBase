@@ -1,0 +1,56 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "model/machine/native 输出边界",
+        "已迁移正式消费者"
+      ],
+      "id": "TSQG-071",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-074",
+  "mutation_scope": [
+    "global/AGENTS.md",
+    "tools/srcq/**",
+    "skills/source-query/**",
+    "development/source-query-gateway/**"
+  ],
+  "outcome": "所有 rg、fd 与 ast-grep 模型查询统一经过 srcq，rg/fd 可直接书写原生 argv 且普通查询不承担网关格式和预算知识；默认外部适配，只有满足正式升级门槛并取得用户该次明确同意才重投影源码改造",
+  "outputs": [
+    "rg/fd 直接原生 argv 入口",
+    "无原生 flag 冲突的显式控制面",
+    "裸 rg/fd/ast-grep 正式路由退出",
+    "旧普通调用入口退出方案",
+    "若受阻则记录可重复反例、上游根因与外部方案排除证据",
+    "源码升级前的用户讨论与该次明确同意记录"
+  ],
+  "reasoning_hint": "high",
+  "revision": 4,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-SQG-010",
+    "SOL-SQG-011",
+    "DES-SQG-003",
+    "DES-SQG-008",
+    "DES-SQG-013",
+    "AC-SQG-006",
+    "AC-SQG-008",
+    "UDES-SQG-002",
+    "UDES-SQG-012",
+    "UDES-SQG-014"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "source-query",
+    "skill-creator"
+  ],
+  "title": "建立 srcq 统一接管的 rg/fd 原生直觉入口",
+  "verification": [
+    "正式规则和 skill 不再裸用 rg、fd 或 ast-grep",
+    "普通查询无需 exec、双横线、view、limit、heading 或 receipt",
+    "原生 argv 值、顺序、重复、stdin、退出和特殊模式不退化",
+    "AST 既有 srcq 命令与 argv 边界不变",
+    "没有符合 DES-SQG-013 的阻塞证据时不提出源码升级；即使触发也须先与用户讨论并取得该次明确同意，未获同意不得拉取或分叉上游源码"
+  ]
+}

@@ -15,7 +15,9 @@ use std::path::PathBuf;
 
 use clap::builder::{OsStringValueParser, PossibleValuesParser};
 use clap::{Arg, ArgAction, ArgMatches, Command};
-use srcq_core::invocation::{ExplicitOptions, NativeInvocation, Profile, WrapperCommand};
+use srcq_core::invocation::{
+    ExplicitOptions, NativeInvocation, OutputFormat, Profile, WrapperCommand,
+};
 
 const NATIVE_DELIMITER: &str = "--";
 
@@ -24,7 +26,7 @@ pub fn command() -> Command {
     let build = srcq_core::build_info();
     Command::new("srcq")
         .version(build.package_version)
-        .about("Token-safe YAML adapter for ast-grep")
+        .about("Low-context source query gateway")
         .arg_required_else_help(true)
         .disable_help_subcommand(true)
         .subcommand(wrapper_subcommand(
@@ -37,8 +39,9 @@ pub fn command() -> Command {
         ))
         .subcommand(cache_subcommand())
         .subcommand(process_subcommand())
-        .subcommand(gateway_backend_subcommand("rg", "ripgrep").hide(true))
-        .subcommand(gateway_backend_subcommand("fd", "fd").hide(true))
+        .subcommand(direct_gateway_subcommand("rg", "ripgrep"))
+        .subcommand(direct_gateway_subcommand("fd", "fd"))
+        .subcommand(query_subcommand())
         .subcommand(
             Command::new("schema")
                 .about("Print the bounded srcq configuration schema")
@@ -53,6 +56,7 @@ pub fn command() -> Command {
         .subcommand(
             Command::new("doctor")
                 .about("Diagnose config, engine, cache, YAML, and protocol limits without scanning")
+                .arg(output_arg())
                 .arg(
                     Arg::new("engine")
                         .long("engine")
@@ -67,8 +71,33 @@ pub fn command() -> Command {
                 ),
         )
         .after_help(
-            "Operational syntax: srcq <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: srcq <schema|capabilities|doctor> ...\nCache syntax: srcq cache <get|query|info|remove|gc> ...\nProcess syntax: srcq process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...",
+            "Operational syntax: srcq <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: srcq <schema|capabilities|doctor> ...\nCache syntax: srcq cache <get|query|info|remove|gc> ...\nProcess syntax: srcq process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...\nText/file syntax: srcq <rg|fd> <native argv...>\nExplicit query controls: srcq query <rg|fd> <exec|defaults> [options] -- <native argv...>",
         )
+}
+
+fn direct_gateway_subcommand(name: &'static str, engine_name: &'static str) -> Command {
+    Command::new(name)
+        .about(format!("Query through {engine_name} with native arguments"))
+        .disable_help_flag(true)
+        .arg(
+            Arg::new("native")
+                .value_name("NATIVE_ARGV")
+                .value_parser(OsStringValueParser::new())
+                .num_args(0..)
+                .allow_hyphen_values(true)
+                .trailing_var_arg(true),
+        )
+        .after_help(format!(
+            "All arguments after `{name}` belong to {engine_name}. Use `srcq query {name} exec ...` only for explicit projection, machine, native, artifact, or continuation controls."
+        ))
+}
+
+fn query_subcommand() -> Command {
+    Command::new("query")
+        .about("Explicit rg/fd projection and diagnostic controls")
+        .subcommand_required(true)
+        .subcommand(gateway_backend_subcommand("rg", "ripgrep"))
+        .subcommand(gateway_backend_subcommand("fd", "fd"))
 }
 
 fn gateway_backend_subcommand(name: &'static str, engine_name: &'static str) -> Command {
@@ -80,6 +109,7 @@ fn gateway_backend_subcommand(name: &'static str, engine_name: &'static str) -> 
         .subcommand(
             Command::new("doctor")
                 .about("Diagnose the exact native engine without searching")
+                .arg(output_arg())
                 .arg(gateway_engine_arg())
                 .arg(gateway_cwd_arg()),
         )
@@ -112,6 +142,7 @@ fn gateway_operation_subcommand(name: &'static str, backend: &'static str) -> Co
     Command::new(name)
         .arg(gateway_engine_arg())
         .arg(gateway_cwd_arg())
+        .arg(output_arg())
         .arg(
             Arg::new("view")
                 .long("view")
@@ -137,6 +168,14 @@ fn gateway_operation_subcommand(name: &'static str, backend: &'static str) -> Co
                 .default_value("240")
                 .help("Maximum displayed characters per text field")
                 .value_parser(clap::value_parser!(u64).range(1..=1_000_000)),
+        )
+        .arg(
+            Arg::new("model-token-budget")
+                .long("model-token-budget")
+                .value_name("N")
+                .default_value("2048")
+                .help("Soft estimated-token budget for one model-visible page")
+                .value_parser(clap::value_parser!(u64).range(32..=1_000_000)),
         )
         .arg(
             Arg::new("receipt")
@@ -169,6 +208,15 @@ fn gateway_cwd_arg() -> Arg {
         .long("cwd")
         .value_name("PATH")
         .value_parser(clap::value_parser!(PathBuf))
+}
+
+fn output_arg() -> Arg {
+    Arg::new("output")
+        .long("output")
+        .value_name("FORMAT")
+        .default_value("model")
+        .value_parser(PossibleValuesParser::new(["model", "machine"]))
+        .help("Model evidence text or stable machine output")
 }
 
 fn process_subcommand() -> Command {
@@ -332,7 +380,7 @@ fn process_source_args(command: Command) -> Command {
 }
 
 fn process_cache_args(command: Command) -> Command {
-    command.arg(
+    command.arg(output_arg()).arg(
         Arg::new("cache-id")
             .long("cache-id")
             .value_name("ID")
@@ -364,6 +412,7 @@ fn cache_subcommand() -> Command {
         .subcommand(
             Command::new("query")
                 .about("Filter cached results by indexed file and rule id")
+                .arg(output_arg())
                 .arg(Arg::new("cache-id").required(true))
                 .arg(Arg::new("file").long("file").value_name("PATH"))
                 .arg(Arg::new("rule-id").long("rule-id").value_name("ID"))
@@ -380,6 +429,13 @@ fn cache_subcommand() -> Command {
                         .value_name("N")
                         .default_value("40")
                         .value_parser(clap::value_parser!(u64).range(1..=1000)),
+                )
+                .arg(
+                    Arg::new("max-text-chars")
+                        .long("max-text-chars")
+                        .value_name("N")
+                        .default_value("240")
+                        .value_parser(clap::value_parser!(u64).range(1..=1_000_000)),
                 ),
         )
         .subcommand(
@@ -408,6 +464,8 @@ pub enum CacheCommand {
         rule_id: Option<String>,
         offset: usize,
         limit: usize,
+        max_text_chars: usize,
+        output: OutputFormat,
     },
     Info {
         cache_id: String,
@@ -449,6 +507,8 @@ pub struct GatewayCommand {
     pub view: String,
     pub limit: usize,
     pub max_text_chars: usize,
+    pub model_token_budget: usize,
+    pub output: OutputFormat,
     pub receipt: String,
     pub artifact_out: Option<PathBuf>,
     pub snapshot: Option<String>,
@@ -463,6 +523,7 @@ pub enum InspectionCommand {
     Doctor {
         engine: Option<PathBuf>,
         cwd: Option<PathBuf>,
+        output: OutputFormat,
     },
 }
 
@@ -517,6 +578,7 @@ pub enum ProcessAction {
 pub struct ProcessCommand {
     pub input: ProcessInput,
     pub action: ProcessAction,
+    pub output: OutputFormat,
 }
 
 fn wrapper_subcommand(name: &'static str, about: &'static str) -> Command {
@@ -534,6 +596,7 @@ fn wrapper_subcommand(name: &'static str, about: &'static str) -> Command {
                 .value_name("PATH")
                 .value_parser(clap::value_parser!(PathBuf)),
         )
+        .arg(output_arg())
         .arg(
             Arg::new("yaml-out")
                 .long("yaml-out")
@@ -624,6 +687,7 @@ fn wrapper_subcommand(name: &'static str, about: &'static str) -> Command {
 #[derive(Debug)]
 pub enum CliParseError {
     Clap(clap::Error),
+    Guidance(&'static str),
     MissingDelimiter,
     EmptyNativeArgv,
     MissingProgramName,
@@ -667,6 +731,7 @@ impl fmt::Display for CliParseError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Clap(error) => error.fmt(formatter),
+            Self::Guidance(message) => formatter.write_str(message),
             Self::MissingDelimiter => formatter
                 .write_str("missing required `--` delimiter before the native ast-grep arguments"),
             Self::EmptyNativeArgv => {
@@ -739,20 +804,20 @@ pub fn parse_cli_from(
             || value == OsStr::new("doctor")
             || value == OsStr::new("rg")
             || value == OsStr::new("fd")
+            || value == OsStr::new("query")
     }) {
-        if matches!(
-            raw.get(1).and_then(|value| value.to_str()),
-            Some("rg" | "fd")
-        ) && matches!(
-            raw.get(2).and_then(|value| value.to_str()),
-            Some("exec" | "defaults")
-        ) && !raw
-            .iter()
-            .skip(3)
-            .any(|value| value == OsStr::new(NATIVE_DELIMITER))
+        if matches!(raw.get(1).and_then(|value| value.to_str()), Some("query"))
+            && matches!(
+                raw.get(3).and_then(|value| value.to_str()),
+                Some("exec" | "defaults")
+            )
             && !raw
                 .iter()
-                .skip(3)
+                .skip(4)
+                .any(|value| value == OsStr::new(NATIVE_DELIMITER))
+            && !raw
+                .iter()
+                .skip(4)
                 .any(|value| value == OsStr::new("--help") || value == OsStr::new("-h"))
         {
             return Err(CliParseError::MissingDelimiter);
@@ -768,17 +833,86 @@ pub fn parse_cli_from(
             Some(("doctor", values)) => Ok(CliAction::Inspect(InspectionCommand::Doctor {
                 engine: values.get_one::<PathBuf>("engine").cloned(),
                 cwd: values.get_one::<PathBuf>("cwd").cloned(),
+                output: parse_output(values),
             })),
-            Some(("rg", values)) => {
-                parse_gateway_command(GatewayBackend::Rg, values).map(CliAction::Gateway)
-            }
-            Some(("fd", values)) => {
-                parse_gateway_command(GatewayBackend::Fd, values).map(CliAction::Gateway)
-            }
+            Some(("rg", values)) => Ok(CliAction::Gateway(parse_direct_gateway_command(
+                GatewayBackend::Rg,
+                values,
+            ))),
+            Some(("fd", values)) => Ok(CliAction::Gateway(parse_direct_gateway_command(
+                GatewayBackend::Fd,
+                values,
+            ))),
+            Some(("query", values)) => match values.subcommand() {
+                Some(("rg", backend)) => {
+                    parse_gateway_command(GatewayBackend::Rg, backend).map(CliAction::Gateway)
+                }
+                Some(("fd", backend)) => {
+                    parse_gateway_command(GatewayBackend::Fd, backend).map(CliAction::Gateway)
+                }
+                _ => Err(CliParseError::MissingDelimiter),
+            },
             _ => Err(CliParseError::MissingDelimiter),
         };
     }
+    if let Some(recovery) = targeted_recovery(&raw) {
+        return Err(CliParseError::Guidance(recovery));
+    }
     parse_invocation_from(raw).map(|invocation| CliAction::Native(Box::new(invocation)))
+}
+
+fn targeted_recovery(raw: &[OsString]) -> Option<&'static str> {
+    let first = raw.get(1)?.to_str()?;
+    if matches!(first, "files" | "--files") {
+        return Some("use: srcq fd <fd argv...>");
+    }
+    if matches!(
+        first,
+        "run" | "scan" | "test" | "new" | "lsp" | "completions" | "--"
+    ) {
+        return Some("use: srcq exec -- <ast-grep argv...>");
+    }
+    if matches!(first, "exec" | "defaults")
+        && !raw
+            .iter()
+            .skip(2)
+            .any(|value| value == OsStr::new(NATIVE_DELIMITER))
+        && !raw
+            .iter()
+            .skip(2)
+            .any(|value| value == OsStr::new("--help") || value == OsStr::new("-h"))
+    {
+        return Some(if first == "exec" {
+            "use: srcq exec -- <ast-grep argv...>"
+        } else {
+            "use: srcq defaults -- <ast-grep argv...>"
+        });
+    }
+    None
+}
+
+fn parse_direct_gateway_command(backend: GatewayBackend, values: &ArgMatches) -> GatewayCommand {
+    GatewayCommand {
+        backend,
+        operation: GatewayOperation::Exec,
+        engine: None,
+        cwd: None,
+        view: "auto".to_owned(),
+        limit: 80,
+        max_text_chars: 240,
+        model_token_budget: 2048,
+        output: OutputFormat::Model,
+        receipt: "auto".to_owned(),
+        artifact_out: None,
+        snapshot: None,
+        after: None,
+        native_argv: values
+            .try_get_many::<OsString>("native")
+            .ok()
+            .flatten()
+            .map(|items| items.cloned().collect())
+            .unwrap_or_default(),
+    }
 }
 
 fn parse_gateway_command(
@@ -827,6 +961,13 @@ fn parse_gateway_command(
             .flatten()
             .and_then(|value| usize::try_from(*value).ok())
             .unwrap_or(240),
+        model_token_budget: values
+            .try_get_one::<u64>("model-token-budget")
+            .ok()
+            .flatten()
+            .and_then(|value| usize::try_from(*value).ok())
+            .unwrap_or(2048),
+        output: parse_output(values),
         receipt: values
             .try_get_one::<String>("receipt")
             .ok()
@@ -921,7 +1062,19 @@ fn parse_process_command(matches: &ArgMatches) -> Result<ProcessCommand, CliPars
         "from-jsonl" => ProcessAction::FromJsonl,
         _ => return Err(CliParseError::MissingDelimiter),
     };
-    Ok(ProcessCommand { input, action })
+    let output = if matches!(
+        action,
+        ProcessAction::Containing { .. } | ProcessAction::GroupLocations { .. }
+    ) {
+        parse_output(values)
+    } else {
+        OutputFormat::Machine
+    };
+    Ok(ProcessCommand {
+        input,
+        action,
+        output,
+    })
 }
 
 fn parse_cache_command(matches: &ArgMatches) -> Result<CacheCommand, CliParseError> {
@@ -946,6 +1099,11 @@ fn parse_cache_command(matches: &ArgMatches) -> Result<CacheCommand, CliParseErr
                 .get_one::<u64>("limit")
                 .and_then(|value| usize::try_from(*value).ok())
                 .unwrap_or(40),
+            max_text_chars: values
+                .get_one::<u64>("max-text-chars")
+                .and_then(|value| usize::try_from(*value).ok())
+                .unwrap_or(240),
+            output: parse_output(values),
         }),
         Some(("info", values)) => Ok(CacheCommand::Info {
             cache_id: required_id(values)?,
@@ -966,6 +1124,7 @@ fn explicit_options(matches: &ArgMatches) -> ExplicitOptions {
         artifact_out: matches.get_one::<PathBuf>("artifact-out").cloned(),
         stderr_yaml: matches.get_one::<PathBuf>("stderr-yaml").cloned(),
         meta_out: matches.get_one::<PathBuf>("meta-out").cloned(),
+        output: parse_output(matches),
         profile: matches
             .get_one::<String>("profile")
             .and_then(|value| match value.as_str() {
@@ -998,12 +1157,24 @@ fn explicit_options(matches: &ArgMatches) -> ExplicitOptions {
     }
 }
 
+fn parse_output(matches: &ArgMatches) -> OutputFormat {
+    match matches
+        .try_get_one::<String>("output")
+        .ok()
+        .flatten()
+        .map(String::as_str)
+    {
+        Some("machine") => OutputFormat::Machine,
+        _ => OutputFormat::Model,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::ffi::OsString;
     use std::path::Path;
 
-    use srcq_core::invocation::{Profile, WrapperCommand};
+    use srcq_core::invocation::{OutputFormat, Profile, WrapperCommand};
 
     use super::{
         parse_cli_from, parse_invocation_from, CacheCommand, CliAction, CliParseError,
@@ -1211,8 +1382,8 @@ mod tests {
     #[test]
     fn parses_gateway_native_argv_without_reordering_or_deduplication() {
         let action = parse_cli_from(os_args(&[
-            "srcq", "rg", "exec", "--view", "grouped", "--limit", "7", "--", "-e", "a b", "-g",
-            "*.rs", "-e", "a b", "", "--", "tail",
+            "srcq", "query", "rg", "exec", "--view", "grouped", "--limit", "7", "--", "-e", "a b",
+            "-g", "*.rs", "-e", "a b", "", "--", "tail",
         ]))
         .expect("rg gateway");
         let CliAction::Gateway(command) = action else {
@@ -1233,6 +1404,7 @@ mod tests {
     fn parses_explicit_full_gateway_receipt() {
         let action = parse_cli_from(os_args(&[
             "srcq",
+            "query",
             "rg",
             "exec",
             "--receipt",
@@ -1250,7 +1422,7 @@ mod tests {
 
     #[test]
     fn gateway_help_does_not_require_a_native_delimiter() {
-        let error = parse_cli_from(os_args(&["srcq", "rg", "exec", "--help"]))
+        let error = parse_cli_from(os_args(&["srcq", "query", "rg", "exec", "--help"]))
             .expect_err("wrapper help exits through clap");
         assert!(matches!(
             error,
@@ -1263,6 +1435,7 @@ mod tests {
     fn gateway_accepts_budget_aliases_without_leaking_them_to_native_argv() {
         let action = parse_cli_from(os_args(&[
             "srcq",
+            "query",
             "rg",
             "exec",
             "--max-items",
@@ -1283,12 +1456,12 @@ mod tests {
     }
 
     #[test]
-    fn gateway_requires_the_boundary_but_preserves_an_empty_native_invocation() {
+    fn explicit_gateway_requires_the_boundary_but_preserves_an_empty_native_invocation() {
         assert!(matches!(
-            parse_cli_from(os_args(&["srcq", "fd", "exec"])),
+            parse_cli_from(os_args(&["srcq", "query", "fd", "exec"])),
             Err(CliParseError::MissingDelimiter)
         ));
-        let action = parse_cli_from(os_args(&["srcq", "fd", "exec", "--"]))
+        let action = parse_cli_from(os_args(&["srcq", "query", "fd", "exec", "--"]))
             .expect("empty native fd invocation");
         assert!(
             matches!(action, CliAction::Gateway(command) if command.backend == GatewayBackend::Fd && command.native_argv.is_empty())
@@ -1297,10 +1470,32 @@ mod tests {
 
     #[test]
     fn parses_gateway_doctor_without_native_argv() {
-        let action = parse_cli_from(os_args(&["srcq", "fd", "doctor", "--engine", "fd.exe"]))
-            .expect("fd doctor");
+        let action = parse_cli_from(os_args(&[
+            "srcq", "query", "fd", "doctor", "--engine", "fd.exe",
+        ]))
+        .expect("fd doctor");
         assert!(
             matches!(action, CliAction::Gateway(command) if command.backend == GatewayBackend::Fd && command.operation == GatewayOperation::Doctor && command.native_argv.is_empty())
+        );
+    }
+
+    #[test]
+    fn direct_gateway_treats_every_backend_token_as_native_argv() {
+        let action = parse_cli_from(os_args(&[
+            "srcq", "rg", "exec", "--view", "grouped", "--help", "", "--", "tail",
+        ]))
+        .expect("direct rg invocation");
+        let CliAction::Gateway(command) = action else {
+            panic!("expected gateway")
+        };
+        assert_eq!(GatewayBackend::Rg, command.backend);
+        assert_eq!(GatewayOperation::Exec, command.operation);
+        assert_eq!("auto", command.view);
+        assert_eq!(80, command.limit);
+        assert_eq!(2048, command.model_token_budget);
+        assert_eq!(
+            os_args(&["exec", "--view", "grouped", "--help", "", "--", "tail"]),
+            command.native_argv
         );
     }
 
@@ -1325,6 +1520,7 @@ mod tests {
                     field: "severity".to_owned(),
                     equals: "\"warning\"".to_owned(),
                 },
+                output: OutputFormat::Machine,
             })
         );
         assert_eq!(
@@ -1339,6 +1535,7 @@ mod tests {
             CliAction::Process(ProcessCommand {
                 input: ProcessInput::Cache("01ARZ3NDEKTSV4RRFFQ69G5FAV".to_owned()),
                 action: ProcessAction::Count,
+                output: OutputFormat::Machine,
             })
         );
         assert_eq!(
@@ -1365,6 +1562,7 @@ mod tests {
                     column: 3,
                     include_text: true,
                 },
+                output: OutputFormat::Model,
             })
         );
         assert_eq!(
@@ -1387,6 +1585,7 @@ mod tests {
                     offset: 2,
                     limit: 5,
                 },
+                output: OutputFormat::Model,
             })
         );
     }

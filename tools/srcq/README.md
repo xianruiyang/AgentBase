@@ -1,19 +1,19 @@
 # srcq
 
-`srcq` 是 Windows 本地源码查询适配器。现有 ast-grep 命令、profile、cache、process、TTY/LSP 和 rewrite 合同保持不变；新增的 `srcq rg` 与 `srcq fd` 命令域把原生参数完整放在 `--` 后，并只在安全等价时压缩模型可见输出。
+`srcq` 是 Windows 本地源码查询适配器。现有 ast-grep 命令、profile、cache、process、TTY/LSP 和 rewrite 合同保持不变；`srcq rg <native argv...>` 与 `srcq fd <native argv...>` 直接接受原生参数，并只在安全等价时压缩模型可见输出。
 
 ```text
-ast-grep 原生输出 → 可选完整缓存 → YAML profile → 模型上下文
+完整事实源 → model 干净证据 / machine 稳定结构 / native 原生通道
 ```
 
 ## 当前状态
 
-- 当前版本：`srcq 0.2.0`。
+- 当前版本：`srcq 0.3.1`。
 - 当前固定验证引擎：`ast-grep 0.42.0`。
 - 精确验证的 ast-grep 版本：`0.41.1`、`0.42.0`、`0.44.1`；不外推为连续版本范围。
-- rg/fd 候选命令域精确验证 `ripgrep 15.1.0` 与 `fd 10.4.2`；29 个公开主模式均有持久分类，版本不匹配时执行入口局部拒绝，`doctor` 给出读回。
+- rg/fd 候选命令域已在 `ripgrep 15.1.0`、Codex PATH 中的 `ripgrep 15.2.0` 与 `fd 10.4.2` 上验证；29 个公开主模式均有持久分类，版本只标识证据范围，不参与运行准入。
 - 唯一维护平台是 Windows x86_64 MSVC，已完成真实引擎、协议、release 和安装生命周期。
-- `srcq` 不包含 ast-grep、ripgrep 或 fd，也不安装语言运行时；必须另行提供相应精确版本的原生引擎。
+- `srcq` 不包含 ast-grep、ripgrep 或 fd，也不安装语言运行时；必须另行提供可启动的原生引擎。
 - 为保持迁移前 AST 结果与缓存可读，版本化数据合同继续使用既有 `_sgy` 字段和 `sgy.*` schema 命名；它们是协议兼容标识，不是可执行文件、安装目录或第二运行时入口。
 
 ## 快速开始
@@ -50,31 +50,38 @@ wrapper 参数必须位于 `--` 前，原生 ast-grep 参数位于 `--` 后：
 srcq exec --profile lossless --cache off -- run -p 'foo($A)' -l ts src
 ```
 
-文本与文件查询同样保持原生 argv，不引入第二套简化语法：
+普通文本与文件查询直接沿用原生命令直觉，不需要 `exec`、分隔符、view 或预算：
 
 ```powershell
-srcq rg exec --view auto --limit 80 -- -n -F 'needle' -g '*.cpp' .
-srcq fd exec --view auto --limit 80 -- -t f 'CommandDispatch' .
-srcq rg exec --receipt full -- -n -F 'needle' .
-srcq rg defaults --view grouped -- -n -F 'needle' .
-srcq fd doctor
+srcq rg -n -F 'needle' -g '*.cpp' .
+srcq fd -t f 'CommandDispatch' .
 ```
 
-普通 rg 搜索和 fd 路径结果先完整有界捕获，再按所选 view 的证据单元投影：文件按去重文件、位置按真实匹配、正文按匹配与上下文、摘要按完整集合。默认 v2 回执固定返回总量与结果、展示、正文三类完整性；非零退出和分页字段只在发生时出现，显式 `--receipt full` 才返回 backend、引擎版本、mode、view 和字节数等诊断。只有分页或 full 回执需要身份时才持久化快照；分页响应中的 `query_snapshot` 与 `next_cursor` 必须原样用于下一页，backend、cwd、原生 argv、引擎版本、snapshot 或实际 view 不匹配时拒绝续页。二进制/NUL 模式要求 `--artifact-out`，fd exec/batch 直接透传，help、统计和其他显式文本报告默认有界。详见 [rg/fd 查询网关](docs/query-gateway.md)。
+若把 `files`、`--files` 或 AST 原生命令误写到根级，srcq 只返回上述唯一入口的一行修正，不创建别名或猜测执行。
+
+只有调用方明确需要 machine、native/artifact、定向投影、诊断或续页时进入独立控制面：
+
+```powershell
+srcq query rg exec --output machine --receipt full -- -n -F 'needle' .
+srcq query rg defaults --view grouped -- -n -F 'needle' .
+srcq query fd doctor
+```
+
+普通 rg、fd 与 AST 查询默认使用 model 输出：只输出干净证据，正常成功、完整和空结果不附 envelope 或回执；rg/fd 在取得真实结果后比较单行、文件 heading、路径树及组合表示，并在内部总预算内按证据单元分页，只有分页、截断、歧义或写入事实追加最短 `@` 记录。parser、round-trip、完整诊断或旧结构化消费者通过 `srcq query` 或 AST 显式 `--output machine`；`--receipt full`、`--yaml-out`、`lossless` 和 `custom` 也保持机器合同。二进制、TTY、LSP 与完整原生字节走 native/artifact 通道。详见 [模型可见输出合同](docs/model-output.md) 和 [rg/fd 查询网关](docs/query-gateway.md)。
 
 ## Profile
 
 | Profile | 用途 | 模型上下文建议 |
 | --- | --- | --- |
-| `token-safe` | 默认；投影必要字段、聚合、省略和截断 | 默认使用 |
-| `locations` | 仅保留每条命中的 0-based 文件与起止位置，并紧凑序列化 | 已知只需定位、不需正文或捕获 |
+| `token-safe` | 默认；model 输出文件、范围与源码，machine 保留既有完整性合同 | 默认使用 |
+| `locations` | 仅保留每条命中的 0-based 文件与起止位置 | 已知只需定位、不需正文或捕获 |
 | `lossless` | JSON value 与 YAML value 等价，保留未知字段 | 机器 round-trip 或完整审计 |
 | `files` | 只关注命中文件与计数 | 先收窄范围 |
 | `custom` | 显式 `--keep-fields`/`--prune-fields` | 已知字段需求 |
 
-默认 Token-Safe 基线是 40 条详情、每个文本字段 400 字符、24 KiB YAML 软预算。它们只影响输出；不会向 ast-grep 注入结果上限。完整 benchmark 显示 lossless YAML 本身通常比 compact JSON 更耗 Token，节省来自 Token-Safe 投影和预算。
+默认 Token-Safe 基线是 40 条详情、每个文本字段 400 字符、24 KiB 机器投影软预算。它们只影响输出；不会向 ast-grep 注入结果上限。model 在同一完整事实源之上移除机器 envelope 和重复捕获，machine 仍可用于解析与审计。
 
-`locations` 沿用同一 `_sgy.total/shown/omitted/files/complete/cache` 完整性合同，`results` 项格式为 `file:start_line:start_column-end_line:end_column`。输出采用 JSON 兼容的安全 YAML 1.2 紧凑表示；不要在仍需正文、metaVariables、rule 或 severity 时使用。
+`locations` 的 model 项格式为 `file:start_line:start_column-end_line:end_column`；machine 沿用 `_sgy.total/shown/omitted/files/complete/cache` 和安全 YAML 合同。不要在仍需正文、捕获、rule 或 severity 时使用该 profile。
 
 ## 文档
 
@@ -85,6 +92,7 @@ srcq fd doctor
 - [安全边界](docs/security.md)
 - [命令兼容](docs/compatibility.md)
 - [rg/fd 查询网关](docs/query-gateway.md)
+- [模型可见输出合同](docs/model-output.md)
 - [排障](docs/troubleshooting.md)
 - [开发与发布](docs/development.md)
 - [第一版发布门禁](docs/release-checklist.md)

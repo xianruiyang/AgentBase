@@ -13,6 +13,18 @@ fn main() -> io::Result<()> {
         .skip(1)
         .map(|value| value.to_string_lossy().into_owned())
         .collect();
+    if !args
+        .first()
+        .is_some_and(|arg| arg == "--version" || arg == "-V")
+    {
+        if let Some(path) = env::var_os("SRCQ_FIXTURE_INVOCATION_LOG") {
+            let mut file = fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)?;
+            writeln!(file, "run")?;
+        }
+    }
     if let Some(path) = args
         .iter()
         .find_map(|arg| arg.strip_prefix("--fixture-child-ready="))
@@ -85,7 +97,9 @@ fn main() -> io::Result<()> {
         .first()
         .is_some_and(|arg| arg == "--version" || arg == "-V")
     {
-        io::stdout().write_all(b"ast-grep fixture 0.0.0\n")?;
+        let version = env::var("SRCQ_FIXTURE_VERSION")
+            .unwrap_or_else(|_| "ast-grep fixture 0.0.0".to_owned());
+        writeln!(io::stdout().lock(), "{version}")?;
         process::exit(exit_flag(&args));
     }
     if args
@@ -101,6 +115,28 @@ fn main() -> io::Result<()> {
         io::stdout().write_all(&input)?;
         io::stdout().flush()?;
         process::exit(exit_flag(&args));
+    }
+
+    if let Ok(protocol) = env::var("SRCQ_FIXTURE_RG_PROTOCOL") {
+        if protocol == "valid" {
+            let mut stdout = io::stdout().lock();
+            writeln!(
+                stdout,
+                "{{\"type\":\"begin\",\"data\":{{\"path\":{{\"text\":\"src/future.rs\"}}}}}}"
+            )?;
+            writeln!(stdout, "{{\"type\":\"match\",\"data\":{{\"path\":{{\"text\":\"src/future.rs\"}},\"lines\":{{\"text\":\"future evidence\\n\"}},\"line_number\":1,\"absolute_offset\":0,\"submatches\":[{{\"match\":{{\"text\":\"future\"}},\"start\":0,\"end\":6}}]}}}}")?;
+            writeln!(stdout, "{{\"type\":\"end\",\"data\":{{\"path\":{{\"text\":\"src/future.rs\"}},\"binary_offset\":null,\"stats\":{{}}}}}}")?;
+            writeln!(stdout, "{{\"type\":\"summary\",\"data\":{{\"elapsed_total\":{{\"human\":\"0s\",\"nanos\":0,\"secs\":0}},\"stats\":{{}}}}}}")?;
+            process::exit(exit_flag(&args));
+        }
+        if protocol == "changed" {
+            if args.iter().any(|arg| arg == "--json") {
+                io::stdout().write_all(b"future-protocol-record\n")?;
+            } else {
+                io::stdout().write_all(b"future evidence\n")?;
+            }
+            process::exit(exit_flag(&args));
+        }
     }
 
     let mut stdin = Vec::new();

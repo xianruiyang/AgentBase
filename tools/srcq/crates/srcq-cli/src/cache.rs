@@ -2,8 +2,9 @@ use std::{io::Write, time::SystemTime};
 
 use serde_json::{Map, Value};
 use srcq_core::{
-    cache::{CacheError, CacheQuery, CacheStore, SourceFormat, VerifiedCache},
+    cache::{CacheError, CacheQuery, CacheStore, CachedResult, SourceFormat, VerifiedCache},
     codec::{write_yaml_document, CodecError},
+    invocation::OutputFormat,
 };
 use thiserror::Error;
 
@@ -52,6 +53,8 @@ pub fn execute(
             rule_id,
             offset,
             limit,
+            max_text_chars,
+            output: format,
         } => {
             let cache = store.open_verified(cache_id, now)?;
             let result = cache.query(&CacheQuery {
@@ -60,6 +63,19 @@ pub fn execute(
                 offset: *offset,
                 limit: *limit,
             })?;
+            if *format == OutputFormat::Model {
+                write_query_model(
+                    cache_id,
+                    *offset,
+                    *max_text_chars,
+                    result.total,
+                    result.shown,
+                    &result.results,
+                    output,
+                )?;
+                output.flush().map_err(CacheCommandError::Output)?;
+                return Ok(());
+            }
             let mut document = Map::new();
             document.insert(
                 "schema".to_owned(),
@@ -140,6 +156,98 @@ pub fn execute(
     output.flush().map_err(CacheCommandError::Output)
 }
 
+fn write_query_model(
+    cache_id: &str,
+    offset: usize,
+    max_text_chars: usize,
+    total: u64,
+    shown: u64,
+    results: &[CachedResult],
+    output: &mut impl Write,
+) -> Result<(), CacheCommandError> {
+    let mut lines = Vec::new();
+    let mut cut = 0_u64;
+    for result in results {
+        let mapping = result.value.as_object().ok_or_else(|| {
+            CacheError::InvalidSelection(
+                "cache query result has no model projection; retry with --output machine"
+                    .to_owned(),
+            )
+        })?;
+        let file = mapping.get("file").and_then(Value::as_str).ok_or_else(|| {
+            CacheError::InvalidSelection(
+                "cache query result has no file; retry with --output machine".to_owned(),
+            )
+        })?;
+        let range = mapping
+            .get("range")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                CacheError::InvalidSelection(
+                    "cache query result has no range; retry with --output machine".to_owned(),
+                )
+            })?;
+        let position = |name: &str| -> Option<(u64, u64)> {
+            let point = range.get(name)?.as_object()?;
+            Some((point.get("line")?.as_u64()?, point.get("column")?.as_u64()?))
+        };
+        let (start_line, start_column) = position("start").ok_or_else(|| {
+            CacheError::InvalidSelection(
+                "cache query result has no valid range.start; retry with --output machine"
+                    .to_owned(),
+            )
+        })?;
+        let (end_line, end_column) = position("end").ok_or_else(|| {
+            CacheError::InvalidSelection(
+                "cache query result has no valid range.end; retry with --output machine".to_owned(),
+            )
+        })?;
+        lines.push(format!(
+            "#{} {}:{start_line}:{start_column}-{end_line}:{end_column}",
+            result.id,
+            file.replace('\\', "/")
+        ));
+        if let Some(text) = mapping.get("text").and_then(Value::as_str) {
+            let mut chars = text.chars();
+            let visible = chars.by_ref().take(max_text_chars).collect::<String>();
+            if chars.next().is_some() {
+                lines.push(format!("{visible}…"));
+                cut = cut.saturating_add(1);
+            } else {
+                lines.push(text.trim_end_matches(['\r', '\n']).to_owned());
+            }
+        }
+        for field in ["ruleId", "severity", "message", "replacement"] {
+            if let Some(value) = mapping.get(field).and_then(Value::as_str) {
+                lines.push(format!("{field}={value}"));
+            }
+        }
+    }
+    let omitted = total.saturating_sub(
+        u64::try_from(offset)
+            .unwrap_or(u64::MAX)
+            .saturating_add(shown),
+    );
+    if omitted > 0 {
+        let next = u64::try_from(offset)
+            .unwrap_or(u64::MAX)
+            .saturating_add(shown);
+        lines.push(format!(
+            "@more shown={shown} omitted={omitted} cache={cache_id} after={next}"
+        ));
+    }
+    if cut > 0 {
+        lines.push(format!("@cut text={cut}"));
+    }
+    if !lines.is_empty() {
+        output
+            .write_all(lines.join("\n").as_bytes())
+            .and_then(|()| output.write_all(b"\n"))
+            .map_err(CacheCommandError::Output)?;
+    }
+    Ok(())
+}
+
 fn write_get(
     cache: &VerifiedCache,
     result: Option<u64>,
@@ -183,7 +291,7 @@ mod tests {
     use srcq_core::{
         cache::{CacheAudit, CacheLimits, CacheMode, CacheProcess, CacheStore, SourceFormat},
         codec::{parse_yaml_documents, JsonLines},
-        invocation::Profile,
+        invocation::{OutputFormat, Profile},
     };
     use tempfile::tempdir;
 
@@ -212,8 +320,8 @@ mod tests {
             CacheMode::On,
         );
         let raw = concat!(
-            "{\"file\":\"src/a.ts\",\"ruleId\":\"r\",\"text\":\"alpha\"}\n",
-            "{\"file\":\"src/b.ts\",\"ruleId\":\"s\",\"text\":\"beta\"}\n"
+            "{\"file\":\"src/a.ts\",\"range\":{\"start\":{\"line\":0,\"column\":0},\"end\":{\"line\":0,\"column\":5}},\"ruleId\":\"r\",\"text\":\"alpha\"}\n",
+            "{\"file\":\"src/b.ts\",\"range\":{\"start\":{\"line\":1,\"column\":0},\"end\":{\"line\":1,\"column\":4}},\"ruleId\":\"s\",\"text\":\"beta\"}\n"
         )
         .as_bytes();
         let now = SystemTime::UNIX_EPOCH + Duration::from_secs(2_000_000_000);
@@ -279,11 +387,54 @@ mod tests {
                 rule_id: None,
                 offset: 0,
                 limit: 40,
+                max_text_chars: 240,
+                output: OutputFormat::Machine,
             },
         );
         assert_eq!(query[0]["schema"], "sgy.cache-query/v1");
         assert_eq!(query[0]["total"], 1);
         assert_eq!(query[0]["results"][0]["id"], 1);
+
+        let mut model = Vec::new();
+        execute(
+            &store,
+            &CacheCommand::Query {
+                cache_id: cache_id.clone(),
+                file: Some("src/b.ts".to_owned()),
+                rule_id: None,
+                offset: 0,
+                limit: 40,
+                max_text_chars: 3,
+                output: OutputFormat::Model,
+            },
+            SystemTime::UNIX_EPOCH + Duration::from_secs(2_000_000_100),
+            &mut model,
+        )
+        .expect("model cache query");
+        assert_eq!(
+            String::from_utf8(model).expect("UTF-8 model query"),
+            "#1 src/b.ts:1:0-1:4\nbet…\nruleId=s\n@cut text=1\n"
+        );
+
+        let mut final_page = Vec::new();
+        execute(
+            &store,
+            &CacheCommand::Query {
+                cache_id: cache_id.clone(),
+                file: None,
+                rule_id: None,
+                offset: 1,
+                limit: 1,
+                max_text_chars: 240,
+                output: OutputFormat::Model,
+            },
+            SystemTime::UNIX_EPOCH + Duration::from_secs(2_000_000_100),
+            &mut final_page,
+        )
+        .expect("final model cache page");
+        assert!(!String::from_utf8(final_page)
+            .expect("UTF-8 final page")
+            .contains("@more"));
 
         let info = run(
             &store,

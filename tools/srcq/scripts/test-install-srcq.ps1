@@ -150,7 +150,7 @@ try {
     Assert-True ((Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash -eq $configHash) "upgrade changed user config"
     Assert-True ((Get-FileHash -LiteralPath $cache -Algorithm SHA256).Hash -eq $cacheHash) "upgrade changed cache"
 
-    $doctor = & $binary doctor --engine $Engine
+    $doctor = & $binary doctor --output machine --engine $Engine
     Assert-True ($LASTEXITCODE -eq 0) "doctor could not use the explicit ast-grep engine"
     $doctorText = $doctor -join "`n"
     Assert-True ($doctorText.Contains('"source": "explicit"')) "doctor did not use the explicit engine"

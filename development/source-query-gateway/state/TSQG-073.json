@@ -2,10 +2,10 @@
   "blocked_reason": "",
   "next_action": "",
   "note": "",
-  "owner": null,
-  "result_ref": null,
-  "revision": 1,
+  "owner": "codex-root",
+  "result_ref": "results/TSQG-073.r4.json",
+  "revision": 4,
   "schema": "task.state",
-  "status": "todo",
+  "status": "done",
   "task_id": "TSQG-073"
 }

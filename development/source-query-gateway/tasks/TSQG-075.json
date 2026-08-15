@@ -1,0 +1,47 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "srcq 统一查询入口",
+        "显式控制面"
+      ],
+      "id": "TSQG-074",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-075",
+  "mutation_scope": [
+    "tools/srcq/**",
+    "development/source-query-gateway/**"
+  ],
+  "outcome": "srcq 根据真实结果在原生等效文本、单行、heading、分组正文和路径树位置结构中选择最低充分表示",
+  "outputs": [
+    "包含原生等效文本的 renderer 候选集合",
+    "路径树与文件 heading 组合投影",
+    "基于实际模型文本成本的 auto 选择器"
+  ],
+  "reasoning_hint": "high",
+  "revision": 2,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-SQG-010",
+    "DES-SQG-004",
+    "DES-SQG-006",
+    "DES-SQG-007",
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-008"
+  ],
+  "suggested_skills": [
+    "source-query",
+    "change-governance"
+  ],
+  "title": "实现真实结果后的自适应模型投影",
+  "verification": [
+    "裸输出没有预设优先级且只在实际最低充分时采用",
+    "同文件多位置只输出一次路径",
+    "多文件共享目录压缩公共前缀并保留位置归属",
+    "离散单位置不为树形增加成本",
+    "结果集合、顺序、范围、正文、上下文和完整性按 EvidenceSignature 等价"
+  ]
+}

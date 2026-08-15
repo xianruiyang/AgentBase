@@ -8,6 +8,8 @@ fn exec_command(workspace: &Path, cache_root: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_srcq"));
     command.current_dir(workspace).args([
         "exec",
+        "--output",
+        "machine",
         "--engine",
         env!("CARGO_BIN_EXE_srcq-native-fixture"),
     ]);

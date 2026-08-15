@@ -16,11 +16,11 @@ name = "srcq-slow-engine"
 path = "src/bin/slow_engine.rs"
 
 [dependencies]
+serde_json.workspace = true
 srcq-cli = { path = "../../crates/srcq-cli" }
 srcq-core = { path = "../../crates/srcq-core" }
 
 [dev-dependencies]
-serde_json.workspace = true
 sha2.workspace = true
 tempfile.workspace = true
 

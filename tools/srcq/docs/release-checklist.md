@@ -21,7 +21,7 @@
 ## 3. 共存与安全
 
 - [ ] `srcq` 不安装或覆盖 `ast-grep`/`sg`，不修改 ast-grep 自身安装。
-- [ ] srcq 配置/cache/安装根与 `ast-grep-token-safe`、ast-mcp、vscode-lsp-mcp 和其他 SymbolStructureWorkflow 组件无路径冲突。
+- [ ] srcq 配置/cache/安装根与 `source-query`、vscode-lsp-mcp 和其他语义编辑组件无路径冲突。
 - [ ] 安装、失败回滚和卸载前后，其他组件与用户配置/cache 的 hash 不变。
 - [ ] 卸载只删除 install state 声明的受管文件和自身 PATH 条目；未知文件、预存 PATH 条目与并发 PATH 编辑保留。
 - [ ] checksum 错误、路径穿越、额外成员、target 不匹配、manifest hash 错误和篡改 state 均被拒绝。

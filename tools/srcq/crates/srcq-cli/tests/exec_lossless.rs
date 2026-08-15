@@ -115,6 +115,8 @@ fn stdin_native_exit_and_invalid_partial_stream_follow_the_contract() {
         .current_dir(directory.path())
         .args([
             "exec",
+            "--output",
+            "machine",
             "--engine",
             env!("CARGO_BIN_EXE_srcq-native-fixture"),
             "--cache",
@@ -156,6 +158,8 @@ fn yaml_out_is_atomic_and_default_profile_is_token_safe() {
         .current_dir(directory.path())
         .args([
             "exec",
+            "--output",
+            "machine",
             "--engine",
             env!("CARGO_BIN_EXE_srcq-native-fixture"),
             "--cache",
@@ -181,6 +185,8 @@ fn batch_meta_out_records_execution_without_replacing_context_yaml() {
         .current_dir(directory.path())
         .args([
             "exec",
+            "--output",
+            "machine",
             "--engine",
             env!("CARGO_BIN_EXE_srcq-native-fixture"),
             "--cache",

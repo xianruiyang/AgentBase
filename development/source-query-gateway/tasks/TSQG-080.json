@@ -1,0 +1,51 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "当前 source-query Skill、AST 合同与正式路由"
+      ],
+      "id": "TSQG-077",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-080",
+  "mutation_scope": [
+    "skills/source-query/**",
+    "development/source-query-gateway/candidate-skill/source-query/**",
+    "development/skill-routing/**"
+  ],
+  "outcome": "已知名称在文本定位和有界读取足以证明结果时不承担 AST 成本，只有真实结构或语义证据缺口才升级且无匹配不会触发盲目重试",
+  "outputs": [
+    "证据缺口驱动的文本、AST 与 LSP 路由",
+    "AST 无匹配后的新证据准入规则",
+    "适用正反路由与行为场景"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-SQG-014",
+    "GAP-SQG-007",
+    "DES-SQG-001",
+    "DES-SQG-008",
+    "DES-SQG-009",
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-006",
+    "UDES-SQG-006",
+    "UDES-SQG-013"
+  ],
+  "suggested_skills": [
+    "skill-creator",
+    "source-query",
+    "change-governance"
+  ],
+  "title": "把 AST 与 LSP 升级改为证据缺口驱动",
+  "verification": [
+    "唯一已知函数完整定义使用文本定位与有界读取闭环",
+    "边界不明、截断、同名重载和结构关系场景按需升级 AST",
+    "真实身份、类型与精确引用分歧按需升级 LSP",
+    "AST 无匹配后没有新源码语法证据时不连续试探 pattern",
+    "AST 既有查询、cache、process、rewrite 安全合同保持"
+  ]
+}

@@ -24,7 +24,7 @@ use srcq_core::config::load_standard_config;
 use srcq_core::context_batch::{run_profile_batch, CachePlan, ProfileBatchRequest};
 use srcq_core::defaults::CommandClassification;
 use srcq_core::engine::{EngineEnvironment, SystemEngineEnvironment};
-use srcq_core::invocation::WrapperCommand;
+use srcq_core::invocation::{OutputFormat, Profile, WrapperCommand};
 use srcq_core::passthrough::{
     commit_metadata, run_lsp, run_tty, MetadataRequest, PassthroughChannel,
 };
@@ -106,7 +106,9 @@ fn run_main() -> i32 {
     );
 
     match prepared.invocation.command {
-        WrapperCommand::Defaults => emit_defaults(&prepared.defaults),
+        WrapperCommand::Defaults => {
+            emit_defaults(&prepared.defaults, prepared.invocation.explicit.output)
+        }
         WrapperCommand::Exec => execute_profile(prepared),
     }
 }
@@ -126,7 +128,11 @@ fn execute_inspection(command: &srcq_cli::InspectionCommand) -> i32 {
         srcq_cli::InspectionCommand::Capabilities => {
             srcq_cli::diagnostics::render_capabilities().map(|yaml| (yaml, true))
         }
-        srcq_cli::InspectionCommand::Doctor { engine, cwd } => {
+        srcq_cli::InspectionCommand::Doctor {
+            engine,
+            cwd,
+            output,
+        } => {
             let environment = SystemEngineEnvironment::from_process_environment();
             srcq_cli::diagnostics::run_doctor(
                 engine.clone(),
@@ -134,7 +140,14 @@ fn execute_inspection(command: &srcq_cli::InspectionCommand) -> i32 {
                 &launch_cwd,
                 &environment,
             )
-            .map(|output| (output.yaml, output.ok))
+            .map(|doctor| {
+                let bytes = if *output == OutputFormat::Machine {
+                    doctor.yaml
+                } else {
+                    doctor.model
+                };
+                (bytes, doctor.ok)
+            })
         }
     };
     let (yaml, ok) = match output {
@@ -276,7 +289,25 @@ fn execute_cache(command: &srcq_cli::CacheCommand) -> i32 {
     }
 }
 
-fn emit_defaults(decision: &srcq_core::defaults::DefaultsDecision) -> i32 {
+fn emit_defaults(decision: &srcq_core::defaults::DefaultsDecision, output: OutputFormat) -> i32 {
+    if output == OutputFormat::Model {
+        let classification = format!("{:?}", decision.classification);
+        let injected = decision
+            .injected
+            .iter()
+            .map(|value| value.to_string_lossy())
+            .collect::<Vec<_>>();
+        let line = if injected.is_empty() {
+            format!("{classification} unchanged\n")
+        } else {
+            format!("{classification} + {}\n", injected.join(" "))
+        };
+        if let Err(error) = io::stdout().lock().write_all(line.as_bytes()) {
+            eprintln!("srcq: failed to write defaults output: {error}");
+            return 127;
+        }
+        return 0;
+    }
     let yaml = match srcq_cli::defaults_output::render_defaults_yaml(decision) {
         Ok(yaml) => yaml,
         Err(error) => {
@@ -577,7 +608,11 @@ fn execute_profile_with_outputs(
                     }
                 };
                 if let Some(yaml) = outcome.yaml.as_ref() {
-                    if let Err(code) = commit_or_emit_yaml(yaml.path(), outputs.yaml.as_ref()) {
+                    if let Err(code) = commit_or_emit_yaml(
+                        yaml.path(),
+                        outputs.yaml.as_ref(),
+                        wants_model_output(&prepared),
+                    ) {
                         warn_possible_partial_write(write_intent);
                         return code;
                     }
@@ -625,7 +660,11 @@ fn execute_profile_with_outputs(
                 }
             };
             if let Some(yaml) = outcome.yaml.as_ref() {
-                if let Err(code) = commit_or_emit_yaml(yaml.path(), outputs.yaml.as_ref()) {
+                if let Err(code) = commit_or_emit_yaml(
+                    yaml.path(),
+                    outputs.yaml.as_ref(),
+                    wants_model_output(&prepared),
+                ) {
                     warn_possible_partial_write(write_intent);
                     return code;
                 }
@@ -849,7 +888,11 @@ fn execute_raw_profile(
         }
     };
     if let Some(yaml) = outcome.yaml.as_ref() {
-        if let Err(code) = commit_or_emit_yaml(yaml.path(), outputs.yaml.as_ref()) {
+        if let Err(code) = commit_or_emit_yaml(
+            yaml.path(),
+            outputs.yaml.as_ref(),
+            wants_model_output(prepared),
+        ) {
             warn_possible_partial_write(write_intent);
             warn_possible_native_side_effects(may_have_native_side_effects);
             return code;
@@ -900,7 +943,11 @@ fn execute_structured_profile(
         }
     };
     if let Some(yaml) = outcome.yaml.as_ref() {
-        if let Err(code) = commit_or_emit_yaml(yaml.path(), outputs.yaml.as_ref()) {
+        if let Err(code) = commit_or_emit_yaml(
+            yaml.path(),
+            outputs.yaml.as_ref(),
+            wants_model_output(&prepared),
+        ) {
             warn_possible_partial_write(write_intent);
             return code;
         }
@@ -1000,11 +1047,29 @@ fn prepare_cache_plan(
     CachePlan::ready(store, audit)
 }
 
-fn commit_or_emit_yaml(path: &Path, final_output: Option<&PreparedOutput>) -> Result<(), i32> {
+fn wants_model_output(prepared: &srcq_core::prepare::PreparedInvocation) -> bool {
+    prepared.invocation.explicit.output == OutputFormat::Model
+        && prepared.invocation.explicit.yaml_out.is_none()
+        && !matches!(
+            prepared.defaults.settings.profile,
+            Profile::Lossless | Profile::Custom
+        )
+}
+
+fn commit_or_emit_yaml(
+    path: &Path,
+    final_output: Option<&PreparedOutput>,
+    model: bool,
+) -> Result<(), i32> {
     if let Some(output) = final_output {
         output.commit_from_path(path).map(|_| ()).map_err(|error| {
             eprintln!("srcq: {error}");
             error.wrapper_exit_code()
+        })
+    } else if model {
+        emit_staged_model(path).map_err(|error| {
+            eprintln!("srcq: {error}");
+            125
         })
     } else {
         emit_staged_yaml(path).map_err(|error| {
@@ -1014,9 +1079,284 @@ fn commit_or_emit_yaml(path: &Path, final_output: Option<&PreparedOutput>) -> Re
     }
 }
 
+fn emit_staged_model(path: &Path) -> Result<(), String> {
+    let bytes = std::fs::read(path)
+        .map_err(|error| format!("cannot read staged machine output: {error}"))?;
+    let documents = srcq_core::codec::parse_yaml_documents(&bytes)
+        .map_err(|error| format!("cannot parse staged machine output: {error}"))?;
+    let mut rendered = Vec::new();
+    for document in &documents {
+        let text = render_model_document(document)?;
+        if !text.is_empty() {
+            rendered.push(text);
+        }
+    }
+    if rendered.is_empty() {
+        return Ok(());
+    }
+    let mut stdout = io::stdout().lock();
+    stdout
+        .write_all(rendered.join("\n").as_bytes())
+        .and_then(|()| stdout.write_all(b"\n"))
+        .and_then(|()| stdout.flush())
+        .map_err(|error| format!("failed to write model output: {error}"))
+}
+
+fn render_model_document(document: &serde_json::Value) -> Result<String, String> {
+    let mapping = document
+        .as_object()
+        .ok_or_else(|| "model output requires a mapping; retry with --output machine".to_owned())?;
+    let mut lines = Vec::new();
+    if let Some(results) = mapping.get("results").and_then(serde_json::Value::as_array) {
+        for result in results {
+            if let Some(location) = result.as_str() {
+                lines.push(location.replace('\\', "/"));
+            } else {
+                render_ast_result(result, &mut lines)?;
+            }
+        }
+    } else if let Some(files) = mapping.get("files") {
+        match files {
+            serde_json::Value::Object(files) => {
+                lines.extend(files.keys().map(|path| path.replace('\\', "/")));
+            }
+            serde_json::Value::Array(files) => {
+                for file in files {
+                    let path = file.as_str().ok_or_else(|| {
+                        "model file output is not textual; retry with --output machine".to_owned()
+                    })?;
+                    lines.push(path.replace('\\', "/"));
+                }
+            }
+            _ => {
+                return Err(
+                    "model file output has an unknown shape; retry with --output machine"
+                        .to_owned(),
+                )
+            }
+        }
+    } else if let Some(stdout) = mapping.get("stdout").and_then(serde_json::Value::as_str) {
+        if !stdout.is_empty() {
+            lines.push(stdout.trim_end_matches(['\r', '\n']).to_owned());
+        }
+    } else if mapping.get("kind").and_then(serde_json::Value::as_str) == Some("artifact") {
+        let path = mapping
+            .get("path")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "artifact output has no path; retry with --output machine".to_owned())?;
+        lines.push(model_path(path));
+    } else {
+        return Err("output has no model projection; retry with --output machine".to_owned());
+    }
+
+    let metadata = mapping.get("_sgy").and_then(serde_json::Value::as_object);
+    if let Some(metadata) = metadata {
+        let shown = metadata
+            .get("shown")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or_else(|| {
+                u64::try_from(
+                    mapping
+                        .get("results")
+                        .and_then(serde_json::Value::as_array)
+                        .map_or(0, Vec::len),
+                )
+                .unwrap_or(u64::MAX)
+            });
+        let omitted = metadata
+            .get("omitted")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0);
+        if omitted > 0 {
+            if let Some(cache) = metadata.get("cache").and_then(serde_json::Value::as_str) {
+                lines.push(format!(
+                    "@more shown={shown} omitted={omitted} cache={cache}"
+                ));
+            } else {
+                lines.push(format!("@cut results={omitted}"));
+            }
+        }
+        if let Some(write) = metadata.get("write").and_then(serde_json::Value::as_object) {
+            let requested = write
+                .get("requested")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("write");
+            let mut notice = format!("@write {requested}");
+            for field in [
+                "matches",
+                "applied_changes",
+                "affected_files",
+                "replacement_records",
+            ] {
+                if let Some(value) = write.get(field).and_then(serde_json::Value::as_u64) {
+                    notice.push_str(&format!(" {field}={value}"));
+                }
+            }
+            if write
+                .get("transactional")
+                .and_then(serde_json::Value::as_bool)
+                == Some(false)
+            {
+                notice.push_str(" nontransactional");
+            }
+            lines.push(notice);
+        }
+    }
+    let cut = count_text_cuts(document);
+    if cut > 0 {
+        lines.push(format!("@cut text={cut}"));
+    }
+    Ok(lines.join("\n"))
+}
+
+fn render_ast_result(result: &serde_json::Value, lines: &mut Vec<String>) -> Result<(), String> {
+    let mapping = result.as_object().ok_or_else(|| {
+        "model AST result has an unknown shape; retry with --output machine".to_owned()
+    })?;
+    if mapping
+        .get("_sgy_unknown")
+        .and_then(serde_json::Value::as_bool)
+        == Some(true)
+    {
+        return Err("model AST result is opaque; retry with --output machine".to_owned());
+    }
+    let file = mapping
+        .get("file")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "model AST result has no file; retry with --output machine".to_owned())?
+        .replace('\\', "/");
+    let range = mapping
+        .get("range")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| "model AST result has no range; retry with --output machine".to_owned())?;
+    let position = |name: &str| -> Result<(u64, u64), String> {
+        let point = range
+            .get(name)
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(|| format!("model AST result has no range.{name}"))?;
+        Ok((
+            point
+                .get("line")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| format!("model AST result has no range.{name}.line"))?,
+            point
+                .get("column")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| format!("model AST result has no range.{name}.column"))?,
+        ))
+    };
+    let (start_line, start_column) = position("start")?;
+    let (end_line, end_column) = position("end")?;
+    lines.push(format!(
+        "{file}:{start_line}:{start_column}-{end_line}:{end_column}"
+    ));
+    let text = mapping
+        .get("text")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "model AST result has no text; retry with --output machine".to_owned())?;
+    lines.push(text.trim_end_matches(['\r', '\n']).to_owned());
+    for field in ["ruleId", "severity", "message", "replacement"] {
+        if let Some(value) = mapping.get(field).and_then(serde_json::Value::as_str) {
+            if !value.is_empty() {
+                lines.push(format!("{field}={value}"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn count_text_cuts(value: &serde_json::Value) -> usize {
+    value
+        .get("results")
+        .and_then(serde_json::Value::as_array)
+        .map(|results| {
+            results
+                .iter()
+                .filter(|result| {
+                    result
+                        .get("_sgy_text_truncated")
+                        .and_then(serde_json::Value::as_bool)
+                        == Some(true)
+                })
+                .count()
+        })
+        .unwrap_or_else(|| {
+            usize::from(
+                value.get("stdout").is_some()
+                    && value
+                        .pointer("/_sgy/complete")
+                        .or_else(|| value.pointer("/_sgy/stdout_complete"))
+                        .and_then(serde_json::Value::as_bool)
+                        == Some(false),
+            )
+        })
+}
+
+fn model_path(path: &str) -> String {
+    let normalized = path.replace('\\', "/");
+    if let Some(rest) = normalized.strip_prefix("//?/UNC/") {
+        format!("//{rest}")
+    } else {
+        normalized
+            .strip_prefix("//?/")
+            .unwrap_or(&normalized)
+            .to_owned()
+    }
+}
+
 fn emit_staged_yaml(path: &Path) -> io::Result<()> {
     let mut source = std::fs::File::open(path)?;
     let mut stdout = io::stdout().lock();
     io::copy(&mut source, &mut stdout)?;
     stdout.flush()
+}
+
+#[cfg(test)]
+mod model_output_tests {
+    use serde_json::json;
+
+    use super::render_model_document;
+
+    #[test]
+    fn ast_model_output_keeps_locator_and_source_without_envelope_or_captures() {
+        let document = json!({
+            "_sgy": {"shown": 1, "omitted": 2, "cache": "cache-1"},
+            "results": [{
+                "file": "src\\main.rs",
+                "range": {
+                    "start": {"line": 3, "column": 1},
+                    "end": {"line": 5, "column": 2}
+                },
+                "text": "fn demo() {\n    call();\n}",
+                "_sgy_text_truncated": true,
+                "metaVariables": {"single": {"A": {"text": "call()"}}}
+            }]
+        });
+        assert_eq!(
+            render_model_document(&document).expect("model output"),
+            "src/main.rs:3:1-5:2\nfn demo() {\n    call();\n}\n@more shown=1 omitted=2 cache=cache-1\n@cut text=1"
+        );
+    }
+
+    #[test]
+    fn opaque_ast_results_require_the_machine_view() {
+        let error = render_model_document(&json!({
+            "_sgy": {"shown": 1, "omitted": 0},
+            "results": [{"_sgy_unknown": true, "json_type": "object"}]
+        }))
+        .expect_err("opaque record must not look complete");
+        assert!(error.contains("--output machine"));
+    }
+
+    #[test]
+    fn omitted_results_without_a_cache_are_marked_unrecoverable() {
+        let document = json!({
+            "_sgy": {"shown": 0, "omitted": 3},
+            "results": []
+        });
+        assert_eq!(
+            render_model_document(&document).expect("model output"),
+            "@cut results=3"
+        );
+    }
 }

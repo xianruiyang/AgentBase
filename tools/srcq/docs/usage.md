@@ -46,7 +46,7 @@ srcq 不会自动添加 `-U`，也不会把 40 条模型可见详情变成 40 �
 
 ## 输出选择
 
-默认输出到 stdout。需要稳定文件时使用原子提交的 `--yaml-out`：
+默认 `--output model` 输出干净证据正文。机器解析、完整捕获和 round-trip 使用 `--output machine`；需要稳定机器文件时使用原子提交的 `--yaml-out`：
 
 ```powershell
 srcq exec --yaml-out results.yml -- run -p 'foo($A)' -l ts src
@@ -57,6 +57,7 @@ srcq exec --yaml-out results.yml -- run -p 'foo($A)' -l ts src
 ```text
 --engine PATH
 --cwd PATH
+--output model|machine
 --profile token-safe|locations|lossless|files|custom
 --cache auto|on|off
 --fingerprint-file PATH
@@ -69,7 +70,9 @@ srcq exec --yaml-out results.yml -- run -p 'foo($A)' -l ts src
 --strict
 ```
 
-`token-safe` 输出的 `_sgy` 至少用于判断：
+`token-safe` 的 model 每项只写文件、完整范围、源码和实际存在的 rule/severity/message/replacement；不重复 metaVariables 捕获或固定 envelope。分页、截断和写入事实才追加最短 `@` 记录。
+
+machine 输出的 `_sgy` 至少用于判断：
 
 ```yaml
 _sgy:
@@ -94,7 +97,7 @@ results: []
 srcq exec --profile locations --cache off -- run -p 'function $F($$$A) { $$$B }' -l ts src
 ```
 
-它保留相同完整性包络，把每项压成 0-based `file:start_line:start_column-end_line:end_column`，并输出 JSON 兼容的紧凑安全 YAML。若仍需正文、捕获或规则诊断，继续使用 `token-safe` 或 `custom`。
+model 每项为 0-based `file:start_line:start_column-end_line:end_column`；machine 保留相同完整性包络和 JSON 兼容的紧凑安全 YAML。若仍需正文、捕获或规则诊断，使用 token-safe model；完整捕获或自定义字段使用 machine/custom。
 
 ## 先预览 effective argv
 
@@ -104,7 +107,7 @@ srcq exec --profile locations --cache off -- run -p 'function $F($$$A) { $$$B }'
 srcq defaults --profile files -- run -p 'foo($A)' -l ts src
 ```
 
-使用 `effective_argv`、`injected`、`suppressed_by` 和设置来源检查配置；确认后再改为 `srcq exec`。
+model 只返回分类与实际注入或 `unchanged`；需要 `effective_argv`、`suppressed_by` 和设置来源时加 `--output machine`。确认后再改为 `srcq exec`。
 
 ## 后处理
 
@@ -144,7 +147,7 @@ srcq process containing --cache-id <ID> --file src/app.ts --line 42 --column 8 -
 srcq process group-locations --cache-id <ID> --file src/app.ts --limit 40
 ```
 
-`containing` 只在 cache 的节点集合内做几何包含；并列最小项全部保留，不声明真实符号身份。位置投影只接受执行前已登记 fingerprint、且执行结束与查询时整文件哈希均一致的源码；旧 cache、未登记文件或任意位置变化都会要求重扫。`group-locations` 让路径只出现一次，适合同文件多目标复用；分页回执中的 `complete/next_offset` 只描述投影视图。
+`containing` 只在 cache 的节点集合内做几何包含；并列最小项全部保留，不声明真实符号身份。位置投影只接受执行前已登记 fingerprint、且执行结束与查询时整文件哈希均一致的源码；旧 cache、未登记文件或任意位置变化都会要求重扫。`group-locations` 让路径只出现一次，适合同文件多目标复用；model 续页使用 `@more cache/after`，machine 的 `complete/next_offset` 只描述投影视图。
 
 ## 诊断与退出码
 
@@ -156,8 +159,8 @@ srcq doctor
 ```
 
 - 原生命令退出码被保留；无匹配和执行错误应按 ast-grep 语义区分。
-- 缺省 Token-Safe 遇到退出码 1 且 stdout/stderr 均为空时仍输出 `total: 0`、`complete: true` 的空 YAML；lossless 保持原生空字节，不制造 JSON value。
-- `doctor` 发现问题时仍输出 `sgy.doctor/v1`，随后退出 1。
+- 缺省 model 遇到退出码 1 且 stdout/stderr 均为空时保持空 stdout；machine Token-Safe 返回显式空集合，lossless 保持原生空字节。
+- `doctor` 成功时 model 只输出 `ok`；失败时输出失败项与 machine 重试入口并退出 1。`--output machine` 返回完整 `sgy.doctor/v1`。
 - 120–127 保留给 wrapper 自身的解析、转换、缓存、I/O 或协议错误。
 - stderr 与 YAML stdout 分离；需要结构化 sidecar 时使用 `--stderr-yaml PATH`。`--meta-out PATH` 适用于 batch、TTY 和 LSP，并记录 argv hash、引擎版本、耗时与退出状态，不记录源码正文。
 

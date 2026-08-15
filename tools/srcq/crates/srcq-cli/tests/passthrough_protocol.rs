@@ -265,6 +265,7 @@ fn help_barrier_wins_over_interactive_flags() {
     let directory = tempfile::tempdir().expect("temporary cwd");
     for native in [vec!["test", "-i", "--help"], vec!["new", "project", "-ih"]] {
         let output = srcq(directory.path())
+            .args(["--output", "machine"])
             .arg("--")
             .args(native)
             .output()

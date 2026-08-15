@@ -3,7 +3,7 @@
 ## srcq 提供什么
 
 - 使用参数数组启动 ast-grep，不拼接 shell command；`--` 后的 token 不做二次 shell 解析。
-- 对 JSON/JSONL 做确定性解析，并输出无 tag、anchor、alias、merge key 或重复键的安全 YAML。
+- 对 JSON/JSONL 做确定性解析；model 输出固定的最小文本语法，machine 输出无 tag、anchor、alias、merge key 或重复键的安全 YAML。
 - `process` 限制输入字节、文档数、记录数和嵌套深度；字段选择、过滤与分组不执行代码。
 - 显式文件输出先写临时文件，再原子提交；失败时不把半成品冒充成功结果。
 - cache ID、root、hash、TTL、配额和 active lease 都在服务端逻辑中校验。
@@ -17,7 +17,7 @@ srcq 不是 sandbox、权限系统或事务引擎。它会在用户授权的 cwd
 
 1. 只在已确认的 workspace、语言、目录和 glob 上运行。
 2. rewrite 首次调用不传 `-U`；先预览匹配、replacement 和受影响文件，再显式应用。
-3. 不把模型可见的 `shown` 当作实际写入数；上下文预算从不限制 ast-grep 写入集合。
+3. 不把模型可见的条目数当作实际写入数；上下文预算从不限制 ast-grep 写入集合，写入结果以 `@write` 或 machine 审计。
 4. 应用后检查 diff、重跑旧 pattern，并执行 formatter、lint/typecheck 和定向测试。
 5. 不信任仓库内 `.srcq.yml` 扩大权限；项目配置本身也禁止 engine、cwd、cache 和输出路径。
 
@@ -31,7 +31,7 @@ srcq 不是 sandbox、权限系统或事务引擎。它会在用户授权的 cwd
 ## 完整性与信息泄漏
 
 - `lossless` 保留原生完整字段，适合机器处理，但不应默认进入模型上下文。
-- `token-safe` 的 `_sgy.complete=false`、`omitted` 和 `_sgy_text_truncated` 是完整性信号；不得省略这些信号后声称结果完整。
+- model 的 `@more`、`@cut`、`@unprojectable` 和 `@write` 是偏离默认的完整性或副作用信号；machine 的 `_sgy.complete=false`、`omitted` 和 `_sgy_text_truncated` 继续承担结构化完整性。不得删除信号后声称结果完整。
 - `cache auto/on` 可能保存完整原生输出；见 [缓存与取回](cache.md) 的清理和隐私要求。
 - stderr 可能包含原生路径、rule 或诊断；只有确有需要时才把 `--stderr-yaml` sidecar 提供给模型。
 

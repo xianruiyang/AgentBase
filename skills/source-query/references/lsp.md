@@ -13,4 +13,4 @@
 
 ## 职责边界
 
-优先使用 Codex 已提供的延迟 MCP 工具目录；未用 LSP 的任务不得为预检而加载其 schema。Source Query Gateway 只负责源码查找，不能因查询需要而取得 rename、Code Action 应用、格式化应用、命令执行或调试控制授权。若宿主延迟发现经正式验收不达标，才允许由分支设计决定是否使用复用现有 VS Code companion 与 Provider 的 `srcq lsp` 只读入口；不得另写第二套 LSP 语义实现。
+优先使用 Codex 已提供的延迟 MCP 工具目录；未用 LSP 的任务不得为预检而加载其 schema。当前正式运行时没有 `srcq lsp` 入口，不得猜测调用；只有宿主延迟发现经正式验收不达标并完成分支设计与实现后，才可接入复用现有 VS Code companion 与 Provider 的只读入口。Source Query Gateway 只负责源码查找，不能因查询需要而取得 rename、Code Action 应用、格式化应用、命令执行或调试控制授权，也不得另写第二套 LSP 语义实现。

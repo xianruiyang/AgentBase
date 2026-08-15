@@ -46,7 +46,10 @@
     - "jsonl"
     - "sarif"
     - "safe_yaml"
-  "context_output": "yaml-1.2-safe-subset"
+  "output":
+    "model": "payload-only-text"
+    "machine": "yaml-1.2-safe-subset"
+    "native": "passthrough-or-artifact"
   "jsonl_round_trip": "common_data_model"
 "yaml":
   "aliases_anchors_tags": false

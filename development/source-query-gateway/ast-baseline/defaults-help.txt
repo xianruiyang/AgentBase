@@ -5,6 +5,7 @@ Usage: sgy.exe defaults [OPTIONS]
 Options:
       --engine <PATH>            
       --cwd <PATH>               
+      --output <FORMAT>          Model evidence text or stable machine output [default: model] [possible values: model, machine]
       --yaml-out <PATH>          
       --artifact-out <PATH>      
       --stderr-yaml <PATH>       

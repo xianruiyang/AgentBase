@@ -1,0 +1,60 @@
+{
+  "changed_files": [
+    "skills/source-query/references/rg-fd.md",
+    "skills/source-query/references/ast.md",
+    "tools/srcq/README.md",
+    "tools/srcq/docs/model-output.md",
+    "tools/srcq/docs/query-gateway.md",
+    "tools/srcq/docs/usage.md",
+    "tools/srcq/docs/cache.md",
+    "tools/srcq/docs/configuration.md",
+    "tools/srcq/docs/troubleshooting.md",
+    "tools/srcq/docs/security.md",
+    "tools/srcq/docs/compatibility.md",
+    "tools/srcq/docs/release-checklist.md",
+    "tools/srcq/scripts/test-install-srcq.ps1",
+    "tools/srcq/benches/benchmark.py",
+    "tools/srcq/benches/budget_sweep.py",
+    "development/source-query-gateway/candidate-skill/source-query/references/rg-fd.md",
+    "development/source-query-gateway/candidate-skill/source-query/references/ast.md",
+    "development/source-query-gateway/ast-baseline/**"
+  ],
+  "evidence_for": [
+    "SOL-SQG-010",
+    "DES-SQG-008",
+    "AC-SQG-002",
+    "UDES-SQG-013"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "contract",
+      "ref": "tools/srcq/docs/model-output.md"
+    },
+    {
+      "kind": "skill",
+      "ref": "skills/source-query/references/ast.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "正式 source-query skill、srcq 文档、安装测试、benchmark 解析器和 AST 兼容基线均已迁移到 model 默认与 machine 显式协议；简单查询不加载或解析旧 envelope，机器消费者逐一添加显式 output，旧默认结构不再作为正式模型入口。",
+  "outputs": [
+    "更新后的 source-query 按需协议",
+    "旧默认 envelope 消费者迁移记录",
+    "machine/diagnostic 显式发现入口"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-002": "sha256:2e60049c4b48151e592446cfa42a5b6aeccce763d0ce0c101556342266224da5",
+    "DES-SQG-008": "sha256:04a8cbb4ed04176a79de64625721f720d1731fda417b94dea5810aa7b253c3cc",
+    "SOL-SQG-010": "sha256:48f6cacf82a6c8af180bb8bcb4b84f7fbeade659f4b6545391baf6031a79ff87",
+    "UDES-SQG-013": "sha256:6445b675c0fd2f9172940f44b72caff693c0b989a03baa3fbe6fd43ac3f5e351"
+  },
+  "task_id": "TSQG-071",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "source-query quick_validate 通过，候选 payload 5 文件边界通过",
+    "AST 0.3.0 基线通过并保留 additive output 合同",
+    "srcq workspace 全量测试通过；因公共默认输出变更扩大到组件全量，不运行 AgentBase 无关测试"
+  ]
+}

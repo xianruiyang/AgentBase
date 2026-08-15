@@ -1,0 +1,49 @@
+{
+  "changed_files": [
+    "tools/srcq/crates/srcq-cli/src/query_gateway.rs",
+    "tools/srcq/crates/srcq-cli/tests/query_gateway_real.rs",
+    "tools/srcq/docs/model-output.md",
+    "tools/srcq/docs/query-gateway.md"
+  ],
+  "evidence_for": [
+    "SOL-SQG-010",
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-008"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "implementation",
+      "ref": "tools/srcq/crates/srcq-cli/src/query_gateway.rs"
+    },
+    {
+      "kind": "test",
+      "ref": "tools/srcq/crates/srcq-cli/tests/query_gateway_real.rs"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "rg/fd model renderer 在取得真实结果后，对同一证据页比较平铺、文件 heading 与保持原生顺序的共享前缀树；只有实际成本更低且集合、顺序、位置和正文不变时采用压缩表示，否则回退平铺。",
+  "outputs": [
+    "结果后置候选选择器",
+    "带位置或正文叶子的路径树",
+    "前缀重入与重复时的无损回退"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:b1c1b9ea19571a7bbd9448f2acb30be65cf77254e6cf2745486e9e4fe81bf4a0",
+    "AC-SQG-002": "sha256:2e60049c4b48151e592446cfa42a5b6aeccce763d0ce0c101556342266224da5",
+    "AC-SQG-008": "sha256:42b8b7122f8e1b575572947c1549a4436135695a13d7d0154c0734538b6551e5",
+    "DES-SQG-004": "sha256:e3bdbc5713f945c317af61e761c6305af9a1683877175648991df10c543ccc81",
+    "DES-SQG-006": "sha256:aa3b49e202cba19e3f51311e5719c3da05f8d9be24b43a801ebcecfa622baabe",
+    "DES-SQG-007": "sha256:61af3c56a0394f54245ad67a7afbc1a32d2a32b91a0dbbb1aec589e42a85ce21",
+    "SOL-SQG-010": "sha256:dda548024d79daaff4c00847a143216774c38ed800e470e2f608943162bbdca8"
+  },
+  "task_id": "TSQG-075",
+  "task_revision": 2,
+  "unresolved": [],
+  "verification": [
+    "有序路径树单元测试覆盖非字典序深度遍历与前缀重入回退",
+    "真实网关集成测试覆盖共享长路径的自动树选择",
+    "真实仓库 fd 与 rg 输出分别观察到树、heading 和平铺按成本选择"
+  ]
+}

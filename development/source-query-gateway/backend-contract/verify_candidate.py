@@ -60,11 +60,26 @@ def check_contract() -> None:
         raise RuntimeError(f"mode sample mismatch: missing={sorted(expected - actual)} extra={sorted(actual - expected)}")
 
 
-def run_defaults(sgy: Path) -> int:
+def run_defaults(srcq: Path) -> int:
     checked = 0
     for mode_id, argv in MODE_SAMPLES.items():
         backend = "rg" if mode_id.startswith("RG-") else "fd"
-        completed = subprocess.run([str(sgy), backend, "defaults", "--", *argv], cwd=FIXTURE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        completed = subprocess.run(
+            [
+                str(srcq),
+                "query",
+                backend,
+                "defaults",
+                "--output",
+                "machine",
+                "--",
+                *argv,
+            ],
+            cwd=FIXTURE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
         if completed.returncode != 0:
             raise RuntimeError(f"defaults failed for {mode_id}: {completed.stderr.decode('utf-8', errors='replace')}")
         text = completed.stdout.decode("utf-8")
@@ -77,18 +92,36 @@ def run_defaults(sgy: Path) -> int:
     return checked
 
 
-def replay_oracle(sgy: Path) -> int:
+def replay_oracle(srcq: Path) -> int:
     oracle = json.loads((ROOT / "native-oracle.json").read_text(encoding="utf-8"))
     checked = 0
-    with tempfile.TemporaryDirectory(prefix="sgy-oracle-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="srcq-oracle-") as temporary:
         for case in oracle["cases"]:
             if case["backend"] not in {"rg", "fd"}:
                 continue
             artifact = Path(temporary) / f"{case['id']}.bin"
             if case["id"] == "fd-print0":
-                command = [str(sgy), "fd", "exec", "--artifact-out", str(artifact), "--", *case["argv"]]
+                command = [
+                    str(srcq),
+                    "query",
+                    "fd",
+                    "exec",
+                    "--artifact-out",
+                    str(artifact),
+                    "--",
+                    *case["argv"],
+                ]
             else:
-                command = [str(sgy), case["backend"], "exec", "--view", "raw", "--", *case["argv"]]
+                command = [
+                    str(srcq),
+                    "query",
+                    case["backend"],
+                    "exec",
+                    "--view",
+                    "raw",
+                    "--",
+                    *case["argv"],
+                ]
             completed = subprocess.run(command, cwd=FIXTURE, input=case.get("stdin", "").encode("utf-8"), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, env={**os.environ, "NO_COLOR": "1"})
             native_stdout = artifact.read_bytes() if case["id"] == "fd-print0" else completed.stdout
             normalized = normalize_stdout(native_stdout, case.get("normalizer", "raw"))
@@ -104,22 +137,22 @@ def replay_oracle(sgy: Path) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sgy", type=Path)
+    parser.add_argument("--srcq", type=Path)
     parser.add_argument("--check-contract", action="store_true")
     args = parser.parse_args()
     if os.name != "nt":
         raise SystemExit("the source-query gateway contract is maintained only on Windows")
     check_contract()
-    if args.check_contract and args.sgy is None:
+    if args.check_contract and args.srcq is None:
         print(json.dumps({"ok": True, "modeSamples": len(MODE_SAMPLES)}))
         return 0
-    if args.sgy is None:
-        parser.error("--sgy is required unless only --check-contract is requested")
-    sgy = args.sgy.resolve()
-    if not sgy.is_file():
-        raise SystemExit(f"sgy executable does not exist: {sgy}")
-    modes = run_defaults(sgy)
-    oracle = replay_oracle(sgy)
+    if args.srcq is None:
+        parser.error("--srcq is required unless only --check-contract is requested")
+    srcq = args.srcq.resolve()
+    if not srcq.is_file():
+        raise SystemExit(f"srcq executable does not exist: {srcq}")
+    modes = run_defaults(srcq)
+    oracle = replay_oracle(srcq)
     print(json.dumps({"ok": True, "modeSamples": modes, "oracleCases": oracle}, ensure_ascii=False))
     return 0
 

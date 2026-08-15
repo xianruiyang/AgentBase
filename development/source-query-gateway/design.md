@@ -2,7 +2,7 @@
 
 ## 1. 文档职责与状态
 
-本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的模型设计，状态为 `reopened_for_model_output_projection`。srcq 运行时、安装生命周期、正式 Skill、消费者退出和原生 LSP 渐进入口已经闭环；既有同身份收益证据只覆盖上一输出身份。新确认的模型输出收敛设计尚未实现或重新验收，项目变化也不表示 Codex 安装态已经发布。
+本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的模型设计，状态为 `implemented_pending_user_review_and_isolated_evaluation`。srcq 运行时、安装生命周期、正式 Skill、消费者退出、原生 LSP 渐进入口、rg/fd 直觉入口、结果后置投影和内部预算已经实现并通过组件验证；既有同身份收益证据只覆盖上一输出身份。新的默认输出已经向用户展示，尚未冻结，也未按用户要求运行独立 Codex 对照；项目变化不表示 Codex 安装态已经发布。
 
 ## 2. 设计结论
 
@@ -10,11 +10,11 @@
 
 该网关只是满足 `REQ-SQG-001` 的候选手段。所有接口统一、兼容矩阵和结构优化最终都必须证明模型先取得正确且充分的内容，再降低完整查找链的总 Token，并在前两项不退化时降低耗时；否则不能以工具实现完整代替根本需求达成。
 
-| 命令域 | 原生 owner | 当前入口 |
+| 命令域 | 原生 owner | 目标普通模型入口 |
 | --- | --- | --- |
 | AST | ast-grep | `srcq exec/defaults/cache/process/schema/capabilities/doctor`，数据协议保持迁移前合同 |
-| rg | ripgrep | `srcq rg <exec|defaults|doctor> ... -- <rg argv...>` |
-| fd | fd | `srcq fd <exec|defaults|doctor> ... -- <fd argv...>` |
+| rg | ripgrep | `srcq rg <rg argv...>`；网关定向控制只在显式控制面出现 |
+| fd | fd | `srcq fd <fd argv...>`；网关定向控制只在显式控制面出现 |
 
 VS Code companion 与 Language Provider 继续拥有真实符号身份、类型、精确引用、层级和诊断事实；模型侧已由真实三案裁决采用 Codex 原生延迟 MCP 发现，不新增 `srcq lsp`。安全重命名、Code Action、格式化、命令执行和调试控制不属于 Source Query Gateway。PowerShell 继续负责 Windows 命令语言。网关不替模型选择查询语义，不签发副作用授权，也不判断任务完成。
 
@@ -40,15 +40,17 @@ AST 继续使用当前强制 `--` argv 边界、透明参数数组、默认 JSON
 
 - 满足: AC-SQG-001, UDES-SQG-002, UDES-SQG-005
 
-所有 `--` 后 token 均以参数数组保留值、顺序和重复项，不经 shell 拼接。AST 沿用迁移前 `defaults` 行为并由 `srcq defaults` 提供；rg/fd 的 `defaults` 只展示原始 argv、为机器读取追加的参数、抑制原因和最终 argv，不启动底层引擎。
+AST 的 `--` 后 token 继续以参数数组保留值、顺序和重复项，不经 shell 拼接。rg/fd 的普通入口把 backend 后全部 token 直接视为原生 argv，使模型可按原生命令直觉调用；网关的 machine/native、定向投影和预算覆盖必须放在 backend 之前的独立控制面或其他无冲突入口，不抢占原生 flag。AST 沿用迁移前 `defaults` 行为并由 `srcq defaults` 提供；rg/fd 的显式 defaults/diagnostic 入口只展示原始 argv、为机器读取追加的参数、抑制原因和最终 argv，不启动底层引擎。
 
-每个受支持精确版本维护完整命令矩阵，并把公开模式分为：可安全结构化、只可有界文本、应写显式产物、必须原样透传。不能结构化不等于不兼容；显式原生选项优先，包装只追加已证明不改变查询或副作用集合的机器输出选项。
+命令矩阵按公开模式和实际输出能力维护，并以测试时观察到的精确后端身份标注证据范围；版本字符串不参与运行准入。公开模式分为：可安全结构化、只可有界文本、应写显式产物、必须原样透传。不能结构化不等于不兼容；显式原生选项优先，包装只追加已证明不改变查询或副作用集合的机器输出选项。
 
 ## DES-SQG-004 最短充分输出规划
 
 - 满足: AC-SQG-001, AC-SQG-002, UDES-SQG-003
 
-backend 先形成完整 `EvidenceSignature`，明确路径、类型、位置、正文、捕获、规则、诊断、顺序、范围和完整性；内部事实的充分性不由最终文字长短决定。规划器先按所选证据视图建立结果单元，再对这些单元分页：文件视图按去重文件，位置视图按匹配位置，正文视图按匹配与必要上下文，摘要视图按完整聚合。不得先对另一底层事件分页再投影。
+普通调用只定义查询语义，不定义展示算法。backend 先取得真实结果并形成完整 `EvidenceSignature`，明确路径、类型、位置、正文、捕获、规则、诊断、顺序、范围和完整性；内部事实的充分性不由最终文字长短决定。规划器随后生成单行 locator、文件 heading、分组正文、紧凑路径树、路径树与位置 heading 组合等适用候选，先证明结果集合、顺序、关系、范围、正文和完整性语义相同，再按实际模型文本成本选择最低充分表示。模型不需要在结果未知时预先提供 heading、view、limit 或正文预算。
+
+规划器按候选证据单元分页：文件表示按去重文件，位置表示按匹配位置，正文表示按匹配与必要上下文，摘要表示按完整聚合。默认模型上下文预算由工具安全持有；短结果全部返回，大结果在不拆坏证据单元的边界上产生可续页快照。不得先按另一底层事件或模型猜测的固定数量分页再投影。调用方明确选择 machine、native、artifact 或定向证据表示时跳过自动选择，但仍不削弱资源硬上限、退出和完整性合同。
 
 同一事实对象提供三个互不混用的输出面：
 
@@ -62,7 +64,7 @@ backend 先形成完整 `EvidenceSignature`，明确路径、类型、位置、�
 
 所有能进入模型上下文的输出族——rg、fd、AST、doctor、defaults、schema/capabilities、cache/process、artifact 与错误——都必须逐项通过字段准入审查，不能只优化主查询 stdout。每个字段必须说明它改变哪项模型动作；无法说明则不进入默认模型视图。候选成本比较使用实际渲染后的模型字符串，而不是把内部对象重新序列化成 JSON/YAML 后估算。真实 Codex 的 `input + output` Token 仍用于最终收益判断。
 
-AST 现有 profile、结果选择、缓存和写入语义保持不变；模型投影可以把文件/范围/源码正文只表达一次，并只在当前证据需要时展示 metavariable 捕获。rg/fd 可提供 `auto` 与显式 view；不适用的 view 返回局部输入错误，不静默删除原生命令要求的信息。
+AST 现有 profile、结果选择、缓存和写入语义保持不变；模型投影可以把文件/范围/源码正文只表达一次，并只在当前证据需要时展示 metavariable 捕获。rg/fd 的普通调用隐式采用 auto，显式 view 只作为可选定向控制；不适用的 view 返回局部输入错误，不静默删除原生命令要求的信息。
 
 ## DES-SQG-005 结果完整性与分页快照
 
@@ -80,23 +82,27 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根按需分配稳
 
 单根查询已由调用参数给出根时，model 输出只写相对路径；一条无分叉路径写成 `A/A0`，共享分支写成 `A/` 后用两空格缩进 `A0`、`A1/F1`、`A2`，另一条无分叉路径可直接写成 `B/B0/B1`。换行、缩进、`/` 和转义是协议字符而非装饰；若混合类型、根外路径或名称转义使该形式不再最短且无歧义，则选择 flat model 或显式 machine 视图，不为坚持树形引入大量标记。
 
-同一结果生成 flat、紧凑 tree 与必要的 machine 候选，并按实际渲染文本比较成本；只在 EvidenceSignature 相同且更短时选择 tree。预算不足时报告省略量与不完整状态；省略标记不得与真实路径混淆。目录树是可逆表示，不是采样器。
+同一结果生成 flat、紧凑 tree 与必要的 machine 候选，并按实际渲染文本比较成本；只在 EvidenceSignature 相同且更短时选择 tree。tree renderer 同时供 rg 的文件与位置结果使用：目录节点压缩公共前缀，文件叶子只有一个位置时可直接承载 locator，同文件多个位置时作为 heading 并缩进位置叶子。预算不足时报告省略量与不完整状态；省略标记不得与真实路径混淆。目录树是可逆表示，不是采样器，也不是模型必须请求的 view。
 
 ## DES-SQG-007 rg 结果适配
 
 - 满足: AC-SQG-001, AC-SQG-002, UDES-SQG-002, UDES-SQG-003
 
-普通 batch 搜索使用 ripgrep 原生 JSON 事件，区分 match、context、begin/end、summary 与错误，并按 EvidenceSignature 选择分组正文、位置或文件视图。model 正文视图把路径只写一次、记录写为最短行号/正文形式，只有存在上下文时才增加上下文标记；位置视图只给路径、行和必要列范围；文件视图复用 fd 的紧凑路径表示；count 写为路径与数量。`type=match`、absolute offset、submatches、native 副本和重复 summary 只在当前证据或 machine 视图需要时出现。count、文件列表、replace 展示、passthru、preprocessor、显式 JSON、help/version 和特殊报告分别进入命令矩阵，不以启发式输出 flag 黑名单猜测。
+普通 batch 搜索使用 ripgrep 原生 JSON 事件，区分 match、context、begin/end、summary 与错误。工具先依据原生命令语义确定必须保留的证据维度，再按真实结果形状在等价 renderer 中选择：离散单位置可用单行 locator，同文件多位置用一次路径 heading，多文件共享长目录用路径树，路径树文件叶子可继续承载位置 heading；正文结果按文件分组并把路径只写一次，只有存在上下文时才增加上下文标记；文件结果复用 fd 的紧凑路径表示；count 写为路径与数量。是否使用这些形式不要求模型预先传 `--heading`、`--view` 或 `--limit`。
+
+`type=match`、absolute offset、submatches、native 副本和重复 summary 只在当前证据或 machine 视图需要时出现。原生 heading/no-heading、vimgrep、JSON 等显式格式意图由命令矩阵映射到定向 model、machine 或 native 行为；调用方明确要求原生字节时不得再自动改写。count、文件列表、replace 展示、passthru、preprocessor、help/version 和特殊报告分别进入命令矩阵，不以启发式输出 flag 黑名单猜测。
 
 无匹配、原生错误、转换错误和结果省略分别保持。只有完整消费底层结果才能声明查询集合完整；N+1 只能证明当前展示窗口是否还有下一项。
+
+普通查询不预检或限制 ripgrep 版本。adapter 先按实际事件和字段合同解析；解析成功才进入自适应投影。实际输出不满足结构合同但命令可执行时，不得把版本差异升级为拒绝：无副作用且可确定重放的只读模式可在同一 `srcq` 调用内降级为原生文本，可能启动外部程序、写入或改变状态的模式必须在执行前进入 native/artifact，禁止为降级重复执行。任何降级都保留真实退出与错误，不能把转换失败解释为空集合。
 
 ## DES-SQG-008 Skill 与成本路由
 
 - 满足: AC-SQG-002, AC-SQG-003, UDES-SQG-001
 
-候选最终只保留一个精炼的高级源码查询 skill；普通文件、文本、全集、不存在证明和已知实现读取由全局短路由直接完成，只有 AST、高级 rg/fd 协议或参数诊断才加载 skill，rg/fd 与 AST 的详细协议继续按需读取。AST 部分以现有 `ast-grep-token-safe` 合同为语义来源，迁移只改变文档归属和正式命令前缀，不改变 AST 命令结构、用法和安全边界；只有独立路由与行为证据证明等价后才退出旧 skill。
+候选最终只保留一个精炼的高级源码查询 skill；已知文件正文可以直接有界读取，所有需要 rg、fd 或 ast-grep 的模型查询统一调用 PATH 中的 srcq，不保留裸工具快路径。常驻规则只提供完成普通任务不可再省的两个正式语法：文件发现使用 `srcq fd <fd argv...>`，文本查询使用 `srcq rg <rg argv...>`；普通调用不加载 skill，也不要求 heading、tree、view、limit、receipt 或预算。只有 AST、缓存、显式 machine/native、特殊模式或参数诊断才读取详细协议。CLI 对 `srcq files`、`srcq --files` 等可识别错形只返回指向上述唯一入口的最短修正，不新增别名或第二查询语法。AST 部分以现有 `ast-grep-token-safe` 合同为语义来源，迁移只改变文档归属和正式命令前缀，不改变 AST 命令结构、用法和安全边界；只有独立路由与行为证据证明等价后才退出旧 skill。
 
-一次精确文件名发现、已知文件内少量文本定位或天然有界的直接读取继续使用受限原生快路径；全集、不存在证明、大结果压缩和目录树在迁移完成后使用 PATH 中的 srcq rg/fd，但不因此加载 skill。只有实际需要 AST、缓存、分页、产物或特殊模式时才承担 skill 成本。LSP 只在真实符号语义会改变结论时升级。
+已知文件正文的天然有界读取可继续直接完成；文件发现、文本定位、全集、不存在证明、结果压缩、目录树和 AST 全部使用 PATH 中的 srcq。已知名称先经文本定位和有界源码读取闭环；“完整定义”只是验收结果，不单独触发 AST。限定源码范围内由一次完整文本结果即可证明的唯一名称定义与直接调用、显式接口/字段/类型映射也不加载高级 skill。只有已经取得文本证据仍不能可靠确定语法边界、候选存在歧义、目标读取被截断，或任务确需结构关系、控制流、rule/rewrite 时才升级 AST；真实符号身份、重载、类型或精确引用会改变结论时才升级 LSP。AST 无匹配后不得仅改写 pattern 连续试探，必须先从实际源码取得会改变下一次查询的新证据，或返回文本路径。简单查询由 srcq 内部走最低充分执行与 renderer，不因结果少就绕过网关。
 
 ## DES-SQG-009 安全与故障边界
 
@@ -104,7 +110,7 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根按需分配稳
 
 网关不是 sandbox 或授权系统。rg preprocessor、fd exec/batch 与 ast-grep rewrite/apply 继续使用当前用户权限和上位授权。网关只对缺少解释必需输入、可能混用快照、二进制输出缺少产物目标或转换会破坏原生字节设置局部可恢复门禁；其他特殊模式透传或落产物并给诊断。
 
-原生退出与 wrapper 错误分通道记录。转换失败不得输出成功空结果；stderr 不混入结构化 stdout，源码正文和秘密不进入 telemetry/meta。
+原生退出与 wrapper 错误分通道记录。转换失败不得输出成功空结果；无副作用降级只可在同一调用内进行，不能把需要模型运行 doctor、help 或改写命令的恢复当作普通成功路径。stderr 不混入结构化 stdout，源码正文和秘密不进入 telemetry/meta。
 
 ## DES-SQG-010 受监控隔离基准是唯一收益入口
 
@@ -114,7 +120,7 @@ fd 优先取得无歧义的 NUL 分隔路径，为每个显式根按需分配稳
 
 benchmark owner、语料、测试代码、fixtures、原始事件和审计结果全部留在 `development/` 或明确的项目外测试产物目录。发布 payload 只消费通过审计得到的设计裁决和运行时实现，不复制 benchmark 文件；共享 payload 合同负责让 Plugin 与 DirectCompatibility 两条发布路径执行同一排除规则，并在直接兼容发布时删除受管理 skill 下的旧测试副本。
 
-每条 run 使用新鲜 `codex exec --json --ephemeral` 进程或能提供等价隔离与完整 usage 事件的正式入口。monitor 位于被测 agent 外部，只启动、观察、限时、归档和终止，不改变 prompt、补救答案或共享另一环境信息。subject、monitor 和 audit 的输入/输出单向流动；独立 audit 只能读取冻结 capsule，不读取候选实现讨论或历史结论。
+每条 run 使用新鲜 `codex exec --json --ephemeral` 进程或能提供等价隔离与完整 usage 事件的正式入口。monitor 位于被测 agent 外部，只启动、观察、限时、归档和终止，不改变 prompt、补救答案或共享另一环境信息。subject、monitor 和 audit 的输入/输出单向流动；独立 audit 只能读取冻结 capsule，不读取候选实现讨论或历史结论。确定性 `verify-capsule` 负责重算 canonical capsule、experiment identity、原始流和环境文件哈希，独立模型只裁决 prompt、answer contract、oracle 与结构完整性，不要求模型心算密码学摘要。
 
 实验 manifest 固定语料版本、项目快照、Codex/模型/推理/service tier、环境树 hash、允许差异、工具与 MCP 可用集、运行顺序种子、超时和网络策略。原始 JSONL、stderr、退出状态、最终答案、工具调用和最后一个 `turn.completed.usage` 一并保存。`total_tokens = input_tokens + output_tokens`；cached input 与 reasoning output 只作子项，不重复相加。质量先用结构化事实关系 oracle，再由独立审计处理语言等价和 oracle 缺陷。
 
@@ -128,7 +134,7 @@ benchmark owner、语料、测试代码、fixtures、原始事件和审计结果
 
 同一生命周期入口提供 `Install`、`Status`、以新归档执行的可恢复升级以及 `Uninstall`。安装和升级在提交前验证归档校验和、成员集合、目标架构、逐文件 hash 与实际 `srcq --version`；升级采用 staging 和失败恢复。卸载依据安装状态只删除受管文件和由安装器增加的 `PATH` 项，配置与 cache 默认保留，只有显式请求才删除 cache。新增 PATH 只保证后续进程可见，部署和文档必须要求重启 Codex 或重新打开终端。
 
-产品身份迁移、隔离安装验证、正式 Skill 消费者接入和私有运行时退出已经完成。正式发布前必须先验证目标主机的 PATH 安装态；缺失、版本不受支持或命令身份无法确认时返回安装、升级或开启新终端的恢复动作，不保留 `sgy.exe` 别名或 skill 私有副本作为 fallback；否则会重新形成两个版本源并破坏穿透式更新。
+产品身份迁移、隔离安装验证、正式 Skill 消费者接入和私有运行时退出已经完成。正式发布前必须先验证目标主机的 PATH 安装态；缺少 `srcq.exe`、受管安装损坏、srcq 命令身份不符或 PATH 尚未刷新时返回安装、升级或开启新终端的恢复动作。rg、fd 或 ast-grep 的版本差异不触发 srcq 安装恢复，也不保留 `sgy.exe` 别名或 skill 私有副本作为 fallback；否则会重新形成两个版本源并破坏穿透式更新。
 
 ## DES-SQG-012 LSP 语义查询渐进暴露与 srcq 降级路线
 
@@ -140,9 +146,19 @@ benchmark owner、语料、测试代码、fixtures、原始事件和审计结果
 
 若宿主能力不稳定或不能实际降低上下文，则将只读 LSP 查询作为正式降级路线合并到 `srcq lsp`：可包含 workspace 发现、文档符号、symbol info、精确引用、调用/类型层级和诊断读取。`srcq` 只是模型侧渐进入口，VS Code companion 和 Language Provider 仍是语义事实 owner；MCP 可作为其他客户端的可选适配器。CLI 与 MCP 必须复用同一传输无关服务合同、认证 IPC、输入验证和 Provider 观测，不分别实现 LSP 业务。重命名、Code Action、格式化、命令和调试保留在编辑器操作职责，不随只读查询迁入。
 
+## DES-SQG-013 后端实现采用外部适配优先、源码改造有证据升级
+
+- 满足: AC-SQG-001, AC-SQG-002, AC-SQG-003, UDES-SQG-005, UDES-SQG-014
+
+rg、fd 与 ast-grep 默认继续作为外部执行后端：srcq 负责 argv、进程、基于实际输出能力的事件或文本协议、证据签名、投影和分页，上游负责搜索语义。运行时不以精确版本名单限制后端；测试仍冻结观察到的版本身份与行为上限，使上游升级和 srcq 输出策略可以分别验证。这个边界能直接复用成熟引擎并降低自有维护面，当前没有足以触发源码分叉的证据，不预先下载、复制或内嵌上游实现。
+
+只有可重复反例证明某项必要验收无法由公开 argv、输出协议、原生模式、产物通道或 srcq 后处理实现，且根因已定位到上游内部时，才建立升级裁决。裁决输入必须包含失败语义与影响、最小复现、根因位置、已尝试的有界外部方案、为何不能满足目标、目标上游 revision，以及许可证、安全、构建体积、编译时间、更新频率和漏洞响应成本。该裁决只形成向用户讨论的建议；必须取得用户针对该次源码升级的明确同意后，才能拉取、复制、内嵌或分叉上游源码。证据不足或用户未同意时继续适配、收紧声明或保持阻塞，不以“做起来困难”代替根因，也不自行越过授权边界。
+
+若裁决通过，改造代码作为 srcq 后端的受管 Windows 构建依赖，不成为新的公开命令。修改保持最小、可审查并尽量可向上游提交；版本、补丁集、来源 hash、许可证和产物 hash 进入同一 release manifest。每次上游升级重放行为矩阵、补丁适用性、供应链与性能验证；上游已提供等价能力、维护成本超过收益或补丁无法安全续用时，退出分叉并回到外部后端。禁止同时维护无期限的系统版、内嵌版和 wrapper 特例来决定同一行为。
+
 ## 4. 版本与迁移边界
 
-当前以 ripgrep 15.1.0、fd 10.4.2 和迁移前已验证的 ast-grep 0.41.1、0.42.0、0.44.1 建立 Windows 精确版本矩阵，不外推连续版本范围。完整兼容表示该精确版本所有公开模式都可通过相应命令域调用并保持原生语义，不表示所有模式都能结构化压缩。`tools/srcq/Cargo.toml` 的 workspace package version 是当前候选版本的唯一默认来源；构建参数只允许显式制作另一个已声明版本，不能长期用覆盖值掩盖源码、README、SBOM、release helper 与运行时版本不一致。
+当前以 ripgrep 15.1.0、Codex PATH 中的 ripgrep 15.2.0、fd 10.4.2 和迁移前已验证的 ast-grep 0.41.1、0.42.0、0.44.1 标记 Windows 行为证据；这些身份限定各项测试结论，不定义允许运行的连续或离散版本范围。完整兼容表示可启动后端的公开命令都能通过相应命令域调用并保持原生语义，不表示所有模式都能结构化压缩；未验证版本的质量声明只覆盖本次实际输出和退出，不能外推未执行模式。`tools/srcq/Cargo.toml` 的 workspace package version 是当前 srcq 候选版本的唯一默认来源；构建参数只允许显式制作另一个已声明的 srcq 版本，不能长期用覆盖值掩盖源码、README、SBOM、release helper 与运行时版本不一致。
 
 | 当前对象 | 分支目标 |
 | --- | --- |
@@ -163,18 +179,19 @@ benchmark owner、语料、测试代码、fixtures、原始事件和审计结果
 | --- | --- |
 | 表面统一破坏成熟 AST 合同 | AST 公开行为冻结；rg/fd 适配它的质量标准，不要求命令对称 |
 | 公共抽象吞掉 backend 特有语义 | 先证明共同生命周期；serializer、cache 和写入边界允许独立 |
-| 完整兼容退化为不完整 parser | 精确版本命令矩阵、argv 透明传递、透传/产物退路和真实引擎测试 |
+| 完整兼容退化为不完整 parser | 模式与实际输出能力矩阵、argv 透明传递、透传/产物/只读安全降级和多版本真实引擎测试；版本不作运行门禁 |
 | 更短输出丢失必要证据 | 先固定 EvidenceSignature，只比较语义等价表示 |
 | fd tree 路径歧义 | 紧凑基数树、按需根/类型标记、可逆转义和 model/machine round-trip 性质测试 |
 | 为机器稳定性把冗余 envelope 常驻给模型 | 三输出面分离、字段准入审查、默认语义与异常式回执；用实际 model renderer 计成本 |
-| 简单查询承担固定成本 | 保留适用范围不同的原生快路径，以端到端 Token 验证触发边界 |
+| 简单查询承担固定成本 | srcq 内部提供轻量执行与稀疏 renderer；裸输出仅作为等价候选，不建立绕过网关的第二入口 |
 | 全量 LSP 工具 Schema 在无关任务中常驻 | 先验证 Codex 原生延迟发现；不成立时使用 `srcq lsp` 只读降级路线，以总 Token 与回合验收 |
 | 为缩小 Schema 将 LSP 压成弱类型万能工具 | 保留完整协议注册和读/预览/应用标注；只改变模型侧暴露时机 |
 | 基准 agent 受对照输出或协调方干预 | 新鲜 subject、单向监控、冻结 capsule 与独立 audit |
 | 环境差异被误归因给候选 | 环境树 hash、允许差异清单、只读项目快照和身份不等即降级结论 |
 | 测试资产增加 Codex 运行时体积或 Token | 测试 owner 固定在 development，共享 payload 过滤并清理旧受管理副本 |
 | PATH 中的 srcq 缺失、被同名程序遮蔽或版本漂移 | 安装状态、`srcq --version`、`srcq doctor` 与发布身份读回；不回退到 skill 私有副本，PATH 变化后重启消费者进程 |
+| 为绕过适配困难过早分叉上游源码 | 以可重复阻塞、根因和外部方案排除为技术门槛，再取得用户针对该次升级的明确同意；此前不拉取源码，获准后固定版本、补丁、供应链、更新和退出责任 |
 
 ## 6. 设计完成判定
 
-实现闭环要求 rg/fd 全部公开模式有持久分类，各视图按自身语义单元给出正确总量、分页与完整性，fd 紧凑树可逆；AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、machine schema、诊断和发布合同逐项未退化。所有模型可见输出族必须完成字段准入审查，model/machine/native 三面不混用，普通成功不重复机器 envelope，异常回执仍足以分页、判断截断和恢复；候选选择按实际 model 字符串，定向 round-trip、语义等价和真实 Codex 对照均通过。命名、安装生命周期、消费者退出和 LSP 渐进暴露的既有闭环继续有效。当前运行时尚未实现或验证新的模型投影，因此本设计重新打开，既有收益数字只作上一身份基线；Codex 发布仍须取得当次明确授权。
+实现闭环要求 rg/fd 全部公开模式有持久分类，各视图按自身语义单元给出正确总量、分页与完整性，fd 紧凑树可逆；AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、machine schema、诊断和发布合同逐项未退化。所有模型可见输出族必须完成字段准入审查，model/machine/native 三面不混用，普通成功不重复机器 envelope，异常回执仍足以分页、判断截断和恢复；候选选择按实际 model 字符串，定向 round-trip、语义等价和真实 Codex 对照均通过。命名、安装生命周期、消费者退出和 LSP 渐进暴露的既有闭环继续有效。默认外部适配若遇到阻塞，只有 DES-SQG-013 的升级证据、生命周期和退出条件全部落实后才可把改造版上游纳入完成范围。当前运行时尚未实现或验证新的模型投影，因此本设计重新打开，既有收益数字只作上一身份基线；Codex 发布仍须取得当次明确授权。

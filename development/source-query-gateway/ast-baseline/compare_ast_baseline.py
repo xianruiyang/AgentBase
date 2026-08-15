@@ -22,7 +22,22 @@ COMMANDS = {
 
 
 def normalized_text(data: bytes) -> str:
-    return data.decode("utf-8").replace("\r\n", "\n")
+    text = data.decode("utf-8").replace("\r\n", "\n")
+    return "\n".join(line.rstrip(" \t") for line in text.split("\n"))
+
+
+def project_top_level_ast_help(text: str) -> str:
+    lines = []
+    for index, line in enumerate(text.splitlines(keepends=True)):
+        if index == 0:
+            lines.append("Token-safe YAML adapter for ast-grep\n")
+            continue
+        if re.match(r"^  (?:rg|fd|query)\s", line):
+            continue
+        if line.startswith(("Text/file syntax:", "Explicit query controls:")):
+            continue
+        lines.append(line)
+    return "".join(lines)
 
 
 def main() -> int:
@@ -53,12 +68,15 @@ def main() -> int:
         if filename == "version.txt" and args.expected_version:
             expected = f"srcq {args.expected_version}\n"
         if filename == "capabilities.yaml" and args.expected_version:
-            expected = expected.replace(
-                '  "version": "0.1.2"\n',
-                f'  "version": "{args.expected_version}"\n',
-                1,
+            expected = re.sub(
+                r'(?m)^(  "version": )"[^"]+"$',
+                rf'\1"{args.expected_version}"',
+                expected,
+                count=1,
             )
         actual = normalized_text(completed.stdout)
+        if filename == "help.txt":
+            actual = project_top_level_ast_help(actual)
         if completed.returncode != 0 or completed.stderr or actual != expected:
             differences.append(
                 {

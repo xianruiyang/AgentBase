@@ -54,6 +54,8 @@ fn real_run_scan_cache_and_processors_preserve_native_results() {
         .args(["exec", "--engine"])
         .arg(&engine)
         .args([
+            "--output",
+            "machine",
             "--cache",
             "on",
             "--max-detail-results",
@@ -144,7 +146,15 @@ fn real_files_and_custom_profiles_remain_compatible() {
     let files = srcq(fixture.workspace(), fixture.cache())
         .args(["exec", "--engine"])
         .arg(&engine)
-        .args(["--profile", "files", "--cache", "off", "--"])
+        .args([
+            "--output",
+            "machine",
+            "--profile",
+            "files",
+            "--cache",
+            "off",
+            "--",
+        ])
         .args(&native_args)
         .output()
         .expect("run files profile against real ast-grep");
@@ -160,6 +170,8 @@ fn real_files_and_custom_profiles_remain_compatible() {
         .args(["exec", "--engine"])
         .arg(&engine)
         .args([
+            "--output",
+            "machine",
             "--profile",
             "custom",
             "--keep-fields",

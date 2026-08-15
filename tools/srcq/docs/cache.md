@@ -16,7 +16,7 @@ cache root 不允许位于当前 workspace 内。默认 TTL 为 7 天，总配�
 
 ## 取回
 
-从 Token-Safe `_sgy.cache` 读取 26 字符 ID：
+从 model 的 `@more cache=<ID>` 或 machine 的 `_sgy.cache` 读取 26 字符 ID：
 
 ```powershell
 srcq cache info 01HXXXXXXXXXXXXXXXXXXXXXXX
@@ -26,7 +26,7 @@ srcq cache get 01HXXXXXXXXXXXXXXXXXXXXXXX --result 12
 srcq cache get 01HXXXXXXXXXXXXXXXXXXXXXXX --result 12 --field /text
 ```
 
-- `query` 使用已建 file/rule 索引和分页，不重新运行 ast-grep。
+- `query` 使用已建 file/rule 索引和分页，不重新运行 ast-grep；默认只输出 `#<result-id> file:range`、有界正文及必要规则字段，续页使用 `@more cache/after`。程序消费时加 `--output machine`。
 - `get --result N` 返回完整原生 result；`--field` 使用 JSON Pointer，并且必须同时指定 result。
 - cache 打开时校验 ID、metadata、hash、大小、TTL 和状态；损坏或过期不会静默返回内容。
 
@@ -39,7 +39,7 @@ srcq process containing --cache-id 01HXXXXXXXXXXXXXXXXXXXXXXX --file src/app.ts 
 srcq process group-locations --cache-id 01HXXXXXXXXXXXXXXXXXXXXXXX --file src/app.ts --limit 40
 ```
 
-位置投影只接受原生 ast-grep cache，并沿用其 workspace 根和 0-based、end-exclusive range。它在返回正文或位置前复核登记文件的整文件哈希与 cache 记录；未登记 fingerprint、执行期间变化或查询前变化都必须重新执行原扫描，不能把旧 cache 当作当前结构。
+位置投影只接受原生 ast-grep cache，并沿用其 workspace 根和 0-based、end-exclusive range。它在返回正文或位置前复核登记文件的整文件哈希与 cache 记录；未登记 fingerprint、执行期间变化或查询前变化都必须重新执行原扫描，不能把旧 cache 当作当前结构。`containing` 与 `group-locations` 默认输出无 envelope 的定位证据；稳定结构消费者显式使用 `--output machine`。
 
 ## 维护与隐私
 

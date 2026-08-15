@@ -98,7 +98,11 @@ $requiredGlobalFragments = @(
     '新一轮调试前只清理会干扰当前判断且目标范围明确的旧日志'
     '工作流程的目标、阶段、状态、依赖、完成和例外由文档定义'
     'CLI、脚本、索引、缓存和生成视图只辅助编辑、查询、压缩和机械校验'
-    '全集、不存在证明、未知大结果、分页或压缩使用 PATH 中的 `srcq.exe`'
+    '模型进行源码查找时先明确当前仍缺的证据'
+    '文件发现使用 `srcq fd <fd argv...>`'
+    '文本查询使用 `srcq rg <rg argv...>`'
+    '“完整定义”本身不触发 AST'
+    'AST 无匹配后必须先取得会改变查询的源码语法证据'
     '写错对象、破坏数据、并发覆盖、资源无界、缺少解释必需输入或混用查询快照'
     '其余可解析偏差只诊断'
 )
@@ -117,7 +121,7 @@ $duplicateRules = Get-Content -LiteralPath $globalPath -Encoding UTF8 |
 Assert-True (@($duplicateRules).Count -eq 0) "Global AGENTS.md contains duplicate normative rules"
 
 $descriptionBoundaryFragments = @{
-    "source-query" = "不用于已知文件或名称的少量文本"
+    "source-query" = "不用于普通规则/配置/日志/文案搜索、已知文件"
     "change-governance" = "不用于规格已完整"
     "codex-event-logger" = "当前上下文充分"
     "codex-qq-hook" = "状态查询不得创建或改写配置"
@@ -187,7 +191,10 @@ $sourceQueryLspContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "r
 $symbolSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\symbol-structure-workflow\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($sourceQueryContent.Contains('PATH 中的 `srcq.exe`')) "source-query must use the installed PATH runtime"
 Assert-True ($sourceQueryContent.Contains('不搜索项目构建目录、Skill、插件或 Codex 缓存中的私有副本')) "source-query must not discover private runtime copies"
-Assert-True ($sourceQueryAstContent.Contains('声明/定义范围') -or $sourceQueryAstContent.Contains('完整范围')) "source-query must own syntactic declaration and definition ranges"
+Assert-True ($globalContent.Contains('文件发现使用 `srcq fd <fd argv...>`')) "global rules must expose the minimal direct fd syntax"
+Assert-True ($globalContent.Contains('文本查询使用 `srcq rg <rg argv...>`')) "global rules must expose the minimal direct rg syntax"
+Assert-True ($sourceQueryAstContent.Contains('“完整定义”是验收结果，不是 AST 触发词')) "source-query must not trigger AST from the requested result wording alone"
+Assert-True ($sourceQueryAstContent.Contains('无匹配不是继续猜 pattern 的依据')) "source-query must require new source evidence before another AST pattern"
 Assert-True ($sourceQueryAstContent.Contains('`_sgy.total/files/shown/omitted/complete/cache`')) "source-query must preserve the stable AST result protocol"
 Assert-True ($sourceQueryLspContent.Contains('单根工作区的 `file` 使用根相对路径')) "source-query must distinguish single-root logical paths"
 Assert-True ($sourceQueryLspContent.Contains('多根才使用 `<root-alias>/<relative-path>`')) "source-query must distinguish multi-root logical paths"
@@ -459,6 +466,7 @@ $requiredCases = @(
     "one-off-generated-artifact"
     "cpp-include-edit"
     "ast-structural-call-search"
+    "ast-no-match-needs-source-evidence"
     "literal-text-search"
     "bounded-file-discovery"
     "powershell-command-authoring"

@@ -1,0 +1,50 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "当前 srcq 普通入口、三输出面与用户可见 identity"
+      ],
+      "id": "TSQG-077",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-078",
+  "mutation_scope": [
+    "tools/srcq/**",
+    "development/source-query-gateway/backend-contract/**",
+    "development/source-query-gateway/ast-baseline/**"
+  ],
+  "outcome": "srcq 不因 rg、fd 或 ast-grep 的版本字符串拒绝可执行后端，并在保持退出、副作用和完整性的前提下完成结构化输出或安全降级",
+  "outputs": [
+    "无后端版本许可的执行与 doctor 合同",
+    "基于实际输出的解析与只读安全降级",
+    "有副作用模式不重放的验证结果"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-SQG-012",
+    "GAP-SQG-007",
+    "DES-SQG-003",
+    "DES-SQG-007",
+    "DES-SQG-009",
+    "DES-SQG-013",
+    "AC-SQG-001",
+    "AC-SQG-007",
+    "UDES-SQG-002",
+    "UDES-SQG-014"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "source-query"
+  ],
+  "title": "以实际输出能力取代后端版本许可",
+  "verification": [
+    "rg 15.1 与 Codex PATH 中 rg 15.2 均不因版本拒绝",
+    "未来版本字符串但同协议输出仍使用自适应投影",
+    "结构变化、原生错误、无匹配和转换失败可区分",
+    "外部程序、写入和状态模式不因降级重复执行",
+    "AST 现有 CLI、cache、process、rewrite 与 machine 合同不退化"
+  ]
+}

@@ -1,0 +1,538 @@
+{
+  "schema": "agentbase.source-query-independent-audit/v2",
+  "isolation_declaration": {
+    "declared_boundary": "Only audit-capsule.json in the current directory may be read and only audit-result.json in the current directory may be written; no repository, other capsule/result, conversation history, hidden expectations, network, or case request may be accessed.",
+    "actual_behavior": {
+      "files_read": [
+        "audit-capsule.json"
+      ],
+      "files_written": [
+        "audit-result.json"
+      ],
+      "repository_read": false,
+      "other_capsule_or_result_read": false,
+      "conversation_history_used": false,
+      "hidden_expectations_accessed": false,
+      "network_accessed": false,
+      "case_requests_executed": false,
+      "method": "Repeated local parsing and deterministic calculation over the designated capsule only."
+    },
+    "compliant": true
+  },
+  "capsule_sha256": {
+    "scheme": "sha256-canonical-json-without-capsule_sha256",
+    "canonicalization": "UTF-8 JSON with recursively sorted object keys, compact separators, Unicode preserved, and the top-level capsule_sha256 member omitted",
+    "claimed": "22f35a44b472278d674a8291a186ca7f1a81ddbb1a736648097b09f152e3e1aa",
+    "recomputed": "22f35a44b472278d674a8291a186ca7f1a81ddbb1a736648097b09f152e3e1aa",
+    "status": "pass"
+  },
+  "experiment_identity": {
+    "scheme": "the same canonical JSON procedure applied to experiment with experiment_identity omitted",
+    "experiment_claimed": "6a30fc236bf36c54910d38c625c1595929e623ccfb3391ddb112cafc6148c4ab",
+    "experiment_recomputed": "6a30fc236bf36c54910d38c625c1595929e623ccfb3391ddb112cafc6148c4ab",
+    "summary_claimed": "6a30fc236bf36c54910d38c625c1595929e623ccfb3391ddb112cafc6148c4ab",
+    "all_equal": true,
+    "status": "pass"
+  },
+  "integrity": {
+    "capsule_schema": "agentbase.source-query-audit-capsule/v2",
+    "run_count": 24,
+    "unique_run_id_count": 24,
+    "unique_case_environment_ordinal_count": 24,
+    "run_uniqueness": "pass",
+    "schedule": {
+      "declared_count": 24,
+      "record_count": 24,
+      "exact_order_match": true,
+      "set_match": true,
+      "status": "pass"
+    },
+    "pairing": {
+      "case_count": 6,
+      "ordinals_per_case": 2,
+      "environments_per_ordinal": 2,
+      "complete_pairs": 12,
+      "missing_pairs": [],
+      "status": "pass"
+    },
+    "run_protocol": {
+      "exit_code_zero_runs": 24,
+      "timed_out_runs": 0,
+      "runs_with_invalid_json_lines": 0,
+      "usage_complete_runs": 24,
+      "actual_total_identity_pass_runs": 24,
+      "status": "pass",
+      "note": "Run-level success is distinct from failed intermediate command tool items."
+    },
+    "usage_identities": {
+      "actual_total_tokens": "input_tokens + output_tokens",
+      "cached_input_tokens": "subset of input_tokens and not added again",
+      "reasoning_output_tokens": "subset of output_tokens and not added again",
+      "visible_output_tokens": "output_tokens - reasoning_output_tokens",
+      "ordinary_input_tokens": "input_tokens - cached_input_tokens - cache_write_input_tokens",
+      "all_runs_pass": true
+    },
+    "postflight": {
+      "declared_failures": [],
+      "status": "pass"
+    },
+    "raw_hash_declarations": {
+      "declared_path_count": 52,
+      "expected_record_artifact_path_count": 52,
+      "manifest_coverage_exact": true,
+      "missing_declarations": [],
+      "extra_declarations": [],
+      "coverage_status": "pass",
+      "raw_byte_hash_verification": "not_independently_recomputable",
+      "reason": "The raw JSONL and stderr bytes are referenced and hash-declared but are not embedded in the capsule; the access boundary forbids reading them."
+    }
+  },
+  "environment_diff_review": {
+    "declared_allowed_differences": [
+      "AGENTS.md",
+      "bin/srcq.exe",
+      "skills/source-query/**"
+    ],
+    "changed_paths": [
+      "AGENTS.md",
+      "bin/srcq.exe",
+      "skills/source-query/SKILL.md",
+      "skills/source-query/references/ast.md",
+      "skills/source-query/references/rg-fd.md"
+    ],
+    "allowlist_mapping": {
+      "AGENTS.md": "AGENTS.md",
+      "bin/srcq.exe": "bin/srcq.exe",
+      "skills/source-query/SKILL.md": "skills/source-query/**",
+      "skills/source-query/references/ast.md": "skills/source-query/**",
+      "skills/source-query/references/rg-fd.md": "skills/source-query/**"
+    },
+    "unexpected_changed_paths": [],
+    "allowlist_closure": true,
+    "manifest_level_status": "pass",
+    "environment_tree_and_changed_file_bytes": "not_independently_recomputable",
+    "note": "Closure is independently checked over the embedded changed-path manifest. The declared tree hashes and file hashes cannot be regenerated without unembedded environment bytes."
+  },
+  "per_run_quality": [
+    {
+      "run_id": "agentbase-file-discovery-control__candidate__1",
+      "case_id": "agentbase-file-discovery-control",
+      "environment": "candidate",
+      "ordinal": 1,
+      "required_semantics": {"status": "pass", "finding": "Returns the oracle's unique repository-relative path."},
+      "core": {"status": "correct", "finding": "tools/srcq/docs/query-gateway.md matches the oracle."},
+      "supporting": {"status": "not_explicit", "finding": "The ignored/rebuildable-output exclusion basis is not stated; it is supporting only and is not promoted to a prompt requirement."},
+      "format": {"status": "pass", "line_count": 1, "answer_max_lines": 1},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 92462, "elapsed_ms": 25160, "command_executions": 4, "failed_tool_items": 2}
+    },
+    {
+      "run_id": "agentbase-file-discovery-control__control__1",
+      "case_id": "agentbase-file-discovery-control",
+      "environment": "control",
+      "ordinal": 1,
+      "required_semantics": {"status": "fail", "finding": "Returns a different path from the unique oracle path."},
+      "core": {"status": "incorrect", "finding": "development/benchmarks/corpus/query-gateway.md is not the oracle answer."},
+      "supporting": {"status": "not_explicit", "finding": "The exclusion basis is not stated; this does not create an additional required failure."},
+      "format": {"status": "pass", "line_count": 1, "answer_max_lines": 1},
+      "overall_quality": "fail",
+      "metrics": {"actual_total_tokens": 17985, "elapsed_ms": 7137, "command_executions": 0, "failed_tool_items": 0}
+    },
+    {
+      "run_id": "agentbase-file-discovery-control__control__2",
+      "case_id": "agentbase-file-discovery-control",
+      "environment": "control",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "Returns the oracle's unique repository-relative path."},
+      "core": {"status": "correct", "finding": "Exact oracle path."},
+      "supporting": {"status": "not_explicit", "finding": "Supporting uniqueness basis is omitted without penalty to required semantics."},
+      "format": {"status": "pass", "line_count": 1, "answer_max_lines": 1},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 36216, "elapsed_ms": 10798, "command_executions": 1, "failed_tool_items": 0}
+    },
+    {
+      "run_id": "agentbase-file-discovery-control__candidate__2",
+      "case_id": "agentbase-file-discovery-control",
+      "environment": "candidate",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "Returns the oracle's unique repository-relative path."},
+      "core": {"status": "correct", "finding": "Exact oracle path."},
+      "supporting": {"status": "not_explicit", "finding": "Supporting uniqueness basis is omitted without penalty to required semantics."},
+      "format": {"status": "pass", "line_count": 1, "answer_max_lines": 1},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 92380, "elapsed_ms": 26332, "command_executions": 4, "failed_tool_items": 2}
+    },
+    {
+      "run_id": "agentbase-rg-policy-sources__control__1",
+      "case_id": "agentbase-rg-policy-sources",
+      "environment": "control",
+      "ordinal": 1,
+      "required_semantics": {"status": "pass", "finding": "Both formal source paths and the joint bounded-read/srcq/stop rule are explicit."},
+      "core": {"status": "correct", "finding": "Paths and relation match the oracle."},
+      "supporting": {"status": "not_explicit", "finding": "The exclusion of tests, validation scripts, and development evidence is not explicitly stated; it remains supporting."},
+      "format": {"status": "pass", "line_count": 4, "answer_max_lines": 4},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 138748, "elapsed_ms": 41508, "command_executions": 5, "failed_tool_items": 1}
+    },
+    {
+      "run_id": "agentbase-rg-policy-sources__candidate__1",
+      "case_id": "agentbase-rg-policy-sources",
+      "environment": "candidate",
+      "ordinal": 1,
+      "required_semantics": {"status": "pass", "finding": "Both formal source paths and the joint rule are explicit."},
+      "core": {"status": "correct", "finding": "Matches the oracle relation."},
+      "supporting": {"status": "not_explicit", "finding": "Excluded roles are not expressly named; no required penalty."},
+      "format": {"status": "pass", "line_count": 4, "answer_max_lines": 4},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 80957, "elapsed_ms": 27520, "command_executions": 4, "failed_tool_items": 1}
+    },
+    {
+      "run_id": "agentbase-rg-policy-sources__candidate__2",
+      "case_id": "agentbase-rg-policy-sources",
+      "environment": "candidate",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "Both formal paths and the complete joint rule are explicit."},
+      "core": {"status": "correct", "finding": "Matches the oracle relation."},
+      "supporting": {"status": "not_explicit", "finding": "Excluded roles are not expressly named; no required penalty."},
+      "format": {"status": "pass", "line_count": 4, "answer_max_lines": 4},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 126665, "elapsed_ms": 42082, "command_executions": 6, "failed_tool_items": 2}
+    },
+    {
+      "run_id": "agentbase-rg-policy-sources__control__2",
+      "case_id": "agentbase-rg-policy-sources",
+      "environment": "control",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "Both formal paths and the complete joint rule are explicit."},
+      "core": {"status": "correct", "finding": "Matches the oracle relation."},
+      "supporting": {"status": "not_explicit", "finding": "Excluded roles are not expressly named; no required penalty."},
+      "format": {"status": "pass", "line_count": 4, "answer_max_lines": 4},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 146530, "elapsed_ms": 53557, "command_executions": 8, "failed_tool_items": 3}
+    },
+    {
+      "run_id": "agentbase-provider-observation__candidate__1",
+      "case_id": "agentbase-provider-observation",
+      "environment": "candidate",
+      "ordinal": 1,
+      "required_semantics": {"status": "pass", "finding": "The unique definition at line 310 and Collection<T>.provider at line 307 are explicit."},
+      "core": {"status": "correct", "finding": "All required path, lines, and field match the oracle."},
+      "supporting": {"status": "explicit", "finding": "document_symbols at line 694, Collection<DocumentSymbol>, and the provider exposure chain are stated."},
+      "format": {"status": "pass", "line_count": 3, "answer_max_lines": 4},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 173958, "elapsed_ms": 57658, "command_executions": 8, "failed_tool_items": 2}
+    },
+    {
+      "run_id": "agentbase-provider-observation__control__1",
+      "case_id": "agentbase-provider-observation",
+      "environment": "control",
+      "ordinal": 1,
+      "required_semantics": {"status": "pass", "finding": "The unique definition and generic provider field with their exact lines are explicit."},
+      "core": {"status": "correct", "finding": "Required facts match the oracle."},
+      "supporting": {"status": "partial", "finding": "The document_symbols mapping line and exposure relationship are mentioned, but Collection<DocumentSymbol> is not explicit."},
+      "format": {"status": "pass", "line_count": 2, "answer_max_lines": 4},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 145936, "elapsed_ms": 45943, "command_executions": 7, "failed_tool_items": 1}
+    },
+    {
+      "run_id": "agentbase-provider-observation__control__2",
+      "case_id": "agentbase-provider-observation",
+      "environment": "control",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "Definition and provider field facts are explicit and exact."},
+      "core": {"status": "correct", "finding": "Matches the oracle."},
+      "supporting": {"status": "explicit", "finding": "The line-694 Collection<DocumentSymbol> mapping and relationship are explicit across the three lines."},
+      "format": {"status": "pass", "line_count": 3, "answer_max_lines": 4},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 143989, "elapsed_ms": 44588, "command_executions": 6, "failed_tool_items": 2}
+    },
+    {
+      "run_id": "agentbase-provider-observation__candidate__2",
+      "case_id": "agentbase-provider-observation",
+      "environment": "candidate",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "Definition and provider field facts are explicit and exact."},
+      "core": {"status": "correct", "finding": "Matches the oracle."},
+      "supporting": {"status": "explicit", "finding": "The document_symbols Collection<DocumentSymbol> mapping and full generic relation are explicit."},
+      "format": {"status": "pass", "line_count": 3, "answer_max_lines": 4},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 301178, "elapsed_ms": 83876, "command_executions": 12, "failed_tool_items": 3}
+    },
+    {
+      "run_id": "agentbase-srcq-containing-contract__control__1",
+      "case_id": "agentbase-srcq-containing-contract",
+      "environment": "control",
+      "ordinal": 1,
+      "required_semantics": {"status": "pass", "finding": "Correct file, zero-based half-open ranges, all tied minima, and fingerprint-based rejection are explicit."},
+      "core": {"status": "correct", "finding": "All four required facts agree with the oracle."},
+      "supporting": {"status": "not_explicit", "finding": "The execute_containing definition range and evidence lines are not supplied; supporting is not made required."},
+      "format": {"status": "pass", "line_count": 4, "answer_max_lines": 6},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 129215, "elapsed_ms": 35149, "command_executions": 6, "failed_tool_items": 0}
+    },
+    {
+      "run_id": "agentbase-srcq-containing-contract__candidate__1",
+      "case_id": "agentbase-srcq-containing-contract",
+      "environment": "candidate",
+      "ordinal": 1,
+      "required_semantics": {"status": "pass", "finding": "All required implementation semantics are explicit and oracle-consistent."},
+      "core": {"status": "correct", "finding": "Correct file and three contract facts."},
+      "supporting": {"status": "not_explicit", "finding": "Definition range and evidence lines are omitted without required-semantic penalty."},
+      "format": {"status": "pass", "line_count": 4, "answer_max_lines": 6},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 587940, "elapsed_ms": 83625, "command_executions": 17, "failed_tool_items": 2}
+    },
+    {
+      "run_id": "agentbase-srcq-containing-contract__candidate__2",
+      "case_id": "agentbase-srcq-containing-contract",
+      "environment": "candidate",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "The strict-containment elimination plus retention of equal ranges explicitly preserves the tied minimal set; other required facts are exact."},
+      "core": {"status": "correct", "finding": "Correct file, coordinates, selection, and staleness behavior."},
+      "supporting": {"status": "not_explicit", "finding": "Definition range and evidence lines are omitted."},
+      "format": {"status": "pass", "line_count": 4, "answer_max_lines": 6},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 122447, "elapsed_ms": 42272, "command_executions": 5, "failed_tool_items": 1}
+    },
+    {
+      "run_id": "agentbase-srcq-containing-contract__control__2",
+      "case_id": "agentbase-srcq-containing-contract",
+      "environment": "control",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "All required facts are explicit and correct."},
+      "core": {"status": "correct", "finding": "Matches the oracle implementation contract."},
+      "supporting": {"status": "not_explicit", "finding": "Definition range and evidence lines are omitted."},
+      "format": {"status": "pass", "line_count": 4, "answer_max_lines": 6},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 105686, "elapsed_ms": 39359, "command_executions": 4, "failed_tool_items": 0}
+    },
+    {
+      "run_id": "ue-command-dispatch-submit__control__1",
+      "case_id": "ue-command-dispatch-submit",
+      "environment": "control",
+      "ordinal": 1,
+      "required_semantics": {"status": "pass", "finding": "Correct production path, inclusive 53-84 range, and both error codes."},
+      "core": {"status": "correct", "finding": "All oracle facts match."},
+      "supporting": {"status": "not_explicit", "finding": "Bound-snapshot formal-production status is not expressly stated; it remains supporting."},
+      "format": {"status": "pass", "line_count": 2, "answer_max_lines": 5},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 132166, "elapsed_ms": 44301, "command_executions": 9, "failed_tool_items": 1}
+    },
+    {
+      "run_id": "ue-command-dispatch-submit__candidate__1",
+      "case_id": "ue-command-dispatch-submit",
+      "environment": "candidate",
+      "ordinal": 1,
+      "required_semantics": {"status": "pass", "finding": "Correct path, range, and both error codes."},
+      "core": {"status": "correct", "finding": "All oracle facts match."},
+      "supporting": {"status": "not_explicit", "finding": "Bound-snapshot formal-production status is not expressly stated."},
+      "format": {"status": "pass", "line_count": 3, "answer_max_lines": 5},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 256985, "elapsed_ms": 77607, "command_executions": 13, "failed_tool_items": 4}
+    },
+    {
+      "run_id": "ue-command-dispatch-submit__candidate__2",
+      "case_id": "ue-command-dispatch-submit",
+      "environment": "candidate",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "Correct path, range, and both error codes."},
+      "core": {"status": "correct", "finding": "All oracle facts match."},
+      "supporting": {"status": "not_explicit", "finding": "Bound-snapshot formal-production status is not expressly stated."},
+      "format": {"status": "pass", "line_count": 3, "answer_max_lines": 5},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 223740, "elapsed_ms": 63407, "command_executions": 10, "failed_tool_items": 5}
+    },
+    {
+      "run_id": "ue-command-dispatch-submit__control__2",
+      "case_id": "ue-command-dispatch-submit",
+      "environment": "control",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "Correct path, inclusive range, and both codes."},
+      "core": {"status": "correct", "finding": "All oracle facts match."},
+      "supporting": {"status": "not_explicit", "finding": "Bound-snapshot formal-production status is not expressly stated."},
+      "format": {"status": "pass", "line_count": 3, "answer_max_lines": 5},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 95233, "elapsed_ms": 39197, "command_executions": 4, "failed_tool_items": 0}
+    },
+    {
+      "run_id": "ue-hjson-isbarekey-occurrences__control__1",
+      "case_id": "ue-hjson-isbarekey-occurrences",
+      "environment": "control",
+      "ordinal": 1,
+      "required_semantics": {"status": "pass", "finding": "Correct production path, definition line, all three call lines, and an explicit completeness confirmation."},
+      "core": {"status": "correct", "finding": "Occurrence set exactly matches the oracle."},
+      "supporting": {"status": "explicit", "finding": "Definition and calls are explicitly classified."},
+      "format": {"status": "fail", "line_count": 9, "answer_max_lines": 8, "finding": "Physical line count includes blank lines and exceeds the limit by one."},
+      "overall_quality": "fail",
+      "metrics": {"actual_total_tokens": 297412, "elapsed_ms": 83645, "command_executions": 16, "failed_tool_items": 3}
+    },
+    {
+      "run_id": "ue-hjson-isbarekey-occurrences__candidate__1",
+      "case_id": "ue-hjson-isbarekey-occurrences",
+      "environment": "candidate",
+      "ordinal": 1,
+      "required_semantics": {"status": "pass", "finding": "Correct path, complete occurrence lines, and completeness confirmation."},
+      "core": {"status": "correct", "finding": "Occurrence set exactly matches the oracle."},
+      "supporting": {"status": "explicit", "finding": "Definition and calls are explicitly classified."},
+      "format": {"status": "fail", "line_count": 9, "answer_max_lines": 8, "finding": "Physical line count exceeds the limit by one."},
+      "overall_quality": "fail",
+      "metrics": {"actual_total_tokens": 450238, "elapsed_ms": 136709, "command_executions": 25, "failed_tool_items": 7}
+    },
+    {
+      "run_id": "ue-hjson-isbarekey-occurrences__candidate__2",
+      "case_id": "ue-hjson-isbarekey-occurrences",
+      "environment": "candidate",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "Correct formal-source path, definition, all calls, and completeness confirmation."},
+      "core": {"status": "correct", "finding": "Exact oracle occurrence set."},
+      "supporting": {"status": "explicit", "finding": "Each occurrence is classified as definition or call."},
+      "format": {"status": "pass", "line_count": 5, "answer_max_lines": 8},
+      "overall_quality": "pass",
+      "metrics": {"actual_total_tokens": 336572, "elapsed_ms": 164118, "command_executions": 18, "failed_tool_items": 4}
+    },
+    {
+      "run_id": "ue-hjson-isbarekey-occurrences__control__2",
+      "case_id": "ue-hjson-isbarekey-occurrences",
+      "environment": "control",
+      "ordinal": 2,
+      "required_semantics": {"status": "pass", "finding": "Correct path, definition, all calls, and completeness confirmation."},
+      "core": {"status": "correct", "finding": "Exact oracle occurrence set."},
+      "supporting": {"status": "explicit", "finding": "Definition and calls are explicitly classified."},
+      "format": {"status": "fail", "line_count": 9, "answer_max_lines": 8, "finding": "Physical line count exceeds the limit by one."},
+      "overall_quality": "fail",
+      "metrics": {"actual_total_tokens": 137152, "elapsed_ms": 59108, "command_executions": 9, "failed_tool_items": 1}
+    }
+  ],
+  "quality_summary": {
+    "supporting_policy": "Supporting criteria were judged only for explicitness and were never promoted into required prompt semantics or used alone to fail overall quality.",
+    "line_count_policy": "All physical lines, including blank lines, count toward answer_max_lines.",
+    "candidate": {
+      "runs": 12,
+      "required_semantics": {"pass": 12, "fail": 0},
+      "core": {"correct": 12, "incorrect": 0},
+      "supporting": {"explicit": 4, "partial": 0, "not_explicit": 8},
+      "format": {"pass": 11, "fail": 1},
+      "overall_quality": {"pass": 11, "fail": 1}
+    },
+    "control": {
+      "runs": 12,
+      "required_semantics": {"pass": 11, "fail": 1},
+      "core": {"correct": 11, "incorrect": 1},
+      "supporting": {"explicit": 3, "partial": 1, "not_explicit": 8},
+      "format": {"pass": 10, "fail": 2},
+      "overall_quality": {"pass": 9, "fail": 3}
+    },
+    "all": {
+      "runs": 24,
+      "required_semantics": {"pass": 23, "fail": 1},
+      "core": {"correct": 23, "incorrect": 1},
+      "supporting": {"explicit": 7, "partial": 1, "not_explicit": 16},
+      "format": {"pass": 21, "fail": 3},
+      "overall_quality": {"pass": 20, "fail": 4}
+    }
+  },
+  "usage_summary": {
+    "definition": "total tokens = input_tokens + output_tokens; cached input and reasoning output are subsets and are not added again",
+    "subject": {
+      "control": {"runs": 12, "input_tokens": 1511063, "cached_input_tokens": 1234944, "cache_write_input_tokens": 0, "ordinary_input_tokens": 276119, "output_tokens": 15205, "reasoning_output_tokens": 6573, "visible_output_tokens": 8632, "actual_total_tokens": 1526268, "elapsed_ms": 504290},
+      "candidate": {"runs": 12, "input_tokens": 2817063, "cached_input_tokens": 2498816, "cache_write_input_tokens": 0, "ordinary_input_tokens": 318247, "output_tokens": 28459, "reasoning_output_tokens": 15796, "visible_output_tokens": 12663, "actual_total_tokens": 2845522, "elapsed_ms": 830366},
+      "all": {"runs": 24, "input_tokens": 4328126, "cached_input_tokens": 3733760, "cache_write_input_tokens": 0, "ordinary_input_tokens": 594366, "output_tokens": 43664, "reasoning_output_tokens": 22369, "visible_output_tokens": 21295, "actual_total_tokens": 4371790, "elapsed_ms": 1334656},
+      "candidate_minus_control": {"input_tokens": 1306000, "cached_input_tokens": 1263872, "ordinary_input_tokens": 42128, "output_tokens": 13254, "reasoning_output_tokens": 9223, "visible_output_tokens": 4031, "actual_total_tokens": 1319254, "elapsed_ms": 326076, "actual_total_percent": 86.43658911803169, "elapsed_percent": 64.6604136508755}
+    },
+    "setup_preflight": {
+      "control": {"runs": 1, "input_tokens": 32248, "cached_input_tokens": 24064, "cache_write_input_tokens": 0, "ordinary_input_tokens": 8184, "output_tokens": 131, "reasoning_output_tokens": 33, "visible_output_tokens": 98, "actual_total_tokens": 32379, "elapsed_ms": 12957},
+      "candidate": {"runs": 1, "input_tokens": 32287, "cached_input_tokens": 15104, "cache_write_input_tokens": 0, "ordinary_input_tokens": 17183, "output_tokens": 130, "reasoning_output_tokens": 31, "visible_output_tokens": 99, "actual_total_tokens": 32417, "elapsed_ms": 11133},
+      "all": {"runs": 2, "input_tokens": 64535, "cached_input_tokens": 39168, "cache_write_input_tokens": 0, "ordinary_input_tokens": 25367, "output_tokens": 261, "reasoning_output_tokens": 64, "visible_output_tokens": 197, "actual_total_tokens": 64796, "elapsed_ms": 24090},
+      "candidate_minus_control": {"actual_total_tokens": 38, "elapsed_ms": -1824, "actual_total_percent": 0.11736001729516499, "elapsed_percent": -14.077332715906454}
+    },
+    "including_setup": {
+      "control": {"runs": 13, "input_tokens": 1543311, "cached_input_tokens": 1259008, "cache_write_input_tokens": 0, "ordinary_input_tokens": 284303, "output_tokens": 15336, "reasoning_output_tokens": 6606, "visible_output_tokens": 8730, "actual_total_tokens": 1558647, "elapsed_ms": 517247},
+      "candidate": {"runs": 13, "input_tokens": 2849350, "cached_input_tokens": 2513920, "cache_write_input_tokens": 0, "ordinary_input_tokens": 335430, "output_tokens": 28589, "reasoning_output_tokens": 15827, "visible_output_tokens": 12762, "actual_total_tokens": 2877939, "elapsed_ms": 841499},
+      "all": {"runs": 26, "input_tokens": 4392661, "cached_input_tokens": 3772928, "cache_write_input_tokens": 0, "ordinary_input_tokens": 619733, "output_tokens": 43925, "reasoning_output_tokens": 22433, "visible_output_tokens": 21492, "actual_total_tokens": 4436586, "elapsed_ms": 1358746},
+      "candidate_minus_control": {"actual_total_tokens": 1319292, "elapsed_ms": 324252, "actual_total_percent": 84.64341188222862, "elapsed_percent": 62.688038789978485}
+    },
+    "recomputed_matches_capsule_usage_reports": true
+  },
+  "paired_summary": [
+    {"case_id": "agentbase-file-discovery-control", "ordinal": 1, "control": {"tokens": 17985, "elapsed_ms": 7137, "tool_calls": 0, "failed_tool_items": 0}, "candidate": {"tokens": 92462, "elapsed_ms": 25160, "tool_calls": 4, "failed_tool_items": 2}, "candidate_minus_control": {"tokens": 74477, "elapsed_ms": 18023, "tool_calls": 4, "failed_tool_items": 2}, "quality": {"control": "fail", "candidate": "pass"}},
+    {"case_id": "agentbase-file-discovery-control", "ordinal": 2, "control": {"tokens": 36216, "elapsed_ms": 10798, "tool_calls": 1, "failed_tool_items": 0}, "candidate": {"tokens": 92380, "elapsed_ms": 26332, "tool_calls": 4, "failed_tool_items": 2}, "candidate_minus_control": {"tokens": 56164, "elapsed_ms": 15534, "tool_calls": 3, "failed_tool_items": 2}, "quality": {"control": "pass", "candidate": "pass"}},
+    {"case_id": "agentbase-rg-policy-sources", "ordinal": 1, "control": {"tokens": 138748, "elapsed_ms": 41508, "tool_calls": 5, "failed_tool_items": 1}, "candidate": {"tokens": 80957, "elapsed_ms": 27520, "tool_calls": 4, "failed_tool_items": 1}, "candidate_minus_control": {"tokens": -57791, "elapsed_ms": -13988, "tool_calls": -1, "failed_tool_items": 0}, "quality": {"control": "pass", "candidate": "pass"}},
+    {"case_id": "agentbase-rg-policy-sources", "ordinal": 2, "control": {"tokens": 146530, "elapsed_ms": 53557, "tool_calls": 8, "failed_tool_items": 3}, "candidate": {"tokens": 126665, "elapsed_ms": 42082, "tool_calls": 6, "failed_tool_items": 2}, "candidate_minus_control": {"tokens": -19865, "elapsed_ms": -11475, "tool_calls": -2, "failed_tool_items": -1}, "quality": {"control": "pass", "candidate": "pass"}},
+    {"case_id": "agentbase-provider-observation", "ordinal": 1, "control": {"tokens": 145936, "elapsed_ms": 45943, "tool_calls": 7, "failed_tool_items": 1}, "candidate": {"tokens": 173958, "elapsed_ms": 57658, "tool_calls": 8, "failed_tool_items": 2}, "candidate_minus_control": {"tokens": 28022, "elapsed_ms": 11715, "tool_calls": 1, "failed_tool_items": 1}, "quality": {"control": "pass", "candidate": "pass"}},
+    {"case_id": "agentbase-provider-observation", "ordinal": 2, "control": {"tokens": 143989, "elapsed_ms": 44588, "tool_calls": 6, "failed_tool_items": 2}, "candidate": {"tokens": 301178, "elapsed_ms": 83876, "tool_calls": 12, "failed_tool_items": 3}, "candidate_minus_control": {"tokens": 157189, "elapsed_ms": 39288, "tool_calls": 6, "failed_tool_items": 1}, "quality": {"control": "pass", "candidate": "pass"}},
+    {"case_id": "agentbase-srcq-containing-contract", "ordinal": 1, "control": {"tokens": 129215, "elapsed_ms": 35149, "tool_calls": 6, "failed_tool_items": 0}, "candidate": {"tokens": 587940, "elapsed_ms": 83625, "tool_calls": 17, "failed_tool_items": 2}, "candidate_minus_control": {"tokens": 458725, "elapsed_ms": 48476, "tool_calls": 11, "failed_tool_items": 2}, "quality": {"control": "pass", "candidate": "pass"}},
+    {"case_id": "agentbase-srcq-containing-contract", "ordinal": 2, "control": {"tokens": 105686, "elapsed_ms": 39359, "tool_calls": 4, "failed_tool_items": 0}, "candidate": {"tokens": 122447, "elapsed_ms": 42272, "tool_calls": 5, "failed_tool_items": 1}, "candidate_minus_control": {"tokens": 16761, "elapsed_ms": 2913, "tool_calls": 1, "failed_tool_items": 1}, "quality": {"control": "pass", "candidate": "pass"}},
+    {"case_id": "ue-command-dispatch-submit", "ordinal": 1, "control": {"tokens": 132166, "elapsed_ms": 44301, "tool_calls": 9, "failed_tool_items": 1}, "candidate": {"tokens": 256985, "elapsed_ms": 77607, "tool_calls": 13, "failed_tool_items": 4}, "candidate_minus_control": {"tokens": 124819, "elapsed_ms": 33306, "tool_calls": 4, "failed_tool_items": 3}, "quality": {"control": "pass", "candidate": "pass"}},
+    {"case_id": "ue-command-dispatch-submit", "ordinal": 2, "control": {"tokens": 95233, "elapsed_ms": 39197, "tool_calls": 4, "failed_tool_items": 0}, "candidate": {"tokens": 223740, "elapsed_ms": 63407, "tool_calls": 10, "failed_tool_items": 5}, "candidate_minus_control": {"tokens": 128507, "elapsed_ms": 24210, "tool_calls": 6, "failed_tool_items": 5}, "quality": {"control": "pass", "candidate": "pass"}},
+    {"case_id": "ue-hjson-isbarekey-occurrences", "ordinal": 1, "control": {"tokens": 297412, "elapsed_ms": 83645, "tool_calls": 16, "failed_tool_items": 3}, "candidate": {"tokens": 450238, "elapsed_ms": 136709, "tool_calls": 25, "failed_tool_items": 7}, "candidate_minus_control": {"tokens": 152826, "elapsed_ms": 53064, "tool_calls": 9, "failed_tool_items": 4}, "quality": {"control": "fail", "candidate": "fail"}},
+    {"case_id": "ue-hjson-isbarekey-occurrences", "ordinal": 2, "control": {"tokens": 137152, "elapsed_ms": 59108, "tool_calls": 9, "failed_tool_items": 1}, "candidate": {"tokens": 336572, "elapsed_ms": 164118, "tool_calls": 18, "failed_tool_items": 4}, "candidate_minus_control": {"tokens": 199420, "elapsed_ms": 105010, "tool_calls": 9, "failed_tool_items": 3}, "quality": {"control": "fail", "candidate": "pass"}}
+  ],
+  "tool_summary": {
+    "tool_call_definition": "completed command_execution items; all embedded tool_items are command executions",
+    "subject": {
+      "control": {"command_executions": 75, "agent_messages": 35, "tool_items": 75, "failed_tool_items": 12},
+      "candidate": {"command_executions": 126, "agent_messages": 46, "tool_items": 126, "failed_tool_items": 35},
+      "all": {"command_executions": 201, "agent_messages": 81, "tool_items": 201, "failed_tool_items": 47},
+      "candidate_minus_control": {"command_executions": 51, "agent_messages": 11, "tool_items": 51, "failed_tool_items": 23}
+    },
+    "setup_preflight": {
+      "control": {"command_executions": 1, "agent_messages": 1, "tool_items": 1, "failed_tool_items": 0},
+      "candidate": {"command_executions": 1, "agent_messages": 1, "tool_items": 1, "failed_tool_items": 0}
+    },
+    "including_setup": {
+      "control": {"command_executions": 76, "agent_messages": 36, "tool_items": 76, "failed_tool_items": 12},
+      "candidate": {"command_executions": 127, "agent_messages": 47, "tool_items": 127, "failed_tool_items": 35},
+      "all": {"command_executions": 203, "agent_messages": 83, "tool_items": 203, "failed_tool_items": 47}
+    }
+  },
+  "failures": {
+    "integrity_failures": [],
+    "run_level_failures": [],
+    "quality_failures": [
+      {"run_id": "agentbase-file-discovery-control__control__1", "kind": "required_and_core", "detail": "Wrong unique path."},
+      {"run_id": "ue-hjson-isbarekey-occurrences__control__1", "kind": "format", "detail": "9 physical lines exceeds maximum 8."},
+      {"run_id": "ue-hjson-isbarekey-occurrences__candidate__1", "kind": "format", "detail": "9 physical lines exceeds maximum 8."},
+      {"run_id": "ue-hjson-isbarekey-occurrences__control__2", "kind": "format", "detail": "9 physical lines exceeds maximum 8."}
+    ],
+    "intermediate_tool_item_failures": {
+      "total": 47,
+      "by_environment": {"control": 12, "candidate": 35},
+      "by_run": {
+        "agentbase-file-discovery-control__candidate__1": 2,
+        "agentbase-file-discovery-control__candidate__2": 2,
+        "agentbase-rg-policy-sources__control__1": 1,
+        "agentbase-rg-policy-sources__candidate__1": 1,
+        "agentbase-rg-policy-sources__candidate__2": 2,
+        "agentbase-rg-policy-sources__control__2": 3,
+        "agentbase-provider-observation__candidate__1": 2,
+        "agentbase-provider-observation__control__1": 1,
+        "agentbase-provider-observation__control__2": 2,
+        "agentbase-provider-observation__candidate__2": 3,
+        "agentbase-srcq-containing-contract__candidate__1": 2,
+        "agentbase-srcq-containing-contract__candidate__2": 1,
+        "ue-command-dispatch-submit__control__1": 1,
+        "ue-command-dispatch-submit__candidate__1": 4,
+        "ue-command-dispatch-submit__candidate__2": 5,
+        "ue-hjson-isbarekey-occurrences__control__1": 3,
+        "ue-hjson-isbarekey-occurrences__candidate__1": 7,
+        "ue-hjson-isbarekey-occurrences__candidate__2": 4,
+        "ue-hjson-isbarekey-occurrences__control__2": 1
+      },
+      "note": "These are observed failed command items inside otherwise exit-zero runs; they are efficiency/reliability evidence, not additional final-answer semantic failures."
+    }
+  },
+  "decision": {
+    "comparison_order": ["quality", "actual_total_tokens", "elapsed_ms"],
+    "winner": "candidate",
+    "quality_basis": "Candidate has 12/12 required/core-correct answers and 11/12 overall passes; control has 11/12 required/core-correct answers and 9/12 overall passes. Candidate therefore wins at the primary quality stage.",
+    "efficiency_basis": "On subject runs candidate uses 1,319,254 more actual total tokens (+86.44%) and 326,076 ms more elapsed time (+64.66%); including setup it uses 1,319,292 more tokens (+84.64%) and 324,252 ms more (+62.69%).",
+    "quality_regression_compensation_applied": false,
+    "rationale": "Token and speed results do not offset quality differences. They are reported as substantial candidate costs after the quality-first decision."
+  },
+  "limitations": [
+    "The audit is capsule-only and does not independently inspect the repository or source files behind oracle hashes.",
+    "Raw JSONL/stderr bytes are not embedded, so their declared SHA-256 values cannot be independently recomputed; only declaration coverage can be checked.",
+    "Environment trees and changed-file bytes are not embedded, so tree hashes and underlying file hashes cannot be independently regenerated; allowlist closure is checked only against the embedded changed-path manifest.",
+    "Final-answer semantics are independently adjudicated against the embedded answer contracts and oracles, whose underlying source truth cannot be re-derived under the access boundary."
+  ]
+}

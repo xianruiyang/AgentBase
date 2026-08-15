@@ -68,4 +68,4 @@ New-Item -ItemType Directory -Force -Path $parent | Out-Null
     ($report | ConvertTo-Json -Depth 6) + "`n",
     [Text.UTF8Encoding]::new($false)
 )
-$report | Select-Object schema, sourceRevision, fileCount
+[pscustomobject]$report | Select-Object schema, sourceRevision, fileCount
