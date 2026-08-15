@@ -1,0 +1,55 @@
+{
+  "changed_files": [
+    "tools/srcq/scripts/install-srcq.ps1",
+    "tools/srcq/scripts/test-install-srcq.ps1",
+    "tools/srcq/docs/installation.md",
+    "development/codex-deployment/manage_agentbase.ps1",
+    "development/codex-deployment/test_manage_agentbase.ps1",
+    "development/codex-deployment/README.md",
+    "development/source-query-gateway/current-state.md",
+    "development/source-query-gateway/verification.md",
+    "development/source-query-gateway/plan.md"
+  ],
+  "evidence_for": [
+    "CON-SQG-001",
+    "UDES-SQG-009",
+    "DES-SQG-011"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "ref": "tools/srcq/scripts/test-install-srcq.ps1"
+    },
+    {
+      "kind": "test",
+      "ref": "development/codex-deployment/test_manage_agentbase.ps1"
+    },
+    {
+      "kind": "verification-summary",
+      "ref": "development/source-query-gateway/verification.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "srcq Status 现直接验证安装身份、受管文件、实际版本和唯一 PATH，并以局部可恢复错误拒绝漂移；真实 Codex Publish 在写入前复用 Status/doctor，部署沙箱保持独立。",
+  "outputs": [
+    "tools/srcq/scripts/install-srcq.ps1",
+    "development/codex-deployment/manage_agentbase.ps1",
+    "tools/srcq/scripts/test-install-srcq.ps1",
+    "development/codex-deployment/test_manage_agentbase.ps1"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "CON-SQG-001": "sha256:1fde805d3b1edb22c22c23c5dc3a7392151e4a370a6a6b85b2ee348149c0f98f",
+    "DES-SQG-011": "sha256:db9078a1301489c183747478660439e345b2d6ce458f23276a421b857d4f981e",
+    "UDES-SQG-009": "sha256:de059e7644de16f13a662da3885167e4930e2790fe136c237ae1185e5c2619ef"
+  },
+  "task_id": "TSQG-066",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "test-install-srcq：篡改二进制与缺失 PATH 均被 Status 拒绝，同版本 Install 修复，完整生命周期通过",
+    "test_manage_agentbase：缺失 srcq 的真实 Publish 在写入前拒绝，沙箱不消费宿主 srcq，全部部署/回滚场景通过",
+    "真实安装 Status：ready=true、integrity=verified、version=0.2.0、PATH count=1",
+    "真实部署 Status：srcq_runtime_ready=true、doctor_ok=true，正式 payload 仍为 published"
+  ]
+}

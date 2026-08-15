@@ -39,6 +39,13 @@ function Invoke-InstallerJson {
     ($text -join "`n") | ConvertFrom-Json
 }
 
+function Invoke-InstallerJsonFailure {
+    param([string[]] $Arguments)
+    $text = & $powershellExe -NoProfile -ExecutionPolicy Bypass -File $installer @Arguments
+    if ($LASTEXITCODE -eq 0) { throw "installer unexpectedly succeeded: $text" }
+    ($text -join "`n") | ConvertFrom-Json
+}
+
 try {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $config) | Out-Null
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $cache) | Out-Null
@@ -55,6 +62,7 @@ try {
     Assert-True ($first.changed -eq $true) "first install did not change state"
     $pathAfterFirst = [IO.File]::ReadAllText($pathFile)
     $entry = Join-Path $installRoot "current"
+    $binary = Join-Path $entry "srcq.exe"
     Assert-True ((@($pathAfterFirst -split ';' | Where-Object { $_ -eq $entry }).Count) -eq 1) "PATH entry was not added exactly once"
 
     $second = Invoke-InstallerJson -Arguments (@("Install", "-Archive", $ArchiveV1) + $common)
@@ -62,7 +70,30 @@ try {
     Assert-True ([IO.File]::ReadAllText($pathFile) -eq $pathAfterFirst) "repeat install changed PATH"
 
     $status = Invoke-InstallerJson -Arguments (@("Status") + $common)
-    Assert-True ($status.installed -eq $true -and $status.version -eq $ExpectedVersionV1) "status did not read back the installed version"
+    Assert-True ($status.installed -eq $true -and $status.ready -eq $true -and $status.integrity -eq 'verified' -and $status.version -eq $ExpectedVersionV1) "status did not verify the installed version and integrity"
+    Assert-True ($status.pathReady -eq $true -and $status.pathEntryCount -eq 1) "status did not verify the unique managed PATH entry"
+
+    $originalBinary = [IO.File]::ReadAllBytes($binary)
+    [IO.File]::WriteAllBytes($binary, [byte[]]@($originalBinary + 0))
+    $tamperedBinaryStatus = Invoke-InstallerJsonFailure -Arguments (@("Status") + $common)
+    Assert-True ($tamperedBinaryStatus.ready -eq $false -and $tamperedBinaryStatus.integrity -eq 'invalid') "status accepted a tampered installed binary"
+    $binaryRepair = Invoke-InstallerJson -Arguments (@("Install", "-Archive", $ArchiveV1) + $common)
+    Assert-True ($binaryRepair.changed -eq $true) "reinstall did not repair a tampered installed binary"
+
+    $readme = Join-Path $entry "README.md"
+    [IO.File]::AppendAllText($readme, "tamper", [Text.UTF8Encoding]::new($false))
+    $tamperedManagedFileStatus = Invoke-InstallerJsonFailure -Arguments (@("Status") + $common)
+    Assert-True ($tamperedManagedFileStatus.ready -eq $false -and $tamperedManagedFileStatus.error -match 'hash/size mismatch') "status accepted a tampered managed data file"
+    $managedFileRepair = Invoke-InstallerJson -Arguments (@("Install", "-Archive", $ArchiveV1) + $common)
+    Assert-True ($managedFileRepair.changed -eq $true) "reinstall did not repair a tampered managed data file"
+
+    [IO.File]::WriteAllText($pathFile, "C:\existing", [Text.UTF8Encoding]::new($false))
+    $missingPathStatus = Invoke-InstallerJsonFailure -Arguments (@("Status") + $common)
+    Assert-True ($missingPathStatus.ready -eq $false -and $missingPathStatus.error -match 'PATH entry count') "status accepted a missing managed PATH entry"
+    $pathRepair = Invoke-InstallerJson -Arguments (@("Install", "-Archive", $ArchiveV1) + $common)
+    Assert-True ($pathRepair.changed -eq $true -and $pathRepair.pathEntryAdded -eq $true) "idempotent install did not repair the managed PATH entry"
+    $statusAfterRepair = Invoke-InstallerJson -Arguments (@("Status") + $common)
+    Assert-True ($statusAfterRepair.ready -eq $true -and $statusAfterRepair.pathEntryCount -eq 1) "status did not verify repaired installation state"
     $oldProcessPath = $env:PATH
     try {
         $env:PATH = $pathAfterFirst
@@ -114,7 +145,6 @@ try {
 
     $upgrade = Invoke-InstallerJson -Arguments (@("Upgrade", "-Archive", $ArchiveV2) + $common)
     Assert-True ($upgrade.version -eq $ExpectedVersionV2) "upgrade did not install $ExpectedVersionV2"
-    $binary = Join-Path $entry "srcq.exe"
     $version = & $binary --version
     Assert-True ($version -eq "srcq $ExpectedVersionV2") "upgraded binary version mismatch"
     Assert-True ((Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash -eq $configHash) "upgrade changed user config"
@@ -187,6 +217,11 @@ try {
         firstInstall = $first.changed
         repeatInstallChanged = $second.changed
         statusReadback = $true
+        statusIntegrityVerified = $true
+        tamperedBinaryStatusRejected = $true
+        tamperedManagedFileStatusRejected = $true
+        missingPathStatusRejected = $true
+        idempotentInstallRepairedPath = $true
         freshProcessPathReadback = $true
         failedUpgradeRolledBack = $rollbackObserved
         unsafeZipRejected = $maliciousRejected

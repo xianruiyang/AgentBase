@@ -14,6 +14,8 @@
 .\scripts\install-srcq.ps1 Uninstall
 ```
 
+`Status` 不只读取状态文件；它还复核 manifest 与安装状态身份、全部受管文件的大小和 SHA-256、实际 `srcq --version`，以及由安装器管理的 PATH 项是否恰好出现一次。缺失、篡改或 PATH 漂移会返回 `ready=false`、原因和恢复动作，并以非零退出；重新使用同一受验证归档执行 `Install` 可以修复受管文件或缺失的 PATH 项。
+
 默认安装到 `%LOCALAPPDATA%\Programs\srcq\current`，并把该目录添加到用户 PATH。PATH 修改只对新启动的终端生效。重复安装相同包不产生变化；升级使用 staging、旧目录备份和失败恢复，不从源码或 `target/` 安装。
 
 测试或便携环境可使用 `-InstallRoot`，并以 `-PathBackend File -PathValueFile <file>` 验证 PATH 逻辑；`-PathBackend None` 禁止 PATH 修改。

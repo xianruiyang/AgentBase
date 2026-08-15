@@ -20,12 +20,12 @@
 | AST 候选非回退 | `ast-baseline/compare_ast_baseline.py --expected-version 0.2.0` | 仅 release version 可变，其余冻结输出逐字一致 |
 | 候选 skill | skill-creator `quick_validate.py` | 有效 |
 | 候选 payload | `verify_candidate_payload.py` | 5 个允许文件，无二进制、私有运行时或开发资产泄漏 |
-| Windows 安装生命周期 | `tools/srcq/scripts/test-install-srcq.ps1`，0.1.1 → 0.2.0 | 安装、幂等、失败回滚、恶意包/篡改拒绝、升级和卸载全部通过 |
+| Windows 安装生命周期 | `tools/srcq/scripts/test-install-srcq.ps1`，0.1.1 → 0.2.0 | 安装、幂等、失败回滚、恶意包/篡改拒绝、升级和卸载全部通过；Status 直接拒绝二进制篡改和 PATH 缺失，同版本 Install 完成修复 |
 | 完整短查询按需 snapshot 机制 | 同一 release 查询、25 个唯一 argv、A-B-B-A，本机进程总耗时 | 旧实现 4115.9/3918.1 ms 且每轮落 25 个 snapshot；当前实现 3870.5/3875.3 ms 且 0 snapshot，均值少 144.1 ms（3.59%） |
 | 正式 Skill 静态校验 | skill-creator `quick_validate.py` | `source-query` 与 `symbol-structure-workflow` 均有效；前者恰为 5 个协议文件 |
 | 正式 detached 路由 | `development/skill-routing/evidence/current.json` | 65/65 首次路由、65/65 行为策略、13/13 治理引用独立通过；首次选择只读取全局短路由与 skill frontmatter |
 | 原生 LSP 渐进路径 | `evidence/lsp-progressive-v1.json` | no-LSP、单项与多阶段三案均按预期只调用 0/2/3 个 MCP 能力，质量通过、usage 完整；独立审计结论为 `pass_with_execution_caveat` |
-| 正式部署合同 | `manage_agentbase.ps1 -Action Validate`、`test_manage_agentbase.ps1` | 11 个 Skill、增量发布/回滚、旧入口退出、测试资产和私有运行时排除通过 |
+| 正式部署合同 | `manage_agentbase.ps1 -Action Validate/Status`、`test_manage_agentbase.ps1` | 11 个 Skill、增量发布/回滚、旧入口退出、测试资产和私有运行时排除通过；真实 Publish 在写入前拒绝缺失 srcq，真实 Status 读回 0.2.0/哈希/PATH/doctor，部署沙箱保持宿主隔离 |
 | 插件 payload | 隔离 `build_plugin.ps1 -SkipOfficialValidation` | 11 个 Skill；`source-query` 恰为 5 文件且无 `.exe` |
 | benchmark owner 定向回归 | `development/code-search-benchmark/tests/test_experiment.py` | 受影响 case 选择、candidate-only 调度、回答合同、capsule canonical hash、identity 与超时保留通过 |
 | 当前 candidate-only 全量审计 | `evidence/audit-result-v12.json` | 12 次中 11 次 usage 完整，完整 run 合计 1,004,033 Token；1 次 TLS 超时原样保留，无 control |

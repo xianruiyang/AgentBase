@@ -701,6 +701,9 @@ function Get-ValidatedSource {
     if (-not $deploymentReadmeContent.Contains('bootstrap_windows.ps1') -or -not $deploymentReadmeContent.Contains('-Action Check')) {
         throw "Deployment README does not document the Windows host bootstrap lifecycle"
     }
+    if (-not $deploymentReadmeContent.Contains('install-srcq.ps1') -or -not $deploymentReadmeContent.Contains('ready=true') -or -not $deploymentReadmeContent.Contains('srcq doctor')) {
+        throw "Deployment README does not retain the independent srcq runtime preflight"
+    }
     $portableConfigPath = Join-Path $Root "global\config.toml"
     $hooksTemplatePath = Join-Path $Root "global\hooks.template.json"
     $portableAgentsPath = Join-Path $Root "global\agents"
@@ -824,6 +827,76 @@ function Resolve-CodexRoot {
     return $item.FullName
 }
 
+function Test-DeploymentSandboxRoot {
+    param([string]$Root, [string]$InstallRoot)
+    $sandboxRoot = [IO.Path]::GetFullPath((Join-Path $Root 'development\codex-deployment\sandbox')).TrimEnd('\') + '\'
+    $candidate = [IO.Path]::GetFullPath($InstallRoot)
+    $candidate.StartsWith($sandboxRoot, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-SrcqRuntimePreflight {
+    param(
+        [string]$Root,
+        [bool]$Required
+    )
+    try {
+        $installer = Join-Path $Root 'tools\srcq\scripts\install-srcq.ps1'
+        if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "srcq installer status entry is missing: $installer"
+        }
+        $cargoManifest = Join-Path $Root 'tools\srcq\Cargo.toml'
+        $cargoText = Get-Content -LiteralPath $cargoManifest -Raw -Encoding UTF8
+        $workspacePackage = [regex]::Match($cargoText, '(?ms)^\[workspace\.package\]\s*$(.*?)(?=^\[|\z)')
+        $versionMatch = if ($workspacePackage.Success) { [regex]::Match($workspacePackage.Groups[1].Value, '(?m)^version\s*=\s*"([^"]+)"\s*$') } else { $null }
+        if ($null -eq $versionMatch -or -not $versionMatch.Success) {
+            throw "Cannot read the expected srcq workspace version"
+        }
+        $expectedVersion = $versionMatch.Groups[1].Value
+
+        $statusText = @(& $installer Status 2>&1)
+        $statusExit = $LASTEXITCODE
+        $status = $null
+        try { $status = ($statusText -join [Environment]::NewLine) | ConvertFrom-Json } catch { }
+        if ($statusExit -ne 0 -or $null -eq $status -or -not [bool]$status.ready) {
+            $detail = if ($null -ne $status -and -not [string]::IsNullOrWhiteSpace([string]$status.error)) { [string]$status.error } else { $statusText -join ' ' }
+            throw "srcq runtime is not ready: $detail. Run tools\srcq\scripts\install-srcq.ps1 Install with the current validated archive, then retry."
+        }
+        if ([string]$status.version -ne $expectedVersion -or [string]$status.binaryVersion -ne "srcq $expectedVersion") {
+            throw "srcq runtime version does not match project version $expectedVersion"
+        }
+        if ([string]$status.path.backend -ne 'User' -or -not [bool]$status.pathReady -or [int]$status.pathEntryCount -ne 1) {
+            throw "srcq runtime must have exactly one installer-managed user PATH entry"
+        }
+        $binary = [IO.Path]::GetFullPath([string]$status.binary)
+        $doctorText = @(& $binary doctor 2>&1)
+        if ($LASTEXITCODE -ne 0) {
+            throw "srcq doctor failed: $($doctorText -join ' ')"
+        }
+        return [pscustomobject]@{
+            in_scope = $true
+            ready = $true
+            version = $expectedVersion
+            binary = $binary
+            integrity = [string]$status.integrity
+            path_entry_count = [int]$status.pathEntryCount
+            doctor_ok = $true
+        }
+    }
+    catch {
+        if ($Required) { throw }
+        return [pscustomobject]@{
+            in_scope = $true
+            ready = $false
+            version = $null
+            binary = $null
+            integrity = $null
+            path_entry_count = 0
+            doctor_ok = $false
+            error = $_.Exception.Message
+        }
+    }
+}
+
 if ($Action -eq "Validate") {
     $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $null -IncludePortableSettings $false -DeliveryMode $SkillDeliveryMode
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
@@ -852,6 +925,11 @@ $CodexRoot = Resolve-CodexRoot -RequestedRoot $CodexRoot -Create ($Action -eq "P
 
 if ($Action -eq "Status") {
     $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode
+    $srcqRuntime = if (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot) {
+        [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null }
+    } else {
+        Get-SrcqRuntimePreflight -Root $ProjectRoot -Required $false
+    }
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
     $installedFingerprint = Get-BundleFingerprint -Targets $source.targets -Side installed
     $installedFullFingerprint = Get-FullInstalledBundleFingerprint -Targets $source.targets
@@ -908,11 +986,24 @@ if ($Action -eq "Status") {
         plugin_mode_ready = if ($SkillDeliveryMode -eq "Plugin") { $pluginModeReady } else { $null }
         direct_compatibility_conflict_count = $directCompatibilityConflicts.Count
         direct_compatibility_conflicts = @($directCompatibilityConflicts)
+        runtime_prerequisite_in_scope = [bool]$srcqRuntime.in_scope
+        srcq_runtime_ready = $srcqRuntime.ready
+        srcq_version = $srcqRuntime.version
+        srcq_binary = $srcqRuntime.binary
+        srcq_integrity = $srcqRuntime.integrity
+        srcq_path_entry_count = $srcqRuntime.path_entry_count
+        srcq_doctor_ok = $srcqRuntime.doctor_ok
+        srcq_runtime_error = if ($srcqRuntime.PSObject.Properties.Name -contains 'error') { $srcqRuntime.error } else { $null }
     }
     return
 }
 
 if ($Action -eq "Publish") {
+    $srcqRuntime = if (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot) {
+        [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null }
+    } else {
+        Get-SrcqRuntimePreflight -Root $ProjectRoot -Required $true
+    }
     $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode
     if ($SkillDeliveryMode -eq "Plugin") {
         $directCompatibilityConflicts = @(Get-PluginModeDirectCompatibilityConflicts -InstallRoot $CodexRoot -RequiredSkills @($source.contract.required_skills))
@@ -988,6 +1079,13 @@ if ($Action -eq "Publish") {
             routing_candidate_bundle_sha256 = $source.routing_evidence.candidate_bundle_sha256
             routing_evaluation_input_sha256 = $source.routing_evidence.evaluation_input_sha256
             routing_case_count = $source.routing_evidence.case_count
+            srcq_runtime_preflight_in_scope = [bool]$srcqRuntime.in_scope
+            srcq_runtime_ready = $srcqRuntime.ready
+            srcq_version = $srcqRuntime.version
+            srcq_binary = $srcqRuntime.binary
+            srcq_integrity = $srcqRuntime.integrity
+            srcq_path_entry_count = $srcqRuntime.path_entry_count
+            srcq_doctor_ok = $srcqRuntime.doctor_ok
             installed_bundle_sha256 = $null
             installed_contract_bundle_sha256 = $null
             targets = $targetStates
@@ -1089,6 +1187,13 @@ if ($Action -eq "Publish") {
         changed_path_count = $changeTargets.Count
         managed_contract_count = @($source.targets).Count
         routing_evidence_sha256 = $source.routing_evidence.sha256
+        runtime_prerequisite_in_scope = [bool]$srcqRuntime.in_scope
+        srcq_runtime_ready = $srcqRuntime.ready
+        srcq_version = $srcqRuntime.version
+        srcq_binary = $srcqRuntime.binary
+        srcq_integrity = $srcqRuntime.integrity
+        srcq_path_entry_count = $srcqRuntime.path_entry_count
+        srcq_doctor_ok = $srcqRuntime.doctor_ok
     }
     return
 }

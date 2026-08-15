@@ -11,14 +11,14 @@
 | in_progress | 0 |
 | review | 0 |
 | blocked | 0 |
-| done | 34 |
+| done | 35 |
 | retired | 1 |
 
 ## 复核与结果
 
 - 需复核任务：0
-- 当前可读取结果：34
-- 含验证结果：34
+- 当前可读取结果：35
+- 含验证结果：35
 - 含未决结果：7
 - 合同修订后陈旧结果：0
 
@@ -67,3 +67,4 @@
 | TSQG-063 | done | codex-root | 裁决候选收益边缘 | TSQG-062:hard | results/TSQG-063.r6.json | 2 |
 | TSQG-064 | retired | codex-root | 请求当次 Codex 发布裁决 | TSQG-065:hard | — | 3 |
 | TSQG-065 | done | codex-root | 逐项完成审计 | TSQG-062:hard, TSQG-063:hard | results/TSQG-065.r3.json | 1 |
+| TSQG-066 | done | codex-root | 强化 srcq 安装状态与 Codex 发布前置门禁 | TSQG-053:hard | results/TSQG-066.r6.json | 1 |

@@ -20,6 +20,8 @@ $succeeded = $false
 $sourceCacheRoot = Join-Path $ProjectRoot "skills\codex-event-logger\tests\__pycache__"
 $sourceCacheProbe = Join-Path $sourceCacheRoot ("agentbase-deployment-probe-" + [guid]::NewGuid().ToString("N") + ".pyc")
 $sourceCacheRootCreated = $false
+$externalPreflightRoot = Join-Path ([IO.Path]::GetTempPath()) ("AgentBase-srcq-preflight-test-" + [guid]::NewGuid().ToString("N"))
+$externalPreflightRejected = $false
 
 function Write-FixtureText {
     param(
@@ -53,6 +55,25 @@ if (-not [string]::IsNullOrWhiteSpace($RetainedTestRootToClean)) {
 }
 
 try {
+    $oldLocalAppData = $env:LOCALAPPDATA
+    try {
+        $env:LOCALAPPDATA = Join-Path $externalPreflightRoot "localappdata"
+        New-Item -ItemType Directory -Path $env:LOCALAPPDATA -Force | Out-Null
+        $externalCodexRoot = Join-Path $externalPreflightRoot "codex"
+        try {
+            & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $externalCodexRoot | Out-Null
+        }
+        catch {
+            $externalPreflightRejected = $_.Exception.Message -match 'srcq runtime is not ready'
+        }
+        if (-not $externalPreflightRejected -or (Test-Path -LiteralPath (Join-Path $externalCodexRoot 'AGENTS.md'))) {
+            throw "Publish did not reject a missing srcq runtime before writing the payload"
+        }
+    }
+    finally {
+        $env:LOCALAPPDATA = $oldLocalAppData
+    }
+
     $baselineValidation = & $manage -Action Validate -ProjectRoot $ProjectRoot
     if (-not (Test-Path -LiteralPath $sourceCacheRoot -PathType Container)) {
         New-Item -ItemType Directory -Path $sourceCacheRoot | Out-Null
@@ -116,6 +137,9 @@ try {
     }
     if ([bool]$defaultPublish.portable_settings_installed) {
         throw "Default publish unexpectedly installed portable settings"
+    }
+    if ([bool]$defaultPublish.runtime_prerequisite_in_scope) {
+        throw "Deployment sandbox unexpectedly consumed the host srcq installation"
     }
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "config.toml") -Algorithm SHA256).Hash -ne $originalConfigHash) {
         throw "Default publish changed config.toml"
@@ -373,12 +397,23 @@ try {
         status_derived_from_manifest_and_fingerprints = $true
         plugin_delivery_rejected_parallel_direct_entry = $true
         plugin_delivery_omitted_direct_skills_and_hooks = $true
+        publish_rejected_missing_srcq_runtime = $externalPreflightRejected
+        deployment_sandbox_ignored_host_srcq = $true
         unrelated_skill_preserved = $true
         unrelated_agent_preserved = $true
         explicit_target_count = $manifestTargets.Count
     }
 }
 finally {
+    if (Test-Path -LiteralPath $externalPreflightRoot) {
+        $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+        $resolvedExternal = [IO.Path]::GetFullPath($externalPreflightRoot)
+        if (-not $resolvedExternal.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Split-Path -Leaf $resolvedExternal).StartsWith('AgentBase-srcq-preflight-test-', [StringComparison]::Ordinal)) {
+            throw "Refusing external preflight cleanup outside the approved temp root: $resolvedExternal"
+        }
+        Remove-Item -LiteralPath $resolvedExternal -Recurse -Force
+    }
     if (Test-Path -LiteralPath $sourceCacheProbe -PathType Leaf) {
         Remove-Item -LiteralPath $sourceCacheProbe -Force
     }

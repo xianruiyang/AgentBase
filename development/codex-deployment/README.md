@@ -46,6 +46,15 @@ When the user asks Codex to prepare, reproduce, or deploy AgentBase on a new Win
 
 The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerShell`, `sharkdp.fd`, `Python.Python.3.13`, and `OpenJS.NodeJS.LTS`, then uses that Node installation to install the exact npm package `@ast-grep/cli@0.44.1`. It changes only missing or unsupported prerequisites and reads back every resolved executable and version plus `fd --max-results` support. Use `-Action Check` for a read-only audit. If PowerShell or another PATH-providing prerequisite was installed, restart the ChatGPT desktop app or begin a new Codex task before continuing so the agent host sees the new commands.
 
+Before publishing a payload that contains `source-query`, run the independent runtime owner's status entry and require `ready=true`, then run `srcq doctor`. The status command verifies the installed manifest, managed file hashes, binary version and unique PATH entry; `manage_agentbase.ps1` does not copy or repair that external runtime:
+
+```powershell
+& '.\tools\srcq\scripts\install-srcq.ps1' Status
+srcq doctor
+```
+
+When `Install` added PATH in the current task, use the exact `binary` returned by `Status` for the immediate doctor readback, then restart Codex before relying on command-name resolution.
+
 ## Validate
 
 Validation checks the global rule and Skill contract, the separately isolated description-only routing, post-routing behavior-policy and post-selection reference capsules, their evaluator identities, clean-input attestations and capsule/candidate/input hashes in `development/skill-routing/evidence/current.json`, the portable config allowlist, the exact custom-agent file/schema contract, the hooks schema and placeholder boundary, and the independent `vscode-lsp-mcp` release owner. The attestation is an auditable input contract, not an OS sandbox claim. Staged evidence proves routing, coarse policy labels and reference selection only; it does not replace the skill regression or component release gates:

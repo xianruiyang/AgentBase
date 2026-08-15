@@ -52,6 +52,20 @@ function Get-Sha256 {
     (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
+function Test-ManagedFilesMatch {
+    param([string] $ExpectedRoot, [string] $ActualRoot, [string[]] $Members)
+    foreach ($leaf in $Members) {
+        $expected = Join-Path $ExpectedRoot $leaf
+        $actual = Join-Path $ActualRoot $leaf
+        if (-not (Test-Path -LiteralPath $actual -PathType Leaf) -or
+            (Get-Item -LiteralPath $expected).Length -ne (Get-Item -LiteralPath $actual).Length -or
+            (Get-Sha256 $expected) -ne (Get-Sha256 $actual)) {
+            return $false
+        }
+    }
+    $true
+}
+
 function Get-NormalizedPathEntry {
     param([string] $Path)
     (Get-FullPath $Path).ToLowerInvariant()
@@ -281,6 +295,81 @@ function Read-InstallState {
     $state
 }
 
+function Get-PathEntryCount {
+    param([string] $Backend, [string] $ValueFile, [string] $Entry)
+    if ($Backend -eq "None") { return 0 }
+    $value = Get-PathValue -Backend $Backend -ValueFile $ValueFile
+    $normalized = Get-NormalizedPathEntry $Entry
+    $count = 0
+    foreach ($part in ($value -split ';')) {
+        if ([string]::IsNullOrWhiteSpace($part)) { continue }
+        try {
+            if ((Get-NormalizedPathEntry $part.Trim()) -eq $normalized) { $count += 1 }
+        } catch {
+            # Preserve malformed unrelated PATH entries without treating them as ours.
+        }
+    }
+    $count
+}
+
+function Get-InstalledPackageHealth {
+    param($State, [string] $Root)
+    $currentDir = Get-FullPath (Join-Path $Root 'current')
+    if (-not (Test-Path -LiteralPath $currentDir -PathType Container)) {
+        throw "Installed current directory is missing"
+    }
+    foreach ($leaf in @($State.managedFiles)) {
+        if (-not (Test-Path -LiteralPath (Join-Path $currentDir $leaf) -PathType Leaf)) {
+            throw "Managed install file is missing: $leaf"
+        }
+    }
+
+    $manifestPath = Join-Path $currentDir 'manifest.json'
+    $manifest = [IO.File]::ReadAllText($manifestPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
+    if ($manifest.schema -ne 'srcq.release/v1' -or $manifest.version -ne $State.version -or
+        $manifest.target -ne $State.target -or $manifest.binary -ne $State.binary) {
+        throw "Installed manifest identity does not match install state"
+    }
+    if ($manifest.target -ne (Get-ExpectedWindowsTarget)) {
+        throw "Installed target $($manifest.target) does not match this host"
+    }
+
+    $allowedFiles = @($manifest.binary, 'README.md', 'LICENSE', 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE', 'THIRD_PARTY_LICENSES.txt', 'sbom.spdx.json')
+    $manifestFiles = @{}
+    foreach ($file in @($manifest.files)) {
+        if ($file.path -notin $allowedFiles -or $manifestFiles.ContainsKey([string]$file.path)) {
+            throw "Installed manifest file set is invalid"
+        }
+        $manifestFiles[[string]$file.path] = $file
+    }
+    if ($manifestFiles.Count -ne 8) { throw "Installed manifest file set is incomplete" }
+    foreach ($leaf in $manifestFiles.Keys) {
+        $path = Join-Path $currentDir $leaf
+        $record = $manifestFiles[$leaf]
+        if ((Get-Item -LiteralPath $path).Length -ne [Int64]$record.bytes -or
+            (Get-Sha256 $path) -ne ([string]$record.sha256).ToLowerInvariant()) {
+            throw "Installed file hash/size mismatch: $leaf"
+        }
+    }
+
+    $binary = Join-Path $currentDir $manifest.binary
+    $versionLine = @(& $binary --version)
+    if ($LASTEXITCODE -ne 0 -or $versionLine.Count -eq 0 -or $versionLine[0] -ne "srcq $($manifest.version)") {
+        throw "Installed binary version does not match manifest"
+    }
+    $pathEntryCount = Get-PathEntryCount -Backend $State.path.backend -ValueFile $State.path.valueFile -Entry $State.path.entry
+    $pathReady = if ($State.path.backend -eq 'None') { $null } else { $pathEntryCount -eq 1 }
+    if ($State.path.backend -ne 'None' -and -not $pathReady) {
+        throw "Managed PATH entry count is $pathEntryCount; expected exactly one"
+    }
+    [pscustomobject]@{
+        Binary = $binary
+        BinaryVersion = $versionLine[0]
+        PathEntryCount = $pathEntryCount
+        PathReady = $pathReady
+    }
+}
+
 function Write-InstallState {
     param([string] $StatePath, $State)
     $temporary = "$StatePath.tmp"
@@ -310,21 +399,40 @@ $StatePath = Join-Path $InstallRoot ".srcq-install-state.json"
 if ($PathValueFile) { $PathValueFile = Get-FullPath $PathValueFile }
 
 if ($Action -eq "Status") {
-    $state = Read-InstallState -StatePath $StatePath -Root $InstallRoot
-    if ($null -eq $state) {
-        [pscustomobject]@{ schema = $StateSchema; installed = $false; installRoot = $InstallRoot } | ConvertTo-Json -Depth 4
-        exit 1
+    try {
+        $state = Read-InstallState -StatePath $StatePath -Root $InstallRoot
+        if ($null -eq $state) {
+            [pscustomobject]@{ schema = $StateSchema; installed = $false; ready = $false; installRoot = $InstallRoot; recovery = "install a validated srcq release archive" } | ConvertTo-Json -Depth 4
+            exit 1
+        }
+        $health = Get-InstalledPackageHealth -State $state -Root $InstallRoot
+        [pscustomobject]@{
+            schema = $StateSchema
+            installed = $true
+            ready = $true
+            integrity = "verified"
+            version = $state.version
+            target = $state.target
+            installRoot = $InstallRoot
+            binary = $health.Binary
+            binaryVersion = $health.BinaryVersion
+            path = $state.path
+            pathReady = $health.PathReady
+            pathEntryCount = $health.PathEntryCount
+        } | ConvertTo-Json -Depth 6
+        exit 0
+    } catch {
+        [pscustomobject]@{
+            schema = $StateSchema
+            installed = (Test-Path -LiteralPath $StatePath -PathType Leaf)
+            ready = $false
+            integrity = "invalid"
+            installRoot = $InstallRoot
+            error = $_.Exception.Message
+            recovery = "reinstall from a validated release archive and repair the managed PATH entry"
+        } | ConvertTo-Json -Depth 5
+        exit 2
     }
-    [pscustomobject]@{
-        schema = $StateSchema
-        installed = $true
-        version = $state.version
-        target = $state.target
-        installRoot = $InstallRoot
-        binary = (Join-Path $CurrentDir $state.binary)
-        path = $state.path
-    } | ConvertTo-Json -Depth 6
-    exit 0
 }
 
 if ($Action -eq "Uninstall") {
@@ -379,9 +487,10 @@ $newCurrentCommitted = $false
 try {
     New-Item -ItemType Directory -Force -Path $stagingRoot | Out-Null
     $package = Expand-VerifiedPackage -ArchivePath $Archive -ChecksumPath $Checksum -StagingRoot $stagingRoot
-    $binaryHash = Get-Sha256 (Join-Path $package.Root $package.Manifest.binary)
-    if ($existingState -and $existingState.version -eq $package.Manifest.version -and $existingState.target -eq $package.Manifest.target -and (Test-Path -LiteralPath (Join-Path $CurrentDir $existingState.binary)) -and (Get-Sha256 (Join-Path $CurrentDir $existingState.binary)) -eq $binaryHash) {
-        [pscustomobject]@{ schema = $StateSchema; changed = $false; version = $existingState.version; installRoot = $InstallRoot } | ConvertTo-Json
+    if ($existingState -and $existingState.version -eq $package.Manifest.version -and $existingState.target -eq $package.Manifest.target -and
+        (Test-ManagedFilesMatch -ExpectedRoot $package.Root -ActualRoot $CurrentDir -Members @($package.Members))) {
+        $pathResult = Ensure-PathEntry -Backend $PathBackend -ValueFile $PathValueFile -Entry $CurrentDir
+        [pscustomobject]@{ schema = $StateSchema; changed = [bool]$pathResult.Added; version = $existingState.version; installRoot = $InstallRoot; pathEntryAdded = [bool]$pathResult.Added } | ConvertTo-Json
         exit 0
     }
     if (Test-Path -LiteralPath $CurrentDir) {
