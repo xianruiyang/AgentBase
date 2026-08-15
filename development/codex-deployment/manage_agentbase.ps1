@@ -471,6 +471,7 @@ function Test-PortableConfigSource {
         '[agents]'
         'enabled = true'
         'default_subagent_model = "gpt-5.6-luna"'
+        'default_subagent_reasoning_effort = "max"'
         '[windows]'
         'sandbox = "elevated"'
         '[features]'
