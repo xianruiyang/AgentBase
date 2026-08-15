@@ -1,1 +1,11 @@
-{"blocked_reason":"","next_action":"","note":"","owner":null,"result_ref":null,"revision":1,"schema":"task.state","status":"todo","task_id":"TSQG-064"}
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "不属于当前项目实现；未来每次 Codex Publish 仅在用户当次明确授权后另行执行",
+  "owner": "codex-root",
+  "result_ref": null,
+  "revision": 2,
+  "schema": "task.state",
+  "status": "retired",
+  "task_id": "TSQG-064"
+}

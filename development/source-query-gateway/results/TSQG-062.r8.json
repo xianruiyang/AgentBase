@@ -1,0 +1,57 @@
+{
+  "changed_files": [
+    "development/source-query-gateway/evidence/audit-result-v13.json",
+    "development/source-query-gateway/prepare_benchmark_homes.py",
+    "development/source-query-gateway/tests/test_prepare_benchmark_homes.py",
+    "development/source-query-gateway/benchmark-protocol.md",
+    "development/code-search-benchmark/corpus/v2.json"
+  ],
+  "evidence_for": [
+    "AC-SQG-004",
+    "UDES-SQG-007"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "detached-evaluation",
+      "ref": "development/source-query-gateway/evidence/audit-result-v13.json"
+    },
+    {
+      "kind": "experiment-contract",
+      "ref": "development/source-query-gateway/benchmark-protocol.md"
+    },
+    {
+      "kind": "corpus",
+      "ref": "development/code-search-benchmark/corpus/v2.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "当前 identity 的 control/candidate 受监控对照完成：24 次新鲜隔离 Codex 全部正常退出、usage 完整，detached auditor 完成身份、质量、成本和顺序裁决。",
+  "outputs": [
+    "development/source-query-gateway/evidence/audit-result-v13.json",
+    "development/source-query-gateway/benchmark-protocol.md",
+    "development/code-search-benchmark/corpus/v2.json"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-SQG-001": "sha256:b1c1b9ea19571a7bbd9448f2acb30be65cf77254e6cf2745486e9e4fe81bf4a0",
+    "AC-SQG-002": "sha256:3d2c913cfe3e12baafb823b328a1f14f1fabaac9b588ec8e8a1774254479b718",
+    "AC-SQG-003": "sha256:dd62ea72b87d1869e8ed85483f7c071873844544c058c11969c24788e76617cc",
+    "AC-SQG-004": "sha256:e4eb30c0328c947301730daa0f698aee02322191aa1b3dfed5380f2959f9cf52",
+    "AC-SQG-005": "sha256:ae702359593cfe82daaf3d398501f8f881d7874429d8c86e6fa03f056ee9de47",
+    "AC-SQG-006": "sha256:e67090c6e5050bd1c96ca1f1a4ee28d8d34fd528f56bc5a0d5b001a47e9cf24c",
+    "AC-SQG-007": "sha256:c417163046c8e50559406ff746778fd990384bf846b7f55e407b16e42a18c6ab",
+    "CON-SQG-001": "sha256:1fde805d3b1edb22c22c23c5dc3a7392151e4a370a6a6b85b2ee348149c0f98f",
+    "CON-SQG-002": "sha256:fd5ad79f19a584827b89c9b831166884608e15a6a5e1e1415c051bb38a8fea68",
+    "CON-SQG-003": "sha256:56b350a9ceb81ce73d6d6376f9bd1ac81785ac08e374219f6ba36e0ddb956ef0",
+    "REQ-SQG-001": "sha256:a6931770a456d333b141b289170b92667d10de8d37f65ad5907dfd3bf96dd2f0",
+    "UDES-SQG-007": "sha256:10db7bd19d1e885622fff930f3fa685d0c1bab8e8497d83e0c11c4108825fb2f"
+  },
+  "task_id": "TSQG-062",
+  "task_revision": 2,
+  "unresolved": [],
+  "verification": [
+    "24/24 runs exit 0、usage 完整、无 timeout，A-B-B-A 与前后 identity 读回通过",
+    "独立 detached auditor 复核 24 个唯一 run、12 个 pair、capsule canonical hash 与 experiment identity",
+    "control/candidate 必需与核心语义均 24/24；六个 case 的两次聚合均降低 Token 与耗时"
+  ]
+}

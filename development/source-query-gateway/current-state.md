@@ -45,18 +45,18 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 现有 `development/code-search-benchmark` 已扩展为本项目唯一的 corpus、环境身份、`codex exec --json --ephemeral` monitor、A-B-B-A 调度、受影响 case 选择、usage 汇总和 detached audit capsule owner。语料绑定来源文件 hash，并用 `answer_contract.required` 区分 prompt 必答内容与只用于证明正确性的 supporting facts；环境只允许显式差异，失败和超时不被静默替换。capsule 声明可独立复算的规范化哈希算法。历史安装态、收紧候选、五-skill 消融与裸环境数字以各自证据上限登记，不跨 identity 拼接。
 
-## OBS-SQG-006 当前行为证据已刷新但没有形成收益对照
+## OBS-SQG-006 当前身份的行为与收益证据已经闭环
 
-- 状态: partially_verified
+- 状态: verified
 - 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004
 
 正式 detached 路由结果 [current.json](../skill-routing/evidence/current.json) 覆盖 65 个首次路由、65 个行为策略和 13 个治理引用场景，三阶段均符合独立 oracle；简单已知读取保持不触发高级 Skill，AST/LSP、分页、写入安全与编辑器操作职责分离。评估 capsule 把首次选择、行为和按需引用分层，避免把详细协议预加载给 evaluator。早期 21-case 候选结果仅作为历史证据保留。
 
-当前轮完整 candidate-only monitor 覆盖六类真实查询各两次；12 次中 11 次有完整 usage，完整 run 的 input 为 `998,139`、output 为 `5,894`、实际总 Token 为 `1,004,033`，全体 wall time 为 `560,744 ms`。`ue-command-dispatch-submit` 的一次运行在已经取得源码证据后遇到 TLS 重连并超时，没有 final answer 与 usage；它保留为真实失败，不能从聚合删除或补跑替换。因此该组数据不是十二次完整总量，也没有 control，不能与历史数字作因果比较。
+早先 candidate-only monitor 的 `1,004,033` Token 与一次 TLS 超时仍作为失败机制和历史过程证据保留，不再承担当前相对收益裁决。
 
-关系 case 的受影响补测证明模型两次都取得定义、泛型承载字段和响应映射证据。最终保留路由的两次 run 共 `157,053` Token、`64,131 ms`；更强的回答规则变体增至 `170,824` Token、`61,916 ms`，仍未稳定复述 supporting relation，故已退出。独立 oracle 复核确认两次答案均满足原 prompt 的最小合同，把未复述 `mapping.type` 判作核心失败属于越过 prompt；corpus `2026-08-15.2` 已将必答内容与 supporting facts 显式分开。该修正还没有新的同 identity 全量运行。
+关系 case 的受影响补测证明模型两次都取得定义、泛型承载字段和响应映射证据。独立 oracle 复核确认 prompt 必答内容与 supporting facts 必须分开，corpus 随后升级到 `2026-08-15.3`，并已纳入当前同身份全量对照。
 
-用户要求冻结且不重跑的五-skill 消融历史记录仍为实际总 Token `1,157,111`、耗时 `508,509 ms`、核心语义 12/12、严格整体 11/12。它缺少当前 experiment 的完整 identity，只能继续作为历史现实依据。由于当前候选的投影、快照、版本和发布身份已改变，旧候选相对该记录的 `0.91%` Token 与 `20.43%` 耗时方向差不能证明当前实现已达收益边缘；TSQG-061—063 已据此重开。
+当前 control/candidate 由同一安装态按显式 allowlist 构建，除全局查询路由、旧查询 skills 退出、正式 `source-query`/`symbol-structure-workflow` 与 candidate 私有 `srcq.exe` 外无意外差异。24 次运行全部正常退出且 usage 完整；独立审计确认两边必需与核心语义均为 24/24。control 实际总 Token 为 `6,115,095`，candidate 为 `4,208,028`（`-31.186%`）；总耗时从 `1,174,966 ms` 降到 `938,489 ms`（`-20.126%`）；工具调用从 268 降到 167。六个 case 的两次聚合均同时降低 Token 和耗时，因此当前候选在质量、Token、速度顺序下保留。单对运行仍有 4/12 Token 反向和 5/12 耗时反向，说明随机波动存在；不据此继续堆叠规则或针对语料调优。
 
 ## OBS-SQG-007 srcq 已有独立 Windows 安装生命周期
 
@@ -101,10 +101,10 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 ## GAP-SQG-003 当前候选缺少身份一致的完成证据
 
-- 状态: open
+- 状态: resolved
 - 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004
 
-当前后端、AST 冻结、候选 payload、独立路由和 candidate-only 监控均已有直接证据，但 corpus 回答合同刚刚修正，完整运行又有一次 usage 缺失，且用户要求冻结的 control 与当前 Codex、工作区、候选及 corpus identity 不同。继续单独重跑 candidate 不会产生可比较收益结论；只有用户允许一次同 identity 的 control/candidate 对照，或明确接受不形成当前因果收益结论，才能关闭该差距。在此之前不得恢复收益边缘、主线采纳或发布完成判断。
+用户允许的新同 identity 对照已完成：24/24 运行与 usage 完整、环境差异符合 allowlist、两边质量相同，candidate 总 Token 降低 `31.186%`，并在前两项不退化后把总耗时降低 `20.126%`。独立结果归档于 [audit-result-v13.json](evidence/audit-result-v13.json)。该证据关闭当前候选的完成差距，但不证明其他 corpus、模型、项目或未来身份具有相同比例；Codex 发布仍需逐次单独授权。
 
 ## GAP-SQG-002 项目主线迁移已实施
 

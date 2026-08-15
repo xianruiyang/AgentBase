@@ -6,26 +6,26 @@
 
 | 状态 | 数量 |
 | --- | ---: |
-| todo | 2 |
+| todo | 0 |
 | claimed | 0 |
 | in_progress | 0 |
 | review | 0 |
-| blocked | 1 |
-| done | 31 |
-| retired | 0 |
+| blocked | 0 |
+| done | 34 |
+| retired | 1 |
 
 ## 复核与结果
 
 - 需复核任务：0
-- 当前可读取结果：31
-- 含验证结果：31
+- 当前可读取结果：34
+- 含验证结果：34
 - 含未决结果：7
 - 合同修订后陈旧结果：0
 
 ## 上游状态
 
 - 用户确认快照：protected
-- 可修订上游未决：2
+- 可修订上游未决：0
 - 延后讨论项：1
 
 ## 任务
@@ -63,6 +63,7 @@
 | TSQG-056 | done | codex-root | 闭环 LSP 渐进模型入口 | TSQG-055:hard, TSQG-043:hard | results/TSQG-056.r3.json | 1 |
 | TSQG-060 | done | codex-root | 运行候选影响验证 | TSQG-053:hard | results/TSQG-060.r12.json | 1 |
 | TSQG-061 | done | codex-root | 运行 detached 路由行为评估 | TSQG-050:hard, TSQG-052:hard | results/TSQG-061.r10.json | 1 |
-| TSQG-062 | blocked | codex-root | 运行受监控 Codex 对照 | TSQG-006:hard, TSQG-060:hard, TSQG-061:hard | — | 1 |
-| TSQG-063 | todo | — | 裁决候选收益边缘 | TSQG-062:hard | — | 1 |
-| TSQG-064 | todo | — | 请求当次 Codex 发布裁决 | TSQG-063:hard | — | 2 |
+| TSQG-062 | done | codex-root | 运行受监控 Codex 对照 | TSQG-006:hard, TSQG-060:hard, TSQG-061:hard | results/TSQG-062.r8.json | 2 |
+| TSQG-063 | done | codex-root | 裁决候选收益边缘 | TSQG-062:hard | results/TSQG-063.r6.json | 2 |
+| TSQG-064 | retired | codex-root | 请求当次 Codex 发布裁决 | TSQG-065:hard | — | 3 |
+| TSQG-065 | done | codex-root | 逐项完成审计 | TSQG-062:hard, TSQG-063:hard | results/TSQG-065.r3.json | 1 |

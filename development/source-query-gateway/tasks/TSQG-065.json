@@ -1,0 +1,60 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "当前身份受控对照与独立审计"
+      ],
+      "id": "TSQG-062",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "质量、Token、速度顺序下的收益裁决"
+      ],
+      "id": "TSQG-063",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-065",
+  "mutation_scope": [
+    "development/source-query-gateway/**"
+  ],
+  "outcome": "逐项复核当前需求、用户设计、约束、实现与证据边界，形成项目实现完成结论",
+  "outputs": [
+    "当前需求与用户设计的逐项完成审计"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "REQ-SQG-001",
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-003",
+    "AC-SQG-004",
+    "AC-SQG-005",
+    "AC-SQG-006",
+    "AC-SQG-007",
+    "CON-SQG-001",
+    "CON-SQG-002",
+    "CON-SQG-003",
+    "UDES-SQG-001",
+    "UDES-SQG-002",
+    "UDES-SQG-003",
+    "UDES-SQG-004",
+    "UDES-SQG-005",
+    "UDES-SQG-006",
+    "UDES-SQG-007",
+    "UDES-SQG-008",
+    "UDES-SQG-009",
+    "UDES-SQG-010",
+    "UDES-SQG-011",
+    "UDES-SQG-012",
+    "UDES-SQG-013"
+  ],
+  "suggested_skills": [],
+  "title": "逐项完成审计",
+  "verification": [
+    "workctl 与 taskctl 当前快照无结构未决、阻塞或过期结果；模型逐项复核 verification.md 与正式证据"
+  ]
+}

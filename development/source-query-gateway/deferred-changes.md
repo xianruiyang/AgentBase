@@ -2,10 +2,10 @@
 
 ## DCR-SQG-001 当前收益对照是否解除旧 control 冻结
 
-- 状态: deferred
+- 状态: resolved
 - 目标: AC-SQG-004, SOL-SQG-007, TSQG-062
-- 来源: 用户前序要求五-skill 消融结果只记录、不再重跑
+- 来源: 用户前序要求五-skill 消融结果只记录、不再重跑；用户随后允许新建当前 identity 对照
 
-旧 control 与当前 Codex、工作区、候选、runner 和 corpus identity 不同，不能和当前 candidate-only 数字拼成因果收益；当前完整运行还保留了一次 TLS 超时与 usage 缺失。继续单独运行 candidate 不会改变完成结论。
+旧 control 与当前 identity 不同，因此仍只保留为历史依据，未被重跑或拼接。经用户允许，实验入口从同一当前安装态构建 control 与 candidate，只允许本次迁移 bundle 形成差异，并在 corpus `2026-08-15.3`、同一工作区、模型、推理深度、runner 和 A-B-B-A 顺序下完成 24 次新鲜隔离运行。
 
-后续需要用户在两种边界中裁决：允许一次当前 identity 下的 control/candidate 对照，以继续验证 `AC-SQG-004`；或维持冻结并接受本分支只保留方向性证据、不声明达到收益边缘，也不进入主线采纳与发布。该裁决不得由 CLI、历史均值或模型静默替代。
+独立 detached 审计确认两边质量均为 12/12；candidate 相对 control 的实际总 Token 从 `6,115,095` 降到 `4,208,028`（`-31.186%`），总耗时从 `1,174,966 ms` 降到 `938,489 ms`（`-20.126%`），工具调用从 268 降到 167。该裁决关闭当前 identity 的收益证据缺口并保留候选；结论只覆盖冻结的六类语料与本次身份，身份变化后必须重新建立对照。

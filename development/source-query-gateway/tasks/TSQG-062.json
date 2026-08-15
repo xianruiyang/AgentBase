@@ -1,1 +1,47 @@
-{"schema":"task.record","id":"TSQG-062","revision":1,"title":"运行受监控 Codex 对照","outcome":"冻结 identity 下保存完整 usage、答案、失败和 detached capsule","source_ids":["AC-SQG-004","UDES-SQG-007"],"dependencies":[{"id":"TSQG-006","type":"hard","consumes":["上游已验证产出"]},{"id":"TSQG-060","type":"hard","consumes":["上游已验证产出"]},{"id":"TSQG-061","type":"hard","consumes":["上游已验证产出"]}],"mutation_scope":["development/source-query-gateway/**","tools/sgy/**"],"outputs":["冻结 identity 下保存完整 usage、答案、失败和 detached capsule"],"verification":["见 development/source-query-gateway/verification.md"],"reasoning_hint":"high","suggested_skills":[]}
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "上游已验证产出"
+      ],
+      "id": "TSQG-006",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "上游已验证产出"
+      ],
+      "id": "TSQG-060",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "上游已验证产出"
+      ],
+      "id": "TSQG-061",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-062",
+  "mutation_scope": [
+    "development/source-query-gateway/**",
+    "development/code-search-benchmark/**",
+    "tools/srcq/**"
+  ],
+  "outcome": "冻结 identity 下保存完整 usage、答案、失败和 detached capsule",
+  "outputs": [
+    "冻结 identity 下保存完整 usage、答案、失败和 detached capsule"
+  ],
+  "reasoning_hint": "high",
+  "revision": 2,
+  "schema": "task.record",
+  "source_ids": [
+    "AC-SQG-004",
+    "UDES-SQG-007"
+  ],
+  "suggested_skills": [],
+  "title": "运行受监控 Codex 对照",
+  "verification": [
+    "见 development/source-query-gateway/verification.md"
+  ]
+}

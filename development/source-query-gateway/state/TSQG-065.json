@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "24 个保护来源逐项审计通过；Codex Publish 保持逐次授权边界",
+  "owner": "codex-root",
+  "result_ref": "results/TSQG-065.r3.json",
+  "revision": 4,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "TSQG-065"
+}

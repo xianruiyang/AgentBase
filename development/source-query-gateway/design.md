@@ -2,7 +2,7 @@
 
 ## 1. 文档职责与状态
 
-本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的模型设计，状态为 `implemented_evidence_deferred`。srcq 运行时、安装生命周期、正式 Skill、消费者退出和原生 LSP 渐进入口已实现；同身份收益证据仍受 DCR-SQG-001 约束，且项目变化不表示 Codex 安装态已经发布。
+本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的模型设计，状态为 `implemented`。srcq 运行时、安装生命周期、正式 Skill、消费者退出、原生 LSP 渐进入口和同身份收益证据均已闭环；项目变化不表示 Codex 安装态已经发布。
 
 ## 2. 设计结论
 

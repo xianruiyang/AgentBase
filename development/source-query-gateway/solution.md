@@ -72,7 +72,7 @@
 
 ## SOL-SQG-007 以当前候选身份的隔离总成本证据裁决采纳
 
-- 状态: evidence_deferred
+- 状态: verified
 - 解决: GAP-SQG-003, GAP-SQG-002
 - 满足: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004, DES-SQG-010
 - 依赖: SOL-SQG-001, SOL-SQG-005, SOL-SQG-006
@@ -81,9 +81,9 @@
 
 历史实验先证明只压低工具输出不足以降低总成本，再把普通查询移出 skill 触发面，并以跨根权威范围、关系端点和最小回答约束修复质量。当时候选在核心与严格语义均 12/12、严格整体 11/12 的前提下，实际总 Token 为 `1,146,601`、耗时为 `404,603 ms`；相对不再重跑的历史五-skill 记录方向性降低 `0.91%` Token 与 `20.43%` 耗时。该结论既缺少严格同 identity control，又不覆盖后续稀疏回执、语义投影、按需 snapshot 和单一版本来源改动，只能作为下一轮测试的历史输入。
 
-当前供应链与 detached 路由已刷新；candidate-only 全量 monitor 保留了一次 TLS 超时和 usage 缺失，受影响关系补测又暴露出 oracle 将 supporting facts 静默升级为必答字段的问题。回答合同现已在 corpus 中显式化，继续加重全局回答规则既增加 Token 又没有改善用户实际必答内容，因此该变体已退出。
+供应链与 detached 路由已经刷新；早先 candidate-only monitor 的 TLS 超时和 usage 缺失作为失败路径保留，回答合同也已把 prompt 必答内容与 supporting facts 显式分开。继续加重全局回答规则既增加 Token 又没有改善用户实际必答内容，因此该变体已经退出。
 
-当前裁决是停止无可比收益的 candidate-only 追跑，并撤销“已达收益边缘”的结论。用户随后明确要求完整实现，因此项目真源和正式 Skill 可以接入已验证职责；这不补足被用户冻结的旧 control，也不构成 `AC-SQG-004` 的因果收益声明。质量、总 Token、速度的最终收益仍须同 identity 对照或用户明确接受方向性证据后才能裁决；实际发布仍需当次用户明确同意。
+用户允许的新同 identity 对照由同一当前安装态生成 control/candidate，24 次 A-B-B-A 运行全部正常退出且 usage 完整。独立 detached 审计确认两边质量均为 12/12；candidate 总 Token 降低 `31.186%`、总耗时降低 `20.126%`、工具调用减少 101 次，六个 case 的两次聚合均改善。按质量、Token、速度顺序保留当前候选并停止基于该语料继续调优；结论只覆盖本次冻结 identity，实际发布仍需当次用户明确同意。
 
 ## SOL-SQG-008 将迁移前 sgy 原子收敛为独立 srcq Windows CLI
 
