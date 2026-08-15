@@ -69,6 +69,7 @@ try {
     Write-FixtureText -Path (Join-Path $codexRoot "AGENTS.md") -Text ("old agents" + [Environment]::NewLine)
     Write-FixtureText -Path (Join-Path $codexRoot "config.toml") -Text ((@(
         'model = "old-model"'
+        'model_reasoning_effort = "high"'
         'notify = ["keep-host-notify"]'
         '[mcp_servers.keep]'
         'command = "keep"'
@@ -191,6 +192,8 @@ try {
     }
     $installedConfigText = Get-Content -LiteralPath (Join-Path $codexRoot "config.toml") -Raw -Encoding UTF8
     foreach ($preservedHostFragment in @(
+        'model = "old-model"'
+        'model_reasoning_effort = "high"'
         'notify = ["keep-host-notify"]'
         '[mcp_servers.keep]'
         'command = "keep"'
@@ -203,7 +206,6 @@ try {
         }
     }
     foreach ($portableFragment in @(
-        'model = "gpt-5.6-sol"'
         'model_reasoning_summary = "none"'
         'model_verbosity = "low"'
         'approval_policy = "never"'

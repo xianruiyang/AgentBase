@@ -7,8 +7,6 @@
 # The deployment entry point merges only the settings declared below into the
 # target config.toml and preserves host-owned MCP, trust, plugin, and runtime state.
 
-model = "gpt-5.6-sol"
-model_reasoning_effort = "medium"
 model_reasoning_summary = "none"
 model_verbosity = "low"
 personality = "pragmatic"

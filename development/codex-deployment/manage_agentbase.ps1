@@ -460,8 +460,6 @@ function Test-PortableConfigSource {
     }
 
     $expectedLines = @(
-        'model = "gpt-5.6-sol"'
-        'model_reasoning_effort = "medium"'
         'model_reasoning_summary = "none"'
         'model_verbosity = "low"'
         'personality = "pragmatic"'

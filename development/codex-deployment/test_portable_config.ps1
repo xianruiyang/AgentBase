@@ -26,6 +26,7 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 try {
     $fixture = (@(
         'model = "old"'
+        'model_reasoning_effort = "high"'
         'model_reasoning_summary = "detailed"'
         'model_verbosity = "high"'
         'approval_policy = "on-request"'
@@ -48,7 +49,8 @@ try {
     $merged = Get-MergedPortableConfigText -PortableSourcePath $portablePath -InstalledPath $installedPath
     [IO.File]::WriteAllText($mergedPath, $merged, $utf8NoBom)
     foreach ($required in @(
-        'model = "gpt-5.6-sol"'
+        'model = "old"'
+        'model_reasoning_effort = "high"'
         'model_reasoning_summary = "none"'
         'model_verbosity = "low"'
         'approval_policy = "never"'
