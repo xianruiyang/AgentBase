@@ -1,0 +1,92 @@
+{
+  "changed_files": [
+    "development/skill-routing/README.md",
+    "development/skill-routing/evidence/current.json",
+    "development/skill-routing/routing_evaluation_common.ps1",
+    "development/skill-routing/routing_fingerprint.ps1",
+    "development/skill-routing/test_routing_capsule.ps1",
+    "development/skill-routing/trigger-cases.json",
+    "development/skill-routing/validate_contract.ps1",
+    "development/skill-routing/validate_routing_results.ps1",
+    "docs/plan.md",
+    "docs/work/20260816_agentbase_delivery_workflow_context_economy/completion-audit.md"
+  ],
+  "evidence_for": [
+    "REQ-002",
+    "AC-005",
+    "AC-006",
+    "UDES-001",
+    "UDES-002",
+    "DES-005",
+    "GAP-003",
+    "SOL-003"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "note": "三阶段独立评估与当前候选身份闭合",
+      "ref": "development/skill-routing/evidence/current.json"
+    },
+    {
+      "kind": "audit",
+      "note": "根需求 owner、证据、约束与重开条件逐项复核",
+      "ref": "docs/work/20260816_agentbase_delivery_workflow_context_economy/completion-audit.md"
+    },
+    {
+      "kind": "version",
+      "note": "实现、验证证据与计划入口的首个仓库版本",
+      "ref": "git:bf0141a"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "交付工作流渐进上下文下一版已形成正式规则、共享引用评估、独立证据、根需求审计和可恢复总计划入口，并由 Git 版本 bf0141a 承载实现基线",
+  "outputs": [
+    "73 项路由、73 项行为策略和 19 项条件引用独立结果通过正式身份与约束校验",
+    "根需求 REQ-001 至 REQ-011 均已核对当前 owner、消费者边界和适用证据",
+    "总计划指向本后继交付链，具体结构计数与完成边界保留在专项审计"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:d931a412c852221aeaa828c0802db6ed99cd04100d5de0f97da847884b32602c",
+    "AC-002": "sha256:e68def11f701984787937a084c603b636b4133253670585f40353d25d344edf8",
+    "AC-003": "sha256:7bbd1d6cfae01a26a0ec1a6a3a54ecfc6ba7c672fd0e76cbb3b39cfdd7ccf475",
+    "AC-004": "sha256:0c5e1b63f9028ee22b59b6e49e2d504242e4d45a5d6b8aa2a03d8ffdac2db956",
+    "AC-005": "sha256:ee3987ff442e0b6516588012a930fd967bb24e9e3065011d92e006c9cd58decb",
+    "AC-006": "sha256:40e34dc15cc0c896c532f3a3535f77d39a81092aedb0bbcc81977506c6061885",
+    "CON-001": "sha256:cf250ba983c0ecece25a55bb744622e21160580d872b7232977a3208826b6d4b",
+    "CON-002": "sha256:76a3852205baa47d654ca9277169c2f2d1363df34e6df2b526e054519bb961aa",
+    "CON-003": "sha256:07c662137e7ac185a19ed3c0599504935c17649464f6401b3eed9bad789ec15e",
+    "CON-004": "sha256:e6adba2aed3d9af90e7a7c44c10772eada9435d97bf8be463e9925559f202f6b",
+    "DES-001": "sha256:e9940c8cfb6ad741b3907091307806bd1e4639b9f4e38d7ec55eb81392be747c",
+    "DES-002": "sha256:b2fe301ff350032d1b94819e2ca500be020b502ed9a93a15ee3d18be61165e70",
+    "DES-003": "sha256:b47eb4a8f94cc69d50682a613dbd3aff9f6c683111d258499a3b7f3cf056d659",
+    "DES-004": "sha256:3a951efe7511259711b3238a9c1a6cb9ed73bbf958e36227d3b7eac5e2512902",
+    "DES-005": "sha256:3e166e2cff2970f86ffd3a7b6ac3640eced09282c79eb2fae4c17fb621617442",
+    "GAP-001": "sha256:434a4419e6ce4626dc7a875d64e158d5ed133503f4cb8f6a8ab56ab20be56b4b",
+    "GAP-002": "sha256:bb7fa36b7eacbdf966763aaa52615e90f9c60a62c5d56854f17f854a93b8c27d",
+    "GAP-003": "sha256:58d63fc250a84a4cfc8b50fff34ae1f340a4b7c287d4d6c4ef960d72e362ba35",
+    "OBS-001": "sha256:c8e5add5d3f82eeae9e4c0181255be4c78676bd925c0037e1655abbf96c9146f",
+    "OBS-002": "sha256:7199307e00b93a86a02e94e9ccf41c8bf0837b228d697c7fa9204594a235718b",
+    "OBS-003": "sha256:034d41d80f1c3c10c8b917cc6c281849bebe88c0c2cc3844694467fb8e232ed6",
+    "OBS-004": "sha256:3e9b8931c2f15ce76c6b0c9b5e7204e71b0080b3182055f835a1ab34d142636f",
+    "OBS-005": "sha256:91656c855fe5658625b682a4656532acda12ced6d6bda4d44da315315dc04fff",
+    "REQ-001": "sha256:5dd3fae2379ec46ddd679cb4db1f5d4a17fb7a95d3d4d0566a47679824192822",
+    "REQ-002": "sha256:bdad7753957e8e2bda079307b761368a784bb9c081a1dece9e8fe57934a7d026",
+    "SOL-001": "sha256:6584bf9df866adedb2ffeca0d4f4750aa9d10bd5f8f6c56dfee91a28ae8a8ee4",
+    "SOL-002": "sha256:54bfc88a2f490c330f1d457d500e7be357b4d173b1ce3ab2ec5095b34a639962",
+    "SOL-003": "sha256:2421e247a20f605e181b0c981a58bb7d490150d32f6df2834e18edd7203c7bc6",
+    "UDES-001": "sha256:84404b100bdfad38bc29d3d9692af471d08bd7677a7806b8e62726026ad4b489",
+    "UDES-002": "sha256:214474638230d7e503a7b8cbd0d6ddbcbab927af91a009cacbf85c2d8b23eb5d"
+  },
+  "task_id": "T003-VERIFY-DELIVER",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "delivery-workflow quick_validate: Skill is valid",
+    "delivery-workflow 受影响单元回归: 32 passed",
+    "routing capsule contract tests: passed",
+    "validate_contract: 73 cases, 34 strict routing, 5 strict reference, 11/11 skill coverage",
+    "detached evidence: routing 73/73, behavior 73/73, references 19/19",
+    "plugin packaging and payload readback: passed"
+  ]
+}

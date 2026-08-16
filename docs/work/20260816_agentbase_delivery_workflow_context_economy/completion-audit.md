@@ -28,6 +28,7 @@
 - AC-005：仓库路径搜索确认旧统一合同没有形态消费者；阶段语义各自由唯一引用维护，`task-table-manager` 与 CLI owner 未被复制。
 - AC-006：结构校验、条件引用结果 schema、受影响 workflow 回归和三阶段 detached 证据共同覆盖当前声明；独立证据身份记录在 `development/skill-routing/evidence/current.json`。
 - UDES-001/UDES-002：本轮直接由根需求建立后继计划；总计划只保留原则、结论和专项入口，不复制严格 Token 计数。
+- 最终复核：在同一 `sha256:58a996832bcc7627a9726b8f9a8ba83d3135817e1f1750f2a462d19655c4edfd` 快照内分两页遍历 10 项 `REQ/AC/UDES`，同时复核 4 项 `CON` 与全部当前 DCR；3 个任务结果均为当前版本且带验证，DCR 数为 0，诊断数为 0。
 
 ## 约束与保留边界
 

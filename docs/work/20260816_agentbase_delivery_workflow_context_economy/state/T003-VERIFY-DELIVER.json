@@ -3,9 +3,9 @@
   "next_action": "",
   "note": "",
   "owner": "codex-root",
-  "result_ref": null,
-  "revision": 2,
+  "result_ref": "results/T003-VERIFY-DELIVER.r3.json",
+  "revision": 3,
   "schema": "task.state",
-  "status": "in_progress",
+  "status": "done",
   "task_id": "T003-VERIFY-DELIVER"
 }
