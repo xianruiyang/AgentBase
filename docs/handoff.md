@@ -1,35 +1,27 @@
 # AgentBase 当前接手状态
 
-更新时间：2026-08-16
+更新时间：2026-08-17
 
 ## 当前版本与发布状态
 
-- Git 当前版本为 `3cf059f`，前一实现提交为 `2836c90`；`main` 已同步到 `origin/main`。
-- 项目真源已通过 `DirectCompatibility` 增量发布到 `C:\Users\gzxt\.codex`。发布后项目源、安装内容、发布清单和路由证据身份一致，正式发布缺口为 0。
-- 本次发布只改变 2 个受管路径，MCP 未变化；`srcq 0.3.1` 的完整性和 doctor 均通过。
-- 发布回滚资产：`C:\Users\gzxt\.codex\backups\AgentBase-20260816-224209-13023c28`。
-- 已发布内容会在新任务中重新构建指令链；完成发布的旧任务不会追溯加载新规则。
+- Git 实现版本为 `6fe7838`，上一实际 Codex 发布基线仍为 `3cf059f`；本轮 handoff 记录随后的文档提交完成后，`main` 同步到 `origin/main`。
+- 实际 Codex 安装仍是上一轮 `DirectCompatibility` 发布，回滚资产仍为 `C:\Users\gzxt\.codex\backups\AgentBase-20260816-224209-13023c28`；本轮没有执行 `Publish`。
+- 本轮候选 `manage_agentbase.ps1 -Action Validate` 通过，source bundle SHA-256 为 `FA48371094AA1239C7A42AE41AB40E2339E79D3A9FCD60657814387CF25FF3E9`，包含 11 个 skill，MCP 身份与可移植设置有效。
+- 再次发布到 `C:\Users\gzxt\.codex` 必须由用户针对该次 `Publish` 明确同意；验证、Git 提交或远端同步都不构成发布授权。
 
 ## 最近完成的版本
 
-最近完成的是 [`completion-context` 任务证据去重](work/20260816_task_completion_context_dedup/completion-audit.md)：
+最近完成的是 [`completion-context` 结果诊断与证据时效语义](work/20260816_task_result_diagnostic_semantics/completion-audit.md)：
 
-- 完整候选任务证据只在响应顶层 `candidate_tasks` 中按任务 ID 返回一次。
-- 每个目标通过 `candidate_task_ids` 保留有序关系；候选计数、结果计数、截断、游标、快照和预算闭包未改变。
-- 同一真实工作区由两页 106,313 UTF-8 字节降为一页 20,642 字节，减少约 80.6%；10 个目标、4 个约束、0 个 DCR、28 条目标—任务关系和 3 个唯一任务保持，12 项任务证据字段完整。
-- `task-table-manager` 64 项受影响模块回归和 skill 结构校验通过；当前 Routing、Policy、References 独立证据分别覆盖 73、73、19 个场景。Routing 满足全部声明约束，保留 3 个非严格额外选择警告。
-- 项目总入口已在[总计划](plan.md)登记；专项需求、设计、结果和完成边界均在 [`docs/work/20260816_task_completion_context_dedup/`](work/20260816_task_completion_context_dedup/) 中。
+- `completion-context` 现在分开返回查询诊断与当前页候选结果诊断汇总；`status` 和 `render` 分别表达状态引用结果、任务 revision 陈旧、来源快照问题、含诊断结果和诊断条目。
+- 旧工作区真实复测从两个含糊零值恢复出 8 项结果诊断：1 项来源快照不完整、7 项来源快照陈旧；查询诊断仍正确为 0，含诊断结果为 1。
+- 后继验证以自己的 `evidence_for`、执行时 `source_snapshot` 和直接验证提供当前目标证据；旧结果与诊断不被抑制、改写或标记 resolved，CLI 不输出整体 pass。
+- `task-table-manager` 66 项与 `delivery-workflow` 32 项回归通过；skill 结构、73 场景静态合同、Routing 73/73、Policy 73、References 19 和部署候选 Validate 均通过。
+- 项目总入口已在[总计划](plan.md)登记；专项需求、设计、任务结果和完成边界均在 [`docs/work/20260816_task_result_diagnostic_semantics/`](work/20260816_task_result_diagnostic_semantics/) 中。
 
 ## 已发现但尚未处理的问题
 
-当前最高价值候选是完成复核的诊断汇总语义不一致：
-
-- 对最近交付工作区读取最终 `completion-context` 时，顶层 `diagnostic_count` 为 0，`taskctl status` 的 `stale_result_count` 也为 0；但候选任务 `T001-NORMALIZE-CANDIDATES` 内仍有 8 条 `result_diagnostics`：1 条来源快照不完整和 7 条来源快照陈旧。
-- `stale_result_count` 当前只统计任务合同 revision 陈旧，不统计来源快照陈旧；顶层 `diagnostic_count` 只统计查询级诊断，不统计候选结果内诊断。字段作用域可以从实现推断，但当前输出名称和汇总不足以让模型直接区分。
-- 后继任务 `T002-VERIFY-DELIVER` 的结果是当前版本、无结果诊断，并通过语义闭包关联全部 10 个目标，因此上述问题没有推翻最近版本的完成结论；风险在于模型可能因两个零值汇总而忽略嵌套诊断。
-- 当前实测响应为 20,537 字节，其中 `targets` 约 7,836 字节、`candidate_tasks` 约 9,987 字节；后者中 `source_snapshot` 约 4,697 字节，`result_diagnostics` 约 2,031 字节。
-
-下一版本优先需要裁决：是让顶层明确汇总候选结果诊断，还是把现有计数改成无歧义的分层命名；同时明确最终验证结果怎样表示对陈旧前置证据的重新验证。这个问题涉及输出合同和最终复核语义，不宜只删诊断或静默过滤旧结果。
+当前没有已确认且应立即进入下一版本的同级问题。诊断汇总语义不一致已在正式 owner 和全部仓库消费者中闭合；若后续发现真实旧字段消费者、页级汇总与候选目录不一致，或后继结果再次自动掩盖历史诊断，应重开该专项。
 
 ## 次级候选
 
@@ -38,10 +30,10 @@
 - 上一真实工作区为 73 个来源—指纹对、30 个唯一对；简单引用池模拟可把候选区由 10,139 字节降到 6,781 字节，减少 3,358 字节。
 - 最近工作区为 56 个来源—指纹对、37 个唯一对；同类模拟可把候选区由 9,987 字节降到 8,595 字节，减少 1,392 字节。
 
-该候选只证明还有约 7%–16% 的结构压缩空间。整数引用池会增加模型重建关系的负担，尚未证明质量同等充分，因此当前不应直接实施；只有形成可读、可局部恢复且不会隐藏版本差异的表示后才值得进入下一版本。
+该候选只证明还有约 7%–16% 的结构压缩空间。整数引用池会增加模型重建关系的负担，尚未证明质量同等充分，因此当前不应直接实施；只有形成可读、可局部恢复且不会隐藏版本差异的表示后才值得进入下一版本。本轮没有改变 `source_snapshot` 表示或引入引用池。
 
 ## 当前边界
 
-- 没有未提交的项目改动；最近交付链的 2 个任务均为 `done`，全部 10 个目标和 4 个约束已在同一最终快照复核，DCR 为 0。
-- 插件迁移仍是独立事项；当前 `DirectCompatibility` 没有冲突且正式发布状态完整，不与诊断汇总问题合并。
+- 本轮交付链有 2 个任务、12 个目标、4 个约束和 0 个 DCR；实现任务与独立验证任务均形成结构化结果，最终快照保留历史陈旧诊断并提供新的当前目标证据。
+- 插件迁移仍是独立事项；当前安装继续使用 `DirectCompatibility`，本轮没有更改插件分发模式。
 - 再次执行 Codex `Publish` 仍需用户针对该次发布明确同意；Git 提交与远端同步继续按项目现有授权维护。
