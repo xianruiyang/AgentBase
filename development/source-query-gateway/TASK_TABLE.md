@@ -6,7 +6,7 @@
 
 | 状态 | 数量 |
 | --- | ---: |
-| todo | 0 |
+| todo | 1 |
 | claimed | 0 |
 | in_progress | 0 |
 | review | 0 |
@@ -25,7 +25,7 @@
 ## 上游状态
 
 - 用户确认快照：protected
-- 可修订上游未决：0
+- 可修订上游未决：2
 - 延后讨论项：1
 
 ## 任务
@@ -83,3 +83,4 @@
 | TSQG-079 | done | codex-root | 固化普通查询最小语法与定向错误恢复 | TSQG-078:hard | results/TSQG-079.r4.json | 1 |
 | TSQG-080 | done | codex-root | 把 AST 与 LSP 升级改为证据缺口驱动 | TSQG-077:hard | results/TSQG-080.r4.json | 1 |
 | TSQG-081 | done | codex-root | 接入三项根因修正并冻结新测试 identity | TSQG-078:hard, TSQG-079:hard, TSQG-080:hard | results/TSQG-081.r4.json | 1 |
+| TSQG-082 | todo | — | 审计高成本证据轮次并裁决最小修正层 | TSQG-073:hard | — | 1 |
