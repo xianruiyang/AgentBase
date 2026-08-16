@@ -1,0 +1,10 @@
+{
+  "id": "agentbase-delivery-workflow-context-economy",
+  "result_dir": "results",
+  "schema": "task.table",
+  "source_index": ".work-cache/index.json",
+  "state_dir": "state",
+  "table_view": "TASK_TABLE.md",
+  "task_dir": "tasks",
+  "title": "AgentBase 交付工作流渐进上下文下一版"
+}

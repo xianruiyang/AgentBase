@@ -1,0 +1,33 @@
+{
+  "dependencies": [],
+  "id": "T001-CONTRACT-ROUTING",
+  "mutation_scope": [
+    "skills/delivery-workflow/SKILL.md",
+    "skills/delivery-workflow/references/*.md"
+  ],
+  "outcome": "单阶段交付动作只需加载公共合同和适用阶段合同，完整链仍可到达全部语义",
+  "outputs": [
+    "按职责拆分的交付合同",
+    "供执行与验证消费的动作引用映射"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-001",
+    "GAP-001",
+    "DES-001",
+    "DES-002",
+    "AC-001",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "delivery-workflow",
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "拆分交付合同并接入动作路由",
+  "verification": [
+    "检查引用可达性、关键语义唯一归属和阶段选择边界"
+  ]
+}

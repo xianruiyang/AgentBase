@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "reopened: 主入口直接持有阶段路由后公共合同进一步缩减，旧结果中的结构字节数已不再是最终候选",
+  "owner": "codex-root",
+  "result_ref": "results/T001-CONTRACT-ROUTING.r6.json",
+  "revision": 6,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T001-CONTRACT-ROUTING"
+}

@@ -4,7 +4,7 @@
 
 ## 正式产物
 
-- [`trigger-cases.json`](trigger-cases.json)：所需 skill、触发用例、严格路由用例和策略标签的测试 oracle。
+- [`trigger-cases.json`](trigger-cases.json)：所需 skill、触发用例、严格路由用例、策略标签和条件引用选择的测试 oracle。
 - [`validate_contract.ps1`](validate_contract.ps1)：规则、skill、项目入口、相对引用和触发集合的静态合同。
 - [`build_routing_evaluation.ps1`](build_routing_evaluation.ps1)：构建 Routing、Policy 或 References 阶段的 detached capsule。
 - [`validate_routing_results.ps1`](validate_routing_results.ps1)：验证独立结果的身份、输入声明、完整性和期望。
@@ -23,7 +23,7 @@
 
 ## 独立评估
 
-首次 Routing capsule 只包含路由前可见的候选全局规则、skill frontmatter、外部 skill 摘要和请求。首次结果通过隐藏 oracle 后，Policy capsule 只加入始终可见规则与行为标签；References capsule 只加入已选治理用例与 `change-governance` 正文。三个阶段必须由不同的独立运行完成：
+首次 Routing capsule 只包含路由前可见的候选全局规则、skill frontmatter、外部 skill 摘要和请求。首次结果通过隐藏 oracle 后，Policy capsule 只加入始终可见规则与行为标签；References capsule 只加入首次路由已选中的条件引用型 skill 正文及相应用例，当前覆盖 `change-governance` 与 `delivery-workflow`。三个阶段必须由不同的独立运行完成：
 
 ```powershell
 & '.\development\skill-routing\build_routing_evaluation.ps1' -ProjectRoot (Get-Location).Path

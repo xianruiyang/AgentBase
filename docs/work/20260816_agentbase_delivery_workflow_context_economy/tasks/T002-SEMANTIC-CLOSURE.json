@@ -1,0 +1,44 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "动作引用映射",
+        "阶段合同边界"
+      ],
+      "id": "T001-CONTRACT-ROUTING",
+      "type": "hard"
+    }
+  ],
+  "id": "T002-SEMANTIC-CLOSURE",
+  "mutation_scope": [
+    "skills/delivery-workflow/**",
+    "skills/task-table-manager/**"
+  ],
+  "outcome": "方案动作和任务执行默认取得最低充分语义，并在真实不确定性或完成审计需要时扩展",
+  "outputs": [
+    "交付 owner 中的最小语义闭包规则",
+    "任务消费者与最终复核的非重复接入"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-002",
+    "GAP-002",
+    "DES-003",
+    "DES-004",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "REQ-001"
+  ],
+  "suggested_skills": [
+    "delivery-workflow",
+    "task-table-manager",
+    "change-governance"
+  ],
+  "title": "接入最小语义闭包与扩展边界",
+  "verification": [
+    "检查默认闭包、扩展条件、最终完成集合和相近非触发边界"
+  ]
+}

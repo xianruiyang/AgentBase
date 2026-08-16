@@ -68,11 +68,12 @@ try {
     Assert-AgentBaseDetachedEvaluator -Evaluator $offsetUtcEvaluator -Label "Test"
 
     $contract = Get-Content -LiteralPath (Join-Path $PSScriptRoot "trigger-cases.json") -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100
+    $referenceSkillNames = @($contract.reference_evaluation_skills | ForEach-Object { [string]$_ })
     $referenceCases = @($contract.cases | Where-Object {
-        @($_.expected_skills | ForEach-Object { [string]$_ }) -contains "change-governance"
+        @($_.expected_skills | ForEach-Object { [string]$_ } | Where-Object { $referenceSkillNames -contains $_ }).Count -gt 0
     })
     if ($referenceCases.Count -eq 0) {
-        throw "Routing contract does not provide a change-governance case for the reference-stage capsule test"
+        throw "Routing contract does not provide a conditional-reference case for the reference-stage capsule test"
     }
     $routingCases = @($contract.cases | ForEach-Object {
         [pscustomobject]@{
@@ -124,13 +125,18 @@ try {
     if ([string]$referenceCapsule.routing_result_sha256 -ne (Get-AgentBaseRoutingResultFingerprint -RoutingResults $routingResults)) {
         throw "Reference-stage capsule is not bound to the first-stage result"
     }
-    if ([string]$referenceCapsule.candidate.skill.name -ne "change-governance" -or [string]::IsNullOrWhiteSpace([string]$referenceCapsule.candidate.skill.content)) {
-        throw "Reference-stage capsule does not expose the selected change-governance skill"
+    if (@($referenceCapsule.candidate.skills).Count -ne $referenceSkillNames.Count) {
+        throw "Reference-stage capsule does not expose every declared conditional-reference skill"
     }
-    if ($referenceCapsule.candidate.PSObject.Properties.Name -contains "global" -or $referenceCapsule.candidate.PSObject.Properties.Name -contains "skills") {
+    foreach ($referenceSkill in @($referenceCapsule.candidate.skills)) {
+        if ($referenceSkillNames -notcontains [string]$referenceSkill.name -or [string]::IsNullOrWhiteSpace([string]$referenceSkill.content) -or @($referenceSkill.available_references).Count -eq 0) {
+            throw "Reference-stage capsule exposes an invalid conditional-reference skill"
+        }
+    }
+    if ($referenceCapsule.candidate.PSObject.Properties.Name -contains "global") {
         throw "Reference-stage capsule exposes first-stage candidate content"
     }
-    foreach ($hiddenField in @("expected_skills", "expected_change_governance_references", "strict_routing_case_ids")) {
+    foreach ($hiddenField in @("expected_skills", "expected_change_governance_references", "expected_delivery_workflow_references", "strict_routing_case_ids", "strict_reference_case_ids")) {
         if ($referenceRaw.Contains(('"' + $hiddenField + '"'))) {
             throw "Reference-stage capsule exposes hidden field: $hiddenField"
         }
@@ -138,6 +144,48 @@ try {
     if ($referenceRaw.Contains($projectRoot, [StringComparison]::OrdinalIgnoreCase)) {
         throw "Reference-stage capsule leaks the source repository path"
     }
+
+    $contractById = @{}
+    foreach ($case in @($contract.cases)) {
+        $contractById[[string]$case.id] = $case
+    }
+    $syntheticReferenceCases = @($referenceCapsule.cases | ForEach-Object {
+        $caseId = [string]$_.id
+        $contractCase = $contractById[$caseId]
+        [pscustomobject]@{
+            id = $caseId
+            selected_references = @($_.selected_reference_skills | ForEach-Object {
+                $skillName = [string]$_
+                $expectedProperty = "expected_$($skillName.Replace('-', '_'))_references"
+                [pscustomobject]@{
+                    skill = $skillName
+                    references = @($contractCase.$expectedProperty | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+                }
+            })
+            note = "synthetic contract-conformant reference selection"
+        }
+    })
+    $syntheticReferenceResult = [pscustomobject]@{
+        schema_version = 3
+        evaluation_kind = "routing-reference-policy"
+        fingerprint_schema = Get-AgentBaseRoutingFingerprintSchema
+        evaluator = [pscustomobject]@{
+            id = "reference-schema-test"
+            model = "test-model"
+            runtime = "test-runtime"
+            evaluated_at_utc = [DateTimeOffset]::UtcNow.ToString("o")
+            isolation_mode = "detached-capsule"
+            repository_accessed = $false
+            hidden_expectations_accessed = $false
+        }
+        evaluation_capsule_sha256 = [string]$referenceCapsuleResult.sha256
+        candidate_bundle_sha256 = [string]$referenceCapsuleResult.candidate_bundle_sha256
+        evaluation_input_sha256 = [string]$referenceCapsuleResult.evaluation_input_sha256
+        routing_evaluation_capsule_sha256 = [string]$capsule.evaluation_capsule_sha256
+        routing_result_sha256 = Get-AgentBaseRoutingResultFingerprint -RoutingResults $routingResults
+        cases = $syntheticReferenceCases
+    }
+    $null = Assert-AgentBaseReferenceEvaluationResults -ProjectRoot $projectRoot -Contract $contract -RoutingResults $routingResults -ReferenceResults $syntheticReferenceResult
 
     Write-Output "Routing capsule tests passed: routing exposes descriptions without policy hints, policy and reference stages expose only their post-routing inputs, every stage hides expectations and repository paths, and identities are bound."
 }

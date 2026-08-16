@@ -16,6 +16,10 @@
     "task-table-manager",
     "understand-space"
   ],
+  "reference_evaluation_skills": [
+    "change-governance",
+    "delivery-workflow"
+  ],
   "allowed_behavior_tags": [
     "read_only",
     "modify_authorized_scope",
@@ -103,6 +107,13 @@
     "qq-troubleshooting-with-powershell",
     "qq-direct-message-required",
     "vertical-validation-closure-selection"
+  ],
+  "strict_reference_case_ids": [
+    "qq-troubleshooting-with-powershell",
+    "delivery-requirements-contract",
+    "delivery-planning-contract",
+    "delivery-task-contract",
+    "delivery-feedback-contract"
   ],
   "cases": [
     {
@@ -1289,6 +1300,95 @@
       "expected_change_governance_references": [],
       "expected_behavior_tags": [
         "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "delivery-requirements-contract",
+      "kind": "positive",
+      "request": "只编写这个复杂项目的需求与用户设计文档，并保留用户确认来源；暂不做模型设计、现状、方案、任务、CLI 操作或最终复核。",
+      "expected_skills": [
+        "delivery-workflow"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_delivery_workflow_references": [
+        "artifact-contracts.md",
+        "target-contracts.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "collaborative_requirement_insight",
+        "protected_user_baseline"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "delivery-planning-contract",
+      "kind": "positive",
+      "request": "需求与用户设计已经确认。现在只根据它们编写模型设计、现状分析和方案设计；不创建任务、不使用 CLI，也不执行最终复核。",
+      "expected_skills": [
+        "delivery-workflow"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_delivery_workflow_references": [
+        "artifact-contracts.md",
+        "planning-contracts.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "document_authority"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "delivery-task-contract",
+      "kind": "positive",
+      "request": "上游方案已经确认，请把其中可执行且有真实产出的动作投影为跨轮任务合同；只设计任务与结果字段，暂不选择或执行任务。",
+      "expected_skills": [
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "forbidden_skills": [
+        "change-governance"
+      ],
+      "expected_change_governance_references": [],
+      "expected_delivery_workflow_references": [
+        "artifact-contracts.md",
+        "execution-contracts.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "document_authority"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "delivery-feedback-contract",
+      "kind": "positive",
+      "request": "读取并更新现有长期交付任务表时得到新证据，需要在不改变已确认需求的前提下判断最小执行上下文、回退到最早失效的模型判断，并把证据和任务状态回流到方案。",
+      "expected_skills": [
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_delivery_workflow_references": [
+        "artifact-contracts.md",
+        "planning-contracts.md",
+        "execution-contracts.md",
+        "iteration.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "protected_user_baseline"
       ],
       "forbidden_behavior_tags": []
     },

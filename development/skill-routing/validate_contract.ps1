@@ -73,6 +73,12 @@ Assert-True ($contract.schema_version -eq 3) "Unsupported trigger contract schem
 $requiredSkills = @(Get-StringArray $contract.required_skills)
 Assert-True ($requiredSkills.Count -gt 0) "Trigger contract has no required skills"
 Assert-True (($requiredSkills | Sort-Object -Unique).Count -eq $requiredSkills.Count) "Trigger contract contains duplicate required skills"
+$referenceEvaluationSkills = @(Get-StringArray $contract.reference_evaluation_skills)
+Assert-True ($referenceEvaluationSkills.Count -gt 0) "Trigger contract has no conditional-reference skills"
+Assert-True (($referenceEvaluationSkills | Sort-Object -Unique).Count -eq $referenceEvaluationSkills.Count) "Trigger contract contains duplicate conditional-reference skills"
+foreach ($referenceSkill in $referenceEvaluationSkills) {
+    Assert-True ($requiredSkills -contains $referenceSkill) "Conditional-reference skill is not in the required skill catalog: $referenceSkill"
+}
 
 $globalPath = Join-Path $ProjectRoot "global\AGENTS.md"
 $globalItem = Get-Item -LiteralPath $globalPath
@@ -314,10 +320,31 @@ Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot "skills\task-table-m
 $deliveryRoot = Join-Path $ProjectRoot "skills\delivery-workflow"
 $deliverySkillContent = Get-Content -LiteralPath (Join-Path $deliveryRoot "SKILL.md") -Raw -Encoding UTF8
 $deliveryScriptContent = Get-Content -LiteralPath (Join-Path $deliveryRoot "scripts\workctl.py") -Raw -Encoding UTF8
+$deliveryReferenceRoot = Join-Path $deliveryRoot "references"
+$deliveryCommonContractPath = Join-Path $deliveryReferenceRoot "artifact-contracts.md"
+$deliveryTargetContractPath = Join-Path $deliveryReferenceRoot "target-contracts.md"
+$deliveryPlanningContractPath = Join-Path $deliveryReferenceRoot "planning-contracts.md"
+$deliveryExecutionContractPath = Join-Path $deliveryReferenceRoot "execution-contracts.md"
+$deliveryIterationPath = Join-Path $deliveryReferenceRoot "iteration.md"
+foreach ($deliveryContractPath in @($deliveryCommonContractPath, $deliveryTargetContractPath, $deliveryPlanningContractPath, $deliveryExecutionContractPath, $deliveryIterationPath)) {
+    Assert-True (Test-Path -LiteralPath $deliveryContractPath -PathType Leaf) "delivery-workflow is missing a routed contract: $deliveryContractPath"
+}
+$deliveryCommonContractContent = Get-Content -LiteralPath $deliveryCommonContractPath -Raw -Encoding UTF8
+$deliveryTargetContractContent = Get-Content -LiteralPath $deliveryTargetContractPath -Raw -Encoding UTF8
+$deliveryPlanningContractContent = Get-Content -LiteralPath $deliveryPlanningContractPath -Raw -Encoding UTF8
+$deliveryExecutionContractContent = Get-Content -LiteralPath $deliveryExecutionContractPath -Raw -Encoding UTF8
+$deliveryIterationContent = Get-Content -LiteralPath $deliveryIterationPath -Raw -Encoding UTF8
 Assert-True ($deliverySkillContent.Contains('requirements.md') -and $deliverySkillContent.Contains('user-design.md')) "delivery-workflow does not separate protected user sources"
 Assert-True ($deliverySkillContent.Contains('模型设计、分析、方案、任务状态、快照、索引、结构检查和各阶段审核都只是中间结果')) "delivery-workflow does not limit intermediate reviews"
 Assert-True ($deliverySkillContent.Contains('Markdown 阶段文档是语义真源')) "delivery-workflow does not keep documents authoritative"
 Assert-True ($deliverySkillContent.Contains('当前消费者接入')) "delivery-workflow does not close shared responsibilities through current consumers"
+Assert-True ($deliverySkillContent.Contains('只增加当前动作所属的一项')) "delivery-workflow does not progressively route stage contracts"
+Assert-True ($deliverySkillContent.Contains('target-contracts.md') -and $deliverySkillContent.Contains('planning-contracts.md') -and $deliverySkillContent.Contains('execution-contracts.md')) "delivery-workflow main entry does not route every stage owner"
+Assert-True ($deliveryTargetContractContent.Contains('## 需求分析') -and $deliveryTargetContractContent.Contains('## 用户设计') -and $deliveryTargetContractContent.Contains('## 延后讨论项')) "delivery-workflow protected-target contract is incomplete"
+Assert-True ($deliveryPlanningContractContent.Contains('## 模型设计') -and $deliveryPlanningContractContent.Contains('## 现状分析') -and $deliveryPlanningContractContent.Contains('## 方案设计')) "delivery-workflow planning contract is incomplete"
+Assert-True ($deliveryExecutionContractContent.Contains('## 任务与结果') -and $deliveryExecutionContractContent.Contains('## 最终完成合同')) "delivery-workflow execution contract is incomplete"
+Assert-True ($deliveryIterationContent.Contains('## 执行上下文') -and $deliveryIterationContent.Contains('默认形成以下最小语义闭包')) "delivery-workflow does not define the minimum semantic execution closure"
+Assert-True ($deliveryIterationContent.Contains('目标或来源仍有歧义') -and $deliveryIterationContent.Contains('实际消费者、派生产物或旧路径需要影响传播') -and $deliveryIterationContent.Contains('进入最终完成复核')) "delivery-workflow does not define evidence-driven context expansion"
 Assert-True ($deliveryScriptContent.Contains('delivery.protected-baseline')) "workctl is missing protected baseline support"
 Assert-True ($deliveryScriptContent.Contains('baseline_source_drift')) "workctl does not report protected-source drift as a diagnostic"
 Assert-True ($deliveryScriptContent.Contains('exclusive_write_json')) "workctl protected baseline is not created exclusively"
@@ -496,6 +523,8 @@ foreach ($peerSkill in $peerSkills) {
 }
 $strictRoutingCaseIds = @(Get-StringArray $contract.strict_routing_case_ids)
 Assert-True (($strictRoutingCaseIds | Sort-Object -Unique).Count -eq $strictRoutingCaseIds.Count) "Trigger contract contains duplicate strict routing case ids"
+$strictReferenceCaseIds = @(Get-StringArray $contract.strict_reference_case_ids)
+Assert-True (($strictReferenceCaseIds | Sort-Object -Unique).Count -eq $strictReferenceCaseIds.Count) "Trigger contract contains duplicate strict reference case ids"
 
 $requiredCases = @(
     "mechanical-document-edit"
@@ -521,6 +550,10 @@ $requiredCases = @(
     "qq-hook-troubleshooting"
     "cross-turn-dependent-plan"
     "full-delivery-chain"
+    "delivery-requirements-contract"
+    "delivery-planning-contract"
+    "delivery-task-contract"
+    "delivery-feedback-contract"
     "vertical-validation-closure-selection"
     "protected-baseline-change-discovered"
     "workflow-cli-gate-boundary"
@@ -571,7 +604,6 @@ foreach ($case in @($contract.cases)) {
     $availablePeerSkills = @(Get-StringArray $case.available_peer_skills)
     $expectedPeerSkills = @(Get-StringArray $case.expected_peer_skills)
     $forbiddenPeerSkills = @(Get-StringArray $case.forbidden_peer_skills)
-    $references = @(Get-StringArray $case.expected_change_governance_references)
     $expectedBehaviors = @(Get-StringArray $case.expected_behavior_tags)
     $forbiddenBehaviors = @(Get-StringArray $case.forbidden_behavior_tags)
 
@@ -596,12 +628,16 @@ foreach ($case in @($contract.cases)) {
         Assert-True ($availablePeerSkills -contains $peerSkill) "Case $($case.id) constrains unavailable peer skill: $peerSkill"
     }
 
-    if ($references.Count -gt 0) {
-        Assert-True ($expectedSkills -contains "change-governance") "Case $($case.id) expects change-governance references without the skill"
-    }
-    foreach ($reference in $references) {
-        $referencePath = Join-Path (Join-Path $ProjectRoot "skills\change-governance\references") $reference
-        Assert-True (Test-Path -LiteralPath $referencePath -PathType Leaf) "Case $($case.id) references missing change-governance file: $reference"
+    foreach ($referenceSkill in $referenceEvaluationSkills) {
+        $expectedProperty = "expected_$($referenceSkill.Replace('-', '_'))_references"
+        $references = @(Get-StringArray $case.$expectedProperty)
+        if ($references.Count -gt 0) {
+            Assert-True ($expectedSkills -contains $referenceSkill) "Case $($case.id) expects $referenceSkill references without the skill"
+        }
+        foreach ($reference in $references) {
+            $referencePath = Join-Path (Join-Path (Join-Path $ProjectRoot "skills") $referenceSkill) ("references\" + $reference)
+            Assert-True (Test-Path -LiteralPath $referencePath -PathType Leaf) "Case $($case.id) references missing $referenceSkill file: $reference"
+        }
     }
 
     foreach ($tag in @($expectedBehaviors + $forbiddenBehaviors)) {
@@ -615,10 +651,15 @@ foreach ($requiredCase in $requiredCases) {
 foreach ($strictRoutingCaseId in $strictRoutingCaseIds) {
     Assert-True ($seenCases.ContainsKey($strictRoutingCaseId)) "Strict routing policy references missing case: $strictRoutingCaseId"
 }
+foreach ($strictReferenceCaseId in $strictReferenceCaseIds) {
+    Assert-True ($seenCases.ContainsKey($strictReferenceCaseId)) "Strict reference policy references missing case: $strictReferenceCaseId"
+    $strictReferenceCase = @($contract.cases | Where-Object { [string]$_.id -eq $strictReferenceCaseId })[0]
+    Assert-True (@($strictReferenceCase.expected_skills | ForEach-Object { [string]$_ } | Where-Object { $referenceEvaluationSkills -contains $_ }).Count -gt 0) "Strict reference case selects no conditional-reference skill: $strictReferenceCaseId"
+}
 
 foreach ($skill in $requiredSkills) {
     Assert-True ($positiveCoverage[$skill] -gt 0) "Required skill has no positive route case: $skill"
     Assert-True ($negativeCoverage[$skill] -gt 0) "Required skill has no non-trigger case: $skill"
 }
 
-Write-Output "Routing contract valid: $($seenCases.Count) cases; $($strictRoutingCaseIds.Count) strict routing cases; $($requiredSkills.Count)/$($requiredSkills.Count) skills have positive and non-trigger coverage; global, metadata, references, peer skills, and policy tags resolve."
+Write-Output "Routing contract valid: $($seenCases.Count) cases; $($strictRoutingCaseIds.Count) strict routing and $($strictReferenceCaseIds.Count) strict reference cases; $($requiredSkills.Count)/$($requiredSkills.Count) skills have positive and non-trigger coverage; global, metadata, references, peer skills, and policy tags resolve."

@@ -110,7 +110,7 @@ foreach ($id in $contractById.Keys) {
     $selectedPeerSkills = @(Get-StringArray $result.selected_peer_skills)
     $strictRouting = $strictRoutingCaseIds -contains $id
 
-    foreach ($postRoutingField in @("behavior_tags", "selected_change_governance_references")) {
+    foreach ($postRoutingField in @("behavior_tags", "selected_references")) {
         if ($result.PSObject.Properties.Name -contains $postRoutingField) {
             Add-Failure $failures "$id returned post-routing field during the skill-routing stage: $postRoutingField"
         }
@@ -188,7 +188,7 @@ if (-not $RoutingOnly) {
         throw "Skill-routing evidence is missing its post-routing behavior-policy evaluation"
     }
     if (-not ($results.PSObject.Properties.Name -contains "reference_evaluation") -or $null -eq $results.reference_evaluation) {
-        throw "Skill-routing evidence is missing its post-routing change-governance reference evaluation"
+        throw "Skill-routing evidence is missing its post-routing conditional reference evaluation"
     }
     $policyMessage = Assert-AgentBasePolicyEvaluationResults -ProjectRoot $ProjectRoot -Contract $contract -RoutingResults $results -PolicyResults $results.policy_evaluation -FailOnUnexpectedSelections:$FailOnUnexpectedSelections -ShowWarnings:$ShowWarnings
     Write-Verbose $policyMessage

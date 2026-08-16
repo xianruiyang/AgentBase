@@ -1,0 +1,63 @@
+{
+  "changed_files": [
+    "skills/delivery-workflow/SKILL.md",
+    "skills/delivery-workflow/references/artifact-contracts.md",
+    "skills/delivery-workflow/references/target-contracts.md",
+    "skills/delivery-workflow/references/planning-contracts.md",
+    "skills/delivery-workflow/references/execution-contracts.md"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "AC-001",
+    "DES-001",
+    "DES-002"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "note": "检查全部引用、阶段 owner 与主入口映射",
+      "ref": "development/skill-routing/validate_contract.ps1"
+    },
+    {
+      "kind": "artifact",
+      "note": "拆分后的唯一阶段合同",
+      "ref": "skills/delivery-workflow/references/"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "交付产物合同已按公共、受保护目标、可修订规划、执行与完成职责拆分，主 skill 直接按当前动作选择引用，旧全文没有作为兼容副本保留",
+  "outputs": [
+    "单阶段合同组合由固定 9201 字节降为约 5777 至 6426 字节",
+    "SKILL.md 可直接发现公共、目标、规划、执行、迭代和工具引用"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:d931a412c852221aeaa828c0802db6ed99cd04100d5de0f97da847884b32602c",
+    "AC-002": "sha256:e68def11f701984787937a084c603b636b4133253670585f40353d25d344edf8",
+    "AC-003": "sha256:7bbd1d6cfae01a26a0ec1a6a3a54ecfc6ba7c672fd0e76cbb3b39cfdd7ccf475",
+    "AC-004": "sha256:0c5e1b63f9028ee22b59b6e49e2d504242e4d45a5d6b8aa2a03d8ffdac2db956",
+    "AC-005": "sha256:ee3987ff442e0b6516588012a930fd967bb24e9e3065011d92e006c9cd58decb",
+    "AC-006": "sha256:40e34dc15cc0c896c532f3a3535f77d39a81092aedb0bbcc81977506c6061885",
+    "CON-001": "sha256:cf250ba983c0ecece25a55bb744622e21160580d872b7232977a3208826b6d4b",
+    "CON-002": "sha256:76a3852205baa47d654ca9277169c2f2d1363df34e6df2b526e054519bb961aa",
+    "CON-003": "sha256:07c662137e7ac185a19ed3c0599504935c17649464f6401b3eed9bad789ec15e",
+    "CON-004": "sha256:e6adba2aed3d9af90e7a7c44c10772eada9435d97bf8be463e9925559f202f6b",
+    "DES-001": "sha256:e9940c8cfb6ad741b3907091307806bd1e4639b9f4e38d7ec55eb81392be747c",
+    "DES-002": "sha256:b2fe301ff350032d1b94819e2ca500be020b502ed9a93a15ee3d18be61165e70",
+    "GAP-001": "sha256:434a4419e6ce4626dc7a875d64e158d5ed133503f4cb8f6a8ab56ab20be56b4b",
+    "OBS-001": "sha256:c8e5add5d3f82eeae9e4c0181255be4c78676bd925c0037e1655abbf96c9146f",
+    "OBS-002": "sha256:7199307e00b93a86a02e94e9ccf41c8bf0837b228d697c7fa9204594a235718b",
+    "REQ-001": "sha256:5dd3fae2379ec46ddd679cb4db1f5d4a17fb7a95d3d4d0566a47679824192822",
+    "REQ-002": "sha256:bdad7753957e8e2bda079307b761368a784bb9c081a1dece9e8fe57934a7d026",
+    "SOL-001": "sha256:6584bf9df866adedb2ffeca0d4f4750aa9d10bd5f8f6c56dfee91a28ae8a8ee4",
+    "UDES-001": "sha256:84404b100bdfad38bc29d3d9692af471d08bd7677a7806b8e62726026ad4b489"
+  },
+  "task_id": "T001-CONTRACT-ROUTING",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "skill-creator quick_validate: Skill is valid",
+    "validate_contract: 73 cases, 38 strict, 11/11 skill coverage",
+    "routing capsule structure test: passed"
+  ]
+}

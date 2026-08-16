@@ -113,10 +113,11 @@ function Get-AgentBaseReferenceInputFingerprint {
         [object[]]$Cases
     )
 
-    $records = @("phase|change-governance-references")
+    $records = @("phase|conditional-skill-references")
     $records += @($Cases | ForEach-Object {
         $request = ConvertTo-AgentBaseCanonicalText ([string]$_.request)
-        "$([string]$_.id)|$request"
+        $selectedReferenceSkills = @($_.selected_reference_skills | ForEach-Object { [string]$_ } | Sort-Object)
+        "$([string]$_.id)|skills=$($selectedReferenceSkills -join ',')|$request"
     })
     return Get-AgentBaseRoutingSha256 ($records -join "`n")
 }

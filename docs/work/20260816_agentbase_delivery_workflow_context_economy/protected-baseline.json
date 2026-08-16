@@ -1,0 +1,36 @@
+{
+  "confirmation_ref": "conversation:2026-08-16:iterate-root-requirements-next-version",
+  "confirmed_by": "user",
+  "cycle_id": "cycle-001",
+  "documents": {
+    "requirements": {
+      "fingerprint": "sha256:3017ada82d5641459b224afe551493f5ff2e6d66293426e2a88597cfdf819fc0",
+      "ids": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006",
+        "CON-001",
+        "CON-002",
+        "CON-003",
+        "CON-004",
+        "REQ-001",
+        "REQ-002"
+      ],
+      "path": "requirements.md"
+    },
+    "user_design": {
+      "fingerprint": "sha256:340216ef9957471e73feb8104f7f9444fe3ed64e7b3125a71c502b755e293e0e",
+      "ids": [
+        "UDES-001",
+        "UDES-002"
+      ],
+      "path": "user-design.md"
+    }
+  },
+  "history": [],
+  "schema": "delivery.protected-baseline",
+  "workflow_id": "agentbase-delivery-workflow-context-economy"
+}

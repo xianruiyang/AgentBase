@@ -230,42 +230,52 @@ function Get-AgentBaseReferenceEvaluationCapsule {
     $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
     $candidate = Get-AgentBaseRoutingCandidate -ProjectRoot $ProjectRoot -Contract $Contract
     $routingResultFingerprint = Get-AgentBaseRoutingResultFingerprint -RoutingResults $RoutingResults
-    $selectedIds = @($RoutingResults.cases | Where-Object {
-        @($_.selected_skills | ForEach-Object { [string]$_ }) -contains "change-governance"
-    } | ForEach-Object { [string]$_.id })
-    $cases = @($Contract.cases | Where-Object { $selectedIds -contains [string]$_.id } | ForEach-Object {
+    $referenceSkills = @($Contract.reference_evaluation_skills | ForEach-Object { [string]$_ })
+    $routingById = @{}
+    foreach ($routingCase in @($RoutingResults.cases)) {
+        $routingById[[string]$routingCase.id] = $routingCase
+    }
+    $cases = @($Contract.cases | Where-Object {
+        $routingCase = $routingById[[string]$_.id]
+        @($routingCase.selected_skills | ForEach-Object { [string]$_ } | Where-Object { $referenceSkills -contains $_ }).Count -gt 0
+    } | ForEach-Object {
+        $routingCase = $routingById[[string]$_.id]
         [ordered]@{
             id = [string]$_.id
             request = [string]$_.request
+            selected_reference_skills = @($routingCase.selected_skills | ForEach-Object { [string]$_ } | Where-Object { $referenceSkills -contains $_ })
         }
     })
-    $skillPath = Join-Path $ProjectRoot "skills\change-governance\SKILL.md"
-    $skillContent = ConvertTo-AgentBaseCanonicalText ([IO.File]::ReadAllText($skillPath, [Text.Encoding]::UTF8))
-    $availableReferences = @([regex]::Matches($skillContent, '\]\(references/(?<name>[^)#]+\.md)(?:#[^)]+)?\)') | ForEach-Object {
-        $_.Groups["name"].Value
-    } | Sort-Object -Unique)
+    $skillCandidates = @($referenceSkills | ForEach-Object {
+        $skillName = $_
+        $skillPath = Join-Path (Join-Path (Join-Path $ProjectRoot "skills") $skillName) "SKILL.md"
+        $skillContent = ConvertTo-AgentBaseCanonicalText ([IO.File]::ReadAllText($skillPath, [Text.Encoding]::UTF8))
+        [ordered]@{
+            name = $skillName
+            logical_path = "skills/$skillName/SKILL.md"
+            content = $skillContent
+            available_references = @([regex]::Matches($skillContent, '\]\(references/(?<name>[^)#]+\.md)(?:#[^)]+)?\)') | ForEach-Object {
+                $_.Groups["name"].Value
+            } | Sort-Object -Unique)
+        }
+    })
     $evaluationInputFingerprint = Get-AgentBaseReferenceInputFingerprint -Cases $cases
     $capsule = [ordered]@{
         schema_version = 3
         evaluation_kind = "routing-reference-policy"
         fingerprint_schema = Get-AgentBaseRoutingFingerprintSchema
-        purpose = "Blind post-routing evaluation of change-governance reference selection after the routing stage has selected that skill."
+        purpose = "Blind post-routing evaluation of conditional skill-reference selection after the routing stage has selected those skills."
         candidate_bundle_sha256 = $candidate.fingerprint
         evaluation_input_sha256 = $evaluationInputFingerprint
         routing_evaluation_capsule_sha256 = [string]$RoutingResults.evaluation_capsule_sha256
         routing_result_sha256 = $routingResultFingerprint
         candidate = [ordered]@{
-            skill = [ordered]@{
-                name = "change-governance"
-                logical_path = "skills/change-governance/SKILL.md"
-                content = $skillContent
-            }
+            skills = $skillCandidates
         }
-        available_references = $availableReferences
         instructions = @(
-            "Use only the selected skill and cases embedded in this detached capsule."
+            "Use only the selected skills and cases embedded in this detached capsule."
             "The cases are derived from the validated first-stage routing result; hidden expected references are not present. Do not inspect the source repository, earlier capsules, results, or tests."
-            "For every case, select all change-governance references that must be read before task actions."
+            "For every case, select all references that must be read for each selected_reference_skill before task actions."
             "Do not execute requests, call tools, or modify files. Return one result per id using the declared output schema."
         )
         output_schema = [ordered]@{
@@ -289,7 +299,12 @@ function Get-AgentBaseReferenceEvaluationCapsule {
             cases = @(
                 [ordered]@{
                     id = "case id"
-                    selected_change_governance_references = @("reference.md")
+                    selected_references = @(
+                        [ordered]@{
+                            skill = "selected reference skill name"
+                            references = @("reference.md")
+                        }
+                    )
                     note = "one concise rationale"
                 }
             )
@@ -478,26 +493,46 @@ function Assert-AgentBaseReferenceEvaluationResults {
             $failures.Add("Missing routing-reference result: $id")
             continue
         }
-        $selected = @($resultById[$id].selected_change_governance_references | ForEach-Object { [string]$_ })
-        $expected = @($contractById[$id].expected_change_governance_references | ForEach-Object { [string]$_ })
-        foreach ($reference in $selected) {
-            if (@($capsule.payload.available_references) -notcontains $reference) {
-                $failures.Add("$id selected an unavailable change-governance reference: $reference")
+        $capsuleCase = @($capsule.payload.cases | Where-Object { [string]$_.id -eq $id })[0]
+        $requiredSkills = @($capsuleCase.selected_reference_skills | ForEach-Object { [string]$_ })
+        $selectedBySkill = @{}
+        foreach ($selection in @($resultById[$id].selected_references)) {
+            $skillName = [string]$selection.skill
+            if ([string]::IsNullOrWhiteSpace($skillName) -or $selectedBySkill.ContainsKey($skillName) -or $requiredSkills -notcontains $skillName) {
+                $failures.Add("$id returned an invalid, duplicate, or unselected reference skill: $skillName")
+                continue
             }
+            $selectedBySkill[$skillName] = @($selection.references | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
         }
-        foreach ($reference in $expected) {
-            if ($selected -notcontains $reference) {
-                $failures.Add("$id missed expected change-governance reference: $reference")
+        foreach ($skillName in $requiredSkills) {
+            if (-not $selectedBySkill.ContainsKey($skillName)) {
+                $failures.Add("$id is missing reference selection for skill: $skillName")
+                continue
             }
-        }
-        if (@($Contract.strict_routing_case_ids) -contains $id) {
-            foreach ($reference in @($selected | Where-Object { $expected -notcontains $_ })) {
-                $failures.Add("$id selected an unspecified change-governance reference: $reference")
+            $skillCandidate = @($capsule.payload.candidate.skills | Where-Object { [string]$_.name -eq $skillName })[0]
+            $available = @($skillCandidate.available_references | ForEach-Object { [string]$_ })
+            $selected = @($selectedBySkill[$skillName])
+            $expectedProperty = "expected_$($skillName.Replace('-', '_'))_references"
+            $expected = @($contractById[$id].$expectedProperty | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            foreach ($reference in $selected) {
+                if ($available -notcontains $reference) {
+                    $failures.Add("$id selected an unavailable $skillName reference: $reference")
+                }
+            }
+            foreach ($reference in $expected) {
+                if ($selected -notcontains $reference) {
+                    $failures.Add("$id missed expected $skillName reference: $reference")
+                }
+            }
+            if (@($Contract.strict_reference_case_ids) -contains $id) {
+                foreach ($reference in @($selected | Where-Object { $expected -notcontains $_ })) {
+                    $failures.Add("$id selected an unspecified $skillName reference: $reference")
+                }
             }
         }
     }
     if ($failures.Count -gt 0) {
         throw ("Routing-reference-policy evaluation failed with $($failures.Count) violation(s):" + [Environment]::NewLine + ($failures -join [Environment]::NewLine))
     }
-    return "Routing-reference-policy evaluation valid: $($resultById.Count)/$($capsuleIds.Count) selected change-governance cases satisfy the reference constraints."
+    return "Routing-reference-policy evaluation valid: $($resultById.Count)/$($capsuleIds.Count) selected skill cases satisfy the reference constraints."
 }

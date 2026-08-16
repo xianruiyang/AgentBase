@@ -1,0 +1,53 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "候选 skill 与引用集合"
+      ],
+      "id": "T001-CONTRACT-ROUTING",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "最终行为合同"
+      ],
+      "id": "T002-SEMANTIC-CLOSURE",
+      "type": "hard"
+    }
+  ],
+  "id": "T003-VERIFY-DELIVER",
+  "mutation_scope": [
+    "development/skill-routing/**",
+    "docs/plan.md",
+    "docs/work/20260816_agentbase_delivery_workflow_context_economy/**"
+  ],
+  "outcome": "下一版本具有受影响验证、独立证据、逐需求完成审计和可恢复的项目计划入口",
+  "outputs": [
+    "受影响静态与独立行为证据",
+    "根需求逐项完成审计",
+    "更新后的总计划与 Git 版本"
+  ],
+  "reasoning_hint": "max",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-003",
+    "GAP-003",
+    "DES-005",
+    "AC-005",
+    "AC-006",
+    "REQ-002",
+    "UDES-001",
+    "UDES-002"
+  ],
+  "suggested_skills": [
+    "delivery-workflow",
+    "task-table-manager",
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "刷新证据并完成根需求审计",
+  "verification": [
+    "运行 skill 校验、定向回归、静态合同、三阶段 detached 评估和最终 completion-context"
+  ]
+}
