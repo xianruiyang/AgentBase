@@ -1,0 +1,85 @@
+{
+  "changed_files": [
+    "development/skill-routing/evidence/current.json",
+    "docs/plan.md",
+    "docs/work/20260816_task_completion_context_dedup/completion-audit.md",
+    "docs/work/20260816_task_completion_context_dedup/current-state.md"
+  ],
+  "evidence_for": [
+    "REQ-002",
+    "AC-006",
+    "UDES-001",
+    "OBS-007"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "independent-evaluation",
+      "note": "当前候选的 Routing、Policy 与 References 隔离评估",
+      "ref": "development/skill-routing/evidence/current.json"
+    },
+    {
+      "kind": "completion-audit",
+      "note": "本轮目标和根需求逐项复核",
+      "ref": "docs/work/20260816_task_completion_context_dedup/completion-audit.md"
+    },
+    {
+      "kind": "git",
+      "note": "实现、合同、回归、独立证据和交付文档候选提交",
+      "ref": "2836c90"
+    }
+  ],
+  "invalidated_source_ids": [
+    "GAP-003"
+  ],
+  "outcome": "任务完成复核去重候选已具有真实机制证据、当前独立 skill 证据、根需求完成审计、总计划入口和可追溯 Git 版本",
+  "outputs": [
+    "development/skill-routing/evidence/current.json 已由三个不同 detached 运行刷新",
+    "docs/work/20260816_task_completion_context_dedup/completion-audit.md 已逐项复核本轮目标和全部根需求",
+    "docs/plan.md 已登记本后继计划、可复用结论与重开条件",
+    "实现与验证资产已提交为 2836c90"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:0bc3fa21e5f580b1fd111cb33dbd0b2222f06336701be0665d9ee5c773c20658",
+    "AC-002": "sha256:5acf63e39ce15d6f059f83d153e1f1342da1d645eaff7f48feaeaf879f9fdebb",
+    "AC-003": "sha256:775b7cfb7c4bf036bb25045bed58887e5f8e41f564015c7f88eabf2cf5d82f73",
+    "AC-004": "sha256:694654866c2d94322954f40086beecb0838ff58fc7b5b453de7c5a9367b6209f",
+    "AC-005": "sha256:630b6711ba5cf158db5f247cfb16ea09df92d463c56bb61347c6f856254e591f",
+    "AC-006": "sha256:684ecd0526065b1145027b482a1b146c13c4e905a539970c4fa0adbae988a989",
+    "CON-001": "sha256:880ceb6ac5495f5a85996e9dbb600233f07d6e63522f79ca71a0ad0d21b130f4",
+    "CON-002": "sha256:1458578848d64b36d8ce7985aa5d39c7d4ea2f18fb73350d49633d269a86a3cd",
+    "CON-003": "sha256:da12863050dc19a788053e80e75a2a6fef17ad10592fd19d349facc5453ca15c",
+    "CON-004": "sha256:1fae5ff3ab28b9ab5653471522eb5b033ce305590849c8fe3e1d5a0bca0eff9b",
+    "DES-001": "sha256:7f8794a9b197b448c93be2dec7fc794991d00ad7294f76634caf8b799ef00f35",
+    "DES-002": "sha256:e956695370a66f7ff38cccbe5398019d2ba4c71b0493c58c27fc7403dbb2d813",
+    "DES-003": "sha256:1eeae27d4c70a3f8a310de58de39cfc4310e916ae9a18a6648cad1b8ea18efaf",
+    "DES-004": "sha256:b12479f9c3f871d9849a17096046fa1ae06621074e2f552cc98a1e01be26e216",
+    "GAP-001": "sha256:69e22f99de0ea25109f1ccbd9e81519cbaca1c1ef26676ac32d8da00b03632ef",
+    "GAP-002": "sha256:6a1174fb4fec18a489b6128c84d7cd26944baf00d2b67d79101e3567e62614dd",
+    "GAP-003": "sha256:e0955d1c9b947e84919bb28252de2045b73d829851db7dff03243b11ac500fad",
+    "OBS-001": "sha256:1600405bbf9ce108a75a129064a2c9d6328c4f1d6405c6cfeec020783b6d2f43",
+    "OBS-003": "sha256:2d62f5b9cb28df0f6bb56294547d759a925000023ff04041d6245cab2100dc10",
+    "OBS-004": "sha256:8e9041e0d39b587d442d2a5562450090b57354694f38e4c7c6d457b39f1056b1",
+    "OBS-005": "sha256:105de6250d1cd3b2b59d4a8ec9bc316d88dcf8827cd8fb69f18d8ff78edce938",
+    "OBS-006": "sha256:a59926d4ce8dcef911fa8ccbac6efb09b3fb25b81fbff5896e59459e63006388",
+    "OBS-007": "sha256:a1720f9b42ff59287e980f69ce7e1f0b375d930591204635b4a36ee7c564977a",
+    "REQ-001": "sha256:75f0d5b2a2bad1b5344123905c8baf05776643a7e5829a02690456e62ffda63e",
+    "REQ-002": "sha256:d99184ca961866532980a20e60748825d51ba70830b08bf9f660019769d17b01",
+    "SOL-001": "sha256:b6d32168213d00e9608fda7167399835b5beb31490899f08e94d92561b8fe143",
+    "SOL-002": "sha256:870fafd8e57831db4c3cd1d3f83fe8b1e962383ace8136cc376b6c985fa18536",
+    "SOL-003": "sha256:42204d7f63b58cabd8a08fc1c9f7e6ec152f0bf879577f37ab080bc01a43983b",
+    "UDES-001": "sha256:e664c2b340b90dcd44e2b213fb43b320eff20a4aab8afb62e7bcfbb7b6e721c0",
+    "UDES-002": "sha256:75bf1e61dc48ba3ce0553090d231aebfb15601563c9a832b0a68e1cc9cba81fe"
+  },
+  "task_id": "T002-VERIFY-DELIVER",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "4 项直接回归通过；task-table-manager 64 项受影响模块回归通过",
+    "skill-creator quick_validate: Skill is valid",
+    "validate_contract: 73 cases, 34 strict routing, 5 strict reference, 11/11 skill coverage",
+    "detached Routing/Policy/References: 73/73、73/73、19/19；Routing 保留 3 项非严格额外选择警告",
+    "真实工作区机制复测: 106313 -> 20642 UTF-8 bytes；10 targets、4 constraints、0 DCR、28 references、3 unique tasks，引用和字段闭合",
+    "根需求 REQ-001 至 REQ-011 已逐项审计"
+  ]
+}
