@@ -14,6 +14,8 @@ must: 本项目只维护 Windows 宿主；项目自有规则、skill、工具、
 
 must: 修改前先读取根 `README.md` 和受影响组件最近的正式说明，只改变当前目标直接涉及的真源、合同和状态说明；纯只读源码定位只读取回答所缺的正式来源，不因本条加载 `README.md`
 
+must: 任务需要选择、新建、替代或重开子计划，改变跨组件方向，或裁决多个正式 owner 时读取 `docs/plan.md`；普通组件内任务不因本条加载总计划
+
 must: 不手工创建 `backup`、`copy`、`draft` 等冗余副本；只有正式发布流程生成的可回滚备份或用户明确要求的副本可以保留
 
 must: `.codex/`、`codexRuntimeLogFile/`、`node_modules/`、`dist/`、`target/`、运行日志、覆盖率和部署沙箱是本地状态或可重建产物，不得作为项目真源提交

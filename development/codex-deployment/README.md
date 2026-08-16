@@ -2,6 +2,8 @@
 
 `manage_agentbase.ps1` is the only AgentBase entry point that installs project-managed files into a Codex home. It validates project truth and the canonical detached routing-policy evidence, compares the selected managed contract with the installation, stages and backs up only changed managed paths, applies them atomically, verifies fingerprints, and records a rollback manifest. Directory payloads and plugin packaging share `development/common/payload_contract.ps1`, so project-only tests, test fixtures, benchmarks, runtime caches, logs, coverage output, dependency trees, build directories, temporary files, and reparse points cannot enter either bundle or its source fingerprint.
 
+Portable global payload semantics are owned by [`global/README.md`](../../global/README.md), routing evidence by [`development/skill-routing/README.md`](../skill-routing/README.md), and plugin assembly by [`development/plugin-packaging/README.md`](../plugin-packaging/README.md). This document owns only host preparation and the Validate, Publish, Status, migration, and Rollback lifecycle; it does not redefine those upstream payloads.
+
 ## Payloads
 
 `-SkillDeliveryMode DirectCompatibility` is the default only to preserve existing installations. Its payload is:

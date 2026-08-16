@@ -45,6 +45,27 @@ function Assert-Disjoint {
     }
 }
 
+function Assert-MarkdownRelativeLinks {
+    param(
+        [string]$Path
+    )
+
+    $markdown = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+    $directory = Split-Path -Parent $Path
+    foreach ($linkMatch in [regex]::Matches($markdown, '\[[^\]]+\]\((?<target>[^)]+)\)')) {
+        $target = $linkMatch.Groups["target"].Value.Trim()
+        if ($target.StartsWith("#") -or $target -match '^[a-zA-Z][a-zA-Z0-9+.-]*:') {
+            continue
+        }
+        $targetPath = ($target -split '#', 2)[0].Trim('<', '>')
+        if ([string]::IsNullOrWhiteSpace($targetPath)) {
+            continue
+        }
+        $resolvedTarget = Join-Path $directory ([Uri]::UnescapeDataString($targetPath))
+        Assert-True (Test-Path -LiteralPath $resolvedTarget) "Broken relative Markdown link in $Path`: $target"
+    }
+}
+
 $contractPath = Join-Path $PSScriptRoot "trigger-cases.json"
 $contract = Get-Content -LiteralPath $contractPath -Raw -Encoding UTF8 | ConvertFrom-Json
 Assert-True ($contract.schema_version -eq 3) "Unsupported trigger contract schema: $($contract.schema_version)"
@@ -60,6 +81,34 @@ Assert-True ($globalItem.Length -le [int]$contract.global_max_bytes) "Global AGE
 $projectAgentsPath = Join-Path $ProjectRoot "AGENTS.md"
 $projectAgentsItem = Get-Item -LiteralPath $projectAgentsPath
 $projectAgentsContent = Get-Content -LiteralPath $projectAgentsPath -Raw -Encoding UTF8
+$readmePath = Join-Path $ProjectRoot "README.md"
+$readmeContent = Get-Content -LiteralPath $readmePath -Raw -Encoding UTF8
+$planPath = Join-Path $ProjectRoot "docs\plan.md"
+Assert-True (Test-Path -LiteralPath $planPath -PathType Leaf) "Project-wide plan entry is missing: docs/plan.md"
+Assert-True ($readmeContent.Contains("docs/plan.md")) "README does not point to docs/plan.md"
+Assert-True ($projectAgentsContent.Contains("docs/plan.md")) "Project AGENTS.md does not register docs/plan.md"
+Assert-True ($projectAgentsContent.Contains("普通组件内任务不因本条加载总计划")) "Project AGENTS.md does not keep the project-wide plan conditional"
+foreach ($ownerReadme in @(
+    "global\README.md",
+    "development\skill-routing\README.md",
+    "development\plugin-packaging\README.md",
+    "development\codex-deployment\README.md"
+)) {
+    $ownerReadmePath = Join-Path $ProjectRoot $ownerReadme
+    Assert-True (Test-Path -LiteralPath $ownerReadmePath -PathType Leaf) "Component owner README is missing: $ownerReadme"
+    Assert-True ($readmeContent.Contains($ownerReadme.Replace('\', '/'))) "Root README does not index component owner: $ownerReadme"
+    Assert-MarkdownRelativeLinks -Path $ownerReadmePath
+}
+Assert-MarkdownRelativeLinks -Path $readmePath
+Assert-MarkdownRelativeLinks -Path $planPath
+
+$planContent = Get-Content -LiteralPath $planPath -Raw -Encoding UTF8
+$subplanRows = @($planContent -split "`r?`n" | Where-Object { $_ -match '^\| [^|]+ \| \[[^]]+\]\(' })
+$formalPlanTargets = @($subplanRows | ForEach-Object {
+    $match = [regex]::Match($_, '^\| [^|]+ \| \[[^]]+\]\((?<target>[^)#]+)')
+    if ($match.Success) { $match.Groups['target'].Value }
+})
+Assert-True (($formalPlanTargets | Sort-Object -Unique).Count -eq $formalPlanTargets.Count) "Project-wide plan assigns the same formal entry to multiple subplans"
 $combinedInstructionBytes = $globalItem.Length + $projectAgentsItem.Length
 Assert-True ($combinedInstructionBytes -le 28672) "AgentBase global and project AGENTS.md files use $combinedInstructionBytes bytes; keep at least 4 KiB below Codex's default 32 KiB project instruction limit"
 Assert-True ($projectAgentsContent.Contains("本仓库文件本身不创建 Git 外部写授权")) "Project AGENTS.md must not treat repository text as self-granted Git external-write authorization"
@@ -373,19 +422,7 @@ Assert-True ($qqInstallerContent.Contains('[string]$CodexRoot')) "codex-qq-hook 
 
 $allMarkdownFiles = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot "skills") -Recurse -File -Filter "*.md"
 foreach ($markdownFile in $allMarkdownFiles) {
-    $markdown = Get-Content -LiteralPath $markdownFile.FullName -Raw -Encoding UTF8
-    foreach ($linkMatch in [regex]::Matches($markdown, '\[[^\]]+\]\((?<target>[^)]+)\)')) {
-        $target = $linkMatch.Groups["target"].Value.Trim()
-        if ($target.StartsWith("#") -or $target -match '^[a-zA-Z][a-zA-Z0-9+.-]*:') {
-            continue
-        }
-        $targetPath = ($target -split '#', 2)[0].Trim('<', '>')
-        if ([string]::IsNullOrWhiteSpace($targetPath)) {
-            continue
-        }
-        $resolvedTarget = Join-Path $markdownFile.DirectoryName ([Uri]::UnescapeDataString($targetPath))
-        Assert-True (Test-Path -LiteralPath $resolvedTarget) "Broken relative Markdown link in $($markdownFile.FullName): $target"
-    }
+    Assert-MarkdownRelativeLinks -Path $markdownFile.FullName
 }
 
 $workflowPath = Join-Path $ProjectRoot ".github\workflows\validate.yml"
@@ -427,7 +464,7 @@ Assert-True ($lifecycleContent.Contains("按稳定约束、状态与生命周期
 Assert-True ($lifecycleContent.Contains("每个适用下游必须形成可恢复的持久裁决")) "Lifecycle reference is missing downstream impact closure"
 $responsibilityDesignPath = Join-Path $ProjectRoot "development\responsibility-lifecycle.md"
 Assert-True (Test-Path -LiteralPath $responsibilityDesignPath -PathType Leaf) "Responsibility lifecycle design analysis is missing"
-Assert-True ($projectAgentsContent.Length -gt 0 -and (Get-Content -LiteralPath (Join-Path $ProjectRoot "README.md") -Raw -Encoding UTF8).Contains("development/responsibility-lifecycle.md")) "README does not index the responsibility lifecycle design analysis"
+Assert-True ($projectAgentsContent.Length -gt 0 -and $readmeContent.Contains("development/responsibility-lifecycle.md")) "README does not index the responsibility lifecycle design analysis"
 $changeSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\change-governance\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($changeSkillContent.Contains("多个入口或第二状态源的方案裁决")) "change-governance does not expose its multi-entry decision trigger"
 Assert-True ($changeSkillContent.Contains("临时路径风险评审")) "change-governance does not expose its temporary-path review trigger"
