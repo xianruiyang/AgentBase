@@ -76,7 +76,10 @@ class PrepareBenchmarkHomesTests(unittest.TestCase):
             root = Path(raw)
             installed = root / "installed"
             installed.mkdir()
-            (installed / "AGENTS.md").write_text(MODULE.current_route() + "\n", encoding="utf-8")
+            (installed / "AGENTS.md").write_text(
+                MODULE.current_route_block() + "\n",
+                encoding="utf-8",
+            )
             skills = installed / "skills"
             skills.mkdir()
             for name in ("powershell-usage", "source-query", "symbol-structure-workflow"):
@@ -113,14 +116,33 @@ class PrepareBenchmarkHomesTests(unittest.TestCase):
     def test_current_route_comes_from_project_global_truth(self) -> None:
         route = MODULE.current_route()
         self.assertTrue(route.startswith(MODULE.CURRENT_ROUTE_PREFIX))
-        self.assertIn("正式源码根", route)
-        self.assertIn("`srcq fd", route)
-        self.assertIn("`srcq rg", route)
+        self.assertIn("`srcq fd <fd argv...>`", route)
+        self.assertIn("`srcq rg <rg argv...>`", route)
+        self.assertIn("全集、不存在或唯一结论先从最近项目正式来源确认权威源码范围", route)
+        self.assertIn("并只查询该范围", route)
+        self.assertIn("不再搜索重读", route)
+        self.assertIn("文本不足才按需通过 srcq 升级 AST", route)
+        self.assertIn("真实符号语义不足才用 LSP", route)
+        self.assertIn("证据充分即停止", route)
+        self.assertNotIn("当前查询快照", route)
 
     def test_previous_migrated_route_is_replaced_only_in_candidate_text(self) -> None:
         previous = MODULE.PREVIOUS_MIGRATED_ROUTE_PREFIX + "上一版正文"
-        migrated = MODULE.replace_migrated_route(previous + "\n")
-        self.assertEqual(MODULE.current_route() + "\n", migrated)
+        previous_scope = MODULE.LEGACY_AUXILIARY_ROUTE_PREFIXES[0] + "上一版范围正文"
+        previous_escalation = MODULE.LEGACY_AUXILIARY_ROUTE_PREFIXES[1] + "上一版升级正文"
+        previous_conclusion = MODULE.LEGACY_AUXILIARY_ROUTE_PREFIXES[2] + "上一版结论正文"
+        installed = "\n\n".join(
+            (previous, previous_scope, previous_escalation, previous_conclusion)
+        ) + "\n"
+        migrated = MODULE.replace_migrated_route(installed)
+        self.assertEqual(MODULE.current_route_block() + "\n", migrated)
+        self.assertEqual(previous, MODULE.migrated_route(installed))
+
+    def test_two_rule_authority_candidate_collapses_to_one_current_route(self) -> None:
+        previous = MODULE.PREVIOUS_AUTHORITY_ROUTE_PREFIX + "上一版正文"
+        evidence = MODULE.CURRENT_EVIDENCE_ROUTE_PREFIX + "上一版范围正文"
+        migrated = MODULE.replace_migrated_route(previous + "\n\n" + evidence + "\n")
+        self.assertEqual(MODULE.current_route_block() + "\n", migrated)
         self.assertEqual(previous, MODULE.migrated_route(previous + "\n"))
 
     def test_minimal_skill_scope_is_the_default_causal_set(self) -> None:
@@ -128,7 +150,10 @@ class PrepareBenchmarkHomesTests(unittest.TestCase):
             root = Path(raw)
             installed = root / "installed"
             installed.mkdir()
-            (installed / "AGENTS.md").write_text(MODULE.current_route() + "\n", encoding="utf-8")
+            (installed / "AGENTS.md").write_text(
+                MODULE.current_route_block() + "\n",
+                encoding="utf-8",
+            )
             skills = installed / "skills"
             for name in (*sorted(MODULE.MIGRATED_SKILLS), "ue-kb"):
                 source = skills / name

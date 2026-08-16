@@ -1,0 +1,249 @@
+{
+  "schema": "agentbase.source-query-independent-audit/v3",
+  "isolation_declaration": {
+    "mode": "detached-capsule",
+    "read_scope": [
+      "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\benchmark-runs\\srcq-p10-20260816-b21\\full-v21\\audit-capsule.json"
+    ],
+    "write_scope": [
+      "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\benchmark-audits\\p10-v21\\audit-result.json"
+    ],
+    "repository_accessed": false,
+    "network_accessed": false,
+    "case_requests_executed": false,
+    "other_benchmark_assets_accessed": false
+  },
+  "capsule_sha256": "24a6519a68cb26b00fe57c7368d47642c31d02a7c1fd931d64af6384167ec3fd",
+  "experiment_identity": {
+    "declared": "0cfb891986cb89c96077427564f91720ed52619f82828e05fa84d420174859d5",
+    "summary": "0cfb891986cb89c96077427564f91720ed52619f82828e05fa84d420174859d5",
+    "recomputed": "0cfb891986cb89c96077427564f91720ed52619f82828e05fa84d420174859d5",
+    "match": true
+  },
+  "integrity": {
+    "capsule_schema": "agentbase.source-query-audit-capsule/v2",
+    "capsule_schema_valid": true,
+    "capsule_hash_scheme": "sha256-canonical-json-without-capsule_sha256",
+    "capsule_hash_recomputed": "24a6519a68cb26b00fe57c7368d47642c31d02a7c1fd931d64af6384167ec3fd",
+    "capsule_hash_match": true,
+    "experiment_schema": "agentbase.source-query-experiment/v2",
+    "results_schema": "agentbase.source-query-results/v2",
+    "experiment_identity_match": true,
+    "postflight_failures": [],
+    "postflight_pass": true,
+    "selected_case_count": 6,
+    "schedule_record_count": 12,
+    "result_record_count": 12,
+    "record_count_match": true,
+    "raw_file_hash_record_count": 28,
+    "benchmark_asset_pollution": false
+  },
+  "environment_diff_review": {
+    "declared_ok": true,
+    "unexpected": [],
+    "unexpected_count": 0,
+    "changed_count": 4,
+    "changed_paths": [
+      "AGENTS.md",
+      "bin/srcq.exe",
+      "skills/source-query/SKILL.md",
+      "skills/source-query/references/rg-fd.md"
+    ],
+    "all_changes_within_allowed_differences": true,
+    "pass": true,
+    "finding": "环境差异仅位于声明允许的 AGENTS.md、bin/srcq.exe 与 skills/source-query/** 范围，且 unexpected 为空。"
+  },
+  "per_run_quality": [
+    {
+      "run_id": "agentbase-file-discovery-control__candidate__1",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 1,
+      "answer_max_lines": 1,
+      "findings": [
+        "唯一返回 tools/srcq/docs/query-gateway.md，与 unique-path oracle 一致。"
+      ]
+    },
+    {
+      "run_id": "agentbase-file-discovery-control__candidate__2",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 1,
+      "answer_max_lines": 1,
+      "findings": [
+        "唯一返回 tools/srcq/docs/query-gateway.md，与 unique-path oracle 一致。"
+      ]
+    },
+    {
+      "run_id": "agentbase-rg-policy-sources__candidate__1",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 3,
+      "answer_max_lines": 4,
+      "findings": [
+        "给出 global/AGENTS.md 与 skills/source-query/SKILL.md，并准确概括有界直读、经 srcq 查询和证据充分即停止。"
+      ]
+    },
+    {
+      "run_id": "agentbase-rg-policy-sources__candidate__2",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 3,
+      "answer_max_lines": 4,
+      "findings": [
+        "给出两个正式来源并准确概括 required 的共同规则。"
+      ]
+    },
+    {
+      "run_id": "agentbase-provider-observation__candidate__1",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 3,
+      "answer_max_lines": 4,
+      "findings": [
+        "准确给出 dto.ts:310 的唯一定义和 Collection<T>.provider 字段 dto.ts:307；额外的 document_symbols:694 映射为 supporting 证据。"
+      ]
+    },
+    {
+      "run_id": "agentbase-provider-observation__candidate__2",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 2,
+      "answer_max_lines": 4,
+      "findings": [
+        "准确给出 dto.ts:310 的唯一定义与 dto.ts:307 的 provider 字段，并以 :694 补强泛型关系。"
+      ]
+    },
+    {
+      "run_id": "agentbase-srcq-containing-contract__candidate__1",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 4,
+      "answer_max_lines": 6,
+      "findings": [
+        "实现路径正确；明确零基半开区间、保留全部并列最小包含节点，以及源码指纹不符时拒绝复用。"
+      ]
+    },
+    {
+      "run_id": "agentbase-srcq-containing-contract__candidate__2",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 4,
+      "answer_max_lines": 6,
+      "findings": [
+        "实现路径和三项 required 契约均与 implementation-contract oracle 一致。"
+      ]
+    },
+    {
+      "run_id": "ue-command-dispatch-submit__candidate__1",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 2,
+      "answer_max_lines": 5,
+      "findings": [
+        "给出正式生产源码路径、1-based inclusive 53-84 定义范围及两个正确协议错误 code。"
+      ]
+    },
+    {
+      "run_id": "ue-command-dispatch-submit__candidate__2",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 4,
+      "answer_max_lines": 5,
+      "findings": [
+        "正式生产源码路径、定义范围和两个错误 code 全部匹配 oracle。"
+      ]
+    },
+    {
+      "run_id": "ue-hjson-isbarekey-occurrences__candidate__1",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 5,
+      "answer_max_lines": 8,
+      "findings": [
+        "按 oracle 顺序给出定义行 2655 和全部调用行 648、868、2037，并声明完整；未逐行重复语义标签不影响 required。"
+      ]
+    },
+    {
+      "run_id": "ue-hjson-isbarekey-occurrences__candidate__2",
+      "required_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "answer_line_count": 5,
+      "answer_max_lines": 8,
+      "findings": [
+        "给出正确定义、全部调用位置及完整性声明，完整覆盖正式生产源码 required 范围。"
+      ]
+    }
+  ],
+  "quality_summary": {
+    "run_count": 12,
+    "required_pass_count": 12,
+    "required_fail_count": 0,
+    "line_limit_pass_count": 12,
+    "line_limit_fail_count": 0,
+    "evidence_complete_count": 12,
+    "answer_line_count_total": 37,
+    "all_required_pass": true,
+    "all_line_limits_pass": true
+  },
+  "usage_summary": {
+    "run_count": 12,
+    "usage_complete_runs": 12,
+    "usage_complete_for_all_runs": true,
+    "per_run_identities_pass": true,
+    "aggregate_matches_report": true,
+    "identities_checked": [
+      "actual_total_tokens = input_tokens + output_tokens",
+      "visible_output_tokens = output_tokens - reasoning_output_tokens",
+      "ordinary_input_tokens = input_tokens - cache_read_input_tokens - cache_write_input_tokens"
+    ],
+    "totals": {
+      "input_tokens": 1057678,
+      "cache_read_input_tokens": 870144,
+      "cache_write_input_tokens": 0,
+      "ordinary_input_tokens": 187534,
+      "output_tokens": 8792,
+      "reasoning_output_tokens": 3925,
+      "visible_output_tokens": 4867,
+      "actual_total_tokens": 1066470
+    }
+  },
+  "tool_summary": {
+    "recorded_command_execution_count": 45,
+    "recorded_tool_item_count": 45,
+    "answer_line_count_total": 37,
+    "all_commands_completed": true,
+    "run_exit_codes_all_zero": true,
+    "timed_out_run_count": 0,
+    "invalid_json_line_count": 0
+  },
+  "failures": [],
+  "decision": {
+    "status": "pass",
+    "required_gate": "12/12",
+    "line_limit_gate": "12/12",
+    "identity_pass": true,
+    "postflight_pass": true,
+    "usage_pass": true,
+    "environment_pass": true,
+    "benchmark_asset_pollution": false,
+    "rationale": "12/12 required 与 12/12 line limit 均通过；identity、postflight、usage、environment 全部成立，且 capsule 未声明 benchmark 资产污染。"
+  },
+  "limitations": [
+    "裁决仅基于指定 detached audit capsule 内的 prompt、answer_contract.required、answer_max_lines、结构化 oracle、最终答案和工具记录。",
+    "未访问仓库、网络、其他 capsule/result、历史或隐藏期望，也未执行任何 case 请求。",
+    "answer_contract.supporting 仅用于验证正确性或记录更强证据，未被提升为最终答案必答字段。"
+  ]
+}

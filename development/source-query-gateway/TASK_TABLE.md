@@ -6,26 +6,26 @@
 
 | 状态 | 数量 |
 | --- | ---: |
-| todo | 1 |
+| todo | 0 |
 | claimed | 0 |
 | in_progress | 0 |
 | review | 0 |
 | blocked | 0 |
-| done | 50 |
+| done | 54 |
 | retired | 1 |
 
 ## 复核与结果
 
 - 需复核任务：0
-- 当前可读取结果：50
-- 含验证结果：50
-- 含未决结果：8
+- 当前可读取结果：54
+- 含验证结果：54
+- 含未决结果：10
 - 合同修订后陈旧结果：0
 
 ## 上游状态
 
 - 用户确认快照：protected
-- 可修订上游未决：2
+- 可修订上游未决：0
 - 延后讨论项：1
 
 ## 任务
@@ -83,4 +83,7 @@
 | TSQG-079 | done | codex-root | 固化普通查询最小语法与定向错误恢复 | TSQG-078:hard | results/TSQG-079.r4.json | 1 |
 | TSQG-080 | done | codex-root | 把 AST 与 LSP 升级改为证据缺口驱动 | TSQG-077:hard | results/TSQG-080.r4.json | 1 |
 | TSQG-081 | done | codex-root | 接入三项根因修正并冻结新测试 identity | TSQG-078:hard, TSQG-079:hard, TSQG-080:hard | results/TSQG-081.r4.json | 1 |
-| TSQG-082 | todo | — | 审计高成本证据轮次并裁决最小修正层 | TSQG-073:hard | — | 1 |
+| TSQG-082 | done | codex-root | 审计高成本证据轮次并裁决最小修正层 | TSQG-073:hard | results/TSQG-082.r8.json | 1 |
+| TSQG-083 | done | codex-root | 接入最小证据闭环与普通首查边界 | TSQG-082:hard | results/TSQG-083.r4.json | 2 |
+| TSQG-084 | done | codex-root | 审计可观察决策链并运行 P10 受影响候选 | TSQG-083:hard | results/TSQG-084.r8.json | 4 |
+| TSQG-085 | done | codex-root | 完成 P10 与需求逐项审计 | TSQG-084:hard | results/TSQG-085.r4.json | 2 |

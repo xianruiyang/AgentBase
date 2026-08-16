@@ -9,7 +9,7 @@
 - 状态: verified
 - 关联: DES-SQG-001, DES-SQG-002, DES-SQG-003
 
-当前 `srcq 0.3.0` 保留迁移前 AST 顶层命令，并以 `srcq rg <native argv...>`、`srcq fd <native argv...>` 提供不抢占任何原生 token 的普通入口；定向 model、machine、native、artifact、diagnostic 与 continuation 位于独立的 `srcq query <rg|fd> ...` 控制面。rg/fd 原生 argv 保留顺序、重复、空值和 Windows 非 UTF 参数，机器参数插入原生命令 `--` 之前；不能安全结构化的调用可用 native、artifact 或 passthrough 保持原生字节和副作用语义。迁移前 `_sgy` 与 `sgy.*` 数据协议继续保留以读取既有 AST 产物，但仓库不提供 `sgy.exe` 命令别名。
+当前 `srcq 0.3.1` 保留迁移前 AST 顶层命令，并以 `srcq rg <native argv...>`、`srcq fd <native argv...>` 提供不抢占任何原生 token 的普通入口；定向 model、machine、native、artifact、diagnostic 与 continuation 位于独立的 `srcq query <rg|fd> ...` 控制面。rg/fd 原生 argv 保留顺序、重复、空值和 Windows 非 UTF 参数，机器参数插入原生命令 `--` 之前；不能安全结构化的调用可用 native、artifact 或 passthrough 保持原生字节和副作用语义。迁移前 `_sgy` 与 `sgy.*` 数据协议继续保留以读取既有 AST 产物，但仓库不提供 `sgy.exe` 命令别名。
 
 29 个 ripgrep 15.1.0 与 fd 10.4.2 公开模式样本均有唯一分类，7 个 raw/artifact oracle 已逐字回放。`defaults` 只解释参数和模式，不发现或启动引擎。
 
@@ -20,7 +20,7 @@
 
 直接反例曾证明旧实现先按 rg 原始 match/context 事件分页、再投影 files/locations/summary：`summary --limit 1` 为已经完整的摘要生成无意义续页；files 把匹配事件数当作文件数；带 context 的 locations 第一页可为空却声称已展示一项。当前实现改为先形成视图自己的证据单元，再计算总量与分页；summary 是终止视图，files 按去重后的匹配文件分页，locations 只按匹配位置分页。相应真实集成回归已覆盖普通 rg、fd、native files、count 和 vimgrep。
 
-普通 model 成功结果只返回证据正文；完整结果不附加 envelope、schema、固定回执或 backend/version/view 等内部元数据。只有续页、截断、错误或恢复需要时才追加最短差异信息；显式 `--receipt full`、machine、native 与 artifact 仍可取得其请求对象。完整默认结果不再计算或持久化无消费者的 snapshot；只有续页或 full 回执需要身份时才计算 hash、原子持久化并返回精确 cursor。进程与持久 snapshot 的既有上限、hash 和混用拒绝仍保留。
+普通 model 成功结果只返回证据正文；完整结果不附加 envelope、schema、固定回执或 backend/version/view 等内部元数据。只有续页、截断、错误或恢复需要时才追加最短差异信息；显式 `--receipt full`、machine、native 与 artifact 仍可取得其请求对象。直接入口在完整结果不超过 512 个证据单元且完整表示仍落在原 2048 estimated-Token 总预算时越过初始 80 项限制；单文件只有在同一总预算内才把单行正文上限提高到 1024，多文件或更大结果仍分页。完整默认结果不再计算或持久化无消费者的 snapshot；只有续页或 full 回执需要身份时才计算 hash、原子持久化并返回精确 cursor。进程与持久 snapshot 的既有上限、hash 和混用拒绝仍保留。
 
 fd 会冻结对象类型并为每个显式根建立可逆 trie；只有估算 Token 确实低于 flat 时 auto 才选 tree。rg 普通 batch 消费原生 JSON 事件，grouped、records、locations、files、summary 与 lossless 均在相同证据签名内选择；count、vimgrep 和特殊模式使用独立严格解析或透传。
 
@@ -45,7 +45,7 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 现有 `development/code-search-benchmark` 已扩展为本项目唯一的 corpus、环境身份、`codex exec --json --ephemeral` monitor、A-B-B-A 调度、受影响 case 选择、usage 汇总和 detached audit capsule owner。语料绑定来源文件 hash，并用 `answer_contract.required` 区分 prompt 必答内容与只用于证明正确性的 supporting facts；环境只允许显式差异，失败和超时不被静默替换。capsule 声明可独立复算的规范化哈希算法。历史安装态、收紧候选、五-skill 消融与裸环境数字以各自证据上限登记，不跨 identity 拼接。
 
-失败的运行前置审计确认四个互相独立的问题：read-only sandbox 在模型执行前拦截真实 `srcq` 查询；未初始化的隔离 home 会在首次 subject 内刷新系统 skill；复制全部安装 skill 会因大型无关知识库触发 CLI 扫描上限；未预登记工作区 trust 会在首次访问后改写两侧 `config.toml`，使冻结身份失效。此外，旧 `target/release/srcq.exe` 虽报告同版本，却仍使用过时参数入口。当前 owner 已要求 `danger-full-access + approval_policy=never`，仍以只读 prompt 和运行后身份读回约束副作用；prepare 会绑定 Codex 二进制 hash，预登记正式工作区，先执行并单独计量 control/candidate 代表性命令，再冻结环境。隔离 home 默认只复制因果 skill 集并拒绝 `%TEMP%` 路径；候选 srcq 复制前必须通过真实直觉入口。大型工作区可声明相对 identity scope，oracle 必须落在该范围内，范围内的 patch 与未跟踪内容仍完整哈希。当前非运行型验证覆盖 benchmark owner 26 项与 home 准备 9 项测试；正式 corpus 已在新的同身份环境中运行，结果见 GAP-SQG-007。
+失败的运行前置审计确认四个互相独立的问题：read-only sandbox 在模型执行前拦截真实 `srcq` 查询；未初始化的隔离 home 会在首次 subject 内刷新系统 skill；复制全部安装 skill 会因大型无关知识库触发 CLI 扫描上限；未预登记工作区 trust 会在首次访问后改写两侧 `config.toml`，使冻结身份失效。此外，旧 `target/release/srcq.exe` 虽报告同版本，却仍使用过时参数入口。当前 owner 已要求 `danger-full-access + approval_policy=never`，仍以只读 prompt 和运行后身份读回约束副作用；prepare 会绑定 Codex 二进制 hash，预登记正式工作区，先执行并单独计量 control/candidate 代表性命令，再冻结环境。隔离 home 默认只复制因果 skill 集并拒绝 `%TEMP%` 路径；候选 srcq 复制前必须通过真实直觉入口。大型工作区可声明相对 identity scope，oracle 必须落在该范围内，范围内的 patch 与未跟踪内容仍完整哈希。当前非运行型验证覆盖 benchmark owner 27 项与 home 准备/路由 11 项测试；正式 corpus 已在新的同身份环境中运行，结果见 GAP-SQG-007 与 GAP-SQG-008。
 
 ## OBS-SQG-006 上一冻结身份的行为与收益证据已经闭环
 
@@ -69,9 +69,9 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 隔离生命周期测试覆盖幂等安装、状态读回、新 PowerShell 进程 PATH 解析、升级提交失败回滚、恶意 ZIP 与篡改状态拒绝、正常升级、保留并发 PATH 修改、未知安装文件、用户配置和默认 cache，以及显式 cache 清理。`Status` 现会复核 manifest 身份、全部受管文件哈希、实际版本和唯一 PATH 项；同版本 `Install` 能修复被篡改二进制或缺失 PATH。真实 Codex Publish 在写入前复用该状态与 `doctor`，缺失运行时会局部阻断；部署沙箱不消费宿主安装。正式 skill、部署与插件合同已经退出私有运行时和旧查询 skill。
 
-当前 `0.3.0` 源码快照 `sha256:35fc5293e472f372184bdfdbe605ed20fd0556a5b800fffb56ddd581ed9a212f` 已生成 Windows x86_64 MSVC 归档，归档 SHA-256 为 `00cfdebd21a25faa9a7d517c68aedda407df4681541144fda2723851fb4da8a0`。隔离生命周期用上一份 `0.2.0` 归档升级到该 `0.3.0` 候选，安装、幂等、完整性读回、受管漂移修复、新进程 PATH、失败回滚、恶意 ZIP、篡改 state、真实升级、doctor、卸载边界、并发 PATH、配置/cache 保留与显式 cache 清理全部通过；没有写入真实用户安装位置。
+首个独立运行时 `0.3.0` 的源码快照和归档只保留为历史安装证据。当前 `0.3.1` 归档已通过从 `0.3.0` 升级的隔离生命周期：安装、幂等、完整性读回、受管漂移修复、新进程 PATH、失败回滚、恶意 ZIP、篡改 state、真实升级、doctor、卸载边界、并发 PATH、配置/cache 保留与显式 cache 清理全部通过；测试没有写入真实用户安装位置。
 
-上一冻结 AST 身份以本机受支持的原生 ast-grep 0.44.1 绑定明确版本 oracle 后，15 项 ignored 真实引擎测试通过，覆盖 run/scan/rewrite、cache/process、LSP、TTY、completion、new/test、失败/取消和 Windows Console Ctrl-C。本轮恢复了顶层 help 中原有 Operational、cache 与 process 语法提示，并用只投影 AST 表面的基线比较证明当前 `0.3.0` 未因新增 rg/fd/query 行发生 AST help/schema/capabilities 回退。
+上一冻结 AST 身份以本机受支持的原生 ast-grep 0.44.1 绑定明确版本 oracle 后，15 项 ignored 真实引擎测试通过，覆盖 run/scan/rewrite、cache/process、LSP、TTY、completion、new/test、失败/取消和 Windows Console Ctrl-C。后续 `0.3.1` 仍用只投影 AST 表面的基线比较证明新增 rg/fd/query 行没有造成 AST help/schema/capabilities 回退。
 
 ## OBS-SQG-008 LSP 原生渐进发现已经通过候选侧实测
 
@@ -131,12 +131,110 @@ capsule `b2636807dd68b69eafd5cc203ef7670b714779002dfccfb528a5c389312adf4a` 由�
 
 三个相对历史上升的任务共消耗 `771,535` Token、28 次工具命令；历史对应任务为 `657,616` Token、17 次工具调用。逐案结果仍全部正确且命令无失败，因此这些增量不能归因于旧版失败恢复，也不能仅凭调用数认定冗余。现有证据只支持把权威范围确认、名称定位、完整正文、关系映射、依赖续查和重复确认逐条分类，判断哪些回合相互独立、哪些必须顺序执行、哪些暴露真实工具能力缺口；在完成该审计前，不能把新增 `inspect`、批量查询或更强常驻规则当成既定方案。
 
-## GAP-SQG-008 高成本查询尚未证明最少必要证据轮次
+## OBS-SQG-014 P10 第一阶段轮次审计只证明命令面可表达
 
-- 状态: open
+- 状态: superseded
+- 关联: AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-006, AC-SQG-007, DES-SQG-014, UDES-SQG-012, UDES-SQG-013, OBS-SQG-013, DEC-SQG-001
+
+[round-trip-audit-p10.md](evidence/round-trip-audit-p10.md) 已把三个上升 case 的 6 个 run、28 次命令逐项绑定到前置知识、直接产出和后续消费；数量、`771,535` Token 与 106,219 个 stdout 字符均与原始记录对账。反事实证据图在不新增命令的条件下得到约 10 次调用的表达下界：Provider 的多个 anchor 在请求时已知，可一次取得；containing 必须先定位文件，再同轮读取两个已知范围；HJSON 必须先裁决正式源码 owner，再做范围内全集查询。后两类真实依赖被保留，没有为减少回合而强行并发。
+
+该审计当时把“已有命令能够表达答案”错误外推成“默认工具输出没有能力缺口”。v1-v4 的 106 次命令和同一捕获对照已经推翻该外推：固定页会在单文件完整结果中返回 `@more`，模型随后重复猜锚点和重查。约 10 次仍是有用的表达下界，但不能独立决定职责；更新后的归因与裁决见 [round-trip-audit-p10.md](evidence/round-trip-audit-p10.md) 第 5 节。
+
+## OBS-SQG-015 P10 第一版规则候选通过三阶段独立路由验证
+
+- 状态: verified
+- 关联: AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-006, AC-SQG-007, DES-SQG-014, UDES-SQG-012, UDES-SQG-013, OBS-SQG-014
+
+第一版全局规则要求先确定当前结论的最小证据闭环：输入已知、彼此独立且有界的证据在同一决策内取得，只有后续输入依赖前一步、候选仍需消歧或结果可能无界时才分轮；普通文本首查不加载高级查询 skill、入口文档、help、doctor 或输出参数，所有 fd、rg 与 AST 查询仍经 `srcq`。`source-query` 同步收窄到文本路径之后的 AST、特殊协议或只读 LSP 证据，语义编辑继续由既有编辑 owner 承担；任务表和变更治理的描述也只消除本次独立评估直接暴露的非职责触发，没有新增执行入口。
+
+三个新案例覆盖独立有界证据、依赖权威范围和普通首查边界。候选 bundle `47D9E58F…E7742` 的静态合同为 68 个案例、33 个 strict 案例，三个脱离仓库的独立 Codex 运行分别覆盖 68 个路由、68 个行为策略和 13 个引用选择，全部通过；正式部署 `Validate` 也通过。该证据只证明第一版规则结构、路由边界和发布合同成立；OBS-SQG-016 已证明它不能满足真实模型的质量与成本目标，后续规则身份必须重新刷新三阶段证据。
+
+## OBS-SQG-016 P10 第一版真实候选未达到质量与总成本目标
+
+- 状态: verified
+- 关联: AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-007, DES-SQG-010, DES-SQG-014, UDES-SQG-007, UDES-SQG-012, UDES-SQG-013, OBS-SQG-015
+
+candidate-only identity `34b6fd64…1360c` 在正常速度、medium、full access、approval never 下完成三个受影响 case 各两次，P9 与冻结五-skill 历史未重跑。确定性 capsule 验证覆盖 16 个原始文件和 2 个环境文件；detached 审计结果见 [iteration-audit-p10-v1.md](evidence/iteration-audit-p10-v1.md) 与 [audit-result-p10-affected-v1.json](evidence/audit-result-p10-affected-v1.json)。
+
+六次运行总 Token `748,591`、26 次命令、耗时 `269.370 s`；相对 P9 同六次只读记录仅少 2.97% Token 和 2 次命令，短/长价格等价反而上升 19.39%/20.29%，且 required 质量 4/6、strict 质量 1/6。containing 两次在定位唯一实现后仍读取 README、测试和多轮同义锚点，达到 `446,292` Token、15 次命令；最终答案还普遍遗漏关系、行号或完整性适用范围。第一版因此不采纳。直接机制支持把规则改为“每个工具轮次对应一个真实依赖层”、按完整闭环总 Token 裁决、直接实现充分后停止次级旁证，并明确最终压缩必须保留关系、范围、完整性与可定位依据；它仍不支持新增 srcq 命令。
+
+## OBS-SQG-017 P10 第二版降低总 Token 但未守住质量顺序
+
+- 状态: verified
+- 关联: AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-007, DES-SQG-014, OBS-SQG-016
+
+candidate-only identity `5047af5e…cb61` 在相同三个受影响 case 上得到 `618,630` Token、23 次命令和 `248.378 s`；相对 P9 同六次记录少 19.82% Token 与 17.86% 命令，但短/长价格等价仍高 0.20%/0.13%，detached 审计只有 required 5/6、strict 2/6。Provider 已收敛，containing 仍追溯不改变请求职责结论的旁证，最终源码定位未逐项覆盖；HJSON 完整性没有稳定写出正式范围与当前快照。证据见 [iteration-audit-p10-v2.md](evidence/iteration-audit-p10-v2.md)。
+
+## OBS-SQG-018 P10 第三版形成成本净收益但仍未达到封闭质量
+
+- 状态: verified
+- 关联: AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004, AC-SQG-007, DES-SQG-010, DES-SQG-014, OBS-SQG-017
+
+candidate-only identity `7e2bf242…7bef` 得到 `542,658` Token、23 次命令和 `220.346 s`；相对 P9 少 29.67% Token、短/长价格等价低 1.36%/0.80%，耗时基本持平。源码事实均可由当前实现直接支持，但 containing 的最终定位仍未稳定逐项对应三项结论，HJSON 两次都省略快照限定；一次广域实现查询还返回 benchmark corpus 路径，因此该身份在 detached 审计前已经明确不满足封闭验收，没有为已否定候选继续支付独立审计成本。证据见 [iteration-audit-p10-v3.md](evidence/iteration-audit-p10-v3.md)。
+
+正式 v6 oracle 与源码都表明 `FUeAgentStructuredHjsonFormatter::IsBareKey` 定义位于 2655，调用位于 648、868、2037；分支 seed 的旧相反标注已同步纠正，不把 oracle 缺陷误判为候选行为。
+
+## OBS-SQG-019 P10 第四版操作约束引发成本反弹
+
+- 状态: verified
+- 关联: AC-SQG-001, AC-SQG-002, AC-SQG-003, DES-SQG-014, UDES-SQG-013, OBS-SQG-018
+
+candidate-only identity `980e4d0d…4104` 得到 `720,707` Token、34 次命令和 `282.026 s`。相对 v3 增加 `178,049` Token、11 次命令和 `61.680 s`；containing 两次为 6/8 次命令，HJSON 一次达到 12 次，最终定位和范围/快照双限定仍不稳定。直接预审已足以否定候选，证据见 [iteration-audit-p10-v4.md](evidence/iteration-audit-p10-v4.md)。这证明把稳定根原则展开为“同次调用、首查全部锚点、已知章节不得列目录”等操作配方会增加模型规划与复核压力；第五版因此撤回这些表层指令，只保留请求职责范围和最终证据保真。
+
+## OBS-SQG-020 P10 全链路归因已形成工具与规则的职责拆分
+
+- 状态: superseded
+- 关联: AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-007, DES-SQG-004, DES-SQG-014, UDES-SQG-003, UDES-SQG-013, DEC-SQG-001, OBS-SQG-019
+
+四轮使用同一项目快照，v3/v4 还使用同一 srcq 二进制；因此项目 `AGENTS.md` 是端到端真实成本但不是候选差异。直接投影对照证明固定页本身制造单文件恢复回合：Provider 的 82 行分页结果可在增加 888 个字符后完整覆盖映射，containing 的完整单文件投影与五次分页后重查的累计 stdout 同量级。第一实现让单一来源使用最多 8192 estimated Token 和 1024 字符正文；OBS-SQG-021 已证明该策略没有覆盖真实高成本命令链，不能作为默认合同保留。
+
+## OBS-SQG-021 P10 第五版暴露高级 skill 误触发且成本反向
+
+- 状态: verified
+- 关联: AC-SQG-001, AC-SQG-002, AC-SQG-003, DES-SQG-004, DES-SQG-014, UDES-SQG-003, UDES-SQG-013, OBS-SQG-020
+
+candidate-only identity `763f0b78…d21da` 的 6 次运行全部正常退出、usage 完整且无 postflight 漂移，总 Token `823,177`、39 次命令、`309.314 s`，明显差于 v3；确定性 capsule `aa7c118e…18a69` 验证 16 个原始文件和 2 个环境文件。五个 run 在首次普通文本查询前加载 `source-query`，HJSON 一次还预加载 rg/fd 与 LSP 引用；另一个 run 先调用 `srcq rg --help`。v5 的 8192 单文件闭环没有覆盖这些链路，因为 locator 是多文件结果，文件确定后模型改用直接读取。直接答案还缺 containing 逐项行范围和一次 HJSON 范围/快照限定，因此没有进入 detached 审计或 12-run。完整记录见 [iteration-audit-p10-v5.md](evidence/iteration-audit-p10-v5.md)。
+
+## OBS-SQG-022 P10 第七版收敛为同预算闭环和专项 skill
+
+- 状态: superseded
+- 关联: AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-007, DES-SQG-004, DES-SQG-014, UDES-SQG-003, UDES-SQG-013, OBS-SQG-021
+
+第七版实现只在完整结果不超过 512 个证据单元且仍落在原 2048 estimated-Token 总预算时越过初始 80 项限制；单一来源可用 1024 字符单行重新评估，但总预算不增加。多来源或更大结果保持 80/2048/240，显式控制面保持调用方精确预算。全局源码路由仍只有一条，`source-query` 收为分页/截断、明确 AST、特殊输出或文本后真实语义歧义的专项入口。组件定向回归通过；随后真实 v7 的结果见 OBS-SQG-023，并证明工具边界成立但规则仍有已知正文重搜问题。
+
+## OBS-SQG-023 P10 第七版把剩余成本收敛到已知正文重搜
+
+- 状态: verified
+- 关联: AC-SQG-001, AC-SQG-002, AC-SQG-003, DES-SQG-014, UDES-SQG-013, OBS-SQG-022
+
+candidate-only identity `93931b4c…9eac2` 的总 Token 为 `736,203`、27 次命令、`272.050 s`。Provider 两次稳定为 2/2 命令，HJSON 为 3/5，证明普通高级 skill 误触发基本退出；containing 却为 7/8 个命令、`390,993` Token，并在唯一文件确定后继续用宽泛 anchor 与 context 搜索正文和 fingerprint 上游。确定性 capsule `ed7c7bc4…80d67` 已验证，直接 strict 失败使本身份不进入 detached 审计。证据见 [iteration-audit-p10-v7.md](evidence/iteration-audit-p10-v7.md)。
+
+## OBS-SQG-024 P10 后续迭代区分候选规则与项目规则成本
+
+- 状态: verified
+- 关联: AC-SQG-001, AC-SQG-002, AC-SQG-003, DES-SQG-014, UDES-SQG-013, OBS-SQG-023
+
+第八版把全局源码规则压成“srcq 搜索、已知正文直读、文本不足升级、证据保真”，得到 `556,677` Token、22 次命令和 `258.587 s`，但一次广域查询读取 benchmark seed，且最终范围、快照和实现范围仍不稳定，不能采纳。后续身份分别收紧权威范围、普通续页和仅审查规则时的高级 skill 非触发；v19 完整 12-run 又升至 `1,340,388` Token、51 次命令。逐命令证据表明 AgentBase 的只读 case 多次因项目“修改前读取 README”条款加载根 README，这不是 srcq 输出或全局查询路由能纠正的职责。
+
+项目规则因此只补充一个根本范围：纯只读源码定位只读取回答所缺的正式来源，不因修改前置条款加载 README。相同六个受影响 run 在 v20 为 `528,450` Token、20 次命令，较 v19 对应六次的 `778,895` Token 明显下降，且没有根 README 读取；这证明修正位于项目规则适用边界，而不是用 benchmark 特例或查询命令配方吸收。
+
+## OBS-SQG-025 P10 最终候选保持质量并降低总 Token
+
+- 状态: verified
+- 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-004, AC-SQG-006, AC-SQG-007, AC-SQG-008, DES-SQG-004, DES-SQG-008, DES-SQG-010, DES-SQG-014, UDES-SQG-003, UDES-SQG-007, UDES-SQG-012, UDES-SQG-013, OBS-SQG-024
+
+最终 v21 identity `0cfb891986cb89c96077427564f91720ed52619f82828e05fa84d420174859d5` 完成六类任务各两次：12/12 required、12/12 可见行限和 12/12 evidence complete 通过，45 次命令全部成功，usage 完整且 postflight 无漂移。总 Token `1,066,470`，其中普通输入 `187,534`、缓存输入 `870,144`、输出 `8,792`、推理输出 `3,925`、可见输出 `4,867`；耗时 `480.739 s`，短/长价格等价 `327,300.4` / `628,224.8`。
+
+相对 P9 同为 12/12 的最终候选，Token 少 `84,058`（`-7.31%`），命令少 3 次（`-6.25%`），但耗时增加 `117.576 s`（`+32.38%`）。质量不退化且第二优先级 Token 明显下降，因此采纳；速度没有改善，不外推为全面性能提升。detached auditor 只读取指定 capsule，复算 experiment identity、canonical capsule hash、usage、环境差异和逐案质量后通过；结果见 [iteration-audit-p10-v21.md](evidence/iteration-audit-p10-v21.md)、[audit-result-p10-v21.json](evidence/audit-result-p10-v21.json) 与 [capsule-verification-p10-v21.json](evidence/capsule-verification-p10-v21.json)。最终规则身份又由三个不同 evaluator 完成 69/69 首次路由、69/69 行为策略和 13/13 引用选择，当前 bundle 为 `E721424A…A63DEB`。
+
+## GAP-SQG-008 高成本查询的共享明显改进已经收敛
+
+- 状态: resolved
 - 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-003, AC-SQG-007, DES-SQG-014, UDES-SQG-002, UDES-SQG-003, UDES-SQG-012, UDES-SQG-013, OBS-SQG-013
 
-当前候选已经满足质量、输出和可靠性合同，但三个高成本任务在多个模型回合中分别取得范围、定位、正文和关系证据。尚无完整归因能证明这些回合是任务固有依赖、模型未按闭环规划，还是现有 srcq 无法在保持边界和失败语义时共同返回必要证据。缺口不是“缺少一个名为 `inspect` 的命令”，而是缺少可复核的最小证据图、全部 28 次调用的分类以及每个拟合并回合的证据等价证明。只有这些输入完成后，才能裁决无需改动、精炼稳定规划原则、扩展既有命令域或新增高层入口中的最小充分方案。
+OBS-SQG-014 的早期纯规则结论已由后续命令链推翻；v1-v4 证明微观操作配方在质量与规划压力之间摆动，v5 否定高预算默认与过宽高级 skill，v7-v8 暴露已知正文重搜和权威范围污染，v19-v20 又把项目规则误用与候选规则成本分离。最终职责是：srcq 只在原总预算内承担机械可证有界闭环；全局规则承担权威范围、已知正文直读、按证据升级与充分即停；项目规则不把修改前置读取外推到纯只读定位。
+
+v21 以 12/12 独立质量和 `1,066,470` Token 关闭本缺口。重复运行仍有正常命令选择波动，且耗时较 P9 上升；但当前记录没有共享失败、错误入口、截断或缺失能力能支持另一项低风险高收益修改。继续增加锚点、固定次数、阅读顺序或更大默认输出会重复已证实的反作用。因此“收益边缘”只在当前 corpus、模型、项目快照和 Provider 条件内成立；新失败、协议变化、新消费者或可重复共享机制出现时重新打开，不把当前数值固化为运行规则。
 
 ## GAP-SQG-007 查询意图入口与自适应模型输出已经闭环
 

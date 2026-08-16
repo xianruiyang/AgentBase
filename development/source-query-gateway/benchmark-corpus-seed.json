@@ -74,11 +74,11 @@
       "answerMaxLines": 8,
       "historicalOracle": {
         "fileSuffix": "UeAgentStructuredHjsonFormatter.cpp",
-        "definitionLine": 648,
+        "definitionLine": 2655,
         "callLines": [
+          648,
           868,
-          2037,
-          2655
+          2037
         ],
         "requiresCompletenessStatement": true
       }

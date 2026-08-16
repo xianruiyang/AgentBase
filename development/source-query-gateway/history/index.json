@@ -52,6 +52,75 @@
         "no surviving detached semantic audit artifact",
         "raw lexical oracle scores cannot substitute for the historical semantic review"
       ]
+    },
+    {
+      "id": "2026-08-16-p9-final-candidate",
+      "status": "verified-candidate-only",
+      "result": {
+        "experiment_identity": "e32871ba9c0f8b19716e7b191260c29666939879215350baa4604d1bfd9c7ac4",
+        "audit_artifact": "development/source-query-gateway/evidence/audit-result-v15.json",
+        "audit_sha256": "5a8d8d797ef8b8ed1a8a46dd5a30de5bbab8bc9d940c92030f60c441b0b64b30",
+        "capsule_verification_artifact": "development/source-query-gateway/evidence/capsule-verification-v15.json",
+        "capsule_verification_sha256": "377a5cbbfef460c02f405ed21694bb912c054ed9d5d695dafdd7bb1ecefe4657"
+      },
+      "aggregates": {
+        "records": 12,
+        "input_tokens": 1140588,
+        "cached_input_tokens": 932096,
+        "output_tokens": 9940,
+        "reasoning_output_tokens": 4699,
+        "total_tokens": 1150528,
+        "elapsed_ms": 363163,
+        "command_count": 48,
+        "required_passed": 12,
+        "line_limit_passed": 12
+      },
+      "identity_limits": [
+        "candidate-only evidence; not a same-identity control comparison",
+        "covers the frozen v6-era corpus, model, workspace snapshots and environment only",
+        "published Codex state is recorded separately from project-source verification"
+      ]
+    },
+    {
+      "id": "2026-08-16-p10-v21-final-candidate",
+      "status": "verified-candidate-only",
+      "result": {
+        "experiment_identity": "0cfb891986cb89c96077427564f91720ed52619f82828e05fa84d420174859d5",
+        "audit_artifact": "development/source-query-gateway/evidence/audit-result-p10-v21.json",
+        "audit_sha256": "7c309f0c7fadc934549bf32f7e137c5bb6a17108f66895ae790abbb3e444db40",
+        "capsule_verification_artifact": "development/source-query-gateway/evidence/capsule-verification-p10-v21.json",
+        "capsule_verification_sha256": "4cb4e4094a5155796e49708751b199436ace8b4d7b5fd8afe316eb7f25bf085a"
+      },
+      "aggregates": {
+        "records": 12,
+        "input_tokens": 1057678,
+        "cached_input_tokens": 870144,
+        "ordinary_input_tokens": 187534,
+        "output_tokens": 8792,
+        "reasoning_output_tokens": 3925,
+        "visible_output_tokens": 4867,
+        "total_tokens": 1066470,
+        "elapsed_ms": 480739,
+        "command_count": 45,
+        "required_passed": 12,
+        "line_limit_passed": 12,
+        "evidence_complete": 12,
+        "short_price_equivalent": 327300.4,
+        "long_price_equivalent": 628224.8
+      },
+      "comparison_to_p9": {
+        "total_token_delta": -84058,
+        "total_token_percent": -7.306,
+        "command_delta": -3,
+        "elapsed_ms_delta": 117576,
+        "elapsed_percent": 32.38
+      },
+      "identity_limits": [
+        "candidate-only evidence; comparison to P9 is not a same-identity A/B causal estimate",
+        "covers corpus v10, gpt-5.6-sol medium/default, frozen AgentBase and GptProjectTest snapshots, and the declared providers only",
+        "quality and Token improved in the required priority order; elapsed time regressed",
+        "Codex installation remains the prior published state until separately authorized"
+      ]
     }
   ]
 }

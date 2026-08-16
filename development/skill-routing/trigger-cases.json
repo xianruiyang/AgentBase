@@ -34,7 +34,8 @@
     "local_mechanical_gates",
     "collaborative_requirement_insight",
     "quality_token_speed_order",
-    "vertical_validation_closure"
+    "vertical_validation_closure",
+    "minimal_evidence_closure"
   ],
   "behavior_tag_definitions": {
     "read_only": "请求只授权分析、解释、审查或查询，不修改文件、进程或外部状态。",
@@ -54,7 +55,8 @@
     "local_mechanical_gates": "CLI 只对可机械证明、局部且可恢复的操作危险设门禁，并返回原因与恢复动作。",
     "collaborative_requirement_insight": "把初始请求作为共同理解的输入，结合证据识别会改变结果的隐含条件、冲突和维护需求，与用户校准且保留用户最终裁决。",
     "quality_token_speed_order": "先选择需求对齐、正确、安全、可维护且有完成证据的方案；质量同等充分时降低 Token，前两者不变差时再提速。",
-    "vertical_validation_closure": "有效规划后，在依赖、关键风险、共享前置和质量允许时限制无必要的横向展开，优先沿当前目标链形成最近可验证闭环，并用证据确认或修正方案、设计和需求达成状态。"
+    "vertical_validation_closure": "有效规划后，在依赖、关键风险、共享前置和质量允许时限制无必要的横向展开，优先沿当前目标链形成最近可验证闭环，并用证据确认或修正方案、设计和需求达成状态。",
+    "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。"
   },
   "peer_skills": [
     {
@@ -71,9 +73,12 @@
     "specified-local-implementation",
     "one-off-generated-artifact",
     "literal-text-search",
+    "source-query-rule-review",
     "complete-known-name-position-list",
     "known-small-definition-range",
     "known-implementation-reading",
+    "independent-bounded-source-evidence",
+    "dependent-authority-source-evidence",
     "ast-no-match-needs-source-evidence",
     "bounded-file-discovery",
     "powershell-command-authoring",
@@ -376,10 +381,9 @@
       "id": "ast-no-match-needs-source-evidence",
       "kind": "boundary",
       "request": "一次 AST pattern 查询没有匹配。请决定下一步：当前还没读取实际候选源码，不允许只改写 pattern 连续试探；先取得能改变语言、节点形状、限定名或 strictness 判断的源码证据，否则返回文本路径。只读处理。",
-      "expected_skills": [
-        "source-query"
-      ],
+      "expected_skills": [],
       "forbidden_skills": [
+        "source-query",
         "symbol-structure-workflow",
         "task-table-manager"
       ],
@@ -443,6 +447,23 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "source-query-rule-review",
+      "kind": "negative",
+      "request": "只审查正式规则文件如何描述 srcq、AST 与 LSP 的职责，不执行源码查询、AST rule/rewrite、特殊输出或语言服务调用。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
       "id": "complete-known-name-position-list",
       "kind": "boundary",
       "request": "已知一个没有同名歧义的方法名称；在限定的正式源码范围内列出定义和直接调用位置。完整文本查询及每个命中的局部上下文足以区分定义与调用，不需要类型、重载解析或语义重命名。",
@@ -490,6 +511,42 @@
       "expected_change_governance_references": [],
       "expected_behavior_tags": [
         "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "independent-bounded-source-evidence",
+      "kind": "behavior",
+      "request": "在已经确认的单个正式源码组件中，定位一个 interface 的定义、一个泛型字段和一个已知映射字段；三个名称都已给出且一次有界文本查询可以返回必要上下文。只读回答，不要先读查询 Skill、README 或逐项重复确认。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "minimal_evidence_closure"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "dependent-authority-source-evidence",
+      "kind": "behavior",
+      "request": "列出生产源码中一个已知限定符号的全部出现位置，但仓库同时存在开发源码与分发副本，当前尚未确认哪个目录是正式生产 owner。先裁决正式源码范围，再在该范围做完整查询；不要为了减少回合把依赖步骤合并。只读回答。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "minimal_evidence_closure"
       ],
       "forbidden_behavior_tags": [
         "modify_authorized_scope"

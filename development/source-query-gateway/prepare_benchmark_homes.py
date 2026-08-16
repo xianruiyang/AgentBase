@@ -23,9 +23,38 @@ PREMIGRATION_SKILLS = RETIRED_QUERY_SKILLS | SHARED_QUERY_SKILLS
 MIGRATED_SKILLS = SHARED_QUERY_SKILLS | {"source-query"}
 MINIMAL_RELEVANT_SKILLS = PREMIGRATION_SKILLS | MIGRATED_SKILLS
 OLD_ROUTE = "should: 文本内容搜索先用受限 `rg`；文件发现使用受限 `fd`；只有文本不能可靠表达语法结构时升级 AST，只有结论依赖真实符号身份时升级 LSP"
-CURRENT_ROUTE_PREFIX = "must: 模型进行源码查找时先明确当前仍缺的证据"
+CURRENT_ROUTE_PREFIX = "must: 全集、不存在或唯一结论先从最近项目正式来源确认权威源码范围，并只查询该范围；"
+PREVIOUS_SCOPE_ROUTE_PREFIX = "must: 全集、不存在或唯一结论先确认权威源码范围；源码文件与文本搜索使用 PATH 中的 `srcq fd` / `srcq rg`，"
+CURRENT_EVIDENCE_ROUTE_PREFIX = "must: 源码定位在答案中保留最小可复查文件与范围；"
+PREVIOUS_CONDITIONAL_ROUTE_PREFIX = "must: 源码文件与文本搜索在来源选择会改变结论时先确认权威源码范围，再使用 PATH 中的 `srcq fd` / `srcq rg`；"
+PREVIOUS_ORDERED_ROUTE_PREFIX = "must: 源码文件与文本搜索先限定当前职责的权威源码根，再使用 PATH 中的 `srcq fd` / `srcq rg`；"
+PREVIOUS_AUTHORITY_ROUTE_PREFIX = "must: 源码文件与文本搜索先限定当前职责的权威源码根，使用 PATH 中的 `srcq fd` / `srcq rg`；"
+PREVIOUS_COMBINED_ROUTE_PREFIX = "must: 源码文件与文本搜索限定当前职责的权威源码根并使用 PATH 中的 `srcq fd` / `srcq rg`；"
+PREVIOUS_DIRECT_ROUTE_PREFIX = "must: 源码文件与文本搜索使用 PATH 中的 `srcq fd` / `srcq rg`；"
+PREVIOUS_COMPACT_ROUTE_PREFIX = "must: 源码查找先明确当前仍缺的直接证据和权威范围；"
+PREVIOUS_DEPENDENCY_ROUTE_PREFIX = "must: 源码查询先确定"
+PREVIOUS_CURRENT_ROUTE_PREFIX = "must: 模型进行源码查找时"
 PREVIOUS_MIGRATED_ROUTE_PREFIX = "should: 源码查找先明确当前仍缺的证据；"
-MIGRATED_ROUTE_PREFIXES = (CURRENT_ROUTE_PREFIX, PREVIOUS_MIGRATED_ROUTE_PREFIX)
+MIGRATED_ROUTE_PREFIXES = (
+    CURRENT_ROUTE_PREFIX,
+    PREVIOUS_SCOPE_ROUTE_PREFIX,
+    PREVIOUS_CONDITIONAL_ROUTE_PREFIX,
+    PREVIOUS_ORDERED_ROUTE_PREFIX,
+    PREVIOUS_AUTHORITY_ROUTE_PREFIX,
+    PREVIOUS_COMBINED_ROUTE_PREFIX,
+    PREVIOUS_DIRECT_ROUTE_PREFIX,
+    PREVIOUS_COMPACT_ROUTE_PREFIX,
+    PREVIOUS_DEPENDENCY_ROUTE_PREFIX,
+    PREVIOUS_CURRENT_ROUTE_PREFIX,
+    PREVIOUS_MIGRATED_ROUTE_PREFIX,
+)
+LEGACY_AUXILIARY_ROUTE_PREFIXES = (
+    CURRENT_EVIDENCE_ROUTE_PREFIX,
+    "must: 全集或不存在结论先确定正式源码根；",
+    "must: 已知名称先用文本定位和有界正文闭环；",
+    "must: 源码结论的压缩不得删除",
+)
+SUPPORTED_ROUTE_PREFIXES = MIGRATED_ROUTE_PREFIXES + LEGACY_AUXILIARY_ROUTE_PREFIXES
 
 
 def config_text(lsp_server: str | None, trusted_projects: tuple[Path, ...] = ()) -> str:
@@ -89,6 +118,10 @@ def current_route() -> str:
     return matches[0]
 
 
+def current_route_block() -> str:
+    return current_route()
+
+
 def migrated_route(text: str) -> str:
     matches = [line for line in text.splitlines() if line.startswith(MIGRATED_ROUTE_PREFIXES)]
     if len(matches) != 1:
@@ -97,7 +130,25 @@ def migrated_route(text: str) -> str:
 
 
 def replace_migrated_route(text: str) -> str:
-    return text.replace(migrated_route(text), current_route(), 1)
+    migrated_route(text)
+    lines = text.splitlines()
+    for prefix in SUPPORTED_ROUTE_PREFIXES:
+        if sum(line.startswith(prefix) for line in lines) > 1:
+            raise SystemExit(f"installed AGENTS.md contains duplicate source-query route: {prefix}")
+    output: list[str] = []
+    inserted = False
+    for line in lines:
+        if line.startswith(SUPPORTED_ROUTE_PREFIXES):
+            if not inserted:
+                output.append(current_route())
+                inserted = True
+            continue
+        if not line and output and not output[-1]:
+            continue
+        output.append(line)
+    while output and not output[-1]:
+        output.pop()
+    return "\n".join(output) + ("\n" if text.endswith("\n") else "")
 
 
 def copy_common(
@@ -258,7 +309,9 @@ def main() -> int:
         install_candidate_bundle(control, candidate, srcq_exe)
         candidate_agents = (candidate / "AGENTS.md").read_text(encoding="utf-8")
         candidate_route = current_route()
-        (candidate / "AGENTS.md").write_text(candidate_agents.replace(OLD_ROUTE, candidate_route), encoding="utf-8")
+        (candidate / "AGENTS.md").write_text(
+            candidate_agents.replace(OLD_ROUTE, current_route_block()), encoding="utf-8"
+        )
         allowed = "AGENTS.md,bin/srcq.exe,skills/ast-grep-token-safe/**,skills/fd-usage/**,skills/rg-token-safe/**,skills/source-query/**,skills/symbol-structure-workflow/**"
     else:
         install_incremental_bundle(control, candidate, baseline_srcq_exe, srcq_exe)

@@ -1,0 +1,71 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "P10 最终 candidate 的质量、Token、耗时、工具轮次和身份完整性证据"
+      ],
+      "id": "TSQG-084",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-085",
+  "mutation_scope": [
+    "development/source-query-gateway/**",
+    "README.md"
+  ],
+  "outcome": "REQ-SQG-001、全部 AC/CON 与 UDES 逐项具有范围匹配的完成证据，GAP-SQG-008 得到可复核结论，且没有仍会改变方案或完成判断的明显改进点",
+  "outputs": [
+    "REQ、AC、CON、UDES 逐项完成矩阵",
+    "GAP-SQG-008 最终状态与收益边际裁决",
+    "实现、测试、安装、发布和外部证据边界",
+    "后续只有新失败、协议变化或新消费者证据才重开的条件"
+  ],
+  "reasoning_hint": "high",
+  "revision": 2,
+  "schema": "task.record",
+  "source_ids": [
+    "REQ-SQG-001",
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-003",
+    "AC-SQG-004",
+    "AC-SQG-005",
+    "AC-SQG-006",
+    "AC-SQG-007",
+    "AC-SQG-008",
+    "CON-SQG-001",
+    "CON-SQG-002",
+    "CON-SQG-003",
+    "UDES-SQG-001",
+    "UDES-SQG-002",
+    "UDES-SQG-003",
+    "UDES-SQG-004",
+    "UDES-SQG-005",
+    "UDES-SQG-006",
+    "UDES-SQG-007",
+    "UDES-SQG-008",
+    "UDES-SQG-009",
+    "UDES-SQG-010",
+    "UDES-SQG-011",
+    "UDES-SQG-012",
+    "UDES-SQG-013",
+    "UDES-SQG-014",
+    "GAP-SQG-008",
+    "OBS-SQG-025",
+    "SOL-SQG-015"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "delivery-workflow",
+    "task-table-manager"
+  ],
+  "title": "完成 P10 与需求逐项审计",
+  "verification": [
+    "每个确认需求和用户设计条目都绑定适用的直接实现、组件、模型或发布边界证据",
+    "局部测试、静态规则或文件存在不外推为端到端完成",
+    "所有未决、陈旧结果、依赖消费者、旧入口和发布 payload 边界逐项复核",
+    "质量优先、Token 其次、速度最后的裁决顺序保持",
+    "没有适用失败、缺失验收、未解释反向样本或会改变当前方案的高收益缺口",
+    "项目真源完成、已安装 Codex 状态与尚待逐次授权的发布边界分别陈述，不互相外推"
+  ]
+}

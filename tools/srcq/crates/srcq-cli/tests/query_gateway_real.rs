@@ -129,6 +129,93 @@ fn direct_queries_choose_compact_path_trees_after_observing_results() {
 }
 
 #[test]
+fn direct_queries_close_bounded_single_file_evidence_but_explicit_budgets_stay_exact() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let mut body = (0..120)
+        .map(|index| format!("needle function body {index:03}"))
+        .collect::<Vec<_>>();
+    body[60] = format!("needle {}", "x".repeat(400));
+    fs::write(
+        directory.path().join("src/large.ts"),
+        format!("{}\n", body.join("\n")),
+    )
+    .expect("large single file");
+
+    let direct = srcq(directory.path(), local.path())
+        .args(["rg", "-n", "-F", "needle", "src/large.ts"])
+        .output()
+        .expect("direct bounded closure");
+    assert!(
+        direct.status.success(),
+        "{}",
+        String::from_utf8_lossy(&direct.stderr)
+    );
+    let direct = String::from_utf8(direct.stdout).expect("UTF-8 direct output");
+    assert!(direct.contains("120:needle function body 119"));
+    assert!(!direct.contains("@more"));
+    assert!(!direct.contains("@cut"));
+
+    let explicit = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "rg",
+            "exec",
+            "--",
+            "-n",
+            "-F",
+            "needle",
+            "src/large.ts",
+        ])
+        .output()
+        .expect("explicit default budget");
+    assert!(explicit.status.success());
+    assert!(String::from_utf8_lossy(&explicit.stdout).contains("@more"));
+}
+
+#[test]
+fn direct_fd_closes_a_compact_tree_past_the_initial_item_limit() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    for index in 0..120 {
+        let path = directory
+            .path()
+            .join(format!("compact/shared/branch-{index:03}/leaf.rs"));
+        fs::create_dir_all(path.parent().expect("parent")).expect("tree parent");
+        fs::write(path, "leaf\n").expect("tree leaf");
+    }
+    let output = srcq(directory.path(), local.path())
+        .args(["fd", "--type", "f", ".", "compact"])
+        .output()
+        .expect("compact fd tree");
+    assert!(output.status.success());
+    let model = String::from_utf8(output.stdout).expect("UTF-8 fd model output");
+    assert!(model.contains("branch-119/leaf.rs"));
+    assert!(!model.contains("@more"));
+}
+
+#[test]
+fn direct_rg_keeps_broad_multi_file_results_bounded() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    for index in 0..120 {
+        let path = directory
+            .path()
+            .join(format!("broad/deep/path-{index:03}/source.rs"));
+        fs::create_dir_all(path.parent().expect("parent")).expect("broad parent");
+        fs::write(path, format!("needle {}\n", "x".repeat(100))).expect("broad source");
+    }
+    let output = srcq(directory.path(), local.path())
+        .args(["rg", "-n", "-F", "needle", "broad"])
+        .output()
+        .expect("bounded broad query");
+    assert!(output.status.success());
+    let model = String::from_utf8(output.stdout).expect("UTF-8 broad model output");
+    assert!(model.contains("@more"));
+    assert!(model.len() < 16_000);
+}
+
+#[test]
 fn internal_model_budget_pages_complete_evidence_units_with_exact_cursor() {
     let directory = fixture();
     let local = tempfile::tempdir().expect("local app data");

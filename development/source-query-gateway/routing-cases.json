@@ -20,7 +20,9 @@
     {"id":"sqg-exact-refs","prompt":"安全重命名符号并只修改编译器认定的真实引用。","expected":{"route":"lsp","reference":"none","authorization_required":true}},
     {"id":"sqg-enough-evidence","prompt":"已读取完整目标定义并足以回答，不需要再找其他位置。请直接作答。","expected":{"route":"no_query","reference":"none"}},
     {"id":"sqg-nonsource","prompt":"评价这个对话框的视觉层级和按钮布局，不涉及查找源码。","expected":{"route":"no_skill","reference":"none"}},
-    {"id":"sqg-large-page","prompt":"当前结果页被截断，继续给出同一查询剩余结果并保持同一表示。","expected":{"route":"sgy_rgfd","reference":"rg-fd","same_snapshot_required":true}},
+    {"id":"sqg-rule-review","prompt":"只审查正式查询规则如何描述 AST 与 srcq 的关系，不执行 AST、LSP 或特殊输出查询。","expected":{"route":"no_skill","reference":"none"}},
+    {"id":"sqg-large-page","prompt":"当前结果页出现 @more，且尚未展示的结果是完整性结论的必要证据；继续同一查询并保持同一表示。","expected":{"route":"sgy_rgfd","reference":"none","same_snapshot_required":true}},
+    {"id":"sqg-irrelevant-cut","prompt":"srcq 输出有 @cut，但请求所需的文件与行号已经完整显示，现有证据足以回答。","expected":{"route":"no_query","reference":"none"}},
     {"id":"sqg-ast-cache","prompt":"同一源码快照里连续查询三个不同函数的完整 AST 范围。","expected":{"route":"sgy_ast","reference":"ast"}}
   ]
 }

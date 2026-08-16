@@ -1,0 +1,253 @@
+{
+  "schema": "agentbase.source-query-independent-audit/v2",
+  "isolation_declaration": {
+    "mode": "detached-capsule",
+    "input_read": "C:/Users/gzxt/AppData/Local/AgentBase/benchmark-runs/srcq-p10-20260816-b2/affected-v2/audit-capsule.json",
+    "output_written": "C:/Users/gzxt/AppData/Local/Temp/AgentBase-source-query-audit-result-p10-affected-v2.json",
+    "repository_accessed": false,
+    "other_inputs_accessed": false,
+    "network_accessed": false,
+    "history_accessed": false,
+    "case_requests_executed": false
+  },
+  "capsule_sha256": "535bf8a84b0dd347113649d1c64aeb553950df9a4b7ac0e6ba30c0df04d07a6d",
+  "experiment_identity": "5047af5e2afa0aa954befb683e33b518c190851d02f0f8960b5f8151edfecb61",
+  "integrity": {
+    "capsule_schema": "agentbase.source-query-audit-capsule/v2",
+    "result_schema_declared_in_capsule": "agentbase.source-query-results/v2",
+    "capsule_hash_scheme": "sha256-canonical-json-without-capsule_sha256",
+    "experiment_identity_scheme": "sha256-canonical-json-without-experiment_identity",
+    "deterministic_verification": "external",
+    "cryptographic_hashes_recomputed": false,
+    "declared_identity_consistency": {
+      "capsule_experiment_identity": "5047af5e2afa0aa954befb683e33b518c190851d02f0f8960b5f8151edfecb61",
+      "summary_experiment_identity": "5047af5e2afa0aa954befb683e33b518c190851d02f0f8960b5f8151edfecb61",
+      "postflight_identity_match": true,
+      "postflight_failures": []
+    },
+    "declared_corpus_identity": {
+      "version": "2026-08-16.8",
+      "sha256": "a0ef5a34c7ec44a40d60ad8ba83c9579db8a293a855c50edcb3e42275df6ccfa"
+    },
+    "declared_workspace_identities": {
+      "agentbase": {
+        "head": "73484ba4654f01f85c7e897eca48873e522218c3",
+        "tree": "232977c8d7b52459ecbc026a7d7d504c21004c7b",
+        "snapshot_sha256": "11ebf03b715fad453d90f83fcf2fbed6b45f4bd4527ea2c2336852720c89a186"
+      },
+      "large-cpp": {
+        "head": "267384eb91bed9615c821bdbc3414a4094c668c9",
+        "tree": "555489c785eea6c393ad2a14db7a4c814019d4d6",
+        "snapshot_sha256": "d08259de948fd8f57a53b50eca64ee9385900fe272a3675d9fe5ed036dced012"
+      }
+    },
+    "declared_environment_trees_sha256": "dde68529d2b4514edc2dab2051914e79104d9354963490f99016fbd67b765948",
+    "declared_environment_diff_sha256": "0f2779c8664094d0d4b474591d6071a708b9dea504d8564a2bc0fbcef3dd94d1"
+  },
+  "environment_diff_review": {
+    "allowed_differences": [
+      "AGENTS.md",
+      "bin/srcq.exe",
+      "skills/source-query/**"
+    ],
+    "changed_paths": [
+      "AGENTS.md",
+      "skills/source-query/SKILL.md",
+      "skills/source-query/references/rg-fd.md"
+    ],
+    "unexpected_paths": [],
+    "all_changes_allowlisted": true,
+    "capsule_reported_ok": true
+  },
+  "per_run_quality": [
+    {
+      "run_id": "agentbase-provider-observation__candidate__1",
+      "required_pass": true,
+      "strict_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "findings": [
+        "Two answer lines are within the four-line limit.",
+        "The answer gives the oracle path and lines 310, 307, and 694, names Collection<T>.provider, and states the document_symbols Collection<DocumentSymbol> relation.",
+        "Embedded tool evidence locates the definition, generic field, and mapping with matching 1-based source lines."
+      ]
+    },
+    {
+      "run_id": "agentbase-provider-observation__candidate__2",
+      "required_pass": true,
+      "strict_pass": true,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "findings": [
+        "Two answer lines are within the four-line limit.",
+        "The answer gives the oracle path and lines 310, 694, and 307 and explicitly states that Collection<T>.provider exposes the observation.",
+        "Embedded tool evidence supplies the complete DTO relation with matching 1-based source lines."
+      ]
+    },
+    {
+      "run_id": "agentbase-srcq-containing-contract__candidate__1",
+      "required_pass": true,
+      "strict_pass": false,
+      "line_limit_pass": true,
+      "evidence_complete": false,
+      "findings": [
+        "Four answer lines are within the six-line limit and all four required conclusions agree with the oracle.",
+        "Strict quality fails because the answer cites only the file, omitting execute_containing lines 106-188 and the oracle's supporting locations for coordinate, selection, and staleness semantics.",
+        "The embedded commands substantively inspect the implementation and fingerprint checks, but much of the decisive source was captured by Get-Content without 1-based source-location annotations; supporting source-location semantics are therefore incomplete."
+      ]
+    },
+    {
+      "run_id": "agentbase-srcq-containing-contract__candidate__2",
+      "required_pass": true,
+      "strict_pass": false,
+      "line_limit_pass": true,
+      "evidence_complete": false,
+      "findings": [
+        "Four answer lines are within the six-line limit and all four required conclusions agree with the oracle.",
+        "Strict quality fails because the answer omits execute_containing lines 106-188 and the supporting evidence lines for the three conclusions.",
+        "Embedded evidence shows line 106 and the relevant implementation text, but the complete definition and decisive passages were read without stable 1-based line annotations, so strict source-location support is incomplete."
+      ]
+    },
+    {
+      "run_id": "ue-hjson-isbarekey-occurrences__candidate__1",
+      "required_pass": false,
+      "strict_pass": false,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "findings": [
+        "Five answer lines are within the eight-line limit, and the definition and all three call locations exactly match the oracle.",
+        "The unqualified claim '完整：是' does not explicitly bind completeness to the searched formal production-source scope, so the required completeness-statement contract fails.",
+        "The completeness claim also does not bind the result to the oracle's bound snapshot, so strict quality fails.",
+        "Embedded scoped search evidence covers Plugins/UeAgentInterface/Source and supports the semantic definition/call classification."
+      ]
+    },
+    {
+      "run_id": "ue-hjson-isbarekey-occurrences__candidate__2",
+      "required_pass": true,
+      "strict_pass": false,
+      "line_limit_pass": true,
+      "evidence_complete": true,
+      "findings": [
+        "Five answer lines are within the eight-line limit, and the definition and all three call locations exactly match the oracle.",
+        "The answer explicitly binds completeness to formal production source at Plugins/UeAgentInterface/Source, satisfying the required scope contract.",
+        "Strict quality fails because the completeness claim does not also bind itself to the frozen/bound snapshot.",
+        "Embedded scoped search evidence supports the occurrence set and definition/call classification."
+      ]
+    }
+  ],
+  "quality_summary": {
+    "run_count": 6,
+    "required_pass_count": 5,
+    "required_fail_count": 1,
+    "strict_pass_count": 2,
+    "strict_fail_count": 4,
+    "line_limit_pass_count": 6,
+    "line_limit_fail_count": 0,
+    "evidence_complete_count": 4,
+    "evidence_incomplete_count": 2,
+    "completeness_claim_review": {
+      "applicable_run_count": 2,
+      "formal_scope_explicit_count": 1,
+      "bound_snapshot_explicit_count": 0
+    }
+  },
+  "usage_summary": {
+    "subject_runs": {
+      "run_count": 6,
+      "usage_complete_runs": 6,
+      "pricing_exact_runs": 6,
+      "totals": {
+        "input_tokens": 612579,
+        "cache_read_input_tokens": 484096,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 128483,
+        "output_tokens": 6051,
+        "reasoning_output_tokens": 3237,
+        "visible_output_tokens": 2814,
+        "actual_total_tokens": 618630
+      }
+    },
+    "setup_runs": {
+      "run_count": 2,
+      "usage_complete_runs": 2,
+      "pricing_exact_runs": 2,
+      "totals": {
+        "input_tokens": 65751,
+        "cache_read_input_tokens": 32256,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 33495,
+        "output_tokens": 253,
+        "reasoning_output_tokens": 67,
+        "visible_output_tokens": 186,
+        "actual_total_tokens": 66004
+      }
+    },
+    "including_setup": {
+      "run_count": 8,
+      "usage_complete_runs": 8,
+      "pricing_exact_runs": 8,
+      "totals": {
+        "input_tokens": 678330,
+        "cache_read_input_tokens": 516352,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 161978,
+        "output_tokens": 6304,
+        "reasoning_output_tokens": 3304,
+        "visible_output_tokens": 3000,
+        "actual_total_tokens": 684634
+      }
+    },
+    "arithmetic_reconciled": true,
+    "reasoning_tokens_treated_as_subset_of_output": true
+  },
+  "tool_summary": {
+    "subject_elapsed_ms": 248378,
+    "setup_elapsed_ms": 32682,
+    "elapsed_ms_including_setup": 281060,
+    "subject_command_count": 23,
+    "setup_command_count": 2,
+    "command_count_including_setup": 25,
+    "subject_command_failures": 0,
+    "setup_command_failures": 0,
+    "timed_out_runs": 0,
+    "nonzero_exit_runs": 0,
+    "invalid_json_line_runs": 0,
+    "reconciled_from_capsule_records": true
+  },
+  "failures": [
+    {
+      "type": "required_quality",
+      "run_id": "ue-hjson-isbarekey-occurrences__candidate__1",
+      "detail": "Completeness was asserted without explicitly binding the formal production-source scope."
+    },
+    {
+      "type": "strict_source_location",
+      "run_ids": [
+        "agentbase-srcq-containing-contract__candidate__1",
+        "agentbase-srcq-containing-contract__candidate__2"
+      ],
+      "detail": "Answers omitted the oracle's implementation range and supporting evidence locations; embedded evidence did not preserve complete 1-based location semantics for all decisive passages."
+    },
+    {
+      "type": "strict_snapshot_binding",
+      "run_ids": [
+        "ue-hjson-isbarekey-occurrences__candidate__1",
+        "ue-hjson-isbarekey-occurrences__candidate__2"
+      ],
+      "detail": "Neither completeness claim explicitly binds the occurrence set to the bound snapshot."
+    }
+  ],
+  "decision": {
+    "status": "fail",
+    "required_quality": "fail",
+    "strict_quality": "fail",
+    "integrity_and_reconciliation": "pass_from_declared_capsule_data",
+    "reason": "One of six runs fails the required answer contract and four of six fail strict quality; capsule-declared identities, allowlisted environment differences, usage, elapsed time, and command arithmetic reconcile internally."
+  },
+  "limitations": [
+    "The audit is confined to the embedded capsule content and does not independently inspect repositories, raw result files, network state, or execution history.",
+    "Cryptographic hashes and canonical identities were not recomputed; deterministic verification is external.",
+    "Tool-evidence judgments assess only the commands and outputs embedded in the capsule and do not execute or reproduce any case request.",
+    "The capsule exposes postflight_failures and a summary experiment identity, but no separate postflight identity object; postflight identity consistency is recorded as the equality of the declared experiment and summary identities plus an empty postflight failure list."
+  ]
+}

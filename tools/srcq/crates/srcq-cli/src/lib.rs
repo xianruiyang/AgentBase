@@ -508,6 +508,7 @@ pub struct GatewayCommand {
     pub limit: usize,
     pub max_text_chars: usize,
     pub model_token_budget: usize,
+    pub auto_complete: bool,
     pub output: OutputFormat,
     pub receipt: String,
     pub artifact_out: Option<PathBuf>,
@@ -901,6 +902,7 @@ fn parse_direct_gateway_command(backend: GatewayBackend, values: &ArgMatches) ->
         limit: 80,
         max_text_chars: 240,
         model_token_budget: 2048,
+        auto_complete: true,
         output: OutputFormat::Model,
         receipt: "auto".to_owned(),
         artifact_out: None,
@@ -967,6 +969,7 @@ fn parse_gateway_command(
             .flatten()
             .and_then(|value| usize::try_from(*value).ok())
             .unwrap_or(2048),
+        auto_complete: false,
         output: parse_output(values),
         receipt: values
             .try_get_one::<String>("receipt")

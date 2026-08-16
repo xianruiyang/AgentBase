@@ -2,7 +2,7 @@
 
 本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule。两者不实现查询语义，也不进入 srcq 或 Codex 发布 payload。
 
-正式语料在 `corpus/`；`v3.json` 是绑定 srcq 直觉入口、自适应输出和当前源码路径的现行六类语料，`v1.json`、`v2.json` 只服务已完成历史结果复核。真实对照先由独立配置生成 experiment，预检 control/candidate 环境差异只包含 allowlist 后才运行：
+正式语料在 `corpus/`；`v10.json` 是绑定 srcq 直觉入口、同预算自动闭环、权威范围、普通续页、规则审查非触发和当前源码路径的现行六类语料，`v1.json` 至 `v9.json` 只服务引用它们的已完成历史结果复核。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
 
 ```powershell
 python -X utf8 development\code-search-benchmark\experiment.py prepare --config <config.json> --output <new-output-dir>

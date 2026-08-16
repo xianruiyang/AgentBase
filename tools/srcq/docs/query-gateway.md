@@ -16,11 +16,11 @@ srcq query <rg|fd> doctor [--engine PATH] [--cwd PATH]
 
 普通文件发现只需 `srcq fd <fd argv...>`，普通文本查询只需 `srcq rg <rg argv...>`；backend 后的 `exec`、`--view`、`--help`、`--files` 等同名 token 全部属于原生 argv。根级 `srcq files` / `srcq --files` 只返回 `srcq fd` 的一行修正，根级 AST 子命令或遗漏分隔符只返回 `srcq exec -- <ast-grep argv...>`；这些修正不执行查询、不猜 backend，也不建立兼容别名。
 
-默认 model 只写 planner 选择的证据文本；正常成功和完整不写 schema、统计或完成回执。内部默认最多处理 80 个当前视图证据单元、每个正文 240 字符，并以 2048 个估算 Token 作为单页软预算；单个不可拆证据单元可以越过软预算。调用方确有需要时才通过显式控制面覆盖。`--output machine` 使用单行紧凑 JSON，仍可由现有安全 YAML 读取器解析。`--receipt full` 和 `lossless` 隐含 machine。特殊模式的原生透传、产物或有界文本合同不改变。
+默认 model 只写 planner 选择的证据文本；正常成功和完整不写 schema、统计或完成回执。显式控制面的缺省页严格使用 80 个当前视图证据单元、每个正文 240 字符和 2048 个估算 Token 软预算，单个不可拆证据单元可以越过软预算。普通直接入口先用同一总预算评估；若完整结果不超过 512 个证据单元且完整渲染仍落在 2048 预算内，则越过初始 80 项上限一次返回。rg 的完整结果只有一个来源文件时，可把单行正文提高到 1024 字符重新评估，但只有整个结果仍落在同一 2048 总预算内才采用；多文件或更大结果保持原预算分页。调用方确有需要时才通过显式控制面覆盖，显式值不被上述直接入口策略改写。`--output machine` 使用单行紧凑 JSON，仍可由现有安全 YAML 读取器解析。`--receipt full` 和 `lossless` 隐含 machine。特殊模式的原生透传、产物或有界文本合同不改变。
 
 ## 处理类别
 
-- 普通 rg 搜索追加原生 `--json --color=never`，完整事实保留 path、match/context、行、绝对偏移、submatch 和正文；model 在相同证据单元和顺序下比较逐行 locator、文件 heading、共享目录路径树与其位置/正文叶子，只选择实际更短者。投影先形成所选 view 的证据单元再分页：files 按去重匹配文件，locations 按匹配位置，grouped/records 按 match/context 记录，summary 对完整集合聚合且不产生续页。
+- 普通 rg 搜索追加原生 `--json --color=never`，完整事实保留 path、match/context、行、绝对偏移、submatch 和正文；model 在相同证据单元和顺序下比较逐行 locator、文件 heading、共享目录路径树与其位置/正文叶子，只选择实际更短者。投影先形成所选 view 的证据单元，再按上述有界完整闭环或分页策略处理：files 按去重匹配文件，locations 按匹配位置，grouped/records 按 match/context 记录，summary 对完整集合聚合且不产生续页。
 - rg 文件列表和 fd 普通路径追加 NUL 输出，完整解析后选择 flat/tree 或 files；model 只有在类型一致、路径可逆且实际文本更短时使用合并单子链的树，混合类型回退为带最小类型标记的 flat。machine tree 为每个显式根建立稳定别名，并保留类型、内部目录结果、重复计数和无法归根的 flat 项。
 - count、JSON、vimgrep 使用各自机器或稳定结构；`lossless` 保留完整原生 JSON 事件，其他 view 只投影声明的证据。显式 view 不适用于当前模式时局部拒绝，不静默换 view。
 - help/version/list-details/format/hyperlink/replace/passthru/pre/stats/quiet 等文本模式返回有界行；`--view raw` 或 `--artifact-out` 请求完整原生 stdout，stderr 在显式原生通道中保持，否则只转发有界诊断。

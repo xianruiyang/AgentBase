@@ -1,0 +1,8 @@
+{
+  "schema": "agentbase.source-query-capsule-verification/v1",
+  "capsule_sha256": "535bf8a84b0dd347113649d1c64aeb553950df9a4b7ac0e6ba30c0df04d07a6d",
+  "experiment_identity": "5047af5e2afa0aa954befb683e33b518c190851d02f0f8960b5f8151edfecb61",
+  "verified_raw_files": 16,
+  "verified_environment_files": 2,
+  "result": "pass"
+}

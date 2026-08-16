@@ -1,0 +1,63 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "冻结的最小证据闭环候选 bundle 与受影响路由证据"
+      ],
+      "id": "TSQG-083",
+      "type": "hard"
+    }
+  ],
+  "id": "TSQG-084",
+  "mutation_scope": [
+    "development/code-search-benchmark/**",
+    "development/source-query-gateway/evidence/**",
+    "development/source-query-gateway/**"
+  ],
+  "outcome": "先以既有真实运行的可观察命令链区分项目规则、候选规则、工具能力、命令选择、实验污染与随机波动，再由单一最小候选证明质量不退化时降低受影响任务的端到端总 Token，并在达标后证明完整六类任务没有普通路径回退",
+  "outputs": [
+    "v1 至 v4 既有原始记录的逐调用可观察决策链与因果归因矩阵",
+    "重审后的 DEC-SQG-001 与唯一职责 owner 裁决",
+    "新 experiment identity 与三个受影响 case 的 6-run 原始事件和 usage",
+    "独立质量审计与确定性 capsule 验真",
+    "工具调用、普通/缓存输入、输出、推理 Token、价格等价和耗时分项",
+    "达标后完整 12-run 采纳证据或不采纳的直接失败机制"
+  ],
+  "reasoning_hint": "high",
+  "revision": 4,
+  "schema": "task.record",
+  "source_ids": [
+    "OBS-SQG-013",
+    "OBS-SQG-014",
+    "OBS-SQG-020",
+    "OBS-SQG-025",
+    "GAP-SQG-008",
+    "DES-SQG-010",
+    "DES-SQG-014",
+    "SOL-SQG-015",
+    "AC-SQG-001",
+    "AC-SQG-002",
+    "AC-SQG-003",
+    "AC-SQG-004",
+    "AC-SQG-007",
+    "UDES-SQG-007",
+    "UDES-SQG-012",
+    "UDES-SQG-013"
+  ],
+  "suggested_skills": [
+    "token-usage-analysis",
+    "change-governance"
+  ],
+  "title": "审计可观察决策链并运行 P10 受影响候选",
+  "verification": [
+    "冻结五-skill、P9 及 v1 至 v4 历史只读复用，不重新运行或与不同 identity 拼成精确因果结论",
+    "保留目标项目 AGENTS.md 作为历次相同的真实运行条件；其成本计入端到端总量，但只有直接适用证据才归类为 project-required，且不得自动归咎项目或候选规则",
+    "逐调用记录已知事实、缺失事实、准确命令、工具返回、后继证据和最终输出；不可见思维不被补写，推断明确标注",
+    "每项成本按 project-required、project-rule-misapplied、candidate-rule-induced、tool-capability/output、command-formulation/model-choice、benchmark-invalid 或 stochastic/inconclusive 归因；证据不足保持未决",
+    "正式运行使用 default service tier、danger-full-access、approval never、新鲜隔离 agent 和外部 monitor",
+    "受影响 6-run 先做机制筛选；required、行限、范围与实验隔离任一失败就不扩大，不把未通过封闭质量的低 Token identity 作为数值硬门槛",
+    "只有候选机制改变才重跑受影响样本，失败和反向结果原样保留",
+    "扩大后的完整 12-run 保持 12/12 required、行限和 evidence complete，普通查询无固定成本回退、总 Token 低于 P9 同质量候选 1150528，且不存在会改变方案的共享明显改进点",
+    "detached auditor 不访问仓库或实现讨论，确定性入口独立复算身份与原始文件哈希"
+  ]
+}

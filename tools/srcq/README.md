@@ -67,7 +67,7 @@ srcq query rg defaults --view grouped -- -n -F 'needle' .
 srcq query fd doctor
 ```
 
-普通 rg、fd 与 AST 查询默认使用 model 输出：只输出干净证据，正常成功、完整和空结果不附 envelope 或回执；rg/fd 在取得真实结果后比较单行、文件 heading、路径树及组合表示，并在内部总预算内按证据单元分页，只有分页、截断、歧义或写入事实追加最短 `@` 记录。parser、round-trip、完整诊断或旧结构化消费者通过 `srcq query` 或 AST 显式 `--output machine`；`--receipt full`、`--yaml-out`、`lossless` 和 `custom` 也保持机器合同。二进制、TTY、LSP 与完整原生字节走 native/artifact 通道。详见 [模型可见输出合同](docs/model-output.md) 和 [rg/fd 查询网关](docs/query-gateway.md)。
+普通 rg、fd 与 AST 查询默认使用 model 输出：只输出干净证据，正常成功、完整和空结果不附 envelope 或回执；rg/fd 在取得真实结果后比较单行、文件 heading、路径树及组合表示。直接入口会在完整结果机械可证有界且整体表示足够小时一次闭环，其他结果才按内部预算和完整证据单元分页；只有分页、截断、歧义或写入事实追加最短 `@` 记录。parser、round-trip、完整诊断或旧结构化消费者通过 `srcq query` 或 AST 显式 `--output machine`；`--receipt full`、`--yaml-out`、`lossless` 和 `custom` 也保持机器合同。二进制、TTY、LSP 与完整原生字节走 native/artifact 通道。详见 [模型可见输出合同](docs/model-output.md) 和 [rg/fd 查询网关](docs/query-gateway.md)。
 
 ## Profile
 

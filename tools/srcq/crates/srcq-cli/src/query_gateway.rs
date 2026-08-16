@@ -23,6 +23,8 @@ use srcq_core::invocation::OutputFormat;
 const MAX_STDOUT_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_STDERR_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_SPOOL_ENTRIES: usize = 32;
+const DIRECT_COMPLETE_MAX_UNITS: usize = 512;
+const DIRECT_SINGLE_PATH_MAX_TEXT_CHARS: usize = 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Handling {
@@ -1540,8 +1542,10 @@ fn render_fd(
             "cursor offset exceeds the snapshot result set",
         ));
     }
-    let maximum_end = paths.len().min(offset.saturating_add(command.limit));
     let roots = fd_roots(&command.native_argv, cwd);
+    let effective_limit = direct_fd_complete_limit(command, &paths, &roots, &snapshot.fd_types)
+        .unwrap_or(command.limit);
+    let maximum_end = paths.len().min(offset.saturating_add(effective_limit));
     let end = if command.output == OutputFormat::Model && command.view != "lossless" {
         model_page_end(
             offset,
@@ -1583,6 +1587,24 @@ fn render_fd(
         view: chosen.to_owned(),
         display_complete: end >= paths.len(),
     })
+}
+
+fn direct_fd_complete_limit(
+    command: &GatewayCommand,
+    paths: &[String],
+    roots: &[FdRoot],
+    types: &BTreeMap<String, String>,
+) -> Option<usize> {
+    if !command.auto_complete
+        || command.output != OutputFormat::Model
+        || command.view != "auto"
+        || paths.len() <= command.limit
+        || paths.len() > DIRECT_COMPLETE_MAX_UNITS
+    {
+        return None;
+    }
+    let (model, _) = render_fd_model(command, paths, roots, types);
+    (model_text_cost(&model) <= command.model_token_budget).then_some(paths.len())
 }
 
 fn render_fd_model(
@@ -2685,28 +2707,25 @@ fn render_rg(
             "cursor offset exceeds the snapshot result set",
         ));
     }
-    let maximum_end = events.len().min(offset.saturating_add(command.limit));
+    let (effective_limit, effective_budget, effective_max_text_chars) =
+        direct_rg_complete_policy(command, &events);
+    let maximum_end = events.len().min(offset.saturating_add(effective_limit));
     let end = if command.output == OutputFormat::Model {
-        model_page_end(
-            offset,
-            maximum_end,
-            command.model_token_budget,
-            |candidate_end| {
-                let (model, _) = render_rg_adaptive_model(
-                    &events[offset..candidate_end],
-                    &command.view,
-                    command.max_text_chars,
-                );
-                model_text_cost(&model)
-            },
-        )
+        model_page_end(offset, maximum_end, effective_budget, |candidate_end| {
+            let (model, _) = render_rg_adaptive_model(
+                &events[offset..candidate_end],
+                &command.view,
+                effective_max_text_chars,
+            );
+            model_text_cost(&model)
+        })
     } else {
         maximum_end
     };
     let page = &events[offset..end];
-    let grouped = render_rg_grouped(page, command.max_text_chars);
-    let records = render_rg_records(page, command.max_text_chars);
-    let (model, chosen) = render_rg_adaptive_model(page, &command.view, command.max_text_chars);
+    let grouped = render_rg_grouped(page, effective_max_text_chars);
+    let records = render_rg_records(page, effective_max_text_chars);
+    let (model, chosen) = render_rg_adaptive_model(page, &command.view, effective_max_text_chars);
     let value = match chosen {
         "grouped" => grouped,
         "records" => records,
@@ -2720,6 +2739,58 @@ fn render_rg(
         view: chosen.to_owned(),
         display_complete: end >= events.len(),
     })
+}
+
+fn direct_rg_complete_policy(command: &GatewayCommand, events: &[Value]) -> (usize, usize, usize) {
+    let fallback = (
+        command.limit,
+        command.model_token_budget,
+        command.max_text_chars,
+    );
+    if !command.auto_complete
+        || command.output != OutputFormat::Model
+        || command.view != "auto"
+        || events.is_empty()
+        || events.len() > DIRECT_COMPLETE_MAX_UNITS
+    {
+        return fallback;
+    }
+
+    let paths = events
+        .iter()
+        .filter_map(|event| event["path"].as_str())
+        .collect::<BTreeSet<_>>();
+    if paths.len() == 1
+        && events.iter().all(|event| {
+            event["text"]
+                .as_str()
+                .unwrap_or("")
+                .trim_end_matches(['\r', '\n'])
+                .chars()
+                .count()
+                <= DIRECT_SINGLE_PATH_MAX_TEXT_CHARS
+        })
+    {
+        let (model, _) =
+            render_rg_adaptive_model(events, &command.view, DIRECT_SINGLE_PATH_MAX_TEXT_CHARS);
+        if model_text_cost(&model) <= command.model_token_budget {
+            return (
+                events.len(),
+                command.model_token_budget,
+                DIRECT_SINGLE_PATH_MAX_TEXT_CHARS,
+            );
+        }
+    }
+
+    let (model, _) = render_rg_adaptive_model(events, &command.view, command.max_text_chars);
+    if model_text_cost(&model) <= command.model_token_budget {
+        return (
+            events.len(),
+            command.model_token_budget,
+            command.max_text_chars,
+        );
+    }
+    fallback
 }
 
 fn render_rg_adaptive_model<'a>(
