@@ -2310,6 +2310,27 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         *index_diagnostics,
         *result_read_diagnostics,
     ]
+    candidate_task_rows: dict[str, dict[str, Any]] = {}
+    for task_id in sorted(tasks):
+        task = tasks[task_id]
+        state = states[task_id]
+        result = current_results[task_id]
+        candidate_task_rows[task_id] = {
+            "status": state["status"],
+            "task_revision": task["revision"],
+            "result_ref": state["result_ref"],
+            "result_outcome": result.get("outcome") if result else None,
+            "outputs": result.get("outputs", []) if result else [],
+            "verification": result.get("verification", []) if result else [],
+            "unresolved": result.get("unresolved", []) if result else [],
+            "invalidated_source_ids": (
+                result.get("invalidated_source_ids", []) if result else []
+            ),
+            "evidence_for": result.get("evidence_for", []) if result else [],
+            "evidence_refs": result.get("evidence_refs", []) if result else [],
+            "source_snapshot": result.get("source_snapshot", {}) if result else {},
+            "result_diagnostics": result_diagnostics(result, task, index),
+        }
     target_rows: list[dict[str, Any]] = []
     candidate_next_after_ids: dict[str, str | None] = {}
     for target_id in page_ids:
@@ -2320,46 +2341,21 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         elif len(definitions) > 1:
             diagnostics.append({"kind": "protected_target_ambiguous", "id": target_id})
         semantic_ids = semantic_downstream_ids(index, target_id)
-        all_linked_tasks = []
+        all_linked_task_ids = []
         for task_id in sorted(tasks):
             task = tasks[task_id]
-            state = states[task_id]
             result = current_results[task_id]
             evidence_for = result.get("evidence_for", []) if result else []
             if not semantic_ids.intersection([*task["source_ids"], *evidence_for]):
                 continue
-            all_linked_tasks.append(
-                {
-                    "id": task_id,
-                    "status": state["status"],
-                    "task_revision": task["revision"],
-                    "result_ref": state["result_ref"],
-                    "result_outcome": result.get("outcome") if result else None,
-                    "outputs": result.get("outputs", []) if result else [],
-                    "verification": result.get("verification", []) if result else [],
-                    "unresolved": result.get("unresolved", []) if result else [],
-                    "invalidated_source_ids": (
-                        result.get("invalidated_source_ids", []) if result else []
-                    ),
-                    "evidence_for": result.get("evidence_for", []) if result else [],
-                    "evidence_refs": result.get("evidence_refs", []) if result else [],
-                    "source_snapshot": result.get("source_snapshot", {}) if result else {},
-                    "result_diagnostics": result_diagnostics(result, task, index),
-                }
-            )
-        candidate_ids = [row["id"] for row in all_linked_tasks]
-        remaining_candidate_ids = set(
-            completion_ids_after(
-                candidate_ids, args.candidate_after_id, "candidate"
-            )
+            all_linked_task_ids.append(task_id)
+        remaining_candidate_ids = completion_ids_after(
+            all_linked_task_ids, args.candidate_after_id, "candidate"
         )
-        candidate_page = [
-            row for row in all_linked_tasks if row["id"] in remaining_candidate_ids
-        ]
-        linked_tasks = candidate_page[: args.max_items]
-        candidate_more = len(candidate_page) > len(linked_tasks)
+        linked_task_ids = remaining_candidate_ids[: args.max_items]
+        candidate_more = len(remaining_candidate_ids) > len(linked_task_ids)
         candidate_next_after_ids[target_id] = (
-            linked_tasks[-1]["id"] if candidate_more and linked_tasks else None
+            linked_task_ids[-1] if candidate_more and linked_task_ids else None
         )
         target_rows.append(
             {
@@ -2369,18 +2365,18 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
                 "line": section.get("line"),
                 "status": section.get("status"),
                 "body": section.get("body", ""),
-                "candidate_tasks": linked_tasks,
-                "candidate_task_count": len(all_linked_tasks),
-                "returned_candidate_task_count": len(linked_tasks),
+                "candidate_task_ids": linked_task_ids,
+                "candidate_task_count": len(all_linked_task_ids),
+                "returned_candidate_task_count": len(linked_task_ids),
                 "candidate_tasks_truncated": candidate_more,
                 "candidate_next_after_id": candidate_next_after_ids[target_id],
                 "candidate_result_count": sum(
-                    linked_task["result_ref"] is not None
-                    for linked_task in all_linked_tasks
+                    candidate_task_rows[task_id]["result_ref"] is not None
+                    for task_id in all_linked_task_ids
                 ),
                 "candidate_result_with_verification_count": sum(
-                    bool(linked_task["verification"])
-                    for linked_task in all_linked_tasks
+                    bool(candidate_task_rows[task_id]["verification"])
+                    for task_id in all_linked_task_ids
                 ),
             }
         )
@@ -2422,6 +2418,16 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
             "body": section.get("body", ""),
         }
 
+    def candidate_catalog(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        task_ids = sorted(
+            {
+                task_id
+                for row in rows
+                for task_id in row["candidate_task_ids"]
+            }
+        )
+        return {task_id: candidate_task_rows[task_id] for task_id in task_ids}
+
     target_more = len(filtered_target_ids) > len(target_rows)
     pagination = {
         "target_next_after_id": (
@@ -2448,6 +2454,7 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         "target_count": len(all_target_ids),
         "returned_target_count": len(target_rows),
         "targets": target_rows,
+        "candidate_tasks": candidate_catalog(target_rows),
         "constraint_count": len(constraint_ids),
         "returned_constraint_count": len(constraint_page_ids),
         "constraints": [section_summary(value) for value in constraint_page_ids],
@@ -2479,6 +2486,7 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         payload["pagination"]["candidate_next_after_ids"] = {
             row["id"]: row["candidate_next_after_id"] for row in target_rows
         }
+        payload["candidate_tasks"] = candidate_catalog(target_rows)
     return fit_payload(payload, args.budget)
 
 

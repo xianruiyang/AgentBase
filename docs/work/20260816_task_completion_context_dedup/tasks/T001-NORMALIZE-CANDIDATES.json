@@ -1,0 +1,43 @@
+{
+  "dependencies": [],
+  "id": "T001-NORMALIZE-CANDIDATES",
+  "mutation_scope": [
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/task-table-manager/references/tooling.md"
+  ],
+  "outcome": "completion-context 每页只返回一次完整候选任务证据，所有目标通过 ID 准确引用且分页与预算闭包保持成立",
+  "outputs": [
+    "页级候选任务目录与目标 ID 引用合同",
+    "单目标、多目标、候选续页和预算闭包回归证据"
+  ],
+  "reasoning_hint": "max",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-001",
+    "SOL-002",
+    "GAP-001",
+    "GAP-002",
+    "DES-001",
+    "DES-002",
+    "DES-003",
+    "DES-004",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "REQ-001",
+    "UDES-002"
+  ],
+  "suggested_skills": [
+    "task-table-manager",
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "规范化完成复核候选证据",
+  "verification": [
+    "运行 task-table-manager 受影响回归并在真实工作区验证字段等价与结构字节"
+  ]
+}

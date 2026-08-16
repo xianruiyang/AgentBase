@@ -1,0 +1,36 @@
+{
+  "confirmation_ref": "conversation:2026-08-16:continue-root-requirements-next-version",
+  "confirmed_by": "user",
+  "cycle_id": "cycle-001",
+  "documents": {
+    "requirements": {
+      "fingerprint": "sha256:614b0160b4d93ec4985b93767a6b7a61db3a10089f2b9ad77751b2e803d63b0f",
+      "ids": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006",
+        "CON-001",
+        "CON-002",
+        "CON-003",
+        "CON-004",
+        "REQ-001",
+        "REQ-002"
+      ],
+      "path": "requirements.md"
+    },
+    "user_design": {
+      "fingerprint": "sha256:e8367c559c3f9074158e8f7e7630bcfe6740f86457c29ff8a4e4ee661b3fe1fd",
+      "ids": [
+        "UDES-001",
+        "UDES-002"
+      ],
+      "path": "user-design.md"
+    }
+  },
+  "history": [],
+  "schema": "delivery.protected-baseline",
+  "workflow_id": "task-completion-context-dedup"
+}

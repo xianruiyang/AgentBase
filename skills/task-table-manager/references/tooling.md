@@ -52,6 +52,8 @@ release     清除领取意图并回到 todo
 
 `complete` 原样保存模型结果中的 `source_snapshot`，并以当前索引比较陈旧、缺失和传递覆盖不足；它不得在完成时自动生成当前指纹并伪装成任务实际输入。上述问题只返回诊断，不阻断结果记录。`completion-context` 同时使用任务合同的 `source_ids` 和结果的 `evidence_for` 建立候选映射；后者可直接把验收证据关联到 `REQ/AC/UDES`。
 
+每个 `completion-context` 响应页只在顶层 `candidate_tasks` 中返回一次完整候选任务证据。该对象以任务 ID 为键，值保留状态、合同修订、结果引用与摘要、产出、验证、未决项、失效来源、证据关联与引用、执行来源快照和结果诊断；值内不重复任务 ID。每个 `targets[]` 用有序 `candidate_task_ids` 引用本目标当前候选页，并继续返回该目标的候选总数、返回数、结果数、带验证结果数、截断状态和精确游标。顶层目录必须恰好覆盖当前页目标实际引用的任务，不得重复完整对象、产生悬空 ID，或在预算移除目标后保留无人引用任务。
+
 `completion-context` 的 `deferred_changes` 流对当前 Markdown 中全部 `DCR` 分页，并返回每项的原始 `status`。它不根据内置状态集判断哪些条目会阻断完成；该结论由模型按交付文档、用户确认和证据裁决。
 
 `completion-context` 返回的目标、约束和 DCR 条目以 `workflow.json.documents` 中的完整工作区相对路径标识 `document`，不把不同目录中的同名阶段文档压缩成相同文件名。

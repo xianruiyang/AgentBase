@@ -1,0 +1,43 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "新输出合同与直接机制证据"
+      ],
+      "id": "T001-NORMALIZE-CANDIDATES",
+      "type": "hard"
+    }
+  ],
+  "id": "T002-VERIFY-DELIVER",
+  "mutation_scope": [
+    "development/skill-routing/**",
+    "docs/plan.md",
+    "docs/work/20260816_task_completion_context_dedup/**"
+  ],
+  "outcome": "当前候选具有受影响验证、独立 skill 证据、根需求完成审计、总计划入口和 Git 版本",
+  "outputs": [
+    "当前候选独立评估证据",
+    "本轮逐需求完成审计与总计划入口",
+    "已提交并同步的 Git 版本"
+  ],
+  "reasoning_hint": "max",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-003",
+    "GAP-003",
+    "AC-006",
+    "REQ-002",
+    "UDES-001"
+  ],
+  "suggested_skills": [
+    "delivery-workflow",
+    "task-table-manager",
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "刷新证据并完成下一版本审计",
+  "verification": [
+    "运行 skill 校验、路由合同、detached 三阶段评估和最终 completion-context"
+  ]
+}

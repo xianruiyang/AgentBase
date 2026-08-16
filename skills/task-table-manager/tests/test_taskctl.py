@@ -494,8 +494,25 @@ class TaskctlTests(unittest.TestCase):
         )
         target_ids = {target["id"] for target in completion["targets"]}
         self.assertEqual(target_ids, {"REQ-001", "AC-001", "UDES-001"})
+        referenced_candidate_ids = set()
         for target in completion["targets"]:
             self.assertGreaterEqual(target["candidate_result_count"], 1)
+            self.assertNotIn("candidate_tasks", target)
+            referenced_candidate_ids.update(target["candidate_task_ids"])
+            self.assertTrue(
+                set(target["candidate_task_ids"]).issubset(completion["candidate_tasks"])
+            )
+        self.assertEqual(set(completion["candidate_tasks"]), referenced_candidate_ids)
+        self.assertLess(
+            len(completion["candidate_tasks"]),
+            sum(
+                target["returned_candidate_task_count"]
+                for target in completion["targets"]
+            ),
+        )
+        for task_id, candidate in completion["candidate_tasks"].items():
+            self.assertNotIn("id", candidate)
+            self.assertTrue(task_id.startswith("T"))
         self.assertNotIn("passed", completion)
         self.assertNotIn("pass", completion)
 
@@ -513,11 +530,8 @@ class TaskctlTests(unittest.TestCase):
         completion = self.run_task(
             "completion-context", "--target-id", "REQ-001", "--budget", "12000"
         )
-        task_row = next(
-            item
-            for item in completion["targets"][0]["candidate_tasks"]
-            if item["id"] == "T001"
-        )
+        self.assertIn("T001", completion["targets"][0]["candidate_task_ids"])
+        task_row = completion["candidate_tasks"]["T001"]
         self.assertIn(
             "result_source_snapshot_stale",
             {item["kind"] for item in task_row["result_diagnostics"]},
@@ -621,14 +635,34 @@ class TaskctlTests(unittest.TestCase):
         completion = self.run_task(
             "completion-context", "--target-id", "REQ-001", "--budget", "12000"
         )
-        candidate_ids = {
-            item["id"] for item in completion["targets"][0]["candidate_tasks"]
-        }
+        candidate_ids = set(completion["targets"][0]["candidate_task_ids"])
         self.assertIn("T003", candidate_ids)
+        self.assertIn("T003", completion["candidate_tasks"])
         stored_result = json.loads(
             next((self.root / "results").glob("T003.r*.json")).read_text(encoding="utf-8")
         )
         self.assertIn("REQ-001", stored_result["source_snapshot"])
+
+    def test_completion_context_budget_trimming_keeps_candidate_catalog_closed(self) -> None:
+        completion = self.run_task(
+            "completion-context", "--limit", "10", "--budget", "2500"
+        )
+        self.assertGreater(completion["returned_target_count"], 0)
+        self.assertLess(completion["returned_target_count"], completion["target_count"])
+        referenced = {
+            task_id
+            for target in completion["targets"]
+            for task_id in target["candidate_task_ids"]
+        }
+        self.assertEqual(set(completion["candidate_tasks"]), referenced)
+        self.assertTrue(
+            all(
+                set(target["candidate_task_ids"]).issubset(
+                    completion["candidate_tasks"]
+                )
+                for target in completion["targets"]
+            )
+        )
 
     def test_recursive_dependents_report_consumption_path(self) -> None:
         self.add_task(
@@ -1340,6 +1374,10 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(first["targets"][0]["candidate_task_count"], 2)
         self.assertEqual(first["targets"][0]["returned_candidate_task_count"], 1)
         self.assertEqual(
+            set(first["candidate_tasks"]),
+            set(first["targets"][0]["candidate_task_ids"]),
+        )
+        self.assertEqual(
             first["returned_streams"],
             ["targets", "constraints", "deferred_changes"],
         )
@@ -1358,6 +1396,14 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(
             candidate_page["targets"][0]["returned_candidate_task_count"], 1
+        )
+        self.assertEqual(
+            set(candidate_page["candidate_tasks"]),
+            set(candidate_page["targets"][0]["candidate_task_ids"]),
+        )
+        self.assertNotEqual(
+            first["targets"][0]["candidate_task_ids"],
+            candidate_page["targets"][0]["candidate_task_ids"],
         )
         self.assertEqual(candidate_page["returned_streams"], ["targets"])
         self.assertEqual(candidate_page["constraints"], [])
