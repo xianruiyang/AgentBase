@@ -4,9 +4,10 @@
 
 ## 当前版本与发布状态
 
-- Git 实现版本为 `6fe7838`，上一实际 Codex 发布基线仍为 `3cf059f`；本轮 handoff 记录随后的文档提交完成后，`main` 同步到 `origin/main`。
-- 实际 Codex 安装仍是上一轮 `DirectCompatibility` 发布，回滚资产仍为 `C:\Users\gzxt\.codex\backups\AgentBase-20260816-224209-13023c28`；本轮没有执行 `Publish`。
-- 本轮候选 `manage_agentbase.ps1 -Action Validate` 通过，source bundle SHA-256 为 `FA48371094AA1239C7A42AE41AB40E2339E79D3A9FCD60657814387CF25FF3E9`，包含 11 个 skill，MCP 身份与可移植设置有效。
+- Git 实现版本为 `6fe7838`，上一 handoff 提交为 `6cd963e`；本次发布状态记录完成后，`main` 同步到 `origin/main`。
+- 项目真源已于 2026-08-17 通过 `DirectCompatibility` 发布到 `C:\Users\gzxt\.codex`；source、installed、contract manifest 与 routing evidence 身份一致，正式发布缺口和直接兼容冲突均为 0。
+- 已发布 source bundle SHA-256 为 `DACC5897574921931B84A8EA6A11E0791D4F2407AC3B72A58DD513F41FE3220A`，包含 11 个 skill、hooks、可移植设置和 3 个 agent；MCP 未变化，`srcq 0.3.1` 完整性与 doctor 通过。
+- 本次发布改变 6 个受管路径；回滚资产为 `C:\Users\gzxt\.codex\backups\AgentBase-20260817-013438-fe195f4a`。
 - 再次发布到 `C:\Users\gzxt\.codex` 必须由用户针对该次 `Publish` 明确同意；验证、Git 提交或远端同步都不构成发布授权。
 
 ## 最近完成的版本
