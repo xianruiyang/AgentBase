@@ -5,6 +5,7 @@
 ## 真源与安装副本
 
 - [`docs/requirements.md`](docs/requirements.md) 是项目长期用户目标、可验收结果和约束的唯一需求真源；它不描述当前实现状态或具体方案。
+- [`docs/plan.md`](docs/plan.md) 是项目级总体计划入口，只维护总体方向、跨计划决策、子计划索引、实践结论和重开条件；各子计划继续维护自己的详细语义与执行证据。
 - `global/AGENTS.md` 是全局规则候选真源，不自动覆盖 Codex 用户目录。
 - `global/config.toml` 是经过筛选的可移植 Codex 设置真源；`global/hooks.template.json` 是按目标 Codex 根目录解析的 hooks 真源；`global/agents/*.toml` 是自定义子代理真源。它们都不会因文件存在而自动覆盖用户配置。
 - `skills/<skill-name>/` 是已迁入 skill 的唯一开发真源。
@@ -22,6 +23,10 @@ AgentBase 只维护 Windows 宿主。项目自有 skill 运行时、MCP、CLI、
 ## 根本需求
 
 项目为什么存在、需要让 Codex 具备什么长期能力以及如何验收，以 [`docs/requirements.md`](docs/requirements.md) 为唯一需求真源。README 只提供入口，不复制需求正文；全局规则、skill、开发设计和脚本分别把这些需求落实为各自职责内的执行规则、方案与机械合同。
+
+## 项目总计划
+
+[`docs/plan.md`](docs/plan.md) 是从根需求进入当前项目方向和各子计划的唯一总计划入口。它索引已经闭环、维护中、被替代或需要重开的专项计划，并保存跨计划可复用的实践裁决；任务状态、原始 benchmark、安装状态和发布授权仍由各自正式来源维护，不在总计划中复制。
 
 ## 当前全局内核
 

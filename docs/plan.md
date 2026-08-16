@@ -1,0 +1,49 @@
+# AgentBase 总计划
+
+## 1. 文档职责
+
+本文件是 AgentBase 唯一的项目级计划入口，维护当前总体方向、跨计划决策、子计划索引、可复用实践结论和重开条件。项目长期目标与约束只由 [requirements.md](requirements.md) 定义；子计划继续拥有各自的需求、设计、任务、结果和详细证据；当前安装状态由正式部署入口读回。本文件不复制这些内容，也不产生执行授权、发布授权或完成判定。
+
+维护项目或启动新一轮工作时，先从本文件确定所属子计划和正式 owner；已有子计划能够承接时回到该入口，只有目标、职责或生命周期确实独立时才新增子计划。子计划形成、关闭、替代或重开后同步更新本文件的入口和结论，不在 README、历史方案或进度说明中维护第二份总计划。
+
+## 2. 总体方向
+
+AgentBase 持续把根需求落实为可跨项目复用的 Codex 协作维护能力：有效洞察并与用户共同校准需求，以证据形成和维护权威职责，让方案、任务、消费者与验证沿目标闭环，并可靠维护规则、skill、工具、配置、部署和发布链。
+
+所有改进依次保证需求对齐、正确性、授权、安全、可维护性和完成证据；质量同等充分时降低端到端 Token，前两者不变差时再提升速度。有效规划后优先沿当前目标链形成最近的可验证闭环；思考深度随真实不确定性、后果、可逆性和验证负担调整，不按任务形式固定。
+
+## 3. 跨计划决策合同
+
+1. 从用户需求和项目事实识别真实差距，不从现有实现、旧测试、任务状态或工具输出反推目标。
+2. 在决定行为的正式 owner 修正问题，闭合当前消费者、派生产物和旧同责路径；不得用上下层补偿特例制造平行入口。
+3. 优化模型取得充分证据并形成可靠结论的完整决策链，不以单个文件、skill、stdout、调用次数或局部预算代替总体结果。
+4. 候选先通过质量、证据和实验身份门禁，再与最近的同质量、同环境且 identity 可比的已验证结果比较总 Token；速度只在前两项不退化时参与选择。
+5. 一次只改变一个有直接证据支持的机制；机制与输入身份未变时不为期待不同结果重跑，低成本但质量、oracle、隔离或身份无效的结果不得成为目标。
+6. 常驻规则只吸收跨任务重复、能稳定改变动作且属于其职责的不变量；专项协议、样本、原始运行和审计保留在对应子计划或 `development/`。
+
+## 4. 子计划索引
+
+| 子计划 | 正式入口 | 当前结论 | 主要 owner | 重开或替代条件 |
+| --- | --- | --- | --- | --- |
+| 根需求收益边缘持续优化 | [方案](work/20260814_agentbase_requirement_edge_optimization/solution.md)、[现状与证据](work/20260814_agentbase_requirement_edge_optimization/current-state.md) | 已闭环；SOL-001—SOL-006 的长期结论已进入当前总计划 | `global/AGENTS.md`、核心 skill、路由与部署验证 | 新的根需求差距、适用失败或跨计划共享机制 |
+| Delivery Workflow 自审 | [方案](work/20260812_agentbase_delivery_workflow_self_review/solution.md) | 已闭环；作为后续十二轮审查的基线 | `delivery-workflow`、`task-table-manager` | 已修机制复发或任务存储/工作流合同改变 |
+| Delivery Workflow 十二轮审查 | [方案](work/20260812_agentbase_delivery_workflow_twelve_round_audit/solution.md) | 已闭环；详细轮次结论保留在该交付链 | `delivery-workflow`、`task-table-manager`、`change-governance` | 阶段语义、快照、分页、影响闭合或任务合同改变 |
+| Source Query Gateway | [分支计划](../development/source-query-gateway/plan.md) | P0—P10 已闭环；当前身份达到质量与 Token 采纳门槛，未证明速度改善 | `tools/srcq`、`source-query`、`vscode-lsp-mcp` | 新查询失败、后端/协议变化、新消费者或可重复共享缺口 |
+| VS Code LSP MCP Companion | [组件方案](../mcp/vscode-lsp-mcp/PLAN.md)、[当前组件入口](../mcp/vscode-lsp-mcp/README.md) | 已形成组件与受验证 Windows release；PLAN 保留架构基线，不作为开放任务表 | `mcp/vscode-lsp-mcp` | 安全边界、Provider 协议、公开工具或发布生命周期改变 |
+| 代码搜索早期改进 | [历史记录](../development/code-search-workflow-improvement-plan.md) | 已由 Source Query Gateway 替代，只保留迁移前证据 | 无当前运行 owner | 仅作证据追溯，不重新启用旧 skill/sgy 入口 |
+
+当前没有未闭环的项目级实施阶段。组件的常规维护由其 README、需求、设计和测试合同承接，不因列入本表自动创建任务。
+
+## 5. 2026-08-16 实践证据
+
+Source Query Gateway P10 提供了一次完整的真实代理优化样本。最终 v21 在 required、行限和 evidence complete 12/12、45 次命令无失败的前提下使用 `1,066,470` Token，相对最近同质量 P9 参照降低 `7.31%`；耗时上升 `32.38%`，因此只证明质量保持与 Token 改善。低至 `542,658` Token 的早期候选因质量和实验污染无效；微观命令配方与 8192 默认预算分别把后续候选推高到 `720,707` 和 `823,177` Token。项目规则误用修正在真实 owner 后，相同受影响六次由 `778,895` 降至 `528,450` Token、20 次命令。
+
+这组证据支持第 3 节的完整决策链、同质量比较、单机制迭代和正确 owner 原则，但数值只适用于对应模型、配置、规则、语料、工具和 benchmark identity；任一身份变化后应形成新的可比证据，不外推固定比例。逐调用事实与限制见 [往返审计](../development/source-query-gateway/evidence/round-trip-audit-p10.md)、[日期化分支汇总](../development/source-query-gateway/plan.md#38-2026-08-16-p10-实践证据与总体计划复核)和 [完成审计](../development/source-query-gateway/evidence/completion-audit-p10.md)。
+
+## 6. 重开与维护
+
+- 新需求或新证据先定位到现有子计划和 owner；能由现有入口承接时不新增计划。
+- 跨计划共享职责、根需求或正式入口变化时，更新本文件的方向、索引和影响结论；专项细节只写回对应子计划。
+- 已关闭子计划出现适用失败时重开其交付链或建立明确后继，不静默改写历史完成证据。
+- 发布、远端外部写入和其他高风险动作始终按当前用户授权与项目规则裁决；历史子计划中的授权不向当前动作继承。
+- 没有新失败、协议变化、新消费者或可重复共享机制时保持收益边缘，不为计划持续存在而制造任务。
