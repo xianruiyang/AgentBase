@@ -1164,18 +1164,53 @@ def result_diagnostics(
     return diagnostics
 
 
+RESULT_SOURCE_SNAPSHOT_DIAGNOSTIC_KINDS = {
+    "result_source_snapshot_missing",
+    "result_source_snapshot_incomplete",
+    "result_source_snapshot_stale",
+}
+
+
+def summarize_result_diagnostics(
+    diagnostics_by_task: dict[str, list[dict[str, Any]]],
+) -> dict[str, Any]:
+    kind_counts: Counter[str] = Counter()
+    result_with_diagnostics_count = 0
+    task_revision_stale_result_count = 0
+    source_snapshot_issue_result_count = 0
+    for diagnostics in diagnostics_by_task.values():
+        if diagnostics:
+            result_with_diagnostics_count += 1
+        kinds = {item.get("kind") for item in diagnostics}
+        kind_counts.update(
+            item["kind"] for item in diagnostics if isinstance(item.get("kind"), str)
+        )
+        if "result_task_revision_stale" in kinds:
+            task_revision_stale_result_count += 1
+        if kinds.intersection(RESULT_SOURCE_SNAPSHOT_DIAGNOSTIC_KINDS):
+            source_snapshot_issue_result_count += 1
+    return {
+        "result_with_diagnostics_count": result_with_diagnostics_count,
+        "task_revision_stale_result_count": task_revision_stale_result_count,
+        "source_snapshot_issue_result_count": source_snapshot_issue_result_count,
+        "result_diagnostic_count": sum(kind_counts.values()),
+        "result_diagnostic_kind_counts": dict(sorted(kind_counts.items())),
+    }
+
+
 def summarize_loaded_task_storage(
     root: Path,
     table: dict[str, Any],
     tasks: dict[str, dict[str, Any]],
     states: dict[str, dict[str, Any]],
+    index: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     result_count = 0
     result_with_verification_count = 0
     result_with_unresolved_count = 0
-    stale_result_count = 0
     invalidated_source_ids: set[str] = set()
     diagnostics: list[dict[str, Any]] = []
+    diagnostics_by_task: dict[str, list[dict[str, Any]]] = {}
     for task_id, task in tasks.items():
         state = states[task_id]
         diagnostics.extend(state_diagnostics(task_id, state))
@@ -1184,8 +1219,7 @@ def summarize_loaded_task_storage(
         if result is None:
             continue
         result_count += 1
-        if not result["current_for_task_revision"]:
-            stale_result_count += 1
+        diagnostics_by_task[task_id] = result_diagnostics(result, task, index)
         if result["verification"]:
             result_with_verification_count += 1
         if result["unresolved"]:
@@ -1197,10 +1231,10 @@ def summarize_loaded_task_storage(
         "result_count": result_count,
         "result_with_verification_count": result_with_verification_count,
         "result_with_unresolved_count": result_with_unresolved_count,
-        "stale_result_count": stale_result_count,
         "invalidated_source_ids": sorted(invalidated_source_ids),
         "diagnostics": diagnostics[:DEFAULT_LIMIT],
         "diagnostic_count": len(diagnostics),
+        **summarize_result_diagnostics(diagnostics_by_task),
     }
 
 
@@ -1208,11 +1242,18 @@ def task_storage_summary(root: Path) -> dict[str, Any]:
     root = root.resolve()
     table = load_table(root)
     tasks, states, storage_diagnostics = load_query_storage(root, table)
-    summary = summarize_loaded_task_storage(root, table, tasks, states)
-    all_diagnostics = [*storage_diagnostics, *summary.get("diagnostics", [])]
+    index, index_diagnostics = maybe_load_index(root, table)
+    summary = summarize_loaded_task_storage(root, table, tasks, states, index)
+    all_diagnostics = [
+        *storage_diagnostics,
+        *index_diagnostics,
+        *summary.get("diagnostics", []),
+    ]
     summary["status"] = "partial" if all_diagnostics else "available"
     summary["diagnostics"] = all_diagnostics[:DEFAULT_LIMIT]
-    summary["diagnostic_count"] = len(all_diagnostics)
+    summary["diagnostic_count"] = (
+        len(all_diagnostics) + summary["result_diagnostic_count"]
+    )
     return summary
 
 
@@ -1620,7 +1661,7 @@ def shrink_value(value: Any, max_string: int) -> Any:
 
 
 def fit_payload(payload: dict[str, Any], budget: int) -> dict[str, Any]:
-    for maximum in (2_000, 1_000, 500, 240, 120):
+    for maximum in (2_000, 1_000, 500, 240, 120, 80):
         candidate = shrink_value(payload, maximum)
         was_shrunk = candidate != payload
         candidate["truncated"] = bool(payload.get("truncated")) or was_shrunk
@@ -2208,8 +2249,16 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
             "protected_baseline": None,
             "targets": [],
             "returned_streams": [],
-            "diagnostics": diagnostics[: args.max_items],
-            "diagnostic_count": len(diagnostics),
+            "query_diagnostics": diagnostics[: args.max_items],
+            "diagnostic_summary": {
+                "query_diagnostic_count": len(diagnostics),
+                "candidate_result_with_diagnostics_count": 0,
+                "candidate_task_revision_stale_result_count": 0,
+                "candidate_source_snapshot_issue_result_count": 0,
+                "candidate_result_diagnostic_count": 0,
+                "candidate_result_diagnostic_kind_counts": {},
+                "total_diagnostic_count": len(diagnostics),
+            },
             "note": "current Markdown could not be indexed by the helper; review the documents directly",
         }
     current_results: dict[str, dict[str, Any] | None] = {}
@@ -2428,6 +2477,37 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         )
         return {task_id: candidate_task_rows[task_id] for task_id in task_ids}
 
+    def page_diagnostic_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+        catalog = candidate_catalog(rows)
+        result_summary = summarize_result_diagnostics(
+            {
+                task_id: candidate["result_diagnostics"]
+                for task_id, candidate in catalog.items()
+                if candidate["result_ref"] is not None
+            }
+        )
+        return {
+            "query_diagnostic_count": len(diagnostics),
+            "candidate_result_with_diagnostics_count": result_summary[
+                "result_with_diagnostics_count"
+            ],
+            "candidate_task_revision_stale_result_count": result_summary[
+                "task_revision_stale_result_count"
+            ],
+            "candidate_source_snapshot_issue_result_count": result_summary[
+                "source_snapshot_issue_result_count"
+            ],
+            "candidate_result_diagnostic_count": result_summary[
+                "result_diagnostic_count"
+            ],
+            "candidate_result_diagnostic_kind_counts": result_summary[
+                "result_diagnostic_kind_counts"
+            ],
+            "total_diagnostic_count": (
+                len(diagnostics) + result_summary["result_diagnostic_count"]
+            ),
+        }
+
     target_more = len(filtered_target_ids) > len(target_rows)
     pagination = {
         "target_next_after_id": (
@@ -2471,8 +2551,8 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
             if included
         ],
         "pagination": pagination,
-        "diagnostics": diagnostics[: args.max_items],
-        "diagnostic_count": len(diagnostics),
+        "query_diagnostics": diagnostics[: args.max_items],
+        "diagnostic_summary": page_diagnostic_summary(target_rows),
         "note": (
             "current Markdown targets and candidate evidence are inputs to model review; no final pass or fail is produced"
         ),
@@ -2487,6 +2567,7 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
             row["id"]: row["candidate_next_after_id"] for row in target_rows
         }
         payload["candidate_tasks"] = candidate_catalog(target_rows)
+        payload["diagnostic_summary"] = page_diagnostic_summary(target_rows)
     return fit_payload(payload, args.budget)
 
 
@@ -2495,13 +2576,14 @@ def command_status(args: argparse.Namespace) -> dict[str, Any]:
     table = load_table(root)
     tasks, states, storage_diagnostics = load_query_storage(root, table)
     index, index_diagnostics = maybe_load_index(root, table)
-    storage = summarize_loaded_task_storage(root, table, tasks, states)
+    storage = summarize_loaded_task_storage(root, table, tasks, states, index)
     dependency_blocked_count = 0
     cycle_ids = set(ensure_acyclic(tasks))
     diagnostic_count = (
         len(storage_diagnostics)
         + len(index_diagnostics)
         + storage.get("diagnostic_count", 0)
+        + storage["result_diagnostic_count"]
     )
     for task_id, task in tasks.items():
         diagnostics = task_diagnostics(task, tasks, states, index, cycle_ids)
@@ -2530,10 +2612,22 @@ def command_status(args: argparse.Namespace) -> dict[str, Any]:
             "invalidated_source_ids": storage["invalidated_source_ids"][: args.limit],
         },
         "results": {
-            "current_result_count": storage["result_count"],
+            "referenced_result_count": storage["result_count"],
             "result_with_verification_count": storage["result_with_verification_count"],
             "result_with_unresolved_count": storage["result_with_unresolved_count"],
-            "stale_result_count": storage["stale_result_count"],
+            "result_with_diagnostics_count": storage[
+                "result_with_diagnostics_count"
+            ],
+            "task_revision_stale_result_count": storage[
+                "task_revision_stale_result_count"
+            ],
+            "source_snapshot_issue_result_count": storage[
+                "source_snapshot_issue_result_count"
+            ],
+            "result_diagnostic_count": storage["result_diagnostic_count"],
+            "result_diagnostic_kind_counts": storage[
+                "result_diagnostic_kind_counts"
+            ],
         },
         "diagnostic_count": diagnostic_count,
         "index_diagnostics": index_diagnostics[: args.limit],
@@ -2974,8 +3068,8 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.task_dir)
     table = load_table(root)
     tasks, states, storage_diagnostics = load_query_storage(root, table)
-    storage = summarize_loaded_task_storage(root, table, tasks, states)
     index, index_diagnostics = maybe_load_index(root, table)
+    storage = summarize_loaded_task_storage(root, table, tasks, states, index)
     output_path = resolve_inside(root, str(table.get("table_view", "TASK_TABLE.md")))
     counts = storage["counts"]
     lines = [
@@ -2996,10 +3090,13 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
             "## 复核与结果",
             "",
             f"- 需复核任务：{counts['review']}",
-            f"- 当前可读取结果：{storage['result_count']}",
+            f"- 当前状态引用结果：{storage['result_count']}",
             f"- 含验证结果：{storage['result_with_verification_count']}",
             f"- 含未决结果：{storage['result_with_unresolved_count']}",
-            f"- 合同修订后陈旧结果：{storage['stale_result_count']}",
+            f"- 含结果诊断：{storage['result_with_diagnostics_count']}",
+            f"- 任务合同 revision 陈旧结果：{storage['task_revision_stale_result_count']}",
+            f"- 含来源快照问题结果：{storage['source_snapshot_issue_result_count']}",
+            f"- 结果诊断条目：{storage['result_diagnostic_count']}",
         ]
     )
     if index is not None:
@@ -3063,12 +3160,24 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
         "status_counts": counts,
         "needs_review_count": counts["review"],
         "results": {
-            "current_result_count": storage["result_count"],
+            "referenced_result_count": storage["result_count"],
             "result_with_verification_count": storage[
                 "result_with_verification_count"
             ],
             "result_with_unresolved_count": storage["result_with_unresolved_count"],
-            "stale_result_count": storage["stale_result_count"],
+            "result_with_diagnostics_count": storage[
+                "result_with_diagnostics_count"
+            ],
+            "task_revision_stale_result_count": storage[
+                "task_revision_stale_result_count"
+            ],
+            "source_snapshot_issue_result_count": storage[
+                "source_snapshot_issue_result_count"
+            ],
+            "result_diagnostic_count": storage["result_diagnostic_count"],
+            "result_diagnostic_kind_counts": storage[
+                "result_diagnostic_kind_counts"
+            ],
         },
         "index_diagnostics": index_diagnostics[:DEFAULT_LIMIT],
         "index_diagnostic_count": len(index_diagnostics),

@@ -1,0 +1,111 @@
+{
+  "changed_files": [
+    "skills/task-table-manager/SKILL.md",
+    "skills/task-table-manager/references/task-contracts.md",
+    "skills/task-table-manager/references/execution.md",
+    "skills/task-table-manager/references/tooling.md",
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py",
+    "docs/work/20260816_task_result_diagnostic_semantics/current-state.md"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "REQ-002",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "DES-001",
+    "DES-002",
+    "DES-003",
+    "DES-004",
+    "DES-005",
+    "SOL-001",
+    "SOL-002",
+    "OBS-007",
+    "OBS-008"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "note": "结果诊断聚合、时效轴、后继证据正反场景、分页预算和来源指纹完整性",
+      "ref": "skills/task-table-manager/tests/test_taskctl.py"
+    },
+    {
+      "kind": "test",
+      "note": "交付状态视图消费新诊断合同",
+      "ref": "skills/delivery-workflow/tests/test_workctl.py"
+    },
+    {
+      "kind": "runtime-measurement",
+      "note": "上一真实工作区的 status、completion-context 和紧预算读回",
+      "ref": "docs/work/20260816_task_result_diagnostic_semantics/current-state.md#OBS-008"
+    }
+  ],
+  "invalidated_source_ids": [
+    "OBS-003",
+    "OBS-004",
+    "OBS-005",
+    "GAP-001",
+    "GAP-002",
+    "GAP-003"
+  ],
+  "outcome": "task-table-manager 已在正式结果合同与唯一查询投影 owner 中统一结果诊断和证据时效语义，completion-context、status、render 与交付状态消费者均使用无歧义分层字段",
+  "outputs": [
+    "后继结果以 evidence_for、当前 source_snapshot 和直接验证提供新证据，旧结果诊断保持可见且不新增 resolved 状态",
+    "同一聚合函数为 completion-context、status、render 和交付状态视图提供结果数、诊断条目、kind、任务 revision 与来源快照问题计数",
+    "66 项 task-table-manager 回归、32 项 delivery-workflow 回归及原真实工作区机制复测通过"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:a3b4059dabb2e973082ff283932192b64fe5e8e0d6b31b367260e15623ae176d",
+    "AC-002": "sha256:6ee72336639dc916a989dcbbaf3b95c4deb0a54e521bdbdd49a6b3cfa9aafffe",
+    "AC-003": "sha256:e0be5b4e6ae4d06b5e121650dfcfc59aa25887077efb1908584854a13b265fce",
+    "AC-004": "sha256:a72e993b8ea00e072013f692e61f9660d07634917be41dcd356adc5fb58ac418",
+    "AC-005": "sha256:a34a11e11964fb16c73216def3665596e03a4df28cd87a47028011347fbc72ad",
+    "AC-006": "sha256:cbf17431c12bc7c51f42beb4327cae4678e0b9d63522c4313b7716efc537ce0e",
+    "AC-007": "sha256:2c7b378671d0313783d1cc2400b9e1e20c31d184434d50548cdc81f8f7959a3a",
+    "CON-001": "sha256:c34e4facf5b25b5be4f5f6edc3226741eed5c9c8c5840e5b5125d2241a545d03",
+    "CON-002": "sha256:0aa94280e93b955535d2073eaf61d2b3a011f36c95aaf5719428f0939b09f962",
+    "CON-003": "sha256:d1e02f5e121b5750f6622aa46433159b8cbb285907ec1ecce4e9f2e545d7c37e",
+    "CON-004": "sha256:4a02bb41a65ce79768f28a90e9b723661401a60721541497f5f2070a9e222d7c",
+    "DES-001": "sha256:9e228f8025cba9ed6289c7e6e7b207f776397139b5b35e899011befe52096f33",
+    "DES-002": "sha256:0a8949a80cc40b8a17a9c97b5737c69805f54fafc7f8ec786ac7896b2342c3ce",
+    "DES-003": "sha256:dd825aed6c39685e6cfbe1a039aa03cf9df8b4f307a4d8c251ce7e6c2e023ef5",
+    "DES-004": "sha256:c976a8fd456caacb3e41c5c134ac464a5468325daf0a61cd89864eabf6ff6392",
+    "DES-005": "sha256:dc59baefdc8deb00df4c50b49251456fbd0d41e257301e721991a193f375a319",
+    "GAP-001": "sha256:9df01966ce981cb6e66d8740381bd52a5b4672d659d4bfaee604ec7daadda63e",
+    "GAP-002": "sha256:349974d7b85da580a09729e0a248cff703c87015272abb000f31e757202b91c3",
+    "GAP-003": "sha256:475f33b47d90e4594f485f780f1cdeecbf477c3b179406482a474e5caadd0e37",
+    "GAP-004": "sha256:9c35a6fcb08eb8b25ce5d1ca6cab26d6158a295ed884039d84d2cc8c16ac0707",
+    "OBS-001": "sha256:456bce363839ce74f57d0bcca0d784c64f390e500f5b41b6991dc5282cb53085",
+    "OBS-002": "sha256:91fded675daf3df06b6bbcadccc797f1948c6960574614528aa21bf7e03b46a9",
+    "OBS-003": "sha256:ee60073ef641208fbb0d1c69efaf8cca0d9aa0ce942932d705dcc7d0501dddf4",
+    "OBS-004": "sha256:9de052a7438d6564d9a8c4ee7a0d5d53d2bc42dd346da53f6b9c0939b2889fea",
+    "OBS-005": "sha256:455f718fc7fffa73038fc13b33b2bda8d637966132c162e0630fd03c4fa1afab",
+    "OBS-006": "sha256:d3b020e1c9067bc7ff17a4709781f0473e80f6574054201937e2592156d7c3f2",
+    "OBS-007": "sha256:c9aae78714047c4d23fb916269576bc908b27d63c54ba598aba9f5f0b047f9b8",
+    "OBS-008": "sha256:fd35c45e15bea3aba1b72303b65c4f51b2324276676e6b3ac75345b9312ccbc7",
+    "REQ-001": "sha256:bfec11bfad8ded5a7a2361c75d5f834d1b4c1eeabf194582d9622be4ccf0730c",
+    "REQ-002": "sha256:50bb31e5991126ec1093e7e5191cf7ef0121b7e8117f6d9409e6b6c7e8420202",
+    "REQ-003": "sha256:63a0e9c5e72514cfbf0af06e4f47ae41ffce8c12cb39f2ebdf40a813862d10ee",
+    "SOL-001": "sha256:b0430e430d4f922a3f1edd3c0559f796d1c26921906a0cbba55f3005bed48afe",
+    "SOL-002": "sha256:3a9dd2976c48dec1ad5f500e43d8ddfcd380d57e049ea9aa7c09741361a33a7a",
+    "UDES-002": "sha256:e689308d20444d060016f3a6c0bce198afbf1d525d9ea2df9b99c3817a8c9b10"
+  },
+  "task_id": "T001-IMPLEMENT-DIAGNOSTIC-CONTRACT",
+  "task_revision": 2,
+  "unresolved": [],
+  "verification": [
+    "task-table-manager 66 项完整回归通过",
+    "delivery-workflow 32 项完整回归通过",
+    "后继结果正反场景证明不自动抑制旧诊断且不生成第二有效性状态",
+    "真实旧工作区读回: query diagnostics 0, candidate result diagnostics 8, affected results 1, source snapshot issues 1, task revision stale 0",
+    "12,000 字符预算变体保持完整候选关系、最终目录汇总和 71 字符 SHA-256 来源指纹"
+  ]
+}

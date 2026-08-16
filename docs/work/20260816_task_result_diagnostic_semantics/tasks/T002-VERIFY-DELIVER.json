@@ -1,0 +1,45 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "新结果诊断输出合同、实现和直接回归证据"
+      ],
+      "id": "T001-IMPLEMENT-DIAGNOSTIC-CONTRACT",
+      "type": "hard"
+    }
+  ],
+  "id": "T002-VERIFY-DELIVER",
+  "mutation_scope": [
+    "development/skill-routing/evidence/current.json",
+    "docs/plan.md",
+    "docs/handoff.md",
+    "docs/work/20260816_task_result_diagnostic_semantics/**"
+  ],
+  "outcome": "当前候选在真实工作区、skill 合同、独立路由证据、总计划、接手入口和完成审计中形成可追溯闭环",
+  "outputs": [
+    "真实工作区结果诊断汇总与后继证据读回",
+    "刷新后的独立 skill 证据",
+    "专项完成审计、项目总计划入口、当前接手状态和 Git 版本"
+  ],
+  "reasoning_hint": "max",
+  "revision": 2,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-003",
+    "GAP-004",
+    "AC-007",
+    "REQ-003",
+    "UDES-001",
+    "UDES-002"
+  ],
+  "suggested_skills": [
+    "delivery-workflow",
+    "task-table-manager",
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "验证并交付诊断语义下一版本",
+  "verification": [
+    "运行真实工作区读回、skill 校验、项目合同、detached 三阶段评估和最终 completion-context"
+  ]
+}

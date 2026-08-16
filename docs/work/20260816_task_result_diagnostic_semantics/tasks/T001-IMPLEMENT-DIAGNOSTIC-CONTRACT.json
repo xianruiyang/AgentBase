@@ -1,0 +1,55 @@
+{
+  "dependencies": [],
+  "id": "T001-IMPLEMENT-DIAGNOSTIC-CONTRACT",
+  "mutation_scope": [
+    "skills/task-table-manager/SKILL.md",
+    "skills/task-table-manager/references/task-contracts.md",
+    "skills/task-table-manager/references/execution.md",
+    "skills/task-table-manager/references/tooling.md",
+    "skills/task-table-manager/scripts/taskctl.py",
+    "skills/task-table-manager/tests/test_taskctl.py",
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py"
+  ],
+  "outcome": "task-table-manager 用无歧义字段和唯一聚合机制返回结果引用、任务 revision 陈旧、来源快照问题和分页级候选结果诊断，并明确后继当前证据合同",
+  "outputs": [
+    "结果时效与后继当前证据正式合同",
+    "completion-context、status、render 与交付状态视图的统一诊断聚合实现",
+    "原场景、时效变体、后继证据正反场景和分页预算回归"
+  ],
+  "reasoning_hint": "max",
+  "revision": 2,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-001",
+    "SOL-002",
+    "GAP-001",
+    "GAP-002",
+    "GAP-003",
+    "GAP-004",
+    "DES-001",
+    "DES-002",
+    "DES-003",
+    "DES-004",
+    "DES-005",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "UDES-002"
+  ],
+  "suggested_skills": [
+    "task-table-manager",
+    "change-governance",
+    "skill-creator"
+  ],
+  "title": "实现结果诊断与证据时效合同",
+  "verification": [
+    "运行 task-table-manager 和 delivery-workflow 受影响回归并检查正式文档和输出字段一致"
+  ]
+}

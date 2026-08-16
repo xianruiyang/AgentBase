@@ -1,0 +1,17 @@
+{
+  "documents": {
+    "current_state": "current-state.md",
+    "deferred_changes": "deferred-changes.md",
+    "design": "design.md",
+    "requirements": "requirements.md",
+    "solution": "solution.md",
+    "user_design": "user-design.md"
+  },
+  "id": "task-result-diagnostic-semantics",
+  "protected_baseline": "protected-baseline.json",
+  "schema": "delivery.workflow",
+  "semantic_index": ".work-cache/index.json",
+  "status_view": "WORK_STATUS.md",
+  "task_table": "task-table.json",
+  "title": "任务结果诊断与证据时效语义"
+}

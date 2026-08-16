@@ -1,0 +1,38 @@
+{
+  "confirmation_ref": "conversation:2026-08-16:develop-next-version-comprehensively",
+  "confirmed_by": "user",
+  "cycle_id": "cycle-001",
+  "documents": {
+    "requirements": {
+      "fingerprint": "sha256:dd086060371cefe2a5b9c8e6098da1b6476e9a1bf67b63955c74ad6170e5def8",
+      "ids": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006",
+        "AC-007",
+        "CON-001",
+        "CON-002",
+        "CON-003",
+        "CON-004",
+        "REQ-001",
+        "REQ-002",
+        "REQ-003"
+      ],
+      "path": "requirements.md"
+    },
+    "user_design": {
+      "fingerprint": "sha256:b1a4affcb4a50c11b5221c4c58e4564cc3ce870e416aec4000a8f3ab7ef3c392",
+      "ids": [
+        "UDES-001",
+        "UDES-002"
+      ],
+      "path": "user-design.md"
+    }
+  },
+  "history": [],
+  "schema": "delivery.protected-baseline",
+  "workflow_id": "task-result-diagnostic-semantics"
+}

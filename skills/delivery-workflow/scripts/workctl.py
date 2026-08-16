@@ -833,6 +833,11 @@ def unavailable_task_summary(kind: str, message: str) -> dict[str, Any]:
         "result_count": None,
         "result_with_verification_count": None,
         "result_with_unresolved_count": None,
+        "result_with_diagnostics_count": None,
+        "task_revision_stale_result_count": None,
+        "source_snapshot_issue_result_count": None,
+        "result_diagnostic_count": None,
+        "result_diagnostic_kind_counts": {},
         "invalidated_source_ids": [],
         "diagnostics": [{"kind": kind, "message": message}],
     }
@@ -1344,9 +1349,13 @@ def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
             "",
             "## 任务结果证据",
             "",
-            f"- 当前可读取结果：{task_summary['result_count'] if task_summary['result_count'] is not None else '未知'}",
+            f"- 任务状态引用结果：{task_summary['result_count'] if task_summary['result_count'] is not None else '未知'}",
             f"- 含验证结果：{task_summary['result_with_verification_count'] if task_summary['result_with_verification_count'] is not None else '未知'}",
             f"- 含未决结果：{task_summary['result_with_unresolved_count'] if task_summary['result_with_unresolved_count'] is not None else '未知'}",
+            f"- 含结果诊断：{task_summary['result_with_diagnostics_count'] if task_summary['result_with_diagnostics_count'] is not None else '未知'}",
+            f"- 任务合同 revision 陈旧结果：{task_summary['task_revision_stale_result_count'] if task_summary['task_revision_stale_result_count'] is not None else '未知'}",
+            f"- 含来源快照问题结果：{task_summary['source_snapshot_issue_result_count'] if task_summary['source_snapshot_issue_result_count'] is not None else '未知'}",
+            f"- 结果诊断条目：{task_summary['result_diagnostic_count'] if task_summary['result_diagnostic_count'] is not None else '未知'}",
             f"- 使上游失效的 ID：{len(task_summary['invalidated_source_ids'])}",
         ]
     )

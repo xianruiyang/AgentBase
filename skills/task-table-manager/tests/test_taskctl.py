@@ -319,7 +319,7 @@ class TaskctlTests(unittest.TestCase):
         status = self.run_task("status")
         self.assertEqual(status["needs_review_count"], 1)
         self.assertEqual(status["upstream"]["deferred_change_count"], 0)
-        self.assertEqual(status["results"]["current_result_count"], 0)
+        self.assertEqual(status["results"]["referenced_result_count"], 0)
 
     def test_note_on_todo_task_claims_it_for_the_owner(self) -> None:
         noted = self.run_task(
@@ -527,6 +527,7 @@ class TaskctlTests(unittest.TestCase):
 
         with (self.root / "solution.md").open("a", encoding="utf-8") as handle:
             handle.write("\n结果形成后上游文档变化。\n")
+        self.run_ok(WORKCTL, "index", "--work-dir", str(self.root))
         completion = self.run_task(
             "completion-context", "--target-id", "REQ-001", "--budget", "12000"
         )
@@ -536,6 +537,25 @@ class TaskctlTests(unittest.TestCase):
             "result_source_snapshot_stale",
             {item["kind"] for item in task_row["result_diagnostics"]},
         )
+        summary = completion["diagnostic_summary"]
+        self.assertEqual(summary["query_diagnostic_count"], 0)
+        self.assertEqual(summary["candidate_result_with_diagnostics_count"], 1)
+        self.assertEqual(summary["candidate_source_snapshot_issue_result_count"], 1)
+        self.assertEqual(summary["candidate_result_diagnostic_count"], 1)
+        self.assertEqual(
+            summary["candidate_result_diagnostic_kind_counts"],
+            {"result_source_snapshot_stale": 1},
+        )
+        self.assertEqual(summary["total_diagnostic_count"], 1)
+        self.assertNotIn("diagnostics", completion)
+        self.assertNotIn("diagnostic_count", completion)
+        status = self.run_task("status")
+        self.assertEqual(status["results"]["referenced_result_count"], 1)
+        self.assertEqual(status["results"]["result_with_diagnostics_count"], 1)
+        self.assertEqual(status["results"]["task_revision_stale_result_count"], 0)
+        self.assertEqual(status["results"]["source_snapshot_issue_result_count"], 1)
+        self.assertEqual(status["results"]["result_diagnostic_count"], 1)
+        self.assertEqual(status["diagnostic_count"], 1)
 
     def test_completion_preserves_execution_snapshot_and_diagnoses_missing_snapshot(self) -> None:
         context = self.run_task("context", "--id", "T001", "--budget", "12000")
@@ -607,6 +627,20 @@ class TaskctlTests(unittest.TestCase):
         )
         partial_kinds = {item["kind"] for item in partial["diagnostics"]}
         self.assertIn("result_source_snapshot_incomplete", partial_kinds)
+        status = self.run_task("status")
+        self.assertEqual(status["results"]["referenced_result_count"], 3)
+        self.assertEqual(status["results"]["result_with_diagnostics_count"], 3)
+        self.assertEqual(status["results"]["task_revision_stale_result_count"], 0)
+        self.assertEqual(status["results"]["source_snapshot_issue_result_count"], 3)
+        self.assertEqual(status["results"]["result_diagnostic_count"], 3)
+        self.assertEqual(
+            status["results"]["result_diagnostic_kind_counts"],
+            {
+                "result_source_snapshot_incomplete": 1,
+                "result_source_snapshot_missing": 1,
+                "result_source_snapshot_stale": 1,
+            },
+        )
 
     def test_completion_context_uses_direct_result_evidence_mapping(self) -> None:
         self.add_task(self.task("T003", "提供直接验收证据", []))
@@ -643,6 +677,57 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertIn("REQ-001", stored_result["source_snapshot"])
 
+    def test_later_current_evidence_does_not_suppress_stale_predecessor(self) -> None:
+        self.complete_t001()
+        with (self.root / "solution.md").open("a", encoding="utf-8") as handle:
+            handle.write("\n前置结果形成后方案发生变化。\n")
+        self.run_ok(WORKCTL, "index", "--work-dir", str(self.root))
+
+        context = self.run_task("context", "--id", "T002", "--budget", "12000")
+        later_result = self.result_payload("T002")
+        later_result["evidence_for"] = ["REQ-001"]
+        later_result["source_snapshot"] = context["source_snapshot"]
+        later_file = Path(self.temp.name) / "T002-current-evidence.json"
+        later_file.write_text(
+            json.dumps(later_result, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        self.run_task(
+            "complete",
+            "--id",
+            "T002",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(later_file),
+        )
+
+        completion = self.run_task(
+            "completion-context", "--target-id", "REQ-001", "--budget", "12000"
+        )
+        predecessor = completion["candidate_tasks"]["T001"]
+        later = completion["candidate_tasks"]["T002"]
+        self.assertIn(
+            "result_source_snapshot_stale",
+            {item["kind"] for item in predecessor["result_diagnostics"]},
+        )
+        self.assertEqual(later["result_diagnostics"], [])
+        self.assertEqual(later["evidence_for"], ["REQ-001"])
+        self.assertEqual(
+            completion["diagnostic_summary"][
+                "candidate_result_with_diagnostics_count"
+            ],
+            1,
+        )
+        self.assertEqual(
+            completion["diagnostic_summary"][
+                "candidate_source_snapshot_issue_result_count"
+            ],
+            1,
+        )
+        self.assertNotIn("resolved_diagnostics", predecessor)
+        self.assertNotIn("revalidated_result_refs", later)
+        self.assertNotIn("passed", completion)
+
     def test_completion_context_budget_trimming_keeps_candidate_catalog_closed(self) -> None:
         completion = self.run_task(
             "completion-context", "--limit", "10", "--budget", "2500"
@@ -663,6 +748,38 @@ class TaskctlTests(unittest.TestCase):
                 for target in completion["targets"]
             )
         )
+        result_diagnostic_count = sum(
+            len(candidate["result_diagnostics"])
+            for candidate in completion["candidate_tasks"].values()
+            if candidate["result_ref"] is not None
+        )
+        self.assertEqual(
+            completion["diagnostic_summary"]["candidate_result_diagnostic_count"],
+            result_diagnostic_count,
+        )
+
+    def test_fit_payload_last_resort_preserves_source_fingerprint(self) -> None:
+        module = load_taskctl_module()
+        fingerprint = "sha256:" + "a" * 64
+        payload = {
+            "ok": True,
+            "command": "completion-context",
+            "source_snapshot": {"REQ-001": fingerprint},
+            "items": ["x" * 200 for _ in range(10)],
+        }
+        at_120 = module.shrink_value(payload, 120)
+        at_120["truncated"] = True
+        at_80 = module.shrink_value(payload, 80)
+        at_80["truncated"] = True
+        size_120 = len(module.compact_json(at_120))
+        size_80 = len(module.compact_json(at_80))
+        self.assertLess(size_80, size_120)
+
+        fitted = module.fit_payload(payload, (size_80 + size_120) // 2)
+        self.assertNotIn("hint", fitted)
+        self.assertTrue(fitted["truncated"])
+        self.assertEqual(fitted["source_snapshot"]["REQ-001"], fingerprint)
+        self.assertTrue(all(len(item) <= 81 for item in fitted["items"]))
 
     def test_recursive_dependents_report_consumption_path(self) -> None:
         self.add_task(
@@ -1011,12 +1128,16 @@ class TaskctlTests(unittest.TestCase):
         rendered = self.run_task("render")
         table = Path(rendered["output"]).read_text(encoding="utf-8")
         self.assertEqual(rendered["needs_review_count"], 1)
-        self.assertEqual(rendered["results"]["current_result_count"], 0)
+        self.assertEqual(rendered["results"]["referenced_result_count"], 0)
         self.assertIn("| review | 1 |", table)
         self.assertIn("需复核任务：1", table)
-        self.assertIn("当前可读取结果：0", table)
+        self.assertIn("当前状态引用结果：0", table)
         self.assertIn("含验证结果：0", table)
         self.assertIn("含未决结果：0", table)
+        self.assertIn("含结果诊断：0", table)
+        self.assertIn("任务合同 revision 陈旧结果：0", table)
+        self.assertIn("含来源快照问题结果：0", table)
+        self.assertIn("结果诊断条目：0", table)
         self.assertIn("只是任务合同与状态的可重建视图", table)
 
     def test_render_uses_visible_placeholders_for_empty_task_cells(self) -> None:
@@ -1084,8 +1205,15 @@ class TaskctlTests(unittest.TestCase):
             {item["kind"] for item in payload["diagnostics"]},
         )
         rendered = self.run_task("render")
-        self.assertEqual(rendered["results"]["current_result_count"], 1)
-        self.assertEqual(rendered["results"]["stale_result_count"], 1)
+        self.assertEqual(rendered["results"]["referenced_result_count"], 1)
+        self.assertEqual(rendered["results"]["task_revision_stale_result_count"], 1)
+        self.assertEqual(rendered["results"]["source_snapshot_issue_result_count"], 0)
+        self.assertEqual(rendered["results"]["result_with_diagnostics_count"], 1)
+        self.assertEqual(rendered["results"]["result_diagnostic_count"], 1)
+        self.assertEqual(
+            rendered["results"]["result_diagnostic_kind_counts"],
+            {"result_task_revision_stale": 1},
+        )
 
     def test_draft_is_directly_addable_task_json(self) -> None:
         drafted = self.run_task(
@@ -1287,7 +1415,7 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(completion["deferred_change_count"], 1)
         self.assertIn(
             "upstream_index_stale",
-            {diagnostic["kind"] for diagnostic in completion["diagnostics"]},
+            {diagnostic["kind"] for diagnostic in completion["query_diagnostics"]},
         )
 
     def test_completion_context_preserves_distinct_relative_document_paths(self) -> None:
@@ -1334,7 +1462,7 @@ class TaskctlTests(unittest.TestCase):
         self.assertNotIn("REQ-999", {item["id"] for item in completion["targets"]})
         self.assertIn(
             "upstream_index_derived_content_mismatch",
-            {item["kind"] for item in completion["diagnostics"]},
+            {item["kind"] for item in completion["query_diagnostics"]},
         )
 
     def test_completion_context_pages_candidates_constraints_and_deferred_items(self) -> None:
@@ -1369,7 +1497,7 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(first["returned_deferred_change_count"], 1)
         self.assertIn(
             "non_standard_deferred_change_status",
-            {item["kind"] for item in first["diagnostics"]},
+            {item["kind"] for item in first["query_diagnostics"]},
         )
         self.assertEqual(first["targets"][0]["candidate_task_count"], 2)
         self.assertEqual(first["targets"][0]["returned_candidate_task_count"], 1)
@@ -1512,10 +1640,10 @@ class TaskctlTests(unittest.TestCase):
     def test_unreadable_current_result_is_isolated_from_batch_render(self) -> None:
         self.complete_t001()
         rendered = self.run_task("render")
-        self.assertEqual(rendered["results"]["current_result_count"], 1)
+        self.assertEqual(rendered["results"]["referenced_result_count"], 1)
         self.assertEqual(rendered["results"]["result_with_verification_count"], 1)
         table = Path(rendered["output"]).read_text(encoding="utf-8")
-        self.assertIn("当前可读取结果：1", table)
+        self.assertIn("当前状态引用结果：1", table)
         result_path = self.root / "results" / "T001.r4.json"
         result = json.loads(result_path.read_text(encoding="utf-8"))
         result["task_revision"] = 99
@@ -1537,7 +1665,7 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(rerendered.returncode, 0, rerendered.stderr)
         rerendered_payload = json.loads(rerendered.stdout)
-        self.assertEqual(rerendered_payload["results"]["current_result_count"], 0)
+        self.assertEqual(rerendered_payload["results"]["referenced_result_count"], 0)
         self.assertIn(
             "current_result_unreadable",
             {item["kind"] for item in rerendered_payload["storage_diagnostics"]},
@@ -1872,7 +2000,7 @@ class TaskctlTests(unittest.TestCase):
         self.assertNotIn("snapshot_id", first_page_payload)
         self.assertIn(
             "delivery_index_rebuild_failed",
-            {item["kind"] for item in first_page_payload["diagnostics"]},
+            {item["kind"] for item in first_page_payload["query_diagnostics"]},
         )
 
         continued = self.run_cli(

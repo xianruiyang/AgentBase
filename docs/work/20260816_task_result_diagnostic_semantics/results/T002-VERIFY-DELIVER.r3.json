@@ -1,0 +1,112 @@
+{
+  "changed_files": [
+    "development/skill-routing/evidence/current.json",
+    "docs/plan.md",
+    "docs/handoff.md",
+    "docs/work/20260816_task_result_diagnostic_semantics/current-state.md",
+    "docs/work/20260816_task_result_diagnostic_semantics/completion-audit.md"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "UDES-001",
+    "UDES-002",
+    "CON-001",
+    "CON-002",
+    "CON-003",
+    "CON-004",
+    "SOL-003",
+    "GAP-004",
+    "OBS-009",
+    "OBS-010"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "completion-audit",
+      "note": "本轮目标、根需求、消费者、真实输入和发布边界逐项复核",
+      "ref": "docs/work/20260816_task_result_diagnostic_semantics/completion-audit.md"
+    },
+    {
+      "kind": "runtime-measurement",
+      "note": "上一真实工作区的分层诊断、后继证据和紧预算读回",
+      "ref": "docs/work/20260816_task_result_diagnostic_semantics/current-state.md#OBS-008"
+    },
+    {
+      "kind": "independent-evaluation",
+      "note": "Routing 73/73、Policy 73、References 19 的正式合并证据",
+      "ref": "development/skill-routing/evidence/current.json"
+    },
+    {
+      "kind": "project-validation",
+      "note": "skill 路由合同与 DirectCompatibility 部署候选 Validate",
+      "ref": "docs/work/20260816_task_result_diagnostic_semantics/current-state.md#OBS-010"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "诊断语义下一版本已在真实工作区、模块回归、独立 skill 证据、项目合同、部署候选、总计划、完成审计和接手入口中形成当前可追溯闭环",
+  "outputs": [
+    "真实旧工作区明确报告查询诊断 0、候选结果诊断 8、含诊断结果 1，并保留后继当前证据与历史诊断并列",
+    "Routing 73/73、Policy 73、References 19 的独立证据已合并，项目静态合同和部署候选 Validate 通过",
+    "专项完成审计、项目总计划和 handoff 已更新；Codex Publish 未执行且继续等待当次用户授权"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:a3b4059dabb2e973082ff283932192b64fe5e8e0d6b31b367260e15623ae176d",
+    "AC-002": "sha256:6ee72336639dc916a989dcbbaf3b95c4deb0a54e521bdbdd49a6b3cfa9aafffe",
+    "AC-003": "sha256:e0be5b4e6ae4d06b5e121650dfcfc59aa25887077efb1908584854a13b265fce",
+    "AC-004": "sha256:a72e993b8ea00e072013f692e61f9660d07634917be41dcd356adc5fb58ac418",
+    "AC-005": "sha256:a34a11e11964fb16c73216def3665596e03a4df28cd87a47028011347fbc72ad",
+    "AC-006": "sha256:cbf17431c12bc7c51f42beb4327cae4678e0b9d63522c4313b7716efc537ce0e",
+    "AC-007": "sha256:2c7b378671d0313783d1cc2400b9e1e20c31d184434d50548cdc81f8f7959a3a",
+    "CON-001": "sha256:c34e4facf5b25b5be4f5f6edc3226741eed5c9c8c5840e5b5125d2241a545d03",
+    "CON-002": "sha256:0aa94280e93b955535d2073eaf61d2b3a011f36c95aaf5719428f0939b09f962",
+    "CON-003": "sha256:d1e02f5e121b5750f6622aa46433159b8cbb285907ec1ecce4e9f2e545d7c37e",
+    "CON-004": "sha256:4a02bb41a65ce79768f28a90e9b723661401a60721541497f5f2070a9e222d7c",
+    "DES-001": "sha256:9e228f8025cba9ed6289c7e6e7b207f776397139b5b35e899011befe52096f33",
+    "DES-002": "sha256:0a8949a80cc40b8a17a9c97b5737c69805f54fafc7f8ec786ac7896b2342c3ce",
+    "DES-003": "sha256:dd825aed6c39685e6cfbe1a039aa03cf9df8b4f307a4d8c251ce7e6c2e023ef5",
+    "DES-004": "sha256:c976a8fd456caacb3e41c5c134ac464a5468325daf0a61cd89864eabf6ff6392",
+    "DES-005": "sha256:dc59baefdc8deb00df4c50b49251456fbd0d41e257301e721991a193f375a319",
+    "GAP-001": "sha256:9df01966ce981cb6e66d8740381bd52a5b4672d659d4bfaee604ec7daadda63e",
+    "GAP-002": "sha256:349974d7b85da580a09729e0a248cff703c87015272abb000f31e757202b91c3",
+    "GAP-003": "sha256:475f33b47d90e4594f485f780f1cdeecbf477c3b179406482a474e5caadd0e37",
+    "GAP-004": "sha256:cf59dde164fd42003ac72628072a68f47676438641f43c08a9a2130a9a8ce8dc",
+    "OBS-001": "sha256:456bce363839ce74f57d0bcca0d784c64f390e500f5b41b6991dc5282cb53085",
+    "OBS-002": "sha256:91fded675daf3df06b6bbcadccc797f1948c6960574614528aa21bf7e03b46a9",
+    "OBS-003": "sha256:ee60073ef641208fbb0d1c69efaf8cca0d9aa0ce942932d705dcc7d0501dddf4",
+    "OBS-004": "sha256:9de052a7438d6564d9a8c4ee7a0d5d53d2bc42dd346da53f6b9c0939b2889fea",
+    "OBS-005": "sha256:455f718fc7fffa73038fc13b33b2bda8d637966132c162e0630fd03c4fa1afab",
+    "OBS-006": "sha256:d3b020e1c9067bc7ff17a4709781f0473e80f6574054201937e2592156d7c3f2",
+    "OBS-007": "sha256:c9aae78714047c4d23fb916269576bc908b27d63c54ba598aba9f5f0b047f9b8",
+    "OBS-008": "sha256:fd35c45e15bea3aba1b72303b65c4f51b2324276676e6b3ac75345b9312ccbc7",
+    "OBS-009": "sha256:985b3471d26464e097c823db1ad4e384244df2bf570a8364bba90bee8cf748b8",
+    "OBS-010": "sha256:96604a96f0967bc3dd4f85f17c959b625da3caeda195b882ddacad660de8bfe9",
+    "REQ-001": "sha256:bfec11bfad8ded5a7a2361c75d5f834d1b4c1eeabf194582d9622be4ccf0730c",
+    "REQ-002": "sha256:50bb31e5991126ec1093e7e5191cf7ef0121b7e8117f6d9409e6b6c7e8420202",
+    "REQ-003": "sha256:63a0e9c5e72514cfbf0af06e4f47ae41ffce8c12cb39f2ebdf40a813862d10ee",
+    "SOL-001": "sha256:b0430e430d4f922a3f1edd3c0559f796d1c26921906a0cbba55f3005bed48afe",
+    "SOL-002": "sha256:3a9dd2976c48dec1ad5f500e43d8ddfcd380d57e049ea9aa7c09741361a33a7a",
+    "SOL-003": "sha256:84719e773894eec9753ac5c5dc2f6a3e7a2355e29c46bd111da1531ab83f5ede",
+    "UDES-001": "sha256:2e1f7a171003eb6c8c411ad92acfbee225c0e326aa710b1f42589ef1f5e5d42e",
+    "UDES-002": "sha256:e689308d20444d060016f3a6c0bce198afbf1d525d9ea2df9b99c3817a8c9b10"
+  },
+  "task_id": "T002-VERIFY-DELIVER",
+  "task_revision": 2,
+  "unresolved": [],
+  "verification": [
+    "task-table-manager 66 项和 delivery-workflow 32 项完整回归通过",
+    "skill-creator quick_validate: Skill is valid",
+    "真实旧工作区: query diagnostics 0, candidate result diagnostics 8, affected results 1, source snapshot issues 1, task revision stale 0",
+    "detached Routing 73/73、Policy 73、References 19 通过正式合并",
+    "validate_contract: 73 cases, 34 strict routing, 5 strict reference, 11/11 skills",
+    "manage_agentbase Validate: DirectCompatibility candidate valid, no Publish executed"
+  ]
+}

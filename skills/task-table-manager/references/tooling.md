@@ -21,6 +21,8 @@ status/render  生成可重建的执行摘要和 TASK_TABLE.md
 
 查询默认使用有界紧凑 JSON，需要时使用 `--pretty`。当任务很少或 CLI 不可用时，可直接维护并读取合同文档；CLI 不是开始、推进、完成或重开任务的许可者。
 
+`status` 和 `render` 的结果摘要使用明确作用域：`referenced_result_count` 表示当前状态文件实际引用的结果数，`task_revision_stale_result_count` 只表示结果记录的任务 revision 与当前合同不一致，`source_snapshot_issue_result_count` 表示至少含一项来源快照缺失、不完整或陈旧诊断的结果数；同时返回含诊断结果数、结果诊断条目数和按 kind 计数。上述字段互不替代，也不表示目标证据充分或整体完成。
+
 `task-table.json` 的 `tasks/`、`state/`、`results/`、`.work-cache/index.json` 和 `TASK_TABLE.md` 路径固定，只为防止生成物覆盖语义真源或结果记录。
 
 `render` 生成的任务表固定保留全部列；没有可显示值的单元格使用 `—` 占位，避免长文本换行时产生列错位错觉。占位符只属于生成视图，不写回任务合同、状态或结果，也不表示模型已经裁决该字段语义为“无”。
@@ -53,6 +55,8 @@ release     清除领取意图并回到 todo
 `complete` 原样保存模型结果中的 `source_snapshot`，并以当前索引比较陈旧、缺失和传递覆盖不足；它不得在完成时自动生成当前指纹并伪装成任务实际输入。上述问题只返回诊断，不阻断结果记录。`completion-context` 同时使用任务合同的 `source_ids` 和结果的 `evidence_for` 建立候选映射；后者可直接把验收证据关联到 `REQ/AC/UDES`。
 
 每个 `completion-context` 响应页只在顶层 `candidate_tasks` 中返回一次完整候选任务证据。该对象以任务 ID 为键，值保留状态、合同修订、结果引用与摘要、产出、验证、未决项、失效来源、证据关联与引用、执行来源快照和结果诊断；值内不重复任务 ID。每个 `targets[]` 用有序 `candidate_task_ids` 引用本目标当前候选页，并继续返回该目标的候选总数、返回数、结果数、带验证结果数、截断状态和精确游标。顶层目录必须恰好覆盖当前页目标实际引用的任务，不得重复完整对象、产生悬空 ID，或在预算移除目标后保留无人引用任务。
+
+`completion-context` 用 `query_diagnostics` 返回存储、索引、结果读取和当前语义目标定位的查询级诊断；`diagnostic_summary` 分别返回 `query_diagnostic_count`、当前候选目录的含诊断结果数、任务 revision 陈旧结果数、来源快照问题结果数、结果诊断条目数、按 kind 计数和两层总数。汇总只覆盖当前响应页最终保留的目标及其唯一候选目录，预算移除目标后同步重建；完整结果诊断不复制到汇总。只存在查询诊断或只存在候选结果诊断时，另一层明确为零，不用无作用域的 `diagnostic_count` 代表两者。
 
 `completion-context` 的 `deferred_changes` 流对当前 Markdown 中全部 `DCR` 分页，并返回每项的原始 `status`。它不根据内置状态集判断哪些条目会阻断完成；该结论由模型按交付文档、用户确认和证据裁决。
 

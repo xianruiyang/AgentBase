@@ -1,0 +1,10 @@
+{
+  "id": "task-result-diagnostic-semantics",
+  "result_dir": "results",
+  "schema": "task.table",
+  "source_index": ".work-cache/index.json",
+  "state_dir": "state",
+  "table_view": "TASK_TABLE.md",
+  "task_dir": "tasks",
+  "title": "任务结果诊断与证据时效语义"
+}
