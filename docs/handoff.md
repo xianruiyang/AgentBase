@@ -4,17 +4,19 @@
 
 ## 当前版本与发布状态
 
-- 当前 Codex 已安装“模型交互面与资产职责”payload，并完成旧查询 skill 退役生命周期修正；payload 仍对应核心实现提交 `dfc47b8`，部署生命周期实现提交为 `b7352b8`，当前使用 `DirectCompatibility` 与可移植设置。受管理 source bundle SHA-256 仍为 `220CCE676647CE00EEF64445DDEA9A94CF5A53CE0073D2BB20185C8AC0BDD451`，routing evidence SHA-256 仍为 `AD83859A201F198AC8DF7923EDA60ED0389CB85434DDD0CE879371897249A021`。
-- 2026-08-17 15:47 的正式 Publish 只改变三个退役目标：`skills\ast-grep-token-safe`、`skills\fd-usage` 与 `skills\rg-token-safe` 均以 `desired_state=absent` 进入 schema 6 清单并从安装目录退出；完整旧目录保存在 `C:\Users\gzxt\.codex\backups\AgentBase-20260817-154709-8e23bcc2`，可由正式 Rollback 恢复。退役合同 SHA-256 为 `5F8C2DD72D5E2C7ADAD59FB014249F50D65137EBBDB82EB95D836AB14508EED8`。
-- 发布后正式 `Status` 读回：安装 bundle、发布清单、当前仓库来源、路由证据与退役合同全部匹配，`managed_payload_formally_published=true`，`formal_publication_gap_count=0`，`retired_managed_path_present_count=0`；`source-query` 仍已安装，`srcq` 0.3.1 完整性与 doctor 均通过。
-- 本次发布授权已经消费；任何后续再次发布到 `C:\Users\gzxt\.codex` 仍必须由用户针对新的 `Publish` 明确同意，开发、验证、Git 提交、远端同步和本次授权都不能替代。
+- 仓库当前候选为提交 `6fb3062`：部署 owner 已从仅记录退役路径的合同升级为路径与配置键共用的完整受管资产生命周期。该候选尚未 Publish 到真实 Codex；本轮没有取得或消费新的发布授权。
+- 当前真实 Codex 仍是 2026-08-17 15:47 的 schema 6 `DirectCompatibility + 可移植设置` 安装，payload 内容仍对应核心实现提交 `dfc47b8` 和旧部署生命周期提交 `b7352b8`。三个旧查询 skill 已从安装目录退出，回滚资产仍为 `C:\Users\gzxt\.codex\backups\AgentBase-20260817-154709-8e23bcc2`；`source-query` 与独立 `srcq` 0.3.1 运行时未被本轮改变。
+- 新合同的规范化 SHA-256 为 `C6A154180B84965299C1A5B85613E625928F9F3D1B921FD1C1767027FF9F66D2`，共 43 个稳定资产身份：38 个 `present`、3 个 `retired`、2 个 `transferred`。修正配置合同逐行指纹后，真实安装与当前来源都读为 `3561488DB15F06DD6DF9D6D8BB9F689F292A01C4063D88575757E7D217BCEBB0`，`installed_matches_source=true`；旧 schema 6 清单没有新算法和生命周期收据，因此 `managed_payload_formally_published=false`，三个正式缺口是清单来源指纹过期、安装指纹相对旧清单过期和生命周期收据过期。退役路径、退役配置键和配置冲突计数均为 0，故这表示候选尚未发布，不表示当前 payload 内容损坏。
+- routing evidence 仍为 `AD83859A201F198AC8DF7923EDA60ED0389CB85434DDD0CE879371897249A021`。任何后续向 `C:\Users\gzxt\.codex` 执行真实 `Publish` 都必须由用户针对该次操作重新明确同意；开发、验证、Git 提交、远端同步和以前的发布授权都不能替代。
 
-## 最近完成的部署生命周期修正
+## 当前未发布的统一生命周期修正
 
-- 根因不是 `srcq` 路由器：仓库已经删除三个旧查询 skill，但部署器只枚举当前 payload，没有表达“此前由 AgentBase 安装、现在必须不存在”的目标；发布前的安装残留因此未被 Status 观察，也未被 Publish 迁移，使当时的 Codex 仍会加载旧 `rg-token-safe` 并提示模型添加 `--heading`、`-M` 和输出截断管道。
-- 正式 owner 为 `development/codex-deployment`。`retired_managed_paths.json` 现在持有跨版本 tombstone；Status 把残留和退役合同清单过期视为正式缺口，Publish 先验证类型和 reparse 边界，再把完整旧路径移入标准备份并移除，Rollback 从同一 schema 6 清单恢复。未列入合同的个人 skill 或 agent 不受影响。
-- 隔离测试真实预置三个旧目录，覆盖发布前诊断、三个目标的精确移除与备份、Rollback 原样恢复、错误文件类型在写入前拒绝、无关 `user-skill` 保留、DirectCompatibility 与 Plugin 两种清单语义。`test_manage_agentbase.ps1`、`test_portable_config.ps1` 和正式 Validate 均通过；既有 76-case 路由合同仍只有原有 1 个非严格额外选择警告，没有漏选、禁选或严格失败。
-- 本修正没有向 `srcq` 增加参数兼容或过滤分支；模型普通文本查询仍应直接调用 `srcq rg <native argv...>`，由工具内部选择紧凑渲染和分页协议。本次也没有改变 payload 内容，因此 source bundle 身份保持不变。
+- 更深根因不是单次清理漏项，而是部署器把“当前来源清单”误当成“完整受管历史”：某个路径或配置键一旦从当前来源消失，系统既不能区分退役与移交，也没有稳定身份和上一受管值来证明可安全删除。仅继续追加 tombstone 会让每种资产形成不同的手工补丁，仍可能在模式切换或配置迁移时复发。
+- 正式 owner 保持为 `development/codex-deployment`。`managed_asset_lifecycle.json` 现在以稳定身份统一维护路径和配置键的 `present`、`retired`、`transferred` 状态；当前来源派生的全部路径与键必须和 `present` 集合精确相等，已发布身份不得删除，只能从现役显式转为退役或移交。稳定身份只包含定位与类型，发布/清理适用范围是可显式演化的策略，因此直接模式安装的旧资产可以在插件迁移时声明跨模式清理。
+- schema 7 清单记录全部资产身份并跨发布模式和设置范围携带最后受管配置值的逐行指纹。退役路径继续验证类型与 reparse 边界后完整备份清理；退役配置键只有在安装值仍等于最后受管值时才随完整 `config.toml` 备份移除，用户修改或来源不可证的键会阻断并要求改为移交或恢复来源值。`transferred`、个人 skill/agent、MCP、项目 trust 和其他未受管宿主状态保持不变。
+- 基线审计读取 19 个历史 `trigger-cases.json` 版本和真实 Codex 中 36 份 AgentBase 备份清单：14 个历史 required skill 等于当前 11 个加 3 个已退役查询 skill，65 个历史事务路径均落在当前或退役资产范围，没有未登记路径；历史 agent 没有超出当前 `luna`、`sol`、`terra`。配置中 `model` 与 `model_reasoning_effort` 的历史退出已明确登记为宿主接管，而不是误作退役删除。
+- 新生命周期测试覆盖来源与合同全集相等、现役资产静默消失拒绝、未登记现役资产拒绝、已发布身份删除拒绝、跨模式显式退役、无效替代身份、跨范围来源证据传递，以及配置键可移除/已修改/不可证三种分支。完整部署沙箱继续覆盖两种分发模式、增量发布、回滚、旧路径清理和无关宿主资产保留；`test_managed_asset_lifecycle.ps1`、`test_manage_agentbase.ps1`、`test_portable_config.ps1`、PowerShell 语法检查和正式 Validate 均通过。既有路由验证仍只有原有 1 个非严格额外选择警告。
+- 本修正没有向 `srcq` 增加参数兼容或过滤分支，也没有改变正式 payload 文件内容；source bundle 数值变化来自原便携配置合同把单元素数组错误下标为首字符的指纹缺陷被修正，真实来源和安装内容在新算法下仍一致。
 
 ## 上一功能版本
 
@@ -31,7 +33,7 @@
 
 - 本轮交付链有 4 个任务、15 个最终目标、3 个约束和 0 个 DCR；四项结构化结果覆盖根合同、文档/任务资产 owner、Event Logger 恢复面和最终验证交付，跨合同完成读回为 0 诊断。
 - 真实 owner 与交互面、机器兼容、模型恢复充分性、Token 对照和生成物边界记录在[交互审计](work/20260817_model_interaction_surface_contract/interaction-audit.md)；跨目标、约束、任务结果和部署身份记录在[完成审计](work/20260817_model_interaction_surface_contract/completion-audit.md)。运行日志只是本轮直接证据，不是项目真源。
-- 本次 `Publish` 只证明文件已安装、发布清单与合同匹配；当前 Codex 运行不会追溯加载新规则，行为变化需要在新任务或重启会话中验证。
+- 上一次正式 `Publish` 只证明当时文件已安装且 schema 6 清单与合同匹配；当前未发布候选不会被当前 Codex 追溯加载，未来即使获批发布，行为变化仍需在新任务或重启会话中验证。
 
 ## 未决问题与后继候选
 
@@ -43,7 +45,7 @@
 
 ## 当前边界
 
-- 本版本已在用户针对本次操作明确同意后发布；任何后续再次发布仍需新的当次明确同意。
+- 当前仓库候选尚未发布；上一版本的发布授权已经消费，任何后续再次发布仍需新的当次明确同意。
 - 本轮没有混入 `source_snapshot` 压缩或插件迁移。
 - 用户已确认项目完全不需要远程 CI；仓库不再维护 GitHub Actions workflow，远端 Actions 权限应保持禁用，所有验证由 Windows 主机上的正式本地入口承担。
 - Git 提交与远端同步继续按项目现有授权维护；不得用历史重写、强制推送或反向读取安装副本改变仓库真源。
