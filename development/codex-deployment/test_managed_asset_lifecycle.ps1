@@ -4,6 +4,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+Update-FormatData -PrependPath (Join-Path $PSScriptRoot 'manage_agentbase.format.ps1xml') -ErrorAction Stop
+
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 }
@@ -212,7 +214,7 @@ try {
         throw 'Retired config key remained in the managed config projection after cleanup'
     }
 
-    [pscustomobject]@{
+    $result = [pscustomobject]@{
         current_inventory_matches_lifecycle = $true
         disappeared_present_unit_rejected = $true
         unregistered_current_unit_rejected = $true
@@ -225,6 +227,8 @@ try {
         unverifiable_retired_config_protected = $true
         unrelated_config_preserved = $true
     }
+    $result.PSObject.TypeNames.Insert(0, 'AgentBase.Deployment.TestResult')
+    $result
 }
 finally {
     if (Test-Path -LiteralPath $testRoot) {

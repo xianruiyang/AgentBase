@@ -59,6 +59,31 @@ srcq doctor
 
 When `Install` added PATH in the current task, use the exact `binary` returned by `Status` for the immediate doctor readback, then fully exit and restart the Codex desktop host before relying on command-name resolution. A new task in the existing host is not a substitute for that process restart.
 
+## Result surfaces
+
+`manage_agentbase.ps1` returns one complete PowerShell object for programmatic consumers. Direct console rendering is a model-facing view of that same object: it omits hashes, repeated scope, empty collections and successful default checks, while retaining the outcome, actionable exceptions and rollback locations. The format view does not create a second status calculation or remove object properties.
+
+Typical direct output is intentionally small:
+
+```text
+valid : true
+```
+
+```text
+published : false
+gaps      : published_manifest_missing,installed_payload_differs_from_source
+```
+
+Publish and Rollback additionally show the exact backup or retired-payload path needed for recovery. Plugin installation and an unavailable `srcq` runtime appear only when they require a separate action.
+
+Assign the result when a program or a later model step needs the machine contract, then select the exact field or serialize the complete object explicitly:
+
+```powershell
+$result = & '.\development\codex-deployment\manage_agentbase.ps1' -Action Status -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex')
+$result.formal_publication_gaps
+$result | ConvertTo-Json -Depth 10
+```
+
 ## Validate
 
 Validation checks the global rule and Skill contract, the separately isolated description-only routing, post-routing behavior-policy and post-selection reference capsules, their evaluator identities, clean-input attestations and capsule/candidate/input hashes in `development/skill-routing/evidence/current.json`, the complete managed-asset lifecycle and current source identities, the portable config allowlist, the exact custom-agent file/schema contract, the hooks schema and placeholder boundary, and the independent `vscode-lsp-mcp` release owner. The attestation is an auditable input contract, not an OS sandbox claim. Staged evidence proves routing, coarse policy labels and reference selection only; it does not replace the skill regression or component release gates:
@@ -74,6 +99,8 @@ The repeatable tests cover lifecycle identity continuity, explicit retirement, s
 & '.\development\codex-deployment\test_managed_asset_lifecycle.ps1' -ProjectRoot (Get-Location).Path
 & '.\development\codex-deployment\test_manage_agentbase.ps1' -ProjectRoot (Get-Location).Path
 ```
+
+A successful direct test invocation renders only `tests : pass`. Assign its returned object before serialization when automation needs the individual check fields.
 
 ## Publish on another Windows machine
 

@@ -313,7 +313,8 @@
       "request": "长期交付执行中，当前证据推翻了一个已完成公共契约的部分内容，用户已明确授权实施修正。请保持用户确认目标不变，沿语义关系、任务消费关系和实际系统找出直接与间接消费者，修订、退出或重验所有受影响结果后再判断完成。",
       "expected_skills": [
         "change-governance",
-        "delivery-workflow"
+        "delivery-workflow",
+        "task-table-manager"
       ],
       "forbidden_skills": [],
       "expected_change_governance_references": [

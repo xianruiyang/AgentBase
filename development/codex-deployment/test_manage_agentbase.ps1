@@ -5,6 +5,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+Update-FormatData -PrependPath (Join-Path $PSScriptRoot 'manage_agentbase.format.ps1xml') -ErrorAction Stop
+
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 }
@@ -77,6 +79,17 @@ try {
     }
 
     $baselineValidation = & $manage -Action Validate -ProjectRoot $ProjectRoot
+    $validationDisplay = ($baselineValidation | Out-String -Width 4096).Trim()
+    if ($validationDisplay -notmatch '(?m)^valid\s*:\s*true\r?$' -or
+        $validationDisplay -match 'source_bundle_sha256|routing_evidence_sha256') {
+        throw "Validate default display did not preserve the compact model-facing contract"
+    }
+    $validationMachine = ($baselineValidation | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
+    if ([string]$validationMachine.action -ne 'Validate' -or
+        [string]$validationMachine.source_bundle_sha256 -ne [string]$baselineValidation.source_bundle_sha256 -or
+        [string]::IsNullOrWhiteSpace([string]$validationMachine.routing_evidence_sha256)) {
+        throw "Validate compact display changed the complete machine-readable object"
+    }
     if (-not (Test-Path -LiteralPath $sourceCacheRoot -PathType Container)) {
         New-Item -ItemType Directory -Path $sourceCacheRoot | Out-Null
         $sourceCacheRootCreated = $true
@@ -166,6 +179,12 @@ try {
         @($prePublishStatus.formal_publication_gaps) -notcontains "retired_managed_paths_present") {
         throw "Status did not expose the installed retired managed paths before publication"
     }
+    $prePublishDisplay = ($prePublishStatus | Out-String -Width 4096).Trim()
+    if ($prePublishDisplay -notmatch '(?m)^published\s*:\s*false\r?$' -or
+        $prePublishDisplay -notmatch '(?m)^gaps\s*:.*retired_managed_paths_present' -or
+        $prePublishDisplay -match 'source_bundle_sha256|installed_bundle_sha256|codex_root') {
+        throw "Status default display did not retain only the actionable publication diagnosis"
+    }
 
     $defaultPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
     if (-not [bool]$defaultPublish.skills_installed -or [bool]$defaultPublish.hooks_installed -or [bool]$defaultPublish.portable_settings_installed) {
@@ -179,6 +198,19 @@ try {
     }
     if ([int]$defaultPublish.retired_managed_path_removed_count -ne $retiredManagedSkills.Count) {
         throw "Default publish did not report all retired managed paths"
+    }
+    $defaultPublishDisplay = ($defaultPublish | Out-String -Width 4096).Trim()
+    if ($defaultPublishDisplay -notmatch '(?m)^published\s*:\s*true\r?$' -or
+        $defaultPublishDisplay -notmatch '(?m)^changed\s*:\s*\d+\r?$' -or
+        $defaultPublishDisplay -notmatch '(?m)^backup\s*:' -or
+        $defaultPublishDisplay -match 'source_bundle_sha256|routing_evidence_sha256|managed_asset_lifecycle_sha256') {
+        throw "Publish default display did not retain the result and rollback handle without machine-only identities"
+    }
+    $defaultPublishMachine = ($defaultPublish | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
+    if ([string]$defaultPublishMachine.action -ne 'Publish' -or
+        [string]$defaultPublishMachine.source_bundle_sha256 -ne [string]$defaultPublish.source_bundle_sha256 -or
+        [string]$defaultPublishMachine.backup_path -ne [string]$defaultPublish.backup_path) {
+        throw "Publish compact display changed the complete machine-readable object"
     }
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "config.toml") -Algorithm SHA256).Hash -ne $originalConfigHash) {
         throw "Default publish changed config.toml"
@@ -240,6 +272,11 @@ try {
         [int]$defaultStatus.retired_managed_path_present_count -ne 0) {
         throw "Status did not recognize the current direct-compatibility publish"
     }
+    $defaultStatusDisplay = ($defaultStatus | Out-String -Width 4096).Trim()
+    if ($defaultStatusDisplay -notmatch '(?m)^published\s*:\s*true\r?$' -or
+        $defaultStatusDisplay -match '(?m)^gaps\s*:|source_bundle_sha256|installed_bundle_sha256') {
+        throw "Healthy Status default display included non-actionable machine detail"
+    }
 
     $staleProjectTestPath = Join-Path $codexRoot "skills\codex-event-logger\tests\stale_project_test.py"
     New-Item -ItemType Directory -Path (Split-Path -Parent $staleProjectTestPath) -Force | Out-Null
@@ -279,7 +316,14 @@ try {
     if ([IO.File]::GetLastWriteTimeUtc($untouchedSkillPath) -ne $sentinelWriteTime) {
         throw "No-op publish touched an unchanged managed file"
     }
-    & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $defaultPublish.backup_path | Out-Null
+    $defaultRollback = & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $defaultPublish.backup_path
+    $defaultRollbackDisplay = ($defaultRollback | Out-String -Width 4096).Trim()
+    if ($defaultRollbackDisplay -notmatch '(?m)^rolled_back\s*:\s*true\r?$' -or
+        $defaultRollbackDisplay -notmatch '(?m)^restored\s*:\s*\d+\r?$' -or
+        $defaultRollbackDisplay -notmatch '(?m)^retired_payload\s*:' -or
+        $defaultRollbackDisplay -match 'codex_root|backup_path|mcp_changed') {
+        throw "Rollback default display did not retain only the result and recovery location"
+    }
     foreach ($retiredSkill in $retiredManagedSkills) {
         $restoredRetiredSkill = Join-Path $codexRoot "skills\$retiredSkill\SKILL.md"
         if (-not (Test-Path -LiteralPath $restoredRetiredSkill -PathType Leaf) -or
@@ -478,7 +522,7 @@ try {
     }
 
     $succeeded = $true
-    [pscustomobject]@{
+    $result = [pscustomobject]@{
         default_publish_preserved_settings = $true
         explicit_publish_merged_portable_settings = $true
         host_owned_config_preserved = $true
@@ -497,12 +541,16 @@ try {
         lifecycle_provenance_crossed_publication_scope = $true
         plugin_delivery_rejected_parallel_direct_entry = $true
         plugin_delivery_omitted_direct_skills_and_hooks = $true
+        compact_default_display_preserved_machine_contract = $true
+        compact_status_display_retained_actionable_gaps = $true
         publish_rejected_missing_srcq_runtime = $externalPreflightRejected
         deployment_sandbox_ignored_host_srcq = $true
         unrelated_skill_preserved = $true
         unrelated_agent_preserved = $true
         explicit_target_count = $manifestTargets.Count
     }
+    $result.PSObject.TypeNames.Insert(0, 'AgentBase.Deployment.TestResult')
+    $result
 }
 finally {
     if (Test-Path -LiteralPath $externalPreflightRoot) {

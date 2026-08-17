@@ -12,6 +12,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$formatDataPath = Join-Path $PSScriptRoot "manage_agentbase.format.ps1xml"
+Update-FormatData -PrependPath $formatDataPath -ErrorAction Stop
+
 $payloadContractPath = Join-Path (Split-Path -Parent $PSScriptRoot) "common\payload_contract.ps1"
 . $payloadContractPath
 $portableConfigContractPath = Join-Path $PSScriptRoot "portable_config.ps1"
@@ -26,6 +29,17 @@ $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 
 if ($InstallPortableSettings -and @("Publish", "Status") -notcontains $Action) {
     throw "InstallPortableSettings is valid only with Action Publish or Status"
+}
+
+function Set-AgentBaseResultType {
+    param(
+        [psobject]$Result,
+        [ValidateSet("Validate", "Status", "Publish", "Rollback")]
+        [string]$Kind
+    )
+
+    $Result.PSObject.TypeNames.Insert(0, "AgentBase.Deployment.${Kind}Result")
+    return $Result
 }
 
 function Assert-ChildPath {
@@ -1013,7 +1027,7 @@ function Get-SrcqRuntimePreflight {
 if ($Action -eq "Validate") {
     $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $null -IncludePortableSettings $false -DeliveryMode $SkillDeliveryMode
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
-    [pscustomobject]@{
+    $result = [pscustomobject]@{
         action = "Validate"
         skill_delivery_mode = $SkillDeliveryMode
         source_bundle_sha256 = $sourceFingerprint
@@ -1037,6 +1051,7 @@ if ($Action -eq "Validate") {
         routing_evidence_sha256 = $source.routing_evidence.sha256
         routing_case_count = $source.routing_evidence.case_count
     }
+    Set-AgentBaseResultType -Result $result -Kind Validate
     return
 }
 
@@ -1097,7 +1112,7 @@ if ($Action -eq "Status") {
     if ($retiredConfigModified.Count -gt 0) { $publicationGaps.Add('retired_managed_config_keys_modified') }
     if ($retiredConfigUnverifiable.Count -gt 0) { $publicationGaps.Add('retired_managed_config_keys_unverifiable') }
     if (-not $pluginModeReady) { $publicationGaps.Add("plugin_mode_has_direct_compatibility_conflicts") }
-    [pscustomobject]@{
+    $result = [pscustomobject]@{
         action = "Status"
         codex_root = $CodexRoot
         skill_delivery_mode = $SkillDeliveryMode
@@ -1136,6 +1151,7 @@ if ($Action -eq "Status") {
         srcq_doctor_ok = $srcqRuntime.doctor_ok
         srcq_runtime_error = if ($srcqRuntime.PSObject.Properties.Name -contains 'error') { $srcqRuntime.error } else { $null }
     }
+    Set-AgentBaseResultType -Result $result -Kind Status
     return
 }
 
@@ -1326,7 +1342,7 @@ if ($Action -eq "Publish") {
         }
     }
 
-    [pscustomobject]@{
+    $result = [pscustomobject]@{
         action = "Publish"
         codex_root = $CodexRoot
         skill_delivery_mode = $SkillDeliveryMode
@@ -1356,6 +1372,7 @@ if ($Action -eq "Publish") {
         srcq_path_entry_count = $srcqRuntime.path_entry_count
         srcq_doctor_ok = $srcqRuntime.doctor_ok
     }
+    Set-AgentBaseResultType -Result $result -Kind Publish
     return
 }
 
@@ -1480,7 +1497,7 @@ catch {
     throw
 }
 
-[pscustomobject]@{
+$result = [pscustomobject]@{
     action = "Rollback"
     codex_root = $CodexRoot
     backup_path = $BackupPath
@@ -1488,3 +1505,4 @@ catch {
     retired_payload = $retiredRoot
     mcp_changed = $false
 }
+Set-AgentBaseResultType -Result $result -Kind Rollback

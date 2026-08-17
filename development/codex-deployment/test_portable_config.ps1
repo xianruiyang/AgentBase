@@ -4,6 +4,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+Update-FormatData -PrependPath (Join-Path $PSScriptRoot 'manage_agentbase.format.ps1xml') -ErrorAction Stop
+
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 }
@@ -125,7 +127,7 @@ try {
         throw "Portable config merge did not reject an ambiguous managed table"
     }
 
-    [pscustomobject]@{
+    $result = [pscustomobject]@{
         managed_projection_matches = $true
         mcp_preserved = $true
         project_trust_preserved = $true
@@ -134,6 +136,8 @@ try {
         host_only_change_ignored_by_contract = $true
         ambiguous_managed_table_rejected = $true
     }
+    $result.PSObject.TypeNames.Insert(0, 'AgentBase.Deployment.TestResult')
+    $result
 }
 finally {
     if (Test-Path -LiteralPath $resolvedTestRoot -PathType Container) {

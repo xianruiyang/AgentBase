@@ -1,0 +1,145 @@
+<Configuration>
+  <ViewDefinitions>
+    <View>
+      <Name>AgentBase.Deployment.ValidateResult</Name>
+      <ViewSelectedBy>
+        <TypeName>AgentBase.Deployment.ValidateResult</TypeName>
+      </ViewSelectedBy>
+      <ListControl>
+        <ListEntries>
+          <ListEntry>
+            <ListItems>
+              <ListItem>
+                <Label>valid</Label>
+                <ScriptBlock>'true'</ScriptBlock>
+              </ListItem>
+            </ListItems>
+          </ListEntry>
+        </ListEntries>
+      </ListControl>
+    </View>
+    <View>
+      <Name>AgentBase.Deployment.StatusResult</Name>
+      <ViewSelectedBy>
+        <TypeName>AgentBase.Deployment.StatusResult</TypeName>
+      </ViewSelectedBy>
+      <ListControl>
+        <ListEntries>
+          <ListEntry>
+            <ListItems>
+              <ListItem>
+                <Label>published</Label>
+                <ScriptBlock>if ($_.managed_payload_formally_published) { 'true' } else { 'false' }</ScriptBlock>
+              </ListItem>
+              <ListItem>
+                <ItemSelectionCondition><ScriptBlock>$_.formal_publication_gap_count -gt 0</ScriptBlock></ItemSelectionCondition>
+                <Label>gaps</Label>
+                <ScriptBlock>@($_.formal_publication_gaps) -join ','</ScriptBlock>
+              </ListItem>
+              <ListItem>
+                <ItemSelectionCondition><ScriptBlock>$_.plugin_installation_in_scope</ScriptBlock></ItemSelectionCondition>
+                <Label>plugin_install</Label>
+                <ScriptBlock>if ($_.plugin_installation_inspected) { 'inspected' } else { 'not_inspected' }</ScriptBlock>
+              </ListItem>
+              <ListItem>
+                <ItemSelectionCondition><ScriptBlock>$_.plugin_installation_in_scope -and $_.plugin_mode_ready -eq $false</ScriptBlock></ItemSelectionCondition>
+                <Label>plugin_conflicts</Label>
+                <ScriptBlock>@($_.direct_compatibility_conflicts) -join ','</ScriptBlock>
+              </ListItem>
+              <ListItem>
+                <ItemSelectionCondition><ScriptBlock>$_.runtime_prerequisite_in_scope -and $_.srcq_runtime_ready -eq $false</ScriptBlock></ItemSelectionCondition>
+                <Label>srcq</Label>
+                <ScriptBlock>'not_ready:' + $_.srcq_runtime_error</ScriptBlock>
+              </ListItem>
+            </ListItems>
+          </ListEntry>
+        </ListEntries>
+      </ListControl>
+    </View>
+    <View>
+      <Name>AgentBase.Deployment.PublishResult</Name>
+      <ViewSelectedBy>
+        <TypeName>AgentBase.Deployment.PublishResult</TypeName>
+      </ViewSelectedBy>
+      <ListControl>
+        <ListEntries>
+          <ListEntry>
+            <ListItems>
+              <ListItem>
+                <Label>published</Label>
+                <ScriptBlock>'true'</ScriptBlock>
+              </ListItem>
+              <ListItem>
+                <Label>changed</Label>
+                <PropertyName>changed_path_count</PropertyName>
+              </ListItem>
+              <ListItem>
+                <Label>backup</Label>
+                <PropertyName>backup_path</PropertyName>
+              </ListItem>
+              <ListItem>
+                <ItemSelectionCondition><ScriptBlock>$_.retired_managed_path_removed_count -gt 0</ScriptBlock></ItemSelectionCondition>
+                <Label>retired_paths</Label>
+                <ScriptBlock>@($_.retired_managed_paths_removed) -join ','</ScriptBlock>
+              </ListItem>
+              <ListItem>
+                <ItemSelectionCondition><ScriptBlock>$_.retired_managed_config_key_removed_count -gt 0</ScriptBlock></ItemSelectionCondition>
+                <Label>retired_config</Label>
+                <ScriptBlock>@($_.retired_managed_config_keys_removed) -join ','</ScriptBlock>
+              </ListItem>
+              <ListItem>
+                <ItemSelectionCondition><ScriptBlock>$_.plugin_installation_must_be_verified_separately</ScriptBlock></ItemSelectionCondition>
+                <Label>plugin_install</Label>
+                <ScriptBlock>'verify_separately'</ScriptBlock>
+              </ListItem>
+            </ListItems>
+          </ListEntry>
+        </ListEntries>
+      </ListControl>
+    </View>
+    <View>
+      <Name>AgentBase.Deployment.RollbackResult</Name>
+      <ViewSelectedBy>
+        <TypeName>AgentBase.Deployment.RollbackResult</TypeName>
+      </ViewSelectedBy>
+      <ListControl>
+        <ListEntries>
+          <ListEntry>
+            <ListItems>
+              <ListItem>
+                <Label>rolled_back</Label>
+                <ScriptBlock>'true'</ScriptBlock>
+              </ListItem>
+              <ListItem>
+                <Label>restored</Label>
+                <PropertyName>restored_target_count</PropertyName>
+              </ListItem>
+              <ListItem>
+                <Label>retired_payload</Label>
+                <PropertyName>retired_payload</PropertyName>
+              </ListItem>
+            </ListItems>
+          </ListEntry>
+        </ListEntries>
+      </ListControl>
+    </View>
+    <View>
+      <Name>AgentBase.Deployment.TestResult</Name>
+      <ViewSelectedBy>
+        <TypeName>AgentBase.Deployment.TestResult</TypeName>
+      </ViewSelectedBy>
+      <ListControl>
+        <ListEntries>
+          <ListEntry>
+            <ListItems>
+              <ListItem>
+                <Label>tests</Label>
+                <ScriptBlock>'pass'</ScriptBlock>
+              </ListItem>
+            </ListItems>
+          </ListEntry>
+        </ListEntries>
+      </ListControl>
+    </View>
+  </ViewDefinitions>
+</Configuration>
