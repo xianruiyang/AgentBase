@@ -2,10 +2,10 @@
   "blocked_reason": "",
   "next_action": "",
   "note": "",
-  "owner": null,
+  "owner": "root",
   "result_ref": null,
-  "revision": 1,
+  "revision": 3,
   "schema": "task.state",
-  "status": "todo",
+  "status": "in_progress",
   "task_id": "T004-DELIVER"
 }

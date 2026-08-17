@@ -25,7 +25,7 @@ Policy oracle 有意把“未声明但未禁选”的兼容标签保留为诊断
 
 ## 恢复充分性与 Token
 
-`docs/handoff.md` 已直接定位：已发布提交、真实 Codex `Status`、精确发布清单与回滚路径、当前未发布交付链、未决候选、发布授权限制和后继顺序。全部相对 Markdown 链接均读回为现有文件；只读部署 `Status` 为 `published=true`、`managed_payload_formally_published=true`、正式缺口 0。
+`docs/handoff.md` 已直接定位：已发布提交、真实 Codex `Status`、精确发布清单与回滚路径、当前未发布候选、未决边界、发布授权限制和后继入口。全部相对 Markdown 链接均读回为现有文件。功能提交形成后，只读 `Status` 为 `managed_payload_formally_published=false`，三个缺口准确表示当前来源与路由证据尚未发布；清单仍匹配已安装基线且没有退役或配置冲突。
 
 同一 `tiktoken 0.13.0 / o200k_base` 结果：
 
@@ -34,8 +34,8 @@ Policy oracle 有意把“未声明但未禁选”的兼容标签保留为诊断
 | `global/AGENTS.md` | 4,690 | 4,531 | -159（-3.4%） |
 | 11 个 skill descriptions | 1,192 | 1,057 | -135（-11.3%） |
 | 每个适用任务常驻合计 | 5,882 | 5,588 | -294（-5.0%） |
-| `docs/handoff.md` 恢复面 | 2,972 | 993 | -1,979（-66.6%） |
-| 三个指定读取面 | 8,854 | 6,581 | -2,273（-25.7%） |
+| `docs/handoff.md` 恢复面 | 2,972 | 1,247 | -1,725（-58.0%） |
+| 三个指定读取面 | 8,854 | 6,835 | -2,019（-22.8%） |
 
 handoff 只在接手时读取，最后一行不是每个任务的固定节省。Token 比较只在上述语义、路由和恢复检查成立后用于采纳。
 

@@ -34,6 +34,7 @@ AgentBase 持续把根需求落实为可跨项目复用的 Codex 协作维护能
 | Task 结果诊断与证据时效语义 | [方案](work/20260816_task_result_diagnostic_semantics/solution.md)、[完成审计](work/20260816_task_result_diagnostic_semantics/completion-audit.md) | 已闭环；查询诊断、结果诊断、任务 revision 陈旧和来源快照问题分层表达，后继当前证据不改写历史结果 | `task-table-manager` | 承接完成复核输出、状态与生成视图；`delivery-workflow` 状态视图、路由证据和部署 payload 消费新合同 | 分层计数与唯一候选目录不一致，旧歧义字段复现，后继结果自动抑制旧诊断，或新证据没有明确覆盖目标与当前来源 |
 | 模型可见工具输出双视图 | [方案](work/20260817_model_visible_tool_output_contract/solution.md)、[输出审计](work/20260817_model_visible_tool_output_contract/output-audit.md)、[消费者复核](work/20260817_model_visible_tool_output_contract/consumer-impact.md)、[完成审计](work/20260817_model_visible_tool_output_contract/completion-audit.md) | 已闭环；taskctl/workctl 默认模型视图只投影当前动作所需证据，显式 machine 视图保留稳定完整合同，两者由同一 canonical 计算与 owner 维护 | `global/AGENTS.md`、`task-table-manager`、`delivery-workflow` | `srcq` 提供既有模型输出成本估算实践；任务与交付消费者、路由验证和部署 payload 消费新合同；其余模型可见入口保持各自 owner，未被误标为已迁移 | 模型视图遗漏完成当前动作的必要证据、重新暴露机器信封或完整快照、machine 合同退化、预算恢复不可定位，真实 tokenizer/阅读质量比较不再成立，或其他 owner 出现可证实的同类高成本输出 |
 | 模型交互面与资产职责 | [方案](work/20260817_model_interaction_surface_contract/solution.md)、[交互审计](work/20260817_model_interaction_surface_contract/interaction-audit.md)、[完成审计](work/20260817_model_interaction_surface_contract/completion-audit.md) | 已闭环；模型读取、模型修改、机器表示和派生物先按事实 owner、消费者、当前责任与生命周期裁决，Event Logger 已接入同源 model/machine 恢复视图 | `global/AGENTS.md`、`delivery-workflow`、`task-table-manager`、`codex-event-logger` | 承接工具双视图并把上位合同扩展到模型阅读或修改的文件；路由、独立评估和部署候选验证消费新合同 | 模型读取面遗漏必要证据、模型修改需同步多个同责位置、生成物反向成为真源、Event Logger 恢复或 machine 兼容退化，或新 owner 出现有直接证据的同类缺口 |
+| 常驻模型上下文与恢复面收敛 | [方案](work/20260817_persistent_context_surface/solution.md)、[读取面审计](work/20260817_persistent_context_surface/context-surface-audit.md)、[验证](work/20260817_persistent_context_surface/verification.md)、[完成审计](work/20260817_persistent_context_surface/completion-audit.md) | 已闭环；全局同责重复规则合并，11 个 description 保持预加载边界，handoff 收敛为当前恢复索引；常驻面在同质量门禁后减少 5.0% tokens | `global/AGENTS.md`、11 个项目 skill、`docs/handoff.md`、`development/skill-routing` | 承接模型交互面合同；Routing、Policy、References 与部署 Validate 消费候选，真实 Codex 仍停留在已发布基线 | 严格路由、条件引用、全局行为或恢复充分性退化，description 重新承载正文执行细节，handoff 复制历史展开，或同 tokenizer 成本收益不再成立 |
 | Source Query Gateway | [分支计划](../development/source-query-gateway/plan.md) | P0—P10 已闭环；当前身份达到质量与 Token 采纳门槛，未证明速度改善 | `tools/srcq`、`source-query`、`vscode-lsp-mcp` | 替代代码搜索早期方案，消费 LSP Companion 的公开查询能力，并由 `source-query` skill 与部署 payload 使用 | 新查询失败、后端/协议变化、新消费者或可重复共享缺口 |
 | VS Code LSP MCP Companion | [组件方案](../mcp/vscode-lsp-mcp/PLAN.md)、[当前组件入口](../mcp/vscode-lsp-mcp/README.md) | 已形成组件与受验证 Windows release；PLAN 保留架构基线，不作为开放任务表 | `mcp/vscode-lsp-mcp` | Source Query Gateway 消费其查询协议；公开工具或协议变化需回到该分支复核 | 安全边界、Provider 协议、公开工具或发布生命周期改变 |
 | 代码搜索早期改进 | [历史记录](../development/code-search-workflow-improvement-plan.md) | 已由 Source Query Gateway 替代，只保留迁移前证据 | 无当前运行 owner | 迁移证据由 Source Query Gateway 保留；没有当前执行消费者 | 仅作证据追溯，不重新启用旧 skill/sgy 入口 |
@@ -62,7 +63,13 @@ Source Query Gateway P10 的真实代理实践表明：局部输出更短、默�
 
 本轮把该上位合同接入 Delivery Workflow 的阶段 Markdown、Task Table Manager 的结构化任务资产和 Codex Event Logger 的机器日志恢复面。Event Logger 的真实 turn 证明，同一次有界事实读取可在保留恢复充分性和显式 machine 合同的同时显著减少模型上下文；具体 Token、文件操作归并和环境边界只由[交互审计](work/20260817_model_interaction_surface_contract/interaction-audit.md)维护，不提升为统一阈值或通用格式要求。`source_snapshot` 表示与插件迁移仍是独立事项，没有被该原则顺带改变。
 
-## 8. 重开与维护
+## 8. 2026-08-17 常驻读取面实践结论
+
+常驻规则、skill description 和接手文档虽然都会被模型读取，但读取时点与 owner 不同，不能统一按篇幅压缩：全局规则只合并同一 owner 内的重复不变量；description 只保留正文加载前会改变选择的正向、相近非触发和必要协同边界；handoff 只维护当前版本、真实安装、直接证据、未决边界和下一入口，历史展开由正式审计持有。当前平台存在相似指令、句式相近或文件接近上限都不能证明语义可删除。
+
+候选先通过静态合同、detached Routing/Policy/References、恢复清单和部署 Validate，再使用同一 tokenizer 比较成本。具体合并项、单项 Token 和 Policy 诊断限制只保留在[读取面审计](work/20260817_persistent_context_surface/context-surface-audit.md)与[验证记录](work/20260817_persistent_context_surface/verification.md)，不提升为固定压缩比例，也不扩张到 `source_snapshot` 或插件迁移。
+
+## 9. 重开与维护
 
 - 新需求或新证据先定位到现有子计划和 owner；能由现有入口承接时不新增计划。
 - 跨计划共享职责、根需求或正式入口变化时，更新本文件的方向、索引和影响结论；专项细节只写回对应子计划。
