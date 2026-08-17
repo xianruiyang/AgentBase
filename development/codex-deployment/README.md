@@ -1,6 +1,6 @@
 # Codex deployment
 
-`manage_agentbase.ps1` is the only AgentBase entry point that installs project-managed files into a Codex home. It validates project truth and the canonical detached routing-policy evidence, compares the selected managed contract with the installation, stages and backs up only changed managed paths, applies them atomically, verifies fingerprints, and records a rollback manifest. Directory payloads and plugin packaging share `development/common/payload_contract.ps1`, so project-only tests, test fixtures, benchmarks, runtime caches, logs, coverage output, dependency trees, build directories, temporary files, and reparse points cannot enter either bundle or its source fingerprint.
+`manage_agentbase.ps1` is the only AgentBase entry point that installs project-managed files into a Codex home. It validates project truth and the canonical detached routing-policy evidence, compares the selected managed contract with the installation, stages and backs up only changed managed paths, applies current and retired-path desired states atomically, verifies fingerprints, and records a rollback manifest. Directory payloads and plugin packaging share `development/common/payload_contract.ps1`, so project-only tests, test fixtures, benchmarks, runtime caches, logs, coverage output, dependency trees, build directories, temporary files, and reparse points cannot enter either bundle or its source fingerprint.
 
 Portable global payload semantics are owned by [`global/README.md`](../../global/README.md), routing evidence by [`development/skill-routing/README.md`](../skill-routing/README.md), and plugin assembly by [`development/plugin-packaging/README.md`](../plugin-packaging/README.md). This document owns only host preparation and the Validate, Publish, Status, migration, and Rollback lifecycle; it does not redefine those upstream payloads.
 
@@ -27,6 +27,8 @@ In `DirectCompatibility` mode, `-InstallPortableSettings` explicitly adds:
 - `global/agents/luna.toml`, `sol.toml`, and `terra.toml` -> the matching files under `<CodexRoot>/agents/`.
 
 In `Plugin` mode the same switch adds `config.toml` and the three agents but omits `hooks.json`, because the plugin supplies those hooks.
+
+`retired_managed_paths.json` is the deployment owner's machine contract for exact paths that an earlier AgentBase release installed but no current payload may retain. It applies in both delivery modes and records an `absent` desired state without making Git history or an installed copy a second project truth. `Status` reports any present retired path as a formal publication gap. `Publish` accepts only the declared file kind, refuses reparse points, moves the complete existing path into the normal rollback backup, and then records the contract hash and removed paths in the manifest. Unlisted personal skills and agents remain outside this lifecycle. A tombstone stays in the contract so an older host can upgrade directly; it can be removed only when that upgrade boundary is deliberately retired.
 
 The settings option merges only changed, explicitly reviewed portable keys from `global/config.toml` into an existing `config.toml`. MCP tables, project trust, plugin and marketplace state, runtime-generated fields, and unowned keys that share a managed table remain unchanged. Standalone managed files are replaced only when their content differs; skill directories are diffed at managed-file granularity, including removal of stale project-only test or benchmark files, while excluded host-generated runtime artifacts remain untouched. The publish transaction backs up only changed complete files, rollback restores them, and unrelated personal agents remain untouched. Omitting the option never touches settings or agent files.
 
@@ -65,7 +67,7 @@ Validation checks the global rule and Skill contract, the separately isolated de
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot (Get-Location).Path
 ```
 
-The repeatable sandbox test covers default preservation, explicit settings and custom-agent installation, resolved hook paths, unrelated Skill and agent preservation, and rollback:
+The repeatable sandbox test covers default preservation, explicit settings and custom-agent installation, resolved hook paths, unrelated Skill and agent preservation, seeded retired-path detection/removal/restoration, wrong-kind refusal, and rollback:
 
 ```powershell
 & '.\development\codex-deployment\test_portable_config.ps1' -ProjectRoot (Get-Location).Path
@@ -104,7 +106,7 @@ Restart the ChatGPT desktop app or begin a new Codex task after publishing. In p
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Status -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -SkillDeliveryMode DirectCompatibility -InstallPortableSettings
 ```
 
-Use the same delivery mode and settings scope that were published. `managed_payload_formally_published=true` covers only files managed by this script; otherwise `formal_publication_gaps` identifies source/install/manifest/evidence drift. In `Plugin` mode, `plugin_mode_ready=false` and `direct_compatibility_conflicts` identify old direct skills or global AgentBase hooks that must be removed before migration. `plugin_installation_inspected=false` is intentional: inspect plugin state through the plugin browser or `codex plugin list`.
+Use the same delivery mode and settings scope that were published. `managed_payload_formally_published=true` covers only files managed by this script and also requires every declared retired path to be absent under the current retirement-contract receipt; otherwise `formal_publication_gaps` identifies source/install/manifest/evidence drift or `retired_managed_paths_present`. In `Plugin` mode, `plugin_mode_ready=false` and `direct_compatibility_conflicts` identify current direct skills or global AgentBase hooks that must be removed before migration. `plugin_installation_inspected=false` is intentional: inspect plugin state through the plugin browser or `codex plugin list`.
 
 The current workflow also uses these separately installed plugins when their capabilities are needed:
 
@@ -127,4 +129,4 @@ Use the exact backup path returned by Publish:
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Rollback -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -BackupPath '<exact-backup-path>'
 ```
 
-Rollback derives its targets from the publish manifest. If portable settings were installed, the prior `config.toml`, `hooks.json`, and matching custom-agent files are restored in the same transaction as the prior AGENTS and Skill files; newly introduced managed agents are removed, and unrelated agents remain untouched.
+Rollback derives its targets from the publish manifest. If portable settings were installed, the prior `config.toml`, `hooks.json`, and matching custom-agent files are restored in the same transaction as the prior AGENTS and Skill files; newly introduced managed agents are removed, and unrelated agents remain untouched. A retired path removed by that publication is restored from the same backup, after which `Status` again exposes the retirement gap until a later approved Publish removes it.

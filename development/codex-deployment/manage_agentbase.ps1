@@ -157,6 +157,131 @@ function Get-FullInstalledBundleFingerprint {
     return Get-TextSha256 ($records -join [Environment]::NewLine)
 }
 
+function Get-NormalizedManagedRelativePath {
+    param(
+        [string]$Path,
+        [string]$Label
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path) -or $Path -ne $Path.Trim()) {
+        throw "$Label must be a non-empty relative path without surrounding whitespace"
+    }
+    $normalized = $Path.Replace('/', '\')
+    if ([IO.Path]::IsPathRooted($normalized) -or $normalized -ne $normalized.Trim('\')) {
+        throw "$Label must be a relative path: $Path"
+    }
+    $segments = @($normalized -split '\\')
+    if ($segments.Count -eq 0 -or @($segments | Where-Object { [string]::IsNullOrWhiteSpace($_) -or $_ -in @('.', '..') }).Count -gt 0) {
+        throw "$Label contains an unsafe path segment: $Path"
+    }
+    if ($normalized.Contains(':') -or $normalized.Contains('*') -or $normalized.Contains('?')) {
+        throw "$Label contains unsupported path characters: $Path"
+    }
+    return $normalized
+}
+
+function Get-ValidatedRetiredManagedPathContract {
+    param(
+        [string]$Root,
+        [string]$InstallRoot,
+        [string[]]$CurrentManagedPaths
+    )
+
+    $contractPath = Join-Path $Root "development\codex-deployment\retired_managed_paths.json"
+    if (-not (Test-Path -LiteralPath $contractPath -PathType Leaf)) {
+        throw "Retired managed-path contract is missing: $contractPath"
+    }
+    try {
+        $contract = Get-Content -LiteralPath $contractPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        throw "Retired managed-path contract is not valid JSON: $($_.Exception.Message)"
+    }
+    if ([int]$contract.schema_version -ne 1) {
+        throw "Unsupported retired managed-path contract schema: $($contract.schema_version)"
+    }
+
+    $currentPaths = @($CurrentManagedPaths | ForEach-Object {
+        Get-NormalizedManagedRelativePath -Path ([string]$_) -Label "Current managed path"
+    })
+    $targets = New-Object 'System.Collections.Generic.List[object]'
+    foreach ($entry in @($contract.targets)) {
+        $relativePath = Get-NormalizedManagedRelativePath -Path ([string]$entry.relative_path) -Label "Retired managed path"
+        $kind = [string]$entry.kind
+        if (@('file', 'directory') -notcontains $kind) {
+            throw "Retired managed path has an unsupported kind: $relativePath ($kind)"
+        }
+
+        foreach ($currentPath in $currentPaths) {
+            if ([string]::Equals($relativePath, $currentPath, [StringComparison]::OrdinalIgnoreCase) -or
+                $relativePath.StartsWith($currentPath + '\', [StringComparison]::OrdinalIgnoreCase) -or
+                $currentPath.StartsWith($relativePath + '\', [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Retired managed path overlaps a current managed path: $relativePath <-> $currentPath"
+            }
+        }
+        foreach ($existingTarget in $targets) {
+            $existingPath = [string]$existingTarget.relative_path
+            if ([string]::Equals($relativePath, $existingPath, [StringComparison]::OrdinalIgnoreCase) -or
+                $relativePath.StartsWith($existingPath + '\', [StringComparison]::OrdinalIgnoreCase) -or
+                $existingPath.StartsWith($relativePath + '\', [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Retired managed paths overlap: $relativePath <-> $existingPath"
+            }
+        }
+
+        $installedPath = if ([string]::IsNullOrWhiteSpace($InstallRoot)) { $null } else { Join-Path $InstallRoot $relativePath }
+        if ($null -ne $installedPath) {
+            Assert-ChildPath -Root $InstallRoot -Path $installedPath -Label "Retired managed path"
+        }
+        $targets.Add([pscustomobject]@{
+            relative_path = $relativePath
+            source_path = $null
+            source_text = $null
+            installed_path = $installedPath
+            kind = $kind
+            desired_state = "absent"
+        })
+    }
+
+    $records = @($targets | Sort-Object relative_path | ForEach-Object { "$($_.relative_path)|$($_.kind)|absent" })
+    return [pscustomobject]@{
+        path = $contractPath
+        schema_version = [int]$contract.schema_version
+        sha256 = Get-TextSha256 ($records -join [Environment]::NewLine)
+        targets = $targets.ToArray()
+    }
+}
+
+function Get-RetiredManagedChangeTargets {
+    param(
+        [object[]]$Targets
+    )
+
+    $changes = New-Object 'System.Collections.Generic.List[object]'
+    foreach ($target in @($Targets)) {
+        if (-not (Test-Path -LiteralPath $target.installed_path)) {
+            continue
+        }
+        $item = Get-Item -LiteralPath $target.installed_path -Force
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Refusing to retire a managed reparse point: $($target.relative_path)"
+        }
+        $actualKind = if ($item.PSIsContainer) { 'directory' } else { 'file' }
+        if ($actualKind -ne [string]$target.kind) {
+            throw "Retired managed path has unexpected kind: $($target.relative_path) (expected $($target.kind), found $actualKind)"
+        }
+        $null = Get-PathFingerprint -Path $item.FullName -IncludeProjectOnlyArtifacts
+        $changes.Add([pscustomobject]@{
+            relative_path = [string]$target.relative_path
+            source_path = $null
+            source_text = $null
+            installed_path = [string]$target.installed_path
+            kind = [string]$target.kind
+            desired_state = "absent"
+        })
+    }
+    return $changes.ToArray()
+}
+
 function Get-IncrementalChangeTargets {
     param(
         [object[]]$Targets
@@ -346,7 +471,7 @@ function Get-LatestPublishedManifest {
         catch {
             continue
         }
-        if ([string]$manifest.state -ne "published" -or @(1, 2, 3, 4, 5) -notcontains [int]$manifest.schema_version) {
+        if ([string]$manifest.state -ne "published" -or @(1, 2, 3, 4, 5, 6) -notcontains [int]$manifest.schema_version) {
             continue
         }
         if (-not [string]::Equals([IO.Path]::GetFullPath([string]$manifest.codex_root), [IO.Path]::GetFullPath($InstallRoot), [StringComparison]::OrdinalIgnoreCase)) {
@@ -773,6 +898,15 @@ function Get-ValidatedSource {
         }
     }
 
+    $currentManagedPaths = @(
+        "AGENTS.md"
+        "config.toml"
+        "hooks.json"
+        @($contract.required_skills | ForEach-Object { "skills\$([string]$_)" })
+        @($portableAgentFiles | ForEach-Object { "agents\$($_.Name)" })
+    )
+    $retiredManagedPaths = Get-ValidatedRetiredManagedPathContract -Root $Root -InstallRoot $InstallRoot -CurrentManagedPaths $currentManagedPaths
+
     $mcpPackagePath = Join-Path $Root "mcp\vscode-lsp-mcp\package.json"
     if (-not (Test-Path -LiteralPath $mcpPackagePath -PathType Leaf)) {
         throw "vscode-lsp-mcp package.json is missing: $mcpPackagePath"
@@ -792,6 +926,9 @@ function Get-ValidatedSource {
         hooks_template_path = $hooksTemplatePath
         portable_agents_path = $portableAgentsPath
         portable_agent_names = @($portableAgentFiles.BaseName)
+        retired_managed_path_contract = $retiredManagedPaths.path
+        retired_managed_path_contract_sha256 = $retiredManagedPaths.sha256
+        retired_managed_targets = @($retiredManagedPaths.targets)
         host_bootstrap_path = $hostBootstrapPath
         routing_evidence = $routingEvidence
         skill_delivery_mode = $DeliveryMode
@@ -913,6 +1050,9 @@ if ($Action -eq "Validate") {
         hooks_template = $source.hooks_template_path
         portable_agents = $source.portable_agents_path
         portable_agent_count = @($source.portable_agent_names).Count
+        retired_managed_path_contract = $source.retired_managed_path_contract
+        retired_managed_path_contract_sha256 = $source.retired_managed_path_contract_sha256
+        retired_managed_path_contract_target_count = @($source.retired_managed_targets).Count
         host_bootstrap = $source.host_bootstrap_path
         routing_evidence = $source.routing_evidence.path
         routing_evidence_sha256 = $source.routing_evidence.sha256
@@ -933,6 +1073,7 @@ if ($Action -eq "Status") {
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
     $installedFingerprint = Get-BundleFingerprint -Targets $source.targets -Side installed
     $installedFullFingerprint = Get-FullInstalledBundleFingerprint -Targets $source.targets
+    $retiredManagedTargets = @(Get-RetiredManagedChangeTargets -Targets $source.retired_managed_targets)
     $directCompatibilityConflicts = if ($SkillDeliveryMode -eq "Plugin") {
         @(Get-PluginModeDirectCompatibilityConflicts -InstallRoot $CodexRoot -RequiredSkills @($source.contract.required_skills))
     }
@@ -956,6 +1097,9 @@ if ($Action -eq "Status") {
     $manifestEvidenceMatches = $null -ne $manifest -and
         $manifest.PSObject.Properties.Name -contains "routing_evidence_sha256" -and
         [string]$manifest.routing_evidence_sha256 -eq [string]$source.routing_evidence.sha256
+    $manifestRetiredManagedPathsMatch = $null -ne $manifest -and
+        $manifest.PSObject.Properties.Name -contains "retired_managed_path_contract_sha256" -and
+        [string]$manifest.retired_managed_path_contract_sha256 -eq [string]$source.retired_managed_path_contract_sha256
     $installedMatchesSource = $installedFingerprint -eq $sourceFingerprint
     $publicationGaps = New-Object 'System.Collections.Generic.List[string]'
     if (-not $installedMatchesSource) { $publicationGaps.Add("installed_payload_differs_from_source") }
@@ -963,6 +1107,8 @@ if ($Action -eq "Status") {
     elseif (-not $manifestMatchesSource) { $publicationGaps.Add("published_manifest_source_is_stale") }
     if ($null -ne $manifest -and -not $manifestMatchesInstalled) { $publicationGaps.Add("installed_payload_differs_from_manifest") }
     if ($null -ne $manifest -and -not $manifestEvidenceMatches) { $publicationGaps.Add("published_manifest_routing_evidence_is_stale") }
+    if ($null -ne $manifest -and -not $manifestRetiredManagedPathsMatch) { $publicationGaps.Add("published_manifest_retired_managed_path_contract_is_stale") }
+    if ($retiredManagedTargets.Count -gt 0) { $publicationGaps.Add("retired_managed_paths_present") }
     if (-not $pluginModeReady) { $publicationGaps.Add("plugin_mode_has_direct_compatibility_conflicts") }
     [pscustomobject]@{
         action = "Status"
@@ -978,7 +1124,12 @@ if ($Action -eq "Status") {
         manifest_matches_source = $manifestMatchesSource
         manifest_matches_installed = $manifestMatchesInstalled
         manifest_matches_routing_evidence = $manifestEvidenceMatches
-        managed_payload_formally_published = $installedMatchesSource -and $manifestMatchesSource -and $manifestMatchesInstalled -and $manifestEvidenceMatches -and $pluginModeReady
+        manifest_matches_retired_managed_path_contract = $manifestRetiredManagedPathsMatch
+        retired_managed_path_contract_sha256 = $source.retired_managed_path_contract_sha256
+        retired_managed_path_contract_target_count = @($source.retired_managed_targets).Count
+        retired_managed_path_present_count = $retiredManagedTargets.Count
+        retired_managed_paths_present = @($retiredManagedTargets.relative_path)
+        managed_payload_formally_published = $installedMatchesSource -and $manifestMatchesSource -and $manifestMatchesInstalled -and $manifestEvidenceMatches -and $manifestRetiredManagedPathsMatch -and $retiredManagedTargets.Count -eq 0 -and $pluginModeReady
         formal_publication_gap_count = $publicationGaps.Count
         formal_publication_gaps = @($publicationGaps)
         plugin_installation_in_scope = $SkillDeliveryMode -eq "Plugin"
@@ -1012,7 +1163,9 @@ if ($Action -eq "Publish") {
         }
     }
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
-    $changeTargets = @(Get-IncrementalChangeTargets -Targets $source.targets)
+    $currentChangeTargets = @(Get-IncrementalChangeTargets -Targets $source.targets)
+    $retiredManagedTargets = @(Get-RetiredManagedChangeTargets -Targets $source.retired_managed_targets)
+    $changeTargets = @((@($currentChangeTargets) + @($retiredManagedTargets)) | Sort-Object relative_path)
     $stageRoot = Join-Path $CodexRoot (".agentbase-stage-" + [guid]::NewGuid().ToString("N"))
     Assert-ChildPath -Root $CodexRoot -Path $stageRoot -Label "Stage path"
     New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
@@ -1055,7 +1208,7 @@ if ($Action -eq "Publish") {
             }
         })
         $manifest = [ordered]@{
-            schema_version = 5
+            schema_version = 6
             state = "prepared"
             created_at_utc = [DateTime]::UtcNow.ToString("o")
             project_root = $ProjectRoot
@@ -1067,6 +1220,9 @@ if ($Action -eq "Publish") {
             portable_settings_sha256 = $source.portable_settings_sha256
             portable_settings_installed = [bool]$InstallPortableSettings
             portable_agent_names = @($source.portable_agent_names)
+            retired_managed_path_contract_sha256 = $source.retired_managed_path_contract_sha256
+            retired_managed_paths = @($source.retired_managed_targets.relative_path)
+            retired_managed_paths_removed = @($retiredManagedTargets.relative_path)
             routing_evidence_path = $source.routing_evidence.path.Substring($ProjectRoot.Length + 1).Replace('\', '/')
             routing_evidence_sha256 = $source.routing_evidence.sha256
             routing_evaluator_id = $source.routing_evidence.evaluator_id
@@ -1186,6 +1342,10 @@ if ($Action -eq "Publish") {
         portable_agent_count = if ($InstallPortableSettings) { @($source.portable_agent_names).Count } else { 0 }
         changed_path_count = $changeTargets.Count
         managed_contract_count = @($source.targets).Count
+        retired_managed_path_contract_sha256 = $source.retired_managed_path_contract_sha256
+        retired_managed_path_contract_target_count = @($source.retired_managed_targets).Count
+        retired_managed_path_removed_count = $retiredManagedTargets.Count
+        retired_managed_paths_removed = @($retiredManagedTargets.relative_path)
         routing_evidence_sha256 = $source.routing_evidence.sha256
         runtime_prerequisite_in_scope = [bool]$srcqRuntime.in_scope
         srcq_runtime_ready = $srcqRuntime.ready
@@ -1209,7 +1369,7 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw "Backup manifest is missing: $manifestPath"
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if (@(1, 2, 3, 4, 5) -notcontains [int]$manifest.schema_version -or [string]$manifest.state -ne "published") {
+if (@(1, 2, 3, 4, 5, 6) -notcontains [int]$manifest.schema_version -or [string]$manifest.state -ne "published") {
     throw "Backup is not in a publish state that can be rolled back: $($manifest.state)"
 }
 if (-not [string]::Equals([IO.Path]::GetFullPath([string]$manifest.codex_root), [IO.Path]::GetFullPath($CodexRoot), [StringComparison]::OrdinalIgnoreCase)) {

@@ -22,6 +22,7 @@ $sourceCacheProbe = Join-Path $sourceCacheRoot ("agentbase-deployment-probe-" + 
 $sourceCacheRootCreated = $false
 $externalPreflightRoot = Join-Path ([IO.Path]::GetTempPath()) ("AgentBase-srcq-preflight-test-" + [guid]::NewGuid().ToString("N"))
 $externalPreflightRejected = $false
+$retiredManagedSkills = @("ast-grep-token-safe", "fd-usage", "rg-token-safe")
 
 function Write-FixtureText {
     param(
@@ -131,6 +132,40 @@ try {
     $originalLunaHash = (Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\luna.toml") -Algorithm SHA256).Hash
     $originalUserAgentHash = (Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\user-agent.toml") -Algorithm SHA256).Hash
 
+    $wrongKindRetiredPath = Join-Path $codexRoot "skills\rg-token-safe"
+    Write-FixtureText -Path $wrongKindRetiredPath -Text ("unexpected file" + [Environment]::NewLine)
+    $wrongKindRetiredHash = (Get-FileHash -LiteralPath $wrongKindRetiredPath -Algorithm SHA256).Hash
+    $wrongKindRetirementRejected = $false
+    try {
+        & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot | Out-Null
+    }
+    catch {
+        $wrongKindRetirementRejected = $_.Exception.Message -like "Retired managed path has unexpected kind*"
+    }
+    if (-not $wrongKindRetirementRejected -or
+        -not (Test-Path -LiteralPath $wrongKindRetiredPath -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $wrongKindRetiredPath -Algorithm SHA256).Hash -ne $wrongKindRetiredHash -or
+        (Get-FileHash -LiteralPath (Join-Path $codexRoot "AGENTS.md") -Algorithm SHA256).Hash -ne $originalAgentsHash) {
+        throw "Publish did not safely reject a retired managed path with the wrong kind"
+    }
+    Remove-Item -LiteralPath $wrongKindRetiredPath -Force
+
+    $retiredFixtureHashes = @{}
+    foreach ($retiredSkill in $retiredManagedSkills) {
+        $retiredSkillRoot = Join-Path $codexRoot "skills\$retiredSkill"
+        New-Item -ItemType Directory -Path $retiredSkillRoot -Force | Out-Null
+        $retiredSkillPath = Join-Path $retiredSkillRoot "SKILL.md"
+        Write-FixtureText -Path $retiredSkillPath -Text ("retired fixture: $retiredSkill" + [Environment]::NewLine)
+        Write-FixtureText -Path (Join-Path $retiredSkillRoot "host-note.txt") -Text ("must be recoverable" + [Environment]::NewLine)
+        $retiredFixtureHashes[$retiredSkill] = (Get-FileHash -LiteralPath $retiredSkillPath -Algorithm SHA256).Hash
+    }
+
+    $prePublishStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    if ([int]$prePublishStatus.retired_managed_path_present_count -ne $retiredManagedSkills.Count -or
+        @($prePublishStatus.formal_publication_gaps) -notcontains "retired_managed_paths_present") {
+        throw "Status did not expose the installed retired managed paths before publication"
+    }
+
     $defaultPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
     if (-not [bool]$defaultPublish.skills_installed -or [bool]$defaultPublish.hooks_installed -or [bool]$defaultPublish.portable_settings_installed) {
         throw "Default publish reported an inconsistent direct-compatibility payload"
@@ -140,6 +175,9 @@ try {
     }
     if ([bool]$defaultPublish.runtime_prerequisite_in_scope) {
         throw "Deployment sandbox unexpectedly consumed the host srcq installation"
+    }
+    if ([int]$defaultPublish.retired_managed_path_removed_count -ne $retiredManagedSkills.Count) {
+        throw "Default publish did not report all retired managed paths"
     }
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "config.toml") -Algorithm SHA256).Hash -ne $originalConfigHash) {
         throw "Default publish changed config.toml"
@@ -169,9 +207,23 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $codexRoot "skills\source-query\SKILL.md") -PathType Leaf)) {
         throw "Default publish omitted the formal source-query skill"
     }
-    foreach ($retiredSkill in @("ast-grep-token-safe", "fd-usage", "rg-token-safe")) {
+    $defaultManifest = Get-Content -LiteralPath (Join-Path $defaultPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([int]$defaultManifest.schema_version -ne 6 -or
+        [string]$defaultManifest.retired_managed_path_contract_sha256 -ne [string]$defaultPublish.retired_managed_path_contract_sha256) {
+        throw "Default publish manifest did not record the retired managed-path contract"
+    }
+    foreach ($retiredSkill in $retiredManagedSkills) {
         if (Test-Path -LiteralPath (Join-Path (Join-Path $codexRoot "skills") $retiredSkill)) {
             throw "Default publish retained a retired query skill: $retiredSkill"
+        }
+        $relativeRetiredPath = "skills\$retiredSkill"
+        $retiredTargetState = @($defaultManifest.targets | Where-Object { [string]$_.relative_path -eq $relativeRetiredPath })
+        $backupSkillPath = Join-Path $defaultPublish.backup_path "payload\$relativeRetiredPath\SKILL.md"
+        if ($retiredTargetState.Count -ne 1 -or [string]$retiredTargetState[0].desired_state -ne "absent" -or
+            -not [bool]$retiredTargetState[0].existed_before -or
+            -not (Test-Path -LiteralPath $backupSkillPath -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $backupSkillPath -Algorithm SHA256).Hash -ne $retiredFixtureHashes[$retiredSkill]) {
+            throw "Default publish did not preserve a recoverable retirement receipt: $retiredSkill"
         }
     }
     $queryRuntimeArtifacts = @(Get-ChildItem -LiteralPath (Join-Path $codexRoot "skills\source-query") -Recurse -Force -File | Where-Object {
@@ -181,7 +233,9 @@ try {
         throw "Default publish copied a private source-query runtime"
     }
     $defaultStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
-    if (-not [bool]$defaultStatus.managed_payload_formally_published) {
+    if (-not [bool]$defaultStatus.managed_payload_formally_published -or
+        -not [bool]$defaultStatus.manifest_matches_retired_managed_path_contract -or
+        [int]$defaultStatus.retired_managed_path_present_count -ne 0) {
         throw "Status did not recognize the current direct-compatibility publish"
     }
 
@@ -224,6 +278,18 @@ try {
         throw "No-op publish touched an unchanged managed file"
     }
     & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $defaultPublish.backup_path | Out-Null
+    foreach ($retiredSkill in $retiredManagedSkills) {
+        $restoredRetiredSkill = Join-Path $codexRoot "skills\$retiredSkill\SKILL.md"
+        if (-not (Test-Path -LiteralPath $restoredRetiredSkill -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $restoredRetiredSkill -Algorithm SHA256).Hash -ne $retiredFixtureHashes[$retiredSkill]) {
+            throw "Rollback did not restore a retired managed path: $retiredSkill"
+        }
+    }
+    $rolledBackStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    if ([int]$rolledBackStatus.retired_managed_path_present_count -ne $retiredManagedSkills.Count -or
+        @($rolledBackStatus.formal_publication_gaps) -notcontains "retired_managed_paths_present") {
+        throw "Status did not expose restored retired paths after rollback"
+    }
 
     $settingsPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings
     if (-not [bool]$settingsPublish.portable_settings_installed) {
@@ -231,6 +297,9 @@ try {
     }
     if ([int]$settingsPublish.portable_agent_count -ne 3) {
         throw "Portable-settings publish reported an unexpected custom-agent count"
+    }
+    if ([int]$settingsPublish.retired_managed_path_removed_count -ne $retiredManagedSkills.Count) {
+        throw "Portable-settings publish did not retire the restored legacy paths"
     }
     $installedConfigText = Get-Content -LiteralPath (Join-Path $codexRoot "config.toml") -Raw -Encoding UTF8
     foreach ($preservedHostFragment in @(
@@ -304,7 +373,7 @@ try {
             throw "Portable custom agent is missing from the rollback manifest: $agentName"
         }
     }
-    if ([int]$manifest.schema_version -ne 5 -or [string]::IsNullOrWhiteSpace([string]$manifest.installed_contract_bundle_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evidence_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evaluation_capsule_sha256)) {
+    if ([int]$manifest.schema_version -ne 6 -or [string]::IsNullOrWhiteSpace([string]$manifest.installed_contract_bundle_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evidence_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evaluation_capsule_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.retired_managed_path_contract_sha256)) {
         throw "Publish manifest is missing the current detached routing-policy evidence receipt"
     }
 
@@ -335,6 +404,11 @@ try {
     }
     if (-not (Test-Path -LiteralPath (Join-Path $codexRoot "skills\user-skill\SKILL.md") -PathType Leaf)) {
         throw "Rollback removed the unrelated user skill"
+    }
+    foreach ($retiredSkill in $retiredManagedSkills) {
+        if (-not (Test-Path -LiteralPath (Join-Path $codexRoot "skills\$retiredSkill\SKILL.md") -PathType Leaf)) {
+            throw "Portable-settings rollback did not restore a retired managed path: $retiredSkill"
+        }
     }
 
     $pluginConflictSkill = Join-Path $codexRoot "skills\codex-event-logger"
@@ -369,7 +443,12 @@ try {
     }
     $pluginManifest = Get-Content -LiteralPath (Join-Path $pluginPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
     $pluginTargets = @($pluginManifest.targets.relative_path)
-    if ($pluginTargets -contains "hooks.json" -or @($pluginTargets | Where-Object { $_ -like "skills\*" }).Count -ne 0) {
+    $pluginSkillTargets = @($pluginManifest.targets | Where-Object { [string]$_.relative_path -like "skills\*" })
+    if ($pluginTargets -contains "hooks.json" -or $pluginSkillTargets.Count -ne $retiredManagedSkills.Count -or
+        @($pluginSkillTargets | Where-Object {
+            [string]$_.desired_state -ne "absent" -or
+            $retiredManagedSkills -notcontains ([IO.Path]::GetFileName([string]$_.relative_path))
+        }).Count -ne 0) {
         throw "Plugin delivery manifest contains direct skills or hooks"
     }
     $pluginStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings -SkillDeliveryMode Plugin
@@ -379,6 +458,11 @@ try {
     & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $pluginPublish.backup_path | Out-Null
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "AGENTS.md") -Algorithm SHA256).Hash -ne $originalAgentsHash) {
         throw "Plugin delivery rollback did not restore AGENTS.md"
+    }
+    foreach ($retiredSkill in $retiredManagedSkills) {
+        if (-not (Test-Path -LiteralPath (Join-Path $codexRoot "skills\$retiredSkill\SKILL.md") -PathType Leaf)) {
+            throw "Plugin delivery rollback did not restore a retired managed path: $retiredSkill"
+        }
     }
 
     $succeeded = $true
@@ -394,6 +478,9 @@ try {
         runtime_cache_ignored_for_rollback_drift = $true
         single_file_incremental_publish = $true
         no_op_publish_touched_nothing = $true
+        retired_managed_paths_removed = $true
+        retired_managed_paths_rollback_restored = $true
+        retired_wrong_kind_rejected = $true
         status_derived_from_manifest_and_fingerprints = $true
         plugin_delivery_rejected_parallel_direct_entry = $true
         plugin_delivery_omitted_direct_skills_and_hooks = $true

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "targets": [
+    {
+      "relative_path": "skills/ast-grep-token-safe",
+      "kind": "directory"
+    },
+    {
+      "relative_path": "skills/fd-usage",
+      "kind": "directory"
+    },
+    {
+      "relative_path": "skills/rg-token-safe",
+      "kind": "directory"
+    }
+  ]
+}
