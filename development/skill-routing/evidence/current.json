@@ -3,16 +3,16 @@
   "evaluation_kind": "skill-routing",
   "fingerprint_schema": "text-lf-v1",
   "evaluator": {
-    "id": "routing-eval-20260817h2-20260817101334088",
+    "id": "routing-eval-e9305e5-20260817133522734",
     "model": "gpt-5",
     "runtime": "codex-subagent:/root/routing_eval_20260817e",
-    "evaluated_at_utc": "2026-08-17T10:13:34.088Z",
+    "evaluated_at_utc": "2026-08-17T13:35:22.734Z",
     "isolation_mode": "detached-capsule",
     "repository_accessed": false,
     "hidden_expectations_accessed": false
   },
-  "evaluation_capsule_sha256": "77052D80D2AB879F05FBF8B70CD9B123AE96F948A3993DF1F04A8D0CBC0A53F8",
-  "candidate_bundle_sha256": "CDE243F4E0C58F73D335EA5E2CE978D645AB5F612170B4EA42D80F997082693C",
+  "evaluation_capsule_sha256": "30606F4E496588E500504211903CDDD83DCC54B9B7CDCFE1124E0E5F466E83B4",
+  "candidate_bundle_sha256": "88145DE1F08FC98DA347E4F02D4FA4EE51CEA80B2FE0443B3F8A6543933364C2",
   "evaluation_input_sha256": "B810EE78AE6B2F2D4E1DAD79087AD836DA3415012EC5778E3F060516CFA8BB4E",
   "cases": [
     {
@@ -55,7 +55,7 @@
       "id": "model-interaction-source-edit-boundary",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "正式来源与生成物边界已由全局唯一 owner 规则覆盖。"
+      "note": "正式来源与生成物边界由全局唯一 owner 规则覆盖。"
     },
     {
       "id": "architecture-discovery-before-implementation",
@@ -581,26 +581,26 @@
     "evaluation_kind": "behavior-policy",
     "fingerprint_schema": "text-lf-v1",
     "evaluator": {
-      "id": "agentbase-policy-evaluator-20260817h2-20260817101748987",
+      "id": "agentbase-policy-evaluator-e9305e5-20260817133818720",
       "model": "gpt-5",
       "runtime": "codex-subagent:/root/policy_eval_20260817e",
-      "evaluated_at_utc": "2026-08-17T10:17:48.987Z",
+      "evaluated_at_utc": "2026-08-17T13:38:18.720Z",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false
     },
-    "evaluation_capsule_sha256": "3F3A5C1750D885EC5334A8CAEB5E8693DF8E0ADE59656E6CF9B0EE8F81E16283",
-    "candidate_bundle_sha256": "CDE243F4E0C58F73D335EA5E2CE978D645AB5F612170B4EA42D80F997082693C",
+    "evaluation_capsule_sha256": "C59C22B0BEC5BCA6E301807D15E6A32C50CB0E6B1A4CBC64AEDD4288ED3530A7",
+    "candidate_bundle_sha256": "88145DE1F08FC98DA347E4F02D4FA4EE51CEA80B2FE0443B3F8A6543933364C2",
     "evaluation_input_sha256": "E5C2D1F63A2DB8D6CF59BBC64A8E58FFD4AE684D545F694134074DA6004098B3",
-    "routing_evaluation_capsule_sha256": "77052D80D2AB879F05FBF8B70CD9B123AE96F948A3993DF1F04A8D0CBC0A53F8",
-    "routing_result_sha256": "FC36E9A4484BB05C69EEC4F300D4E122ED016BE83073F4D9361525666D4DA3F6",
+    "routing_evaluation_capsule_sha256": "30606F4E496588E500504211903CDDD83DCC54B9B7CDCFE1124E0E5F466E83B4",
+    "routing_result_sha256": "63FC1A84620A5AC5D08BBD45662CB40C438EA107D3ED24EF7E3FCF80EC27BA3C",
     "cases": [
       {
         "id": "mechanical-document-edit",
         "behavior_tags": [
           "modify_authorized_scope"
         ],
-        "note": "目标与替换均明确，只实施指定 README 修改。"
+        "note": "目标与替换明确，只实施指定 README 修改。"
       },
       {
         "id": "specified-local-implementation",
@@ -618,7 +618,7 @@
           "no_alternative_execution",
           "collaborative_requirement_insight"
         ],
-        "note": "并发覆盖证据使通用重试前提有害，应核实并共同校准目标，且不实施替代方案。"
+        "note": "并发覆盖证据使通用重试前提有害，应共同校准目标且不实施替代方案。"
       },
       {
         "id": "quality-token-speed-priority",
@@ -635,7 +635,7 @@
           "read_only",
           "model_interaction_surface"
         ],
-        "note": "请求明确要求在 model 与 machine 视图间选择，应采用当前判断的最小充分模型面。"
+        "note": "请求要求在 model 与 machine 视图间选择，应采用最小充分模型面。"
       },
       {
         "id": "model-interaction-generated-report-read",
@@ -643,7 +643,7 @@
           "read_only",
           "model_interaction_surface"
         ],
-        "note": "请求要求在完整程序报告与有界投影间选择，模型只读取三个失败项所需证据。"
+        "note": "请求要求在完整报告与有界投影间选择，只读取三个失败项所需证据。"
       },
       {
         "id": "model-interaction-source-edit-boundary",
@@ -653,7 +653,7 @@
           "document_authority",
           "model_interaction_surface"
         ],
-        "note": "请求要求选择正式编辑源；只应修改阶段 Markdown，不能把生成视图当语义入口。"
+        "note": "请求要求选择正式编辑源；应修改阶段 Markdown，不能编辑生成视图。"
       },
       {
         "id": "architecture-discovery-before-implementation",
@@ -673,7 +673,7 @@
           "architecture_integrated",
           "impact_closure"
         ],
-        "note": "已有唯一 owner 和迁移入口，应接入既有正式职责并复核契约消费者。"
+        "note": "接入已有唯一 owner 与迁移入口，并复核契约消费者。"
       },
       {
         "id": "shared-responsibility-discovery-and-adoption",
@@ -684,7 +684,7 @@
           "authority_lifecycle",
           "impact_closure"
         ],
-        "note": "先裁决共享判断的权威 owner，再让两个入口采用同一路径并闭合影响。"
+        "note": "先裁决共享 owner，再让两个入口采用同一路径并闭合影响。"
       },
       {
         "id": "authority-change-impact-closure",
@@ -695,7 +695,7 @@
           "protected_user_baseline",
           "final_user_scope_only"
         ],
-        "note": "保持用户目标，按新证据修订或重验全部消费者后再判断完成。"
+        "note": "保持用户目标，修订或重验全部消费者后再判断完成。"
       },
       {
         "id": "surface-similarity-no-shared-owner",
@@ -710,7 +710,7 @@
         "behavior_tags": [
           "modify_authorized_scope"
         ],
-        "note": "格式、内容和一次性生命周期均明确，按授权生成临时产物。"
+        "note": "格式、内容和一次性生命周期明确，按授权生成临时产物。"
       },
       {
         "id": "specified-synthesis-artifact",
@@ -725,7 +725,7 @@
           "modify_authorized_scope",
           "no_scope_expansion"
         ],
-        "note": "只调整公共头依赖组织并保持公开 API 不变。"
+        "note": "只调整公共头依赖并保持公开 API 不变。"
       },
       {
         "id": "cpp-module-cycle-diagnosis",
@@ -786,7 +786,7 @@
           "model_interaction_surface",
           "minimal_evidence_closure"
         ],
-        "note": "字面量文本查询足够，并按真实结果选择最低充分输出面。"
+        "note": "文本查询足够，并按真实结果选择最低充分输出面。"
       },
       {
         "id": "source-query-rule-review",
@@ -802,7 +802,7 @@
           "read_only",
           "minimal_evidence_closure"
         ],
-        "note": "完整文本命中和局部上下文足以区分定义与调用。"
+        "note": "文本命中和局部上下文足以区分定义与调用。"
       },
       {
         "id": "known-small-definition-range",
@@ -810,7 +810,7 @@
           "read_only",
           "minimal_evidence_closure"
         ],
-        "note": "现有有界正文已证明范围与字面量，应停止升级。"
+        "note": "有界正文已证明范围与字面量，应停止升级。"
       },
       {
         "id": "known-implementation-reading",
@@ -826,7 +826,7 @@
           "read_only",
           "minimal_evidence_closure"
         ],
-        "note": "权威组件已确认，一次有界文本查询可取得全部必要证据。"
+        "note": "权威组件已确认，一次有界查询可取得全部必要证据。"
       },
       {
         "id": "dependent-authority-source-evidence",
@@ -836,7 +836,7 @@
           "authority_lifecycle",
           "minimal_evidence_closure"
         ],
-        "note": "先裁决正式生产 owner，再只在该权威范围完整查询。"
+        "note": "先裁决正式生产 owner，再只在该权威范围查询。"
       },
       {
         "id": "bounded-file-discovery",
@@ -845,7 +845,7 @@
           "model_interaction_surface",
           "minimal_evidence_closure"
         ],
-        "note": "文件发现入口已定，树或平铺的模型展示应按真实结果选择。"
+        "note": "文件发现入口已定，树或平铺展示应按真实结果选择。"
       },
       {
         "id": "powershell-command-authoring",
@@ -863,7 +863,7 @@
           "no_scope_expansion",
           "minimal_evidence_closure"
         ],
-        "note": "先锁定同一重载符号，只改真实引用并读回跨文件诊断。"
+        "note": "先锁定同一重载符号，只改真实引用并读回诊断。"
       },
       {
         "id": "event-log-context-recovery",
@@ -871,7 +871,7 @@
           "read_only",
           "fact_first"
         ],
-        "note": "只从项目级运行记录取得当前轮要求、Goal 和文件操作事实。"
+        "note": "只从项目运行记录取得当前轮要求、Goal 和文件操作事实。"
       },
       {
         "id": "qq-hook-explicit-enable",
@@ -911,7 +911,7 @@
           "document_authority",
           "vertical_validation_closure"
         ],
-        "note": "用任务合同维护依赖并沿目标链执行，表中状态不能替代迁移结果。"
+        "note": "用任务合同维护依赖并沿目标链执行，表中状态不能替代结果。"
       },
       {
         "id": "full-delivery-chain",
@@ -924,7 +924,7 @@
           "collaborative_requirement_insight",
           "vertical_validation_closure"
         ],
-        "note": "共同确认并保护需求设计，以文档为准、CLI 仅辅助，沿目标链验证最终达成。"
+        "note": "确认并保护需求设计，以文档为准、CLI 仅辅助，沿目标链验证达成。"
       },
       {
         "id": "vertical-validation-closure-selection",
@@ -934,7 +934,7 @@
           "no_alternative_execution",
           "vertical_validation_closure"
         ],
-        "note": "读取上下游证据，只选择延续目标链并形成最近可验证结果的任务。"
+        "note": "读取上下游证据，只选择延续目标链的最近可验证任务。"
       },
       {
         "id": "protected-baseline-change-discovered",
@@ -1010,7 +1010,7 @@
           "fact_first",
           "impact_closure"
         ],
-        "note": "元数据是入口变更的派生结果，应按当前架构事实和验证证据更新。"
+        "note": "元数据是入口变更的派生结果，应按架构事实和验证证据更新。"
       },
       {
         "id": "shared-blocking-gate",
@@ -1021,7 +1021,7 @@
           "authority_lifecycle",
           "impact_closure"
         ],
-        "note": "共享阻断设计需确定正式职责，并证明失败代表契约违反且覆盖全部合并路径。"
+        "note": "共享阻断设计需确定正式职责，并证明失败代表契约违反。"
       },
       {
         "id": "current-context-is-sufficient",
@@ -1037,7 +1037,7 @@
           "fact_first",
           "final_user_scope_only"
         ],
-        "note": "只按目标和验证证据汇报完成状态，不产生额外外部动作。"
+        "note": "只按目标和验证证据汇报完成状态，不产生外部动作。"
       },
       {
         "id": "cpp-word-in-document",
@@ -1093,7 +1093,7 @@
           "architecture_integrated",
           "no_scope_expansion"
         ],
-        "note": "收敛到唯一入口以避免永久第二状态源，同时不顺带重构。"
+        "note": "收敛到唯一入口以避免第二状态源，同时不顺带重构。"
       },
       {
         "id": "review-only-no-alternative-execution",
@@ -1114,7 +1114,7 @@
           "cli_assistive_only",
           "local_mechanical_gates"
         ],
-        "note": "共享政策由文档统一承载并覆盖两套 CLI；CLI 仅辅助且只设局部可恢复门禁。"
+        "note": "共享政策由文档统一承载；CLI 仅辅助且只设局部可恢复门禁。"
       },
       {
         "id": "single-task-cli-formatting",
@@ -1123,7 +1123,7 @@
           "no_scope_expansion",
           "cli_assistive_only"
         ],
-        "note": "CLI 只机械格式化指定 JSON，不扩展为长期流程或语义裁决。"
+        "note": "CLI 只机械格式化指定 JSON，不扩展为长期流程。"
       },
       {
         "id": "ast-rewrite-preview",
@@ -1132,7 +1132,7 @@
           "no_alternative_execution",
           "minimal_evidence_closure"
         ],
-        "note": "AST 查询和 rewrite 预览已足够，不应用修改或升级符号语义。"
+        "note": "AST 查询和 rewrite 预览已足够，不应用修改或升级语义查询。"
       },
       {
         "id": "event-log-explicit-history-request",
@@ -1182,7 +1182,7 @@
           "fact_first",
           "no_alternative_execution"
         ],
-        "note": "只审查布局，结论须由坐标、裁剪和滚动后的直接证据支持。"
+        "note": "只审查布局，结论须由坐标、裁剪和滚动证据支持。"
       },
       {
         "id": "ui-copy-review-with-peer",
@@ -1206,7 +1206,7 @@
         "behavior_tags": [
           "modify_authorized_scope"
         ],
-        "note": "字段、单位、坐标系和验收值均明确，精确修改即可。"
+        "note": "字段、单位、坐标系和验收值明确，精确修改即可。"
       },
       {
         "id": "delivery-requirements-contract",
@@ -1230,7 +1230,7 @@
           "final_user_scope_only",
           "document_authority"
         ],
-        "note": "以确认基线和现状证据编写设计方案，不建任务或把计划当最终结果。"
+        "note": "以确认基线和现状证据编写设计方案，不建任务或代替最终结果。"
       },
       {
         "id": "delivery-task-contract",
@@ -1241,7 +1241,7 @@
           "document_authority",
           "model_interaction_surface"
         ],
-        "note": "请求明确设计供跨轮模型维护的任务与结果字段，应形成唯一、可定位的交互面。"
+        "note": "请求设计供跨轮模型维护的任务与结果字段，应形成唯一可定位交互面。"
       },
       {
         "id": "delivery-feedback-contract",
@@ -1254,7 +1254,7 @@
           "document_authority",
           "vertical_validation_closure"
         ],
-        "note": "以新证据回退最早失效判断并重投影影响，保持需求并重新闭合验证。"
+        "note": "以新证据回退最早失效判断并重投影影响，保持需求并闭合验证。"
       },
       {
         "id": "qq-troubleshooting-with-powershell",
@@ -1271,19 +1271,19 @@
     "evaluation_kind": "routing-reference-policy",
     "fingerprint_schema": "text-lf-v1",
     "evaluator": {
-      "id": "references-eval-20260817h2-20260817T101522770Z",
+      "id": "references-eval-e9305e5-20260817T133705418Z",
       "model": "gpt-5.6-sol",
       "runtime": "codex-collaboration-subagent",
-      "evaluated_at_utc": "2026-08-17T10:15:22.770Z",
+      "evaluated_at_utc": "2026-08-17T13:37:05.418Z",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false
     },
-    "evaluation_capsule_sha256": "7CD8F4B6F0B9F74A491043E04B75C6BB9EC8393DD94FAED1E82EB20E97BC1789",
-    "candidate_bundle_sha256": "CDE243F4E0C58F73D335EA5E2CE978D645AB5F612170B4EA42D80F997082693C",
+    "evaluation_capsule_sha256": "A7B4FD854F1740791A6554C56149D58A6B3A9DF8B0255884A2611EBCA36F213C",
+    "candidate_bundle_sha256": "88145DE1F08FC98DA347E4F02D4FA4EE51CEA80B2FE0443B3F8A6543933364C2",
     "evaluation_input_sha256": "75CAFA6D925EBF6B9D74D4A15E7BEAD86C5A6E3739ABA5F53351F5AD04AC3349",
-    "routing_evaluation_capsule_sha256": "77052D80D2AB879F05FBF8B70CD9B123AE96F948A3993DF1F04A8D0CBC0A53F8",
-    "routing_result_sha256": "FC36E9A4484BB05C69EEC4F300D4E122ED016BE83073F4D9361525666D4DA3F6",
+    "routing_evaluation_capsule_sha256": "30606F4E496588E500504211903CDDD83DCC54B9B7CDCFE1124E0E5F466E83B4",
+    "routing_result_sha256": "63FC1A84620A5AC5D08BBD45662CB40C438EA107D3ED24EF7E3FCF80EC27BA3C",
     "cases": [
       {
         "id": "architecture-discovery-before-implementation",
