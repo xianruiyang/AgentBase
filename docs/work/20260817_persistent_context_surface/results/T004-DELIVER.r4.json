@@ -1,0 +1,74 @@
+{
+  "changed_files": [
+    "docs/plan.md",
+    "docs/handoff.md",
+    "docs/work/20260817_persistent_context_surface/context-surface-audit.md",
+    "docs/work/20260817_persistent_context_surface/verification.md",
+    "docs/work/20260817_persistent_context_surface/completion-audit.md"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "UDES-001",
+    "UDES-002",
+    "SOL-004"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "completion-audit",
+      "note": "全部目标、约束、任务与消费者闭合",
+      "ref": "docs/work/20260817_persistent_context_surface/completion-audit.md"
+    },
+    {
+      "kind": "recovery",
+      "note": "已发布基线与未发布候选的当前入口",
+      "ref": "docs/handoff.md"
+    },
+    {
+      "kind": "git",
+      "note": "功能与状态提交已同步，ahead/behind 0/0",
+      "ref": "origin/main@1295490c863ea49fd46c5b04e45b67bdf24c16ae"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "项目总计划、handoff、完成审计和 Git 历史已准确区分已发布基线与未发布候选；功能与状态提交已非强制同步到 origin/main，未再次发布 Codex。",
+  "outputs": [
+    "docs/work/20260817_persistent_context_surface/completion-audit.md",
+    "docs/plan.md 与 docs/handoff.md 的当前项目入口",
+    "已同步至 origin/main 的功能提交 fc1215b 与状态提交 1295490"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:03b939246b8a55a9077abac10a8cfc5b6fc378448de5b03b9bc78795fc0a07e7",
+    "AC-002": "sha256:8f09ebd74aaa6a1e91ff6341c5bd5552fb9b234d5e0b6bdf4f98598b0b27782b",
+    "AC-003": "sha256:4615259a3221dd035d9781d36bcf3415211d90ac5f78f2a94670ab2a91c679c6",
+    "AC-004": "sha256:46ef437bd263addbeec82046cc6a06702a3ea8ce9fe3a071bb913d62cb1c355d",
+    "CON-001": "sha256:1c49276213f3c0bbb9081dd8c951f571b8d566b1e8e6af52be059087d75ecfe5",
+    "CON-002": "sha256:ea7baadbed446018e1e80f3974447f4ca41518d611e7164eb75b96f4cd8c215d",
+    "DES-001": "sha256:4fd19474581ad472cc9a5dc39a1355a1328a890931266fdb2663c10ec8e6abec",
+    "DES-003": "sha256:cae88a8f446d87ec2f17df34316cbb605f1a94d3b3aa10ab3a91768ba08ff33e",
+    "DES-004": "sha256:6e2ef2e693eb543b844c84f5f06b3ced14327584bc8579d208182b63a90f04e4",
+    "GAP-002": "sha256:e53a15bcd9356b7135bb4fcb9c5d4e5bbf9b793fe5f5132608ba09682fe92149",
+    "GAP-003": "sha256:bceafb38b7066168b4ed2beec8184cc5472b106dfba1fee1803df2fb9783b3a5",
+    "OBS-001": "sha256:65be4ce434afc68048a7cf903a7fa1526a009ea417c853bded18247a7413c4b1",
+    "OBS-003": "sha256:6079c75c6e2d7ac486e04e09ea33dbbe66cf3639b0c88e2b68b13db114dce158",
+    "REQ-001": "sha256:28d6dc6115b24e6eeeae172347374c8db448261a1980dffef8c040c203ff0445",
+    "SOL-004": "sha256:7e6bce17a16cffecbae07740d1047e321a1fbbe380b153f085608fc31f34d8ab",
+    "UDES-001": "sha256:3ac656e9a1184d91ad72fb33d88a475cab77967e556aa8acab213f43cf43b5a7",
+    "UDES-002": "sha256:279080b974e0fe511ed8c6da796c02891445abd6aa141a2823a7c968340bbba2"
+  },
+  "task_id": "T004-DELIVER",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "completion-context 单页覆盖 7 个目标和 2 个约束，无分页缺失",
+    "静态合同、staged 76/76/19 与 manage_agentbase Validate valid=true 再次通过",
+    "handoff 7 个相对链接均存在，最终 o200k_base 为 1,247 tokens",
+    "Status 返回候选未发布的三个预期缺口，清单仍匹配安装且没有退役或配置冲突",
+    "origin/main 与 1295490c863ea49fd46c5b04e45b67bdf24c16ae 同步后 ahead/behind 为 0/0",
+    "未执行真实 Codex Publish"
+  ]
+}

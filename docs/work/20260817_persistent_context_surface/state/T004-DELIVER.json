@@ -3,9 +3,9 @@
   "next_action": "",
   "note": "",
   "owner": "root",
-  "result_ref": null,
-  "revision": 3,
+  "result_ref": "results/T004-DELIVER.r4.json",
+  "revision": 4,
   "schema": "task.state",
-  "status": "in_progress",
+  "status": "done",
   "task_id": "T004-DELIVER"
 }

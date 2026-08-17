@@ -2,7 +2,7 @@
 
 ## 审计范围与身份
 
-本审计只覆盖当前交付链确认的 1 个需求、4 个验收条件、2 个用户设计和 2 个约束。已发布 Codex 基线仍是 `86ee057306659da6e615a7d33580184f8c543cb8`；功能候选提交是 `fc1215b8d54939217fe82c7d830b8722713e6948`，routing bundle 是 `CDE243F4E0C58F73D335EA5E2CE978D645AB5F612170B4EA42D80F997082693C`。本版本没有再次执行真实 `Publish`。
+本审计只覆盖当前交付链确认的 1 个需求、4 个验收条件、2 个用户设计和 2 个约束。已发布 Codex 基线仍是 `86ee057306659da6e615a7d33580184f8c543cb8`；功能候选提交是 `fc1215b8d54939217fe82c7d830b8722713e6948`，状态提交是 `1295490c863ea49fd46c5b04e45b67bdf24c16ae`，两者已同步到 `origin/main`；routing bundle 是 `CDE243F4E0C58F73D335EA5E2CE978D645AB5F612170B4EA42D80F997082693C`。本版本没有再次执行真实 `Publish`。
 
 ## 目标证据
 
@@ -32,10 +32,10 @@
 | T001-HANDOFF | 当前恢复索引的功能阶段候选 | 状态、回滚、边界、下一入口、链接与 993-token 中间候选读回；T004 以最终发布/候选身份重验为 1,247 tokens |
 | T002-RULE-AUDIT | 逐项审计与候选 | 静态 76 cases、34 strict routing、5 strict references；Routing 76/76 |
 | T003-VERIFY | 三阶段证据与部署候选 | staged 76/76/19，`Validate valid=true`，同 tokenizer 对照 |
-| T004-DELIVER | 项目计划、handoff、完成审计与 Git 交付 | 最终状态读回和远端同步后闭合 |
+| T004-DELIVER | 项目计划、handoff、完成审计与 Git 交付 | `results/T004-DELIVER.r4.json`；最终状态、链接、Token、发布边界与 `origin/main` 0/0 读回 |
 
 Policy 单次候选结果比已发布基线多 3 个未声明但未禁选的 `model_interaction_surface` 标签；正式期望与禁选全部满足，差异所对应的交互面条款本次未修改，不能形成候选导致退化的因果证据。该限制已在[验证记录](verification.md)保留，不反复运行筛选结果，也不改写 oracle。
 
 ## 完成判定
 
-功能、路由、恢复和部署候选证据已经满足当前目标。待 T004 完成当前仓库状态读回、任务结果、总计划与 handoff 更新并把两个职责清晰的提交非强制同步到上游后，当前范围可判定完成；真实 Codex 继续停留在已发布基线，直到用户另行批准一次新的 Publish。
+最终 `completion-context` 快照 `sha256:d9e6a126693be29b4981ad19c200e7f39f6fffaa6235cc802dd49510bd58c3fd` 单页覆盖全部 7 个目标和 2 个约束；每个目标都有当前结果和验证，4 个任务均为 `done`，没有 DCR、分页缺失、未决结果或已失效上游。结合上述 owner、消费者、路由、恢复、Token、部署和 Git 证据，当前范围已完成。真实 Codex 继续停留在已发布基线，直到用户另行批准一次新的 Publish。
