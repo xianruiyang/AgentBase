@@ -84,9 +84,9 @@ $globalPath = Join-Path $ProjectRoot "global\AGENTS.md"
 $globalItem = Get-Item -LiteralPath $globalPath
 $globalContent = Get-Content -LiteralPath $globalPath -Raw -Encoding UTF8
 Assert-True ($globalItem.Length -le [int]$contract.global_max_bytes) "Global AGENTS.md is $($globalItem.Length) bytes; contract limit is $($contract.global_max_bytes)"
-Assert-True ($globalContent.Contains("先按实际消费者和当前判断、动作或恢复需要选择输出面")) "Global AGENTS.md is missing consumer-aware tool output selection"
-Assert-True ($globalContent.Contains("同一次权威事实计算形成消费者投影")) "Global AGENTS.md is missing same-source model/machine projection"
-Assert-True ($globalContent.Contains("实际 Token 成本和可读性选择")) "Global AGENTS.md still treats format names as token evidence"
+Assert-True ($globalContent.Contains("设计或选择模型交互面时，先确认事实 owner、实际消费者、模型当前判断或修改责任和内容生命周期")) "Global AGENTS.md is missing the model-interaction-surface decision order"
+Assert-True ($globalContent.Contains("程序维护真源时模型通过有界投影、查询或受验证语义修改入口使用")) "Global AGENTS.md is missing the program-owned source projection contract"
+Assert-True ($globalContent.Contains("完成相关性投影后按实际 Token 成本、可读性和可定位性选择")) "Global AGENTS.md still treats format names as model-interaction evidence"
 $projectAgentsPath = Join-Path $ProjectRoot "AGENTS.md"
 $projectAgentsItem = Get-Item -LiteralPath $projectAgentsPath
 $projectAgentsContent = Get-Content -LiteralPath $projectAgentsPath -Raw -Encoding UTF8
@@ -97,8 +97,9 @@ Assert-True (Test-Path -LiteralPath $planPath -PathType Leaf) "Project-wide plan
 Assert-True ($readmeContent.Contains("docs/plan.md")) "README does not point to docs/plan.md"
 Assert-True ($projectAgentsContent.Contains("docs/plan.md")) "Project AGENTS.md does not register docs/plan.md"
 Assert-True ($projectAgentsContent.Contains("普通组件内任务不因本条加载总计划")) "Project AGENTS.md does not keep the project-wide plan conditional"
-Assert-True ($projectAgentsContent.Contains("模型视图按当前动作投影最小充分证据")) "Project AGENTS.md is missing model-visible tool output maintenance responsibility"
-Assert-True ($projectAgentsContent.Contains("模型视图的决策充分性、预算内渐进恢复、机器视图的结构稳定性")) "Project AGENTS.md is missing cross-view verification"
+Assert-True ($projectAgentsContent.Contains("新增或修改模型直接读取、生成或维护的工具返回")) "Project AGENTS.md is missing model-interaction asset maintenance responsibility"
+Assert-True ($projectAgentsContent.Contains("模型修改面保持职责局部且可验证")) "Project AGENTS.md is missing the model-editing surface contract"
+Assert-True ($projectAgentsContent.Contains("模型修改面的唯一真源与局部可验证性")) "Project AGENTS.md is missing cross-consumer interaction-surface verification"
 foreach ($ownerReadme in @(
     "global\README.md",
     "development\skill-routing\README.md",
@@ -295,6 +296,7 @@ Assert-True ($governorScriptContent.Contains('operation: "set"')) "reasoning-gov
 $taskTableSkillPath = Join-Path $ProjectRoot "skills\task-table-manager\SKILL.md"
 $taskTableSkillContent = Get-Content -LiteralPath $taskTableSkillPath -Raw -Encoding UTF8
 $taskTableToolingContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\task-table-manager\references\tooling.md") -Raw -Encoding UTF8
+$taskTableContractContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\task-table-manager\references\task-contracts.md") -Raw -Encoding UTF8
 Assert-True ($taskTableSkillContent.Contains('`$reasoning-governor`')) "task-table-manager must delegate reasoning depth to reasoning-governor"
 $taskTableScriptPath = Join-Path $ProjectRoot "skills\task-table-manager\scripts\taskctl.py"
 $taskTableScriptContent = Get-Content -LiteralPath $taskTableScriptPath -Raw -Encoding UTF8
@@ -309,6 +311,9 @@ Assert-True ($taskTableScriptContent.Contains('sys.stdout.reconfigure(encoding="
 Assert-True ($taskTableScriptContent.Contains('compact_model')) "taskctl is missing its compact model renderer"
 Assert-True ($taskTableToolingContent.Contains('`--view model` 是默认值') -and $taskTableToolingContent.Contains('`--view machine` 面向程序')) "taskctl tooling does not define consumer output surfaces"
 Assert-True ($taskTableToolingContent.Contains('紧凑 HJSON 风格文本')) "taskctl tooling does not define the measured model representation"
+Assert-True ($taskTableSkillContent.Contains('任务合同、状态和结果是程序消费且由模型作出语义决定的结构化真源')) "task-table-manager does not declare its model-maintained structured source"
+Assert-True ($taskTableContractContent.Contains('不能直接编辑 `tasks/*.json` 绕过 CAS、路径和原子写入职责')) "task-table-manager does not keep permanent task edits on the validated write entry"
+Assert-True ($taskTableToolingContent.Contains('不直接编辑生成视图或绕过存储职责')) "task-table-manager still permits generated views as editing entries"
 Assert-True ($taskTableToolingContent.Contains('completion-context') -and $taskTableToolingContent.Contains('省略候选结果中只供机器校验的完整来源指纹映射')) "taskctl model completion projection is not documented"
 Assert-True ($taskTableScriptContent.Contains('needs_review_count')) "taskctl status does not expose the review count"
 Assert-True ($taskTableScriptContent.Contains('upstream_index_derived_content_mismatch')) "taskctl does not bind cached index content to current workflow documents"
@@ -351,6 +356,8 @@ $deliveryIterationContent = Get-Content -LiteralPath $deliveryIterationPath -Raw
 Assert-True ($deliverySkillContent.Contains('requirements.md') -and $deliverySkillContent.Contains('user-design.md')) "delivery-workflow does not separate protected user sources"
 Assert-True ($deliverySkillContent.Contains('模型设计、分析、方案、任务状态、快照、索引、结构检查和各阶段审核都只是中间结果')) "delivery-workflow does not limit intermediate reviews"
 Assert-True ($deliverySkillContent.Contains('Markdown 阶段文档是语义真源')) "delivery-workflow does not keep documents authoritative"
+Assert-True ($deliveryCommonContractContent.Contains('## 模型读取面与修改面')) "delivery-workflow is missing its model interaction asset contract"
+Assert-True ($deliveryCommonContractContent.Contains('模型不得通过直接编辑它们改变目标、设计、任务或完成状态')) "delivery-workflow still permits generated assets as semantic editing entries"
 Assert-True ($deliverySkillContent.Contains('当前消费者接入')) "delivery-workflow does not close shared responsibilities through current consumers"
 Assert-True ($deliverySkillContent.Contains('只增加当前动作所属的一项')) "delivery-workflow does not progressively route stage contracts"
 Assert-True ($deliverySkillContent.Contains('不因此额外读取目标合同')) "delivery-workflow does not prevent target-contract over-selection when confirmed targets are unchanged"
@@ -413,10 +420,16 @@ Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hoo
 $eventLoggerRoot = Join-Path $ProjectRoot "skills\codex-event-logger"
 $eventLoggerSkillContent = Get-Content -LiteralPath (Join-Path $eventLoggerRoot "SKILL.md") -Raw -Encoding UTF8
 $eventLoggerReaderPath = Join-Path $eventLoggerRoot "scripts\read_codex_turn_log.py"
+$eventLoggerReaderContent = Get-Content -LiteralPath $eventLoggerReaderPath -Raw -Encoding UTF8
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $eventLoggerRoot "HOOK_INSTALL.md"))) "codex-event-logger keeps installation documentation inside the skill root"
 Assert-True (Test-Path -LiteralPath $eventLoggerReaderPath -PathType Leaf) "codex-event-logger is missing its bounded reader"
 Assert-True ($eventLoggerSkillContent.Contains('read_codex_turn_log.py')) "codex-event-logger SKILL.md does not route reads through the bounded reader"
 Assert-True (-not $eventLoggerSkillContent.Contains('Get-Content -Raw')) "codex-event-logger SKILL.md contains an unbounded raw read"
+Assert-True ($eventLoggerSkillContent.Contains('显式增加 `--view machine`')) "codex-event-logger does not reserve complete JSON for explicit machine consumers"
+Assert-True ($eventLoggerReaderContent.Contains('choices=("model", "machine"), default="model"')) "codex-event-logger reader is missing default model and explicit machine views"
+Assert-True ($eventLoggerReaderContent.Contains('def model_read_projection')) "codex-event-logger reader is missing its recovery projection owner"
+Assert-True ($eventLoggerReaderContent.Contains('def project_operations')) "codex-event-logger reader does not form bounded net file operations"
+Assert-True ($eventLoggerReaderContent.Contains('def fit_model_output')) "codex-event-logger reader is missing model-budget recovery"
 Assert-True (Test-Path -LiteralPath (Join-Path $eventLoggerRoot "tests\test_event_logger.py") -PathType Leaf) "codex-event-logger is missing its regression tests"
 
 $expectedSourceQueryFiles = @(

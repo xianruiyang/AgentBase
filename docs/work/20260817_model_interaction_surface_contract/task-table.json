@@ -1,0 +1,10 @@
+{
+  "id": "model-interaction-surface-contract",
+  "result_dir": "results",
+  "schema": "task.table",
+  "source_index": ".work-cache/index.json",
+  "state_dir": "state",
+  "table_view": "TASK_TABLE.md",
+  "task_dir": "tasks",
+  "title": "模型交互面合同"
+}

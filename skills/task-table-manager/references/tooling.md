@@ -27,7 +27,7 @@ completion-context  从当前 Markdown 分页返回 REQ/AC/UDES、CON、全部 D
 status/render  生成可重建的执行摘要和 TASK_TABLE.md
 ```
 
-查询默认使用有界 model 视图；程序解析时显式使用 machine 视图。当任务很少或 CLI 不可用时，可直接维护并读取合同文档；CLI 不是开始、推进、完成或重开任务的许可者。
+查询默认使用有界 model 视图；程序解析时显式使用 machine 视图。当任务很少或 CLI 不可用时仍按正式合同继续；CLI 可用时，永久任务、状态和结果 JSON 通过带 revision 的写命令维护，不直接编辑生成视图或绕过存储职责。CLI 不是开始、推进、完成或重开任务的许可者。
 
 `status` 和 `render` 的结果摘要使用明确作用域：`referenced_result_count` 表示当前状态文件实际引用的结果数，`task_revision_stale_result_count` 只表示结果记录的任务 revision 与当前合同不一致，`source_snapshot_issue_result_count` 表示至少含一项来源快照缺失、不完整或陈旧诊断的结果数；同时返回含诊断结果数、结果诊断条目数和按 kind 计数。上述字段互不替代，也不表示目标证据充分或整体完成。
 
@@ -35,7 +35,7 @@ status/render  生成可重建的执行摘要和 TASK_TABLE.md
 
 `task-table.json` 的 `tasks/`、`state/`、`results/`、`.work-cache/index.json` 和 `TASK_TABLE.md` 路径固定，只为防止生成物覆盖语义真源或结果记录。
 
-`render` 生成的任务表固定保留全部列；没有可显示值的单元格使用 `—` 占位，避免长文本换行时产生列错位错觉。占位符只属于生成视图，不写回任务合同、状态或结果，也不表示模型已经裁决该字段语义为“无”。
+`render` 生成的任务表固定保留全部列；没有可显示值的单元格使用 `—` 占位，避免长文本换行时产生列错位错觉。占位符只属于生成视图，不写回任务合同、状态或结果，也不表示模型已经裁决该字段语义为“无”。模型不得直接编辑 `TASK_TABLE.md` 改变任务；修改通过任务合同或状态命令进入唯一结构化真源，再重新生成视图。
 
 ## 状态与结果命令
 

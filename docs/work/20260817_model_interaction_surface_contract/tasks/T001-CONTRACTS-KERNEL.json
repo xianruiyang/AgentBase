@@ -1,0 +1,47 @@
+{
+  "dependencies": [],
+  "id": "T001-CONTRACTS-KERNEL",
+  "mutation_scope": [
+    "docs/requirements.md",
+    "global/AGENTS.md",
+    "global/README.md",
+    "AGENTS.md"
+  ],
+  "outcome": "根需求、跨项目规则和项目维护合同统一从事实 owner、消费者责任与生命周期裁决模型读取面、修改面和机器面",
+  "outputs": [
+    "给 T002/T003 使用的模型交互面上位合同",
+    "给 T004 使用的项目维护与验证责任"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-001",
+    "GAP-001",
+    "GAP-002",
+    "DES-001",
+    "DES-002",
+    "DES-003",
+    "DES-004",
+    "REQ-001",
+    "REQ-002",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "UDES-001",
+    "UDES-002",
+    "UDES-003",
+    "UDES-004"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "delivery-workflow"
+  ],
+  "title": "建立模型交互面根合同与全局内核",
+  "verification": [
+    "逐项检查工具输出子集、文件读取面、文件修改面和唯一真源均可由同一上位合同推导",
+    "检查全局内核没有引入统一格式器或领域字段协议"
+  ]
+}

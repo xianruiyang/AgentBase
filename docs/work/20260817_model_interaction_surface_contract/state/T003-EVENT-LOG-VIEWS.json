@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "",
+  "owner": "codex",
+  "result_ref": "results/T003-EVENT-LOG-VIEWS.r3.json",
+  "revision": 3,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T003-EVENT-LOG-VIEWS"
+}

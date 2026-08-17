@@ -1,0 +1,64 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "项目维护与验证责任"
+      ],
+      "id": "T001-CONTRACTS-KERNEL",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "阶段文档和任务资产合同"
+      ],
+      "id": "T002-ASSET-OWNERS",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "事件日志恢复面与质量证据"
+      ],
+      "id": "T003-EVENT-LOG-VIEWS",
+      "type": "hard"
+    }
+  ],
+  "id": "T004-VERIFY-DELIVER",
+  "mutation_scope": [
+    "development/skill-routing/**",
+    "docs/plan.md",
+    "docs/handoff.md",
+    "docs/work/20260817_model_interaction_surface_contract/**"
+  ],
+  "outcome": "读取、修改和机器消费者场景均通过适用验证，项目计划与接手状态准确记录候选身份、边界和未发布状态",
+  "outputs": [
+    "独立 Routing/Policy/References 证据",
+    "部署候选 Validate 身份",
+    "完成审计与接手状态"
+  ],
+  "reasoning_hint": "high",
+  "revision": 2,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-004",
+    "GAP-005",
+    "DES-008",
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "AC-008",
+    "UDES-004",
+    "CON-001",
+    "CON-002",
+    "CON-003"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "delivery-workflow",
+    "task-table-manager"
+  ],
+  "title": "扩展策略评估并闭合模型交互面版本",
+  "verification": [
+    "运行静态合同、三项独立评估、受影响组件回归和部署候选 Validate",
+    "最终逐项复核 15 个目标、3 个约束和全部 DCR"
+  ]
+}

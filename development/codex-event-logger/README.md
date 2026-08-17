@@ -24,4 +24,4 @@
 python.exe '.\skills\codex-event-logger\tests\test_event_logger.py'
 ```
 
-另外检查 Python/PowerShell 语法、空输入 smoke、代表性 hook payload 与落盘读回；设计发生变化时同步更新本目录的设计文档。日志读取统一使用 `read_codex_turn_log.py`，它在读取正文前检查大小，并限制读取字节、JSONL 记录数、单行和字符串长度。
+另外检查 Python/PowerShell 语法、空输入 smoke、代表性 hook payload 与落盘读回；设计发生变化时同步更新本目录的设计文档。日志读取统一使用 `read_codex_turn_log.py`：默认 model 视图验证恢复信息充分且在预算内，显式 `--view machine` 验证原有有界 JSON 合同；两者共享同一次文件大小、读取字节、JSONL 记录数、单行和字符串限幅事实。

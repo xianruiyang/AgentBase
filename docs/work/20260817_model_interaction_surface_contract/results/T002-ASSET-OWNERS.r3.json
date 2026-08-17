@@ -1,0 +1,92 @@
+{
+  "changed_files": [
+    "skills/delivery-workflow/SKILL.md",
+    "skills/delivery-workflow/references/artifact-contracts.md",
+    "skills/delivery-workflow/references/tooling.md",
+    "skills/task-table-manager/SKILL.md",
+    "skills/task-table-manager/references/task-contracts.md",
+    "skills/task-table-manager/references/tooling.md"
+  ],
+  "evidence_for": [
+    "SOL-002",
+    "GAP-002",
+    "GAP-003",
+    "DES-005",
+    "DES-006",
+    "REQ-003",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-007"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "contract",
+      "note": "阶段 Markdown、结构化管理资产与生成视图的职责边界",
+      "ref": "skills/delivery-workflow/references/artifact-contracts.md#模型读取面与修改面"
+    },
+    {
+      "kind": "contract",
+      "note": "任务合同与结果的正式维护入口",
+      "ref": "skills/task-table-manager/references/task-contracts.md"
+    },
+    {
+      "kind": "test",
+      "note": "35 项回归通过",
+      "ref": "skills/delivery-workflow/tests/test_workctl.py"
+    },
+    {
+      "kind": "test",
+      "note": "70 项回归通过",
+      "ref": "skills/task-table-manager/tests/test_taskctl.py"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "Delivery Workflow 与 Task Table Manager 已明确模型维护真源、结构化真源、派生产物和正式读取/修改入口，同时保留既有默认 model 与显式 machine 输出合同",
+  "outputs": [
+    "阶段 Markdown 按稳定 ID 作为模型和用户维护的语义真源，结构化管理文件与生成视图各守其责",
+    "任务合同、状态和结果通过正式 revision/CAS 写入命令维护，模型查询使用动作投影，完整结构留给显式机器消费者",
+    "WORK_STATUS.md、TASK_TABLE.md 与缓存索引均明确为可重建读取面而非语义修改入口"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:1b48fae25e996841ccdbe6bd94353fb00b415d99d56e3facb3296fd63d48a3e8",
+    "AC-002": "sha256:dfe9691201d736f6176906780e2f04f16ba4d232caafa35ee90dbd6029ba8a87",
+    "AC-003": "sha256:d5f4bf0da1fc7992168a06c2d76bce2fd190fda7543d702ff12458c03004968b",
+    "AC-004": "sha256:877ad371f653c7a898d144188226c1567058b2c42baf3e2b5c2d1b30b80af73c",
+    "AC-005": "sha256:8abbee0986fe13d0a6811c6481105bb7c01e00aa4a5b486cbe54543cd8735af5",
+    "AC-006": "sha256:e9f3a43363ed0d94da0ed7f04292ba449bf5474d3f9a7f9191feefb94c95c1cd",
+    "AC-007": "sha256:e0cc7e018d12c758854d86bbd38a776638be769b70b554d780c10e2b85b57a6f",
+    "AC-008": "sha256:e4a6645fd4e823cdf4750bc9eab8dad9be05f71dcd2449840684b3da00c4e673",
+    "CON-001": "sha256:a61da07f1c5249d5c5f3f416e7827385dbfa7bef18bdb8b4f4ab13936d0c15ff",
+    "DES-001": "sha256:2909e6ed9453e318e8e720d86e042d093ac5cbab454589c3d4cfd0c4b713e5d1",
+    "DES-002": "sha256:36c88a465dd6657febde21d2f94df79094a634e09653e7fca8fccda811f7ae41",
+    "DES-003": "sha256:3d616349389b7242ae5a2d68398c7614e2bc3f31505087ee60dfffa5fc6b9260",
+    "DES-004": "sha256:d2f6074ff8f2d159df3060cb8ae517dc258be484647a8cddea8f9c7389616452",
+    "DES-005": "sha256:914aeb92c4cdb053d40e0fa6569a0cc7e9de03165a57693a9c7bd46ba3c19a36",
+    "DES-006": "sha256:8052cf4e9e4b332c56994407230563834d1cd7b3a9a7176903ff3b8c3c1ba0af",
+    "GAP-001": "sha256:7c5d190527b054844da5fca4a51fb4290b64cbdc655f9721d40a439a5dbe4055",
+    "GAP-002": "sha256:2de4a61f909c68824c386b66cab25b734abc0232c62023e4177821d3e050942c",
+    "GAP-003": "sha256:33111a392d476ef26d906f88659655406ae9066fc51423ad91fa8d6d31082996",
+    "OBS-001": "sha256:b73546de7f4d61cce0891c74d2d38590c378e5ead646ebf6325745a2f8670b96",
+    "OBS-002": "sha256:b874c53fa35aaee8c7e16c2cebcec2595cea6ed0401ffc8a0358bf24d1512750",
+    "OBS-003": "sha256:c1918a9fcf435f403cf5205fe229314f1e7095c856cbb0ac1738ecd95e8248b7",
+    "OBS-004": "sha256:fcb69ffa9d5381be0d82a403b54c621bbbfda63921d96d8a134eba071e5458ec",
+    "REQ-001": "sha256:82bb8c3751f6289189fd97efa9e61dc8e3343a3d0ae930fef7a093f16a4e7417",
+    "REQ-002": "sha256:684492b55b9ec3e1f20ad9c9fa6f16f42072b8ee8c3e4c5a3900fa961975f653",
+    "REQ-003": "sha256:c39dbd5acf5bd99dd003634d4c903d646b8ee4293ac676a8af81b45d9aaee8fb",
+    "SOL-001": "sha256:dc8674099bc0efbbc2f115019f33323b6802f1b9c834819f6c92b50b1e4e1b71",
+    "SOL-002": "sha256:05984c776f7fa355f638809e2521ae7e67591725fa1e9fd06e86bb8c43a46dcc",
+    "UDES-001": "sha256:dbad7932c9b027aaefd1fdc76e060bf9e6e2127e50d674e0063100e25f8049c5",
+    "UDES-002": "sha256:c342d4d7833aacf98862125581c34c84ea24d51bd575e45554a0b0f509762c4f",
+    "UDES-003": "sha256:f341adfade75bc184e1956c62004528cb0c56a3c0be55685b2b82e544c0a9293"
+  },
+  "task_id": "T002-ASSET-OWNERS",
+  "task_revision": 2,
+  "unresolved": [],
+  "verification": [
+    "delivery-workflow 回归 35 项全部通过",
+    "task-table-manager 回归 70 项全部通过",
+    "直接审查确认新增内容没有重复或反转既有默认 model、显式 machine renderer 合同"
+  ]
+}

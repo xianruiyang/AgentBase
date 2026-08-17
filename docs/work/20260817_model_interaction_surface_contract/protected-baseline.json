@@ -1,0 +1,40 @@
+{
+  "confirmation_ref": "2026-08-17 current conversation: model-read, generated and model-editable files are all in scope; continue implementation",
+  "confirmed_by": "user",
+  "cycle_id": "cycle-001",
+  "documents": {
+    "requirements": {
+      "fingerprint": "sha256:b27b172639be068818399a3420bf6e300fce392f4432dd1559406128dc740783",
+      "ids": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006",
+        "AC-007",
+        "AC-008",
+        "CON-001",
+        "CON-002",
+        "CON-003",
+        "REQ-001",
+        "REQ-002",
+        "REQ-003"
+      ],
+      "path": "requirements.md"
+    },
+    "user_design": {
+      "fingerprint": "sha256:3e2c1a21c54f4fe9a503025520c20ca312a34f680c9d09a3902751bde17770f8",
+      "ids": [
+        "UDES-001",
+        "UDES-002",
+        "UDES-003",
+        "UDES-004"
+      ],
+      "path": "user-design.md"
+    }
+  },
+  "history": [],
+  "schema": "delivery.protected-baseline",
+  "workflow_id": "model-interaction-surface-contract"
+}

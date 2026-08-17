@@ -28,7 +28,9 @@ impact    递归返回显式引用指定 ID 的下游条目及首条依赖路径
 render    生成 WORK_STATUS.md 只读视图
 ```
 
-这些命令都是可选辅助；文件量小或 CLI 不可用时可直接读写阶段文档。`outline` 从当前 `workflow.json` 返回阶段实际登记的文档路径，不用内置模板文件名替代项目正式位置。索引及查询结果中每个条目的 `document` 同样保留该完整工作区相对路径，不退化为文件名；不同目录中的同名文档仍可唯一定位。默认输出为有界 model 视图，程序解析时显式使用 machine 视图。`context` 的 model 视图按语义 section 选择当前 ID、直接关系和必要正文，预算不足时保留目标身份、位置和精确恢复；machine 视图继续使用既有 `--budget` 字符预算，仍需更多内容时按返回 ID 精确读取。
+这些命令都是可选辅助；文件量小或 CLI 不可用时可直接读写阶段 Markdown 真源。`outline` 从当前 `workflow.json` 返回阶段实际登记的文档路径，不用内置模板文件名替代项目正式位置。索引及查询结果中每个条目的 `document` 同样保留该完整工作区相对路径，不退化为文件名；不同目录中的同名文档仍可唯一定位。默认输出为有界 model 视图，程序解析时显式使用 machine 视图。`context` 的 model 视图按语义 section 选择当前 ID、直接关系和必要正文，预算不足时保留目标身份、位置和精确恢复；machine 视图继续使用既有 `--budget` 字符预算，仍需更多内容时按返回 ID 精确读取。
+
+`render` 只重建 `WORK_STATUS.md`；模型不得直接编辑该视图来改变阶段或任务状态。语义修改进入对应 Markdown 条目，结构化 manifest、快照和缓存只通过本合同定义的入口维护。
 
 `workflow.json` 中 `protected-baseline.json`、`.work-cache/index.json`、`WORK_STATUS.md` 和 `task-table.json` 的管理路径固定；阶段文档路径可按项目正式位置配置。固定管理路径只防止缓存或视图覆盖语义真源、任务合同或结果。
 

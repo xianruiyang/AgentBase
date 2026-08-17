@@ -636,13 +636,15 @@ private_key
 
 `transcript_path` 可以记录路径，但不复制 transcript 内容。
 
-## 查询脚本输出
+## 查询脚本交互面
 
 当前只读查询入口：
 
 ```text
 <CODEX_ROOT>\skills\codex-event-logger\scripts\read_codex_turn_log.py
 ```
+
+日志文件由 hook 和程序维护，是完整机器真源，不是模型直接读取或修改的文件。查询脚本只读取一次有界事实，再按消费者形成视图；不得维护另一份模型摘要日志或从模型视图反向同步机器日志。
 
 当前职责：
 
@@ -652,6 +654,8 @@ private_key
 读取 conversation.json 前检查大小
 只读取 file-operations.jsonl 的有界尾部和有限记录
 对单行、字符串、集合深度和集合项数继续限幅并再次脱敏
+默认 model 视图只投影恢复当前 turn 所需的 prompt、最终回复、活跃 goal、文件净操作路径/行区间和异常
+显式 --view machine 保持原有完整有界 JSON 合同
 ```
 
 默认边界：
@@ -662,9 +666,10 @@ file-operations.jsonl: 只读末尾 256 KiB、最多 80 条
 JSONL 单行: 最大 32 KiB
 输出字符串: 最大 12,000 字符
 列出 turn: 最多 50 个
+model 视图: 默认 2,048 Token 预算，可有界提高
 ```
 
-输出为结构化 JSON，并同时报告实际文件大小、适用上限、截断状态和跳过原因。跨会话全文搜索、任意统计或无界展开不属于该入口职责；需要时先用明确会话和时间范围收窄，再增加独立的有界查询能力。
+默认 model 输出采用紧凑、低标点的模型可读格式：正常读取不重复 session 路径、文件大小、适用上限、时间戳和 hook 来源；同一工作目录只保留一次公共基准，其内文件使用相对路径，同一路径的重复修改合并，本轮创建后又删除的临时文件不进入恢复面。只有缺失、拒绝、部分读取、跳过或预算不足时才返回相关诊断和同一 turn 的精确恢复方式。程序、测试和完整结构审计显式使用 `--view machine`，其 JSON 继续报告逐条原始操作、实际文件大小、适用上限、截断状态和跳过原因。跨会话全文搜索、任意统计或无界展开不属于该入口职责；需要时先用明确会话和时间范围收窄，再增加独立的有界查询能力。
 
 ## 验收方法
 
@@ -701,6 +706,7 @@ session_id + turn_id 负责关联
 输出写入项目根目录 codexRuntimeLogFile
 turn 目录名使用创建时间 + turnId，靠 .turn-index.json 保证同轮复用
 每轮目录包含 conversation.json 和 file-operations.jsonl
+只读查询默认返回模型恢复投影，完整有界 JSON 由显式 machine 视图提供
 ```
 
 这个方案能覆盖普通对话、工具执行和 goal 自动续跑；日志跟随项目保存，脚本通过 skill 全局复用，同时不依赖不稳定的 transcript 内部格式。

@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "",
+  "owner": "codex",
+  "result_ref": null,
+  "revision": 2,
+  "schema": "task.state",
+  "status": "in_progress",
+  "task_id": "T004-VERIFY-DELIVER"
+}

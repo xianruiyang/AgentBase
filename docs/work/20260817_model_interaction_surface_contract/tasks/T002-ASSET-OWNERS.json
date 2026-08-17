@@ -1,0 +1,46 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "模型交互面上位合同"
+      ],
+      "id": "T001-CONTRACTS-KERNEL",
+      "type": "hard"
+    }
+  ],
+  "id": "T002-ASSET-OWNERS",
+  "mutation_scope": [
+    "skills/delivery-workflow/**",
+    "skills/task-table-manager/**"
+  ],
+  "outcome": "Delivery Workflow 与 Task Table Manager 明确模型维护真源、结构化真源、派生产物和正式读取/修改入口，并沿用已经成立的 model/machine 输出合同",
+  "outputs": [
+    "给 T004 使用的阶段文档和任务资产正式合同",
+    "模型读取/修改入口与生成物边界说明"
+  ],
+  "reasoning_hint": "high",
+  "revision": 2,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-002",
+    "GAP-002",
+    "GAP-003",
+    "DES-005",
+    "DES-006",
+    "REQ-003",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-007"
+  ],
+  "suggested_skills": [
+    "delivery-workflow",
+    "task-table-manager",
+    "change-governance"
+  ],
+  "title": "接入交付与任务资产的读取和修改合同",
+  "verification": [
+    "运行 delivery-workflow 与 task-table-manager 回归",
+    "检查真源、生成物、模型读取和模型修改入口无冲突且不重复既有 renderer 合同"
+  ]
+}

@@ -39,7 +39,7 @@
     "collaborative_requirement_insight",
     "quality_token_speed_order",
     "vertical_validation_closure",
-    "consumer_aware_tool_output",
+    "model_interaction_surface",
     "minimal_evidence_closure"
   ],
   "behavior_tag_definitions": {
@@ -61,7 +61,7 @@
     "collaborative_requirement_insight": "把初始请求作为共同理解的输入，结合证据识别会改变结果的隐含条件、冲突和维护需求，与用户校准且保留用户最终裁决。",
     "quality_token_speed_order": "先选择需求对齐、正确、安全、可维护且有完成证据的方案；质量同等充分时降低 Token，前两者不变差时再提速。",
     "vertical_validation_closure": "有效规划后，在依赖、关键风险、共享前置和质量允许时限制无必要的横向展开，优先沿当前目标链形成最近可验证闭环，并用证据确认或修正方案、设计和需求达成状态。",
-    "consumer_aware_tool_output": "工具输出进入模型上下文时选择当前动作的最小充分模型视图；程序需要稳定完整结构时显式选择机器视图，两者来自同一权威事实。",
+    "model_interaction_surface": "当前请求要求设计、选择或改变模型直接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面最小充分且可局部修改，机器面保持稳定完整，生成物不作为语义修改入口。",
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。"
   },
   "peer_skills": [
@@ -195,7 +195,7 @@
       ]
     },
     {
-      "id": "consumer-aware-tool-output",
+      "id": "model-interaction-tool-read",
       "kind": "behavior",
       "request": "一个查询工具同时提供 model 和 machine 两种视图：model 只含本次阻塞判断、直接依据与续查游标，machine 是包含完整身份、空值和审计字段的稳定 JSON。当前只需要判断是否继续下一步，请选择输出面并说明原则，不执行修改。",
       "expected_skills": [],
@@ -206,7 +206,44 @@
       "expected_change_governance_references": [],
       "expected_behavior_tags": [
         "read_only",
-        "consumer_aware_tool_output"
+        "model_interaction_surface"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "model-interaction-generated-report-read",
+      "kind": "behavior",
+      "request": "程序维护一份 8 MiB 的完整诊断 report.json，同时由同一 owner 提供按失败项查询的有界投影。当前只需要判断三个失败项是否阻断下一步，请选择读取入口并说明哪些正常元数据和完整历史不应进入模型上下文；只分析，不修改。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "model_interaction_surface"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "model-interaction-source-edit-boundary",
+      "kind": "behavior",
+      "request": "阶段 Markdown 按稳定 ID 保存模型和用户维护的验收语义；index.json 与 WORK_STATUS.md 都由程序从它生成。现在要修订 AC-017，请只说明应修改哪个正式来源、哪些生成文件不能直接编辑，以及修改后如何验证；当前不实施。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "document_authority",
+        "model_interaction_surface"
       ],
       "forbidden_behavior_tags": [
         "modify_authorized_scope"

@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "reopened: OBS-004 直接证据已校正，刷新当前来源快照并重验上位合同",
+  "owner": "codex",
+  "result_ref": "results/T001-CONTRACTS-KERNEL.r6.json",
+  "revision": 6,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T001-CONTRACTS-KERNEL"
+}

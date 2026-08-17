@@ -1,0 +1,43 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "模型交互面上位合同"
+      ],
+      "id": "T001-CONTRACTS-KERNEL",
+      "type": "hard"
+    }
+  ],
+  "id": "T003-EVENT-LOG-VIEWS",
+  "mutation_scope": [
+    "skills/codex-event-logger/**",
+    "development/codex-event-logger/**"
+  ],
+  "outcome": "Event Logger 保持原始日志和完整 JSON 机器合同，同时默认只向模型返回恢复或历史选择所需的最小充分内容",
+  "outputs": [
+    "默认 model 与显式 machine 的同源读取器",
+    "给 T004 使用的恢复质量和 Token 证据"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-003",
+    "GAP-004",
+    "DES-007",
+    "REQ-003",
+    "AC-002",
+    "AC-005",
+    "AC-006",
+    "AC-008",
+    "UDES-002",
+    "UDES-003",
+    "UDES-004"
+  ],
+  "suggested_skills": [],
+  "title": "为事件日志建立模型恢复与机器读取面",
+  "verification": [
+    "原机器 JSON 测试显式 machine 后保持通过",
+    "新增 list/read/异常/低预算模型视图与代表性恢复 fixture"
+  ]
+}

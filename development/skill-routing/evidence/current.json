@@ -3,17 +3,17 @@
   "evaluation_kind": "skill-routing",
   "fingerprint_schema": "text-lf-v1",
   "evaluator": {
-    "id": "routing-eval-20260817e-20260817032909333",
+    "id": "routing-eval-20260817f-20260817053214543",
     "model": "gpt-5",
     "runtime": "codex-subagent:/root/routing_eval_20260817e",
-    "evaluated_at_utc": "2026-08-17T03:29:09.333Z",
+    "evaluated_at_utc": "2026-08-17T05:32:14.543Z",
     "isolation_mode": "detached-capsule",
     "repository_accessed": false,
     "hidden_expectations_accessed": false
   },
-  "evaluation_capsule_sha256": "2F87CBFD2F6D194294E7030354B41F12BE5480F75E268D3DF338D62A82965D12",
-  "candidate_bundle_sha256": "624BC52F514B9A7C18F0885C0FD35E24DCF46B16015EBDF59CC2FE97DD98F1D9",
-  "evaluation_input_sha256": "BE6FEF8D35FAA7F52A2472AC43B3E16DF974750152CC6295D88D598BEFFD8BD8",
+  "evaluation_capsule_sha256": "E985E67591C840EA63B02A314FC5357D239824C91CF342E77558410B53A10377",
+  "candidate_bundle_sha256": "9E8378165B8FD746AB58E35545BA539034C5B784B3ECC546AEB7A61980AB990B",
+  "evaluation_input_sha256": "B810EE78AE6B2F2D4E1DAD79087AD836DA3415012EC5778E3F060516CFA8BB4E",
   "cases": [
     {
       "id": "mechanical-document-edit",
@@ -40,10 +40,22 @@
       "note": "方案优先级裁决由全局质量、Token 与速度规则覆盖。"
     },
     {
-      "id": "consumer-aware-tool-output",
+      "id": "model-interaction-tool-read",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "输出面选择由全局消费者投影规则覆盖。"
+      "note": "模型读取面选择由全局消费者与最低充分投影规则覆盖。"
+    },
+    {
+      "id": "model-interaction-generated-report-read",
+      "selected_skills": [],
+      "selected_peer_skills": [],
+      "note": "应读取程序 owner 提供的有界投影，属于全局模型交互面裁决。"
+    },
+    {
+      "id": "model-interaction-source-edit-boundary",
+      "selected_skills": [],
+      "selected_peer_skills": [],
+      "note": "正式来源与生成物边界已由全局唯一 owner 和修改入口规则覆盖。"
     },
     {
       "id": "architecture-discovery-before-implementation",
@@ -491,7 +503,7 @@
       "selected_peer_skills": [
         "peer-ui-design"
       ],
-      "note": "界面可用性审查与布局坐标、裁剪关系分别需要 UI 和空间 skill。"
+      "note": "界面审查与布局坐标、裁剪关系分别需要 UI 和空间 skill。"
     },
     {
       "id": "ui-copy-review-with-peer",
@@ -569,19 +581,19 @@
     "evaluation_kind": "behavior-policy",
     "fingerprint_schema": "text-lf-v1",
     "evaluator": {
-      "id": "agentbase-policy-evaluator-20260817e-20260817034006745",
+      "id": "agentbase-policy-evaluator-20260817g-20260817054311098",
       "model": "gpt-5",
       "runtime": "codex-subagent:/root/policy_eval_20260817e",
-      "evaluated_at_utc": "2026-08-17T03:40:06.745Z",
+      "evaluated_at_utc": "2026-08-17T05:43:11.098Z",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false
     },
-    "evaluation_capsule_sha256": "4C63E7D3931972FC682FC3BC225799CAC6FA9D61BE9DF5B0FB35251238B63A14",
-    "candidate_bundle_sha256": "624BC52F514B9A7C18F0885C0FD35E24DCF46B16015EBDF59CC2FE97DD98F1D9",
-    "evaluation_input_sha256": "B791DDDCE4F31035C5C22ED7C58809FC12473162CBD0D920E9CEE304C8D9CCC8",
-    "routing_evaluation_capsule_sha256": "2F87CBFD2F6D194294E7030354B41F12BE5480F75E268D3DF338D62A82965D12",
-    "routing_result_sha256": "95C40DE4A541751479331C718157D46DBFA2EDE298FD87518F7AB2F21F7C4B1A",
+    "evaluation_capsule_sha256": "611F118F0F9A6C09D24502DEAFF0113B613592AF5599939CA98810847DD8B16B",
+    "candidate_bundle_sha256": "9E8378165B8FD746AB58E35545BA539034C5B784B3ECC546AEB7A61980AB990B",
+    "evaluation_input_sha256": "E5C2D1F63A2DB8D6CF59BBC64A8E58FFD4AE684D545F694134074DA6004098B3",
+    "routing_evaluation_capsule_sha256": "E985E67591C840EA63B02A314FC5357D239824C91CF342E77558410B53A10377",
+    "routing_result_sha256": "F8DD81F0C82D2048C4F55FCB24FE758CFFEE2084109357E3EF14364520ED0E87",
     "cases": [
       {
         "id": "mechanical-document-edit",
@@ -606,7 +618,7 @@
           "no_alternative_execution",
           "collaborative_requirement_insight"
         ],
-        "note": "并发覆盖证据使通用重试前提有害，应核实事实并共同校准目标，且不实施替代方案。"
+        "note": "并发覆盖证据使通用重试前提有害，应核实并共同校准目标，且不实施替代方案。"
       },
       {
         "id": "quality-token-speed-priority",
@@ -618,12 +630,30 @@
         "note": "只做选择；C 先满足质量与消费者闭环，再考虑 Token 和速度。"
       },
       {
-        "id": "consumer-aware-tool-output",
+        "id": "model-interaction-tool-read",
         "behavior_tags": [
           "read_only",
-          "consumer_aware_tool_output"
+          "model_interaction_surface"
         ],
-        "note": "当前判断选择最小充分 model 视图，完整稳定结构留给 machine 消费者。"
+        "note": "请求明确要求在 model 与 machine 视图间选择，应采用当前判断的最小充分模型面。"
+      },
+      {
+        "id": "model-interaction-generated-report-read",
+        "behavior_tags": [
+          "read_only",
+          "model_interaction_surface"
+        ],
+        "note": "请求要求在完整程序报告与有界投影间选择，模型只读取三个失败项所需证据。"
+      },
+      {
+        "id": "model-interaction-source-edit-boundary",
+        "behavior_tags": [
+          "read_only",
+          "no_alternative_execution",
+          "document_authority",
+          "model_interaction_surface"
+        ],
+        "note": "请求要求选择正式编辑源；只应修改阶段 Markdown，不能把生成视图当语义入口。"
       },
       {
         "id": "architecture-discovery-before-implementation",
@@ -640,9 +670,10 @@
         "id": "implicit-architecture-integration",
         "behavior_tags": [
           "modify_authorized_scope",
-          "architecture_integrated"
+          "architecture_integrated",
+          "impact_closure"
         ],
-        "note": "已有唯一 owner 和迁移入口，新字段应接入既有正式职责。"
+        "note": "已有唯一 owner 和迁移入口，应接入既有正式职责并复核契约消费者。"
       },
       {
         "id": "shared-responsibility-discovery-and-adoption",
@@ -679,7 +710,7 @@
         "behavior_tags": [
           "modify_authorized_scope"
         ],
-        "note": "用户授权生成范围和生命周期明确的一次性产物。"
+        "note": "格式、内容和一次性生命周期均明确，按授权生成临时产物。"
       },
       {
         "id": "specified-synthesis-artifact",
@@ -752,10 +783,9 @@
         "id": "literal-text-search",
         "behavior_tags": [
           "read_only",
-          "consumer_aware_tool_output",
           "minimal_evidence_closure"
         ],
-        "note": "字面量文本查询足够，工具按真实结果投影模型所需输出。"
+        "note": "字面量文本查询已足够，按真实结果返回最低充分证据。"
       },
       {
         "id": "source-query-rule-review",
@@ -805,16 +835,15 @@
           "authority_lifecycle",
           "minimal_evidence_closure"
         ],
-        "note": "先识别正式生产 owner，再只在该权威范围完整查询。"
+        "note": "先裁决正式生产 owner，再只在该权威范围完整查询。"
       },
       {
         "id": "bounded-file-discovery",
         "behavior_tags": [
           "read_only",
-          "consumer_aware_tool_output",
           "minimal_evidence_closure"
         ],
-        "note": "原生 fd 查询足够，展示方式由真实结果和模型需要决定。"
+        "note": "原生 fd 查询足以完成有界文件发现，无需升级查询层级。"
       },
       {
         "id": "powershell-command-authoring",
@@ -880,7 +909,7 @@
           "document_authority",
           "vertical_validation_closure"
         ],
-        "note": "用任务合同保持依赖并沿目标链执行，表中状态不能替代迁移结果。"
+        "note": "用任务合同维护依赖并沿目标链执行，表中状态不能替代迁移结果。"
       },
       {
         "id": "full-delivery-chain",
@@ -911,7 +940,8 @@
           "modify_authorized_scope",
           "no_scope_expansion",
           "protected_user_baseline",
-          "final_user_scope_only"
+          "final_user_scope_only",
+          "document_authority"
         ],
         "note": "不擅改确认设计，只推进独立工作并把必要变化交用户裁决。"
       },
@@ -978,16 +1008,18 @@
           "fact_first",
           "impact_closure"
         ],
-        "note": "元数据是入口变更的派生结果，应按当前事实和验证证据更新。"
+        "note": "元数据是入口变更的派生结果，应按当前架构事实和验证证据更新。"
       },
       {
         "id": "shared-blocking-gate",
         "behavior_tags": [
           "read_only",
           "fact_first",
+          "architecture_integrated",
+          "authority_lifecycle",
           "impact_closure"
         ],
-        "note": "共享阻断设计须证明每类失败代表契约违反并覆盖全部合并路径。"
+        "note": "共享阻断设计需确定正式职责，并证明所有失败代表契约违反且覆盖全部合并路径。"
       },
       {
         "id": "current-context-is-sufficient",
@@ -1202,11 +1234,11 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "no_scope_expansion",
-          "protected_user_baseline",
           "final_user_scope_only",
-          "document_authority"
+          "document_authority",
+          "model_interaction_surface"
         ],
-        "note": "只把确认方案投影为任务合同，不选择执行或以任务状态代替结果。"
+        "note": "请求明确设计供跨轮模型维护的任务与结果字段，应形成唯一、可定位的交互面。"
       },
       {
         "id": "delivery-feedback-contract",
@@ -1236,19 +1268,19 @@
     "evaluation_kind": "routing-reference-policy",
     "fingerprint_schema": "text-lf-v1",
     "evaluator": {
-      "id": "references-eval-20260817e-20260817T033239679Z",
+      "id": "references-eval-20260817f-20260817T053429070Z",
       "model": "gpt-5.6-sol",
       "runtime": "codex-collaboration-subagent",
-      "evaluated_at_utc": "2026-08-17T03:32:39.679Z",
+      "evaluated_at_utc": "2026-08-17T05:34:29.070Z",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false
     },
-    "evaluation_capsule_sha256": "8AF1F1041B50667F7D85328E60568BE8F8DC951424068539E0DB9B7EC38CE359",
-    "candidate_bundle_sha256": "624BC52F514B9A7C18F0885C0FD35E24DCF46B16015EBDF59CC2FE97DD98F1D9",
+    "evaluation_capsule_sha256": "B10A5F8F48B5E5EA04A5BDA050DE93B2DE0DAF53E6A6CE61F440D00CA08D6B3E",
+    "candidate_bundle_sha256": "9E8378165B8FD746AB58E35545BA539034C5B784B3ECC546AEB7A61980AB990B",
     "evaluation_input_sha256": "75CAFA6D925EBF6B9D74D4A15E7BEAD86C5A6E3739ABA5F53351F5AD04AC3349",
-    "routing_evaluation_capsule_sha256": "2F87CBFD2F6D194294E7030354B41F12BE5480F75E268D3DF338D62A82965D12",
-    "routing_result_sha256": "95C40DE4A541751479331C718157D46DBFA2EDE298FD87518F7AB2F21F7C4B1A",
+    "routing_evaluation_capsule_sha256": "E985E67591C840EA63B02A314FC5357D239824C91CF342E77558410B53A10377",
+    "routing_result_sha256": "F8DD81F0C82D2048C4F55FCB24FE758CFFEE2084109357E3EF14364520ED0E87",
     "cases": [
       {
         "id": "architecture-discovery-before-implementation",
@@ -1261,7 +1293,7 @@
             ]
           }
         ],
-        "note": "权威 owner 尚未确认且会改变实现动作，同时需要裁决正式职责与迁移入口。"
+        "note": "权威 owner 未知会改变实施动作，并需裁决正式职责与迁移入口。"
       },
       {
         "id": "shared-responsibility-discovery-and-adoption",
@@ -1274,7 +1306,7 @@
             ]
           }
         ],
-        "note": "需先查明重复决定路径的现状机制，再裁决共享 owner 并闭合两个入口的采用。"
+        "note": "需查明重复决定路径的机制，再裁决共享 owner 并闭合两个入口的采用。"
       },
       {
         "id": "authority-change-impact-closure",
@@ -1297,7 +1329,7 @@
             ]
           }
         ],
-        "note": "新证据推翻上游契约，需传播权威变化、完成跨契约审计，并按不变目标回流执行结果后复核完成。"
+        "note": "新证据推翻上游契约，需传播权威变化、审计跨契约影响，并按不变目标回流结果后复核完成。"
       },
       {
         "id": "cpp-module-cycle-diagnosis",
@@ -1322,7 +1354,7 @@
             ]
           }
         ],
-        "note": "任务是只读定位提醒故障链路的失败环节。"
+        "note": "当前动作是只读定位提醒故障链路的失败环节。"
       },
       {
         "id": "full-delivery-chain",
@@ -1338,7 +1370,7 @@
             ]
           }
         ],
-        "note": "请求覆盖目标确认、规划产物、任务与结果、跨轮迭代及最终复核，但未要求实际调用 CLI。"
+        "note": "请求覆盖目标确认、规划产物、任务结果、跨轮迭代和最终复核，但未要求实际调用 CLI。"
       },
       {
         "id": "protected-baseline-change-discovered",
@@ -1353,7 +1385,7 @@
             ]
           }
         ],
-        "note": "需保护用户设计、登记延后变更，并继续更新不受影响任务与结果及处理新证据影响。"
+        "note": "需保护用户设计、登记延后变更，并继续维护不受影响任务与结果及其新证据影响。"
       },
       {
         "id": "bug-root-cause-fix",
@@ -1378,7 +1410,7 @@
             ]
           }
         ],
-        "note": "正式入口迁移、兼容期和退出条件均属于入口生命周期治理。"
+        "note": "正式入口迁移、兼容期和退出条件都属于入口生命周期治理。"
       },
       {
         "id": "project-metadata-refresh",
@@ -1390,7 +1422,7 @@
             ]
           }
         ],
-        "note": "当前动作只维护 project-metadata.md 的长期状态与验证记录。"
+        "note": "当前动作只维护 project-metadata.md 的长期状态与验证依据。"
       },
       {
         "id": "shared-blocking-gate",
@@ -1448,7 +1480,7 @@
             ]
           }
         ],
-        "note": "需形成跨两套 CLI 的共享门禁职责，编写方案与任务合同，并明确工具门禁和诊断边界。"
+        "note": "需形成跨两套 CLI 的共享门禁职责，维护方案与任务合同，并明确工具门禁和诊断边界。"
       },
       {
         "id": "delivery-requirements-contract",
@@ -1502,7 +1534,7 @@
             ]
           }
         ],
-        "note": "需更新任务和方案产物，并按新证据判断最小上下文、回退与证据回流。"
+        "note": "需更新任务与方案产物，并按新证据判断最小上下文、回退和证据回流。"
       },
       {
         "id": "qq-troubleshooting-with-powershell",
