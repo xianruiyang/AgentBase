@@ -4,11 +4,11 @@
 
 ## 当前版本与发布状态
 
-- 当前 Codex 已安装版本仍是 Git 实现 `6fe7838` 对应的 `DirectCompatibility` 发布；已发布 source bundle SHA-256 为 `DACC5897574921931B84A8EA6A11E0791D4F2407AC3B72A58DD513F41FE3220A`，回滚资产为 `C:\Users\gzxt\.codex\backups\AgentBase-20260817-013438-fe195f4a`。
-- 仓库最新核心实现提交为 `dfc47b8`，对应“模型交互面与资产职责”开发候选；正式部署候选 `Validate` 通过，source bundle SHA-256 为 `E855645C83C820E3063425B55DCD410ACD3F52B3751C41E00D15BB964913C772`，routing evidence SHA-256 为 `AD83859A201F198AC8DF7923EDA60ED0389CB85434DDD0CE879371897249A021`。该候选没有发布到 Codex。
-- 再次发布到 `C:\Users\gzxt\.codex` 必须由用户针对该次 `Publish` 明确同意；开发、验证、Git 提交、远端同步和此前发布授权都不能替代。
+- 当前 Codex 已安装“模型交互面与资产职责”版本，对应核心实现提交 `dfc47b8` 和 `DirectCompatibility` 发布；包含可移植设置的受管理 source bundle SHA-256 为 `220CCE676647CE00EEF64445DDEA9A94CF5A53CE0073D2BB20185C8AC0BDD451`，routing evidence SHA-256 为 `AD83859A201F198AC8DF7923EDA60ED0389CB85434DDD0CE879371897249A021`，回滚资产为 `C:\Users\gzxt\.codex\backups\AgentBase-20260817-142154-933bdcd3`。
+- 发布后正式 `Status` 读回：安装 bundle、发布清单、当前仓库来源和路由证据全部匹配，`managed_payload_formally_published=true`，`formal_publication_gap_count=0`；`srcq` 0.3.1 完整性与 doctor 均通过。仓库交付收束提交为 `25d7e79`。
+- 本次发布授权已经消费；任何后续再次发布到 `C:\Users\gzxt\.codex` 仍必须由用户针对新的 `Publish` 明确同意，开发、验证、Git 提交、远端同步和本次授权都不能替代。
 
-## 最近完成的开发候选
+## 最近完成并发布的版本
 
 最近完成的是 [模型交互面与资产职责](work/20260817_model_interaction_surface_contract/completion-audit.md)：
 
@@ -23,7 +23,7 @@
 
 - 本轮交付链有 4 个任务、15 个最终目标、3 个约束和 0 个 DCR；四项结构化结果覆盖根合同、文档/任务资产 owner、Event Logger 恢复面和最终验证交付，跨合同完成读回为 0 诊断。
 - 真实 owner 与交互面、机器兼容、模型恢复充分性、Token 对照和生成物边界记录在[交互审计](work/20260817_model_interaction_surface_contract/interaction-audit.md)；跨目标、约束、任务结果和部署身份记录在[完成审计](work/20260817_model_interaction_surface_contract/completion-audit.md)。运行日志只是本轮直接证据，不是项目真源。
-- 发布 `Validate` 只证明仓库候选可部署且合同通过；当前 Codex 运行不会追溯加载仓库新规则，只有用户单独同意并完成实际 `Publish` 后，才可在新任务或重启会话中验证安装行为。
+- 本次 `Publish` 只证明文件已安装、发布清单与合同匹配；当前 Codex 运行不会追溯加载新规则，行为变化需要在新任务或重启会话中验证。
 
 ## 未决问题与后继候选
 
@@ -31,10 +31,10 @@
 
 跨任务 `source_snapshot` 仍存在重复，但本轮没有改变它的事实表示、引用池、时效语义或恢复合同。既有测量不足以证明替代表达保持模型质量，继续作为独立候选处理。
 
-插件迁移仍是独立事项；当前安装和本候选验证继续使用 `DirectCompatibility`，本轮没有修改插件分发模式。
+插件迁移仍是独立事项；当前安装继续使用 `DirectCompatibility`，本轮没有修改插件分发模式。
 
 ## 当前边界
 
-- 本轮没有向 Codex 执行 `Publish`；任何再次发布仍需用户针对当次操作明确同意。
+- 本版本已在用户针对本次操作明确同意后发布；任何后续再次发布仍需新的当次明确同意。
 - 本轮没有混入 `source_snapshot` 压缩或插件迁移。
 - Git 提交与远端同步继续按项目现有授权维护；不得用历史重写、强制推送或反向读取安装副本改变仓库真源。
