@@ -1,0 +1,114 @@
+{
+  "changed_files": [
+    "development/skill-routing/evidence/current.json",
+    "development/skill-routing/trigger-cases.json",
+    "development/skill-routing/validate_contract.ps1",
+    "docs/plan.md",
+    "docs/handoff.md",
+    "docs/work/20260817_model_interaction_surface_contract/interaction-audit.md",
+    "docs/work/20260817_model_interaction_surface_contract/completion-audit.md"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "UDES-001",
+    "UDES-002",
+    "UDES-003",
+    "UDES-004",
+    "CON-001",
+    "CON-002",
+    "CON-003"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "audit",
+      "note": "owner、读取/修改面、机器兼容、真实 Token 与生成物边界",
+      "ref": "docs/work/20260817_model_interaction_surface_contract/interaction-audit.md"
+    },
+    {
+      "kind": "routing-evidence",
+      "note": "Routing 76、Policy 76、References 19 独立评估与输入声明",
+      "ref": "development/skill-routing/evidence/current.json"
+    },
+    {
+      "kind": "implementation-identity",
+      "note": "模型交互面核心实现提交",
+      "ref": "git:dfc47b8"
+    },
+    {
+      "kind": "deployment-validate",
+      "note": "DirectCompatibility 候选 Validate 通过，未执行 Publish",
+      "ref": "source-bundle:E855645C83C820E3063425B55DCD410ACD3F52B3751C41E00D15BB964913C772"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "模型交互面版本已通过组件回归、真实模型读取与修改审计、独立路由评估、静态合同和正式部署候选 Validate，项目计划与接手状态准确保留未发布及排除项边界",
+  "outputs": [
+    "15 个最终目标和 3 个约束均有当前结构化证据",
+    "Routing、Policy、References 与静态合同覆盖扩展后的规则和消费者",
+    "仓库候选具有可追溯实现与部署身份，但没有向实际 Codex 根目录发布"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:1b48fae25e996841ccdbe6bd94353fb00b415d99d56e3facb3296fd63d48a3e8",
+    "AC-002": "sha256:dfe9691201d736f6176906780e2f04f16ba4d232caafa35ee90dbd6029ba8a87",
+    "AC-003": "sha256:d5f4bf0da1fc7992168a06c2d76bce2fd190fda7543d702ff12458c03004968b",
+    "AC-004": "sha256:877ad371f653c7a898d144188226c1567058b2c42baf3e2b5c2d1b30b80af73c",
+    "AC-005": "sha256:8abbee0986fe13d0a6811c6481105bb7c01e00aa4a5b486cbe54543cd8735af5",
+    "AC-006": "sha256:e9f3a43363ed0d94da0ed7f04292ba449bf5474d3f9a7f9191feefb94c95c1cd",
+    "AC-007": "sha256:e0cc7e018d12c758854d86bbd38a776638be769b70b554d780c10e2b85b57a6f",
+    "AC-008": "sha256:e4a6645fd4e823cdf4750bc9eab8dad9be05f71dcd2449840684b3da00c4e673",
+    "CON-001": "sha256:a61da07f1c5249d5c5f3f416e7827385dbfa7bef18bdb8b4f4ab13936d0c15ff",
+    "CON-002": "sha256:a9b8e0f7f631399c63c737cc340b488cd4db47da0626b9c1f6ed540b5d63371d",
+    "CON-003": "sha256:0ad8163d7b83a8062a1140c467076cf37318da50b1bf303831afe9196b5bdab6",
+    "DES-001": "sha256:2909e6ed9453e318e8e720d86e042d093ac5cbab454589c3d4cfd0c4b713e5d1",
+    "DES-002": "sha256:36c88a465dd6657febde21d2f94df79094a634e09653e7fca8fccda811f7ae41",
+    "DES-003": "sha256:3d616349389b7242ae5a2d68398c7614e2bc3f31505087ee60dfffa5fc6b9260",
+    "DES-004": "sha256:d2f6074ff8f2d159df3060cb8ae517dc258be484647a8cddea8f9c7389616452",
+    "DES-005": "sha256:914aeb92c4cdb053d40e0fa6569a0cc7e9de03165a57693a9c7bd46ba3c19a36",
+    "DES-006": "sha256:8052cf4e9e4b332c56994407230563834d1cd7b3a9a7176903ff3b8c3c1ba0af",
+    "DES-007": "sha256:085534951740db4f56c269f98a654430565044fa2786967cbd726224938c5117",
+    "DES-008": "sha256:81448d731738a42c51a43fd1a1a077898a320222a0447e3fb88a0fcaab58b80d",
+    "GAP-001": "sha256:7c5d190527b054844da5fca4a51fb4290b64cbdc655f9721d40a439a5dbe4055",
+    "GAP-002": "sha256:2de4a61f909c68824c386b66cab25b734abc0232c62023e4177821d3e050942c",
+    "GAP-003": "sha256:33111a392d476ef26d906f88659655406ae9066fc51423ad91fa8d6d31082996",
+    "GAP-004": "sha256:ead27ea3f892145fdc5cf7af0b4fe1d64fee4b1f11904674ee2df5d4f727b1c9",
+    "GAP-005": "sha256:0563067315319d8dc5f624ffc5b05786fc4d01bf3253d4e330e9806d0da80758",
+    "OBS-001": "sha256:b73546de7f4d61cce0891c74d2d38590c378e5ead646ebf6325745a2f8670b96",
+    "OBS-002": "sha256:b874c53fa35aaee8c7e16c2cebcec2595cea6ed0401ffc8a0358bf24d1512750",
+    "OBS-003": "sha256:c1918a9fcf435f403cf5205fe229314f1e7095c856cbb0ac1738ecd95e8248b7",
+    "OBS-004": "sha256:fcb69ffa9d5381be0d82a403b54c621bbbfda63921d96d8a134eba071e5458ec",
+    "OBS-005": "sha256:2541f778548b59b3f39d0f7c1320b5ed39cbdff528466f57248d961a30ec352a",
+    "OBS-006": "sha256:01035eea6e0b0971ee5d00aa0d9633cdda89fecd0fa6798b8353c245f082655a",
+    "REQ-001": "sha256:82bb8c3751f6289189fd97efa9e61dc8e3343a3d0ae930fef7a093f16a4e7417",
+    "REQ-002": "sha256:684492b55b9ec3e1f20ad9c9fa6f16f42072b8ee8c3e4c5a3900fa961975f653",
+    "REQ-003": "sha256:c39dbd5acf5bd99dd003634d4c903d646b8ee4293ac676a8af81b45d9aaee8fb",
+    "SOL-001": "sha256:dc8674099bc0efbbc2f115019f33323b6802f1b9c834819f6c92b50b1e4e1b71",
+    "SOL-002": "sha256:05984c776f7fa355f638809e2521ae7e67591725fa1e9fd06e86bb8c43a46dcc",
+    "SOL-003": "sha256:9ab83a5b49deb2403eb785fa5b35210fa6f7ae41b02a62a0fac669048ba01db0",
+    "SOL-004": "sha256:4161ec3a7c28a42899b40114bff66acaf3a88f9ebacdf2cf9421f7f781a078af",
+    "UDES-001": "sha256:dbad7932c9b027aaefd1fdc76e060bf9e6e2127e50d674e0063100e25f8049c5",
+    "UDES-002": "sha256:c342d4d7833aacf98862125581c34c84ea24d51bd575e45554a0b0f509762c4f",
+    "UDES-003": "sha256:f341adfade75bc184e1956c62004528cb0c56a3c0be55685b2b82e544c0a9293",
+    "UDES-004": "sha256:769c9b8ec92a7abb6fbb41d587f54b9e327385a7d202a14bca9ef877f9dcbf46"
+  },
+  "task_id": "T004-VERIFY-DELIVER",
+  "task_revision": 2,
+  "unresolved": [],
+  "verification": [
+    "Task Table Manager 70 项、Delivery Workflow 35 项、Event Logger 10 项回归通过；Event Logger 1 项目录链接用例按既有主机能力条件跳过",
+    "静态 76-case 合同、Routing 76、Policy 76、References 19 均通过；仅保留一个非严格额外 skill 选择警告",
+    "真实当前 turn 的默认 model 为 489 tokens、显式 machine 为 8736 tokens，模型恢复内容仍充分",
+    "正式 DirectCompatibility 部署候选 Validate 通过，source bundle 为 E855645C83C820E3063425B55DCD410ACD3F52B3751C41E00D15BB964913C772",
+    "未执行 Codex Publish，未改变 source_snapshot 表示或插件分发模式"
+  ]
+}

@@ -32,6 +32,7 @@ AgentBase 持续把根需求落实为可跨项目复用的 Codex 协作维护能
 | Task completion-context 证据去重 | [方案](work/20260816_task_completion_context_dedup/solution.md)、[完成审计](work/20260816_task_completion_context_dedup/completion-audit.md) | 已闭环；页级目录只返回一次完整任务证据，目标以 ID 保持关系，预算与分页闭包不变 | `task-table-manager` | 承接交付链最终复核与任务结果；路由证据和部署 payload 消费变更后的 skill | 目标关联、证据字段、预算闭包或分页退化，出现真实旧格式消费者，或进一步重复已对完整决策链造成可证实成本 |
 | Task 结果诊断与证据时效语义 | [方案](work/20260816_task_result_diagnostic_semantics/solution.md)、[完成审计](work/20260816_task_result_diagnostic_semantics/completion-audit.md) | 已闭环；查询诊断、结果诊断、任务 revision 陈旧和来源快照问题分层表达，后继当前证据不改写历史结果 | `task-table-manager` | 承接完成复核输出、状态与生成视图；`delivery-workflow` 状态视图、路由证据和部署 payload 消费新合同 | 分层计数与唯一候选目录不一致，旧歧义字段复现，后继结果自动抑制旧诊断，或新证据没有明确覆盖目标与当前来源 |
 | 模型可见工具输出双视图 | [方案](work/20260817_model_visible_tool_output_contract/solution.md)、[输出审计](work/20260817_model_visible_tool_output_contract/output-audit.md)、[消费者复核](work/20260817_model_visible_tool_output_contract/consumer-impact.md)、[完成审计](work/20260817_model_visible_tool_output_contract/completion-audit.md) | 已闭环；taskctl/workctl 默认模型视图只投影当前动作所需证据，显式 machine 视图保留稳定完整合同，两者由同一 canonical 计算与 owner 维护 | `global/AGENTS.md`、`task-table-manager`、`delivery-workflow` | `srcq` 提供既有模型输出成本估算实践；任务与交付消费者、路由验证和部署 payload 消费新合同；其余模型可见入口保持各自 owner，未被误标为已迁移 | 模型视图遗漏完成当前动作的必要证据、重新暴露机器信封或完整快照、machine 合同退化、预算恢复不可定位，真实 tokenizer/阅读质量比较不再成立，或其他 owner 出现可证实的同类高成本输出 |
+| 模型交互面与资产职责 | [方案](work/20260817_model_interaction_surface_contract/solution.md)、[交互审计](work/20260817_model_interaction_surface_contract/interaction-audit.md)、[完成审计](work/20260817_model_interaction_surface_contract/completion-audit.md) | 已闭环；模型读取、模型修改、机器表示和派生物先按事实 owner、消费者、当前责任与生命周期裁决，Event Logger 已接入同源 model/machine 恢复视图 | `global/AGENTS.md`、`delivery-workflow`、`task-table-manager`、`codex-event-logger` | 承接工具双视图并把上位合同扩展到模型阅读或修改的文件；路由、独立评估和部署候选验证消费新合同 | 模型读取面遗漏必要证据、模型修改需同步多个同责位置、生成物反向成为真源、Event Logger 恢复或 machine 兼容退化，或新 owner 出现有直接证据的同类缺口 |
 | Source Query Gateway | [分支计划](../development/source-query-gateway/plan.md) | P0—P10 已闭环；当前身份达到质量与 Token 采纳门槛，未证明速度改善 | `tools/srcq`、`source-query`、`vscode-lsp-mcp` | 替代代码搜索早期方案，消费 LSP Companion 的公开查询能力，并由 `source-query` skill 与部署 payload 使用 | 新查询失败、后端/协议变化、新消费者或可重复共享缺口 |
 | VS Code LSP MCP Companion | [组件方案](../mcp/vscode-lsp-mcp/PLAN.md)、[当前组件入口](../mcp/vscode-lsp-mcp/README.md) | 已形成组件与受验证 Windows release；PLAN 保留架构基线，不作为开放任务表 | `mcp/vscode-lsp-mcp` | Source Query Gateway 消费其查询协议；公开工具或协议变化需回到该分支复核 | 安全边界、Provider 协议、公开工具或发布生命周期改变 |
 | 代码搜索早期改进 | [历史记录](../development/code-search-workflow-improvement-plan.md) | 已由 Source Query Gateway 替代，只保留迁移前证据 | 无当前运行 owner | 迁移证据由 Source Query Gateway 保留；没有当前执行消费者 | 仅作证据追溯，不重新启用旧 skill/sgy 入口 |
@@ -54,7 +55,13 @@ Source Query Gateway P10 的真实代理实践表明：局部输出更短、默�
 
 工具输出的首要合同不是“统一序列化”，而是“当前消费者下一步必须知道什么”。模型视图应先按动作投影最小充分证据，再在候选表示之间用真实 tokenizer 和可读性比较；machine 视图则保留完整、稳定、可解析的协议。两种视图必须由同一 canonical 计算和正式 owner 生成，避免为降 Token 引入第二套事实源；预算不足时裁剪完整低优先级单元并返回可定位恢复信息，不截断语义字段。具体投影、真实工作区样本、Token 对照和边界保留在[输出审计](work/20260817_model_visible_tool_output_contract/output-audit.md)，不把单次比例提升为全项目固定阈值。
 
-## 7. 重开与维护
+## 7. 2026-08-17 模型交互面实践结论
+
+更深层的问题不是 JSON、YAML 或 HJSON 的选择，而是把存储对象和传统工程输出误当成与消费者无关的中性载体。进入模型上下文或交给模型修改之前，应先确定事实 owner、实际消费者、当前判断或修改责任和内容生命周期：模型读取面只提供最小充分证据，模型修改面强调稳定局部边界、唯一决定位置和直接验证，机器面保持稳定完整；模型或人维护的语义真源可派生机器产物，程序维护的机器真源则通过有界投影、查询或受验证语义入口服务模型。格式只在完成这次职责投影之后用真实 Token、可读性和可定位性比较。
+
+本轮把该上位合同接入 Delivery Workflow 的阶段 Markdown、Task Table Manager 的结构化任务资产和 Codex Event Logger 的机器日志恢复面。Event Logger 的真实 turn 证明，同一次有界事实读取可在保留恢复充分性和显式 machine 合同的同时显著减少模型上下文；具体 Token、文件操作归并和环境边界只由[交互审计](work/20260817_model_interaction_surface_contract/interaction-audit.md)维护，不提升为统一阈值或通用格式要求。`source_snapshot` 表示与插件迁移仍是独立事项，没有被该原则顺带改变。
+
+## 8. 重开与维护
 
 - 新需求或新证据先定位到现有子计划和 owner；能由现有入口承接时不新增计划。
 - 跨计划共享职责、根需求或正式入口变化时，更新本文件的方向、索引和影响结论；专项细节只写回对应子计划。
