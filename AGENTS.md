@@ -24,6 +24,8 @@ must: `.codex/`、`codexRuntimeLogFile/`、`node_modules/`、`dist/`、`target/`
 
 must: 自动化测试、测试 fixture、benchmark 语料、runner、原始结果和审计产物是仓库内开发资产，不得进入 Codex 发布 payload；公共 payload 合同必须同时约束插件和直接兼容发布，并从受管理安装范围移除旧版遗留测试。具有真实运行时消费者的 doctor 或自检命令按运行职责裁决，不得把项目测试伪装成运行时能力发布
 
+must: 新增、退役或移交由正式 Codex 部署入口管理的路径或配置键时，在 `development/codex-deployment/managed_asset_lifecycle.json` 中维护稳定身份和显式生命周期转换；不得把当前来源不再枚举直接解释为安装目标应删除，也不得在对应旧版本直接升级边界仍受支持时删除历史身份
+
 must: 可移植 Codex 设置、hooks 模板和自定义子代理不得包含认证、凭据、项目绝对路径、信任哈希、历史、缓存或宿主自动生成状态；机器相关 MCP 和插件安装只记录正式安装入口与前置条件，不伪装成可直接复制的配置
 
 must: 修改全局规则或 skill 的触发语义时，同步维护 `development/skill-routing/validate_contract.ps1` 和适用的 `trigger-cases.json`；不得为保留旧字符串检查而在正式规则中制造重复表述

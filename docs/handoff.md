@@ -4,7 +4,7 @@
 
 ## 当前版本与发布状态
 
-- 仓库当前候选为提交 `6fb3062`：部署 owner 已从仅记录退役路径的合同升级为路径与配置键共用的完整受管资产生命周期。该候选尚未 Publish 到真实 Codex；本轮没有取得或消费新的发布授权。
+- 统一生命周期实现基线为提交 `6fb3062`；本文件所在仓库版本又在项目根 `AGENTS.md` 增加跨组件维护路由，要求任何受管路径或配置键的新增、退役和移交进入同一生命周期 owner，不得把当前来源缺席直接当成删除语义。该候选尚未 Publish 到真实 Codex；本轮没有取得或消费新的发布授权。
 - 当前真实 Codex 仍是 2026-08-17 15:47 的 schema 6 `DirectCompatibility + 可移植设置` 安装，payload 内容仍对应核心实现提交 `dfc47b8` 和旧部署生命周期提交 `b7352b8`。三个旧查询 skill 已从安装目录退出，回滚资产仍为 `C:\Users\gzxt\.codex\backups\AgentBase-20260817-154709-8e23bcc2`；`source-query` 与独立 `srcq` 0.3.1 运行时未被本轮改变。
 - 新合同的规范化 SHA-256 为 `C6A154180B84965299C1A5B85613E625928F9F3D1B921FD1C1767027FF9F66D2`，共 43 个稳定资产身份：38 个 `present`、3 个 `retired`、2 个 `transferred`。修正配置合同逐行指纹后，真实安装与当前来源都读为 `3561488DB15F06DD6DF9D6D8BB9F689F292A01C4063D88575757E7D217BCEBB0`，`installed_matches_source=true`；旧 schema 6 清单没有新算法和生命周期收据，因此 `managed_payload_formally_published=false`，三个正式缺口是清单来源指纹过期、安装指纹相对旧清单过期和生命周期收据过期。退役路径、退役配置键和配置冲突计数均为 0，故这表示候选尚未发布，不表示当前 payload 内容损坏。
 - routing evidence 仍为 `AD83859A201F198AC8DF7923EDA60ED0389CB85434DDD0CE879371897249A021`。任何后续向 `C:\Users\gzxt\.codex` 执行真实 `Publish` 都必须由用户针对该次操作重新明确同意；开发、验证、Git 提交、远端同步和以前的发布授权都不能替代。
