@@ -18,7 +18,7 @@ description: 用低 Token 管理长期任务合同、依赖图、状态、结果
 
 - 完整读取 [task-contracts.md](references/task-contracts.md) 创建或修改任务；执行、恢复和并行领取时读取 [execution.md](references/execution.md)；使用 CLI 时读取 [tooling.md](references/tooling.md)。
 - 工具入口是 `<SkillDir>/scripts/taskctl.py`。只在它能降低编辑、查询或恢复成本时使用，并显式传绝对 `--task-dir`；CLI 不可用时仍按同一文档合同继续。默认 `--view model` 只返回当前命令所需的稀疏证据，程序、测试或确需完整身份与字段时显式使用 `--view machine`；两种视图来自同一次任务事实计算。
-- `task-table.json` 登记目录；`tasks/<ID>.json` 持有任务合同，`state/<ID>.json` 持有执行状态，`results/<ID>.r<state-revision>.json` 持有可追溯的结果摘要，状态文件只指向当前结果。
+- `task-table.json` 登记目录；`tasks/<ID>.json` 持有任务合同，`state/<ID>.json` 持有执行状态，`results/<ID>.r<state-revision>.json` 持有可追溯的结果摘要，`snapshots/<sha256>.json` 持有内容寻址的不可变执行来源映射，状态文件只指向当前结果。
 - `TASK_TABLE.md` 是生成视图，`.work-cache/index.json` 是上游索引；两者都不是任务或语义真源。
 - 任务合同、状态和结果是程序消费且由模型作出语义决定的结构化真源；CLI 可用时，模型通过 `draft/add/update` 和带 revision 的状态命令维护，不直接改永久 JSON 绕过路径、原子写入或并发比较。模型查询默认使用按当前动作投影的视图，完整结构只供显式机器消费者；生成表格和索引不得作为修改入口。
 
@@ -26,9 +26,9 @@ description: 用低 Token 管理长期任务合同、依赖图、状态、结果
 
 1. 模型根据上游 `SOL/GAP/DES/AC/REQ` 和真实工作范围编写任务合同；公共产出与消费者接入拆分时必须声明真实消费依赖，需要模板时可用 `taskctl draft`，CLI 不自动把文档变成任务。
 2. 需要结构化存储时用 `add` 或 `update`。创建新任务不需要 revision；更新已有任务必须先读当前合同并传 `--expected-task-revision`。写入只对 ID/路径、破坏性覆盖、工作区锁和 CAS revision 冲突设置门禁；owner、依赖环、状态流转、上游未决和验证缺失只作为诊断。
-3. 用 `next`、`deps`、`dependents` 和 `context` 以有界模型视图选择工作。先考虑用户优先级、硬依赖、关键风险、共享前置、冲突和当前能力；条件相当时，优先继续当前目标链并缩短到最近可验证闭环的距离，避免打开更多未闭合的平级分支。任务深度只作线索，CLI 排序只是建议。`context` 的模型视图保留任务执行和结果提交实际需要的传递上游指纹，但省略机器 envelope 与正常空值；执行结果沿用该快照。`hard` 依赖未完成时可用 `--include-blocked` 查看并继续分析或准备工作。
+3. 用 `next`、`deps`、`dependents` 和 `context` 以有界模型视图选择工作。先考虑用户优先级、硬依赖、关键风险、共享前置、冲突和当前能力；条件相当时，优先继续当前目标链并缩短到最近可验证闭环的距离，避免打开更多未闭合的平级分支。任务深度只作线索，CLI 排序只是建议。开始实际执行时用 `context --capture`；模型视图保留必要上游正文和 `{ref,count,complete}` 收据，完整指纹映射由工具按最终 Token 预算投影后写入机器快照。`hard` 依赖未完成时可用 `--include-blocked` 查看并继续分析或准备工作。
 4. 需要跨轮跟踪时用 `claim/start/note/complete/reopen/release`，每次先读取当前 state revision 并传 `--expected-state-revision`；不再执行的任务可标记 `retired`。命令记录模型已作出的判断，不决定该判断是否被允许。
-5. `complete` 保存实际结果、验证、未决问题、证据指向和工作实际依据的上游来源快照；完成时当前版本只用于比较，不替代实际输入。后继任务重新执行或验证旧结果覆盖的行为时，以自己的当前来源快照、明确 `evidence_for` 和直接验证提交新证据，不改写或隐藏旧结果诊断；依赖关系本身不表示重新验证。
+5. `complete --source-snapshot-ref <REF>` 保存实际结果、验证、未决问题和证据指向，并由工具把捕获收据附加为工作实际依据；模型结果输入不复制指纹。完成时当前版本只用于比较，不替代实际输入。旧内联快照结果继续可读，旧式完成输入由同一入口外部化为引用；后继验证提交自己的收据、明确 `evidence_for` 和直接证据，不改写或隐藏旧结果诊断。
 6. 上游改变时用 `$delivery-workflow` 的 `impact`、本工具的递归 `impact` 和实际系统依赖逐项判断消费者与结果，按结论更新、重开或退休任务并重新验证；CLI 只返回路径和陈旧诊断，不自动重置状态或宣布结果失效。
 7. 需要最终复核且范围较大时可用 `completion-context` 的模型视图从当前 Markdown 取得每个 `REQ/AC/UDES`、`CON` 和全部 `DCR`，再汇总关联结果；模型视图保留目标正文、候选结果摘要、诊断、证据引用和分页恢复，但不复制候选结果的完整 `source_snapshot`。查询诊断与当前页候选结果诊断分层计数，完整机器结果仍可由 `--view machine` 取得。DCR 原始状态只供模型复核，不由 CLI 筛选完成阻断项。CLI 不返回整体通过值；分页必须沿用同一 snapshot ID，任务或文档改变时从第一页重审。
 

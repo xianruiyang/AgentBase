@@ -16,7 +16,7 @@ import tempfile
 from collections import Counter, deque
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -38,6 +38,7 @@ TASK_ID_RE = re.compile(r"^T[A-Za-z0-9][A-Za-z0-9._-]*$")
 SOURCE_ID_RE = re.compile(
     r"^(?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-[A-Za-z0-9][A-Za-z0-9._-]*$"
 )
+SOURCE_SNAPSHOT_REF_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 STATUSES = ("todo", "claimed", "in_progress", "review", "blocked", "done", "retired")
 ACTIVE_STATUSES = {"claimed", "in_progress", "review", "blocked"}
 DEPENDENCY_TYPES = ("hard", "ordering", "informational")
@@ -470,11 +471,50 @@ def task_model_variants(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
             yield copy.deepcopy(candidate)
 
 
-def fit_task_model(payload: dict[str, Any], budget: int) -> str:
+def context_model_receipt_candidate(
+    candidate: dict[str, Any], *, capture: bool
+) -> tuple[dict[str, Any], dict[str, str]]:
+    projected = copy.deepcopy(candidate)
+    original_snapshot = source_snapshot_map(
+        projected.pop("source_snapshot", {}), "context.source_snapshot"
+    )
+    originally_complete = bool(projected.pop("source_snapshot_complete", False))
+    visible_ids = {
+        row.get("id")
+        for row in projected.get("upstream", [])
+        if isinstance(row, dict) and isinstance(row.get("id"), str)
+    }
+    visible_snapshot = {
+        source_id: fingerprint
+        for source_id, fingerprint in original_snapshot.items()
+        if source_id in visible_ids
+    }
+    complete = originally_complete and len(visible_snapshot) == len(original_snapshot)
+    receipt: dict[str, Any] = {
+        "count": len(visible_snapshot),
+        "complete": complete,
+    }
+    if capture:
+        receipt["ref"] = source_snapshot_record(visible_snapshot)["ref"]
+    else:
+        receipt["capture"] = "context --capture"
+    projected["source_snapshot"] = receipt
+    return projected, visible_snapshot
+
+
+def fit_task_model_with_snapshot(
+    payload: dict[str, Any], budget: int, *, capture: bool = False
+) -> tuple[str, dict[str, str] | None]:
     for candidate in task_model_variants(payload):
-        text = render_model(candidate)
+        snapshot = None
+        rendered_candidate = candidate
+        if payload.get("command") == "context":
+            rendered_candidate, snapshot = context_model_receipt_candidate(
+                candidate, capture=capture
+            )
+        text = render_model(rendered_candidate)
         if model_text_cost(text) <= budget:
-            return text
+            return text, snapshot if capture else None
     core: dict[str, Any] = {}
     for key in ("id", "task_id", "snapshot_id", "error", "gate"):
         if payload.get(key) not in (None, "", [], {}):
@@ -499,7 +539,7 @@ def fit_task_model(payload: dict[str, Any], budget: int) -> str:
     }
     text = render_model(sparse_model_value(core))
     if model_text_cost(text) <= budget:
-        return text
+        return text, None
     minimal = {
         "id": payload.get("id") or payload.get("task_id"),
         "more": {"reason": "model_token_budget", "view": "machine"},
@@ -507,7 +547,11 @@ def fit_task_model(payload: dict[str, Any], budget: int) -> str:
     text = render_model(sparse_model_value(minimal))
     if model_text_cost(text) > budget:
         raise TaskctlError("--model-token-budget is too small for a recoverable response")
-    return text
+    return text, None
+
+
+def fit_task_model(payload: dict[str, Any], budget: int) -> str:
+    return fit_task_model_with_snapshot(payload, budget)[0]
 
 
 def emit(
@@ -516,6 +560,7 @@ def emit(
     pretty: bool = False,
     view: str = "model",
     model_token_budget: int = DEFAULT_MODEL_TOKEN_BUDGET,
+    capture_snapshot: Callable[[dict[str, str]], str] | None = None,
     stream: Any = sys.stdout,
 ) -> None:
     if view == "machine":
@@ -524,7 +569,22 @@ def emit(
         else:
             text = compact_json(value)
     else:
-        text = fit_task_model(value, model_token_budget)
+        text, snapshot = fit_task_model_with_snapshot(
+            value,
+            model_token_budget,
+            capture=capture_snapshot is not None,
+        )
+        if snapshot is not None and capture_snapshot is not None:
+            expected_ref = source_snapshot_record(snapshot)["ref"]
+            actual_ref = capture_snapshot(snapshot)
+            if actual_ref != expected_ref:
+                raise TaskctlError(
+                    "captured source snapshot identity changed during model rendering",
+                    gate_id="TASK-SNAPSHOT-CONFLICT",
+                    risk="the model receipt would identify different evidence from the stored snapshot",
+                    recovery="rerun context --capture from a stable task workspace",
+                    retryable=True,
+                )
     stream.write(text + "\n")
 
 
@@ -665,6 +725,7 @@ def load_table(root: Path) -> dict[str, Any]:
         ("task_dir", "tasks"),
         ("state_dir", "state"),
         ("result_dir", "results"),
+        ("snapshot_dir", "snapshots"),
         ("table_view", "TASK_TABLE.md"),
     ):
         value = table.get(field, default)
@@ -684,15 +745,22 @@ def load_table(root: Path) -> dict[str, Any]:
         resolved_paths["task_dir"],
         resolved_paths["state_dir"],
         resolved_paths["result_dir"],
+        resolved_paths["snapshot_dir"],
     ]
     if any(path == root for path in storage_paths):
-        raise TaskctlError("task, state, and result storage must not use the workspace root")
+        raise TaskctlError(
+            "task, state, result, and snapshot storage must not use the workspace root"
+        )
     if len(set(storage_paths)) != len(storage_paths):
-        raise TaskctlError("task, state, and result storage must use distinct directories")
+        raise TaskctlError(
+            "task, state, result, and snapshot storage must use distinct directories"
+        )
     for index, left in enumerate(storage_paths):
         for right in storage_paths[index + 1 :]:
             if left in right.parents or right in left.parents:
-                raise TaskctlError("task, state, and result storage directories must not overlap")
+                raise TaskctlError(
+                    "task, state, result, and snapshot storage directories must not overlap"
+                )
     reserved_files = {(root / "task-table.json").resolve(), (root / "workflow.json").resolve()}
     workflow = load_workflow(root)
     if workflow is not None:
@@ -734,6 +802,93 @@ def table_paths(root: Path, table: dict[str, Any]) -> tuple[Path, Path, Path]:
         resolve_inside(root, str(table.get("state_dir", "state"))),
         resolve_inside(root, str(table.get("result_dir", "results"))),
     )
+
+
+def snapshot_directory(root: Path, table: dict[str, Any]) -> Path:
+    return resolve_inside(root, str(table.get("snapshot_dir", "snapshots")))
+
+
+def normalize_source_snapshot_ref(value: Any, field: str) -> str:
+    reference = require_identity_string(value, field)
+    if not SOURCE_SNAPSHOT_REF_RE.fullmatch(reference):
+        raise TaskctlError(
+            f"{field} must be a sha256 source snapshot reference",
+            gate_id="TASK-INPUT-UNREADABLE",
+            risk="the command cannot locate the exact immutable source snapshot",
+            recovery="use the exact source snapshot reference returned by context --capture",
+        )
+    return reference
+
+
+def source_snapshot_record(sources: dict[str, str]) -> dict[str, Any]:
+    normalized = source_snapshot_map(sources, "source_snapshot.sources")
+    body = {"schema": "task.source-snapshot", "sources": normalized}
+    reference = "sha256:" + hashlib.sha256(compact_json(body).encode("utf-8")).hexdigest()
+    return {**body, "ref": reference}
+
+
+def source_snapshot_path(root: Path, table: dict[str, Any], reference: str) -> Path:
+    normalized = normalize_source_snapshot_ref(reference, "source_snapshot_ref")
+    digest = normalized.removeprefix("sha256:")
+    return snapshot_directory(root, table) / f"{digest}.json"
+
+
+def store_source_snapshot(
+    root: Path, table: dict[str, Any], sources: dict[str, str]
+) -> str:
+    record = source_snapshot_record(sources)
+    reference = record["ref"]
+    path = source_snapshot_path(root, table, reference)
+    if path.exists():
+        existing = read_json(path)
+        if existing != record:
+            raise TaskctlError(
+                f"conflicting source snapshot asset: {path}",
+                gate_id="TASK-OVERWRITE",
+                risk="the same content identity would resolve to different snapshot evidence",
+                recovery="inspect the existing snapshot asset before retrying",
+            )
+    else:
+        atomic_write_json(path, record)
+    return reference
+
+
+def read_source_snapshot(
+    root: Path, table: dict[str, Any], reference: str, task_id: str
+) -> tuple[dict[str, str], list[dict[str, Any]]]:
+    path = source_snapshot_path(root, table, reference)
+    if not path.is_file():
+        return {}, [
+            {
+                "kind": "result_source_snapshot_asset_missing",
+                "task_id": task_id,
+                "source_snapshot_ref": reference,
+            }
+        ]
+    try:
+        raw = read_json(path)
+        if not isinstance(raw, dict) or raw.get("schema") != "task.source-snapshot":
+            raise TaskctlError("source snapshot asset has an unsupported schema")
+        sources = source_snapshot_map(raw.get("sources"), "source_snapshot.sources")
+        expected = source_snapshot_record(sources)
+        if raw.get("ref") != reference or expected != raw:
+            return {}, [
+                {
+                    "kind": "result_source_snapshot_asset_identity_mismatch",
+                    "task_id": task_id,
+                    "source_snapshot_ref": reference,
+                }
+            ]
+        return sources, []
+    except (OSError, TaskctlError) as exc:
+        return {}, [
+            {
+                "kind": "result_source_snapshot_asset_invalid",
+                "task_id": task_id,
+                "source_snapshot_ref": reference,
+                "message": str(exc),
+            }
+        ]
 
 
 def require_identity_string(value: Any, field: str) -> str:
@@ -1026,6 +1181,21 @@ def validate_result_for_task(
     metadata = raw.get("metadata", {})
     if not isinstance(metadata, dict):
         raise TaskctlError("result.metadata must be an object")
+    inline_snapshot = source_snapshot_map(
+        raw.get("source_snapshot"), "result.source_snapshot"
+    )
+    snapshot_ref = None
+    if raw.get("source_snapshot_ref") not in (None, ""):
+        snapshot_ref = normalize_source_snapshot_ref(
+            raw.get("source_snapshot_ref"), "result.source_snapshot_ref"
+        )
+    if inline_snapshot and snapshot_ref is not None:
+        raise TaskctlError(
+            "result must not contain both source_snapshot and source_snapshot_ref",
+            gate_id="TASK-SNAPSHOT-CONFLICT",
+            risk="the completion would create two competing sources for execution provenance",
+            recovery="use the captured reference or the legacy inline map, not both",
+        )
     result = {
         "schema": "task.result",
         "task_id": task["id"],
@@ -1038,13 +1208,38 @@ def validate_result_for_task(
         "invalidated_source_ids": invalidated_ids,
         "evidence_for": string_list(raw.get("evidence_for"), "result.evidence_for"),
         "evidence_refs": evidence_ref_list(raw.get("evidence_refs"), "result.evidence_refs"),
-        "source_snapshot": source_snapshot_map(
-            raw.get("source_snapshot"), "result.source_snapshot"
-        ),
     }
+    if inline_snapshot:
+        result["source_snapshot"] = inline_snapshot
+    if snapshot_ref is not None:
+        result["source_snapshot_ref"] = snapshot_ref
     if metadata:
         result["metadata"] = metadata
     return result
+
+
+def hydrate_result_source_snapshot(
+    root: Path, table: dict[str, Any], result: dict[str, Any]
+) -> dict[str, Any]:
+    hydrated = copy.deepcopy(result)
+    reference = hydrated.get("source_snapshot_ref")
+    if reference:
+        sources, diagnostics = read_source_snapshot(
+            root, table, reference, hydrated["task_id"]
+        )
+        hydrated["source_snapshot"] = sources
+        hydrated["_source_snapshot_diagnostics"] = diagnostics
+    return hydrated
+
+
+def public_result(result: dict[str, Any] | None) -> dict[str, Any] | None:
+    if result is None:
+        return None
+    return {
+        key: copy.deepcopy(value)
+        for key, value in result.items()
+        if not key.startswith("_")
+    }
 
 
 def load_state(root: Path, table: dict[str, Any], task_id: str) -> dict[str, Any]:
@@ -1381,7 +1576,7 @@ def current_result(
         read_json(path), task, require_current_revision=False
     )
     result["current_for_task_revision"] = result["task_revision"] == task["revision"]
-    return result
+    return hydrate_result_source_snapshot(root, table, result)
 
 
 def safe_current_result(
@@ -1454,7 +1649,9 @@ def result_diagnostics(
 ) -> list[dict[str, Any]]:
     if result is None:
         return []
-    diagnostics: list[dict[str, Any]] = []
+    diagnostics: list[dict[str, Any]] = list(
+        result.get("_source_snapshot_diagnostics", [])
+    )
     diagnostics.extend(
         semantic_text_diagnostics(
             result["outcome"], "result.outcome", task_id=task["id"]
@@ -1542,7 +1739,11 @@ def result_diagnostics(
         )
     source_basis = sorted(set([*task["source_ids"], *result.get("evidence_for", [])]))
     recorded_snapshot = result.get("source_snapshot", {})
-    if source_basis and not recorded_snapshot:
+    if (
+        source_basis
+        and not recorded_snapshot
+        and not result.get("source_snapshot_ref")
+    ):
         diagnostics.append(
             {
                 "kind": "result_source_snapshot_missing",
@@ -1587,6 +1788,9 @@ RESULT_SOURCE_SNAPSHOT_DIAGNOSTIC_KINDS = {
     "result_source_snapshot_missing",
     "result_source_snapshot_incomplete",
     "result_source_snapshot_stale",
+    "result_source_snapshot_asset_missing",
+    "result_source_snapshot_asset_invalid",
+    "result_source_snapshot_asset_identity_mismatch",
 }
 
 
@@ -1858,7 +2062,7 @@ def command_init_locked(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     ]
     conflicts.extend(
         directory
-        for directory in ("tasks", "state", "results")
+        for directory in ("tasks", "state", "results", "snapshots")
         if (root / directory).is_dir() and any((root / directory).iterdir())
     )
     if conflicts:
@@ -1868,7 +2072,7 @@ def command_init_locked(args: argparse.Namespace, root: Path) -> dict[str, Any]:
             risk="initialization would overwrite existing task data",
             recovery="choose an empty directory or preserve and inspect the existing workspace",
         )
-    for directory in ("tasks", "state", "results"):
+    for directory in ("tasks", "state", "results", "snapshots"):
         (root / directory).mkdir(parents=True, exist_ok=True)
     table = {
         "schema": "task.table",
@@ -1877,6 +2081,7 @@ def command_init_locked(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         "task_dir": "tasks",
         "state_dir": "state",
         "result_dir": "results",
+        "snapshot_dir": "snapshots",
         "source_index": ".work-cache/index.json",
         "table_view": "TASK_TABLE.md",
     }
@@ -2091,6 +2296,7 @@ def fit_payload(payload: dict[str, Any], budget: int) -> dict[str, Any]:
         "command": payload.get("command"),
         "id": payload.get("id") or payload.get("task_id"),
         "snapshot_id": payload.get("snapshot_id"),
+        "source_snapshot_ref": payload.get("source_snapshot_ref"),
         "pagination": payload.get("pagination"),
         "truncated": True,
         "hint": "increase --budget or use show/deps/context with a narrower target",
@@ -2162,7 +2368,7 @@ def command_show(args: argparse.Namespace) -> dict[str, Any]:
         "id": args.id,
         "task": tasks[args.id],
         "state": state,
-        "result": result,
+        "result": public_result(result),
         "diagnostics": [
             *storage_diagnostics,
             *state_diagnostics(args.id, state),
@@ -2554,8 +2760,15 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
                 "type": dependency["type"],
                 "status": dependency_state["status"],
                 "consumes": dependency["consumes"],
-                "result": dependency_result,
-                "diagnostics": dependency_result_diagnostics,
+                "result": public_result(dependency_result),
+                "diagnostics": [
+                    *dependency_result_diagnostics,
+                    *(
+                        dependency_result.get("_source_snapshot_diagnostics", [])
+                        if dependency_result
+                        else []
+                    ),
+                ],
             }
         )
     reverse = reverse_graph(tasks)
@@ -2602,6 +2815,11 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
         "truncation": truncation,
         "truncated": any(truncation.values()),
     }
+    if args.capture and args.view == "machine":
+        with workspace_lock(root):
+            payload["source_snapshot_ref"] = store_source_snapshot(
+                root, load_table(root), source_snapshot
+            )
     return fit_payload(payload, args.budget) if args.view == "machine" else payload
 
 
@@ -2794,6 +3012,9 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
             ),
             "evidence_for": result.get("evidence_for", []) if result else [],
             "evidence_refs": result.get("evidence_refs", []) if result else [],
+            "source_snapshot_ref": (
+                result.get("source_snapshot_ref") if result else None
+            ),
             "source_snapshot": result.get("source_snapshot", {}) if result else {},
             "result_diagnostics": result_diagnostics(result, task, index),
         }
@@ -3314,6 +3535,38 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
             )
         task = tasks[args.id]
         result = validate_result(raw_result, task)
+        inline_snapshot = result.pop("source_snapshot", None)
+        result_file_snapshot_ref = result.get("source_snapshot_ref")
+        argument_snapshot_ref = None
+        if args.source_snapshot_ref is not None:
+            argument_snapshot_ref = normalize_source_snapshot_ref(
+                args.source_snapshot_ref, "--source-snapshot-ref"
+            )
+        if inline_snapshot is not None and argument_snapshot_ref is not None:
+            raise TaskctlError(
+                "legacy inline source_snapshot cannot be combined with --source-snapshot-ref",
+                gate_id="TASK-SNAPSHOT-CONFLICT",
+                risk="the completion would mix two competing execution snapshots",
+                recovery="use the captured reference or the legacy inline map, not both",
+            )
+        if (
+            result_file_snapshot_ref is not None
+            and argument_snapshot_ref is not None
+            and result_file_snapshot_ref != argument_snapshot_ref
+        ):
+            raise TaskctlError(
+                "result source_snapshot_ref differs from --source-snapshot-ref",
+                gate_id="TASK-SNAPSHOT-CONFLICT",
+                risk="the completion would mix two competing execution snapshots",
+                recovery="pass the same captured reference through one completion input",
+            )
+        legacy_snapshot_externalized = inline_snapshot is not None
+        if inline_snapshot is not None:
+            result["source_snapshot_ref"] = store_source_snapshot(
+                root, table, inline_snapshot
+            )
+        elif argument_snapshot_ref is not None:
+            result["source_snapshot_ref"] = argument_snapshot_ref
         state = states[args.id]
         check_expected_state(state, args.expected_state_revision)
         index, index_diagnostics = maybe_load_index(root, table)
@@ -3322,6 +3575,13 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
             *index_diagnostics,
             *owner_diagnostics(state, args.owner),
         ]
+        if legacy_snapshot_externalized:
+            diagnostics.append(
+                {
+                    "kind": "legacy_inline_source_snapshot_externalized",
+                    "source_snapshot_ref": result["source_snapshot_ref"],
+                }
+            )
         if state["status"] == "done":
             diagnostics.append({"kind": "task_already_done"})
         if state["status"] not in {"in_progress", "review"}:
@@ -3362,7 +3622,8 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
         state = next_state
         states = {**states, args.id: state}
         diagnostics.extend(task_diagnostics(task, tasks, states, index))
-        diagnostics.extend(result_diagnostics(result, task, index))
+        diagnostic_result = hydrate_result_source_snapshot(root, table, result)
+        diagnostics.extend(result_diagnostics(diagnostic_result, task, index))
         if not result["verification"]:
             diagnostics.append({"kind": "result_verification_empty"})
         if result["unresolved"]:
@@ -3704,6 +3965,7 @@ def build_parser() -> argparse.ArgumentParser:
     context_parser.add_argument("--id", required=True)
     context_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET)
     context_parser.add_argument("--max-items", type=int, default=DEFAULT_LIMIT)
+    context_parser.add_argument("--capture", action="store_true")
     context_parser.set_defaults(
         handler=command_context, model_token_budget=6_144
     )
@@ -3758,6 +4020,7 @@ def build_parser() -> argparse.ArgumentParser:
     complete_parser.add_argument("--id", required=True)
     complete_parser.add_argument("--owner", required=True)
     complete_parser.add_argument("--result-file", required=True)
+    complete_parser.add_argument("--source-snapshot-ref")
     complete_parser.add_argument("--diagnostic-limit", type=int, default=20)
     add_state_revision(complete_parser)
     complete_parser.set_defaults(handler=command_complete)
@@ -3859,11 +4122,24 @@ def main() -> int:
     try:
         validate_args(args)
         result = args.handler(args)
+        capture_snapshot = None
+        if (
+            args.command == "context"
+            and args.view == "model"
+            and getattr(args, "capture", False)
+        ):
+            root = resolve_root(args.task_dir)
+
+            def capture_snapshot(sources: dict[str, str]) -> str:
+                with workspace_lock(root):
+                    return store_source_snapshot(root, load_table(root), sources)
+
         emit(
             result,
             pretty=args.pretty,
             view=args.view,
             model_token_budget=args.model_token_budget,
+            capture_snapshot=capture_snapshot,
         )
         return 0
     except TaskctlError as exc:

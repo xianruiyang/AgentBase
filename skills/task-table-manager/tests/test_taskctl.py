@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import importlib.util
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -269,8 +270,16 @@ class TaskctlTests(unittest.TestCase):
             ],
         }
 
+    def read_snapshot(self, reference: str) -> dict:
+        digest = reference.removeprefix("sha256:")
+        return json.loads(
+            (self.root / "snapshots" / f"{digest}.json").read_text(encoding="utf-8")
+        )
+
     def complete_t001(self) -> dict:
-        context = self.run_task("context", "--id", "T001", "--budget", "12000")
+        context = self.run_task(
+            "context", "--id", "T001", "--budget", "12000", "--capture"
+        )
         claimed = self.run_task("claim", "--id", "T001", "--owner", "agent-a")
         started = self.run_task(
             "start",
@@ -282,7 +291,6 @@ class TaskctlTests(unittest.TestCase):
             str(claimed["state"]["revision"]),
         )
         result = self.result_payload()
-        result["source_snapshot"] = context["source_snapshot"]
         result_file = Path(self.temp.name) / "T001-result.json"
         result_file.write_text(
             json.dumps(result, ensure_ascii=False, indent=2),
@@ -296,6 +304,8 @@ class TaskctlTests(unittest.TestCase):
             "agent-a",
             "--result-file",
             str(result_file),
+            "--source-snapshot-ref",
+            context["source_snapshot_ref"],
             "--expected-state-revision",
             str(started["state"]["revision"]),
         )
@@ -333,9 +343,28 @@ class TaskctlTests(unittest.TestCase):
         self.assertIn("task:", model.stdout)
         self.assertIn("实现导出职责", model.stdout)
         self.assertIn("source_snapshot:", model.stdout)
-        self.assertIn("source_snapshot_complete:true", model.stdout)
+        self.assertIn("complete:true", model.stdout)
+        self.assertIn("capture:context --capture", model.stdout)
+        self.assertNotIn("sha256:", model.stdout)
         module = load_taskctl_module()
         self.assertLessEqual(module.model_text_cost(model.stdout.rstrip()), 2048)
+
+        captured = self.run_default_cli(
+            TASKCTL,
+            "context",
+            "--id",
+            "T001",
+            "--task-dir",
+            str(self.root),
+            "--capture",
+            "--model-token-budget",
+            "2048",
+        )
+        self.assertEqual(captured.returncode, 0, captured.stderr)
+        match = re.search(r'ref:"(sha256:[0-9a-f]{64})"', captured.stdout)
+        self.assertIsNotNone(match, captured.stdout)
+        snapshot = self.read_snapshot(match.group(1))
+        self.assertEqual(len(snapshot["sources"]), 7)
 
         constrained = self.run_default_cli(
             TASKCTL,
@@ -358,6 +387,69 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertLessEqual(
             module.model_text_cost(constrained.stdout.rstrip()), 256
+        )
+
+    def test_captured_snapshot_matches_final_budgeted_model_upstream(self) -> None:
+        captured = None
+        for budget in (1536, 1280, 1024, 768, 512):
+            candidate = self.run_default_cli(
+                TASKCTL,
+                "context",
+                "--id",
+                "T001",
+                "--task-dir",
+                str(self.root),
+                "--capture",
+                "--model-token-budget",
+                str(budget),
+            )
+            self.assertEqual(candidate.returncode, 0, candidate.stderr)
+            if "complete:false" in candidate.stdout and 'ref:"sha256:' in candidate.stdout:
+                captured = candidate
+                break
+        self.assertIsNotNone(captured, "no budget produced a recoverable partial context")
+        match = re.search(r'ref:"(sha256:[0-9a-f]{64})"', captured.stdout)
+        self.assertIsNotNone(match, captured.stdout)
+        snapshot = self.read_snapshot(match.group(1))
+        visible_ids = set(
+            re.findall(
+                r'- \{id:((?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-[A-Za-z0-9._-]+)',
+                captured.stdout,
+            )
+        )
+        self.assertEqual(set(snapshot["sources"]), visible_ids)
+        self.assertGreater(len(visible_ids), 0)
+        self.assertLess(len(visible_ids), 7)
+        self.assertIn("upstream_ids", captured.stdout)
+
+    def test_capture_deduplicates_identical_source_maps(self) -> None:
+        first = self.run_task(
+            "context", "--id", "T001", "--budget", "12000", "--capture"
+        )
+        second = self.run_task(
+            "context", "--id", "T001", "--budget", "12000", "--capture"
+        )
+        self.assertEqual(first["source_snapshot_ref"], second["source_snapshot_ref"])
+        self.assertEqual(len(list((self.root / "snapshots").glob("*.json"))), 1)
+
+    def test_capture_upgrades_legacy_workspace_without_snapshot_manifest(self) -> None:
+        table_path = self.root / "task-table.json"
+        table = json.loads(table_path.read_text(encoding="utf-8"))
+        table.pop("snapshot_dir")
+        table_path.write_text(
+            json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        (self.root / "snapshots").rmdir()
+
+        captured = self.run_task(
+            "context", "--id", "T001", "--budget", "12000", "--capture"
+        )
+
+        self.assertRegex(captured["source_snapshot_ref"], r"^sha256:[0-9a-f]{64}$")
+        self.assertTrue((self.root / "snapshots").is_dir())
+        self.assertEqual(
+            self.read_snapshot(captured["source_snapshot_ref"])["sources"],
+            captured["source_snapshot"],
         )
 
     def test_completion_model_omits_full_source_snapshot(self) -> None:
@@ -636,8 +728,10 @@ class TaskctlTests(unittest.TestCase):
         result = json.loads(result_path.read_text(encoding="utf-8"))
         self.assertEqual(result["evidence_for"], ["SOL-001"])
         self.assertEqual(result["evidence_refs"][0]["kind"], "test")
-        self.assertIn("SOL-001", result["source_snapshot"])
-        self.assertIn("REQ-001", result["source_snapshot"])
+        self.assertNotIn("source_snapshot", result)
+        snapshot = self.read_snapshot(result["source_snapshot_ref"])
+        self.assertIn("SOL-001", snapshot["sources"])
+        self.assertIn("REQ-001", snapshot["sources"])
 
         with (self.root / "solution.md").open("a", encoding="utf-8") as handle:
             handle.write("\n结果形成后上游文档变化。\n")
@@ -672,14 +766,15 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(status["diagnostic_count"], 1)
 
     def test_completion_preserves_execution_snapshot_and_diagnoses_missing_snapshot(self) -> None:
-        context = self.run_task("context", "--id", "T001", "--budget", "12000")
+        context = self.run_task(
+            "context", "--id", "T001", "--budget", "12000", "--capture"
+        )
         self.assertTrue(context["source_snapshot_complete"])
         captured = context["source_snapshot"]
         with (self.root / "solution.md").open("a", encoding="utf-8") as handle:
             handle.write("\n执行读取后方案发生变化。\n")
 
         result = self.result_payload()
-        result["source_snapshot"] = captured
         result_file = Path(self.temp.name) / "captured-result.json"
         result_file.write_text(
             json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -692,11 +787,15 @@ class TaskctlTests(unittest.TestCase):
             "agent-a",
             "--result-file",
             str(result_file),
+            "--source-snapshot-ref",
+            context["source_snapshot_ref"],
         )
         kinds = {item["kind"] for item in completed["diagnostics"]}
         self.assertIn("result_source_snapshot_stale", kinds)
         stored = json.loads((self.root / completed["result_ref"]).read_text(encoding="utf-8"))
-        self.assertEqual(stored["source_snapshot"], captured)
+        self.assertNotIn("source_snapshot", stored)
+        self.assertEqual(stored["source_snapshot_ref"], context["source_snapshot_ref"])
+        self.assertEqual(self.read_snapshot(stored["source_snapshot_ref"])["sources"], captured)
 
         self.add_task(self.task("T003", "记录无快照结果", ["REQ-001"]))
         missing_file = Path(self.temp.name) / "missing-snapshot-result.json"
@@ -718,7 +817,8 @@ class TaskctlTests(unittest.TestCase):
         missing_stored = json.loads(
             (self.root / missing["result_ref"]).read_text(encoding="utf-8")
         )
-        self.assertEqual(missing_stored["source_snapshot"], {})
+        self.assertNotIn("source_snapshot", missing_stored)
+        self.assertNotIn("source_snapshot_ref", missing_stored)
 
         self.add_task(self.task("T004", "记录部分来源快照", ["REQ-001"]))
         partial_context = self.run_task("context", "--id", "T004", "--budget", "12000")
@@ -740,6 +840,7 @@ class TaskctlTests(unittest.TestCase):
             str(partial_file),
         )
         partial_kinds = {item["kind"] for item in partial["diagnostics"]}
+        self.assertIn("legacy_inline_source_snapshot_externalized", partial_kinds)
         self.assertIn("result_source_snapshot_incomplete", partial_kinds)
         status = self.run_task("status")
         self.assertEqual(status["results"]["referenced_result_count"], 3)
@@ -754,6 +855,185 @@ class TaskctlTests(unittest.TestCase):
                 "result_source_snapshot_missing": 1,
                 "result_source_snapshot_stale": 1,
             },
+        )
+
+    def test_missing_snapshot_asset_is_diagnosed_without_losing_result(self) -> None:
+        context = self.run_task(
+            "context", "--id", "T001", "--budget", "12000", "--capture"
+        )
+        reference = context["source_snapshot_ref"]
+        snapshot_path = (
+            self.root
+            / "snapshots"
+            / f"{reference.removeprefix('sha256:')}.json"
+        )
+        snapshot_path.unlink()
+        result_file = Path(self.temp.name) / "missing-asset-result.json"
+        result_file.write_text(
+            json.dumps(self.result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        completed = self.run_task(
+            "complete",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--source-snapshot-ref",
+            reference,
+        )
+        kinds = {item["kind"] for item in completed["diagnostics"]}
+        self.assertIn("result_source_snapshot_asset_missing", kinds)
+        stored = json.loads(
+            (self.root / completed["result_ref"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(stored["source_snapshot_ref"], reference)
+        shown = self.run_task("show", "--id", "T001", "--budget", "12000")
+        self.assertEqual(
+            [
+                item["kind"]
+                for item in shown["diagnostics"]
+                if item["kind"] == "result_source_snapshot_asset_missing"
+            ],
+            ["result_source_snapshot_asset_missing"],
+        )
+        status = self.run_task("status")
+        self.assertEqual(status["results"]["source_snapshot_issue_result_count"], 1)
+        self.assertEqual(
+            status["results"]["result_diagnostic_kind_counts"],
+            {"result_source_snapshot_asset_missing": 1},
+        )
+        self.assertEqual(status["diagnostic_count"], 1)
+        dependent_context = self.run_task(
+            "context", "--id", "T002", "--budget", "12000"
+        )
+        self.assertIn(
+            "result_source_snapshot_asset_missing",
+            {
+                item["kind"]
+                for item in dependent_context["dependencies"][0]["diagnostics"]
+            },
+        )
+
+    def test_modified_snapshot_asset_reports_identity_mismatch(self) -> None:
+        context = self.run_task(
+            "context", "--id", "T001", "--budget", "12000", "--capture"
+        )
+        reference = context["source_snapshot_ref"]
+        snapshot_path = (
+            self.root
+            / "snapshots"
+            / f"{reference.removeprefix('sha256:')}.json"
+        )
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        snapshot["sources"]["REQ-001"] = "sha256:" + ("0" * 64)
+        snapshot_path.write_text(
+            json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        result_file = Path(self.temp.name) / "modified-asset-result.json"
+        result_file.write_text(
+            json.dumps(self.result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        completed = self.run_task(
+            "complete",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--source-snapshot-ref",
+            reference,
+        )
+        self.assertIn(
+            "result_source_snapshot_asset_identity_mismatch",
+            {item["kind"] for item in completed["diagnostics"]},
+        )
+
+    def test_unreadable_snapshot_asset_reports_invalid(self) -> None:
+        context = self.run_task(
+            "context", "--id", "T001", "--budget", "12000", "--capture"
+        )
+        reference = context["source_snapshot_ref"]
+        snapshot_path = (
+            self.root
+            / "snapshots"
+            / f"{reference.removeprefix('sha256:')}.json"
+        )
+        snapshot_path.write_text("not-json", encoding="utf-8")
+        result_file = Path(self.temp.name) / "invalid-asset-result.json"
+        result_file.write_text(
+            json.dumps(self.result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        completed = self.run_task(
+            "complete",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--source-snapshot-ref",
+            reference,
+        )
+
+        self.assertIn(
+            "result_source_snapshot_asset_invalid",
+            {item["kind"] for item in completed["diagnostics"]},
+        )
+
+    def test_complete_rejects_competing_snapshot_inputs(self) -> None:
+        context = self.run_task(
+            "context", "--id", "T001", "--budget", "12000", "--capture"
+        )
+        result = self.result_payload()
+        result["source_snapshot"] = context["source_snapshot"]
+        result_file = Path(self.temp.name) / "conflicting-snapshot-result.json"
+        result_file.write_text(
+            json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        conflict = self.run_cli(
+            TASKCTL,
+            "complete",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--source-snapshot-ref",
+            context["source_snapshot_ref"],
+            "--expected-state-revision",
+            "1",
+            "--task-dir",
+            str(self.root),
+        )
+
+        self.assertEqual(conflict.returncode, 2)
+        payload = json.loads(conflict.stderr)
+        self.assertEqual(payload["gate"]["id"], "TASK-SNAPSHOT-CONFLICT")
+
+    def test_historical_inline_snapshot_remains_readable(self) -> None:
+        completed = self.complete_t001()
+        result_path = self.root / completed["result_ref"]
+        stored = json.loads(result_path.read_text(encoding="utf-8"))
+        snapshot = self.read_snapshot(stored.pop("source_snapshot_ref"))["sources"]
+        stored["source_snapshot"] = snapshot
+        result_path.write_text(
+            json.dumps(stored, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        shown = self.run_task("show", "--id", "T001", "--budget", "12000")
+        self.assertEqual(shown["result"]["source_snapshot"], snapshot)
+        self.assertNotIn("source_snapshot_ref", shown["result"])
+        self.assertNotIn(
+            "result_source_snapshot_missing",
+            {item["kind"] for item in shown["diagnostics"]},
         )
 
     def test_completion_context_uses_direct_result_evidence_mapping(self) -> None:
@@ -789,7 +1069,10 @@ class TaskctlTests(unittest.TestCase):
         stored_result = json.loads(
             next((self.root / "results").glob("T003.r*.json")).read_text(encoding="utf-8")
         )
-        self.assertIn("REQ-001", stored_result["source_snapshot"])
+        self.assertNotIn("source_snapshot", stored_result)
+        self.assertIn(
+            "REQ-001", self.read_snapshot(stored_result["source_snapshot_ref"])["sources"]
+        )
 
     def test_later_current_evidence_does_not_suppress_stale_predecessor(self) -> None:
         self.complete_t001()
@@ -797,10 +1080,11 @@ class TaskctlTests(unittest.TestCase):
             handle.write("\n前置结果形成后方案发生变化。\n")
         self.run_ok(WORKCTL, "index", "--work-dir", str(self.root))
 
-        context = self.run_task("context", "--id", "T002", "--budget", "12000")
+        context = self.run_task(
+            "context", "--id", "T002", "--budget", "12000", "--capture"
+        )
         later_result = self.result_payload("T002")
         later_result["evidence_for"] = ["REQ-001"]
-        later_result["source_snapshot"] = context["source_snapshot"]
         later_file = Path(self.temp.name) / "T002-current-evidence.json"
         later_file.write_text(
             json.dumps(later_result, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -813,6 +1097,8 @@ class TaskctlTests(unittest.TestCase):
             "agent-a",
             "--result-file",
             str(later_file),
+            "--source-snapshot-ref",
+            context["source_snapshot_ref"],
         )
 
         completion = self.run_task(
@@ -1979,6 +2265,8 @@ class TaskctlTests(unittest.TestCase):
             (accepted_root / "task-table.json").read_text(encoding="utf-8")
         )
         self.assertEqual(table["title"], " ")
+        self.assertEqual(table["snapshot_dir"], "snapshots")
+        self.assertTrue((accepted_root / "snapshots").is_dir())
 
     def test_init_in_existing_workflow_gates_id_but_not_semantic_title(self) -> None:
         target = Path(self.temp.name) / "recover-task-table"

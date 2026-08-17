@@ -17,23 +17,23 @@ python <SkillDir>/scripts/taskctl.py <command> --task-dir <AbsoluteTaskDir>
 ## 查询与存储
 
 ```text
-init        建立固定 tasks/state/results 目录和 task-table.json
+init        建立固定 tasks/state/results/snapshots 目录和 task-table.json
 draft       输出最小候选任务，不写文件；准备直接保存 JSON 时使用 machine 视图
 add/update  保存模型已编写的任务合同
 show/list   有界返回任务、状态、结果和局部诊断
 deps/dependents/impact  查询任务图；后继查询返回首条路径与该边消费内容
-next/context  生成选择建议及带实际传递上游指纹的有界执行上下文
+next/context  生成选择建议；context --capture 产生最终模型可见来源的持久收据
 completion-context  从当前 Markdown 分页返回 REQ/AC/UDES、CON、全部 DCR 与候选证据
 status/render  生成可重建的执行摘要和 TASK_TABLE.md
 ```
 
 查询默认使用有界 model 视图；程序解析时显式使用 machine 视图。当任务很少或 CLI 不可用时仍按正式合同继续；CLI 可用时，永久任务、状态和结果 JSON 通过带 revision 的写命令维护，不直接编辑生成视图或绕过存储职责。CLI 不是开始、推进、完成或重开任务的许可者。
 
-`status` 和 `render` 的结果摘要使用明确作用域：`referenced_result_count` 表示当前状态文件实际引用的结果数，`task_revision_stale_result_count` 只表示结果记录的任务 revision 与当前合同不一致，`source_snapshot_issue_result_count` 表示至少含一项来源快照缺失、不完整或陈旧诊断的结果数；同时返回含诊断结果数、结果诊断条目数和按 kind 计数。上述字段互不替代，也不表示目标证据充分或整体完成。
+`status` 和 `render` 的结果摘要使用明确作用域：`referenced_result_count` 表示当前状态文件实际引用的结果数，`task_revision_stale_result_count` 只表示结果记录的任务 revision 与当前合同不一致，`source_snapshot_issue_result_count` 表示至少含一项收据缺失、资产异常、覆盖不完整或逐来源陈旧诊断的结果数；同时返回含诊断结果数、结果诊断条目数和按 kind 计数。上述字段互不替代，也不表示目标证据充分或整体完成。
 
-`status` 的 model 视图只显示非零状态、异常、结果进展和实际诊断；正常空诊断、完整 protected baseline 及所有零计数只保留在 machine 视图。`context` 的 model 视图保留当前任务合同、状态、直接依赖、必要上游正文、来源快照、异常和恢复信息；来源快照是后续结果提交的直接工具输入，本版本不改变其事实表示。`completion-context` 的 model 视图保留目标、约束、DCR、候选结果摘要、诊断、证据引用、快照 ID 和精确游标，但省略候选结果中只供机器校验的完整来源指纹映射。
+`status` 的 model 视图只显示非零状态、异常、结果进展和实际诊断；正常空诊断、完整 protected baseline 及所有零计数只保留在 machine 视图。`context` 的 model 视图保留当前任务合同、状态、直接依赖、必要上游正文、异常、恢复信息和 `{ref,count,complete}` 来源收据，不输出完整指纹映射；无 `--capture` 时只提示捕获入口。快照成员从最终 Token 预算投影实际保留的上游生成，预算移除正文时同步移除成员并标记不完整。machine 视图继续返回完整映射。`completion-context` 的 model 视图保留目标、约束、DCR、候选结果摘要、诊断、证据引用、快照 ID 和精确游标，但省略完整来源映射。
 
-`task-table.json` 的 `tasks/`、`state/`、`results/`、`.work-cache/index.json` 和 `TASK_TABLE.md` 路径固定，只为防止生成物覆盖语义真源或结果记录。
+`task-table.json` 的 `tasks/`、`state/`、`results/`、`snapshots/`、`.work-cache/index.json` 和 `TASK_TABLE.md` 路径固定，只为防止生成物覆盖语义真源、结果或不可变来源证据。
 
 `render` 生成的任务表固定保留全部列；没有可显示值的单元格使用 `—` 占位，避免长文本换行时产生列错位错觉。占位符只属于生成视图，不写回任务合同、状态或结果，也不表示模型已经裁决该字段语义为“无”。模型不得直接编辑 `TASK_TABLE.md` 改变任务；修改通过任务合同或状态命令进入唯一结构化真源，再重新生成视图。
 
@@ -58,11 +58,11 @@ release     清除领取意图并回到 todo
 
 - `evidence_for`：本结果声称支持的 `REQ/AC/UDES/DES/SOL` 等上游 ID。
 - `evidence_refs`：可直接查看的测试、日志、文件、页面或其他证据引用；至少包含 `ref`，可附 `kind` 和 `note`。
-- `source_snapshot`：生成结果时所依赖上游 ID 到指纹的映射。与当前索引不一致时标记陈旧，不将结果伪装成损坏数据。
+- `source_snapshot_ref`：指向 `context --capture` 生成的内容寻址执行来源映射；模型通过 `complete` 参数传入，工具附加到永久结果。
 
-`context` 从任务 `source_ids` 沿当前语义引用读取传递祖先，并返回可直接写入结果的 `source_snapshot` 与完整性标记；它表示本次上下文实际读取的版本。若输出截断或来源无法唯一定位，模型先补齐输入或限定结果边界。
+`context` 从任务 `source_ids` 沿当前语义引用读取传递祖先。`--capture` 在最终模型预算候选确定后保存实际返回正文对应的完整映射，并返回可传给 `complete` 的引用、成员数和完整性；若输出截断或来源无法唯一定位，模型先补齐输入并重新捕获，或明确限定结果边界。
 
-`complete` 原样保存模型结果中的 `source_snapshot`，并以当前索引比较陈旧、缺失和传递覆盖不足；它不得在完成时自动生成当前指纹并伪装成任务实际输入。上述问题只返回诊断，不阻断结果记录。`completion-context` 同时使用任务合同的 `source_ids` 和结果的 `evidence_for` 建立候选映射；后者可直接把验收证据关联到 `REQ/AC/UDES`。
+`complete --source-snapshot-ref <REF>` 保存模型语义结果并附加已有收据；它解引用实际捕获映射，再以当前索引比较资产缺失、无效、身份不一致、覆盖不足和逐来源陈旧，不在完成时生成当前指纹冒充实际输入。历史内联结果继续读取；旧式内联完成输入由该入口内容寻址外部化并返回兼容诊断，新永久结果不得同时持有引用和映射。上述语义问题只返回诊断，不阻断结果记录。
 
 每个 `completion-context` 响应页只在顶层 `candidate_tasks` 中返回一次完整候选任务证据。该对象以任务 ID 为键，值保留状态、合同修订、结果引用与摘要、产出、验证、未决项、失效来源、证据关联与引用、执行来源快照和结果诊断；值内不重复任务 ID。每个 `targets[]` 用有序 `candidate_task_ids` 引用本目标当前候选页，并继续返回该目标的候选总数、返回数、结果数、带验证结果数、截断状态和精确游标。顶层目录必须恰好覆盖当前页目标实际引用的任务，不得重复完整对象、产生悬空 ID，或在预算移除目标后保留无人引用任务。
 
@@ -84,6 +84,7 @@ release     清除领取意图并回到 todo
 - `TASK-LOCK` / `TASK-REVISION`：工作区并发写入，或已有记录写入缺少调用方已读 revision、期望 revision 已过期。
 - `TASK-LIMIT` / `TASK-INPUT-UNREADABLE`：当前命令无法有界读取，JSON/schema/必需字段的类型与身份使当前对象无法确定解释，最终复核续页游标无法标识当前快照中的续点，或续页时无法重建当前 Markdown 以核对快照身份；不得用它阻断仍可保留并诊断的非标准语义值。批量查询中单个损坏记录应被隔离并诊断，不阻断其他记录。
 - `TASK-AMBIGUOUS-TARGET`：精确写入或查询需要唯一 ID，但当前匹配不唯一。
+- `TASK-SNAPSHOT-CONFLICT`：一次捕获或完成输入同时指定两个不同来源快照，工具无法证明实际使用版本；改用同一收据后重试。
 - `TASK-PAGINATION-SNAPSHOT`：`completion-context` 续页会混用两个任务/文档快照。
 
 门禁错误必须返回 `gate.id`、`gate.risk`、`gate.scope`、`gate.recovery` 和 `gate.retryable`。依赖环、owner、状态流转、可解析的非标准枚举/ID/描述性路径、重复值、快照/缓存漂移、上游未决、覆盖度和结果来源时效性均是诊断。

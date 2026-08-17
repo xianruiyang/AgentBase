@@ -712,6 +712,7 @@ def load_manifest(root: Path) -> dict[str, Any]:
             ("task_dir", "tasks"),
             ("state_dir", "state"),
             ("result_dir", "results"),
+            ("snapshot_dir", "snapshots"),
         ):
             value = task_table.get(field, default)
             if not isinstance(value, str) or not value.strip():
@@ -1188,7 +1189,7 @@ def init_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, Any
     conflicts = [name for name in managed_files if (root / name).exists()]
     conflicts.extend(
         directory
-        for directory in ("tasks", "state", "results")
+        for directory in ("tasks", "state", "results", "snapshots")
         if (root / directory).is_dir() and any((root / directory).iterdir())
     )
     if conflicts:
@@ -1199,7 +1200,7 @@ def init_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, Any
             recovery="choose an empty directory or preserve and inspect the existing workspace",
         )
 
-    for directory in ("tasks", "state", "results"):
+    for directory in ("tasks", "state", "results", "snapshots"):
         (root / directory).mkdir(parents=True, exist_ok=True)
     template_root = Path(__file__).resolve().parents[1] / "assets" / "templates"
     for filename in DEFAULT_DOCUMENTS.values():
@@ -1223,6 +1224,7 @@ def init_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, Any
         "task_dir": "tasks",
         "state_dir": "state",
         "result_dir": "results",
+        "snapshot_dir": "snapshots",
         "source_index": ".work-cache/index.json",
         "table_view": "TASK_TABLE.md",
     }
@@ -1232,7 +1234,7 @@ def init_workspace_locked(args: argparse.Namespace, root: Path) -> dict[str, Any
         "ok": True,
         "command": "init",
         "work_dir": str(root),
-        "created": created_files + ["tasks/", "state/", "results/"],
+        "created": created_files + ["tasks/", "state/", "results/", "snapshots/"],
         "pending": pending_files,
         "diagnostics": semantic_text_diagnostics(title, "workflow.title"),
     }

@@ -269,6 +269,12 @@ class WorkctlTests(unittest.TestCase):
     def test_init_distinguishes_created_and_pending_artifacts(self) -> None:
         self.assertIn("workflow.json", self.initialized["created"])
         self.assertIn("requirements.md", self.initialized["created"])
+        self.assertIn("snapshots/", self.initialized["created"])
+        self.assertTrue((self.root / "snapshots").is_dir())
+        task_table = json.loads(
+            (self.root / "task-table.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(task_table["snapshot_dir"], "snapshots")
         self.assertNotIn("protected-baseline.json", self.initialized["created"])
         self.assertNotIn(".work-cache/index.json", self.initialized["created"])
         self.assertEqual(

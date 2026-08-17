@@ -18,6 +18,7 @@
 ├── tasks/
 ├── state/
 ├── results/
+├── snapshots/
 ├── TASK_TABLE.md
 └── .work-cache/index.json
 ```
@@ -28,7 +29,7 @@
 
 阶段 Markdown 是模型与用户直接读取、由模型按稳定 ID 局部维护的语义真源。每个条目只承担所属阶段职责，修改时把新信息合入正确条目并删除已失效或重复的表述；逐轮对话、原始日志、派生计数和可从其他真源重建的摘要不写入阶段文档。需要更多上下游时按 ID 和实际关系渐进读取，不因工作区存在而全量装入。
 
-`workflow.json` 只维护文档位置，`protected-baseline.json` 只维护确认来源元数据，任务 JSON 由任务合同拥有；它们的完整机器结构不自动成为模型读取面。`.work-cache/index.json`、`WORK_STATUS.md` 和 `TASK_TABLE.md` 是可重建产物，模型不得通过直接编辑它们改变目标、设计、任务或完成状态。程序需要的索引和视图从当前 Markdown 与结构化任务真源生成，不维护反向同步的第二语义源。
+`workflow.json` 只维护文档位置，`protected-baseline.json` 只维护确认来源元数据，任务 JSON 与 `snapshots/` 的内容寻址执行来源证据由任务合同拥有；它们的完整机器结构不自动成为模型读取面。模型通过快照收据定位证据，不编辑指纹映射。`.work-cache/index.json`、`WORK_STATUS.md` 和 `TASK_TABLE.md` 是可重建产物，模型不得通过直接编辑它们改变目标、设计、任务或完成状态。程序需要的索引和视图从当前 Markdown 与结构化任务真源生成，不维护反向同步的第二语义源。
 
 ## 稳定 ID
 
