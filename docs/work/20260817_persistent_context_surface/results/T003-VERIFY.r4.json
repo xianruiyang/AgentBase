@@ -1,0 +1,66 @@
+{
+  "changed_files": [
+    "development/skill-routing/evidence/current.json",
+    "docs/work/20260817_persistent_context_surface/verification.md"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "UDES-001",
+    "SOL-003"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "verification",
+      "note": "身份、质量、恢复、Token、部署候选和限制",
+      "ref": "docs/work/20260817_persistent_context_surface/verification.md"
+    },
+    {
+      "kind": "evaluation",
+      "note": "三个不同 detached evaluator 的合并证据",
+      "ref": "development/skill-routing/evidence/current.json"
+    },
+    {
+      "kind": "test",
+      "note": "valid=true",
+      "ref": "development/codex-deployment/manage_agentbase.ps1 -Action Validate"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "常驻读取面候选已通过恢复充分性、静态合同、严格 Routing、完整三阶段 evidence、同 tokenizer 成本比较和部署候选 Validate。",
+  "outputs": [
+    "development/skill-routing/evidence/current.json 的当前三阶段独立证据",
+    "docs/work/20260817_persistent_context_surface/verification.md",
+    "给 T004 使用的质量、成本、发布边界和已知证据限制"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:03b939246b8a55a9077abac10a8cfc5b6fc378448de5b03b9bc78795fc0a07e7",
+    "AC-002": "sha256:8f09ebd74aaa6a1e91ff6341c5bd5552fb9b234d5e0b6bdf4f98598b0b27782b",
+    "AC-003": "sha256:4615259a3221dd035d9781d36bcf3415211d90ac5f78f2a94670ab2a91c679c6",
+    "AC-004": "sha256:46ef437bd263addbeec82046cc6a06702a3ea8ce9fe3a071bb913d62cb1c355d",
+    "CON-001": "sha256:1c49276213f3c0bbb9081dd8c951f571b8d566b1e8e6af52be059087d75ecfe5",
+    "CON-002": "sha256:ea7baadbed446018e1e80f3974447f4ca41518d611e7164eb75b96f4cd8c215d",
+    "DES-001": "sha256:4fd19474581ad472cc9a5dc39a1355a1328a890931266fdb2663c10ec8e6abec",
+    "DES-003": "sha256:cae88a8f446d87ec2f17df34316cbb605f1a94d3b3aa10ab3a91768ba08ff33e",
+    "GAP-003": "sha256:bceafb38b7066168b4ed2beec8184cc5472b106dfba1fee1803df2fb9783b3a5",
+    "OBS-001": "sha256:65be4ce434afc68048a7cf903a7fa1526a009ea417c853bded18247a7413c4b1",
+    "REQ-001": "sha256:28d6dc6115b24e6eeeae172347374c8db448261a1980dffef8c040c203ff0445",
+    "SOL-003": "sha256:2e95a162f53d79bfbcba8384bd55cc67fd6b9075f969a16257dfc90d0cbb857a",
+    "UDES-001": "sha256:3ac656e9a1184d91ad72fb33d88a475cab77967e556aa8acab213f43cf43b5a7"
+  },
+  "task_id": "T003-VERIFY",
+  "task_revision": 1,
+  "unresolved": [],
+  "verification": [
+    "静态合同通过 76 cases、34 strict routing、5 strict references，11/11 skill 有正向和非触发覆盖",
+    "detached Routing 严格 76/76；完整 staged Routing/Policy/References 为 76/76/19",
+    "handoff 恢复清单、相对链接和只读 Status 通过，当前候选 993 tokens",
+    "o200k_base 常驻 global+descriptions 5,882→5,588，减少 294 tokens（5.0%）",
+    "manage_agentbase.ps1 -Action Validate 返回 valid=true",
+    "未执行真实 Codex Publish"
+  ]
+}

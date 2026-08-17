@@ -185,16 +185,17 @@ $duplicateRules = Get-Content -LiteralPath $globalPath -Encoding UTF8 |
 Assert-True (@($duplicateRules).Count -eq 0) "Global AGENTS.md contains duplicate normative rules"
 
 $descriptionBoundaryFragments = @{
-    "source-query" = "分页或截断确实阻止当前必要证据"
-    "change-governance" = "不用于规格已完整"
+    "source-query" = "分页或截断阻断当前必要证据"
+    "change-governance" = "不用于已有唯一 owner 与明确依赖的普通实现"
     "codex-event-logger" = "当前上下文充分"
-    "codex-qq-hook" = "状态查询不得创建或改写配置"
-    "delivery-workflow" = "不用于规格已完整的单轮实现"
+    "codex-qq-hook" = "状态查询不改配置"
+    "cpp-engineering-rules" = "仅正文提及 C++ 不触发"
+    "delivery-workflow" = "不用于规格完整的单轮实现"
     "powershell-usage" = "不用于单条精确只读"
-    "reasoning-governor" = "没有 active Goal 时不用于模型自主切换"
+    "reasoning-governor" = "无 active Goal 不自主切换"
     "symbol-structure-workflow" = "不用于只读文本"
     "task-table-manager" = "不用于单轮修改"
-    "understand-space" = "不因正文偶然出现空间词触发"
+    "understand-space" = "正文偶有空间词不触发"
 }
 
 foreach ($skill in $requiredSkills) {
@@ -266,7 +267,7 @@ Assert-True ($sourceQueryAstContent.Contains('`_sgy.total/files/shown/omitted/co
 Assert-True ($sourceQueryLspContent.Contains('单根工作区的 `file` 使用根相对路径')) "source-query must distinguish single-root logical paths"
 Assert-True ($sourceQueryLspContent.Contains('多根才使用 `<root-alias>/<relative-path>`')) "source-query must distinguish multi-root logical paths"
 Assert-True ($sourceQueryLspContent.Contains('在小项目、热索引或高效 Provider 下可以直接使用')) "source-query must keep workspace_symbols conditionally available"
-Assert-True ($symbolSkillContent.Contains('这些由 source-query 承担')) "symbol-structure-workflow must delegate read-only source queries"
+Assert-True ($symbolSkillContent.Contains('后者由 source-query 承担')) "symbol-structure-workflow must delegate read-only source queries"
 
 $routingCommonPath = Join-Path $PSScriptRoot "routing_evaluation_common.ps1"
 $routingCommonContent = Get-Content -LiteralPath $routingCommonPath -Raw -Encoding UTF8

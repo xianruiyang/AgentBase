@@ -1,0 +1,36 @@
+{
+  "dependencies": [],
+  "id": "T001-HANDOFF",
+  "mutation_scope": [
+    "docs/handoff.md"
+  ],
+  "outcome": "接手者用更低输入成本准确恢复已发布基线、未发布候选、直接证据、未决边界和下一入口",
+  "outputs": [
+    "给 T003 使用的最小充分恢复面候选",
+    "当前发布与回滚状态的唯一接手索引"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-001",
+    "GAP-002",
+    "DES-001",
+    "DES-003",
+    "AC-003",
+    "AC-004",
+    "REQ-001",
+    "UDES-001",
+    "CON-001",
+    "CON-002"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "delivery-workflow"
+  ],
+  "title": "收敛 handoff 当前恢复面",
+  "verification": [
+    "按恢复清单从候选独立定位当前版本、安装状态、回滚入口、未决候选、授权限制和下一动作",
+    "使用 o200k_base 与基线比较模型 Token"
+  ]
+}

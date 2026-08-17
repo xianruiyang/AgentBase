@@ -1,0 +1,62 @@
+{
+  "changed_files": [
+    "docs/handoff.md"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "AC-003",
+    "AC-004",
+    "UDES-001",
+    "SOL-001"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "artifact",
+      "note": "当前恢复索引",
+      "ref": "docs/handoff.md"
+    },
+    {
+      "kind": "readback",
+      "note": "published=true，正式发布缺口为 0",
+      "ref": "development/codex-deployment/manage_agentbase.ps1 -Action Status"
+    },
+    {
+      "kind": "measurement",
+      "note": "候选 985 tokens；基线 2,972 tokens",
+      "ref": "tiktoken 0.13.0 o200k_base"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "handoff 已改为当前恢复索引；接手者可直接恢复已发布基线、真实安装状态、精确回滚入口、未发布候选、授权边界和下一动作。",
+  "outputs": [
+    "docs/handoff.md 最小充分恢复面候选",
+    "已发布提交 86ee057 与当前未发布开发链的明确生命周期分界"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:03b939246b8a55a9077abac10a8cfc5b6fc378448de5b03b9bc78795fc0a07e7",
+    "AC-002": "sha256:8f09ebd74aaa6a1e91ff6341c5bd5552fb9b234d5e0b6bdf4f98598b0b27782b",
+    "AC-003": "sha256:4615259a3221dd035d9781d36bcf3415211d90ac5f78f2a94670ab2a91c679c6",
+    "AC-004": "sha256:46ef437bd263addbeec82046cc6a06702a3ea8ce9fe3a071bb913d62cb1c355d",
+    "CON-001": "sha256:1c49276213f3c0bbb9081dd8c951f571b8d566b1e8e6af52be059087d75ecfe5",
+    "CON-002": "sha256:ea7baadbed446018e1e80f3974447f4ca41518d611e7164eb75b96f4cd8c215d",
+    "DES-001": "sha256:4fd19474581ad472cc9a5dc39a1355a1328a890931266fdb2663c10ec8e6abec",
+    "DES-003": "sha256:cae88a8f446d87ec2f17df34316cbb605f1a94d3b3aa10ab3a91768ba08ff33e",
+    "GAP-002": "sha256:e53a15bcd9356b7135bb4fcb9c5d4e5bbf9b793fe5f5132608ba09682fe92149",
+    "OBS-003": "sha256:6079c75c6e2d7ac486e04e09ea33dbbe66cf3639b0c88e2b68b13db114dce158",
+    "REQ-001": "sha256:28d6dc6115b24e6eeeae172347374c8db448261a1980dffef8c040c203ff0445",
+    "SOL-001": "sha256:0577dea9b77b8bdf59534d8bdb503829b62802219ae6cc43c304d3c8d7c8d1aa",
+    "UDES-001": "sha256:3ac656e9a1184d91ad72fb33d88a475cab77967e556aa8acab213f43cf43b5a7"
+  },
+  "task_id": "T001-HANDOFF",
+  "task_revision": 1,
+  "unresolved": [
+    "最终交付时由 T004 更新候选提交身份和完成状态"
+  ],
+  "verification": [
+    "恢复清单逐项存在：当前版本、真实 Status、回滚入口、未决候选、授权限制和下一动作",
+    "正式 Status 读回 published=true 且 formal_publication_gap_count=0",
+    "所有 handoff 项目链接均指向现有正式文件",
+    "o200k_base 从 2,972 tokens 降至 985 tokens，减少约 66.9%"
+  ]
+}

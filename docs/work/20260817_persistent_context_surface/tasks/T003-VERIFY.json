@@ -1,0 +1,55 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "最小充分恢复面候选"
+      ],
+      "id": "T001-HANDOFF",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "逐项必要性审计",
+        "常驻读取面候选或保持现状结论"
+      ],
+      "id": "T002-RULE-AUDIT",
+      "type": "hard"
+    }
+  ],
+  "id": "T003-VERIFY",
+  "mutation_scope": [
+    "development/skill-routing/evidence/current.json",
+    "docs/work/20260817_persistent_context_surface/**"
+  ],
+  "outcome": "候选通过结构、恢复、独立路由、适用回归和部署 Validate，且只在同质量前提下采纳 Token 改善",
+  "outputs": [
+    "独立 Routing、Policy、References 证据",
+    "同质量 Token 对比与恢复充分性证据",
+    "部署候选 Validate 结果"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-003",
+    "GAP-003",
+    "DES-003",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "REQ-001",
+    "CON-001",
+    "CON-002"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "delivery-workflow",
+    "task-table-manager"
+  ],
+  "title": "验证常驻读取面候选的语义、路由和成本",
+  "verification": [
+    "运行静态合同、三个独立 detached evaluator、适用回归和部署 Validate",
+    "核对 evaluator 身份、声明、capsule 哈希和严格期望"
+  ]
+}

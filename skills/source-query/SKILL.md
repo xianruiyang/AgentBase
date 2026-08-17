@@ -1,6 +1,6 @@
 ---
 name: source-query
-description: 仅在 srcq 的分页或截断确实阻止当前必要证据、任务需要实际执行 AST rule/rewrite 或 srcq machine/native/artifact、文本证据仍不能确定完整语法边界或结构关系，或结论仍有真实定义身份、重载、类型、精确引用、层级或语言服务诊断歧义时使用；仅审查规则或提及工具名不触发。
+description: 仅在 srcq 分页或截断阻断当前必要证据，需实际执行 AST rule/rewrite 或 srcq machine/native/artifact，文本仍不能确定完整语法边界或结构关系，或仍有定义身份、重载、类型、精确引用、层级或语言服务诊断歧义时使用；仅审查规则或提及工具名不触发。
 ---
 
 # Source Query

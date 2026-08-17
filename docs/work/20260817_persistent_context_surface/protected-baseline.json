@@ -1,0 +1,31 @@
+{
+  "confirmation_ref": "2026-08-17: 好，本次可以发布。然后按你的说法继续开发",
+  "confirmed_by": "user",
+  "cycle_id": "cycle-001",
+  "documents": {
+    "requirements": {
+      "fingerprint": "sha256:f3a6908fd0ab3e654ac9c028e6ba605a68db3b686a600657613af338f4048288",
+      "ids": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "CON-001",
+        "CON-002",
+        "REQ-001"
+      ],
+      "path": "requirements.md"
+    },
+    "user_design": {
+      "fingerprint": "sha256:078b89d30120a1d1e2e9ce1b93e6224c90ebeb6cade72c7db1ffc5d59edf72a3",
+      "ids": [
+        "UDES-001",
+        "UDES-002"
+      ],
+      "path": "user-design.md"
+    }
+  },
+  "history": [],
+  "schema": "delivery.protected-baseline",
+  "workflow_id": "persistent-context-surface"
+}

@@ -1,6 +1,6 @@
 ---
 name: reasoning-governor
-description: 动态读取和切换当前 Codex 线程的 next-turn 推理深度。用于用户明确要求查看或修改当前线程深度，或 active Goal 执行中下一段工作的真实不确定性、后果、可逆性或验证负担发生实质变化，需要在继续前升降 reasoning effort 时；没有 active Goal 时不用于模型自主切换，也不创建 Goal、任务表、hook、持久状态或自动恢复等级。
+description: 读取或切换当前 Codex 线程的 next-turn 推理深度。用于用户明确要求查看或修改当前深度，或 active Goal 下一段工作的真实不确定性、后果、可逆性或验证负担实质变化时；无 active Goal 不自主切换，也不创建 Goal、任务表、hook、持久状态或自动恢复等级。
 ---
 
 # Reasoning Governor

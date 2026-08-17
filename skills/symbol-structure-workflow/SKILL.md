@@ -1,6 +1,6 @@
 ---
 name: symbol-structure-workflow
-description: 安全组织由 VS Code Provider 执行的语义代码修改与编辑器操作。用于用户已授权并需要语义重命名、Code Action、格式化应用、工作区 task/command、调试控制或窗口/Extension Host 重载时；不用于只读文本、文件、AST、定义、类型、引用、层级或诊断查询，这些由 source-query 承担。
+description: 安全组织由 VS Code Provider 执行的语义修改和编辑器操作。用于已授权的语义重命名、Code Action、格式化、workspace task/command、调试控制或窗口/Extension Host 重载；不用于只读文本、文件、AST、定义、类型、引用、层级或诊断查询，后者由 source-query 承担。
 ---
 
 # Symbol Structure Workflow

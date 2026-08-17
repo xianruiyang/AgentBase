@@ -1,0 +1,10 @@
+{
+  "id": "persistent-context-surface",
+  "result_dir": "results",
+  "schema": "task.table",
+  "source_index": ".work-cache/index.json",
+  "state_dir": "state",
+  "table_view": "TASK_TABLE.md",
+  "task_dir": "tasks",
+  "title": "常驻模型上下文与恢复面收敛"
+}

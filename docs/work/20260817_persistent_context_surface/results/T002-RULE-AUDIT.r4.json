@@ -1,0 +1,75 @@
+{
+  "changed_files": [
+    "global/AGENTS.md",
+    "skills/change-governance/SKILL.md",
+    "skills/codex-event-logger/SKILL.md",
+    "skills/codex-qq-hook/SKILL.md",
+    "skills/cpp-engineering-rules/SKILL.md",
+    "skills/delivery-workflow/SKILL.md",
+    "skills/powershell-usage/SKILL.md",
+    "skills/reasoning-governor/SKILL.md",
+    "skills/source-query/SKILL.md",
+    "skills/symbol-structure-workflow/SKILL.md",
+    "skills/task-table-manager/SKILL.md",
+    "skills/understand-space/SKILL.md",
+    "development/skill-routing/validate_contract.ps1",
+    "docs/work/20260817_persistent_context_surface/context-surface-audit.md"
+  ],
+  "evidence_for": [
+    "SOL-002",
+    "DES-001",
+    "DES-002",
+    "AC-001",
+    "AC-002"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "audit",
+      "note": "逐项必要性与 Token 对照",
+      "ref": "docs/work/20260817_persistent_context_surface/context-surface-audit.md"
+    },
+    {
+      "kind": "test",
+      "note": "静态路由合同通过",
+      "ref": "development/skill-routing/validate_contract.ps1"
+    },
+    {
+      "kind": "evaluation",
+      "note": "detached Routing 76/76 严格通过",
+      "ref": "C:/Users/gzxt/AppData/Local/Temp/AgentBase-routing-evaluation-result-20260817h2.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "全局规则和 11 个 skill description 已按 owner、预加载时点与删除后果逐项裁决，形成通过静态合同与首阶段严格路由的常驻读取面候选。",
+  "outputs": [
+    "docs/work/20260817_persistent_context_surface/context-surface-audit.md",
+    "待 T003 完成 Policy、References 与完整回归的常驻读取面候选"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:03b939246b8a55a9077abac10a8cfc5b6fc378448de5b03b9bc78795fc0a07e7",
+    "AC-002": "sha256:8f09ebd74aaa6a1e91ff6341c5bd5552fb9b234d5e0b6bdf4f98598b0b27782b",
+    "AC-003": "sha256:4615259a3221dd035d9781d36bcf3415211d90ac5f78f2a94670ab2a91c679c6",
+    "AC-004": "sha256:46ef437bd263addbeec82046cc6a06702a3ea8ce9fe3a071bb913d62cb1c355d",
+    "CON-001": "sha256:1c49276213f3c0bbb9081dd8c951f571b8d566b1e8e6af52be059087d75ecfe5",
+    "CON-002": "sha256:ea7baadbed446018e1e80f3974447f4ca41518d611e7164eb75b96f4cd8c215d",
+    "DES-001": "sha256:4fd19474581ad472cc9a5dc39a1355a1328a890931266fdb2663c10ec8e6abec",
+    "DES-002": "sha256:5c4e975232965a4d689e6157ff94803ed0996394fff4f2b1595382eaaac87251",
+    "DES-003": "sha256:cae88a8f446d87ec2f17df34316cbb605f1a94d3b3aa10ab3a91768ba08ff33e",
+    "GAP-001": "sha256:96bda6be338704fe8d39389889568b5aab5a71888ff6707e2e8c2e743dc5af98",
+    "OBS-001": "sha256:65be4ce434afc68048a7cf903a7fa1526a009ea417c853bded18247a7413c4b1",
+    "OBS-002": "sha256:610aaa4b8dc57a05cf514c162fb9ca5e610e29f14e7b39c3bc86e58321227173",
+    "REQ-001": "sha256:28d6dc6115b24e6eeeae172347374c8db448261a1980dffef8c040c203ff0445",
+    "SOL-002": "sha256:6dceea1150b30d04af56775a3244d86174212b81d9a71517b769e9497b91366a",
+    "UDES-001": "sha256:3ac656e9a1184d91ad72fb33d88a475cab77967e556aa8acab213f43cf43b5a7"
+  },
+  "task_id": "T002-RULE-AUDIT",
+  "task_revision": 2,
+  "unresolved": [],
+  "verification": [
+    "逐项审计保留跨项目不变量、正向触发、相近非触发与必要协同边界",
+    "validate_contract.ps1 通过 76 cases、34 strict routing、5 strict references，11/11 skills 具有正向与非触发覆盖",
+    "detached Routing 隐藏 oracle 严格验证 76/76",
+    "o200k_base：global 4,690→4,531；11 descriptions 1,192→1,057；常驻合计减少 294 tokens（5.0%）"
+  ]
+}

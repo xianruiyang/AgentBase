@@ -3,23 +3,23 @@
   "evaluation_kind": "skill-routing",
   "fingerprint_schema": "text-lf-v1",
   "evaluator": {
-    "id": "routing-eval-20260817f-20260817053214543",
+    "id": "routing-eval-20260817h2-20260817101334088",
     "model": "gpt-5",
     "runtime": "codex-subagent:/root/routing_eval_20260817e",
-    "evaluated_at_utc": "2026-08-17T05:32:14.543Z",
+    "evaluated_at_utc": "2026-08-17T10:13:34.088Z",
     "isolation_mode": "detached-capsule",
     "repository_accessed": false,
     "hidden_expectations_accessed": false
   },
-  "evaluation_capsule_sha256": "E985E67591C840EA63B02A314FC5357D239824C91CF342E77558410B53A10377",
-  "candidate_bundle_sha256": "9E8378165B8FD746AB58E35545BA539034C5B784B3ECC546AEB7A61980AB990B",
+  "evaluation_capsule_sha256": "77052D80D2AB879F05FBF8B70CD9B123AE96F948A3993DF1F04A8D0CBC0A53F8",
+  "candidate_bundle_sha256": "CDE243F4E0C58F73D335EA5E2CE978D645AB5F612170B4EA42D80F997082693C",
   "evaluation_input_sha256": "B810EE78AE6B2F2D4E1DAD79087AD836DA3415012EC5778E3F060516CFA8BB4E",
   "cases": [
     {
       "id": "mechanical-document-edit",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "已明确的机械文档替换不需要候选 skill。"
+      "note": "明确的机械文档替换无需候选 skill。"
     },
     {
       "id": "specified-local-implementation",
@@ -31,31 +31,31 @@
       "id": "collaborative-requirement-insight",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "当前仅做目标与风险校准，由全局目标证据规则覆盖。"
+      "note": "当前仅校准目标和风险，由全局目标证据规则覆盖。"
     },
     {
       "id": "quality-token-speed-priority",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "方案优先级裁决由全局质量、Token 与速度规则覆盖。"
+      "note": "质量、Token 与速度的优先级由全局方案规则覆盖。"
     },
     {
       "id": "model-interaction-tool-read",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "模型读取面选择由全局消费者与最低充分投影规则覆盖。"
+      "note": "读取面选择由全局消费者与最低充分投影规则覆盖。"
     },
     {
       "id": "model-interaction-generated-report-read",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "应读取程序 owner 提供的有界投影，属于全局模型交互面裁决。"
+      "note": "应使用程序 owner 的有界投影，属于全局模型交互面裁决。"
     },
     {
       "id": "model-interaction-source-edit-boundary",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "正式来源与生成物边界已由全局唯一 owner 和修改入口规则覆盖。"
+      "note": "正式来源与生成物边界已由全局唯一 owner 规则覆盖。"
     },
     {
       "id": "architecture-discovery-before-implementation",
@@ -63,7 +63,7 @@
         "change-governance"
       ],
       "selected_peer_skills": [],
-      "note": "权威 owner 与迁移入口未决，实施前必须治理职责归属。"
+      "note": "权威 owner 与迁移入口未决，实施前必须裁决职责归属。"
     },
     {
       "id": "implicit-architecture-integration",
@@ -87,13 +87,13 @@
         "task-table-manager"
       ],
       "selected_peer_skills": [],
-      "note": "公共契约权威变化需跨消费者治理，并回流长期交付链和任务记录。"
+      "note": "公共契约变化需跨消费者治理，并回流交付链和长期任务记录。"
     },
     {
       "id": "surface-similarity-no-shared-owner",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "生命周期与变化原因已证明职责不同，按完整契约做局部修改即可。"
+      "note": "生命周期与变化原因已证明职责不同，按完整契约局部修改即可。"
     },
     {
       "id": "one-off-generated-artifact",
@@ -105,7 +105,7 @@
       "id": "specified-synthesis-artifact",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "权威素材、受众与验收均明确，属于普通专业文档编写。"
+      "note": "素材、受众和验收均明确，属于普通专业文档编写。"
     },
     {
       "id": "cpp-include-edit",
@@ -166,7 +166,7 @@
       "id": "literal-text-search",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "普通 srcq rg 字面量查询明确不加载 source-query。"
+      "note": "普通 srcq rg 字面量查询不加载 source-query。"
     },
     {
       "id": "source-query-rule-review",
@@ -178,7 +178,7 @@
       "id": "complete-known-name-position-list",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "限定范围内完整文本与局部上下文已足以判定位置。"
+      "note": "完整文本及局部上下文已足以判定定义和调用位置。"
     },
     {
       "id": "known-small-definition-range",
@@ -232,7 +232,7 @@
         "codex-event-logger"
       ],
       "selected_peer_skills": [],
-      "note": "上下文压缩后需从项目运行记录恢复当前轮状态。"
+      "note": "上下文压缩后需从项目对话记录恢复当前轮状态。"
     },
     {
       "id": "qq-hook-explicit-enable",
@@ -282,7 +282,7 @@
         "task-table-manager"
       ],
       "selected_peer_skills": [],
-      "note": "完整交付阶段由 delivery-workflow 组织，跨轮任务合同由任务表维护。"
+      "note": "完整交付阶段由交付链组织，跨轮任务合同由任务表维护。"
     },
     {
       "id": "vertical-validation-closure-selection",
@@ -290,7 +290,7 @@
         "task-table-manager"
       ],
       "selected_peer_skills": [],
-      "note": "只需查询长期任务及上下游产出并选择下一项工作。"
+      "note": "需查询长期任务及上下游产出并选择下一项工作。"
     },
     {
       "id": "protected-baseline-change-discovered",
@@ -299,7 +299,7 @@
         "task-table-manager"
       ],
       "selected_peer_skills": [],
-      "note": "受保护设计变更需延后，并将可继续工作与状态维护在交付链和任务表。"
+      "note": "受保护设计变更需延后，并在交付链和任务表中继续独立工作。"
     },
     {
       "id": "active-goal-reasoning-shift",
@@ -307,7 +307,7 @@
         "reasoning-governor"
       ],
       "selected_peer_skills": [],
-      "note": "active Goal 的下一段风险和验证负担已实质上升，需先调整推理深度。"
+      "note": "active Goal 下一段风险和验证负担已实质上升，需先调整深度。"
     },
     {
       "id": "explicit-thread-reasoning-setting",
@@ -449,7 +449,7 @@
       "id": "single-task-cli-formatting",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "已指定单个 JSON 的机械格式化不建立长期任务流程。"
+      "note": "单个已指定 JSON 的机械格式化不建立长期任务流程。"
     },
     {
       "id": "ast-rewrite-preview",
@@ -471,7 +471,7 @@
       "id": "fd-full-path-directory-discovery",
       "selected_skills": [],
       "selected_peer_skills": [],
-      "note": "普通 srcq fd 目录发现明确不加载 source-query。"
+      "note": "普通 srcq fd 目录发现不加载 source-query。"
     },
     {
       "id": "powershell-readonly-command-inspection",
@@ -487,7 +487,7 @@
         "cpp-engineering-rules"
       ],
       "selected_peer_skills": [],
-      "note": "C++ 头依赖审查需要 C++ 规则；给定精确只读命令不触发 PowerShell skill。"
+      "note": "C++ 头依赖审查需要 C++ 规则；给定精确只读 cmdlet 不触发 PowerShell skill。"
     },
     {
       "id": "long-context-latest-simple-request",
@@ -529,7 +529,7 @@
       "selected_peer_skills": [
         "peer-ue-authoring"
       ],
-      "note": "UE 字段写入需要 UE skill，但已确认坐标字段和值无需空间推理。"
+      "note": "UE 字段写入需要 UE skill，但已确认字段和值无需空间推理。"
     },
     {
       "id": "delivery-requirements-contract",
@@ -563,7 +563,7 @@
         "task-table-manager"
       ],
       "selected_peer_skills": [],
-      "note": "新证据需回退上游模型判断并同步更新长期任务状态和方案。"
+      "note": "新证据需回退上游判断并同步更新长期任务状态和方案。"
     },
     {
       "id": "qq-troubleshooting-with-powershell",
@@ -573,7 +573,7 @@
         "powershell-usage"
       ],
       "selected_peer_skills": [],
-      "note": "未确认 QQ 故障需治理和通知排查，且请求用 PowerShell 编排配置、hook 与日志检查。"
+      "note": "未确认 QQ 故障需治理和通知排查，并用 PowerShell 编排配置、hook 与日志检查。"
     }
   ],
   "policy_evaluation": {
@@ -581,19 +581,19 @@
     "evaluation_kind": "behavior-policy",
     "fingerprint_schema": "text-lf-v1",
     "evaluator": {
-      "id": "agentbase-policy-evaluator-20260817g-20260817054311098",
+      "id": "agentbase-policy-evaluator-20260817h2-20260817101748987",
       "model": "gpt-5",
       "runtime": "codex-subagent:/root/policy_eval_20260817e",
-      "evaluated_at_utc": "2026-08-17T05:43:11.098Z",
+      "evaluated_at_utc": "2026-08-17T10:17:48.987Z",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false
     },
-    "evaluation_capsule_sha256": "611F118F0F9A6C09D24502DEAFF0113B613592AF5599939CA98810847DD8B16B",
-    "candidate_bundle_sha256": "9E8378165B8FD746AB58E35545BA539034C5B784B3ECC546AEB7A61980AB990B",
+    "evaluation_capsule_sha256": "3F3A5C1750D885EC5334A8CAEB5E8693DF8E0ADE59656E6CF9B0EE8F81E16283",
+    "candidate_bundle_sha256": "CDE243F4E0C58F73D335EA5E2CE978D645AB5F612170B4EA42D80F997082693C",
     "evaluation_input_sha256": "E5C2D1F63A2DB8D6CF59BBC64A8E58FFD4AE684D545F694134074DA6004098B3",
-    "routing_evaluation_capsule_sha256": "E985E67591C840EA63B02A314FC5357D239824C91CF342E77558410B53A10377",
-    "routing_result_sha256": "F8DD81F0C82D2048C4F55FCB24FE758CFFEE2084109357E3EF14364520ED0E87",
+    "routing_evaluation_capsule_sha256": "77052D80D2AB879F05FBF8B70CD9B123AE96F948A3993DF1F04A8D0CBC0A53F8",
+    "routing_result_sha256": "FC36E9A4484BB05C69EEC4F300D4E122ED016BE83073F4D9361525666D4DA3F6",
     "cases": [
       {
         "id": "mechanical-document-edit",
@@ -783,9 +783,10 @@
         "id": "literal-text-search",
         "behavior_tags": [
           "read_only",
+          "model_interaction_surface",
           "minimal_evidence_closure"
         ],
-        "note": "字面量文本查询已足够，按真实结果返回最低充分证据。"
+        "note": "字面量文本查询足够，并按真实结果选择最低充分输出面。"
       },
       {
         "id": "source-query-rule-review",
@@ -841,9 +842,10 @@
         "id": "bounded-file-discovery",
         "behavior_tags": [
           "read_only",
+          "model_interaction_surface",
           "minimal_evidence_closure"
         ],
-        "note": "原生 fd 查询足以完成有界文件发现，无需升级查询层级。"
+        "note": "文件发现入口已定，树或平铺的模型展示应按真实结果选择。"
       },
       {
         "id": "powershell-command-authoring",
@@ -1019,7 +1021,7 @@
           "authority_lifecycle",
           "impact_closure"
         ],
-        "note": "共享阻断设计需确定正式职责，并证明所有失败代表契约违反且覆盖全部合并路径。"
+        "note": "共享阻断设计需确定正式职责，并证明失败代表契约违反且覆盖全部合并路径。"
       },
       {
         "id": "current-context-is-sufficient",
@@ -1136,9 +1138,10 @@
         "id": "event-log-explicit-history-request",
         "behavior_tags": [
           "read_only",
-          "fact_first"
+          "fact_first",
+          "model_interaction_surface"
         ],
-        "note": "有界列出候选，再以直接记录追溯指定历史。"
+        "note": "请求明确选择先读有界候选视图，再按稳定 turn 定位历史。"
       },
       {
         "id": "fd-full-path-directory-discovery",
@@ -1268,19 +1271,19 @@
     "evaluation_kind": "routing-reference-policy",
     "fingerprint_schema": "text-lf-v1",
     "evaluator": {
-      "id": "references-eval-20260817f-20260817T053429070Z",
+      "id": "references-eval-20260817h2-20260817T101522770Z",
       "model": "gpt-5.6-sol",
       "runtime": "codex-collaboration-subagent",
-      "evaluated_at_utc": "2026-08-17T05:34:29.070Z",
+      "evaluated_at_utc": "2026-08-17T10:15:22.770Z",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false
     },
-    "evaluation_capsule_sha256": "B10A5F8F48B5E5EA04A5BDA050DE93B2DE0DAF53E6A6CE61F440D00CA08D6B3E",
-    "candidate_bundle_sha256": "9E8378165B8FD746AB58E35545BA539034C5B784B3ECC546AEB7A61980AB990B",
+    "evaluation_capsule_sha256": "7CD8F4B6F0B9F74A491043E04B75C6BB9EC8393DD94FAED1E82EB20E97BC1789",
+    "candidate_bundle_sha256": "CDE243F4E0C58F73D335EA5E2CE978D645AB5F612170B4EA42D80F997082693C",
     "evaluation_input_sha256": "75CAFA6D925EBF6B9D74D4A15E7BEAD86C5A6E3739ABA5F53351F5AD04AC3349",
-    "routing_evaluation_capsule_sha256": "E985E67591C840EA63B02A314FC5357D239824C91CF342E77558410B53A10377",
-    "routing_result_sha256": "F8DD81F0C82D2048C4F55FCB24FE758CFFEE2084109357E3EF14364520ED0E87",
+    "routing_evaluation_capsule_sha256": "77052D80D2AB879F05FBF8B70CD9B123AE96F948A3993DF1F04A8D0CBC0A53F8",
+    "routing_result_sha256": "FC36E9A4484BB05C69EEC4F300D4E122ED016BE83073F4D9361525666D4DA3F6",
     "cases": [
       {
         "id": "architecture-discovery-before-implementation",

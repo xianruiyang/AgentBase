@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "",
+  "owner": "root",
+  "result_ref": "results/T002-RULE-AUDIT.r4.json",
+  "revision": 4,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T002-RULE-AUDIT"
+}

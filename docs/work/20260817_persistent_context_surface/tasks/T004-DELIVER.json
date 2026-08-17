@@ -1,0 +1,49 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "独立评估证据",
+        "Token 与恢复充分性证据",
+        "部署候选 Validate 结果"
+      ],
+      "id": "T003-VERIFY",
+      "type": "hard"
+    }
+  ],
+  "id": "T004-DELIVER",
+  "mutation_scope": [
+    "docs/plan.md",
+    "docs/handoff.md",
+    "docs/work/20260817_persistent_context_surface/**"
+  ],
+  "outcome": "项目计划、handoff、完成审计和 Git 历史准确区分已发布基线与未发布候选，并覆盖全部当前目标",
+  "outputs": [
+    "当前范围完成审计",
+    "准确的项目计划与接手状态",
+    "已同步但未再次发布的仓库候选"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-004",
+    "DES-004",
+    "AC-003",
+    "AC-004",
+    "REQ-001",
+    "UDES-001",
+    "UDES-002",
+    "CON-001",
+    "CON-002"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "delivery-workflow",
+    "task-table-manager"
+  ],
+  "title": "闭合项目状态并交付未发布候选",
+  "verification": [
+    "逐项复核全部 REQ、AC、UDES、CON 和 DCR",
+    "确认远端提交与本机已发布基线分离且未执行第二次 Publish"
+  ]
+}

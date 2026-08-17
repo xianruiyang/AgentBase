@@ -1,0 +1,41 @@
+{
+  "dependencies": [],
+  "id": "T002-RULE-AUDIT",
+  "mutation_scope": [
+    "global/AGENTS.md",
+    "skills/*/SKILL.md",
+    "development/skill-routing/**",
+    "docs/work/20260817_persistent_context_surface/**"
+  ],
+  "outcome": "全局规则和 11 个 skill description 已按预加载必要性逐项裁决，并形成可由 T003 独立验证的常驻读取面候选",
+  "outputs": [
+    "给 T003 使用的逐项必要性审计",
+    "待独立验证的常驻读取面候选"
+  ],
+  "reasoning_hint": "high",
+  "revision": 2,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-002",
+    "GAP-001",
+    "DES-001",
+    "DES-002",
+    "AC-001",
+    "AC-002",
+    "AC-004",
+    "REQ-001",
+    "UDES-001",
+    "CON-001",
+    "CON-002"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "delivery-workflow"
+  ],
+  "title": "审计并收敛常驻规则与 skill 路由描述",
+  "verification": [
+    "逐项记录 owner、读取时点、删除后果和采纳结论",
+    "检查 description 与 trigger cases 的正向、负向及协同边界",
+    "静态路由合同覆盖全部 76 个既有用例"
+  ]
+}
