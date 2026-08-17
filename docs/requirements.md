@@ -521,3 +521,11 @@ AgentBase 应把模型直接读取、生成或修改的工具返回、文件、�
 - 关联: REQ-002, REQ-007, REQ-008, REQ-010
 
 AgentBase 自有规则、skill、工具、MCP、构建、测试、部署和发布只以 Windows 宿主为维护与验收对象，不建立 Linux、macOS 或其他非 Windows 平台的安装入口、运行时、兼容承诺、测试矩阵或延期路线。第三方依赖、外部协议和文件格式中不可避免的平台术语不构成项目支持声明；已经退出的非 Windows 资产不得继续作为正式入口或发布负担保留。
+
+## CON-007 项目不使用远程 CI
+
+- 状态: confirmed
+- 来源: 用户明确确认 AgentBase 完全不需要远程 CI
+- 关联: REQ-007, REQ-008, REQ-010
+
+AgentBase 不维护 GitHub Actions 或其他远程 CI workflow、runner、required check 和计费自动化；远端仓库只承担源码与历史同步。项目验证通过 Windows 主机上的正式本地入口按实际影响范围执行，缺少远程 CI 不构成维护缺口。重新引入任何远程 CI 必须先由用户修订本约束并明确接受其外部执行与资源成本。

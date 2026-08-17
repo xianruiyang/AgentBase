@@ -487,20 +487,19 @@ foreach ($markdownFile in $allMarkdownFiles) {
     Assert-MarkdownRelativeLinks -Path $markdownFile.FullName
 }
 
-$workflowPath = Join-Path $ProjectRoot ".github\workflows\validate.yml"
-$workflowContent = Get-Content -LiteralPath $workflowPath -Raw -Encoding UTF8
-Assert-True ($workflowContent.Contains("npm run verify:release")) "Repository CI does not run the vscode-lsp-mcp release gate"
-Assert-True ($workflowContent.Contains("rustsec/audit-check@")) "Repository CI does not run the RustSec gate"
-Assert-True ($workflowContent.Contains("srcq-windows:")) "Repository CI is missing the Windows srcq native gate"
-Assert-True ($workflowContent.Contains("validate_routing_results.ps1") -and $workflowContent.Contains("evidence\current.json")) "Repository CI does not validate current routing-policy evidence"
-Assert-True ($workflowContent.Contains("test_routing_fingerprint.ps1")) "Repository CI does not verify line-ending-neutral routing fingerprints"
-Assert-True ($workflowContent.Contains("test_routing_capsule.ps1")) "Repository CI does not verify the detached routing capsule boundary"
-Assert-True ($workflowContent.Contains("test_send_qq_message.ps1")) "Repository CI does not run the direct QQ message regression test"
-Assert-True ($workflowContent.Contains("build_plugin.ps1") -and $workflowContent.Contains("-SkipOfficialValidation")) "Repository CI does not build the plugin package with its portable contract"
-$unpinnedActions = @([regex]::Matches($workflowContent, '(?m)^\s*-?\s*uses:\s*[^@\s]+@(?<ref>[^\s#]+)') | Where-Object {
-    $_.Groups["ref"].Value -notmatch '^[0-9a-f]{40}$'
-})
-Assert-True ($unpinnedActions.Count -eq 0) "Repository CI contains an action that is not pinned to a full commit SHA"
+$workflowRoot = Join-Path $ProjectRoot ".github\workflows"
+$workflowFiles = if (Test-Path -LiteralPath $workflowRoot -PathType Container) {
+    @(Get-ChildItem -LiteralPath $workflowRoot -Recurse -Force -File)
+} else {
+    @()
+}
+$requirementsPath = Join-Path $ProjectRoot "docs\requirements.md"
+$requirementsContent = Get-Content -LiteralPath $requirementsPath -Raw -Encoding UTF8
+Assert-True ($workflowFiles.Count -eq 0) "Repository contains a remote CI workflow despite the no-remote-CI contract"
+Assert-True ($requirementsContent.Contains("CON-007 项目不使用远程 CI")) "Project requirements do not record the user-confirmed no-remote-CI constraint"
+Assert-True ($projectAgentsContent.Contains("本项目不维护 GitHub Actions 或其他远程 CI")) "Project AGENTS.md does not prevent remote CI from being reintroduced"
+Assert-True ($readmeContent.Contains("本仓库不维护远程 CI")) "README still treats remote CI as a project verification entry"
+Assert-True ($planContent.Contains("项目验证只通过 Windows 主机上的正式本地入口")) "Project plan does not route validation to local Windows entry points"
 
 $payloadContractPath = Join-Path $ProjectRoot "development\common\payload_contract.ps1"
 $pluginBuilderPath = Join-Path $ProjectRoot "development\plugin-packaging\build_plugin.ps1"

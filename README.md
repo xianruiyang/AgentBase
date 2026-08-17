@@ -46,7 +46,7 @@ AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、ski
 
 ## 验证与发布导航
 
-按实际影响范围运行对应组件说明中的最小充分验证。仓库持续验证入口是 [`.github/workflows/validate.yml`](.github/workflows/validate.yml)；全局规则、skill 与项目静态关系由 [`validate_contract.ps1`](development/skill-routing/validate_contract.ps1) 检查，部署合同由 [`manage_agentbase.ps1`](development/codex-deployment/manage_agentbase.ps1) 校验。
+本仓库不维护远程 CI，GitHub Actions 也不是项目验证入口；远端只承担源码与历史同步。按实际影响范围在 Windows 主机运行对应组件说明中的最小充分验证：全局规则、skill 与项目静态关系由 [`validate_contract.ps1`](development/skill-routing/validate_contract.ps1) 检查，部署合同由 [`manage_agentbase.ps1`](development/codex-deployment/manage_agentbase.ps1) 校验，其他组件沿各自 README 或清单中的正式本地入口验证。
 
 插件构建、Codex 发布模式、主机前置条件、只读状态和回滚命令分别由[插件打包说明](development/plugin-packaging/README.md)与[部署说明](development/codex-deployment/README.md)维护。每次向真实 Codex 根目录执行 `Publish` 前都必须取得用户针对该次发布的明确同意；Git 同步、此前发布授权或验证通过均不能替代。
 

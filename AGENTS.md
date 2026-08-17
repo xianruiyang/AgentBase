@@ -10,6 +10,8 @@ must: 由部署入口显式传入的 Codex 根目录中的同名内容是安装�
 
 must: 本项目只维护 Windows 宿主；项目自有规则、skill、工具、MCP、构建、测试、部署和发布不得新增或保留非 Windows 平台的正式入口、运行时、兼容承诺、测试矩阵或延期路线，外部协议与文件格式中的平台术语不因此改写
 
+must: 本项目不维护 GitHub Actions 或其他远程 CI workflow、runner、required check 和计费自动化；远端仓库只承担源码与历史同步，项目验证通过 Windows 主机上的正式本地入口按影响范围执行，不得把缺少远程 CI 当作待修缺口；重新引入前必须取得用户对外部执行与资源成本的明确裁决
+
 ## 维护约定
 
 must: 修改前先读取根 `README.md` 和受影响组件最近的正式说明，只改变当前目标直接涉及的真源、合同和状态说明；纯只读源码定位只读取回答所缺的正式来源，不因本条加载 `README.md`
@@ -46,7 +48,7 @@ must: 全局规则或 skill 变更至少运行：
 & (Join-Path (Get-Location).Path 'development\skill-routing\validate_contract.ps1') -ProjectRoot (Get-Location).Path
 ```
 
-must: 全局规则、skill 内容、外部 skill 共存摘要或触发场景变化后，正式 `Validate` 或 `Publish` 前必须由只读取脱离仓库 capsule 的独立评估运行刷新 `development/skill-routing/evidence/current.json`，记录运行、模型、环境、UTC 时间、capsule 哈希和未访问仓库/隐藏期望的输入声明；部署入口与 CI 必须拒绝身份或声明缺失、哈希过期、缺项或违反期望、禁选及严格路由约束的证据
+must: 全局规则、skill 内容、外部 skill 共存摘要或触发场景变化后，正式 `Validate` 或 `Publish` 前必须由只读取脱离仓库 capsule 的独立评估运行刷新 `development/skill-routing/evidence/current.json`，记录运行、模型、环境、UTC 时间、capsule 哈希和未访问仓库/隐藏期望的输入声明；正式 `Validate` 与 `Publish` 必须拒绝身份或声明缺失、哈希过期、缺项或违反期望、禁选及严格路由约束的证据
 
 must: 修改 `global/config.toml`、`global/hooks.template.json`、`global/agents/` 或部署合同后运行：
 
