@@ -1,0 +1,60 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "taskctl 双视图实现与组件证据"
+      ],
+      "id": "T002-TASKCTL-VIEWS",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "workctl 双视图实现与组件证据"
+      ],
+      "id": "T003-WORKCTL-VIEWS",
+      "type": "hard"
+    }
+  ],
+  "id": "T004-VERIFY-DELIVER",
+  "mutation_scope": [
+    "development/skill-routing/**",
+    "global/README.md",
+    "skills/delivery-workflow/SKILL.md",
+    "skills/powershell-usage/SKILL.md",
+    "docs/plan.md",
+    "docs/handoff.md",
+    "docs/work/20260817_model_visible_tool_output_contract/**"
+  ],
+  "outcome": "两项 CLI 的模型质量、机器稳定性、消费者迁移和 Token 收益具有直接证据，项目计划与接手状态准确反映未发布的新版本",
+  "outputs": [
+    "真实工作区输出与 Token 审计",
+    "项目级合同、路由和部署候选验证",
+    "总计划、完成审计与 handoff"
+  ],
+  "reasoning_hint": "max",
+  "revision": 4,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-004",
+    "GAP-003",
+    "DES-005",
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "AC-003",
+    "AC-005",
+    "AC-008",
+    "CON-001",
+    "CON-002",
+    "CON-003"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "delivery-workflow",
+    "task-table-manager"
+  ],
+  "title": "验证消费者迁移并完成交付",
+  "verification": [
+    "运行真实工作区读回、组件回归、静态合同、独立路由评估和部署候选 Validate，并执行跨契约完成审计"
+  ]
+}

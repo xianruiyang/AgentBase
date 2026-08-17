@@ -1,0 +1,121 @@
+{
+  "changed_files": [
+    "development/skill-routing/evidence/current.json",
+    "development/skill-routing/validate_contract.ps1",
+    "global/README.md",
+    "skills/delivery-workflow/SKILL.md",
+    "skills/powershell-usage/SKILL.md",
+    "docs/plan.md",
+    "docs/handoff.md",
+    "docs/work/20260817_model_visible_tool_output_contract/output-audit.md",
+    "docs/work/20260817_model_visible_tool_output_contract/consumer-impact.md",
+    "docs/work/20260817_model_visible_tool_output_contract/completion-audit.md"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "UDES-001",
+    "UDES-002",
+    "UDES-003",
+    "CON-001",
+    "CON-002",
+    "CON-003",
+    "DES-005",
+    "GAP-003",
+    "SOL-004"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "quality-token-audit",
+      "note": "真实工作区逐项证明模型决策充分性，并用 o200k_base 比较 model、machine 与同投影格式",
+      "ref": "docs/work/20260817_model_visible_tool_output_contract/output-audit.md"
+    },
+    {
+      "kind": "consumer-impact",
+      "note": "沿正式 owner 复核 srcq、MCP、事件日志、推理深度、QQ 与开发入口，没有把未迁移组件误标为已完成",
+      "ref": "docs/work/20260817_model_visible_tool_output_contract/consumer-impact.md"
+    },
+    {
+      "kind": "independent-evaluation",
+      "note": "Routing 74、Policy 74、References 19 由三个不同 detached capsule 运行生成并通过身份、期望、禁选与严格约束校验",
+      "ref": "development/skill-routing/evidence/current.json"
+    },
+    {
+      "kind": "completion-audit",
+      "note": "跨目标、消费者、边界与发布状态完成审计",
+      "ref": "docs/work/20260817_model_visible_tool_output_contract/completion-audit.md"
+    },
+    {
+      "kind": "superseded-result-diagnostic",
+      "note": "r3 曾将 CON-002 列为证据但没有消费其执行来源；该历史结果保持不改写，由本结果显式消费并重新验证",
+      "ref": "docs/work/20260817_model_visible_tool_output_contract/results/T004-VERIFY-DELIVER.r3.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "taskctl/workctl 的同源模型与机器输出面已在真实消费者、语义预算、UTF-8、机器兼容、路由和部署候选层完成验证；本后继执行显式消费 CON-002 并以完整来源快照重新覆盖全部目标与约束，历史 r3 诊断保持可见",
+  "outputs": [
+    "taskctl/workctl 真实输出与 Token 审计",
+    "全项目消费者影响复核",
+    "74/74 Routing、74 Policy、19/19 References 当前证据",
+    "DirectCompatibility 部署候选 Validate",
+    "总计划、完成审计与未发布 handoff",
+    "包含 CON-002 的完整后继执行来源快照"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:ce150ed6ba0608f0e91f684013c350548fd5f997db4e0bc2afa7a45a296e66fb",
+    "AC-002": "sha256:9225074c566db451e97f06bce138ead48d29a9a909f1eb2587e724064b28bffe",
+    "AC-003": "sha256:7615fd70caa6ba1dbae9cd85a19147218324c58ab2957bfb16e70112da18d9eb",
+    "AC-004": "sha256:1901a45e8c7476e04048c61fd8a86b739de9ca1419320a79ee5e7841c0a2a561",
+    "AC-005": "sha256:44a6ed84f38228a4f9903a4d5c96d3ed8a2941a3f5f8db65ab8d384c93e6aa9f",
+    "AC-006": "sha256:7f04d6265954d9582a8f92f7922e185a8f9ea1b5d9cbe0b4c8f0133e367b9e7a",
+    "AC-007": "sha256:10a4be90dfd78878ea5f629fcbe3ca3e2a603634913b1bee0861d8e36e3fdb6e",
+    "AC-008": "sha256:3923a0407beee1e45b579ecc3e4083cfa3cf38b91769b49c04bad77103eff32b",
+    "CON-001": "sha256:6c4266e6c0615a3fee64b9e116b75d2c65654f7b8c0d4ca8222b2e54f38ccf2a",
+    "CON-002": "sha256:79048f20823191a4c7817fea5abe36396ee6cb78b4cafb7dac730dc7eb331e27",
+    "CON-003": "sha256:f8d7416c9ecd6eccd4663eaafcf9a0acd63f16e73897fd24b78fb543f353b464",
+    "DES-001": "sha256:c4caf7ed083e6bf2f23f7dfb08ea8737100224107b61dcca5051f777694c0521",
+    "DES-002": "sha256:28533a0a2c3d6b9a6863471f6a33fc55ba54493b83c11de9d92adbe7592002f9",
+    "DES-003": "sha256:e7ab8235bf2e825160b1aadf7d1f6c630e961228a8185815ac73d35cf88d5b02",
+    "DES-004": "sha256:21ec3ce0096bdbb1e8da4ca0947f6b289fe88b65277d069fca93d9d8074a5105",
+    "DES-005": "sha256:5f3f996880acc1198f1897ba88f111c5c5850439c68225c5a4954f8799859b8d",
+    "GAP-001": "sha256:2679f49fa930deedc790e938eea17423166abc1cb51a5eec944fba938554efed",
+    "GAP-002": "sha256:2d8d24d2981f478b749d8b3e716821bf154b8fdb2a581c3719d925b20c06896d",
+    "GAP-003": "sha256:d2f6492ebe20e95812ee12d9c339468993c13639621189720b3e10add1ff85e1",
+    "OBS-001": "sha256:169bec4aa597484635dee922974b0aa2df6b3cc329921e1a8141cf8cc4c21a85",
+    "OBS-002": "sha256:ed31deba5740bb251d58b53f3f8b1fabec105e9ce6f3c93c3881c66395dfb22c",
+    "OBS-003": "sha256:b015f3a840f4267a2cf32103b2e89b5dd8a19267c0b436e98f1b94201a68c822",
+    "OBS-004": "sha256:27bf9b606178a991a1c20e8f939cbd5b4bf0bdf226c9803c414eb14016366688",
+    "OBS-005": "sha256:b92465ea7be1dd614236f6b75cf5165567655d0062554c8cf5feabe511f212b5",
+    "REQ-001": "sha256:d579f951c346ac16b4e0afc11eb553841c9103e62c57cbcd0d5e3624fd18f96c",
+    "REQ-002": "sha256:75a82a30a32b50ed6e717fc2a0e9067224248592b8f05c8bcc2a449d62251ce7",
+    "REQ-003": "sha256:36d7a74301b2c15d957b92eb6bcb6a768a5bbfd686f01c6f526fcd67b44c8b25",
+    "SOL-001": "sha256:15516d5ea34ae8710715de3e65548adb46a6ad245e0fe69e39cc603719173522",
+    "SOL-002": "sha256:6db29469fd2873976e777682e3664319b709e6401c3d1e2344212acc1abbc814",
+    "SOL-003": "sha256:b40ca66368f7e2781ebc1832644c64f861def010c6bd9f65583cc8157e868c89",
+    "SOL-004": "sha256:507d4a0fa15989dd92011b5b99b353478f09f65c7954eca76c1a5dd1d36827fa",
+    "UDES-001": "sha256:1499231578f1e445652c1b8b14f3c6a81a45fba2e17db65f77a86a44d3464cad",
+    "UDES-002": "sha256:3e0a47247e3ee1110cfabbfc9d538608e6a56f2c920fe53be25dbe4c58fd2ac2",
+    "UDES-003": "sha256:3a99472b6c1251f36085939e09f4ff69d79e7edb708ca57fca77185ffcb75732"
+  },
+  "task_id": "T004-VERIFY-DELIVER",
+  "task_revision": 4,
+  "unresolved": [],
+  "verification": [
+    "task-table-manager：70/70 tests passed；delivery-workflow：35/35 tests passed",
+    "真实工作区 model/machine 质量与 o200k_base Token 审计通过；同投影 HJSON 风格优于 compact JSON 与块状 YAML",
+    "validate_contract.ps1：74 cases、34 strict routing、5 strict reference、11/11 skill 正反覆盖通过",
+    "detached evaluation：Routing 74/74、Policy 74、References 19/19；仅 1 个非严格额外选择警告",
+    "manage_agentbase.ps1 -Action Validate：DirectCompatibility 候选通过，未执行 Publish",
+    "后继 context：source_snapshot_complete=true，34 个来源含 CON-002，0 diagnostics"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "dependencies": [],
+  "id": "T001-CONTRACTS-RULES",
+  "mutation_scope": [
+    "AGENTS.md",
+    "global/AGENTS.md",
+    "docs/requirements.md",
+    "docs/work/20260817_model_visible_tool_output_contract/**",
+    "skills/task-table-manager/SKILL.md",
+    "skills/task-table-manager/references/tooling.md",
+    "skills/delivery-workflow/SKILL.md",
+    "skills/delivery-workflow/references/tooling.md",
+    "development/skill-routing/validate_contract.ps1"
+  ],
+  "outcome": "项目根需求、全局模型调用原则、项目维护规则和两个 skill 的正式合同共同定义同源 model/machine 输出面，且没有复制领域决定",
+  "outputs": [
+    "消费者感知输出的项目根需求",
+    "最低充分作用域的全局与项目规则",
+    "供 taskctl 与 workctl 实现消费的正式输出面合同"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-001",
+    "GAP-001",
+    "DES-001",
+    "DES-002",
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "AC-001",
+    "AC-004",
+    "AC-006",
+    "UDES-001",
+    "UDES-002",
+    "UDES-003"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "delivery-workflow"
+  ],
+  "title": "建立输出面正式合同与规则链",
+  "verification": [
+    "检查项目需求、全局规则、项目规则和两个 skill 的职责边界、引用及静态合同"
+  ]
+}

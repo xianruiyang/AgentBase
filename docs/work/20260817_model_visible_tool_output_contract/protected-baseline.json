@@ -1,0 +1,39 @@
+{
+  "confirmation_ref": "conversation:2026-08-17-model-visible-tool-output-principle",
+  "confirmed_by": "user",
+  "cycle_id": "cycle-001",
+  "documents": {
+    "requirements": {
+      "fingerprint": "sha256:3e0d27b2df715c50cf09430fe86cdbc4f01cddd8dbed28a18a0605093d2bd607",
+      "ids": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006",
+        "AC-007",
+        "AC-008",
+        "CON-001",
+        "CON-002",
+        "CON-003",
+        "REQ-001",
+        "REQ-002",
+        "REQ-003"
+      ],
+      "path": "requirements.md"
+    },
+    "user_design": {
+      "fingerprint": "sha256:9498789c3a722df5ba8e65beee8fefd0b7edc1bf0cdf71391091bc2f09e71e3f",
+      "ids": [
+        "UDES-001",
+        "UDES-002",
+        "UDES-003"
+      ],
+      "path": "user-design.md"
+    }
+  },
+  "history": [],
+  "schema": "delivery.protected-baseline",
+  "workflow_id": "agentbase-model-visible-tool-output-contract"
+}

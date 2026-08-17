@@ -77,8 +77,28 @@ class TaskctlTests(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         environment = dict(os.environ)
         environment["PYTHONUTF8"] = "1"
+        arguments = list(args)
+        if "--view" not in arguments and not any(
+            argument.startswith("--view=") for argument in arguments
+        ):
+            arguments.extend(["--view", "machine"])
         return subprocess.run(
-            [sys.executable, "-X", "utf8", str(script), *args],
+            [sys.executable, "-X", "utf8", str(script), *arguments],
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            env=environment,
+            check=False,
+        )
+
+    def run_default_cli(
+        self, script: Path, *args: str
+    ) -> subprocess.CompletedProcess[str]:
+        environment = dict(os.environ)
+        environment.pop("PYTHONUTF8", None)
+        environment.pop("PYTHONIOENCODING", None)
+        return subprocess.run(
+            [sys.executable, str(script), *args],
             text=True,
             capture_output=True,
             encoding="utf-8",
@@ -279,6 +299,100 @@ class TaskctlTests(unittest.TestCase):
             "--expected-state-revision",
             str(started["state"]["revision"]),
         )
+
+    def test_default_model_view_is_sparse_and_machine_is_explicit(self) -> None:
+        model = self.run_default_cli(
+            TASKCTL, "status", "--task-dir", str(self.root)
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("tasks:", model.stdout)
+        self.assertNotIn('"command"', model.stdout)
+        self.assertNotIn('"ok"', model.stdout)
+        self.assertFalse(model.stdout.lstrip().startswith("{"))
+
+        machine = self.run_cli(
+            TASKCTL, "status", "--task-dir", str(self.root)
+        )
+        self.assertEqual(machine.returncode, 0, machine.stderr)
+        payload = json.loads(machine.stdout)
+        self.assertEqual(payload["task_count"], 2)
+        self.assertIn("total:2", model.stdout)
+
+    def test_context_model_budget_preserves_core_and_provenance(self) -> None:
+        model = self.run_default_cli(
+            TASKCTL,
+            "context",
+            "--id",
+            "T001",
+            "--task-dir",
+            str(self.root),
+            "--model-token-budget",
+            "2048",
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("task:", model.stdout)
+        self.assertIn("实现导出职责", model.stdout)
+        self.assertIn("source_snapshot:", model.stdout)
+        self.assertIn("source_snapshot_complete:true", model.stdout)
+        module = load_taskctl_module()
+        self.assertLessEqual(module.model_text_cost(model.stdout.rstrip()), 2048)
+
+        constrained = self.run_default_cli(
+            TASKCTL,
+            "context",
+            "--id",
+            "T001",
+            "--task-dir",
+            str(self.root),
+            "--model-token-budget",
+            "256",
+        )
+        self.assertEqual(constrained.returncode, 0, constrained.stderr)
+        self.assertIn("more:", constrained.stdout)
+        self.assertTrue(
+            "task:" in constrained.stdout or "id: T001" in constrained.stdout
+        )
+        self.assertNotEqual(
+            constrained.stdout.strip(),
+            "hint: increase --budget or use show/deps/context with a narrower target",
+        )
+        self.assertLessEqual(
+            module.model_text_cost(constrained.stdout.rstrip()), 256
+        )
+
+    def test_completion_model_omits_full_source_snapshot(self) -> None:
+        self.complete_t001()
+        machine = self.run_task(
+            "completion-context", "--target-id", "REQ-001", "--budget", "12000"
+        )
+        self.assertTrue(
+            machine["candidate_tasks"]["T001"]["source_snapshot"]
+        )
+        model = self.run_default_cli(
+            TASKCTL,
+            "completion-context",
+            "--target-id",
+            "REQ-001",
+            "--task-dir",
+            str(self.root),
+            "--model-token-budget",
+            "4096",
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("targets:", model.stdout)
+        self.assertIn("candidates:", model.stdout)
+        self.assertNotIn("source_snapshot:", model.stdout)
+        self.assertIn("verification:", model.stdout)
+
+    def test_model_error_keeps_gate_and_recovery(self) -> None:
+        result = self.run_default_cli(
+            TASKCTL, "show", "--id", "UNKNOWN", "--task-dir", str(self.root)
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("error:", result.stderr)
+        self.assertIn("gate:", result.stderr)
+        self.assertIn("recovery:", result.stderr)
+        self.assertNotIn('"ok"', result.stderr)
 
     def test_next_is_advisory_and_dependency_query_is_compact(self) -> None:
         next_payload = self.run_task("next")

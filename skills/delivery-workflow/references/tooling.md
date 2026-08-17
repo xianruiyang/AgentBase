@@ -6,6 +6,14 @@
 python <SkillDir>/scripts/workctl.py <command> --work-dir <AbsoluteWorkDir>
 ```
 
+## 输出面
+
+- `--view model` 是默认值，面向直接进入 Codex 上下文的结果；使用分行的紧凑 HJSON 风格文本，只保留当前阶段判断、动作、影响或恢复需要的字段，并省略成功 envelope、空集合、默认零值和正常机器身份。该视图服务模型阅读，不承诺机器解析；程序必须使用 machine 视图。
+- model 与 machine stdout/stderr 均由 CLI 固定为 UTF-8，不依赖 Windows 当前控制台代码页。
+- `--view machine` 面向程序、测试和完整字段检查，保持既有紧凑 JSON 合同；需要缩进 JSON 时同时使用 `--pretty`。`--pretty` 不适用于 model 视图。
+- 两种视图来自同一次工作区索引或命令事实计算；renderer 不重新裁决需求、状态、关系、目标保护或完成语义。模型预算由 `--model-token-budget` 控制并在选择 section 前生效；machine `context` 的既有 `--budget` 仍表示 JSON 字符预算。
+- 依赖原默认 JSON 的调用方迁移为显式 `--view machine`；没有已证实消费者时不增加永久兼容分支。
+
 ## 常用命令
 
 ```text
@@ -15,12 +23,12 @@ outline   返回某阶段的条目类型、当前 manifest 文档路径和建议
 index     从当前 Markdown 重建 .work-cache/index.json
 status    摘要报告语义条目和可读取的任务状态
 coverage  报告各类 ID、未决项和引用分布
-context   在字符预算内返回某个 ID 及邻接条目
+context   model 按 Token 预算、machine 按字符预算返回某个 ID 及邻接条目
 impact    递归返回显式引用指定 ID 的下游条目及首条依赖路径
 render    生成 WORK_STATUS.md 只读视图
 ```
 
-这些命令都是可选辅助；文件量小或 CLI 不可用时可直接读写阶段文档。`outline` 从当前 `workflow.json` 返回阶段实际登记的文档路径，不用内置模板文件名替代项目正式位置。索引及查询结果中每个条目的 `document` 同样保留该完整工作区相对路径，不退化为文件名；不同目录中的同名文档仍可唯一定位。默认输出为有界紧凑 JSON，人工阅读时使用 `--pretty`。`context` 必须设置合理 `--budget`，仍需更多内容时按返回 ID 精确读取。
+这些命令都是可选辅助；文件量小或 CLI 不可用时可直接读写阶段文档。`outline` 从当前 `workflow.json` 返回阶段实际登记的文档路径，不用内置模板文件名替代项目正式位置。索引及查询结果中每个条目的 `document` 同样保留该完整工作区相对路径，不退化为文件名；不同目录中的同名文档仍可唯一定位。默认输出为有界 model 视图，程序解析时显式使用 machine 视图。`context` 的 model 视图按语义 section 选择当前 ID、直接关系和必要正文，预算不足时保留目标身份、位置和精确恢复；machine 视图继续使用既有 `--budget` 字符预算，仍需更多内容时按返回 ID 精确读取。
 
 `workflow.json` 中 `protected-baseline.json`、`.work-cache/index.json`、`WORK_STATUS.md` 和 `task-table.json` 的管理路径固定；阶段文档路径可按项目正式位置配置。固定管理路径只防止缓存或视图覆盖语义真源、任务合同或结果。
 

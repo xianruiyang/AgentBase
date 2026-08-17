@@ -45,8 +45,26 @@ class WorkctlTests(unittest.TestCase):
     def run_cli(self, *args: str) -> subprocess.CompletedProcess[str]:
         environment = dict(os.environ)
         environment["PYTHONUTF8"] = "1"
+        arguments = list(args)
+        if "--view" not in arguments and not any(
+            argument.startswith("--view=") for argument in arguments
+        ):
+            arguments.extend(["--view", "machine"])
         return subprocess.run(
-            [sys.executable, "-X", "utf8", str(SCRIPT), *args],
+            [sys.executable, "-X", "utf8", str(SCRIPT), *arguments],
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            env=environment,
+            check=False,
+        )
+
+    def run_default_cli(self, *args: str) -> subprocess.CompletedProcess[str]:
+        environment = dict(os.environ)
+        environment.pop("PYTHONUTF8", None)
+        environment.pop("PYTHONIOENCODING", None)
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), *args],
             text=True,
             capture_output=True,
             encoding="utf-8",
@@ -160,6 +178,65 @@ class WorkctlTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         return self.payload(result)
+
+    def test_default_model_view_is_sparse_and_machine_is_explicit(self) -> None:
+        model = self.run_default_cli("status", "--work-dir", str(self.root))
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("semantic:", model.stdout)
+        self.assertNotIn('"command"', model.stdout)
+        self.assertNotIn('"ok"', model.stdout)
+        self.assertNotIn("unresolved_count:0", model.stdout)
+        self.assertFalse(model.stdout.lstrip().startswith("{"))
+
+        machine = self.run_cli("status", "--work-dir", str(self.root))
+        self.assertEqual(machine.returncode, 0, machine.stderr)
+        payload = self.payload(machine)
+        self.assertEqual(payload["semantic"]["section_count"], 8)
+        self.assertIn("section_count:8", model.stdout)
+
+    def test_context_model_budget_preserves_section_and_recovery(self) -> None:
+        model = self.run_default_cli(
+            "context",
+            "--work-dir",
+            str(self.root),
+            "--id",
+            "REQ-001",
+            "--model-token-budget",
+            "2048",
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("sections:", model.stdout)
+        self.assertIn("REQ-001", model.stdout)
+        self.assertIn("导出当前结果", model.stdout)
+        self.assertIn("body:", model.stdout)
+        module = load_workctl_module()
+        self.assertLessEqual(module.model_text_cost(model.stdout.rstrip()), 2048)
+
+        constrained = self.run_default_cli(
+            "context",
+            "--work-dir",
+            str(self.root),
+            "--id",
+            "REQ-001",
+            "--model-token-budget",
+            "256",
+        )
+        self.assertEqual(constrained.returncode, 0, constrained.stderr)
+        self.assertIn("more:", constrained.stdout)
+        self.assertIn("REQ-001", constrained.stdout)
+        self.assertLessEqual(
+            module.model_text_cost(constrained.stdout.rstrip()), 256
+        )
+
+    def test_model_error_keeps_gate_and_recovery(self) -> None:
+        result = self.run_default_cli(
+            "context", "--work-dir", str(self.root), "--id", "UNKNOWN"
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("error:", result.stderr)
+        self.assertIn("gate:", result.stderr)
+        self.assertIn("recovery:", result.stderr)
+        self.assertNotIn('"ok"', result.stderr)
 
     def test_init_index_and_protected_drift_is_advisory(self) -> None:
         before = self.run_cli("index", "--work-dir", str(self.root))

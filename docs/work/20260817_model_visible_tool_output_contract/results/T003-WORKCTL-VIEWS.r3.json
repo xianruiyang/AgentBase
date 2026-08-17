@@ -1,0 +1,81 @@
+{
+  "changed_files": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py"
+  ],
+  "evidence_for": [
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "DES-003",
+    "DES-004",
+    "CON-001"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "note": "35 项 machine 兼容、默认 model、预算、错误、编码、索引与关系回归通过",
+      "ref": "skills/delivery-workflow/tests/test_workctl.py"
+    },
+    {
+      "kind": "audit",
+      "note": "真实完成工作区的 status/context 质量与 o200k Token 对比",
+      "ref": "docs/work/20260817_model_visible_tool_output_contract/output-audit.md"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "workctl 已从同一交付索引事实形成默认 model 与显式 machine 视图，阶段状态和上下文由交付域投影，中文输出不再依赖 Windows 控制台代码页",
+  "outputs": [
+    "与 taskctl 一致命名和编码的 model/machine 输出面",
+    "status、context 交付域投影与语义预算恢复",
+    "真实工作区中 status 76.4%、context 11.0% 的代表性 Token 降幅，必要阶段正文保持完整"
+  ],
+  "schema": "task.result",
+  "source_snapshot": {
+    "AC-001": "sha256:ce150ed6ba0608f0e91f684013c350548fd5f997db4e0bc2afa7a45a296e66fb",
+    "AC-002": "sha256:9225074c566db451e97f06bce138ead48d29a9a909f1eb2587e724064b28bffe",
+    "AC-003": "sha256:7615fd70caa6ba1dbae9cd85a19147218324c58ab2957bfb16e70112da18d9eb",
+    "AC-004": "sha256:1901a45e8c7476e04048c61fd8a86b739de9ca1419320a79ee5e7841c0a2a561",
+    "AC-005": "sha256:44a6ed84f38228a4f9903a4d5c96d3ed8a2941a3f5f8db65ab8d384c93e6aa9f",
+    "AC-006": "sha256:7f04d6265954d9582a8f92f7922e185a8f9ea1b5d9cbe0b4c8f0133e367b9e7a",
+    "AC-007": "sha256:10a4be90dfd78878ea5f629fcbe3ca3e2a603634913b1bee0861d8e36e3fdb6e",
+    "AC-008": "sha256:3923a0407beee1e45b579ecc3e4083cfa3cf38b91769b49c04bad77103eff32b",
+    "CON-001": "sha256:6c4266e6c0615a3fee64b9e116b75d2c65654f7b8c0d4ca8222b2e54f38ccf2a",
+    "DES-001": "sha256:c4caf7ed083e6bf2f23f7dfb08ea8737100224107b61dcca5051f777694c0521",
+    "DES-002": "sha256:28533a0a2c3d6b9a6863471f6a33fc55ba54493b83c11de9d92adbe7592002f9",
+    "DES-003": "sha256:e7ab8235bf2e825160b1aadf7d1f6c630e961228a8185815ac73d35cf88d5b02",
+    "DES-004": "sha256:21ec3ce0096bdbb1e8da4ca0947f6b289fe88b65277d069fca93d9d8074a5105",
+    "GAP-001": "sha256:2679f49fa930deedc790e938eea17423166abc1cb51a5eec944fba938554efed",
+    "GAP-002": "sha256:2d8d24d2981f478b749d8b3e716821bf154b8fdb2a581c3719d925b20c06896d",
+    "GAP-004": "sha256:c72be0cd0b2a253723209f599d7c3b0bf9331c9b2fc40f5ce2aafebd2f2f7e3e",
+    "OBS-001": "sha256:169bec4aa597484635dee922974b0aa2df6b3cc329921e1a8141cf8cc4c21a85",
+    "OBS-003": "sha256:b015f3a840f4267a2cf32103b2e89b5dd8a19267c0b436e98f1b94201a68c822",
+    "OBS-004": "sha256:27bf9b606178a991a1c20e8f939cbd5b4bf0bdf226c9803c414eb14016366688",
+    "OBS-006": "sha256:1bc5846f11c07c76b51649d88e7a4a637576787db122071b3e8a556866afb5f6",
+    "REQ-001": "sha256:d579f951c346ac16b4e0afc11eb553841c9103e62c57cbcd0d5e3624fd18f96c",
+    "REQ-002": "sha256:75a82a30a32b50ed6e717fc2a0e9067224248592b8f05c8bcc2a449d62251ce7",
+    "REQ-003": "sha256:36d7a74301b2c15d957b92eb6bcb6a768a5bbfd686f01c6f526fcd67b44c8b25",
+    "SOL-001": "sha256:15516d5ea34ae8710715de3e65548adb46a6ad245e0fe69e39cc603719173522",
+    "SOL-003": "sha256:b40ca66368f7e2781ebc1832644c64f861def010c6bd9f65583cc8157e868c89",
+    "UDES-001": "sha256:1499231578f1e445652c1b8b14f3c6a81a45fba2e17db65f77a86a44d3464cad",
+    "UDES-002": "sha256:3e0a47247e3ee1110cfabbfc9d538608e6a56f2c920fe53be25dbe4c58fd2ac2",
+    "UDES-003": "sha256:3a99472b6c1251f36085939e09f4ff69d79e7edb708ca57fca77185ffcb75732"
+  },
+  "task_id": "T003-WORKCTL-VIEWS",
+  "task_revision": 2,
+  "unresolved": [],
+  "verification": [
+    "python -m unittest skills.delivery-workflow.tests.test_workctl：35/35 通过",
+    "真实工作区 model 输出保留阶段摘要、目标 section、关系、正文、位置与恢复入口",
+    "o200k_base：status 360→85、context 1714→1526 tokens",
+    "未设置 PYTHONUTF8 且未使用 -X utf8 时中文 model/error 输出读回正确"
+  ]
+}

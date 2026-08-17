@@ -6,11 +6,19 @@
 python <SkillDir>/scripts/taskctl.py <command> --task-dir <AbsoluteTaskDir>
 ```
 
+## 输出面
+
+- `--view model` 是默认值，面向直接进入 Codex 上下文的结果；使用分行的紧凑 HJSON 风格文本，只保留缺失后会改变当前任务判断、动作、验证或恢复的字段，不输出正常成功 envelope、空集合、默认零值或重复机器身份。该视图服务模型阅读，不承诺机器解析；程序必须使用 machine 视图。
+- model 与 machine stdout/stderr 均由 CLI 固定为 UTF-8，不依赖 Windows 当前控制台代码页。
+- `--view machine` 面向程序、测试和完整字段检查，保持既有紧凑 JSON 合同；需要缩进 JSON 时同时使用 `--pretty`。`--pretty` 不适用于 model 视图。
+- 两种视图消费同一个命令 handler 的权威结果；renderer 不重新计算任务状态、诊断、候选关系、分页或证据时效。模型预算由 `--model-token-budget` 控制，并在选择语义单元时生效；机器 `context/show/completion-context` 的既有 `--budget` 仍表示 JSON 字符预算。
+- 若调用方此前依赖默认 JSON，迁移为显式 `--view machine`；没有已证实消费者时不保留第二个隐式默认入口。
+
 ## 查询与存储
 
 ```text
 init        建立固定 tasks/state/results 目录和 task-table.json
-draft       输出最小候选任务 JSON，不写文件
+draft       输出最小候选任务，不写文件；准备直接保存 JSON 时使用 machine 视图
 add/update  保存模型已编写的任务合同
 show/list   有界返回任务、状态、结果和局部诊断
 deps/dependents/impact  查询任务图；后继查询返回首条路径与该边消费内容
@@ -19,9 +27,11 @@ completion-context  从当前 Markdown 分页返回 REQ/AC/UDES、CON、全部 D
 status/render  生成可重建的执行摘要和 TASK_TABLE.md
 ```
 
-查询默认使用有界紧凑 JSON，需要时使用 `--pretty`。当任务很少或 CLI 不可用时，可直接维护并读取合同文档；CLI 不是开始、推进、完成或重开任务的许可者。
+查询默认使用有界 model 视图；程序解析时显式使用 machine 视图。当任务很少或 CLI 不可用时，可直接维护并读取合同文档；CLI 不是开始、推进、完成或重开任务的许可者。
 
 `status` 和 `render` 的结果摘要使用明确作用域：`referenced_result_count` 表示当前状态文件实际引用的结果数，`task_revision_stale_result_count` 只表示结果记录的任务 revision 与当前合同不一致，`source_snapshot_issue_result_count` 表示至少含一项来源快照缺失、不完整或陈旧诊断的结果数；同时返回含诊断结果数、结果诊断条目数和按 kind 计数。上述字段互不替代，也不表示目标证据充分或整体完成。
+
+`status` 的 model 视图只显示非零状态、异常、结果进展和实际诊断；正常空诊断、完整 protected baseline 及所有零计数只保留在 machine 视图。`context` 的 model 视图保留当前任务合同、状态、直接依赖、必要上游正文、来源快照、异常和恢复信息；来源快照是后续结果提交的直接工具输入，本版本不改变其事实表示。`completion-context` 的 model 视图保留目标、约束、DCR、候选结果摘要、诊断、证据引用、快照 ID 和精确游标，但省略候选结果中只供机器校验的完整来源指纹映射。
 
 `task-table.json` 的 `tasks/`、`state/`、`results/`、`.work-cache/index.json` 和 `TASK_TABLE.md` 路径固定，只为防止生成物覆盖语义真源或结果记录。
 

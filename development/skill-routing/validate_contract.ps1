@@ -84,6 +84,9 @@ $globalPath = Join-Path $ProjectRoot "global\AGENTS.md"
 $globalItem = Get-Item -LiteralPath $globalPath
 $globalContent = Get-Content -LiteralPath $globalPath -Raw -Encoding UTF8
 Assert-True ($globalItem.Length -le [int]$contract.global_max_bytes) "Global AGENTS.md is $($globalItem.Length) bytes; contract limit is $($contract.global_max_bytes)"
+Assert-True ($globalContent.Contains("先按实际消费者和当前判断、动作或恢复需要选择输出面")) "Global AGENTS.md is missing consumer-aware tool output selection"
+Assert-True ($globalContent.Contains("同一次权威事实计算形成消费者投影")) "Global AGENTS.md is missing same-source model/machine projection"
+Assert-True ($globalContent.Contains("实际 Token 成本和可读性选择")) "Global AGENTS.md still treats format names as token evidence"
 $projectAgentsPath = Join-Path $ProjectRoot "AGENTS.md"
 $projectAgentsItem = Get-Item -LiteralPath $projectAgentsPath
 $projectAgentsContent = Get-Content -LiteralPath $projectAgentsPath -Raw -Encoding UTF8
@@ -94,6 +97,8 @@ Assert-True (Test-Path -LiteralPath $planPath -PathType Leaf) "Project-wide plan
 Assert-True ($readmeContent.Contains("docs/plan.md")) "README does not point to docs/plan.md"
 Assert-True ($projectAgentsContent.Contains("docs/plan.md")) "Project AGENTS.md does not register docs/plan.md"
 Assert-True ($projectAgentsContent.Contains("普通组件内任务不因本条加载总计划")) "Project AGENTS.md does not keep the project-wide plan conditional"
+Assert-True ($projectAgentsContent.Contains("模型视图按当前动作投影最小充分证据")) "Project AGENTS.md is missing model-visible tool output maintenance responsibility"
+Assert-True ($projectAgentsContent.Contains("模型视图的决策充分性、预算内渐进恢复、机器视图的结构稳定性")) "Project AGENTS.md is missing cross-view verification"
 foreach ($ownerReadme in @(
     "global\README.md",
     "development\skill-routing\README.md",
@@ -289,6 +294,7 @@ Assert-True ($governorScriptContent.Contains('operation: "set"')) "reasoning-gov
 
 $taskTableSkillPath = Join-Path $ProjectRoot "skills\task-table-manager\SKILL.md"
 $taskTableSkillContent = Get-Content -LiteralPath $taskTableSkillPath -Raw -Encoding UTF8
+$taskTableToolingContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\task-table-manager\references\tooling.md") -Raw -Encoding UTF8
 Assert-True ($taskTableSkillContent.Contains('`$reasoning-governor`')) "task-table-manager must delegate reasoning depth to reasoning-governor"
 $taskTableScriptPath = Join-Path $ProjectRoot "skills\task-table-manager\scripts\taskctl.py"
 $taskTableScriptContent = Get-Content -LiteralPath $taskTableScriptPath -Raw -Encoding UTF8
@@ -297,6 +303,13 @@ Assert-True ($taskTableSkillContent.Contains('最终完成标准只来自 `$deli
 Assert-True ($taskTableSkillContent.Contains('`taskctl` 只辅助存储、索引、查询、上下文压缩和可重建视图')) "task-table-manager does not keep taskctl assistive"
 Assert-True ($taskTableSkillContent.Contains('优先继续当前目标链并缩短到最近可验证闭环的距离')) "task-table-manager is missing vertical validation closure selection"
 Assert-True ($taskTableScriptContent.Contains('command_completion_context')) "taskctl is missing its bounded final-review context"
+Assert-True ($taskTableScriptContent.Contains('task_model_projection')) "taskctl is missing its model projection owner"
+Assert-True ($taskTableScriptContent.Contains('choices=("model", "machine")')) "taskctl is missing explicit model/machine views"
+Assert-True ($taskTableScriptContent.Contains('sys.stdout.reconfigure(encoding="utf-8")')) "taskctl does not make model output independent of the Windows console code page"
+Assert-True ($taskTableScriptContent.Contains('compact_model')) "taskctl is missing its compact model renderer"
+Assert-True ($taskTableToolingContent.Contains('`--view model` 是默认值') -and $taskTableToolingContent.Contains('`--view machine` 面向程序')) "taskctl tooling does not define consumer output surfaces"
+Assert-True ($taskTableToolingContent.Contains('紧凑 HJSON 风格文本')) "taskctl tooling does not define the measured model representation"
+Assert-True ($taskTableToolingContent.Contains('completion-context') -and $taskTableToolingContent.Contains('省略候选结果中只供机器校验的完整来源指纹映射')) "taskctl model completion projection is not documented"
 Assert-True ($taskTableScriptContent.Contains('needs_review_count')) "taskctl status does not expose the review count"
 Assert-True ($taskTableScriptContent.Contains('upstream_index_derived_content_mismatch')) "taskctl does not bind cached index content to current workflow documents"
 Assert-True ($taskTableScriptContent.Contains('completion snapshot changed')) "taskctl completion pagination is missing snapshot consistency"
@@ -320,6 +333,7 @@ Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot "skills\task-table-m
 $deliveryRoot = Join-Path $ProjectRoot "skills\delivery-workflow"
 $deliverySkillContent = Get-Content -LiteralPath (Join-Path $deliveryRoot "SKILL.md") -Raw -Encoding UTF8
 $deliveryScriptContent = Get-Content -LiteralPath (Join-Path $deliveryRoot "scripts\workctl.py") -Raw -Encoding UTF8
+$deliveryToolingContent = Get-Content -LiteralPath (Join-Path $deliveryRoot "references\tooling.md") -Raw -Encoding UTF8
 $deliveryReferenceRoot = Join-Path $deliveryRoot "references"
 $deliveryCommonContractPath = Join-Path $deliveryReferenceRoot "artifact-contracts.md"
 $deliveryTargetContractPath = Join-Path $deliveryReferenceRoot "target-contracts.md"
@@ -339,6 +353,7 @@ Assert-True ($deliverySkillContent.Contains('模型设计、分析、方案、�
 Assert-True ($deliverySkillContent.Contains('Markdown 阶段文档是语义真源')) "delivery-workflow does not keep documents authoritative"
 Assert-True ($deliverySkillContent.Contains('当前消费者接入')) "delivery-workflow does not close shared responsibilities through current consumers"
 Assert-True ($deliverySkillContent.Contains('只增加当前动作所属的一项')) "delivery-workflow does not progressively route stage contracts"
+Assert-True ($deliverySkillContent.Contains('不因此额外读取目标合同')) "delivery-workflow does not prevent target-contract over-selection when confirmed targets are unchanged"
 Assert-True ($deliverySkillContent.Contains('target-contracts.md') -and $deliverySkillContent.Contains('planning-contracts.md') -and $deliverySkillContent.Contains('execution-contracts.md')) "delivery-workflow main entry does not route every stage owner"
 Assert-True ($deliveryTargetContractContent.Contains('## 需求分析') -and $deliveryTargetContractContent.Contains('## 用户设计') -and $deliveryTargetContractContent.Contains('## 延后讨论项')) "delivery-workflow protected-target contract is incomplete"
 Assert-True ($deliveryPlanningContractContent.Contains('## 模型设计') -and $deliveryPlanningContractContent.Contains('## 现状分析') -and $deliveryPlanningContractContent.Contains('## 方案设计')) "delivery-workflow planning contract is incomplete"
@@ -346,6 +361,12 @@ Assert-True ($deliveryExecutionContractContent.Contains('## 任务与结果') -a
 Assert-True ($deliveryIterationContent.Contains('## 执行上下文') -and $deliveryIterationContent.Contains('默认形成以下最小语义闭包')) "delivery-workflow does not define the minimum semantic execution closure"
 Assert-True ($deliveryIterationContent.Contains('目标或来源仍有歧义') -and $deliveryIterationContent.Contains('实际消费者、派生产物或旧路径需要影响传播') -and $deliveryIterationContent.Contains('进入最终完成复核')) "delivery-workflow does not define evidence-driven context expansion"
 Assert-True ($deliveryScriptContent.Contains('delivery.protected-baseline')) "workctl is missing protected baseline support"
+Assert-True ($deliveryScriptContent.Contains('work_model_projection')) "workctl is missing its model projection owner"
+Assert-True ($deliveryScriptContent.Contains('choices=("model", "machine")')) "workctl is missing explicit model/machine views"
+Assert-True ($deliveryScriptContent.Contains('sys.stdout.reconfigure(encoding="utf-8")')) "workctl does not make model output independent of the Windows console code page"
+Assert-True ($deliveryScriptContent.Contains('compact_model')) "workctl is missing its compact model renderer"
+Assert-True ($deliveryToolingContent.Contains('`--view model` 是默认值') -and $deliveryToolingContent.Contains('`--view machine` 面向程序')) "workctl tooling does not define consumer output surfaces"
+Assert-True ($deliveryToolingContent.Contains('紧凑 HJSON 风格文本')) "workctl tooling does not define the measured model representation"
 Assert-True ($deliveryScriptContent.Contains('baseline_source_drift')) "workctl does not report protected-source drift as a diagnostic"
 Assert-True ($deliveryScriptContent.Contains('exclusive_write_json')) "workctl protected baseline is not created exclusively"
 Assert-True ($deliveryScriptContent.Contains('baseline_has_no_final_target')) "workctl does not diagnose a snapshot without final targets"
@@ -423,6 +444,7 @@ Assert-True (Test-Path -LiteralPath (Join-Path $srcqRoot 'scripts\install-srcq.p
 $powerShellSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\powershell-usage\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($powerShellSkillContent.Contains('PowerShell 7（`pwsh`）')) "powershell-usage does not declare its PowerShell 7 baseline"
 Assert-True ($powerShellSkillContent.Contains('普通任务不重复探测版本')) "powershell-usage does not delegate host verification to environment initialization"
+Assert-True ($powerShellSkillContent.Contains('不因物理上写在一行而排除本 skill')) "powershell-usage does not distinguish a pipeline from one exact read-only cmdlet"
 Assert-True (-not $powerShellSkillContent.Contains('$PSVersionTable.PSVersion')) "powershell-usage performs redundant per-command host version detection"
 Assert-True (-not $powerShellSkillContent.Contains('Windows PowerShell 5.1')) "powershell-usage keeps obsolete Windows PowerShell 5.1 guidance"
 

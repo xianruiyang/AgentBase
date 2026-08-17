@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import importlib.util
 import json
@@ -17,10 +18,17 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
+
 MAX_JSON_BYTES = 2 * 1024 * 1024
 MAX_DOCUMENT_BYTES = 4 * 1024 * 1024
 MAX_RECORDS = 20_000
 DEFAULT_MAX_ITEMS = 50
+DEFAULT_MODEL_TOKEN_BUDGET = 2_048
 MAX_MANIFEST_TEXT = 2_000
 ID_PATTERN = r"(?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-[A-Za-z0-9][A-Za-z0-9._-]*"
 ID_RE = re.compile(rf"\b({ID_PATTERN})\b")
@@ -85,7 +93,7 @@ class JsonArgumentParser(argparse.ArgumentParser):
             recovery="correct the command arguments and retry",
             retryable=True,
         )
-        emit(error.payload(), stream=sys.stderr)
+        emit(error.payload(), view=requested_view(), stream=sys.stderr)
         raise SystemExit(2)
 
 
@@ -137,11 +145,323 @@ def compact_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
-def emit(value: Any, *, pretty: bool = False, stream: Any = sys.stdout) -> None:
-    if pretty:
-        text = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
+def requested_view(argv: list[str] | None = None) -> str:
+    arguments = sys.argv[1:] if argv is None else argv
+    for index, argument in enumerate(arguments):
+        if argument == "--view" and index + 1 < len(arguments):
+            return arguments[index + 1]
+        if argument.startswith("--view="):
+            return argument.split("=", 1)[1]
+    return "model"
+
+
+def model_text_cost(text: str) -> int:
+    total = 0
+    ascii_word = 0
+    for character in text:
+        if character.isascii() and (character.isalnum() or character == "_"):
+            ascii_word += 1
+            continue
+        if ascii_word:
+            total += (ascii_word + 3) // 4
+            ascii_word = 0
+        if character == "\n" or not character.isspace():
+            total += 1
+    return total + (ascii_word + 3) // 4
+
+
+def model_scalar(value: Any) -> str:
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if value is None:
+        return "null"
+    text = str(value)
+    reserved = {"null", "true", "false", "yes", "no", "on", "off", "~"}
+    unsafe_start = "-?:,[]{}#&*!|>'\"%@`"
+    if (
+        text
+        and text == text.strip()
+        and "\n" not in text
+        and not text.startswith(tuple(unsafe_start))
+        and not any(character in text for character in "{}[],:#\"")
+        and text.lower() not in reserved
+    ):
+        return text
+    return json.dumps(text, ensure_ascii=False)
+
+
+def compact_model(value: Any) -> str:
+    if isinstance(value, dict):
+        return "{" + ",".join(
+            f"{key}:{compact_model(item)}" for key, item in value.items()
+        ) + "}"
+    if isinstance(value, list):
+        return "[" + ",".join(compact_model(item) for item in value) + "]"
+    return model_scalar(value)
+
+
+def render_model_lines(value: Any, indent: int = 0) -> list[str]:
+    prefix = " " * indent
+    if isinstance(value, dict):
+        lines: list[str] = []
+        for key, item in value.items():
+            compact = compact_model(item)
+            if len(compact) <= 800:
+                lines.append(f"{prefix}{key}:{compact}")
+            elif isinstance(item, (dict, list)):
+                lines.append(f"{prefix}{key}:")
+                lines.extend(render_model_lines(item, indent + 2))
+            else:
+                lines.append(f"{prefix}{key}:{model_scalar(item)}")
+        return lines
+    if isinstance(value, list):
+        lines = []
+        for item in value:
+            compact = compact_model(item)
+            if len(compact) <= 2_400:
+                lines.append(f"{prefix}- {compact}")
+            elif isinstance(item, (dict, list)):
+                lines.append(f"{prefix}-")
+                lines.extend(render_model_lines(item, indent + 2))
+            else:
+                lines.append(f"{prefix}- {model_scalar(item)}")
+        return lines
+    return [f"{prefix}{model_scalar(value)}"]
+
+
+def render_model(value: Any) -> str:
+    lines = render_model_lines(value)
+    return "\n".join(lines) if lines else "ok"
+
+
+def sparse_model_value(value: Any, *, root: bool = False) -> Any:
+    if isinstance(value, dict):
+        result: dict[str, Any] = {}
+        for key, item in value.items():
+            if root and key in {"ok", "command", "note"}:
+                continue
+            projected = sparse_model_value(item)
+            if projected is None or projected == "" or projected == [] or projected == {}:
+                continue
+            result[key] = projected
+        return result
+    if isinstance(value, list):
+        return [sparse_model_value(item) for item in value]
+    return value
+
+
+def without_zero_counts(value: Any) -> Any:
+    if isinstance(value, dict):
+        result: dict[str, Any] = {}
+        for key, item in value.items():
+            projected = without_zero_counts(item)
+            if (
+                projected in (None, "", [], {})
+                or (projected is False and key == "truncated")
+                or (projected == 0 and (key.endswith("_count") or key.endswith("_bytes")))
+            ):
+                continue
+            result[key] = projected
+        return result
+    if isinstance(value, list):
+        return [without_zero_counts(item) for item in value]
+    return value
+
+
+def protected_baseline_issue(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    diagnostics = value.get("diagnostics", [])
+    aligned = value.get("aligned")
+    if not diagnostics and aligned is not False:
+        return {}
+    return without_zero_counts(
+        {
+            "aligned": aligned,
+            "cycle_id": value.get("cycle_id"),
+            "confirmed_by": value.get("confirmed_by"),
+            "diagnostics": diagnostics,
+        }
+    )
+
+
+def work_status_model(payload: dict[str, Any]) -> dict[str, Any]:
+    projected: dict[str, Any] = {}
+    source_semantic = payload.get("semantic", {})
+    semantic = without_zero_counts(
+        {
+            key: copy.deepcopy(source_semantic.get(key))
+            for key in (
+                "section_count",
+                "stage_counts",
+                "unresolved_count",
+                "unresolved_ids",
+                "deferred_change_count",
+                "deferred_change_status_counts",
+                "duplicate_count",
+                "stage_mismatch_count",
+                "unknown_reference_count",
+            )
+            if isinstance(source_semantic, dict)
+        }
+    )
+    if semantic:
+        projected["semantic"] = semantic
+    baseline = protected_baseline_issue(payload.get("protected_baseline"))
+    if baseline:
+        projected["protected_baseline"] = baseline
+    source_tasks = payload.get("tasks", {})
+    task_counts = {
+        key: count
+        for key, count in source_tasks.get("counts", {}).items()
+        if count
+    } if isinstance(source_tasks, dict) else {}
+    tasks = without_zero_counts(
+        {
+            "task_count": source_tasks.get("task_count")
+            if isinstance(source_tasks, dict)
+            else None,
+            "states": task_counts,
+            "status": source_tasks.get("status")
+            if isinstance(source_tasks, dict)
+            else None,
+            "result_count": source_tasks.get("result_count")
+            if isinstance(source_tasks, dict)
+            else None,
+            "result_with_verification_count": source_tasks.get(
+                "result_with_verification_count"
+            )
+            if isinstance(source_tasks, dict)
+            else None,
+            "result_with_unresolved_count": source_tasks.get(
+                "result_with_unresolved_count"
+            )
+            if isinstance(source_tasks, dict)
+            else None,
+            "result_diagnostic_count": source_tasks.get("result_diagnostic_count")
+            if isinstance(source_tasks, dict)
+            else None,
+            "result_diagnostic_kind_counts": source_tasks.get(
+                "result_diagnostic_kind_counts"
+            )
+            if isinstance(source_tasks, dict)
+            else None,
+            "diagnostics": source_tasks.get("diagnostics")
+            if isinstance(source_tasks, dict)
+            else None,
+        }
+    )
+    if tasks:
+        projected["tasks"] = tasks
+    if payload.get("diagnostics"):
+        projected["diagnostics"] = payload["diagnostics"]
+    if payload.get("truncated"):
+        projected["more"] = {"truncated": True}
+    return sparse_model_value(projected)
+
+
+def work_context_model(payload: dict[str, Any]) -> dict[str, Any]:
+    projected: dict[str, Any] = {}
+    if payload.get("sections"):
+        projected["sections"] = sparse_model_value(copy.deepcopy(payload["sections"]))
+    if payload.get("truncated"):
+        projected["more"] = {
+            "truncated": True,
+            "recovery": "read the returned document and line or raise --model-token-budget",
+        }
+    return projected
+
+
+def work_model_projection(payload: dict[str, Any]) -> dict[str, Any]:
+    if payload.get("ok") is False:
+        return sparse_model_value(payload, root=True)
+    command = payload.get("command")
+    if command == "status":
+        return work_status_model(payload)
+    if command == "context":
+        return work_context_model(payload)
+    candidate = copy.deepcopy(payload)
+    if command in {"coverage", "index"}:
+        candidate["protected_baseline"] = protected_baseline_issue(
+            candidate.get("protected_baseline")
+        )
+    return without_zero_counts(sparse_model_value(candidate, root=True))
+
+
+def work_model_variants(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    projected = work_model_projection(payload)
+    yield projected
+    if payload.get("command") == "context":
+        candidate = copy.deepcopy(projected)
+        sections = candidate.get("sections")
+        omitted: list[str] = []
+        if isinstance(sections, list):
+            for section in reversed(sections):
+                if isinstance(section, dict) and section.get("body"):
+                    section.pop("body", None)
+                    if section.get("id"):
+                        omitted.append(str(section["id"]))
+                    candidate["more"] = {
+                        "truncated": True,
+                        "body_ids": list(reversed(omitted)),
+                        "recovery": "read the returned document and line or raise --model-token-budget",
+                    }
+                    yield copy.deepcopy(candidate)
+
+
+def fit_work_model(payload: dict[str, Any], budget: int) -> str:
+    for candidate in work_model_variants(payload):
+        text = render_model(candidate)
+        if model_text_cost(text) <= budget:
+            return text
+    core: dict[str, Any] = {}
+    for key in ("id", "stage", "document", "error", "gate"):
+        if payload.get(key) not in (None, "", [], {}):
+            core[key] = payload[key]
+    sections = payload.get("sections")
+    if isinstance(sections, list) and sections:
+        section = sections[0]
+        core["section"] = {
+            key: section[key]
+            for key in ("id", "title", "stage", "document", "line", "status")
+            if section.get(key) not in (None, "", [], {})
+        }
+    core["more"] = {
+        "reason": "model_token_budget",
+        "recovery": "read the returned document and line, narrow the query, or use --view machine",
+    }
+    text = render_model(sparse_model_value(core))
+    if model_text_cost(text) <= budget:
+        return text
+    minimal = {
+        "id": payload.get("id"),
+        "more": {"reason": "model_token_budget", "view": "machine"},
+    }
+    text = render_model(sparse_model_value(minimal))
+    if model_text_cost(text) > budget:
+        raise WorkctlError("--model-token-budget is too small for a recoverable response")
+    return text
+
+
+def emit(
+    value: Any,
+    *,
+    pretty: bool = False,
+    view: str = "model",
+    model_token_budget: int = DEFAULT_MODEL_TOKEN_BUDGET,
+    stream: Any = sys.stdout,
+) -> None:
+    if view == "machine":
+        if pretty:
+            text = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
+        else:
+            text = compact_json(value)
     else:
-        text = compact_json(value)
+        text = fit_work_model(value, model_token_budget)
     stream.write(text + "\n")
 
 
@@ -1244,7 +1564,7 @@ def context_workspace(args: argparse.Namespace) -> dict[str, Any]:
         "sections": sections,
         "truncated": len(seen) > args.max_items,
     }
-    return fit_context(payload, args.budget)
+    return fit_context(payload, args.budget) if args.view == "machine" else payload
 
 
 def impact_workspace(args: argparse.Namespace) -> dict[str, Any]:
@@ -1383,7 +1703,11 @@ def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
 def add_common(subparser: argparse.ArgumentParser, *, include_work_dir: bool = True) -> None:
     if include_work_dir:
         subparser.add_argument("--work-dir", required=True)
+    subparser.add_argument("--view", choices=("model", "machine"), default="model")
     subparser.add_argument("--pretty", action="store_true")
+    subparser.add_argument(
+        "--model-token-budget", type=int, default=DEFAULT_MODEL_TOKEN_BUDGET
+    )
     subparser.add_argument("--max-items", type=int, default=DEFAULT_MAX_ITEMS)
 
 
@@ -1446,6 +1770,10 @@ def validate_args(args: argparse.Namespace) -> None:
         raise WorkctlError("--max-items must be between 1 and 1000")
     if hasattr(args, "budget") and not 1_000 <= args.budget <= 100_000:
         raise WorkctlError("--budget must be between 1000 and 100000")
+    if not 256 <= args.model_token_budget <= 100_000:
+        raise WorkctlError("--model-token-budget must be between 256 and 100000")
+    if args.pretty and args.view != "machine":
+        raise WorkctlError("--pretty requires --view machine")
 
 
 def main() -> int:
@@ -1454,10 +1782,22 @@ def main() -> int:
     try:
         validate_args(args)
         result = args.handler(args)
-        emit(result, pretty=args.pretty)
+        emit(
+            result,
+            pretty=args.pretty,
+            view=args.view,
+            model_token_budget=args.model_token_budget,
+        )
         return 0
     except WorkctlError as exc:
-        emit(exc.payload(), stream=sys.stderr)
+        emit(
+            exc.payload(),
+            view=getattr(args, "view", "model"),
+            model_token_budget=getattr(
+                args, "model_token_budget", DEFAULT_MODEL_TOKEN_BUDGET
+            ),
+            stream=sys.stderr,
+        )
         return 2
     except OSError as exc:
         error = WorkctlError(
@@ -1466,7 +1806,14 @@ def main() -> int:
             recovery="resolve the reported filesystem condition and retry",
             retryable=True,
         )
-        emit(error.payload(), stream=sys.stderr)
+        emit(
+            error.payload(),
+            view=getattr(args, "view", "model"),
+            model_token_budget=getattr(
+                args, "model_token_budget", DEFAULT_MODEL_TOKEN_BUDGET
+            ),
+            stream=sys.stderr,
+        )
         return 2
 
 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import fnmatch
 import hashlib
 import importlib.util
@@ -18,6 +19,12 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
+
 MAX_JSON_BYTES = 2 * 1024 * 1024
 MAX_INDEX_BYTES = 16 * 1024 * 1024
 MAX_RECORDS = 20_000
@@ -26,6 +33,7 @@ MAX_LIST_ITEMS = 200
 MAX_STRING = 8_000
 DEFAULT_LIMIT = 50
 DEFAULT_BUDGET = 16_000
+DEFAULT_MODEL_TOKEN_BUDGET = 2_048
 TASK_ID_RE = re.compile(r"^T[A-Za-z0-9][A-Za-z0-9._-]*$")
 SOURCE_ID_RE = re.compile(
     r"^(?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-[A-Za-z0-9][A-Za-z0-9._-]*$"
@@ -75,7 +83,7 @@ class JsonArgumentParser(argparse.ArgumentParser):
             recovery="correct the command arguments and retry",
             retryable=True,
         )
-        emit(error.payload(), stream=sys.stderr)
+        emit(error.payload(), view=requested_view(), stream=sys.stderr)
         raise SystemExit(2)
 
 
@@ -101,11 +109,422 @@ def compact_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
-def emit(value: Any, *, pretty: bool = False, stream: Any = sys.stdout) -> None:
-    if pretty:
-        text = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
+def requested_view(argv: list[str] | None = None) -> str:
+    arguments = sys.argv[1:] if argv is None else argv
+    for index, argument in enumerate(arguments):
+        if argument == "--view" and index + 1 < len(arguments):
+            return arguments[index + 1]
+        if argument.startswith("--view="):
+            return argument.split("=", 1)[1]
+    return "model"
+
+
+def model_text_cost(text: str) -> int:
+    total = 0
+    ascii_word = 0
+    for character in text:
+        if character.isascii() and (character.isalnum() or character == "_"):
+            ascii_word += 1
+            continue
+        if ascii_word:
+            total += (ascii_word + 3) // 4
+            ascii_word = 0
+        if character == "\n" or not character.isspace():
+            total += 1
+    return total + (ascii_word + 3) // 4
+
+
+def model_scalar(value: Any) -> str:
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if value is None:
+        return "null"
+    text = str(value)
+    reserved = {"null", "true", "false", "yes", "no", "on", "off", "~"}
+    unsafe_start = "-?:,[]{}#&*!|>'\"%@`"
+    if (
+        text
+        and text == text.strip()
+        and "\n" not in text
+        and not text.startswith(tuple(unsafe_start))
+        and not any(character in text for character in "{}[],:#\"")
+        and text.lower() not in reserved
+    ):
+        return text
+    return json.dumps(text, ensure_ascii=False)
+
+
+def compact_model(value: Any) -> str:
+    if isinstance(value, dict):
+        return "{" + ",".join(
+            f"{key}:{compact_model(item)}" for key, item in value.items()
+        ) + "}"
+    if isinstance(value, list):
+        return "[" + ",".join(compact_model(item) for item in value) + "]"
+    return model_scalar(value)
+
+
+def render_model_lines(value: Any, indent: int = 0) -> list[str]:
+    prefix = " " * indent
+    if isinstance(value, dict):
+        lines: list[str] = []
+        for key, item in value.items():
+            compact = compact_model(item)
+            if len(compact) <= 800:
+                lines.append(f"{prefix}{key}:{compact}")
+            elif isinstance(item, (dict, list)):
+                lines.append(f"{prefix}{key}:")
+                lines.extend(render_model_lines(item, indent + 2))
+            else:
+                lines.append(f"{prefix}{key}:{model_scalar(item)}")
+        return lines
+    if isinstance(value, list):
+        lines = []
+        for item in value:
+            compact = compact_model(item)
+            if len(compact) <= 2_400:
+                lines.append(f"{prefix}- {compact}")
+            elif isinstance(item, (dict, list)):
+                lines.append(f"{prefix}-")
+                lines.extend(render_model_lines(item, indent + 2))
+            else:
+                lines.append(f"{prefix}- {model_scalar(item)}")
+        return lines
+    return [f"{prefix}{model_scalar(value)}"]
+
+
+def render_model(value: Any) -> str:
+    lines = render_model_lines(value)
+    return "\n".join(lines) if lines else "ok"
+
+
+def sparse_model_value(value: Any, *, root: bool = False) -> Any:
+    if isinstance(value, dict):
+        result: dict[str, Any] = {}
+        for key, item in value.items():
+            if root and key in {"ok", "command", "note"}:
+                continue
+            projected = sparse_model_value(item)
+            if projected is None or projected == "" or projected == [] or projected == {}:
+                continue
+            result[key] = projected
+        return result
+    if isinstance(value, list):
+        return [sparse_model_value(item) for item in value]
+    return value
+
+
+def nonzero_counts(value: Any) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key): count
+        for key, count in value.items()
+        if isinstance(count, int) and count != 0
+    }
+
+
+def task_status_model(payload: dict[str, Any]) -> dict[str, Any]:
+    tasks: dict[str, Any] = {"total": payload.get("task_count", 0)}
+    states = nonzero_counts(payload.get("status_counts"))
+    if states:
+        tasks["states"] = states
+    if payload.get("dependency_attention_count"):
+        tasks["dependency_attention"] = payload["dependency_attention_count"]
+    upstream_source = payload.get("upstream", {})
+    upstream: dict[str, Any] = {}
+    for source_key, target_key in (
+        ("unresolved_count", "unresolved"),
+        ("deferred_change_count", "deferred_changes"),
+        ("invalidated_source_ids", "invalidated"),
+    ):
+        value = upstream_source.get(source_key) if isinstance(upstream_source, dict) else None
+        if value not in (None, 0, [], {}):
+            upstream[target_key] = value
+    result_source = payload.get("results", {})
+    results: dict[str, Any] = {}
+    for source_key, target_key in (
+        ("referenced_result_count", "referenced"),
+        ("result_with_verification_count", "verified"),
+        ("result_with_unresolved_count", "unresolved"),
+        ("result_with_diagnostics_count", "diagnosed"),
+        ("task_revision_stale_result_count", "task_revision_stale"),
+        ("source_snapshot_issue_result_count", "source_snapshot_issues"),
+        ("result_diagnostic_count", "diagnostic_items"),
+    ):
+        value = result_source.get(source_key) if isinstance(result_source, dict) else None
+        if value not in (None, 0):
+            results[target_key] = value
+    kind_counts = nonzero_counts(
+        result_source.get("result_diagnostic_kind_counts", {})
+        if isinstance(result_source, dict)
+        else {}
+    )
+    if kind_counts:
+        results["issues"] = kind_counts
+    projected: dict[str, Any] = {"tasks": tasks}
+    if upstream:
+        projected["upstream"] = upstream
+    if results:
+        projected["results"] = results
+    for key in ("index_diagnostics", "storage_diagnostics"):
+        if payload.get(key):
+            projected[key] = payload[key]
+    return projected
+
+
+def task_context_model(payload: dict[str, Any]) -> dict[str, Any]:
+    task = copy.deepcopy(payload.get("task", {}))
+    if isinstance(task, dict):
+        task.pop("schema", None)
+    state = copy.deepcopy(payload.get("state", {}))
+    if isinstance(state, dict):
+        state.pop("schema", None)
+        state.pop("task_id", None)
+    projected: dict[str, Any] = {
+        "task": sparse_model_value(task),
+        "state": sparse_model_value(state),
+    }
+    for key in ("diagnostics", "upstream", "source_snapshot"):
+        if payload.get(key):
+            projected[key] = sparse_model_value(copy.deepcopy(payload[key]))
+    dependencies: list[dict[str, Any]] = []
+    for dependency in payload.get("dependencies", []):
+        row = {
+            key: copy.deepcopy(dependency.get(key))
+            for key in ("id", "type", "status", "consumes", "diagnostics")
+        }
+        result = dependency.get("result")
+        if isinstance(result, dict):
+            row["result"] = {
+                key: copy.deepcopy(result.get(key))
+                for key in (
+                    "outcome",
+                    "outputs",
+                    "verification",
+                    "unresolved",
+                    "invalidated_source_ids",
+                    "evidence_for",
+                    "evidence_refs",
+                )
+            }
+        dependencies.append(sparse_model_value(row))
+    if dependencies:
+        projected["dependencies"] = dependencies
+    projected["source_snapshot_complete"] = bool(
+        payload.get("source_snapshot_complete")
+    )
+    if payload.get("dependents"):
+        projected["dependents"] = sparse_model_value(copy.deepcopy(payload["dependents"]))
+    more = {
+        key: value
+        for key, value in payload.get("truncation", {}).items()
+        if value
+    }
+    if payload.get("truncated") or more:
+        projected["more"] = {
+            "truncated": True,
+            **more,
+            "recovery": "narrow with show/deps/context or raise --model-token-budget",
+        }
+    return sparse_model_value(projected)
+
+
+def task_completion_model(payload: dict[str, Any]) -> dict[str, Any]:
+    projected: dict[str, Any] = {}
+    if payload.get("snapshot_id"):
+        projected["snapshot_id"] = payload["snapshot_id"]
+    counts = {
+        "targets": payload.get("target_count", 0),
+        "returned_targets": payload.get("returned_target_count", 0),
+        "constraints": payload.get("constraint_count", 0),
+        "returned_constraints": payload.get("returned_constraint_count", 0),
+        "deferred_changes": payload.get("deferred_change_count", 0),
+        "returned_deferred_changes": payload.get("returned_deferred_change_count", 0),
+    }
+    projected["review"] = {key: value for key, value in counts.items() if value}
+    if payload.get("diagnostic_summary"):
+        summary = sparse_model_value(copy.deepcopy(payload["diagnostic_summary"]))
+        if isinstance(summary, dict):
+            summary = {
+                key: value
+                for key, value in summary.items()
+                if value not in (0, {}, [])
+            }
+        if summary:
+            projected["diagnostics"] = summary
+    if payload.get("query_diagnostics"):
+        projected["query_diagnostics"] = payload["query_diagnostics"]
+    if payload.get("targets"):
+        projected["targets"] = sparse_model_value(copy.deepcopy(payload["targets"]))
+    candidates: dict[str, Any] = {}
+    for task_id, candidate in payload.get("candidate_tasks", {}).items():
+        row = {
+            key: copy.deepcopy(candidate.get(key))
+            for key in (
+                "status",
+                "result_ref",
+                "result_outcome",
+                "outputs",
+                "verification",
+                "unresolved",
+                "invalidated_source_ids",
+                "evidence_refs",
+                "result_diagnostics",
+            )
+        }
+        compacted = sparse_model_value(row)
+        if compacted:
+            candidates[task_id] = compacted
+    if candidates:
+        projected["candidates"] = candidates
+    for source_key, target_key in (
+        ("constraints", "constraints"),
+        ("deferred_changes", "deferred_changes"),
+    ):
+        if payload.get(source_key):
+            projected[target_key] = sparse_model_value(copy.deepcopy(payload[source_key]))
+    pagination = sparse_model_value(copy.deepcopy(payload.get("pagination", {})))
+    if isinstance(pagination, dict):
+        pagination = {
+            key: value
+            for key, value in pagination.items()
+            if value not in (None, {}, [])
+        }
+    if pagination:
+        projected["more"] = {"snapshot_id": payload.get("snapshot_id"), **pagination}
+    return sparse_model_value(projected)
+
+
+def task_model_projection(payload: dict[str, Any]) -> dict[str, Any]:
+    if payload.get("ok") is False:
+        return sparse_model_value(payload, root=True)
+    command = payload.get("command")
+    if command == "status":
+        return task_status_model(payload)
+    if command == "context":
+        return task_context_model(payload)
+    if command == "completion-context":
+        return task_completion_model(payload)
+    if command == "show":
+        candidate = copy.deepcopy(payload)
+        result = candidate.get("result")
+        if isinstance(result, dict) and result.get("source_snapshot"):
+            result["source_snapshot_count"] = len(result["source_snapshot"])
+            result.pop("source_snapshot", None)
+        return sparse_model_value(candidate, root=True)
+    return sparse_model_value(copy.deepcopy(payload), root=True)
+
+
+def task_model_variants(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    projected = task_model_projection(payload)
+    yield projected
+    command = payload.get("command")
+    if command == "context":
+        candidate = copy.deepcopy(projected)
+        candidate.pop("dependents", None)
+        yield candidate
+        upstream = candidate.get("upstream")
+        omitted: list[str] = []
+        if isinstance(upstream, list):
+            while len(upstream) > 1:
+                row = upstream.pop()
+                if isinstance(row, dict) and row.get("id"):
+                    omitted.append(str(row["id"]))
+                candidate["more"] = {
+                    **candidate.get("more", {}),
+                    "upstream_ids": list(reversed(omitted)),
+                    "recovery": "query an omitted upstream ID or raise --model-token-budget",
+                }
+                yield copy.deepcopy(candidate)
+    elif command == "completion-context":
+        candidate = copy.deepcopy(projected)
+        for row in candidate.get("candidates", {}).values():
+            for evidence in row.get("evidence_refs", []):
+                if isinstance(evidence, dict):
+                    evidence.pop("note", None)
+        yield candidate
+        targets = candidate.get("targets")
+        while isinstance(targets, list) and len(targets) > 1:
+            targets.pop()
+            referenced = {
+                task_id
+                for target in targets
+                for task_id in target.get("candidate_task_ids", [])
+            }
+            candidate["candidates"] = {
+                task_id: row
+                for task_id, row in candidate.get("candidates", {}).items()
+                if task_id in referenced
+            }
+            last_id = targets[-1].get("id") if targets else None
+            candidate["more"] = {
+                **candidate.get("more", {}),
+                "target_next_after_id": last_id,
+                "snapshot_id": payload.get("snapshot_id"),
+            }
+            yield copy.deepcopy(candidate)
+
+
+def fit_task_model(payload: dict[str, Any], budget: int) -> str:
+    for candidate in task_model_variants(payload):
+        text = render_model(candidate)
+        if model_text_cost(text) <= budget:
+            return text
+    core: dict[str, Any] = {}
+    for key in ("id", "task_id", "snapshot_id", "error", "gate"):
+        if payload.get(key) not in (None, "", [], {}):
+            core[key] = payload[key]
+    task = payload.get("task")
+    if isinstance(task, dict):
+        core["task"] = {
+            key: task[key]
+            for key in ("id", "title", "outcome", "source_ids")
+            if task.get(key) not in (None, "", [], {})
+        }
+    state = payload.get("state")
+    if isinstance(state, dict):
+        core["state"] = {
+            key: state[key]
+            for key in ("status", "owner", "blocked_reason", "next_action", "revision")
+            if state.get(key) not in (None, "", [], {})
+        }
+    core["more"] = {
+        "reason": "model_token_budget",
+        "recovery": "narrow the query, continue with returned cursors, or use --view machine",
+    }
+    text = render_model(sparse_model_value(core))
+    if model_text_cost(text) <= budget:
+        return text
+    minimal = {
+        "id": payload.get("id") or payload.get("task_id"),
+        "more": {"reason": "model_token_budget", "view": "machine"},
+    }
+    text = render_model(sparse_model_value(minimal))
+    if model_text_cost(text) > budget:
+        raise TaskctlError("--model-token-budget is too small for a recoverable response")
+    return text
+
+
+def emit(
+    value: Any,
+    *,
+    pretty: bool = False,
+    view: str = "model",
+    model_token_budget: int = DEFAULT_MODEL_TOKEN_BUDGET,
+    stream: Any = sys.stdout,
+) -> None:
+    if view == "machine":
+        if pretty:
+            text = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
+        else:
+            text = compact_json(value)
     else:
-        text = compact_json(value)
+        text = fit_task_model(value, model_token_budget)
     stream.write(text + "\n")
 
 
@@ -1737,23 +2156,21 @@ def command_show(args: argparse.Namespace) -> dict[str, Any]:
     result, result_read_diagnostics = safe_current_result(
         root, table, tasks[args.id], state
     )
-    return fit_payload(
-        {
-            "ok": True,
-            "command": "show",
-            "id": args.id,
-            "task": tasks[args.id],
-            "state": state,
-            "result": result,
-            "diagnostics": [
-                *storage_diagnostics,
-                *state_diagnostics(args.id, state),
-                *result_read_diagnostics,
-                *result_diagnostics(result, tasks[args.id], None),
-            ],
-        },
-        args.budget,
-    )
+    payload = {
+        "ok": True,
+        "command": "show",
+        "id": args.id,
+        "task": tasks[args.id],
+        "state": state,
+        "result": result,
+        "diagnostics": [
+            *storage_diagnostics,
+            *state_diagnostics(args.id, state),
+            *result_read_diagnostics,
+            *result_diagnostics(result, tasks[args.id], None),
+        ],
+    }
+    return fit_payload(payload, args.budget) if args.view == "machine" else payload
 
 
 def command_list(args: argparse.Namespace) -> dict[str, Any]:
@@ -2185,7 +2602,7 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
         "truncation": truncation,
         "truncated": any(truncation.values()),
     }
-    return fit_payload(payload, args.budget)
+    return fit_payload(payload, args.budget) if args.view == "machine" else payload
 
 
 def semantic_downstream_ids(index: dict[str, Any], source_id: str) -> set[str]:
@@ -2557,18 +2974,23 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
             "current Markdown targets and candidate evidence are inputs to model review; no final pass or fail is produced"
         ),
     }
-    while len(compact_json(shrink_value(payload, 500))) > args.budget and len(target_rows) > 1:
-        target_rows.pop()
-        payload["returned_target_count"] = len(target_rows)
-        payload["pagination"]["target_next_after_id"] = (
-            target_rows[-1]["id"] if target_rows else args.after_id
-        )
-        payload["pagination"]["candidate_next_after_ids"] = {
-            row["id"]: row["candidate_next_after_id"] for row in target_rows
-        }
-        payload["candidate_tasks"] = candidate_catalog(target_rows)
-        payload["diagnostic_summary"] = page_diagnostic_summary(target_rows)
-    return fit_payload(payload, args.budget)
+    if args.view == "machine":
+        while (
+            len(compact_json(shrink_value(payload, 500))) > args.budget
+            and len(target_rows) > 1
+        ):
+            target_rows.pop()
+            payload["returned_target_count"] = len(target_rows)
+            payload["pagination"]["target_next_after_id"] = (
+                target_rows[-1]["id"] if target_rows else args.after_id
+            )
+            payload["pagination"]["candidate_next_after_ids"] = {
+                row["id"]: row["candidate_next_after_id"] for row in target_rows
+            }
+            payload["candidate_tasks"] = candidate_catalog(target_rows)
+            payload["diagnostic_summary"] = page_diagnostic_summary(target_rows)
+        return fit_payload(payload, args.budget)
+    return payload
 
 
 def command_status(args: argparse.Namespace) -> dict[str, Any]:
@@ -3188,7 +3610,11 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
 
 def add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--task-dir", required=True)
+    parser.add_argument("--view", choices=("model", "machine"), default="model")
     parser.add_argument("--pretty", action="store_true")
+    parser.add_argument(
+        "--model-token-budget", type=int, default=DEFAULT_MODEL_TOKEN_BUDGET
+    )
 
 
 def add_limit(parser: argparse.ArgumentParser) -> None:
@@ -3278,7 +3704,9 @@ def build_parser() -> argparse.ArgumentParser:
     context_parser.add_argument("--id", required=True)
     context_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET)
     context_parser.add_argument("--max-items", type=int, default=DEFAULT_LIMIT)
-    context_parser.set_defaults(handler=command_context)
+    context_parser.set_defaults(
+        handler=command_context, model_token_budget=6_144
+    )
 
     completion_parser = subparsers.add_parser("completion-context")
     add_common(completion_parser)
@@ -3291,7 +3719,9 @@ def build_parser() -> argparse.ArgumentParser:
     completion_parser.add_argument("--snapshot-id")
     completion_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET)
     completion_parser.add_argument("--max-items", type=int, default=DEFAULT_LIMIT)
-    completion_parser.set_defaults(handler=command_completion_context)
+    completion_parser.set_defaults(
+        handler=command_completion_context, model_token_budget=4_096
+    )
 
     status_parser = subparsers.add_parser("status")
     add_common(status_parser)
@@ -3367,6 +3797,10 @@ def validate_args(args: argparse.Namespace) -> None:
                 raise TaskctlError(f"--{name.replace('_', '-')} must be between 1 and 1000")
     if hasattr(args, "budget") and not 1_000 <= args.budget <= 100_000:
         raise TaskctlError("--budget must be between 1000 and 100000")
+    if not 256 <= args.model_token_budget <= 100_000:
+        raise TaskctlError("--model-token-budget must be between 256 and 100000")
+    if args.pretty and args.view != "machine":
+        raise TaskctlError("--pretty requires --view machine")
     if hasattr(args, "expected_state_revision"):
         value = args.expected_state_revision
         if value is not None and value < 1:
@@ -3425,10 +3859,22 @@ def main() -> int:
     try:
         validate_args(args)
         result = args.handler(args)
-        emit(result, pretty=args.pretty)
+        emit(
+            result,
+            pretty=args.pretty,
+            view=args.view,
+            model_token_budget=args.model_token_budget,
+        )
         return 0
     except TaskctlError as exc:
-        emit(exc.payload(), stream=sys.stderr)
+        emit(
+            exc.payload(),
+            view=getattr(args, "view", "model"),
+            model_token_budget=getattr(
+                args, "model_token_budget", DEFAULT_MODEL_TOKEN_BUDGET
+            ),
+            stream=sys.stderr,
+        )
         return 2
     except OSError as exc:
         error = TaskctlError(
@@ -3437,7 +3883,14 @@ def main() -> int:
             recovery="resolve the reported filesystem condition and retry",
             retryable=True,
         )
-        emit(error.payload(), stream=sys.stderr)
+        emit(
+            error.payload(),
+            view=getattr(args, "view", "model"),
+            model_token_budget=getattr(
+                args, "model_token_budget", DEFAULT_MODEL_TOKEN_BUDGET
+            ),
+            stream=sys.stderr,
+        )
         return 2
 
 

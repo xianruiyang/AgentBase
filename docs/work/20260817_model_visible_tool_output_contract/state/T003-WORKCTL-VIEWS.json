@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "workctl 双视图、真实工作区质量和成本验证已完成",
+  "owner": "codex-root",
+  "result_ref": "results/T003-WORKCTL-VIEWS.r3.json",
+  "revision": 3,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T003-WORKCTL-VIEWS"
+}

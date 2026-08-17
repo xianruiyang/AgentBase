@@ -1,0 +1,46 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "统一输出面命名、字段准入、预算和迁移合同"
+      ],
+      "id": "T001-CONTRACTS-RULES",
+      "type": "hard"
+    }
+  ],
+  "id": "T003-WORKCTL-VIEWS",
+  "mutation_scope": [
+    "skills/delivery-workflow/scripts/workctl.py",
+    "skills/delivery-workflow/tests/test_workctl.py"
+  ],
+  "outcome": "workctl 默认返回动作相关的低 Token model 视图，显式 machine 视图保持现有 JSON 合同，并由交付域 owner 决定阶段信息优先级",
+  "outputs": [
+    "workctl 同源 model/machine renderer",
+    "status 与 context 领域投影",
+    "机器兼容、低预算、异常与投影回归"
+  ],
+  "reasoning_hint": "high",
+  "revision": 2,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-003",
+    "GAP-001",
+    "GAP-002",
+    "GAP-004",
+    "DES-003",
+    "DES-004",
+    "AC-001",
+    "AC-002",
+    "AC-004",
+    "AC-006",
+    "AC-007"
+  ],
+  "suggested_skills": [
+    "delivery-workflow",
+    "change-governance"
+  ],
+  "title": "实现 workctl 消费者输出视图",
+  "verification": [
+    "运行 delivery-workflow 全部回归并在真实工作区比较 model 与 machine 判断覆盖和 Token 成本"
+  ]
+}

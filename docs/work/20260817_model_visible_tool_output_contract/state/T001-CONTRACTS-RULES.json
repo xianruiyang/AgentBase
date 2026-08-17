@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "正式合同与规则链已建立并通过静态验证",
+  "owner": "codex-root",
+  "result_ref": "results/T001-CONTRACTS-RULES.r2.json",
+  "revision": 2,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T001-CONTRACTS-RULES"
+}

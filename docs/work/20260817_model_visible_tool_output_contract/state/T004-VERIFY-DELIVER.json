@@ -1,0 +1,11 @@
+{
+  "blocked_reason": "",
+  "next_action": "",
+  "note": "reopened: r3 结果将 CON-002 列为证据但执行来源快照未包含该约束，需由后继执行显式消费并重新验证",
+  "owner": "codex-root",
+  "result_ref": "results/T004-VERIFY-DELIVER.r6.json",
+  "revision": 6,
+  "schema": "task.state",
+  "status": "done",
+  "task_id": "T004-VERIFY-DELIVER"
+}
