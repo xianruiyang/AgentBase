@@ -16,6 +16,8 @@ $payloadContractPath = Join-Path (Split-Path -Parent $PSScriptRoot) "common\payl
 . $payloadContractPath
 $portableConfigContractPath = Join-Path $PSScriptRoot "portable_config.ps1"
 . $portableConfigContractPath
+$managedAssetLifecycleScriptPath = Join-Path $PSScriptRoot "managed_asset_lifecycle.ps1"
+. $managedAssetLifecycleScriptPath
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -97,7 +99,8 @@ function Get-TargetSourceFingerprint {
     )
 
     if ($Target.PSObject.Properties.Name -contains "fingerprint_mode" -and [string]$Target.fingerprint_mode -eq "portable_config") {
-        return Get-PortableConfigContractFingerprint -Path ([string]$Target.source_path) -PortableSourcePath ([string]$Target.source_path)
+        $retiredConfigKeys = if ($Target.PSObject.Properties.Name -contains 'retired_config_keys') { @($Target.retired_config_keys) } else { @() }
+        return Get-PortableConfigContractFingerprint -Path ([string]$Target.source_path) -PortableSourcePath ([string]$Target.source_path) -RetiredConfigKeys $retiredConfigKeys
     }
     if ($Target.PSObject.Properties.Name -contains "source_text" -and $null -ne $Target.source_text) {
         return Get-TextFileFingerprint ([string]$Target.source_text)
@@ -111,7 +114,8 @@ function Get-TargetInstalledContractFingerprint {
     )
 
     if ($Target.PSObject.Properties.Name -contains "fingerprint_mode" -and [string]$Target.fingerprint_mode -eq "portable_config") {
-        return Get-PortableConfigContractFingerprint -Path ([string]$Target.installed_path) -PortableSourcePath ([string]$Target.source_path)
+        $retiredConfigKeys = if ($Target.PSObject.Properties.Name -contains 'retired_config_keys') { @($Target.retired_config_keys) } else { @() }
+        return Get-PortableConfigContractFingerprint -Path ([string]$Target.installed_path) -PortableSourcePath ([string]$Target.source_path) -RetiredConfigKeys $retiredConfigKeys
     }
     return Get-PathFingerprint ([string]$Target.installed_path) -IncludeProjectOnlyArtifacts
 }
@@ -155,100 +159,6 @@ function Get-FullInstalledBundleFingerprint {
         "$($_.relative_path)|$(Get-PathFingerprint $_.installed_path -IncludeProjectOnlyArtifacts)"
     })
     return Get-TextSha256 ($records -join [Environment]::NewLine)
-}
-
-function Get-NormalizedManagedRelativePath {
-    param(
-        [string]$Path,
-        [string]$Label
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Path) -or $Path -ne $Path.Trim()) {
-        throw "$Label must be a non-empty relative path without surrounding whitespace"
-    }
-    $normalized = $Path.Replace('/', '\')
-    if ([IO.Path]::IsPathRooted($normalized) -or $normalized -ne $normalized.Trim('\')) {
-        throw "$Label must be a relative path: $Path"
-    }
-    $segments = @($normalized -split '\\')
-    if ($segments.Count -eq 0 -or @($segments | Where-Object { [string]::IsNullOrWhiteSpace($_) -or $_ -in @('.', '..') }).Count -gt 0) {
-        throw "$Label contains an unsafe path segment: $Path"
-    }
-    if ($normalized.Contains(':') -or $normalized.Contains('*') -or $normalized.Contains('?')) {
-        throw "$Label contains unsupported path characters: $Path"
-    }
-    return $normalized
-}
-
-function Get-ValidatedRetiredManagedPathContract {
-    param(
-        [string]$Root,
-        [string]$InstallRoot,
-        [string[]]$CurrentManagedPaths
-    )
-
-    $contractPath = Join-Path $Root "development\codex-deployment\retired_managed_paths.json"
-    if (-not (Test-Path -LiteralPath $contractPath -PathType Leaf)) {
-        throw "Retired managed-path contract is missing: $contractPath"
-    }
-    try {
-        $contract = Get-Content -LiteralPath $contractPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    }
-    catch {
-        throw "Retired managed-path contract is not valid JSON: $($_.Exception.Message)"
-    }
-    if ([int]$contract.schema_version -ne 1) {
-        throw "Unsupported retired managed-path contract schema: $($contract.schema_version)"
-    }
-
-    $currentPaths = @($CurrentManagedPaths | ForEach-Object {
-        Get-NormalizedManagedRelativePath -Path ([string]$_) -Label "Current managed path"
-    })
-    $targets = New-Object 'System.Collections.Generic.List[object]'
-    foreach ($entry in @($contract.targets)) {
-        $relativePath = Get-NormalizedManagedRelativePath -Path ([string]$entry.relative_path) -Label "Retired managed path"
-        $kind = [string]$entry.kind
-        if (@('file', 'directory') -notcontains $kind) {
-            throw "Retired managed path has an unsupported kind: $relativePath ($kind)"
-        }
-
-        foreach ($currentPath in $currentPaths) {
-            if ([string]::Equals($relativePath, $currentPath, [StringComparison]::OrdinalIgnoreCase) -or
-                $relativePath.StartsWith($currentPath + '\', [StringComparison]::OrdinalIgnoreCase) -or
-                $currentPath.StartsWith($relativePath + '\', [StringComparison]::OrdinalIgnoreCase)) {
-                throw "Retired managed path overlaps a current managed path: $relativePath <-> $currentPath"
-            }
-        }
-        foreach ($existingTarget in $targets) {
-            $existingPath = [string]$existingTarget.relative_path
-            if ([string]::Equals($relativePath, $existingPath, [StringComparison]::OrdinalIgnoreCase) -or
-                $relativePath.StartsWith($existingPath + '\', [StringComparison]::OrdinalIgnoreCase) -or
-                $existingPath.StartsWith($relativePath + '\', [StringComparison]::OrdinalIgnoreCase)) {
-                throw "Retired managed paths overlap: $relativePath <-> $existingPath"
-            }
-        }
-
-        $installedPath = if ([string]::IsNullOrWhiteSpace($InstallRoot)) { $null } else { Join-Path $InstallRoot $relativePath }
-        if ($null -ne $installedPath) {
-            Assert-ChildPath -Root $InstallRoot -Path $installedPath -Label "Retired managed path"
-        }
-        $targets.Add([pscustomobject]@{
-            relative_path = $relativePath
-            source_path = $null
-            source_text = $null
-            installed_path = $installedPath
-            kind = $kind
-            desired_state = "absent"
-        })
-    }
-
-    $records = @($targets | Sort-Object relative_path | ForEach-Object { "$($_.relative_path)|$($_.kind)|absent" })
-    return [pscustomobject]@{
-        path = $contractPath
-        schema_version = [int]$contract.schema_version
-        sha256 = Get-TextSha256 ($records -join [Environment]::NewLine)
-        targets = $targets.ToArray()
-    }
 }
 
 function Get-RetiredManagedChangeTargets {
@@ -444,8 +354,11 @@ function Get-ValidatedRoutingEvidence {
 function Get-LatestPublishedManifest {
     param(
         [string]$InstallRoot,
-        [string]$DeliveryMode,
-        [bool]$PortableSettingsInstalled
+        [ValidateSet("DirectCompatibility", "Plugin")]
+        [string]$DeliveryMode = "DirectCompatibility",
+        [bool]$PortableSettingsInstalled = $false,
+        [switch]$IgnorePublicationScope,
+        [int]$MinimumSchemaVersion = 1
     )
 
     $backupsRoot = Join-Path $InstallRoot "backups"
@@ -471,7 +384,10 @@ function Get-LatestPublishedManifest {
         catch {
             continue
         }
-        if ([string]$manifest.state -ne "published" -or @(1, 2, 3, 4, 5, 6) -notcontains [int]$manifest.schema_version) {
+        if ([string]$manifest.state -ne "published" -or @(1, 2, 3, 4, 5, 6, 7) -notcontains [int]$manifest.schema_version) {
+            continue
+        }
+        if ([int]$manifest.schema_version -lt $MinimumSchemaVersion) {
             continue
         }
         if (-not [string]::Equals([IO.Path]::GetFullPath([string]$manifest.codex_root), [IO.Path]::GetFullPath($InstallRoot), [StringComparison]::OrdinalIgnoreCase)) {
@@ -483,7 +399,8 @@ function Get-LatestPublishedManifest {
         else {
             "DirectCompatibility"
         }
-        if ($manifestMode -ne $DeliveryMode -or [bool]$manifest.portable_settings_installed -ne $PortableSettingsInstalled) {
+        if (-not $IgnorePublicationScope -and
+            ($manifestMode -ne $DeliveryMode -or [bool]$manifest.portable_settings_installed -ne $PortableSettingsInstalled)) {
             continue
         }
         return [pscustomobject]@{
@@ -789,7 +706,8 @@ function Get-ValidatedSource {
         [string]$InstallRoot,
         [bool]$IncludePortableSettings,
         [ValidateSet("DirectCompatibility", "Plugin")]
-        [string]$DeliveryMode
+        [string]$DeliveryMode,
+        [object]$PreviousManifest
     )
 
     & (Join-Path $Root "development\skill-routing\validate_contract.ps1") -ProjectRoot $Root | Out-Null
@@ -845,67 +763,123 @@ function Get-ValidatedSource {
     $portableSettingsFingerprint = Get-TextSha256 ($portableSettingsRecords -join [Environment]::NewLine)
 
     $contract = Get-Content -LiteralPath (Join-Path $Root "development\skill-routing\trigger-cases.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-    $targets = New-Object 'System.Collections.Generic.List[object]'
-    $targets.Add([pscustomobject]@{
-        relative_path = "AGENTS.md"
-        source_path = Join-Path $Root "global\AGENTS.md"
-        source_text = $null
-        installed_path = if ([string]::IsNullOrWhiteSpace($InstallRoot)) { $null } else { Join-Path $InstallRoot "AGENTS.md" }
-        kind = "file"
+    $portableConfigText = Get-Content -LiteralPath $portableConfigPath -Raw -Encoding UTF8
+    $currentConfigUnits = @(Get-PortableConfigManagedUnits -PortableText $portableConfigText)
+    $potentialTargets = New-Object 'System.Collections.Generic.List[object]'
+    $potentialTargets.Add([pscustomobject]@{
+        lifecycle_id = 'global:agents-md'
+        relative_path = 'AGENTS.md'
+        source_path = Join-Path $Root 'global\AGENTS.md'
+        target_kind = 'file'
+        delivery_modes = @('DirectCompatibility', 'Plugin')
+        requires_portable_settings = $false
+        role = 'plain'
     })
-    if ($DeliveryMode -eq "DirectCompatibility") {
-        foreach ($skill in @($contract.required_skills)) {
-            $relativePath = "skills\$skill"
-            $targets.Add([pscustomobject]@{
-                relative_path = $relativePath
-                source_path = Join-Path (Join-Path $Root "skills") ([string]$skill)
-                source_text = $null
-                installed_path = if ([string]::IsNullOrWhiteSpace($InstallRoot)) { $null } else { Join-Path $InstallRoot $relativePath }
-                kind = "directory"
-            })
-        }
-    }
-    if ($IncludePortableSettings) {
-        if ([string]::IsNullOrWhiteSpace($InstallRoot)) {
-            throw "InstallRoot is required when portable settings are selected"
-        }
-        $targets.Add([pscustomobject]@{
-            relative_path = "config.toml"
-            source_path = $portableConfigPath
-            source_text = Get-MergedPortableConfigText -PortableSourcePath $portableConfigPath -InstalledPath (Join-Path $InstallRoot "config.toml")
-            installed_path = Join-Path $InstallRoot "config.toml"
-            kind = "file"
-            fingerprint_mode = "portable_config"
+    foreach ($skill in @($contract.required_skills)) {
+        $potentialTargets.Add([pscustomobject]@{
+            lifecycle_id = "skill:$([string]$skill)"
+            relative_path = "skills\$([string]$skill)"
+            source_path = Join-Path (Join-Path $Root 'skills') ([string]$skill)
+            target_kind = 'directory'
+            delivery_modes = @('DirectCompatibility')
+            requires_portable_settings = $false
+            role = 'plain'
         })
-        if ($DeliveryMode -eq "DirectCompatibility") {
-            $targets.Add([pscustomobject]@{
-                relative_path = "hooks.json"
-                source_path = $hooksTemplatePath
-                source_text = Get-ResolvedHooksText -TemplatePath $hooksTemplatePath -InstallRoot $InstallRoot
-                installed_path = Join-Path $InstallRoot "hooks.json"
-                kind = "file"
-            })
-        }
-        foreach ($portableAgentFile in $portableAgentFiles) {
-            $relativePath = "agents\$($portableAgentFile.Name)"
-            $targets.Add([pscustomobject]@{
-                relative_path = $relativePath
-                source_path = $portableAgentFile.FullName
-                source_text = $null
-                installed_path = Join-Path $InstallRoot $relativePath
-                kind = "file"
-            })
-        }
+    }
+    $potentialTargets.Add([pscustomobject]@{
+        lifecycle_id = 'settings:config'
+        relative_path = 'config.toml'
+        source_path = $portableConfigPath
+        target_kind = 'file'
+        delivery_modes = @('DirectCompatibility', 'Plugin')
+        requires_portable_settings = $true
+        role = 'portable_config'
+    })
+    $potentialTargets.Add([pscustomobject]@{
+        lifecycle_id = 'settings:hooks'
+        relative_path = 'hooks.json'
+        source_path = $hooksTemplatePath
+        target_kind = 'file'
+        delivery_modes = @('DirectCompatibility')
+        requires_portable_settings = $true
+        role = 'hooks'
+    })
+    foreach ($portableAgentFile in $portableAgentFiles) {
+        $potentialTargets.Add([pscustomobject]@{
+            lifecycle_id = "agent:$($portableAgentFile.BaseName)"
+            relative_path = "agents\$($portableAgentFile.Name)"
+            source_path = $portableAgentFile.FullName
+            target_kind = 'file'
+            delivery_modes = @('DirectCompatibility', 'Plugin')
+            requires_portable_settings = $true
+            role = 'plain'
+        })
     }
 
-    $currentManagedPaths = @(
-        "AGENTS.md"
-        "config.toml"
-        "hooks.json"
-        @($contract.required_skills | ForEach-Object { "skills\$([string]$_)" })
-        @($portableAgentFiles | ForEach-Object { "agents\$($_.Name)" })
-    )
-    $retiredManagedPaths = Get-ValidatedRetiredManagedPathContract -Root $Root -InstallRoot $InstallRoot -CurrentManagedPaths $currentManagedPaths
+    $currentPathUnits = @($potentialTargets | ForEach-Object {
+        [pscustomobject]@{
+            id = [string]$_.lifecycle_id
+            kind = 'path'
+            relative_path = [string]$_.relative_path
+            path_kind = [string]$_.target_kind
+            delivery_modes = @($_.delivery_modes)
+            requires_portable_settings = [bool]$_.requires_portable_settings
+        }
+    })
+    $lifecyclePath = Join-Path $Root 'development\codex-deployment\managed_asset_lifecycle.json'
+    $lifecycle = Get-ManagedAssetLifecycleContract -Path $lifecyclePath -CurrentPathUnits $currentPathUnits -CurrentConfigUnits $currentConfigUnits -PreviousManifest $PreviousManifest
+    $retiredPathUnits = @(Get-SelectedRetiredManagedPathUnits -Contract $lifecycle -DeliveryMode $DeliveryMode -IncludePortableSettings $IncludePortableSettings)
+    $retiredConfigUnits = @(Get-SelectedRetiredManagedConfigUnits -Contract $lifecycle -DeliveryMode $DeliveryMode -IncludePortableSettings $IncludePortableSettings)
+    $retiredConfigDiagnostics = if (-not [string]::IsNullOrWhiteSpace($InstallRoot) -and $IncludePortableSettings) {
+        @(Get-RetiredPortableConfigKeyDiagnostics -InstalledPath (Join-Path $InstallRoot 'config.toml') -RetiredConfigKeys $retiredConfigUnits -PreviousManifest $PreviousManifest)
+    }
+    else {
+        @()
+    }
+
+    $targets = New-Object 'System.Collections.Generic.List[object]'
+    foreach ($potential in @($potentialTargets | Where-Object {
+        @($_.delivery_modes) -contains $DeliveryMode -and
+        (-not [bool]$_.requires_portable_settings -or $IncludePortableSettings)
+    })) {
+        if ([string]::IsNullOrWhiteSpace($InstallRoot) -and [bool]$potential.requires_portable_settings) {
+            throw 'InstallRoot is required when portable settings are selected'
+        }
+        $installedPath = if ([string]::IsNullOrWhiteSpace($InstallRoot)) { $null } else { Join-Path $InstallRoot ([string]$potential.relative_path) }
+        $target = [ordered]@{
+            lifecycle_id = [string]$potential.lifecycle_id
+            relative_path = [string]$potential.relative_path
+            source_path = [string]$potential.source_path
+            source_text = $null
+            installed_path = $installedPath
+            kind = [string]$potential.target_kind
+        }
+        if ([string]$potential.role -eq 'portable_config') {
+            $target.source_text = Get-MergedPortableConfigText -PortableSourcePath $portableConfigPath -InstalledPath $installedPath -RetiredConfigKeys $retiredConfigUnits
+            $target.fingerprint_mode = 'portable_config'
+            $target.retired_config_keys = @($retiredConfigUnits)
+        }
+        elseif ([string]$potential.role -eq 'hooks') {
+            $target.source_text = Get-ResolvedHooksText -TemplatePath $hooksTemplatePath -InstallRoot $InstallRoot
+        }
+        $targets.Add([pscustomobject]$target)
+    }
+    $retiredPathTargets = @($retiredPathUnits | ForEach-Object {
+        $installedPath = if ([string]::IsNullOrWhiteSpace($InstallRoot)) { $null } else { Join-Path $InstallRoot ([string]$_.relative_path) }
+        if ($null -ne $installedPath) {
+            Assert-ChildPath -Root $InstallRoot -Path $installedPath -Label 'Retired managed path'
+        }
+        [pscustomobject]@{
+            lifecycle_id = [string]$_.id
+            relative_path = [string]$_.relative_path
+            source_path = $null
+            source_text = $null
+            installed_path = $installedPath
+            kind = [string]$_.path_kind
+            desired_state = 'absent'
+        }
+    })
+    $lifecycleReceiptUnits = @(Get-ManagedAssetLifecycleReceiptUnits -Contract $lifecycle -CurrentConfigUnits $currentConfigUnits -PreviousManifest $PreviousManifest -DeliveryMode $DeliveryMode -IncludePortableSettings $IncludePortableSettings)
 
     $mcpPackagePath = Join-Path $Root "mcp\vscode-lsp-mcp\package.json"
     if (-not (Test-Path -LiteralPath $mcpPackagePath -PathType Leaf)) {
@@ -926,9 +900,11 @@ function Get-ValidatedSource {
         hooks_template_path = $hooksTemplatePath
         portable_agents_path = $portableAgentsPath
         portable_agent_names = @($portableAgentFiles.BaseName)
-        retired_managed_path_contract = $retiredManagedPaths.path
-        retired_managed_path_contract_sha256 = $retiredManagedPaths.sha256
-        retired_managed_targets = @($retiredManagedPaths.targets)
+        managed_asset_lifecycle = $lifecycle
+        managed_asset_lifecycle_receipt_units = @($lifecycleReceiptUnits)
+        retired_path_targets = @($retiredPathTargets)
+        retired_config_units = @($retiredConfigUnits)
+        retired_config_diagnostics = @($retiredConfigDiagnostics)
         host_bootstrap_path = $hostBootstrapPath
         routing_evidence = $routingEvidence
         skill_delivery_mode = $DeliveryMode
@@ -1050,9 +1026,12 @@ if ($Action -eq "Validate") {
         hooks_template = $source.hooks_template_path
         portable_agents = $source.portable_agents_path
         portable_agent_count = @($source.portable_agent_names).Count
-        retired_managed_path_contract = $source.retired_managed_path_contract
-        retired_managed_path_contract_sha256 = $source.retired_managed_path_contract_sha256
-        retired_managed_path_contract_target_count = @($source.retired_managed_targets).Count
+        managed_asset_lifecycle = $source.managed_asset_lifecycle.path
+        managed_asset_lifecycle_sha256 = $source.managed_asset_lifecycle.sha256
+        managed_asset_unit_count = @($source.managed_asset_lifecycle.units).Count
+        managed_asset_present_count = @($source.managed_asset_lifecycle.units | Where-Object { [string]$_.state -eq 'present' }).Count
+        managed_asset_retired_count = @($source.managed_asset_lifecycle.units | Where-Object { [string]$_.state -eq 'retired' }).Count
+        managed_asset_transferred_count = @($source.managed_asset_lifecycle.units | Where-Object { [string]$_.state -eq 'transferred' }).Count
         host_bootstrap = $source.host_bootstrap_path
         routing_evidence = $source.routing_evidence.path
         routing_evidence_sha256 = $source.routing_evidence.sha256
@@ -1064,7 +1043,11 @@ if ($Action -eq "Validate") {
 $CodexRoot = Resolve-CodexRoot -RequestedRoot $CodexRoot -Create ($Action -eq "Publish")
 
 if ($Action -eq "Status") {
-    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode
+    $publishRecord = Get-LatestPublishedManifest -InstallRoot $CodexRoot -DeliveryMode $SkillDeliveryMode -PortableSettingsInstalled ([bool]$InstallPortableSettings)
+    $manifest = if ($null -eq $publishRecord) { $null } else { $publishRecord.document }
+    $lifecyclePublishRecord = Get-LatestPublishedManifest -InstallRoot $CodexRoot -IgnorePublicationScope -MinimumSchemaVersion 7
+    $lifecycleManifest = if ($null -eq $lifecyclePublishRecord) { $null } else { $lifecyclePublishRecord.document }
+    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode -PreviousManifest $lifecycleManifest
     $srcqRuntime = if (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot) {
         [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null }
     } else {
@@ -1073,7 +1056,10 @@ if ($Action -eq "Status") {
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
     $installedFingerprint = Get-BundleFingerprint -Targets $source.targets -Side installed
     $installedFullFingerprint = Get-FullInstalledBundleFingerprint -Targets $source.targets
-    $retiredManagedTargets = @(Get-RetiredManagedChangeTargets -Targets $source.retired_managed_targets)
+    $retiredManagedTargets = @(Get-RetiredManagedChangeTargets -Targets $source.retired_path_targets)
+    $retiredConfigDiagnostics = @($source.retired_config_diagnostics)
+    $retiredConfigModified = @($retiredConfigDiagnostics | Where-Object { [string]$_.status -eq 'modified' })
+    $retiredConfigUnverifiable = @($retiredConfigDiagnostics | Where-Object { [string]$_.status -eq 'unverifiable' })
     $directCompatibilityConflicts = if ($SkillDeliveryMode -eq "Plugin") {
         @(Get-PluginModeDirectCompatibilityConflicts -InstallRoot $CodexRoot -RequiredSkills @($source.contract.required_skills))
     }
@@ -1081,8 +1067,6 @@ if ($Action -eq "Status") {
         @()
     }
     $pluginModeReady = $SkillDeliveryMode -ne "Plugin" -or $directCompatibilityConflicts.Count -eq 0
-    $publishRecord = Get-LatestPublishedManifest -InstallRoot $CodexRoot -DeliveryMode $SkillDeliveryMode -PortableSettingsInstalled ([bool]$InstallPortableSettings)
-    $manifest = if ($null -eq $publishRecord) { $null } else { $publishRecord.document }
     $manifestMatchesSource = $null -ne $manifest -and [string]$manifest.source_bundle_sha256 -eq $sourceFingerprint
     $manifestInstalledContractFingerprint = if ($null -ne $manifest -and $manifest.PSObject.Properties.Name -contains "installed_contract_bundle_sha256") {
         [string]$manifest.installed_contract_bundle_sha256
@@ -1097,9 +1081,9 @@ if ($Action -eq "Status") {
     $manifestEvidenceMatches = $null -ne $manifest -and
         $manifest.PSObject.Properties.Name -contains "routing_evidence_sha256" -and
         [string]$manifest.routing_evidence_sha256 -eq [string]$source.routing_evidence.sha256
-    $manifestRetiredManagedPathsMatch = $null -ne $manifest -and
-        $manifest.PSObject.Properties.Name -contains "retired_managed_path_contract_sha256" -and
-        [string]$manifest.retired_managed_path_contract_sha256 -eq [string]$source.retired_managed_path_contract_sha256
+    $manifestLifecycleMatches = $null -ne $manifest -and
+        $manifest.PSObject.Properties.Name -contains 'managed_asset_lifecycle_sha256' -and
+        [string]$manifest.managed_asset_lifecycle_sha256 -eq [string]$source.managed_asset_lifecycle.sha256
     $installedMatchesSource = $installedFingerprint -eq $sourceFingerprint
     $publicationGaps = New-Object 'System.Collections.Generic.List[string]'
     if (-not $installedMatchesSource) { $publicationGaps.Add("installed_payload_differs_from_source") }
@@ -1107,8 +1091,11 @@ if ($Action -eq "Status") {
     elseif (-not $manifestMatchesSource) { $publicationGaps.Add("published_manifest_source_is_stale") }
     if ($null -ne $manifest -and -not $manifestMatchesInstalled) { $publicationGaps.Add("installed_payload_differs_from_manifest") }
     if ($null -ne $manifest -and -not $manifestEvidenceMatches) { $publicationGaps.Add("published_manifest_routing_evidence_is_stale") }
-    if ($null -ne $manifest -and -not $manifestRetiredManagedPathsMatch) { $publicationGaps.Add("published_manifest_retired_managed_path_contract_is_stale") }
+    if ($null -ne $manifest -and -not $manifestLifecycleMatches) { $publicationGaps.Add("published_manifest_managed_asset_lifecycle_is_stale") }
     if ($retiredManagedTargets.Count -gt 0) { $publicationGaps.Add("retired_managed_paths_present") }
+    if ($retiredConfigDiagnostics.Count -gt 0) { $publicationGaps.Add('retired_managed_config_keys_present') }
+    if ($retiredConfigModified.Count -gt 0) { $publicationGaps.Add('retired_managed_config_keys_modified') }
+    if ($retiredConfigUnverifiable.Count -gt 0) { $publicationGaps.Add('retired_managed_config_keys_unverifiable') }
     if (-not $pluginModeReady) { $publicationGaps.Add("plugin_mode_has_direct_compatibility_conflicts") }
     [pscustomobject]@{
         action = "Status"
@@ -1124,12 +1111,15 @@ if ($Action -eq "Status") {
         manifest_matches_source = $manifestMatchesSource
         manifest_matches_installed = $manifestMatchesInstalled
         manifest_matches_routing_evidence = $manifestEvidenceMatches
-        manifest_matches_retired_managed_path_contract = $manifestRetiredManagedPathsMatch
-        retired_managed_path_contract_sha256 = $source.retired_managed_path_contract_sha256
-        retired_managed_path_contract_target_count = @($source.retired_managed_targets).Count
+        manifest_matches_managed_asset_lifecycle = $manifestLifecycleMatches
+        managed_asset_lifecycle_sha256 = $source.managed_asset_lifecycle.sha256
+        managed_asset_unit_count = @($source.managed_asset_lifecycle.units).Count
         retired_managed_path_present_count = $retiredManagedTargets.Count
         retired_managed_paths_present = @($retiredManagedTargets.relative_path)
-        managed_payload_formally_published = $installedMatchesSource -and $manifestMatchesSource -and $manifestMatchesInstalled -and $manifestEvidenceMatches -and $manifestRetiredManagedPathsMatch -and $retiredManagedTargets.Count -eq 0 -and $pluginModeReady
+        retired_managed_config_key_present_count = $retiredConfigDiagnostics.Count
+        retired_managed_config_key_conflict_count = $retiredConfigModified.Count + $retiredConfigUnverifiable.Count
+        retired_managed_config_key_conflicts = @($retiredConfigDiagnostics | Where-Object { [string]$_.status -ne 'removable' } | ForEach-Object { "$($_.id):$($_.status)" })
+        managed_payload_formally_published = $installedMatchesSource -and $manifestMatchesSource -and $manifestMatchesInstalled -and $manifestEvidenceMatches -and $manifestLifecycleMatches -and $retiredManagedTargets.Count -eq 0 -and $retiredConfigDiagnostics.Count -eq 0 -and $pluginModeReady
         formal_publication_gap_count = $publicationGaps.Count
         formal_publication_gaps = @($publicationGaps)
         plugin_installation_in_scope = $SkillDeliveryMode -eq "Plugin"
@@ -1155,7 +1145,14 @@ if ($Action -eq "Publish") {
     } else {
         Get-SrcqRuntimePreflight -Root $ProjectRoot -Required $true
     }
-    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode
+    $previousLifecycleRecord = Get-LatestPublishedManifest -InstallRoot $CodexRoot -IgnorePublicationScope -MinimumSchemaVersion 7
+    $previousLifecycleManifest = if ($null -eq $previousLifecycleRecord) { $null } else { $previousLifecycleRecord.document }
+    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode -PreviousManifest $previousLifecycleManifest
+    $retiredConfigBlockingDiagnostics = @($source.retired_config_diagnostics | Where-Object { [string]$_.status -ne 'removable' })
+    if ($retiredConfigBlockingDiagnostics.Count -gt 0) {
+        $details = @($retiredConfigBlockingDiagnostics | ForEach-Object { "$($_.id):$($_.status)" }) -join ', '
+        throw "Retired managed config keys cannot be removed safely. Preserve them by changing the lifecycle state to transferred, or restore the last managed value before retrying. Conflicts: $details"
+    }
     if ($SkillDeliveryMode -eq "Plugin") {
         $directCompatibilityConflicts = @(Get-PluginModeDirectCompatibilityConflicts -InstallRoot $CodexRoot -RequiredSkills @($source.contract.required_skills))
         if ($directCompatibilityConflicts.Count -gt 0) {
@@ -1164,7 +1161,8 @@ if ($Action -eq "Publish") {
     }
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
     $currentChangeTargets = @(Get-IncrementalChangeTargets -Targets $source.targets)
-    $retiredManagedTargets = @(Get-RetiredManagedChangeTargets -Targets $source.retired_managed_targets)
+    $retiredManagedTargets = @(Get-RetiredManagedChangeTargets -Targets $source.retired_path_targets)
+    $retiredConfigRemoved = @($source.retired_config_diagnostics | Where-Object { [string]$_.status -eq 'removable' })
     $changeTargets = @((@($currentChangeTargets) + @($retiredManagedTargets)) | Sort-Object relative_path)
     $stageRoot = Join-Path $CodexRoot (".agentbase-stage-" + [guid]::NewGuid().ToString("N"))
     Assert-ChildPath -Root $CodexRoot -Path $stageRoot -Label "Stage path"
@@ -1208,7 +1206,7 @@ if ($Action -eq "Publish") {
             }
         })
         $manifest = [ordered]@{
-            schema_version = 6
+            schema_version = 7
             state = "prepared"
             created_at_utc = [DateTime]::UtcNow.ToString("o")
             project_root = $ProjectRoot
@@ -1220,9 +1218,10 @@ if ($Action -eq "Publish") {
             portable_settings_sha256 = $source.portable_settings_sha256
             portable_settings_installed = [bool]$InstallPortableSettings
             portable_agent_names = @($source.portable_agent_names)
-            retired_managed_path_contract_sha256 = $source.retired_managed_path_contract_sha256
-            retired_managed_paths = @($source.retired_managed_targets.relative_path)
+            managed_asset_lifecycle_sha256 = $source.managed_asset_lifecycle.sha256
+            managed_asset_units = @($source.managed_asset_lifecycle_receipt_units)
             retired_managed_paths_removed = @($retiredManagedTargets.relative_path)
+            retired_managed_config_keys_removed = @($retiredConfigRemoved.id)
             routing_evidence_path = $source.routing_evidence.path.Substring($ProjectRoot.Length + 1).Replace('\', '/')
             routing_evidence_sha256 = $source.routing_evidence.sha256
             routing_evaluator_id = $source.routing_evidence.evaluator_id
@@ -1342,10 +1341,12 @@ if ($Action -eq "Publish") {
         portable_agent_count = if ($InstallPortableSettings) { @($source.portable_agent_names).Count } else { 0 }
         changed_path_count = $changeTargets.Count
         managed_contract_count = @($source.targets).Count
-        retired_managed_path_contract_sha256 = $source.retired_managed_path_contract_sha256
-        retired_managed_path_contract_target_count = @($source.retired_managed_targets).Count
+        managed_asset_lifecycle_sha256 = $source.managed_asset_lifecycle.sha256
+        managed_asset_unit_count = @($source.managed_asset_lifecycle.units).Count
         retired_managed_path_removed_count = $retiredManagedTargets.Count
         retired_managed_paths_removed = @($retiredManagedTargets.relative_path)
+        retired_managed_config_key_removed_count = $retiredConfigRemoved.Count
+        retired_managed_config_keys_removed = @($retiredConfigRemoved.id)
         routing_evidence_sha256 = $source.routing_evidence.sha256
         runtime_prerequisite_in_scope = [bool]$srcqRuntime.in_scope
         srcq_runtime_ready = $srcqRuntime.ready
@@ -1369,7 +1370,7 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw "Backup manifest is missing: $manifestPath"
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if (@(1, 2, 3, 4, 5, 6) -notcontains [int]$manifest.schema_version -or [string]$manifest.state -ne "published") {
+if (@(1, 2, 3, 4, 5, 6, 7) -notcontains [int]$manifest.schema_version -or [string]$manifest.state -ne "published") {
     throw "Backup is not in a publish state that can be rolled back: $($manifest.state)"
 }
 if (-not [string]::Equals([IO.Path]::GetFullPath([string]$manifest.codex_root), [IO.Path]::GetFullPath($CodexRoot), [StringComparison]::OrdinalIgnoreCase)) {

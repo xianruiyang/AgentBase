@@ -22,7 +22,8 @@ $sourceCacheProbe = Join-Path $sourceCacheRoot ("agentbase-deployment-probe-" + 
 $sourceCacheRootCreated = $false
 $externalPreflightRoot = Join-Path ([IO.Path]::GetTempPath()) ("AgentBase-srcq-preflight-test-" + [guid]::NewGuid().ToString("N"))
 $externalPreflightRejected = $false
-$retiredManagedSkills = @("ast-grep-token-safe", "fd-usage", "rg-token-safe")
+$managedAssetLifecycle = Get-Content -LiteralPath (Join-Path $ProjectRoot 'development\codex-deployment\managed_asset_lifecycle.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$retiredManagedSkills = @($managedAssetLifecycle.paths.retired | ForEach-Object { [IO.Path]::GetFileName(([string]$_.path).Replace('/', '\')) })
 
 function Write-FixtureText {
     param(
@@ -208,9 +209,10 @@ try {
         throw "Default publish omitted the formal source-query skill"
     }
     $defaultManifest = Get-Content -LiteralPath (Join-Path $defaultPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([int]$defaultManifest.schema_version -ne 6 -or
-        [string]$defaultManifest.retired_managed_path_contract_sha256 -ne [string]$defaultPublish.retired_managed_path_contract_sha256) {
-        throw "Default publish manifest did not record the retired managed-path contract"
+    if ([int]$defaultManifest.schema_version -ne 7 -or
+        [string]$defaultManifest.managed_asset_lifecycle_sha256 -ne [string]$defaultPublish.managed_asset_lifecycle_sha256 -or
+        @($defaultManifest.managed_asset_units).Count -ne [int]$defaultPublish.managed_asset_unit_count) {
+        throw "Default publish manifest did not record the complete managed-asset lifecycle"
     }
     foreach ($retiredSkill in $retiredManagedSkills) {
         if (Test-Path -LiteralPath (Join-Path (Join-Path $codexRoot "skills") $retiredSkill)) {
@@ -234,7 +236,7 @@ try {
     }
     $defaultStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
     if (-not [bool]$defaultStatus.managed_payload_formally_published -or
-        -not [bool]$defaultStatus.manifest_matches_retired_managed_path_contract -or
+        -not [bool]$defaultStatus.manifest_matches_managed_asset_lifecycle -or
         [int]$defaultStatus.retired_managed_path_present_count -ne 0) {
         throw "Status did not recognize the current direct-compatibility publish"
     }
@@ -373,14 +375,24 @@ try {
             throw "Portable custom agent is missing from the rollback manifest: $agentName"
         }
     }
-    if ([int]$manifest.schema_version -ne 6 -or [string]::IsNullOrWhiteSpace([string]$manifest.installed_contract_bundle_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evidence_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evaluation_capsule_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.retired_managed_path_contract_sha256)) {
-        throw "Publish manifest is missing the current detached routing-policy evidence receipt"
+    if ([int]$manifest.schema_version -ne 7 -or [string]::IsNullOrWhiteSpace([string]$manifest.installed_contract_bundle_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evidence_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evaluation_capsule_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.managed_asset_lifecycle_sha256) -or @($manifest.managed_asset_units).Count -eq 0) {
+        throw "Publish manifest is missing the current routing and managed-asset lifecycle receipts"
+    }
+    $scopeBridgePublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    $scopeBridgeManifest = Get-Content -LiteralPath (Join-Path $scopeBridgePublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $scopeBridgeConfigReceipts = @($scopeBridgeManifest.managed_asset_units | Where-Object {
+        [string]$_.kind -eq 'config_key' -and [string]$_.state -eq 'present'
+    })
+    if ($scopeBridgeConfigReceipts.Count -eq 0 -or
+        @($scopeBridgeConfigReceipts | Where-Object { [string]::IsNullOrWhiteSpace([string]$_.last_managed_source_fingerprint) }).Count -ne 0) {
+        throw "A publication outside portable-settings scope did not carry config provenance from the latest lifecycle receipt"
     }
 
     $installedCacheRoot = Join-Path $codexRoot "skills\codex-event-logger\tests\__pycache__"
     New-Item -ItemType Directory -Path $installedCacheRoot -Force | Out-Null
     [IO.File]::WriteAllBytes((Join-Path $installedCacheRoot "runtime-probe.pyc"), [byte[]]@(5, 6, 7, 8))
 
+    & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $scopeBridgePublish.backup_path | Out-Null
     & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $settingsPublish.backup_path | Out-Null
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "AGENTS.md") -Algorithm SHA256).Hash -ne $originalAgentsHash) {
         throw "Rollback did not restore AGENTS.md"
@@ -482,6 +494,7 @@ try {
         retired_managed_paths_rollback_restored = $true
         retired_wrong_kind_rejected = $true
         status_derived_from_manifest_and_fingerprints = $true
+        lifecycle_provenance_crossed_publication_scope = $true
         plugin_delivery_rejected_parallel_direct_entry = $true
         plugin_delivery_omitted_direct_skills_and_hooks = $true
         publish_rejected_missing_srcq_runtime = $externalPreflightRejected

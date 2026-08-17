@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "paths": {
+    "present": [
+      { "id": "global:agents-md", "path": "AGENTS.md", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": false },
+      { "id": "skill:change-governance", "path": "skills/change-governance", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:codex-event-logger", "path": "skills/codex-event-logger", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:codex-qq-hook", "path": "skills/codex-qq-hook", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:cpp-engineering-rules", "path": "skills/cpp-engineering-rules", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:delivery-workflow", "path": "skills/delivery-workflow", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:powershell-usage", "path": "skills/powershell-usage", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:reasoning-governor", "path": "skills/reasoning-governor", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:source-query", "path": "skills/source-query", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:symbol-structure-workflow", "path": "skills/symbol-structure-workflow", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:task-table-manager", "path": "skills/task-table-manager", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:understand-space", "path": "skills/understand-space", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "settings:config", "path": "config.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
+      { "id": "settings:hooks", "path": "hooks.json", "kind": "file", "modes": ["DirectCompatibility"], "requires_portable_settings": true },
+      { "id": "agent:luna", "path": "agents/luna.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
+      { "id": "agent:sol", "path": "agents/sol.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
+      { "id": "agent:terra", "path": "agents/terra.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true }
+    ],
+    "retired": [
+      { "id": "skill:ast-grep-token-safe", "path": "skills/ast-grep-token-safe", "kind": "directory", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": false, "since": "045656f", "reason": "replaced by the unified source-query owner", "replaced_by": "skill:source-query", "legacy_import": true },
+      { "id": "skill:fd-usage", "path": "skills/fd-usage", "kind": "directory", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": false, "since": "045656f", "reason": "replaced by the unified source-query owner", "replaced_by": "skill:source-query", "legacy_import": true },
+      { "id": "skill:rg-token-safe", "path": "skills/rg-token-safe", "kind": "directory", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": false, "since": "045656f", "reason": "replaced by the unified source-query owner", "replaced_by": "skill:source-query", "legacy_import": true }
+    ],
+    "transferred": []
+  },
+  "config_keys": {
+    "present": [
+      { "id": "config:root/model_reasoning_summary", "table": "", "key": "model_reasoning_summary" },
+      { "id": "config:root/model_verbosity", "table": "", "key": "model_verbosity" },
+      { "id": "config:root/personality", "table": "", "key": "personality" },
+      { "id": "config:root/approval_policy", "table": "", "key": "approval_policy" },
+      { "id": "config:root/sandbox_mode", "table": "", "key": "sandbox_mode" },
+      { "id": "config:root/web_search", "table": "", "key": "web_search" },
+      { "id": "config:root/service_tier", "table": "", "key": "service_tier" },
+      { "id": "config:root/project_doc_max_bytes", "table": "", "key": "project_doc_max_bytes" },
+      { "id": "config:agents/enabled", "table": "agents", "key": "enabled" },
+      { "id": "config:agents/default_subagent_model", "table": "agents", "key": "default_subagent_model" },
+      { "id": "config:agents/default_subagent_reasoning_effort", "table": "agents", "key": "default_subagent_reasoning_effort" },
+      { "id": "config:windows/sandbox", "table": "windows", "key": "sandbox" },
+      { "id": "config:features/hooks", "table": "features", "key": "hooks" },
+      { "id": "config:features/multi_agent", "table": "features", "key": "multi_agent" },
+      { "id": "config:features/js_repl", "table": "features", "key": "js_repl" },
+      { "id": "config:desktop/conversationdetailmode", "table": "desktop", "key": "conversationDetailMode" },
+      { "id": "config:desktop/followupqueuemode", "table": "desktop", "key": "followUpQueueMode" },
+      { "id": "config:desktop/notifications-turn-mode", "table": "desktop", "key": "notifications-turn-mode" },
+      { "id": "config:desktop/ambient-suggestions-enabled", "table": "desktop", "key": "ambient-suggestions-enabled" },
+      { "id": "config:desktop/show-context-window-usage", "table": "desktop", "key": "show-context-window-usage" },
+      { "id": "config:desktop/enabled-reasoning-efforts", "table": "desktop", "key": "enabled-reasoning-efforts" }
+    ],
+    "retired": [],
+    "transferred": [
+      { "id": "config:root/model", "table": "", "key": "model", "since": "302c1a0", "reason": "ownership transferred to the target host", "legacy_import": true },
+      { "id": "config:root/model_reasoning_effort", "table": "", "key": "model_reasoning_effort", "since": "302c1a0", "reason": "ownership transferred to the target host", "legacy_import": true }
+    ]
+  }
+}

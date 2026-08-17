@@ -36,7 +36,7 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 - 状态: verified
 - 关联: DES-SQG-008, DES-SQG-009, CON-SQG-003
 
-正式 `skills/source-query` 用一个精炼主文件按“已知正文直接读取 → srcq rg/fd 普通入口 → 按需 AST → 渐进 LSP”组织，只有完整性、分页、特殊协议或定向输出才读取 rg/fd 细则。正式 payload 只有 `SKILL.md`、`agents/openai.yaml` 和三份按需引用；私有 `sgy.exe`、runtime manifest、来源与许可副本已经退出，消费者只调用用户 PATH 中的 `srcq.exe`。`candidate-skill/source-query` 仅作为隔离 benchmark 输入保留；测试、fixture、runner、corpus、result 和 audit 资产仍由项目开发目录承担。旧 `ast-grep-token-safe`、`fd-usage` 与 `rg-token-safe` 安装路径由 `development/codex-deployment/retired_managed_paths.json` 持有退役合同，使旧主机升级时由正式 Publish 备份并移除残留，而不是仅凭当前 payload 不再列出它们。
+正式 `skills/source-query` 用一个精炼主文件按“已知正文直接读取 → srcq rg/fd 普通入口 → 按需 AST → 渐进 LSP”组织，只有完整性、分页、特殊协议或定向输出才读取 rg/fd 细则。正式 payload 只有 `SKILL.md`、`agents/openai.yaml` 和三份按需引用；私有 `sgy.exe`、runtime manifest、来源与许可副本已经退出，消费者只调用用户 PATH 中的 `srcq.exe`。`candidate-skill/source-query` 仅作为隔离 benchmark 输入保留；测试、fixture、runner、corpus、result 和 audit 资产仍由项目开发目录承担。旧 `ast-grep-token-safe`、`fd-usage` 与 `rg-token-safe` 安装路径由 `development/codex-deployment/managed_asset_lifecycle.json` 以稳定身份持有退役状态，使旧主机升级时由正式 Publish 备份并移除残留，而不是仅凭当前 payload 不再列出它们。
 
 ## OBS-SQG-005 benchmark owner 已具备隔离运行合同
 
