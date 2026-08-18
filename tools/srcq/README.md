@@ -15,6 +15,7 @@
 - 唯一维护平台是 Windows x86_64 MSVC，已完成真实引擎、协议、release 和安装生命周期。
 - `srcq` 不包含 ast-grep、ripgrep 或 fd，也不安装语言运行时；必须另行提供可启动的原生引擎。
 - 为保持迁移前 AST 结果与缓存可读，版本化数据合同继续使用既有 `_sgy` 字段和 `sgy.*` schema 命名；它们是协议兼容标识，不是可执行文件、安装目录或第二运行时入口。
+- 发布生成的 `THIRD_PARTY_LICENSES.txt` 使用 `SRCQ THIRD-PARTY LICENSES` 产品标题；兼容协议标识不得重新成为发布产物品牌。
 
 ## 快速开始
 

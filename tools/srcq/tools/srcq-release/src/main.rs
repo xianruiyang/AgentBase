@@ -12,6 +12,7 @@ const FIXED_AST_GREP: &str = "0.42.0";
 const VERIFIED_AST_GREP: [&str; 3] = ["0.41.1", "0.42.0", "0.44.1"];
 const VERIFIED_RIPGREP: [&str; 2] = ["15.1.0", "15.2.0"];
 const VERIFIED_FD: [&str; 1] = ["10.4.2"];
+const THIRD_PARTY_LICENSES_TITLE: &str = "SRCQ THIRD-PARTY LICENSES";
 
 fn main() {
     if let Err(error) = run() {
@@ -413,11 +414,7 @@ fn build_third_party_licenses(
         package_index.push("\n".to_owned());
     }
 
-    let mut output = format!(
-        "SGY THIRD-PARTY LICENSES\nTARGET: {}\nPACKAGES: {}\n\nThis file is generated from target-filtered Cargo metadata. License texts are deduplicated by SHA-256; every package/file mapping is listed below.\n\n=== PACKAGE INDEX ===\n\n",
-        request.target,
-        ordered.len()
-    );
+    let mut output = third_party_licenses_preamble(&request.target, ordered.len());
     for line in package_index {
         output.push_str(&line);
     }
@@ -434,6 +431,12 @@ fn build_third_party_licenses(
         output.push('\n');
     }
     Ok(output.into_bytes())
+}
+
+fn third_party_licenses_preamble(target: &str, package_count: usize) -> String {
+    format!(
+        "{THIRD_PARTY_LICENSES_TITLE}\nTARGET: {target}\nPACKAGES: {package_count}\n\nThis file is generated from target-filtered Cargo metadata. License texts are deduplicated by SHA-256; every package/file mapping is listed below.\n\n=== PACKAGE INDEX ===\n\n"
+    )
 }
 
 fn allowed_license_expression(expression: &str) -> bool {
@@ -793,7 +796,10 @@ fn crc32(bytes: &[u8]) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{allowed_license_expression, crc32, deterministic_zip, unix_to_rfc3339, ZipEntry};
+    use super::{
+        allowed_license_expression, crc32, deterministic_zip, third_party_licenses_preamble,
+        unix_to_rfc3339, ZipEntry,
+    };
 
     #[test]
     fn license_policy_accepts_reviewed_permissive_expressions_only() {
@@ -817,6 +823,13 @@ mod tests {
             unix_to_rfc3339(1_767_225_599).expect("year end"),
             "2025-12-31T23:59:59Z"
         );
+    }
+
+    #[test]
+    fn third_party_license_preamble_uses_srcq_product_identity() {
+        let preamble = third_party_licenses_preamble("x86_64-pc-windows-msvc", 52);
+        assert!(preamble.starts_with("SRCQ THIRD-PARTY LICENSES\n"));
+        assert!(!preamble.contains("SGY THIRD-PARTY LICENSES"));
     }
 
     #[test]

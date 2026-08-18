@@ -29,7 +29,7 @@
 ## 4. 质量、许可与漏洞
 
 - [ ] `cargo fmt --all -- --check`、严格 Clippy、workspace tests 通过。
-- [ ] Windows target 的 normal/build 可达依赖许可证审计通过，包内第三方许可证全文与 SBOM 一致。
+- [ ] Windows target 的 normal/build 可达依赖许可证审计通过，包内第三方许可证使用 `SRCQ THIRD-PARTY LICENSES` 产品标题，全文与 SBOM 一致。
 - [ ] 使用当前 RustSec advisory-db 对最终 `Cargo.lock` 审计；高风险发现必须修复或记录明确的发布阻断处置。
 - [ ] 文档链接、命令示例、机器绝对路径和内部验证标识检查通过。
 
