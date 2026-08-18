@@ -60,10 +60,17 @@ Codex 可移植设置只管理 Luna 与 Sol 两个自定义角色，并按用户
 
 ## CON-003 后继发布仅限本次授权
 
-- 状态: confirmed
+- 状态: superseded
 - 来源: 用户 2026-08-19 明确要求“发布”
 
-允许按当前迁移状态执行一次 `DirectCompatibility + InstallPortableSettings` Publish，并进行只读 Status 验收；该授权不继承到以后发布，也不创建 Git 提交或远端同步授权。
+允许按当前迁移状态执行一次 `DirectCompatibility + InstallPortableSettings` Publish，并进行只读 Status 验收；该授权不继承到以后发布。它当时没有创建 Git 授权，随后用户通过独立请求授予了项目持续 Git 维护与远端同步权限。
+
+## CON-004 持续维护项目 Git 历史
+
+- 状态: confirmed
+- 来源: 用户 2026-08-19 明确说明“这个已经说过你来全权控制的了，可能项目 agent.md 没写”，并要求完善后处理 Git
+
+AgentBase 内已授权并验证的项目改动默认由模型自行形成职责清晰的提交并非强制推送到已配置私有远端，不再逐次请求同类 Git 授权；历史重写、强制推送、远端或仓库归属变更和破坏性删除不包含在持续授权内。
 
 ## CON-002 保留既有工作区改动
 

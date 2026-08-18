@@ -20,5 +20,6 @@
 
 - `CON-001` 在初始实施轮满足，随后被用户明确的后继发布请求替代；`CON-003` 已满足。本次 `DirectCompatibility + InstallPortableSettings` 发布和发布后 Status 均成功，Luna/Sol 与 Terra 退役已进入真实 Codex。
 - `CON-002` 满足：既有 `docs/plan.md` 与 `docs/handoff.md` 改动被保留并合入当前状态，没有回退无关工作。
+- `CON-004` 满足：项目 `AGENTS.md` 已持久记录日常 Git 维护与私有远端同步授权，同时保留强制推送、历史重写和远端归属变更的单次授权边界；本轮源码已形成职责分离的提交并同步。
 - 本次发布授权已经消耗；未来任何 Publish 仍需新的明确授权。
 - 当前范围无开放实施项；未做真实 Luna 与 Sol 质量/成本比较，因为用户已直接裁决档位且本轮目标不要求该实验。

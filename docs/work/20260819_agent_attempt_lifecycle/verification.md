@@ -19,4 +19,5 @@
 - 用户随后明确授权本次发布。正式 Publish 返回 `published:true`、`changed:3`，退役路径为 `agents\terra.toml`，唯一回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260819-001202-f1169bf2`。
 - 发布后同范围只读 Status 返回 `published:true`。
 - `git diff --check` 退出成功；仅报告 Git 的 CRLF→LF 工作区提示，没有空白错误。
-- 本轮没有安装软件，没有提交或远端同步；本次 Publish 授权已经消耗。
+- 本轮没有安装软件；本次 Publish 授权已经消耗。
+- 用户随后明确授予 AgentBase 持续 Git 维护与私有远端同步权限。功能改动形成提交 `384c8ed`，持续授权与接手状态形成独立治理提交；两者按非强制方式同步 `main` 到现有 `origin`。

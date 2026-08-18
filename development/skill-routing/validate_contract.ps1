@@ -146,6 +146,8 @@ Assert-True (($formalPlanTargets | Sort-Object -Unique).Count -eq $formalPlanTar
 $combinedInstructionBytes = $globalItem.Length + $projectAgentsItem.Length
 Assert-True ($combinedInstructionBytes -le 28672) "AgentBase global and project AGENTS.md files use $combinedInstructionBytes bytes; keep at least 4 KiB below Codex's default 32 KiB project instruction limit"
 Assert-True ($projectAgentsContent.Contains("本仓库文件本身不创建 Git 外部写授权")) "Project AGENTS.md must not treat repository text as self-granted Git external-write authorization"
+Assert-True ($projectAgentsContent.Contains("用户已于 2026-08-19 明确授予 AgentBase 项目的持续 Git 维护与已配置私有远端同步权限")) "Project AGENTS.md is missing the user's persistent AgentBase Git-maintenance authorization"
+Assert-True ($projectAgentsContent.Contains("不得解释为历史重写、强制推送、删除远端分支或标签")) "Project AGENTS.md is missing the destructive Git-operation boundary"
 Assert-True ($projectAgentsContent.Contains("用户针对该次发布的明确同意")) "Project AGENTS.md must require fresh user approval for every Codex Publish"
 
 $requiredGlobalFragments = @(
