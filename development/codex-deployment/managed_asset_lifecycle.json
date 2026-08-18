@@ -17,13 +17,13 @@
       { "id": "settings:config", "path": "config.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
       { "id": "settings:hooks", "path": "hooks.json", "kind": "file", "modes": ["DirectCompatibility"], "requires_portable_settings": true },
       { "id": "agent:luna", "path": "agents/luna.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
-      { "id": "agent:sol", "path": "agents/sol.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
-      { "id": "agent:terra", "path": "agents/terra.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true }
+      { "id": "agent:sol", "path": "agents/sol.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true }
     ],
     "retired": [
       { "id": "skill:ast-grep-token-safe", "path": "skills/ast-grep-token-safe", "kind": "directory", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": false, "since": "045656f", "reason": "replaced by the unified source-query owner", "replaced_by": "skill:source-query", "legacy_import": true },
       { "id": "skill:fd-usage", "path": "skills/fd-usage", "kind": "directory", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": false, "since": "045656f", "reason": "replaced by the unified source-query owner", "replaced_by": "skill:source-query", "legacy_import": true },
-      { "id": "skill:rg-token-safe", "path": "skills/rg-token-safe", "kind": "directory", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": false, "since": "045656f", "reason": "replaced by the unified source-query owner", "replaced_by": "skill:source-query", "legacy_import": true }
+      { "id": "skill:rg-token-safe", "path": "skills/rg-token-safe", "kind": "directory", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": false, "since": "045656f", "reason": "replaced by the unified source-query owner", "replaced_by": "skill:source-query", "legacy_import": true },
+      { "id": "agent:terra", "path": "agents/terra.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true, "since": "2026-08-18", "reason": "the user retired the intermediate Terra role; Luna and Sol remain the only managed custom-agent roles" }
     ],
     "transferred": []
   },

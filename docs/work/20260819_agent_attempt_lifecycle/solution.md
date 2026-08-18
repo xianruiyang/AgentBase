@@ -1,0 +1,25 @@
+# 方案
+
+## SOL-001 收敛角色与部署生命周期
+
+- 状态: implemented
+- 解决: GAP-001
+- 关联: DES-001, REQ-001
+
+把默认子代理改为 Luna/max，在 Luna 与 Sol 文件中分别显式声明 `max`、`medium`，删除 Terra 候选并登记退役生命周期；同步部署说明、portable validator 和部署回归消费者。
+
+## SOL-002 建立 Begin/Finish 唯一入口
+
+- 状态: implemented
+- 解决: GAP-002
+- 关联: DES-002, REQ-002
+
+把记录器改为 `Begin|Finish` 两阶段入口，先持久化 started 再运行 evaluator；Finish 同时覆盖结果通过、结果失败和执行失败。merge 绑定三份已通过 attempt ID，正式 validator 阻断未完成收据。
+
+## SOL-003 轮换有界活跃账本
+
+- 状态: implemented
+- 解决: GAP-003
+- 关联: DES-003, AC-005
+
+把账本升级到 schema 2，一个活跃周期最多六份收据；新周期写入前检查旧周期没有 started，并保存旧周期 ID、文件哈希与收据数。迁移脚本通过同一 Begin/Finish 入口导入当前三份 baseline。

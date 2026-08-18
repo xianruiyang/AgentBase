@@ -8,11 +8,14 @@ param(
     [string]$ReferenceResultsPath,
     [Parameter(Mandatory = $true)]
     [string]$OutputPath,
+    [Parameter(Mandatory = $true)]
+    [string]$RoutingAttemptId,
+    [Parameter(Mandatory = $true)]
+    [string]$PolicyAttemptId,
+    [Parameter(Mandatory = $true)]
+    [string]$ReferenceAttemptId,
     [string]$ProjectRoot,
-    [string]$AttemptHistoryPath,
-    [string]$RoutingRetryJustification,
-    [string]$PolicyRetryJustification,
-    [string]$ReferenceRetryJustification
+    [string]$AttemptHistoryPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,9 +38,6 @@ if ([string]::IsNullOrWhiteSpace($outputDirectory) -or -not (Test-Path -LiteralP
     throw "Output directory must already exist: $outputDirectory"
 }
 
-& (Join-Path $PSScriptRoot "record_routing_attempt.ps1") -ProjectRoot $ProjectRoot -Phase Routing -ResultsPath $RoutingResultsPath -AttemptHistoryPath $AttemptHistoryPath -RetryJustification $RoutingRetryJustification | Out-Null
-& (Join-Path $PSScriptRoot "record_routing_attempt.ps1") -ProjectRoot $ProjectRoot -Phase Policy -ResultsPath $PolicyResultsPath -RoutingResultsPath $RoutingResultsPath -AttemptHistoryPath $AttemptHistoryPath -RetryJustification $PolicyRetryJustification | Out-Null
-& (Join-Path $PSScriptRoot "record_routing_attempt.ps1") -ProjectRoot $ProjectRoot -Phase References -ResultsPath $ReferenceResultsPath -RoutingResultsPath $RoutingResultsPath -AttemptHistoryPath $AttemptHistoryPath -RetryJustification $ReferenceRetryJustification | Out-Null
 & (Join-Path $PSScriptRoot "validate_routing_results.ps1") -ProjectRoot $ProjectRoot -ResultsPath $RoutingResultsPath -RoutingOnly | Out-Null
 $contract = Get-Content -LiteralPath (Join-Path $PSScriptRoot "trigger-cases.json") -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100
 $routing = Get-Content -LiteralPath $RoutingResultsPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100 -DateKind String
@@ -52,6 +52,26 @@ $stageEvaluatorIds = @(
 )
 if (@($stageEvaluatorIds | Sort-Object -Unique).Count -ne 3) {
     throw "Routing, behavior-policy, and routing-reference evidence must come from distinct evaluator runs"
+}
+
+$history = Get-Content -LiteralPath $AttemptHistoryPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 30 -DateKind String
+$stageReceipts = @(
+    [pscustomobject]@{ phase = 'Routing'; attempt_id = $RoutingAttemptId; result = $routing; path = $RoutingResultsPath },
+    [pscustomobject]@{ phase = 'Policy'; attempt_id = $PolicyAttemptId; result = $policy; path = $PolicyResultsPath },
+    [pscustomobject]@{ phase = 'References'; attempt_id = $ReferenceAttemptId; result = $references; path = $ReferenceResultsPath }
+)
+foreach ($stage in $stageReceipts) {
+    $resultHash = (Get-FileHash -LiteralPath $stage.path -Algorithm SHA256).Hash
+    $receipt = @($history.attempts | Where-Object {
+        [string]$_.attempt_id -eq [string]$stage.attempt_id -and
+        [string]$_.phase -eq [string]$stage.phase -and
+        [string]$_.outcome -eq 'passed' -and
+        [string]$_.result_sha256 -eq $resultHash -and
+        [string]$_.evaluator_id -eq [string]$stage.result.evaluator.id
+    })
+    if ($receipt.Count -ne 1) {
+        throw "$($stage.phase) result is not bound to the supplied passed attempt id: $($stage.attempt_id)"
+    }
 }
 
 $routing | Add-Member -NotePropertyName "policy_evaluation" -NotePropertyValue $policy -Force
@@ -81,4 +101,7 @@ finally {
     routing_evaluation_capsule_sha256 = [string]$routing.evaluation_capsule_sha256
     policy_evaluation_capsule_sha256 = [string]$policy.evaluation_capsule_sha256
     reference_evaluation_capsule_sha256 = [string]$references.evaluation_capsule_sha256
+    routing_attempt_id = $RoutingAttemptId
+    policy_attempt_id = $PolicyAttemptId
+    reference_attempt_id = $ReferenceAttemptId
 }

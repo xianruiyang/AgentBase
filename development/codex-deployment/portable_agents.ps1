@@ -7,7 +7,7 @@ function Get-ValidatedPortableAgentSources {
         throw "Portable Codex agents directory is missing: $Path"
     }
 
-    $expectedAgentNames = @("luna", "sol", "terra")
+    $expectedAgentNames = @("luna", "sol")
     $entries = @(Get-ChildItem -LiteralPath $Path -Force | Sort-Object Name)
     $expectedFileNames = @($expectedAgentNames | ForEach-Object { "{0}.toml" -f $_ })
     $actualFileNames = @($entries.Name)
@@ -29,20 +29,25 @@ function Get-ValidatedPortableAgentSources {
 
         $document = [regex]::Match(
             $raw,
-            '(?s)\A\s*name\s*=\s*"(?<name>[^"\r\n]+)"\s*\r?\n\s*description\s*=\s*"(?<description>[^"\r\n]+)"\s*\r?\n\s*model\s*=\s*"(?<model>[^"\r\n]+)"\s*\r?\n\s*developer_instructions\s*=\s*"""\s*\r?\n(?<instructions>.*?)\r?\n\s*"""\s*\z'
+            '(?s)\A\s*name\s*=\s*"(?<name>[^"\r\n]+)"\s*\r?\n\s*description\s*=\s*"(?<description>[^"\r\n]+)"\s*\r?\n\s*model\s*=\s*"(?<model>[^"\r\n]+)"\s*\r?\n\s*model_reasoning_effort\s*=\s*"(?<effort>[^"\r\n]+)"\s*\r?\n\s*developer_instructions\s*=\s*"""\s*\r?\n(?<instructions>.*?)\r?\n\s*"""\s*\z'
         )
         if (-not $document.Success) {
-            throw "Portable Codex agent must contain only name, description, model, and multiline developer_instructions in the reviewed order: $($entry.Name)"
+            throw "Portable Codex agent must contain only name, description, model, model_reasoning_effort, and multiline developer_instructions in the reviewed order: $($entry.Name)"
         }
 
         $agentName = [IO.Path]::GetFileNameWithoutExtension($entry.Name)
         $name = $document.Groups['name'].Value.Trim()
         $description = $document.Groups['description'].Value.Trim()
         $model = $document.Groups['model'].Value.Trim()
+        $effort = $document.Groups['effort'].Value.Trim()
         $developerInstructions = $document.Groups['instructions'].Value.Trim()
         $modelPattern = '^gpt-[0-9]+(?:\.[0-9]+)*-' + [regex]::Escape($agentName) + '$'
         if ($name -ne $agentName -or $model -notmatch $modelPattern) {
             throw "Portable Codex agent name or model does not match its file identity: $($entry.Name)"
+        }
+        $expectedEffort = if ($agentName -eq 'luna') { 'max' } else { 'medium' }
+        if ($effort -ne $expectedEffort) {
+            throw "Portable Codex agent reasoning effort does not match its role contract: $($entry.Name)"
         }
         if ([string]::IsNullOrWhiteSpace($description) -or [string]::IsNullOrWhiteSpace($developerInstructions)) {
             throw "Portable Codex agent description and developer instructions must be non-empty: $($entry.Name)"

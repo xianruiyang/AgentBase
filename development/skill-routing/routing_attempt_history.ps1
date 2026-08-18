@@ -1,9 +1,13 @@
 function Get-AgentBaseRoutingAttemptHistorySchema {
-    return 1
+    return 2
 }
 
 function Get-AgentBaseRoutingAttemptLimit {
     return 2
+}
+
+function Get-AgentBaseRoutingAttemptLedgerLimit {
+    return 6
 }
 
 function Get-AgentBaseRoutingAttemptKey {
@@ -61,6 +65,31 @@ function Write-AgentBaseRoutingAttemptHistory {
         if (Test-Path -LiteralPath $temporaryPath) {
             Remove-Item -LiteralPath $temporaryPath -Force
         }
+    }
+}
+
+function New-AgentBaseRoutingAttemptHistory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CycleId,
+        [Parameter(Mandatory = $true)]
+        [string]$Reason,
+        [string]$PreviousCycleId,
+        [string]$PreviousLedgerSha256,
+        [int]$PreviousAttemptCount = 0
+    )
+
+    return [pscustomobject]@{
+        schema_version = Get-AgentBaseRoutingAttemptHistorySchema
+        active_cycle_id = $CycleId.ToUpperInvariant()
+        ledger_started_at_utc = [DateTimeOffset]::UtcNow.ToString('o')
+        ledger_start_reason = $Reason
+        previous_cycle_id = if ([string]::IsNullOrWhiteSpace($PreviousCycleId)) { $null } else { $PreviousCycleId.ToUpperInvariant() }
+        previous_ledger_sha256 = if ([string]::IsNullOrWhiteSpace($PreviousLedgerSha256)) { $null } else { $PreviousLedgerSha256.ToUpperInvariant() }
+        previous_attempt_count = $PreviousAttemptCount
+        max_attempts_per_unchanged_input = Get-AgentBaseRoutingAttemptLimit
+        max_receipts_per_cycle = Get-AgentBaseRoutingAttemptLedgerLimit
+        attempts = @()
     }
 }
 

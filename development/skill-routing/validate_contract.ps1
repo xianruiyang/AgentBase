@@ -121,9 +121,18 @@ foreach ($attemptContractPath in @(
 )) {
     Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot $attemptContractPath) -PathType Leaf) "Routing attempt contract entry is missing: $attemptContractPath"
 }
-Assert-True ($routingReadmeContent.Contains("正式尝试的唯一接收方")) "Skill-routing README does not identify the formal attempt owner"
-Assert-True ($routingReadmeContent.Contains("至多允许一次")) "Skill-routing README does not bound unchanged-input retries"
+Assert-True ($routingReadmeContent.Contains("正式尝试生命周期的唯一 owner")) "Skill-routing README does not identify the formal attempt owner"
+Assert-True ($routingReadmeContent.Contains("每个不变输入最多两次")) "Skill-routing README does not bound unchanged-input retries"
+Assert-True ($routingReadmeContent.Contains("一个活跃周期最多六份收据")) "Skill-routing README does not bound the active ledger"
+Assert-True ($routingReadmeContent.Contains('未完成的 `started` 收据会阻断正式 Validate 和 Publish')) "Skill-routing README does not define unfinished-attempt blocking"
 Assert-True ($routingReadmeContent.Contains("更早尝试未被重建")) "Skill-routing README does not disclose the baseline history boundary"
+$attemptRecorderContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "development\skill-routing\record_routing_attempt.ps1") -Raw -Encoding UTF8
+$attemptMergeContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "development\skill-routing\merge_routing_evidence.ps1") -Raw -Encoding UTF8
+$attemptHistoryContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "development\skill-routing\routing_attempt_history.ps1") -Raw -Encoding UTF8
+Assert-True ($attemptRecorderContent.Contains("[ValidateSet('Begin', 'Finish')]")) "Routing attempt recorder does not expose the two-phase lifecycle"
+Assert-True ($attemptRecorderContent.Contains("'execution_failed'")) "Routing attempt recorder does not preserve evaluator execution failures"
+Assert-True ($attemptMergeContent.Contains('$RoutingAttemptId') -and $attemptMergeContent.Contains('$PolicyAttemptId') -and $attemptMergeContent.Contains('$ReferenceAttemptId')) "Routing evidence merge is not bound to three completed attempt IDs"
+Assert-True ($attemptHistoryContent.Contains('max_receipts_per_cycle')) "Routing attempt ledger does not expose its active-cycle bound"
 Assert-MarkdownRelativeLinks -Path $readmePath
 Assert-MarkdownRelativeLinks -Path $planPath
 
