@@ -1,50 +1,39 @@
 # AgentBase 当前接手状态
 
-状态截点：2026-08-18 源码基线固化与 srcq 发布身份修复后（Asia/Shanghai）
+状态截点：2026-08-18 验证溯源、CLI 帮助与 Git 基线闭环并同步，当前源码未再次发布（Asia/Shanghai）
 
 ## 一句话状态
 
-当前 Codex 受管理 payload 候选已通过正式验证并发布到本机，原 dirty candidate 已形成 Git 基线；随后已在项目源码中修正 srcq 发布许可证的旧 SGY 产品标题并补回归，但按用户要求暂不构建、安装或迁移任何新版本。
+`main` 与 `origin/main` 已同步，核心实现提交为 `5814dca`；Agent/Skill/CLI 候选及验证失败尝试合同均已进入 Git，当前没有开放实施项。真实 Codex 仍是本轮源码改进前的 `DirectCompatibility + InstallPortableSettings` 发布，不能把此前 `published:true` 外推到当前源码。
 
 ## 仓库与发布状态
 
-- 当前分支为 `main`；`9b29a5c`（`feat: refine model interaction and execution contracts`）固化此前已发布且验证通过的完整候选，后继提交只修正 srcq release helper、回归和直接受影响的状态说明。最终 HEAD 与上游应通过 Git 读回，不再把 `5b9523e` 当作当前源码。
-- 2026-08-18 09:34 已在用户针对该次操作的明确同意下，通过唯一部署入口发布到 `C:\Users\gzxt\.codex`。模式为 `DirectCompatibility + InstallPortableSettings`，实际改变 3 项；没有混入插件迁移。
-- 独立 `srcq` 安装仍为 `{ready:true version:0.3.1}`；该已安装版本的 `THIRD_PARTY_LICENSES.txt` 仍带旧 SGY 标题，项目源码已经修复但没有构建或安装替代版本。Codex 使用同一模式读回 `published : true`，此次源码修复不改变该 payload 状态。
-- 本次回滚资产是 `C:\Users\gzxt\.codex\backups\AgentBase-20260818-093442-e6af20a4`。需要回滚时必须使用该路径和[部署说明](../development/codex-deployment/README.md)中的正式 `Rollback` 入口。
-- 发布只证明受管理安装合同成立。发布当时的任务不会追溯加载新规则；新建任务或重启 Codex 后才使用本次安装内容。
-- 本交接和总计划是在发布后维护的仓库文档，不属于 Codex payload，也不使上述安装状态失效。
+- 当前分支为 `main`，核心实现提交 `5814dca` 已非强制推送到私有 `origin/main`；状态文档由其后续文档提交维护，正常接手时工作区应为 clean。
+- “Agent 与 Skill 指令面收敛”与“验证溯源、CLI 帮助与 Git 基线”均已闭环；各自的验证和完成审计是最小恢复入口，总计划只维护索引与重开条件。
+- 2026-08-18 上一次真实 Codex 发布使用 `DirectCompatibility + InstallPortableSettings`，改变 18 个受管理项，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260818-180544-7f1850ae`。
+- 本轮增加验证尝试合同和 taskctl 二级帮助后，只读 `Status` 返回 `published:false`，缺口为 `installed_payload_differs_from_source` 与 `published_manifest_source_is_stale`；没有再次运行 Publish。
+- 独立 `srcq` 安装仍为 0.3.1；新版本构建、安装和插件迁移继续延后。
+- 上一次 Publish 授权已经消耗；任何再次 Publish 必须取得用户针对那一次操作的明确同意，Git 同步不能替代。
 
-## 当前候选已完成的能力
+## 当前源码能力
 
-- 模型交互面已从“统一完整序列化”转为同一 canonical 结果的消费者视图：模型面按动作保留最小充分证据，machine 面保留完整稳定合同。Task/Work CLI 的 authoring、completion、查询、写入回执和生成式导航均已沿各自 owner 闭合；详细索引在[总计划](plan.md)第 4 节。
-- `source_snapshot` 已完成收据化交互面：最终模型预算投影决定捕获成员，模型传递最小收据，机器面持有内容寻址映射；进一步压缩或语义迁移仍是独立候选，不能据此视为开放任务。
-- 部署、Windows bootstrap 和 `srcq` 安装器的直接控制台输出已采用紧凑模型投影，完整程序合同保留在显式 machine 视图；旧版受管理资产由生命周期合同清理，不靠手工删除。
-- 执行控制已明确：架构或职责证据使原方案失效时先重裁再实现；是否建立计划由任务的跨步骤控制需要决定。
-- Skill 每个 new turn 重新路由；完整正文仍在有效上下文且来源未变时不重复读取，压缩后只恢复当前重新选中的 skill 及必要引用。
-- 推理档位控制已从 Goal 解耦：先独立判断目标档位，只有状态证据会改变动作时查询，只有错配且剩余工作能摊销切换成本时设置；用户固定档位始终优先，Goal 只承载本来需要的续轮。
+- Luna、Terra、Sol 使用中文角色语义与明确升级边界；角色正文只由 `global/agents/*.toml` 维护，部署 validator 不复制正文。
+- taskctl 协议拆为共享入口与 authoring、query、execution、completion 四个动作族；全部子命令参数具有中文职责说明，复杂上下文与完成命令包含最小示例。
+- 正式路由 merge 通过唯一登记入口维护有界尝试收据：失败保留分类，相同 phase/candidate/input/capsule 的新 evaluator 运行必须显式说明理由且至多一次，完全相同的通过结果只幂等复用。
+- 当前三阶段 evidence 以三份 `baseline_import` 收据接入 `evidence/attempts.json`，明确声明更早失败尝试没有被重建；后续正式尝试才受完整新合同覆盖。
+- skill description 与案例合同已收紧需求校准、QQ 根因协同、任务状态更新、固定推理档位和最终复核边界；`global/config.toml` 的 Luna/max 默认值没有改变。
 
-## 直接证据与正式入口
+## 验证边界
 
-- 项目方向、所有闭环子计划、owner、消费者和重开条件以[总计划](plan.md)为唯一索引；当前没有未闭环的项目级实施项。
-- 最新全局规则与 skill 候选通过静态合同：90 个场景，49 个严格路由场景、6 个严格引用场景，11/11 项目 skill 均有正向与非触发覆盖。
-- 最新 detached 评估为 Routing `90/90`、Policy `90/90`、References `21/21`；候选 bundle 为 `24CC35AECD613FAAED13E45A2B2FE69D724FFA9E53009E049CA8942FC12EBA18`。身份、输入声明和 capsule 哈希由 [`evidence/current.json`](../development/skill-routing/evidence/current.json)持有，不在本文件复制完整结果。
-- 当前基线复验覆盖 Task Table Manager `92/92`、Delivery Workflow `39/39`、推理生命周期 `8/8`、bootstrap、srcq 安装视图与安装生命周期、90-case 路由静态合同和正式部署 `Validate`；详细专项证据仍由各自验证文档持有。
-- srcq release helper 的定向 Rust 回归为 `5/5`，新增用例直接断言第三方许可证前言使用 SRCQ 产品身份且不含旧 SGY 标题；正式新版本构建、归档验收和真实安装尚未执行。
-- 真实安装状态不能由本文件推断；使用[部署说明](../development/codex-deployment/README.md)中的只读 `Status`，并保持 `DirectCompatibility + InstallPortableSettings` 范围一致。
-
-## 未决边界
-
-- 当前没有已知失败阻断已发布 Codex payload，也没有仅因计划存在而应继续实施的任务。srcq 源码缺陷已修复；生成新版本、归档验收和真实安装是用户明确延后的独立生命周期，不能误报为已经完成。
-- 插件迁移尚未进行。直接 skill 安装与 `agentbase-core` 插件不得同时启用；迁移必须作为独立工作验证安装、启停、hook 信任、卸载和回滚。
-- 原 dirty candidate 已形成职责清晰的 Git 基线；下个对话仍先用 `git status --short`、当前分支和上游读回确认最终工作区状态，不从本文件猜测。
-- 任何下一次真实 `Publish` 都必须重新取得用户针对那一次发布的明确同意；本次授权已经消费。Git 授权也不能替代发布授权。
-- 项目不使用远程 CI；正式验证在 Windows 本机执行，远端只承担源码与历史同步。
+- `validate_contract.ps1`：93 cases、52 strict routing、10 strict references，11/11 skill 具有正向与非触发覆盖。
+- detached evidence：Routing 93/93、Policy 93/93、References 26/26；candidate bundle `F29BEE77353CCB144A6DAD5EBE9EC054A72D8A7116ADC175ECEA1740C09A1836`。
+- 路由尝试历史测试覆盖 baseline、失败收据、同输入理由、两次上限、幂等复用、正式 merge 和跨阶段 evaluator 身份；当前历史为 3 份通过 baseline 收据。
+- Task Table Manager 92/92；部署 Validate、部署回归、custom agent 合同、路由 capsule/fingerprint、PowerShell 语法、插件构建和差异检查均通过。
+- 未执行 custom agent 的真实宿主质量与成本比较；这仍是改变默认 Luna/max 前的证据边界。
 
 ## 下个对话的最小恢复步骤
 
-1. 先读取根 `README.md` 和本文件；只有需要选择、重开或替代子计划时再读取[总计划](plan.md)。
-2. 运行 `git status --short` 并读回当前分支、HEAD 与上游；`9b29a5c` 是此前已发布候选的源码基线，后继 srcq 修复不代表已经构建或安装新版本。
-3. 若任务依赖真实安装状态，按部署说明以 `DirectCompatibility + InstallPortableSettings` 运行只读 `Status`；不要从 handoff 或 Git 历史推断安装状态。
-4. 根据用户的新请求定位总计划中的现有 owner。只有命中重开条件才继续开发；若目标是整理 Git，则先审查实际差异并取得当前操作所需授权。
-5. 只读取所选专项的 `solution.md`、`verification.md` 或 `completion-audit.md` 中当前判断缺少的部分，不批量重读全部历史交付链。
+1. 读取根 `README.md` 和本文件，运行 `git status --short`；若出现 dirty 内容，先确认其归属，不把任何旧 HEAD 当成当前完整源码。
+2. 当前没有开放实施项。只有需要选择、替代或重开子计划时读取 `docs/plan.md`；普通组件工作从 README 定位 owner。
+3. 任务依赖真实安装状态时，按部署说明只读核对 `DirectCompatibility + InstallPortableSettings Status`。当前源码尚未再次发布。
+4. 安装、插件迁移与 srcq 新版本继续延后；任何再次 Publish 都必须重新取得针对当次操作的明确同意。
