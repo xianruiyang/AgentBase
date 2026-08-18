@@ -18,7 +18,8 @@
   ],
   "reference_evaluation_skills": [
     "change-governance",
-    "delivery-workflow"
+    "delivery-workflow",
+    "task-table-manager"
   ],
   "allowed_behavior_tags": [
     "read_only",
@@ -131,7 +132,10 @@
     "skill-intact-context-reuse",
     "skill-after-compaction-reload",
     "skill-after-compaction-unselected",
-    "skill-known-change-reload"
+    "skill-known-change-reload",
+    "task-cli-authoring-references",
+    "task-cli-execution-references",
+    "task-cli-completion-references"
   ],
   "strict_reference_case_ids": [
     "qq-troubleshooting-with-powershell",
@@ -139,7 +143,11 @@
     "delivery-planning-contract",
     "delivery-task-contract",
     "delivery-feedback-contract",
-    "reasoning-long-domain-work-assessment"
+    "reasoning-long-domain-work-assessment",
+    "vertical-validation-closure-selection",
+    "task-cli-authoring-references",
+    "task-cli-execution-references",
+    "task-cli-completion-references"
   ],
   "cases": [
     {
@@ -257,7 +265,7 @@
     {
       "id": "model-interaction-source-edit-boundary",
       "kind": "behavior",
-      "request": "阶段 Markdown 按稳定 ID 保存模型和用户维护的验收语义；index.json 与 WORK_STATUS.md 都由程序从它生成。现在要修订 AC-017，请只说明应修改哪个正式来源、哪些生成文件不能直接编辑，以及修改后如何验证；当前不实施。",
+      "request": "阶段 Markdown 按稳定 ID 定义模型和用户维护的目标、状态、依赖、完成、例外与验收语义，是工作流规则的语义真源；index.json 与 WORK_STATUS.md 都由程序从它生成，工具输出和生成文件不定义规则。现在要修订 AC-017，请只说明应修改哪个正式来源、哪些生成文件不能直接编辑，以及修改后如何验证；当前不实施。",
       "expected_skills": [],
       "forbidden_skills": [
         "change-governance",
@@ -353,7 +361,7 @@
     {
       "id": "authority-change-impact-closure",
       "kind": "behavior",
-      "request": "长期交付执行中，当前证据推翻了一个已完成公共契约的部分内容，用户已明确授权实施修正。请保持用户确认目标不变，沿语义关系、任务消费关系和实际系统找出直接与间接消费者，修订、退出或重验所有受影响结果后再判断完成。",
+      "request": "长期交付执行中，当前证据推翻了一个已完成公共契约的部分内容，用户已明确授权实施修正。请保持用户确认目标不变，沿语义关系、任务消费关系和实际系统找出直接与间接消费者，更新受影响的长期任务合同、依赖、状态和结果摘要，并修订、退出或重验所有受影响结果后再判断完成。",
       "expected_skills": [
         "change-governance",
         "delivery-workflow",
@@ -841,6 +849,10 @@
         "delivery-workflow"
       ],
       "expected_change_governance_references": [],
+      "expected_task_table_manager_references": [
+        "tooling.md",
+        "query-tooling.md"
+      ],
       "expected_behavior_tags": [
         "read_only",
         "vertical_validation_closure"
@@ -1691,6 +1703,9 @@
         "artifact-contracts.md",
         "execution-contracts.md"
       ],
+      "expected_task_table_manager_references": [
+        "task-contracts.md"
+      ],
       "expected_behavior_tags": [
         "modify_authorized_scope",
         "document_authority"
@@ -1700,7 +1715,7 @@
     {
       "id": "delivery-feedback-contract",
       "kind": "positive",
-      "request": "读取并更新现有长期交付任务表时得到新证据，需要在不改变已确认需求的前提下判断最小执行上下文、回退到最早失效的模型判断，并把证据和任务状态回流到方案。",
+      "request": "使用 taskctl impact 查询现有长期交付任务表时得到新证据，再按 revision 用 note 或 reopen 更新任务状态；需要在不改变已确认需求的前提下判断最小执行上下文、回退到最早失效的模型判断，并把证据和任务状态回流到方案。",
       "expected_skills": [
         "delivery-workflow",
         "task-table-manager"
@@ -1713,11 +1728,101 @@
         "execution-contracts.md",
         "iteration.md"
       ],
+      "expected_task_table_manager_references": [
+        "execution.md",
+        "tooling.md",
+        "query-tooling.md",
+        "execution-tooling.md"
+      ],
       "expected_behavior_tags": [
         "modify_authorized_scope",
         "protected_user_baseline"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "task-cli-authoring-references",
+      "kind": "positive",
+      "request": "上游方案和任务语义已经确认。现在使用 taskctl draft 形成候选，再用 add 或 update 写入长期任务合同；CLI 只对写错对象、并发覆盖等可机械证明、局部且可恢复的风险设门禁，并返回原因与恢复动作。不要选择或执行任务，也不要加载查询、执行或最终复核协议。",
+      "expected_skills": [
+        "task-table-manager"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_task_table_manager_references": [
+        "task-contracts.md",
+        "tooling.md",
+        "authoring-tooling.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "cli_assistive_only",
+        "local_mechanical_gates"
+      ],
+      "forbidden_behavior_tags": [
+        "authority_lifecycle"
+      ]
+    },
+    {
+      "id": "task-cli-execution-references",
+      "kind": "positive",
+      "request": "现有长期任务合同和依赖已经确认。使用 taskctl context --capture 取得执行来源，按 revision 记录 start 和 note，完成验证后用 complete 提交结果；不要修改任务合同或进行最终交付复核。",
+      "expected_skills": [
+        "task-table-manager"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_task_table_manager_references": [
+        "execution.md",
+        "tooling.md",
+        "execution-tooling.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "cli_assistive_only",
+        "local_mechanical_gates"
+      ],
+      "forbidden_behavior_tags": [
+        "authority_lifecycle"
+      ]
+    },
+    {
+      "id": "task-cli-completion-references",
+      "kind": "positive",
+      "request": "当前交付文档和任务结果已经稳定。使用 taskctl completion-context 分页取得全部需求、约束、DCR 和候选证据并执行最终复核；不要写任务合同或执行状态，CLI 不得替我判断整体完成。",
+      "expected_skills": [
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "forbidden_skills": [
+        "change-governance"
+      ],
+      "expected_change_governance_references": [],
+      "expected_delivery_workflow_references": [
+        "artifact-contracts.md",
+        "target-contracts.md",
+        "execution-contracts.md",
+        "iteration.md"
+      ],
+      "expected_task_table_manager_references": [
+        "tooling.md",
+        "completion-tooling.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "final_user_scope_only",
+        "document_authority",
+        "cli_assistive_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "qq-troubleshooting-with-powershell",

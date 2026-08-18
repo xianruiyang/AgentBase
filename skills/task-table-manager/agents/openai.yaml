@@ -1,4 +1,4 @@
 interface:
   display_name: "Task Table Manager"
   short_description: "管理长期任务、消费依赖、来源版本、影响传播与恢复上下文"
-  default_prompt: "使用 $task-table-manager 维护长期任务合同、消费依赖、实际来源快照和影响传播，并把 CLI 限定为存储、查询与机械诊断辅助。"
+  default_prompt: "使用 $task-table-manager 维护长期任务合同、消费依赖、实际来源快照和影响传播，并在交付证据改变既有任务合同、依赖、状态或结果时更新任务表；CLI 只作存储、查询与机械诊断辅助。"

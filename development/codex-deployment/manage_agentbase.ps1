@@ -21,6 +21,8 @@ $portableConfigContractPath = Join-Path $PSScriptRoot "portable_config.ps1"
 . $portableConfigContractPath
 $managedAssetLifecycleScriptPath = Join-Path $PSScriptRoot "managed_asset_lifecycle.ps1"
 . $managedAssetLifecycleScriptPath
+$portableAgentContractPath = Join-Path $PSScriptRoot "portable_agents.ps1"
+. $portableAgentContractPath
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -345,6 +347,7 @@ function Get-ValidatedRoutingEvidence {
     }
 
     & (Join-Path $Root "development\skill-routing\validate_routing_results.ps1") -ProjectRoot $Root -ResultsPath $evidencePath | Out-Null
+    & (Join-Path $Root "development\skill-routing\validate_routing_attempt_history.ps1") -ProjectRoot $Root -AttemptHistoryPath (Join-Path $Root "development\skill-routing\evidence\attempts.json") -CurrentEvidencePath $evidencePath | Out-Null
     $evidence = Get-Content -LiteralPath $evidencePath -Raw -Encoding UTF8 | ConvertFrom-Json -DateKind String
     if ([string]::IsNullOrWhiteSpace([string]$evidence.evaluator.id)) {
         throw "Current staged routing evidence does not identify its routing evaluator run"
@@ -569,68 +572,6 @@ function Test-PortableConfigSource {
     if ($raw -match '(?i)([a-z]:[\\/]|\\\\|https?://|api[_-]?key\s*=|password\s*=|secret\s*=|credential\s*=|trusted_hash\s*=)') {
         throw "Portable Codex config comments contain a machine path or sensitive assignment"
     }
-}
-
-function Get-ValidatedPortableAgentSources {
-    param(
-        [string]$Path
-    )
-
-    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
-        throw "Portable Codex agents directory is missing: $Path"
-    }
-
-    $expectedAgents = [ordered]@{
-        luna = [ordered]@{
-            description = "Use Luna for clear, narrowly scoped, repeatable, or high-throughput tasks."
-            model = "gpt-5.6-luna"
-            developer_instructions = "Complete well-defined tasks quickly and stay within scope. Return concise, verifiable results."
-        }
-        sol = [ordered]@{
-            description = "Use Sol for demanding, ambiguous, multi-step tasks that require deep reasoning and validation."
-            model = "gpt-5.6-sol"
-            developer_instructions = "Handle complex reasoning, implementation, and verification tasks. Keep conclusions evidence-based and validate material changes."
-        }
-        terra = [ordered]@{
-            description = "Use Terra for general tasks that should balance quality, speed, and cost."
-            model = "gpt-5.6-terra"
-            developer_instructions = "Complete exploration, analysis, and routine implementation efficiently. Return concise, verifiable results."
-        }
-    }
-    $entries = @(Get-ChildItem -LiteralPath $Path -Force | Sort-Object Name)
-    $expectedNames = @($expectedAgents.Keys | ForEach-Object { "{0}.toml" -f $_ })
-    $actualNames = @($entries.Name)
-    if (($actualNames -join '|') -ne ($expectedNames -join '|')) {
-        throw "Portable Codex agents contain an unexpected file set: $($actualNames -join ', ')"
-    }
-
-    foreach ($entry in $entries) {
-        if ($entry.PSIsContainer -or ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-            throw "Portable Codex agent must be a real TOML file: $($entry.FullName)"
-        }
-        $agentName = [IO.Path]::GetFileNameWithoutExtension($entry.Name)
-        $spec = $expectedAgents[$agentName]
-        $expectedLines = @(
-            "name = `"$agentName`""
-            "description = `"$($spec.description)`""
-            "model = `"$($spec.model)`""
-            'developer_instructions = """'
-            [string]$spec.developer_instructions
-            '"""'
-        )
-        $actualLines = @(Get-Content -LiteralPath $entry.FullName -Encoding UTF8 | ForEach-Object { $_.Trim() } | Where-Object {
-            -not [string]::IsNullOrWhiteSpace($_)
-        })
-        if (($actualLines -join [Environment]::NewLine) -ne ($expectedLines -join [Environment]::NewLine)) {
-            throw "Portable Codex agent differs from the reviewed contract: $($entry.Name)"
-        }
-        $raw = Get-Content -LiteralPath $entry.FullName -Raw -Encoding UTF8
-        if ($raw -match '(?i)([a-z]:[\\/]|\\\\|https?://|api[_-]?key|password|secret|credential|trusted_hash|mcp_servers|skills\.config)') {
-            throw "Portable Codex agent contains a machine path, external dependency, or sensitive setting: $($entry.Name)"
-        }
-    }
-
-    return $entries
 }
 
 function Test-HooksTemplateSource {

@@ -2815,6 +2815,35 @@ class TaskctlTests(unittest.TestCase):
         helped = self.run_cli(TASKCTL, "--help")
         self.assertEqual(helped.returncode, 0)
         self.assertIn("usage:", helped.stdout)
+        self.assertIn("管理任务合同、依赖查询、执行状态和有界上下文", helped.stdout)
+        self.assertIn("返回建议候选，不签发执行许可", helped.stdout)
+        self.assertIn("分页取得最终复核证据，不裁决整体完成", helped.stdout)
+        self.assertIn("用 task/state CAS 和来源收据提交结果", helped.stdout)
+
+        context_help = self.run_cli(TASKCTL, "context", "--help")
+        self.assertEqual(context_help.returncode, 0)
+        self.assertIn("model 视图的保守 Token 上限", context_help.stdout)
+        self.assertIn("内容寻址来源快照并返回收据", context_help.stdout)
+        self.assertIn("taskctl.py context --task-dir", context_help.stdout)
+
+        complete_help = self.run_cli(TASKCTL, "complete", "--help")
+        self.assertEqual(complete_help.returncode, 0)
+        self.assertIn("执行所依据的 task revision", complete_help.stdout)
+        self.assertIn("context --capture 返回的内容寻址来源收据", complete_help.stdout)
+        self.assertIn("预期 state revision", complete_help.stdout)
+
+        module = load_taskctl_module()
+        parser = module.build_parser()
+        subparser_action = next(
+            action for action in parser._actions if action.dest == "command"
+        )
+        for command, command_parser in subparser_action.choices.items():
+            self.assertTrue(command_parser.description, command)
+            for action in command_parser._actions:
+                if action.dest == "help":
+                    continue
+                self.assertIsInstance(action.help, str, f"{command}:{action.dest}")
+                self.assertTrue(action.help.strip(), f"{command}:{action.dest}")
 
     def test_task_table_preserves_noncanonical_semantic_title(self) -> None:
         table_path = self.root / "task-table.json"

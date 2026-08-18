@@ -1,4 +1,4 @@
 interface:
   display_name: "Change Governance"
-  short_description: "裁决根因、职责入口、跨消费者影响传播、迁移与完成审计"
+  short_description: "裁决复杂变更的根因、职责入口、跨消费者影响、迁移与完成审计"
   default_prompt: "使用 $change-governance 裁决这项复杂变更的根因、权威职责、消费者影响、迁移退出与验证证据。"

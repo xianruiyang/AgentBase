@@ -8,7 +8,11 @@ param(
     [string]$ReferenceResultsPath,
     [Parameter(Mandatory = $true)]
     [string]$OutputPath,
-    [string]$ProjectRoot
+    [string]$ProjectRoot,
+    [string]$AttemptHistoryPath,
+    [string]$RoutingRetryJustification,
+    [string]$PolicyRetryJustification,
+    [string]$ReferenceRetryJustification
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,11 +26,18 @@ $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $RoutingResultsPath = (Resolve-Path -LiteralPath $RoutingResultsPath).Path
 $PolicyResultsPath = (Resolve-Path -LiteralPath $PolicyResultsPath).Path
 $ReferenceResultsPath = (Resolve-Path -LiteralPath $ReferenceResultsPath).Path
+if ([string]::IsNullOrWhiteSpace($AttemptHistoryPath)) {
+    $AttemptHistoryPath = Join-Path $PSScriptRoot "evidence\attempts.json"
+}
+$AttemptHistoryPath = [IO.Path]::GetFullPath($AttemptHistoryPath)
 $outputDirectory = Split-Path -Parent $OutputPath
 if ([string]::IsNullOrWhiteSpace($outputDirectory) -or -not (Test-Path -LiteralPath $outputDirectory -PathType Container)) {
     throw "Output directory must already exist: $outputDirectory"
 }
 
+& (Join-Path $PSScriptRoot "record_routing_attempt.ps1") -ProjectRoot $ProjectRoot -Phase Routing -ResultsPath $RoutingResultsPath -AttemptHistoryPath $AttemptHistoryPath -RetryJustification $RoutingRetryJustification | Out-Null
+& (Join-Path $PSScriptRoot "record_routing_attempt.ps1") -ProjectRoot $ProjectRoot -Phase Policy -ResultsPath $PolicyResultsPath -RoutingResultsPath $RoutingResultsPath -AttemptHistoryPath $AttemptHistoryPath -RetryJustification $PolicyRetryJustification | Out-Null
+& (Join-Path $PSScriptRoot "record_routing_attempt.ps1") -ProjectRoot $ProjectRoot -Phase References -ResultsPath $ReferenceResultsPath -RoutingResultsPath $RoutingResultsPath -AttemptHistoryPath $AttemptHistoryPath -RetryJustification $ReferenceRetryJustification | Out-Null
 & (Join-Path $PSScriptRoot "validate_routing_results.ps1") -ProjectRoot $ProjectRoot -ResultsPath $RoutingResultsPath -RoutingOnly | Out-Null
 $contract = Get-Content -LiteralPath (Join-Path $PSScriptRoot "trigger-cases.json") -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100
 $routing = Get-Content -LiteralPath $RoutingResultsPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100 -DateKind String
@@ -52,6 +63,7 @@ $temporaryPath = Join-Path $outputDirectory (".{0}.{1}.tmp" -f ([IO.Path]::GetFi
 try {
     [IO.File]::WriteAllText($temporaryPath, $json + [Environment]::NewLine, $utf8NoBom)
     & (Join-Path $PSScriptRoot "validate_routing_results.ps1") -ProjectRoot $ProjectRoot -ResultsPath $temporaryPath | Out-Null
+    & (Join-Path $PSScriptRoot "validate_routing_attempt_history.ps1") -ProjectRoot $ProjectRoot -AttemptHistoryPath $AttemptHistoryPath -CurrentEvidencePath $temporaryPath | Out-Null
     [IO.File]::Move($temporaryPath, $outputFullPath, $true)
 }
 finally {

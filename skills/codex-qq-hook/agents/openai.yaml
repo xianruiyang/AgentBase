@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex QQ 通知"
   short_description: "按明确授权配置、主动发送和排查 Codex QQ 通知"
-  default_prompt: "使用 $codex-qq-hook 管理或排查 QQ 完成提醒，并在已授权且延迟通知会造成实质影响时主动发送最小消息。"
+  default_prompt: "使用 $codex-qq-hook 管理或排查 QQ 完成提醒；未发送原因尚未确认时同时使用 $change-governance，并仅在已授权且延迟会造成实质影响时主动发送最小消息。"

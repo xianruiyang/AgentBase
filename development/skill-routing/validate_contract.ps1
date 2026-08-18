@@ -111,6 +111,19 @@ foreach ($ownerReadme in @(
     Assert-True ($readmeContent.Contains($ownerReadme.Replace('\', '/'))) "Root README does not index component owner: $ownerReadme"
     Assert-MarkdownRelativeLinks -Path $ownerReadmePath
 }
+$routingReadmeContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "development\skill-routing\README.md") -Raw -Encoding UTF8
+foreach ($attemptContractPath in @(
+    "development\skill-routing\routing_attempt_history.ps1",
+    "development\skill-routing\record_routing_attempt.ps1",
+    "development\skill-routing\validate_routing_attempt_history.ps1",
+    "development\skill-routing\initialize_routing_attempt_history.ps1",
+    "development\skill-routing\test_routing_attempt_history.ps1"
+)) {
+    Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot $attemptContractPath) -PathType Leaf) "Routing attempt contract entry is missing: $attemptContractPath"
+}
+Assert-True ($routingReadmeContent.Contains("正式尝试的唯一接收方")) "Skill-routing README does not identify the formal attempt owner"
+Assert-True ($routingReadmeContent.Contains("至多允许一次")) "Skill-routing README does not bound unchanged-input retries"
+Assert-True ($routingReadmeContent.Contains("更早尝试未被重建")) "Skill-routing README does not disclose the baseline history boundary"
 Assert-MarkdownRelativeLinks -Path $readmePath
 Assert-MarkdownRelativeLinks -Path $planPath
 
@@ -197,15 +210,15 @@ Assert-True (@($duplicateRules).Count -eq 0) "Global AGENTS.md contains duplicat
 
 $descriptionBoundaryFragments = @{
     "source-query" = "分页或截断阻断当前必要证据"
-    "change-governance" = "不用于已有唯一 owner 与明确依赖的普通实现"
+    "change-governance" = "不用于上游契约稳定且仅按已确认需求与证据做常规最终交付复核"
     "codex-event-logger" = "当前上下文充分"
-    "codex-qq-hook" = "状态查询不改配置"
+    "codex-qq-hook" = "未发送原因尚未确认的链路排查必须同时选择 change-governance"
     "cpp-engineering-rules" = "仅正文提及 C++ 不触发"
     "delivery-workflow" = "不用于规格完整的单轮实现"
     "powershell-usage" = "不用于单条精确只读"
-    "reasoning-governor" = "无 active Goal 仍可触发"
+    "reasoning-governor" = "用户已经固定并确认设置、当前只要求保持该档位继续任务时不使用"
     "symbol-structure-workflow" = "不用于只读文本"
-    "task-table-manager" = "不用于单轮修改"
+    "task-table-manager" = "交付执行证据要求更新既有任务合同、依赖、状态或结果"
     "understand-space" = "正文偶有空间词不触发"
 }
 
@@ -317,8 +330,21 @@ Assert-True ($governorPowerShellContent.Contains('[ValidateSet("model", "machine
 
 $taskTableSkillPath = Join-Path $ProjectRoot "skills\task-table-manager\SKILL.md"
 $taskTableSkillContent = Get-Content -LiteralPath $taskTableSkillPath -Raw -Encoding UTF8
-$taskTableToolingContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\task-table-manager\references\tooling.md") -Raw -Encoding UTF8
-$taskTableContractContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\task-table-manager\references\task-contracts.md") -Raw -Encoding UTF8
+$taskTableReferenceRoot = Join-Path $ProjectRoot "skills\task-table-manager\references"
+$taskTableToolingPath = Join-Path $taskTableReferenceRoot "tooling.md"
+$taskTableAuthoringToolingPath = Join-Path $taskTableReferenceRoot "authoring-tooling.md"
+$taskTableQueryToolingPath = Join-Path $taskTableReferenceRoot "query-tooling.md"
+$taskTableExecutionToolingPath = Join-Path $taskTableReferenceRoot "execution-tooling.md"
+$taskTableCompletionToolingPath = Join-Path $taskTableReferenceRoot "completion-tooling.md"
+foreach ($taskTableRoutedReference in @($taskTableToolingPath, $taskTableAuthoringToolingPath, $taskTableQueryToolingPath, $taskTableExecutionToolingPath, $taskTableCompletionToolingPath)) {
+    Assert-True (Test-Path -LiteralPath $taskTableRoutedReference -PathType Leaf) "task-table-manager is missing a routed tooling contract: $taskTableRoutedReference"
+}
+$taskTableToolingContent = Get-Content -LiteralPath $taskTableToolingPath -Raw -Encoding UTF8
+$taskTableAuthoringToolingContent = Get-Content -LiteralPath $taskTableAuthoringToolingPath -Raw -Encoding UTF8
+$taskTableQueryToolingContent = Get-Content -LiteralPath $taskTableQueryToolingPath -Raw -Encoding UTF8
+$taskTableExecutionToolingContent = Get-Content -LiteralPath $taskTableExecutionToolingPath -Raw -Encoding UTF8
+$taskTableCompletionToolingContent = Get-Content -LiteralPath $taskTableCompletionToolingPath -Raw -Encoding UTF8
+$taskTableContractContent = Get-Content -LiteralPath (Join-Path $taskTableReferenceRoot "task-contracts.md") -Raw -Encoding UTF8
 Assert-True ($taskTableSkillContent.Contains('`$reasoning-governor`')) "task-table-manager must delegate reasoning depth to reasoning-governor"
 $taskTableScriptPath = Join-Path $ProjectRoot "skills\task-table-manager\scripts\taskctl.py"
 $taskTableScriptContent = Get-Content -LiteralPath $taskTableScriptPath -Raw -Encoding UTF8
@@ -333,10 +359,14 @@ Assert-True ($taskTableScriptContent.Contains('sys.stdout.reconfigure(encoding="
 Assert-True ($taskTableScriptContent.Contains('compact_model')) "taskctl is missing its compact model renderer"
 Assert-True ($taskTableToolingContent.Contains('`--view model` 是默认值') -and $taskTableToolingContent.Contains('`--view machine` 面向程序')) "taskctl tooling does not define consumer output surfaces"
 Assert-True ($taskTableToolingContent.Contains('紧凑 HJSON 风格文本')) "taskctl tooling does not define the measured model representation"
+Assert-True ($taskTableSkillContent.Contains('再只增加当前命令族的一项')) "task-table-manager does not progressively select one CLI command family"
+Assert-True ($taskTableToolingContent.Contains('不要为发现命令而预读其他族')) "taskctl common tooling does not prohibit command-family preloading"
+Assert-True ($taskTableSkillContent.Contains('authoring-tooling.md') -and $taskTableSkillContent.Contains('query-tooling.md') -and $taskTableSkillContent.Contains('execution-tooling.md') -and $taskTableSkillContent.Contains('completion-tooling.md')) "task-table-manager main entry does not route every CLI command family"
 Assert-True ($taskTableSkillContent.Contains('任务合同、状态和结果是程序消费且由模型作出语义决定的结构化真源')) "task-table-manager does not declare its model-maintained structured source"
 Assert-True ($taskTableContractContent.Contains('不能直接编辑 `tasks/*.json` 绕过 CAS、路径和原子写入职责')) "task-table-manager does not keep permanent task edits on the validated write entry"
-Assert-True ($taskTableToolingContent.Contains('不直接编辑生成视图或绕过存储职责')) "task-table-manager still permits generated views as editing entries"
-Assert-True ($taskTableToolingContent.Contains('completion-context') -and $taskTableToolingContent.Contains('省略完整来源映射')) "taskctl model completion projection is not documented"
+Assert-True ($taskTableAuthoringToolingContent.Contains('不直接编辑 `tasks/*.json`、生成视图或其他机器资产')) "task-table-manager still permits generated views as editing entries"
+Assert-True ($taskTableCompletionToolingContent.Contains('`completion-context`') -and $taskTableCompletionToolingContent.Contains('省略完整来源映射')) "taskctl model completion projection is not documented"
+Assert-True ($taskTableQueryToolingContent.Contains('返回候选和建议排序，不决定下一项工作') -and $taskTableQueryToolingContent.Contains('不签发执行许可')) "taskctl next query is not documented as advisory"
 Assert-True ($taskTableScriptContent.Contains('needs_review_count')) "taskctl status does not expose the review count"
 Assert-True ($taskTableScriptContent.Contains('upstream_index_derived_content_mismatch')) "taskctl does not bind cached index content to current workflow documents"
 Assert-True ($taskTableScriptContent.Contains('completion snapshot changed')) "taskctl completion pagination is missing snapshot consistency"
@@ -344,7 +374,7 @@ Assert-True ($taskTableScriptContent.Contains('TASK-PAGINATION-SNAPSHOT')) "task
 Assert-True ($taskTableScriptContent.Contains('owner_mismatch')) "taskctl does not report owner conflicts as diagnostics"
 Assert-True ($taskTableScriptContent.Contains('dependency_cycle')) "taskctl does not report dependency cycles as diagnostics"
 Assert-True ($taskTableScriptContent.Contains('context_model_receipt_candidate') -and $taskTableScriptContent.Contains('store_source_snapshot')) "taskctl does not bind the final model projection to immutable source snapshot receipts"
-Assert-True ($taskTableScriptContent.Contains('source_snapshot_ref') -and $taskTableToolingContent.Contains('模型语义结果并附加已有收据')) "taskctl results do not reference machine-owned source snapshots"
+Assert-True ($taskTableScriptContent.Contains('source_snapshot_ref') -and $taskTableExecutionToolingContent.Contains('指向 `context --capture` 生成的内容寻址执行来源映射')) "taskctl results do not reference machine-owned source snapshots"
 Assert-True ($taskTableScriptContent.Contains('result_source_snapshot_missing')) "taskctl does not diagnose results without an execution-time source snapshot"
 Assert-True ($taskTableScriptContent.Contains('result_source_snapshot_incomplete')) "taskctl does not diagnose incomplete transitive source snapshots"
 Assert-True ($taskTableScriptContent.Contains('result_source_snapshot_asset_missing') -and $taskTableScriptContent.Contains('result_source_snapshot_asset_invalid') -and $taskTableScriptContent.Contains('result_source_snapshot_asset_identity_mismatch')) "taskctl does not distinguish missing, unreadable, or changed snapshot assets"
@@ -358,6 +388,8 @@ Assert-True ($taskTableScriptContent.Contains('result_history_record_unreadable'
 Assert-True ($taskTableScriptContent.Contains('[*task["source_ids"], *evidence_for]')) "taskctl completion context does not consume direct result evidence mappings"
 Assert-True (-not $taskTableScriptContent.Contains('contains duplicate values')) "taskctl still blocks parseable duplicate values"
 Assert-True (-not $taskTableScriptContent.Contains('choices=STATUSES')) "taskctl still uses its status vocabulary as an argparse gate"
+Assert-True ($taskTableScriptContent.Contains('"返回建议候选，不签发执行许可"') -and $taskTableScriptContent.Contains('"分页取得最终复核证据，不裁决整体完成"')) "taskctl top-level help does not expose advisory query and final-review boundaries"
+Assert-True ($taskTableScriptContent.Contains('"执行所依据的 task revision；不匹配时拒绝提交"') -and $taskTableScriptContent.Contains('"context --capture 返回的内容寻址来源收据；与结果文件内收据不可并用"')) "taskctl secondary help does not expose CAS and source-receipt boundaries"
 Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot "skills\task-table-manager\tests\test_taskctl.py") -PathType Leaf) "task-table-manager is missing its CLI regression tests"
 
 $deliveryRoot = Join-Path $ProjectRoot "skills\delivery-workflow"
@@ -385,7 +417,9 @@ Assert-True ($deliveryCommonContractContent.Contains('## 模型读取面与修�
 Assert-True ($deliveryCommonContractContent.Contains('模型不得通过直接编辑它们改变目标、设计、任务或完成状态')) "delivery-workflow still permits generated assets as semantic editing entries"
 Assert-True ($deliverySkillContent.Contains('当前消费者接入')) "delivery-workflow does not close shared responsibilities through current consumers"
 Assert-True ($deliverySkillContent.Contains('只增加当前动作所属的一项')) "delivery-workflow does not progressively route stage contracts"
+Assert-True ($deliverySkillContent.Contains('最终复核同时读取公共产物、目标与执行合同')) "delivery-workflow final review does not include the common artifact contract"
 Assert-True ($deliverySkillContent.Contains('不因此额外读取目标合同')) "delivery-workflow does not prevent target-contract over-selection when confirmed targets are unchanged"
+Assert-True ($deliverySkillContent.Contains('实际使用 `workctl` 时读取')) "delivery-workflow tooling reference is not scoped to its own CLI"
 Assert-True ($deliverySkillContent.Contains('target-contracts.md') -and $deliverySkillContent.Contains('planning-contracts.md') -and $deliverySkillContent.Contains('execution-contracts.md')) "delivery-workflow main entry does not route every stage owner"
 Assert-True ($deliveryTargetContractContent.Contains('## 需求分析') -and $deliveryTargetContractContent.Contains('## 用户设计') -and $deliveryTargetContractContent.Contains('## 延后讨论项')) "delivery-workflow protected-target contract is incomplete"
 Assert-True ($deliveryPlanningContractContent.Contains('## 模型设计') -and $deliveryPlanningContractContent.Contains('## 现状分析') -and $deliveryPlanningContractContent.Contains('## 方案设计')) "delivery-workflow planning contract is incomplete"

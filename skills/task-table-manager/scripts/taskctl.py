@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manage task contracts, dependency queries, execution state, and bounded context."""
+"""管理任务合同、依赖查询、执行状态和有界上下文。"""
 
 from __future__ import annotations
 
@@ -78,6 +78,12 @@ class TaskctlError(RuntimeError):
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault(
+            "formatter_class", argparse.ArgumentDefaultsHelpFormatter
+        )
+        super().__init__(*args, **kwargs)
+
     def error(self, message: str) -> None:
         error = TaskctlError(
             f"argument error: {message}",
@@ -4181,185 +4187,230 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def add_common(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--task-dir", required=True)
-    parser.add_argument("--view", choices=("model", "machine"), default="model")
-    parser.add_argument("--pretty", action="store_true")
     parser.add_argument(
-        "--model-token-budget", type=int, default=DEFAULT_MODEL_TOKEN_BUDGET
+        "--task-dir",
+        required=True,
+        help="任务表工作目录，其中必须包含 task-table.json",
+    )
+    parser.add_argument(
+        "--view",
+        choices=("model", "machine"),
+        default="model",
+        help="输出视图：model 为当前动作稀疏证据，machine 为完整稳定结构",
+    )
+    parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="仅在 machine 视图缩进 JSON 输出",
+    )
+    parser.add_argument(
+        "--model-token-budget",
+        type=int,
+        default=DEFAULT_MODEL_TOKEN_BUDGET,
+        help="model 视图的保守 Token 上限；超限时裁剪完整低优先级单元",
     )
 
 
 def add_limit(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT)
+    parser.add_argument(
+        "--limit", type=int, default=DEFAULT_LIMIT, help="单页最多返回的记录数（1—1000）"
+    )
 
 
 def add_state_revision(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--expected-state-revision", type=int)
+    parser.add_argument(
+        "--expected-state-revision",
+        type=int,
+        help="预期 state revision；不匹配时拒绝并发覆盖",
+    )
+
+
+def add_command_parser(
+    subparsers: Any, name: str, summary: str, *, epilog: str | None = None
+) -> argparse.ArgumentParser:
+    return subparsers.add_parser(
+        name, help=summary, description=summary, epilog=epilog
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = JsonArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_parser = subparsers.add_parser("init")
+    init_parser = add_command_parser(subparsers, "init", "初始化任务表固定目录和登记文件")
     add_common(init_parser)
-    init_parser.add_argument("--id", required=True)
-    init_parser.add_argument("--title", required=True)
+    init_parser.add_argument("--id", required=True, help="工作流稳定 ID，必须与 Delivery Workflow 一致")
+    init_parser.add_argument("--title", required=True, help="任务表的人类可读标题")
     init_parser.set_defaults(handler=command_init)
 
-    draft_parser = subparsers.add_parser("draft")
+    draft_parser = add_command_parser(subparsers, "draft", "生成不落盘的最小候选任务")
     add_common(draft_parser)
-    draft_parser.add_argument("--id", required=True)
-    draft_parser.add_argument("--title", required=True)
-    draft_parser.add_argument("--outcome", required=True)
-    draft_parser.add_argument("--source-id", action="append", default=[])
-    draft_parser.add_argument("--dependency", action="append", default=[])
-    draft_parser.add_argument("--mutation-scope", action="append", default=[])
-    draft_parser.add_argument("--output", action="append", default=[])
-    draft_parser.add_argument("--verification", action="append", default=[])
-    draft_parser.add_argument("--suggested-skill", action="append", default=[])
-    draft_parser.add_argument("--reasoning-hint")
+    draft_parser.add_argument("--id", required=True, help="候选任务稳定 ID")
+    draft_parser.add_argument("--title", required=True, help="候选任务标题")
+    draft_parser.add_argument("--outcome", required=True, help="任务完成后必须成立的可验收结果")
+    draft_parser.add_argument("--source-id", action="append", default=[], help="关联的上游方案或目标 ID；可重复")
+    draft_parser.add_argument("--dependency", action="append", default=[], help="依赖任务 ID；可重复")
+    draft_parser.add_argument("--mutation-scope", action="append", default=[], help="允许修改的路径或职责范围；可重复")
+    draft_parser.add_argument("--output", action="append", default=[], help="必须交付的产物；可重复")
+    draft_parser.add_argument("--verification", action="append", default=[], help="直接验收方式；可重复")
+    draft_parser.add_argument("--suggested-skill", action="append", default=[], help="执行时建议选择的 skill；可重复且不构成许可")
+    draft_parser.add_argument("--reasoning-hint", help="执行阶段的非约束推理深度提示")
     draft_parser.set_defaults(handler=command_draft)
 
-    add_parser = subparsers.add_parser("add")
+    add_parser = add_command_parser(subparsers, "add", "写入新的任务合同并注入机器字段")
     add_common(add_parser)
-    add_parser.add_argument("--file", required=True)
+    add_parser.add_argument("--file", required=True, help="只含任务语义的 JSON 输入文件")
     add_parser.set_defaults(handler=command_add)
 
-    update_parser = subparsers.add_parser("update")
+    update_parser = add_command_parser(subparsers, "update", "按任务 revision 更新任务合同")
     add_common(update_parser)
-    update_parser.add_argument("--file", required=True)
-    update_parser.add_argument("--owner")
-    update_parser.add_argument("--expected-task-revision", type=int)
+    update_parser.add_argument("--file", required=True, help="完整替换任务语义的 JSON 输入文件")
+    update_parser.add_argument("--owner", help="当前执行 owner；用于所有权诊断，不创建授权")
+    update_parser.add_argument("--expected-task-revision", type=int, help="预期 task revision；不匹配时拒绝并发覆盖")
     update_parser.set_defaults(handler=command_update)
 
-    show_parser = subparsers.add_parser("show")
+    show_parser = add_command_parser(subparsers, "show", "有界读取一个任务及其状态和结果")
     add_common(show_parser)
-    show_parser.add_argument("--id", required=True)
-    show_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET)
+    show_parser.add_argument("--id", required=True, help="要读取的任务 ID")
+    show_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help="machine JSON 最大字符数（1000—100000）")
     show_parser.set_defaults(handler=command_show)
 
-    list_parser = subparsers.add_parser("list")
+    list_parser = add_command_parser(subparsers, "list", "分页列出任务及局部诊断")
     add_common(list_parser)
     add_limit(list_parser)
-    list_parser.add_argument("--after-id")
-    list_parser.add_argument("--status", action="append")
+    list_parser.add_argument("--after-id", help="从该任务 ID 之后继续分页")
+    list_parser.add_argument("--status", action="append", help="只返回指定状态；可重复")
     list_parser.set_defaults(handler=command_list)
 
-    deps_parser = subparsers.add_parser("deps")
+    deps_parser = add_command_parser(subparsers, "deps", "查询任务依赖")
     add_common(deps_parser)
     add_limit(deps_parser)
-    deps_parser.add_argument("--id", required=True)
-    deps_parser.add_argument("--recursive", action="store_true")
-    deps_parser.add_argument("--after-id")
+    deps_parser.add_argument("--id", required=True, help="作为查询起点的任务 ID")
+    deps_parser.add_argument("--recursive", action="store_true", help="递归返回传递依赖")
+    deps_parser.add_argument("--after-id", help="从该依赖任务 ID 之后继续分页")
     deps_parser.set_defaults(handler=command_deps)
 
-    dependents_parser = subparsers.add_parser("dependents")
+    dependents_parser = add_command_parser(subparsers, "dependents", "查询消费当前任务的后继")
     add_common(dependents_parser)
     add_limit(dependents_parser)
-    dependents_parser.add_argument("--id", required=True)
-    dependents_parser.add_argument("--recursive", action="store_true")
-    dependents_parser.add_argument("--after-id")
+    dependents_parser.add_argument("--id", required=True, help="作为查询起点的任务 ID")
+    dependents_parser.add_argument("--recursive", action="store_true", help="递归返回传递后继")
+    dependents_parser.add_argument("--after-id", help="从该后继任务 ID 之后继续分页")
     dependents_parser.set_defaults(handler=command_dependents)
 
-    next_parser = subparsers.add_parser("next")
+    next_parser = add_command_parser(subparsers, "next", "返回建议候选，不签发执行许可")
     add_common(next_parser)
     add_limit(next_parser)
-    next_parser.add_argument("--owner")
-    next_parser.add_argument("--include-blocked", action="store_true")
-    next_parser.add_argument("--diagnostic-limit", type=int, default=10)
-    next_parser.add_argument("--after-id")
+    next_parser.add_argument("--owner", help="按当前领取 owner 过滤或解释候选")
+    next_parser.add_argument("--include-blocked", action="store_true", help="把被阻塞任务也纳入建议结果")
+    next_parser.add_argument("--diagnostic-limit", type=int, default=10, help="最多返回的诊断条数（1—1000）")
+    next_parser.add_argument("--after-id", help="从该候选任务 ID 之后继续分页")
     next_parser.set_defaults(handler=command_next)
 
-    context_parser = subparsers.add_parser("context")
+    context_parser = add_command_parser(
+        subparsers,
+        "context",
+        "取得执行上下文并可捕获来源收据",
+        epilog="示例：taskctl.py context --task-dir <工作目录> --id T001 --capture",
+    )
     add_common(context_parser)
-    context_parser.add_argument("--id", required=True)
-    context_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET)
-    context_parser.add_argument("--max-items", type=int, default=DEFAULT_LIMIT)
-    context_parser.add_argument("--capture", action="store_true")
+    context_parser.add_argument("--id", required=True, help="要执行的任务 ID")
+    context_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help="machine JSON 最大字符数（1000—100000）")
+    context_parser.add_argument("--max-items", type=int, default=DEFAULT_LIMIT, help="每类上游上下文最多包含的完整条目数（1—1000）")
+    context_parser.add_argument("--capture", action="store_true", help="按最终可见上下文写入内容寻址来源快照并返回收据")
     context_parser.set_defaults(
         handler=command_context, model_token_budget=6_144
     )
 
-    completion_parser = subparsers.add_parser("completion-context")
+    completion_parser = add_command_parser(
+        subparsers,
+        "completion-context",
+        "分页取得最终复核证据，不裁决整体完成",
+        epilog="示例：taskctl.py completion-context --task-dir <工作目录> --target-id T001",
+    )
     add_common(completion_parser)
     add_limit(completion_parser)
-    completion_parser.add_argument("--after-id")
-    completion_parser.add_argument("--target-id")
-    completion_parser.add_argument("--candidate-after-id")
-    completion_parser.add_argument("--constraint-after-id")
-    completion_parser.add_argument("--deferred-after-id")
-    completion_parser.add_argument("--snapshot-id")
-    completion_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET)
-    completion_parser.add_argument("--max-items", type=int, default=DEFAULT_LIMIT)
+    completion_parser.add_argument("--after-id", help="从该目标任务 ID 之后继续目标目录分页")
+    completion_parser.add_argument("--target-id", help="只展开一个目标任务的完整复核证据")
+    completion_parser.add_argument("--candidate-after-id", help="继续指定 target 的候选证据分页；要求 --target-id")
+    completion_parser.add_argument("--constraint-after-id", help="继续约束目录分页")
+    completion_parser.add_argument("--deferred-after-id", help="继续延后项目录分页")
+    completion_parser.add_argument("--snapshot-id", help="首屏返回的复核快照 ID；后续页必须原样传回")
+    completion_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help="machine JSON 最大字符数（1000—100000）")
+    completion_parser.add_argument("--max-items", type=int, default=DEFAULT_LIMIT, help="每类证据最多返回的完整条目数（1—1000）")
     completion_parser.set_defaults(
         handler=command_completion_context, model_token_budget=4_096
     )
 
-    status_parser = subparsers.add_parser("status")
+    status_parser = add_command_parser(subparsers, "status", "汇总任务状态、结果和实际诊断")
     add_common(status_parser)
     add_limit(status_parser)
     status_parser.set_defaults(handler=command_status)
 
-    claim_parser = subparsers.add_parser("claim")
+    claim_parser = add_command_parser(subparsers, "claim", "按 state revision 记录领取意图")
     add_common(claim_parser)
-    claim_parser.add_argument("--id", required=True)
-    claim_parser.add_argument("--owner", required=True)
+    claim_parser.add_argument("--id", required=True, help="要领取的任务 ID")
+    claim_parser.add_argument("--owner", required=True, help="领取者稳定身份")
     add_state_revision(claim_parser)
     claim_parser.set_defaults(handler=command_claim)
 
-    start_parser = subparsers.add_parser("start")
+    start_parser = add_command_parser(subparsers, "start", "按 state revision 记录开始执行")
     add_common(start_parser)
-    start_parser.add_argument("--id", required=True)
-    start_parser.add_argument("--owner", required=True)
+    start_parser.add_argument("--id", required=True, help="要开始执行的任务 ID")
+    start_parser.add_argument("--owner", required=True, help="必须与当前领取者一致的稳定身份")
     add_state_revision(start_parser)
     start_parser.set_defaults(handler=command_start)
 
-    note_parser = subparsers.add_parser("note")
+    note_parser = add_command_parser(subparsers, "note", "按 state revision 写入有界执行说明")
     add_common(note_parser)
-    note_parser.add_argument("--id", required=True)
-    note_parser.add_argument("--owner", required=True)
-    note_parser.add_argument("--message")
-    note_parser.add_argument("--status")
-    note_parser.add_argument("--blocked-reason")
-    note_parser.add_argument("--next-action")
+    note_parser.add_argument("--id", required=True, help="要更新执行说明的任务 ID")
+    note_parser.add_argument("--owner", required=True, help="当前执行 owner 的稳定身份")
+    note_parser.add_argument("--message", help="替换当前有界执行说明；传空字符串可清除")
+    note_parser.add_argument("--status", help="新的执行状态；非标准值只形成诊断")
+    note_parser.add_argument("--blocked-reason", help="阻塞原因；仅 blocked 状态应保留")
+    note_parser.add_argument("--next-action", help="恢复执行所需的下一动作")
     add_state_revision(note_parser)
     note_parser.set_defaults(handler=command_note)
 
-    complete_parser = subparsers.add_parser("complete")
+    complete_parser = add_command_parser(
+        subparsers,
+        "complete",
+        "用 task/state CAS 和来源收据提交结果",
+        epilog="示例：taskctl.py complete --task-dir <工作目录> --id T001 --owner agent-a --result-file result.json --expected-task-revision 3 --expected-state-revision 5",
+    )
     add_common(complete_parser)
-    complete_parser.add_argument("--id", required=True)
-    complete_parser.add_argument("--owner", required=True)
-    complete_parser.add_argument("--result-file", required=True)
-    complete_parser.add_argument("--expected-task-revision", type=int)
-    complete_parser.add_argument("--source-snapshot-ref")
-    complete_parser.add_argument("--diagnostic-limit", type=int, default=20)
+    complete_parser.add_argument("--id", required=True, help="要提交结果的任务 ID")
+    complete_parser.add_argument("--owner", required=True, help="必须与当前执行 owner 一致的稳定身份")
+    complete_parser.add_argument("--result-file", required=True, help="只含结果语义的 JSON 输入文件；机器身份由 CLI 注入")
+    complete_parser.add_argument("--expected-task-revision", type=int, help="执行所依据的 task revision；不匹配时拒绝提交")
+    complete_parser.add_argument("--source-snapshot-ref", help="context --capture 返回的内容寻址来源收据；与结果文件内收据不可并用")
+    complete_parser.add_argument("--diagnostic-limit", type=int, default=20, help="最多返回的结果诊断条数（1—1000）")
     add_state_revision(complete_parser)
     complete_parser.set_defaults(handler=command_complete)
 
-    reopen_parser = subparsers.add_parser("reopen")
+    reopen_parser = add_command_parser(subparsers, "reopen", "记录现有完成结论或合同已经失效")
     add_common(reopen_parser)
-    reopen_parser.add_argument("--id", required=True)
-    reopen_parser.add_argument("--owner", required=True)
-    reopen_parser.add_argument("--reason", required=True)
+    reopen_parser.add_argument("--id", required=True, help="要重开的任务 ID")
+    reopen_parser.add_argument("--owner", required=True, help="执行重开的稳定身份")
+    reopen_parser.add_argument("--reason", required=True, help="现有完成结论或合同失效的直接原因")
     add_state_revision(reopen_parser)
     reopen_parser.set_defaults(handler=command_reopen)
 
-    release_parser = subparsers.add_parser("release")
+    release_parser = add_command_parser(subparsers, "release", "清除领取意图并返回待办状态")
     add_common(release_parser)
-    release_parser.add_argument("--id", required=True)
-    release_parser.add_argument("--owner", required=True)
+    release_parser.add_argument("--id", required=True, help="要释放的任务 ID")
+    release_parser.add_argument("--owner", required=True, help="必须与当前领取者一致的稳定身份")
     add_state_revision(release_parser)
     release_parser.set_defaults(handler=command_release)
 
-    impact_parser = subparsers.add_parser("impact")
+    impact_parser = add_command_parser(subparsers, "impact", "递归查询受当前任务影响的后继")
     add_common(impact_parser)
     add_limit(impact_parser)
-    impact_parser.add_argument("--id", required=True)
-    impact_parser.add_argument("--after-id")
+    impact_parser.add_argument("--id", required=True, help="发生变化的起点任务 ID")
+    impact_parser.add_argument("--after-id", help="从该受影响任务 ID 之后继续分页")
     impact_parser.set_defaults(handler=command_impact)
 
-    render_parser = subparsers.add_parser("render")
+    render_parser = add_command_parser(subparsers, "render", "重建只读 TASK_TABLE.md 导航视图")
     add_common(render_parser)
     render_parser.set_defaults(handler=command_render)
     return parser

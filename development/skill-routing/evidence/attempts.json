@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "history_started_at_utc": "2026-08-18T14:15:53.0732803+00:00",
+  "history_start_reason": "Imported the current validated staged evidence; attempts before this baseline are not reconstructed.",
+  "max_attempts_per_unchanged_input": 2,
+  "attempts": [
+    {
+      "attempt_id": "2833cfead3b84c46bba7c87532573e86",
+      "recorded_at_utc": "2026-08-18T14:15:53.5249438+00:00",
+      "phase": "Routing",
+      "origin": "baseline_import",
+      "attempt_key": "routing|F29BEE77353CCB144A6DAD5EBE9EC054A72D8A7116ADC175ECEA1740C09A1836|9B5B28BAFF7024D2C554E197C2B1EC228A17305B055F2F897AF0E8B93163FEF1|8F672E0AD42E55EE8375B9762FDF8BB0AF81524C0574F3819911668B4EE79A1A",
+      "result_sha256": "0C7E598978232E935C4ECCDDB99845689F3B552026FB1EF5550571BCB7019A76",
+      "candidate_bundle_sha256": "F29BEE77353CCB144A6DAD5EBE9EC054A72D8A7116ADC175ECEA1740C09A1836",
+      "evaluation_input_sha256": "9B5B28BAFF7024D2C554E197C2B1EC228A17305B055F2F897AF0E8B93163FEF1",
+      "evaluation_capsule_sha256": "8F672E0AD42E55EE8375B9762FDF8BB0AF81524C0574F3819911668B4EE79A1A",
+      "evaluator_id": "agentbase-routing-v8-codexexec-20260818-0837z",
+      "evaluator_model": "gpt-5.6-sol",
+      "evaluator_runtime": "codex-cli-0.148.0-alpha.9/windows/read-only/ephemeral/routing-v8",
+      "evaluated_at_utc": "2026-08-18T08:37:00Z",
+      "outcome": "passed",
+      "failure_class": null,
+      "failure_summary": null,
+      "retry_justification": null,
+      "previous_attempt_id": null,
+      "changed_since_previous": [
+        "initial_attempt"
+      ]
+    },
+    {
+      "attempt_id": "3fa7ebad44c5449eaea7c26506d4cb86",
+      "recorded_at_utc": "2026-08-18T14:15:54.1610141+00:00",
+      "phase": "Policy",
+      "origin": "baseline_import",
+      "attempt_key": "policy|F29BEE77353CCB144A6DAD5EBE9EC054A72D8A7116ADC175ECEA1740C09A1836|12381A3AA16B9D3DE18D70AC0A66BA924576C6DBF0CD00610613D28761FCE609|9743F54C12DA2F8AB0F3A683A27B4FF5B1C59EA397DD20E452CFE02AE7D63EDC",
+      "result_sha256": "7EF4B625467C2E026F88AF1E0ABCDB2DDB06519AB738A509986EDDF4DE24CF7B",
+      "candidate_bundle_sha256": "F29BEE77353CCB144A6DAD5EBE9EC054A72D8A7116ADC175ECEA1740C09A1836",
+      "evaluation_input_sha256": "12381A3AA16B9D3DE18D70AC0A66BA924576C6DBF0CD00610613D28761FCE609",
+      "evaluation_capsule_sha256": "9743F54C12DA2F8AB0F3A683A27B4FF5B1C59EA397DD20E452CFE02AE7D63EDC",
+      "evaluator_id": "agentbase-policy-v8-codexexec-20260818-0841z",
+      "evaluator_model": "gpt-5.6-sol",
+      "evaluator_runtime": "codex-cli-0.148.0-alpha.9/windows/read-only/ephemeral/policy-v8",
+      "evaluated_at_utc": "2026-08-18T08:41:00Z",
+      "outcome": "passed",
+      "failure_class": null,
+      "failure_summary": null,
+      "retry_justification": null,
+      "previous_attempt_id": null,
+      "changed_since_previous": [
+        "initial_attempt"
+      ]
+    },
+    {
+      "attempt_id": "ec47b9f70de6421ab7446be3c2263805",
+      "recorded_at_utc": "2026-08-18T14:15:54.8133715+00:00",
+      "phase": "References",
+      "origin": "baseline_import",
+      "attempt_key": "references|F29BEE77353CCB144A6DAD5EBE9EC054A72D8A7116ADC175ECEA1740C09A1836|B6D5730C244E137DC4E61DB1A1F4EF78B2E60F07643EBE7C5CFEF09A26322B16|1F1DAD2D74A797DA1E4505BCC204D64BAC6440A9BF4E8BA1F5CBAF2776DC7C77",
+      "result_sha256": "FBA6590974C2C60A19E62D1A722C0280F7B4C87E93504BD96079FAF9B28105D1",
+      "candidate_bundle_sha256": "F29BEE77353CCB144A6DAD5EBE9EC054A72D8A7116ADC175ECEA1740C09A1836",
+      "evaluation_input_sha256": "B6D5730C244E137DC4E61DB1A1F4EF78B2E60F07643EBE7C5CFEF09A26322B16",
+      "evaluation_capsule_sha256": "1F1DAD2D74A797DA1E4505BCC204D64BAC6440A9BF4E8BA1F5CBAF2776DC7C77",
+      "evaluator_id": "agentbase-references-v8-codexexec-20260818-0845z",
+      "evaluator_model": "gpt-5.6-sol",
+      "evaluator_runtime": "codex-cli-0.148.0-alpha.9/windows/read-only/ephemeral/references-v8",
+      "evaluated_at_utc": "2026-08-18T08:45:00Z",
+      "outcome": "passed",
+      "failure_class": null,
+      "failure_summary": null,
+      "retry_justification": null,
+      "previous_attempt_id": null,
+      "changed_since_previous": [
+        "initial_attempt"
+      ]
+    }
+  ]
+}

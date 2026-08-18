@@ -1,4 +1,4 @@
 interface:
   display_name: "Reasoning Governor"
   short_description: "按下一段实质工作判断目标档位，仅在收益充分时读回或切换"
-  default_prompt: "使用 $reasoning-governor 独立判断下一段工作的目标档位；用户固定时优先，否则只在档位错配会影响质量或总体成本且收益足以摊销转换时读回或设置。"
+  default_prompt: "使用 $reasoning-governor 判断下一段工作的目标档位；用户当次要求读、设、固定、改变或解除时按其要求执行，已确认固定只需保持或有效读回已匹配时不要重复使用，否则仅在档位错配会影响质量或总体成本且收益足以摊销转换时读回或设置。"
