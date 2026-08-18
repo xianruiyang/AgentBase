@@ -733,6 +733,8 @@ function Get-ValidatedSource {
     $hostBootstrapContent = Get-Content -LiteralPath $hostBootstrapPath -Raw -Encoding UTF8
     $requiredBootstrapFragments = @(
         'ValidateSet("Check", "Install")'
+        'ValidateSet("Model", "Machine")'
+        'Format-HostPrerequisiteModelResult'
         'Microsoft.PowerShell'
         'sharkdp.fd'
         'Python.Python.3.13'
@@ -755,7 +757,8 @@ function Get-ValidatedSource {
     if (-not $projectAgentsContent.Contains('bootstrap_windows.ps1') -or -not $projectAgentsContent.Contains('-Action Install')) {
         throw "Project AGENTS.md does not route Windows reproduction through the host bootstrap"
     }
-    if (-not $deploymentReadmeContent.Contains('bootstrap_windows.ps1') -or -not $deploymentReadmeContent.Contains('-Action Check')) {
+    if (-not $deploymentReadmeContent.Contains('bootstrap_windows.ps1') -or -not $deploymentReadmeContent.Contains('-Action Check') -or
+        -not $deploymentReadmeContent.Contains('-View Machine')) {
         throw "Deployment README does not document the Windows host bootstrap lifecycle"
     }
     if (-not $deploymentReadmeContent.Contains('install-srcq.ps1') -or -not $deploymentReadmeContent.Contains('ready=true') -or -not $deploymentReadmeContent.Contains('srcq doctor')) {
@@ -980,7 +983,7 @@ function Get-SrcqRuntimePreflight {
         }
         $expectedVersion = $versionMatch.Groups[1].Value
 
-        $statusText = @(& $installer Status 2>&1)
+        $statusText = @(& $installer Status -View Machine 2>&1)
         $statusExit = $LASTEXITCODE
         $status = $null
         try { $status = ($statusText -join [Environment]::NewLine) | ConvertFrom-Json } catch { }

@@ -9,9 +9,7 @@ import { fileURLToPath } from "node:url";
 const VALID_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max", "ultra"]);
 const DEFAULT_TIMEOUT_MS = 20000;
 const NORMAL_FRAME_LIMIT_BYTES = 8 * 1024 * 1024;
-const SNAPSHOT_PREFIX_BYTES = 4096;
-const SNAPSHOT_TAIL_BYTES = 4 * 1024 * 1024;
-const SETTINGS_SCAN_LIMIT_CHARS = 256 * 1024;
+const SCANNER_TOKEN_LIMIT_BYTES = 512;
 
 function usage() {
   return [
@@ -24,6 +22,7 @@ function usage() {
     "  --thread-id defaults to CODEX_THREAD_ID, then stdin JSON when available.",
     "  --pipe defaults to the Codex desktop IPC pipe for this platform.",
     "  --host-id defaults to the current thread host reported by Codex, then local.",
+    "  --view defaults to model; use --view machine for the complete JSON receipt.",
     "",
     "Notes:",
     "  status reads the configured next-turn effort without changing it.",
@@ -40,6 +39,7 @@ function parseArgs(argv) {
     hostId: null,
     pipePath: null,
     timeoutMs: DEFAULT_TIMEOUT_MS,
+    view: "model",
     debug: false,
     help: false,
   };
@@ -61,6 +61,10 @@ function parseArgs(argv) {
       out.pipePath = argv[++i] ?? null;
     } else if (arg === "--timeout-ms") {
       out.timeoutMs = Number(argv[++i] ?? DEFAULT_TIMEOUT_MS);
+    } else if (arg === "--view") {
+      out.view = argv[++i] ?? null;
+    } else if (arg === "--machine") {
+      out.view = "machine";
     } else if (arg === "--debug") {
       out.debug = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -75,6 +79,9 @@ function parseArgs(argv) {
 
   if (!Number.isFinite(out.timeoutMs) || out.timeoutMs <= 0) {
     throw new Error("--timeout-ms must be a positive number.");
+  }
+  if (!new Set(["model", "machine"]).has(out.view)) {
+    throw new Error("--view must be model or machine.");
   }
 
   out.action ??= out.effort ? "set" : null;
@@ -174,190 +181,311 @@ function encodeFrame(message) {
   return frame;
 }
 
-function createTailBuffer(capacity) {
-  const buffer = Buffer.allocUnsafe(capacity);
-  let position = 0;
-  let size = 0;
+const SNAPSHOT_PATHS = {
+  type: ["type"],
+  method: ["method"],
+  conversationId: ["params", "conversationId"],
+  hostId: ["params", "hostId"],
+  changeType: ["params", "change", "type"],
+  settings: ["params", "change", "conversationState", "latestThreadSettings"],
+  effort: ["params", "change", "conversationState", "latestThreadSettings", "effort"],
+};
 
-  return {
-    reset() {
-      position = 0;
-      size = 0;
-    },
-    append(chunk) {
-      if (chunk.length >= capacity) {
-        chunk.copy(buffer, 0, chunk.length - capacity);
-        position = 0;
-        size = capacity;
-        return;
-      }
+function pathsEqual(actual, expected) {
+  return (
+    Array.isArray(actual) &&
+    actual.length === expected.length &&
+    actual.every((part, index) => part === expected[index])
+  );
+}
 
-      const firstLength = Math.min(chunk.length, capacity - position);
-      chunk.copy(buffer, position, 0, firstLength);
-      if (firstLength < chunk.length) {
-        chunk.copy(buffer, 0, firstLength);
-      }
-      position = (position + chunk.length) % capacity;
-      size = Math.min(capacity, size + chunk.length);
-    },
-    toBuffer() {
-      if (size < capacity) {
-        return Buffer.from(buffer.subarray(0, size));
-      }
-      return Buffer.concat([buffer.subarray(position), buffer.subarray(0, position)]);
-    },
+function createSnapshotFieldScanner() {
+  const stack = [];
+  const fields = {
+    type: null,
+    method: null,
+    conversationId: null,
+    hostId: null,
+    changeType: null,
+    settingsFound: false,
+    effort: null,
   };
-}
+  let rootConsumed = false;
+  let stringToken = null;
+  let primitiveToken = null;
 
-function isEscaped(text, index) {
-  let backslashes = 0;
-  for (let i = index - 1; i >= 0 && text[i] === "\\"; i -= 1) {
-    backslashes += 1;
-  }
-  return backslashes % 2 === 1;
-}
-
-function findLastUnescaped(text, token) {
-  let index = text.lastIndexOf(token);
-  while (index >= 0) {
-    if (!isEscaped(text, index)) {
-      return index;
+  function currentValuePath() {
+    if (stack.length === 0) {
+      return rootConsumed ? null : [];
     }
-    index = text.lastIndexOf(token, index - 1);
-  }
-  return -1;
-}
 
-function parseJsonStringAt(text, start) {
-  if (text[start] !== '"') {
-    return null;
+    const parent = stack.at(-1);
+    if (parent.type === "object") {
+      return parent.state === "value" && typeof parent.pendingKey === "string"
+        ? [...parent.path, parent.pendingKey]
+        : null;
+    }
+    return parent.state === "valueOrEnd" ? [...parent.path, "*"] : null;
   }
 
-  let escaped = false;
-  for (let i = start + 1; i < text.length; i += 1) {
-    const char = text[i];
-    if (escaped) {
-      escaped = false;
-      continue;
+  function consumeParentValue() {
+    if (stack.length === 0) {
+      rootConsumed = true;
+      return;
     }
-    if (char === "\\") {
-      escaped = true;
-      continue;
+
+    const parent = stack.at(-1);
+    parent.state = "commaOrEnd";
+    if (parent.type === "object") {
+      parent.pendingKey = null;
     }
-    if (char === '"') {
-      try {
-        return { value: JSON.parse(text.slice(start, i + 1)), end: i + 1 };
-      } catch {
-        return null;
+  }
+
+  function markValueStart(pathValue) {
+    if (pathsEqual(pathValue, SNAPSHOT_PATHS.settings)) {
+      fields.settingsFound = true;
+      fields.effort = null;
+    }
+  }
+
+  function isCapturedScalar(pathValue) {
+    return [
+      SNAPSHOT_PATHS.type,
+      SNAPSHOT_PATHS.method,
+      SNAPSHOT_PATHS.conversationId,
+      SNAPSHOT_PATHS.hostId,
+      SNAPSHOT_PATHS.changeType,
+      SNAPSHOT_PATHS.effort,
+    ].some((target) => pathsEqual(pathValue, target));
+  }
+
+  function appendCaptured(token, byte) {
+    if (!token.capture || token.overflow) {
+      return;
+    }
+    if (token.bytes.length >= SCANNER_TOKEN_LIMIT_BYTES) {
+      token.overflow = true;
+      token.bytes.length = 0;
+      return;
+    }
+    token.bytes.push(byte);
+  }
+
+  function decodeStringToken(token) {
+    if (!token.capture || token.overflow) {
+      return null;
+    }
+    try {
+      const raw = Buffer.from(token.bytes).toString("utf8");
+      return JSON.parse(`"${raw}"`);
+    } catch {
+      return null;
+    }
+  }
+
+  function recordScalar(pathValue, value) {
+    if (pathsEqual(pathValue, SNAPSHOT_PATHS.type)) {
+      fields.type = value;
+    } else if (pathsEqual(pathValue, SNAPSHOT_PATHS.method)) {
+      fields.method = value;
+    } else if (pathsEqual(pathValue, SNAPSHOT_PATHS.conversationId)) {
+      fields.conversationId = value;
+    } else if (pathsEqual(pathValue, SNAPSHOT_PATHS.hostId)) {
+      fields.hostId = value;
+    } else if (pathsEqual(pathValue, SNAPSHOT_PATHS.changeType)) {
+      fields.changeType = value;
+    } else if (pathsEqual(pathValue, SNAPSHOT_PATHS.effort)) {
+      fields.effort = typeof value === "string" ? value : null;
+    }
+  }
+
+  function startString() {
+    const parent = stack.at(-1);
+    if (parent?.type === "object" && parent.state === "keyOrEnd") {
+      stringToken = {
+        role: "key",
+        path: null,
+        capture: true,
+        overflow: false,
+        bytes: [],
+        escaped: false,
+      };
+      return;
+    }
+
+    const pathValue = currentValuePath();
+    if (pathValue) {
+      markValueStart(pathValue);
+    }
+    stringToken = {
+      role: pathValue ? "value" : "ignored",
+      path: pathValue,
+      capture: pathValue ? isCapturedScalar(pathValue) : false,
+      overflow: false,
+      bytes: [],
+      escaped: false,
+    };
+  }
+
+  function finishString() {
+    const token = stringToken;
+    stringToken = null;
+    const value = decodeStringToken(token);
+
+    if (token.role === "key") {
+      const parent = stack.at(-1);
+      if (parent?.type === "object") {
+        parent.pendingKey = value;
+        parent.state = "colon";
       }
+      return;
+    }
+    if (token.role === "value") {
+      recordScalar(token.path, value);
+      consumeParentValue();
     }
   }
-  return null;
-}
 
-function extractDirectObjectField(text, objectStart, fieldName) {
-  const end = Math.min(text.length, objectStart + SETTINGS_SCAN_LIMIT_CHARS);
-  let depth = 0;
-
-  for (let i = objectStart; i < end; i += 1) {
-    const char = text[i];
-    if (char === "{") {
-      depth += 1;
-      continue;
+  function startContainer(type) {
+    const pathValue = currentValuePath();
+    if (!pathValue) {
+      return;
     }
-    if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return { found: false, value: null };
+    markValueStart(pathValue);
+    consumeParentValue();
+    stack.push({
+      type,
+      path: pathValue,
+      state: type === "object" ? "keyOrEnd" : "valueOrEnd",
+      pendingKey: null,
+    });
+  }
+
+  function startPrimitive(byte) {
+    const pathValue = currentValuePath();
+    if (pathValue) {
+      markValueStart(pathValue);
+    }
+    primitiveToken = {
+      path: pathValue,
+      capture: pathValue ? isCapturedScalar(pathValue) : false,
+      overflow: false,
+      bytes: [],
+    };
+    appendCaptured(primitiveToken, byte);
+  }
+
+  function finishPrimitive() {
+    const token = primitiveToken;
+    primitiveToken = null;
+    let value;
+    if (token.capture && !token.overflow) {
+      const raw = Buffer.from(token.bytes).toString("utf8");
+      value = raw === "null" ? null : undefined;
+    }
+    if (token.path) {
+      recordScalar(token.path, value);
+      consumeParentValue();
+    }
+  }
+
+  function isWhitespace(byte) {
+    return byte === 0x20 || byte === 0x09 || byte === 0x0a || byte === 0x0d;
+  }
+
+  function isPrimitiveDelimiter(byte) {
+    return isWhitespace(byte) || byte === 0x2c || byte === 0x5d || byte === 0x7d;
+  }
+
+  function processStructural(byte) {
+    if (isWhitespace(byte)) {
+      return;
+    }
+    if (byte === 0x22) {
+      startString();
+      return;
+    }
+    if (byte === 0x7b) {
+      startContainer("object");
+      return;
+    }
+    if (byte === 0x5b) {
+      startContainer("array");
+      return;
+    }
+    if (byte === 0x7d || byte === 0x5d) {
+      stack.pop();
+      return;
+    }
+    if (byte === 0x3a) {
+      const parent = stack.at(-1);
+      if (parent?.type === "object" && parent.state === "colon") {
+        parent.state = "value";
       }
-      continue;
+      return;
     }
-    if (char !== '"') {
-      continue;
+    if (byte === 0x2c) {
+      const parent = stack.at(-1);
+      if (parent?.state === "commaOrEnd") {
+        parent.state = parent.type === "object" ? "keyOrEnd" : "valueOrEnd";
+      }
+      return;
     }
-
-    const parsedKey = parseJsonStringAt(text, i);
-    if (!parsedKey) {
-      return { found: false, value: null };
-    }
-    i = parsedKey.end - 1;
-    if (depth !== 1) {
-      continue;
-    }
-
-    let cursor = parsedKey.end;
-    while (cursor < end && /\s/.test(text[cursor])) {
-      cursor += 1;
-    }
-    if (text[cursor] !== ":") {
-      continue;
-    }
-    cursor += 1;
-    while (cursor < end && /\s/.test(text[cursor])) {
-      cursor += 1;
-    }
-    if (parsedKey.value !== fieldName) {
-      continue;
-    }
-    if (text.startsWith("null", cursor)) {
-      return { found: true, value: null };
-    }
-
-    const parsedValue = parseJsonStringAt(text, cursor);
-    return parsedValue
-      ? { found: true, value: parsedValue.value }
-      : { found: false, value: null };
+    startPrimitive(byte);
   }
 
-  return { found: false, value: null };
-}
+  function append(chunk) {
+    for (const byte of chunk) {
+      if (stringToken) {
+        if (stringToken.escaped) {
+          appendCaptured(stringToken, byte);
+          stringToken.escaped = false;
+        } else if (byte === 0x5c) {
+          appendCaptured(stringToken, byte);
+          stringToken.escaped = true;
+        } else if (byte === 0x22) {
+          finishString();
+        } else {
+          appendCaptured(stringToken, byte);
+        }
+        continue;
+      }
 
-function extractConfiguredEffortFromSnapshotTail(snapshotTail) {
-  const key = '"latestThreadSettings"';
-  const keyIndex = findLastUnescaped(snapshotTail, key);
-  if (keyIndex < 0) {
-    return { found: false, effort: null };
-  }
+      if (primitiveToken) {
+        if (isPrimitiveDelimiter(byte)) {
+          finishPrimitive();
+          processStructural(byte);
+        } else {
+          appendCaptured(primitiveToken, byte);
+        }
+        continue;
+      }
 
-  let cursor = keyIndex + key.length;
-  while (cursor < snapshotTail.length && /\s/.test(snapshotTail[cursor])) {
-    cursor += 1;
-  }
-  if (snapshotTail[cursor] !== ":") {
-    return { found: false, effort: null };
-  }
-  cursor += 1;
-  while (cursor < snapshotTail.length && /\s/.test(snapshotTail[cursor])) {
-    cursor += 1;
-  }
-  if (snapshotTail.startsWith("null", cursor)) {
-    return { found: true, effort: null };
-  }
-  if (snapshotTail[cursor] !== "{") {
-    return { found: false, effort: null };
-  }
-
-  const field = extractDirectObjectField(snapshotTail, cursor, "effort");
-  return { found: field.found, effort: field.value };
-}
-
-function parseSnapshotEnvelope(prefix, tail, bodyLength) {
-  if (
-    !prefix.includes('"method":"thread-stream-state-changed"') ||
-    !prefix.includes('"change":{"type":"snapshot"')
-  ) {
-    return null;
+      processStructural(byte);
+    }
   }
 
-  const conversationMatch = prefix.match(/"conversationId":"([^"\\]+)"/);
-  const hostMatch = prefix.match(/"hostId":"([^"\\]+)"/);
-  const effort = extractConfiguredEffortFromSnapshotTail(tail);
-  return {
-    conversationId: conversationMatch?.[1] ?? null,
-    hostId: hostMatch?.[1] ?? null,
-    bodyLength,
-    ...effort,
-  };
+  function finish(bodyLength) {
+    if (primitiveToken) {
+      finishPrimitive();
+    }
+    if (
+      fields.type !== "broadcast" ||
+      fields.method !== "thread-stream-state-changed" ||
+      fields.changeType !== "snapshot"
+    ) {
+      return null;
+    }
+    return {
+      conversationId: fields.conversationId,
+      hostId: fields.hostId,
+      bodyLength,
+      found: fields.settingsFound,
+      effort: fields.settingsFound ? fields.effort : null,
+    };
+  }
+
+  return { append, finish };
 }
 
 function attachFrameReader(socket, { onMessage, onSnapshot, onError }) {
@@ -366,9 +494,7 @@ function attachFrameReader(socket, { onMessage, onSnapshot, onError }) {
   let bodyLength = 0;
   let bodyBytes = 0;
   let body = null;
-  const prefix = Buffer.allocUnsafe(SNAPSHOT_PREFIX_BYTES);
-  let prefixBytes = 0;
-  const tail = createTailBuffer(SNAPSHOT_TAIL_BYTES);
+  let largeFrameScanner = null;
 
   socket.on("data", (chunk) => {
     try {
@@ -391,22 +517,17 @@ function attachFrameReader(socket, { onMessage, onSnapshot, onError }) {
           }
 
           bodyBytes = 0;
-          prefixBytes = 0;
-          tail.reset();
           body = bodyLength <= NORMAL_FRAME_LIMIT_BYTES ? Buffer.allocUnsafe(bodyLength) : null;
+          largeFrameScanner = body ? null : createSnapshotFieldScanner();
         }
 
         const bytes = Math.min(bodyLength - bodyBytes, chunk.length - offset);
         const segment = chunk.subarray(offset, offset + bytes);
         if (body) {
           segment.copy(body, bodyBytes);
+        } else {
+          largeFrameScanner.append(segment);
         }
-        if (prefixBytes < prefix.length) {
-          const prefixLength = Math.min(segment.length, prefix.length - prefixBytes);
-          segment.copy(prefix, prefixBytes, 0, prefixLength);
-          prefixBytes += prefixLength;
-        }
-        tail.append(segment);
         bodyBytes += bytes;
         offset += bytes;
 
@@ -414,11 +535,7 @@ function attachFrameReader(socket, { onMessage, onSnapshot, onError }) {
           if (body) {
             onMessage(JSON.parse(body.toString("utf8")));
           } else {
-            const snapshot = parseSnapshotEnvelope(
-              prefix.subarray(0, prefixBytes).toString("utf8"),
-              tail.toBuffer().toString("utf8"),
-              bodyLength,
-            );
+            const snapshot = largeFrameScanner.finish(bodyLength);
             if (!snapshot) {
               throw new Error(`Unsupported large IPC frame: ${bodyLength} bytes`);
             }
@@ -427,6 +544,7 @@ function attachFrameReader(socket, { onMessage, onSnapshot, onError }) {
           bodyLength = 0;
           bodyBytes = 0;
           body = null;
+          largeFrameScanner = null;
         }
       }
     } catch (error) {
@@ -760,6 +878,42 @@ async function updateReasoningEffort({ pipePath, threadId, hostId, effort, timeo
   }
 }
 
+function renderModelResult(result) {
+  const operation = result.operation ?? "unknown";
+  if (result.ok === true) {
+    return `{ok:true op:${operation} effort:${result.currentConfiguredEffort ?? "null"}}`;
+  }
+
+  let reason = "operation_failed";
+  if (operation === "set" && result.updateAccepted !== true) {
+    reason = "update_rejected";
+  } else if (result.readbackVerified !== true) {
+    reason = "readback_unavailable";
+  } else if (operation === "set" && result.matchesRequestedEffort !== true) {
+    reason = "readback_mismatch";
+  }
+
+  const fields = [`ok:false`, `op:${operation}`, `reason:${reason}`];
+  if (operation === "set" && result.requestedEffort) {
+    fields.push(`requested:${result.requestedEffort}`);
+  }
+  if (result.readbackVerified === true) {
+    fields.push(`effort:${result.currentConfiguredEffort ?? "null"}`);
+  }
+  if (result.readbackError) {
+    fields.push(`detail:${JSON.stringify(result.readbackError)}`);
+  }
+  return `{${fields.join(" ")}}`;
+}
+
+function requestedOutputView(argv) {
+  if (argv.includes("--machine")) {
+    return "machine";
+  }
+  const viewIndex = argv.lastIndexOf("--view");
+  return viewIndex >= 0 && argv[viewIndex + 1] === "machine" ? "machine" : "model";
+}
+
 async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
 
@@ -791,7 +945,7 @@ async function main(argv = process.argv.slice(2)) {
       ? await readReasoningEffort(common)
       : await updateReasoningEffort({ ...common, effort: args.effort });
 
-  console.log(JSON.stringify(result, null, 2));
+  console.log(args.view === "machine" ? JSON.stringify(result, null, 2) : renderModelResult(result));
   return result.ok ? 0 : 3;
 }
 
@@ -799,15 +953,11 @@ async function runCli(argv = process.argv.slice(2)) {
   try {
     process.exitCode = await main(argv);
   } catch (error) {
+    const failure = { ok: false, error: error.message };
     console.error(
-      JSON.stringify(
-        {
-          ok: false,
-          error: error.message,
-        },
-        null,
-        2,
-      ),
+      requestedOutputView(argv) === "machine"
+        ? JSON.stringify(failure, null, 2)
+        : `{ok:false reason:error detail:${JSON.stringify(error.message)}}`,
     );
     process.exitCode = 1;
   }
@@ -821,10 +971,10 @@ if (isMain) {
 }
 
 export {
-  extractConfiguredEffortFromSnapshotTail,
+  createSnapshotFieldScanner,
   parseArgs,
-  parseSnapshotEnvelope,
   readReasoningEffort,
+  renderModelResult,
   runCli,
   updateReasoningEffort,
 };

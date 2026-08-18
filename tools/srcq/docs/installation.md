@@ -11,10 +11,13 @@
 ```powershell
 .\scripts\install-srcq.ps1 Install -Archive .\dist\srcq-<version>-x86_64-pc-windows-msvc.zip
 .\scripts\install-srcq.ps1 Status
+.\scripts\install-srcq.ps1 Status -View Machine
 .\scripts\install-srcq.ps1 Uninstall
 ```
 
-`Status` 不只读取状态文件；它还复核 manifest 与安装状态身份、全部受管文件的大小和 SHA-256、实际 `srcq --version`，以及由安装器管理的 PATH 项是否恰好出现一次。缺失、篡改或 PATH 漂移会返回 `ready=false`、原因和恢复动作，并以非零退出；重新使用同一受验证归档执行 `Install` 可以修复受管文件或缺失的 PATH 项。
+安装器始终先形成一份完整结果。默认直接输出是模型视图：成功的 `Status` 只返回 `ready`、`version` 和后续 doctor 可能需要的精确 `binary`，失败只返回原因、直接诊断和恢复动作；Install、Upgrade 与 Uninstall 同样只返回当前动作需要的结果。`-View Machine` 把同一结果序列化为稳定完整 JSON，供测试、部署校验和其他程序消费者使用。
+
+`Status` 不只读取状态文件；它还复核 manifest 与安装状态身份、全部受管文件的大小和 SHA-256、实际 `srcq --version`，以及由安装器管理的 PATH 项是否恰好出现一次。缺失、篡改或 PATH 漂移会返回 `ready=false`、原因和恢复动作，并以非零退出；重新使用同一受验证归档执行 `Install` 可以修复受管文件或缺失的 PATH 项。视图不改变这些检查、退出码或机器字段。
 
 默认安装到 `%LOCALAPPDATA%\Programs\srcq\current`，并把该目录添加到用户 PATH。PATH 修改只对新启动的终端生效。重复安装相同包不产生变化；升级使用 staging、旧目录备份和失败恢复，不从源码或 `target/` 安装。
 

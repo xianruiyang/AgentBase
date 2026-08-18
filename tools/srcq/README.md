@@ -25,6 +25,8 @@
 srcq doctor
 ```
 
+安装器直接输出默认是最小模型回执；程序需要完整安装、完整性和 PATH 合同时显式传入 `-View Machine`。两种视图来自同一检查结果，详见[安装、升级与卸载](docs/installation.md)。
+
 结构搜索时不必手写 JSON 参数；缺省 batch `run`/`scan` 会由 wrapper 补 `--json=stream`：
 
 ```powershell
@@ -106,4 +108,5 @@ cargo ci-test
 cargo ci-build
 cargo lint
 cargo fmt-check
+& '.\scripts\test-install-srcq-views.ps1'
 ```

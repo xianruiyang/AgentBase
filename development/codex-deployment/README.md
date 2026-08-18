@@ -48,7 +48,7 @@ When the user asks Codex to prepare, reproduce, or deploy AgentBase on a new Win
 & '.\development\codex-deployment\bootstrap_windows.ps1' -Action Install
 ```
 
-The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerShell`, `sharkdp.fd`, `Python.Python.3.13`, and `OpenJS.NodeJS.LTS`, then uses that Node installation to install the exact npm package `@ast-grep/cli@0.44.1`. It changes only missing or unsupported prerequisites and reads back every resolved executable and version plus `fd --max-results` support. Use `-Action Check` for a read-only audit. If PowerShell or another PATH-providing prerequisite was installed, fully exit and restart the Codex desktop host before continuing so the new process inherits the persisted PATH. Starting another task inside the same host does not prove that PATH was refreshed.
+The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerShell`, `sharkdp.fd`, `Python.Python.3.13`, and `OpenJS.NodeJS.LTS`, then uses that Node installation to install the exact npm package `@ast-grep/cli@0.44.1`. It changes only missing or unsupported prerequisites and reads back every resolved executable and version plus `fd --max-results` support. Use `-Action Check` for a read-only audit. Direct output defaults to the model view: success is `{ready:true}`, while failure lists only unsupported tools and the recovery action. Add `-View Machine` when automation needs the complete tool, package, path and version JSON. If PowerShell or another PATH-providing prerequisite was installed, fully exit and restart the Codex desktop host before continuing so the new process inherits the persisted PATH. Starting another task inside the same host does not prove that PATH was refreshed.
 
 Before publishing a payload that contains `source-query`, run the independent runtime owner's status entry and require `ready=true`, then run `srcq doctor`. The status command verifies the installed manifest, managed file hashes, binary version and unique PATH entry; `manage_agentbase.ps1` does not copy or repair that external runtime:
 
@@ -57,11 +57,13 @@ Before publishing a payload that contains `source-query`, run the independent ru
 srcq doctor
 ```
 
+The installer also defaults to a compact model receipt. Ready `Status` retains only `ready`, `version` and the exact `binary`; failures retain the reason, direct diagnosis and recovery. Install and upgrade add the binary only when a PATH change requires an immediate explicit doctor call. Use `-View Machine` for the stable complete JSON consumed by deployment validation and other programs.
+
 When `Install` added PATH in the current task, use the exact `binary` returned by `Status` for the immediate doctor readback, then fully exit and restart the Codex desktop host before relying on command-name resolution. A new task in the existing host is not a substitute for that process restart.
 
 ## Result surfaces
 
-`manage_agentbase.ps1` returns one complete PowerShell object for programmatic consumers. Direct console rendering is a model-facing view of that same object: it omits hashes, repeated scope, empty collections and successful default checks, while retaining the outcome, actionable exceptions and rollback locations. The format view does not create a second status calculation or remove object properties.
+The host bootstrap and srcq installer compute one canonical result and default to a compact model projection; `-View Machine` serializes that same result as complete JSON. `manage_agentbase.ps1` returns one complete PowerShell object for programmatic consumers. Its direct console rendering is likewise a model-facing view of that same object: it omits hashes, repeated scope, empty collections and successful default checks, while retaining the outcome, actionable exceptions and rollback locations. None of these views creates a second status calculation.
 
 Typical direct output is intentionally small:
 
@@ -98,6 +100,7 @@ The repeatable tests cover lifecycle identity continuity, explicit retirement, s
 & '.\development\codex-deployment\test_portable_config.ps1' -ProjectRoot (Get-Location).Path
 & '.\development\codex-deployment\test_managed_asset_lifecycle.ps1' -ProjectRoot (Get-Location).Path
 & '.\development\codex-deployment\test_manage_agentbase.ps1' -ProjectRoot (Get-Location).Path
+& '.\development\codex-deployment\test_bootstrap_windows.ps1'
 ```
 
 A successful direct test invocation renders only `tests : pass`. Assign its returned object before serialization when automation needs the individual check fields.

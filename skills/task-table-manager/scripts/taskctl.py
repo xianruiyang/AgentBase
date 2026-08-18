@@ -401,9 +401,174 @@ def task_completion_model(payload: dict[str, Any]) -> dict[str, Any]:
     return sparse_model_value(projected)
 
 
+def add_bounded_issues(
+    projected: dict[str, Any],
+    payload: dict[str, Any],
+    items_key: str,
+    count_key: str,
+) -> None:
+    items = payload.get(items_key)
+    if items:
+        projected[items_key] = sparse_model_value(copy.deepcopy(items))
+    visible_count = len(items) if isinstance(items, list) else 0
+    total_count = payload.get(count_key)
+    if isinstance(total_count, int) and total_count > visible_count:
+        projected[count_key] = total_count
+
+
+def task_contract_write_model(payload: dict[str, Any]) -> dict[str, Any]:
+    projected = {
+        key: copy.deepcopy(payload.get(key))
+        for key in ("task_id", "task_revision", "state_revision")
+    }
+    if payload.get("recovered_partial_write") is True:
+        projected["recovered_partial_write"] = True
+    add_bounded_issues(projected, payload, "diagnostics", "diagnostic_count")
+    return sparse_model_value(projected)
+
+
+def task_state_write_model(payload: dict[str, Any]) -> dict[str, Any]:
+    command = payload.get("command")
+    source_state = payload.get("state", {})
+    state = {
+        key: copy.deepcopy(source_state.get(key))
+        for key in (
+            "status",
+            "owner",
+            "note",
+            "blocked_reason",
+            "next_action",
+            "result_ref",
+            "revision",
+        )
+        if isinstance(source_state, dict)
+    }
+    if command == "complete":
+        state.pop("result_ref", None)
+    projected: dict[str, Any] = {
+        "id": payload.get("id"),
+        "state": sparse_model_value(state),
+    }
+    if command == "complete":
+        projected["result_ref"] = payload.get("result_ref")
+        if payload.get("recovered_partial_write") is True:
+            projected["recovered_partial_write"] = True
+    add_bounded_issues(projected, payload, "warnings", "warning_count")
+    add_bounded_issues(projected, payload, "diagnostics", "diagnostic_count")
+    return sparse_model_value(projected)
+
+
+def task_render_model(payload: dict[str, Any]) -> dict[str, Any]:
+    summary = task_status_model(payload)
+    tasks = summary.get("tasks")
+    if isinstance(tasks, dict) and payload.get("needs_review_count"):
+        tasks["needs_review"] = payload["needs_review_count"]
+    return sparse_model_value(
+        {
+            "output": payload.get("output"),
+            **summary,
+        }
+    )
+
+
+def task_show_model(payload: dict[str, Any]) -> dict[str, Any]:
+    task = copy.deepcopy(payload.get("task", {}))
+    if isinstance(task, dict):
+        task.pop("schema", None)
+        task.pop("id", None)
+    state = copy.deepcopy(payload.get("state", {}))
+    if isinstance(state, dict):
+        state.pop("schema", None)
+        state.pop("task_id", None)
+    result = copy.deepcopy(payload.get("result"))
+    if isinstance(result, dict):
+        result.pop("schema", None)
+        result.pop("task_id", None)
+        if result.get("current_for_task_revision") is True:
+            result.pop("current_for_task_revision", None)
+        if result.get("source_snapshot"):
+            result["source_snapshot_count"] = len(result["source_snapshot"])
+            result.pop("source_snapshot", None)
+    return sparse_model_value(
+        {
+            "id": payload.get("id"),
+            "task": task,
+            "state": state,
+            "result": result,
+            "diagnostics": copy.deepcopy(payload.get("diagnostics", [])),
+        }
+    )
+
+
+def task_page_more(
+    payload: dict[str, Any], total_key: str, *, total_label: str = "total"
+) -> dict[str, Any]:
+    if not payload.get("truncated"):
+        return {}
+    return sparse_model_value(
+        {
+            total_label: payload.get(total_key),
+            "after_id": payload.get("next_after_id"),
+        }
+    )
+
+
+def task_list_model(payload: dict[str, Any]) -> dict[str, Any]:
+    items = copy.deepcopy(payload.get("items", []))
+    projected: dict[str, Any] = {
+        "counts": nonzero_counts(payload.get("counts")),
+        "items": items,
+    }
+    if not items:
+        projected["matched_count"] = payload.get("matched_count", 0)
+    more = task_page_more(payload, "matched_count")
+    if more:
+        projected["more"] = more
+    add_bounded_issues(projected, payload, "diagnostics", "diagnostic_count")
+    return sparse_model_value(projected)
+
+
+def task_relation_model(payload: dict[str, Any], count_key: str) -> dict[str, Any]:
+    items = copy.deepcopy(payload.get("items", []))
+    projected: dict[str, Any] = {
+        "id": payload.get("id"),
+        "items": items,
+    }
+    if not items:
+        projected[count_key] = payload.get(count_key, 0)
+    more = task_page_more(payload, count_key)
+    if more:
+        projected["more"] = more
+    add_bounded_issues(projected, payload, "diagnostics", "diagnostic_count")
+    return sparse_model_value(projected)
+
+
+def task_next_model(payload: dict[str, Any]) -> dict[str, Any]:
+    items = copy.deepcopy(payload.get("items", []))
+    for item in items:
+        if isinstance(item, dict) and item.get("recommended") is True:
+            item.pop("recommended", None)
+    projected: dict[str, Any] = {"items": items}
+    if not items:
+        projected["candidate_count"] = payload.get("candidate_count", 0)
+    more = task_page_more(payload, "candidate_count", total_label="candidate_count")
+    if more:
+        recommended_count = payload.get("recommended_count")
+        if recommended_count != payload.get("candidate_count"):
+            more["recommended_count"] = recommended_count
+        projected["more"] = more
+    add_bounded_issues(projected, payload, "diagnostics", "diagnostic_count")
+    return sparse_model_value(projected)
+
+
 def task_model_projection(payload: dict[str, Any]) -> dict[str, Any]:
     if payload.get("ok") is False:
         return sparse_model_value(payload, root=True)
+    if payload.get("schema") == "task.record":
+        candidate = copy.deepcopy(payload)
+        candidate.pop("schema", None)
+        candidate.pop("revision", None)
+        return sparse_model_value(candidate, root=True)
     command = payload.get("command")
     if command == "status":
         return task_status_model(payload)
@@ -411,13 +576,22 @@ def task_model_projection(payload: dict[str, Any]) -> dict[str, Any]:
         return task_context_model(payload)
     if command == "completion-context":
         return task_completion_model(payload)
+    if command in {"add", "update"}:
+        return task_contract_write_model(payload)
+    if command in {"claim", "start", "note", "complete", "reopen", "release"}:
+        return task_state_write_model(payload)
+    if command == "render":
+        return task_render_model(payload)
     if command == "show":
-        candidate = copy.deepcopy(payload)
-        result = candidate.get("result")
-        if isinstance(result, dict) and result.get("source_snapshot"):
-            result["source_snapshot_count"] = len(result["source_snapshot"])
-            result.pop("source_snapshot", None)
-        return sparse_model_value(candidate, root=True)
+        return task_show_model(payload)
+    if command == "list":
+        return task_list_model(payload)
+    if command == "deps":
+        return task_relation_model(payload, "dependency_count")
+    if command in {"dependents", "impact"}:
+        return task_relation_model(payload, "dependent_count")
+    if command == "next":
+        return task_next_model(payload)
     return sparse_model_value(copy.deepcopy(payload), root=True)
 
 
@@ -891,6 +1065,24 @@ def read_source_snapshot(
         ]
 
 
+def require_completion_source_snapshot(
+    root: Path, table: dict[str, Any], reference: str, task_id: str
+) -> None:
+    _, diagnostics = read_source_snapshot(root, table, reference, task_id)
+    if not diagnostics:
+        return
+    issue = diagnostics[0]
+    raise TaskctlError(
+        "completion source snapshot cannot be resolved: "
+        f"{issue['kind']} ({reference})",
+        gate_id="TASK-INPUT-UNREADABLE",
+        risk="the completion would persist a result with a missing, unreadable, or identity-mismatched provenance asset",
+        scope="current completion write",
+        recovery="restore the referenced immutable snapshot or recapture the execution context and retry with the returned reference",
+        retryable=True,
+    )
+
+
 def require_identity_string(value: Any, field: str) -> str:
     if not isinstance(value, str):
         raise TaskctlError(f"{field} must be a string")
@@ -1039,17 +1231,11 @@ def semantic_text_diagnostics(
     return []
 
 
-def validate_task(raw: Any, *, expected_id: str | None = None) -> dict[str, Any]:
-    if not isinstance(raw, dict) or raw.get("schema") != "task.record":
-        raise TaskctlError("task file must use schema task.record")
-    task_id = require_identity_string(raw.get("id"), "task.id")
-    if not TASK_ID_RE.fullmatch(task_id):
-        raise TaskctlError(f"invalid task id: {task_id}")
-    if expected_id is not None and task_id != expected_id:
-        raise TaskctlError(f"task id mismatch: expected {expected_id}, got {task_id}")
-    revision = raw.get("revision")
-    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
-        raise TaskctlError("task.revision must be a positive integer")
+def normalize_task_body(
+    raw: Any, task_id: str, revision: int
+) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise TaskctlError("task input must be an object")
     source_ids = string_list(raw.get("source_ids"), "task.source_ids")
 
     raw_dependencies = raw.get("dependencies", [])
@@ -1111,6 +1297,42 @@ def validate_task(raw: Any, *, expected_id: str | None = None) -> dict[str, Any]
     return normalized
 
 
+def validate_task(raw: Any, *, expected_id: str | None = None) -> dict[str, Any]:
+    if not isinstance(raw, dict) or raw.get("schema") != "task.record":
+        raise TaskctlError("task file must use schema task.record")
+    task_id = require_identity_string(raw.get("id"), "task.id")
+    if not TASK_ID_RE.fullmatch(task_id):
+        raise TaskctlError(f"invalid task id: {task_id}")
+    if expected_id is not None and task_id != expected_id:
+        raise TaskctlError(f"task id mismatch: expected {expected_id}, got {task_id}")
+    revision = raw.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+        raise TaskctlError("task.revision must be a positive integer")
+    return normalize_task_body(raw, task_id, revision)
+
+
+def normalize_task_authoring_input(raw: Any) -> tuple[dict[str, Any], bool]:
+    if not isinstance(raw, dict):
+        raise TaskctlError("task authoring input must be an object")
+    if raw.get("schema") == "task.record":
+        return validate_task(raw), True
+    machine_fields = sorted(
+        field for field in ("schema", "revision") if field in raw
+    )
+    if machine_fields:
+        raise TaskctlError(
+            "semantic task input contains machine-owned fields: "
+            + ", ".join(machine_fields),
+            risk="the model task body would duplicate schema or revision lifecycle owned by the task write command",
+            recovery="remove the reported fields and use --expected-task-revision when updating an existing task",
+            retryable=True,
+        )
+    task_id = require_identity_string(raw.get("id"), "task.id")
+    if not TASK_ID_RE.fullmatch(task_id):
+        raise TaskctlError(f"invalid task id: {task_id}")
+    return normalize_task_body(raw, task_id, 1), False
+
+
 def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
     if not isinstance(raw, dict) or raw.get("schema") != "task.state":
         raise TaskctlError(f"state for {task_id} must use schema task.state")
@@ -1150,8 +1372,37 @@ def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
     }
 
 
-def validate_result(raw: Any, task: dict[str, Any]) -> dict[str, Any]:
-    return validate_result_for_task(raw, task, require_current_revision=True)
+def normalize_result_body(
+    raw: Any, task: dict[str, Any], task_revision: int
+) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise TaskctlError("result input must be an object")
+    changed_files = [
+        validate_relative(value, "result.changed_files[]", allow_glob=False)
+        for value in string_list(raw.get("changed_files"), "result.changed_files")
+    ]
+    invalidated_ids = string_list(
+        raw.get("invalidated_source_ids"), "result.invalidated_source_ids"
+    )
+    metadata = raw.get("metadata", {})
+    if not isinstance(metadata, dict):
+        raise TaskctlError("result.metadata must be an object")
+    result = {
+        "schema": "task.result",
+        "task_id": task["id"],
+        "task_revision": task_revision,
+        "outcome": semantic_string(raw.get("outcome"), "result.outcome"),
+        "outputs": string_list(raw.get("outputs"), "result.outputs"),
+        "changed_files": changed_files,
+        "verification": string_list(raw.get("verification"), "result.verification"),
+        "unresolved": string_list(raw.get("unresolved"), "result.unresolved"),
+        "invalidated_source_ids": invalidated_ids,
+        "evidence_for": string_list(raw.get("evidence_for"), "result.evidence_for"),
+        "evidence_refs": evidence_ref_list(raw.get("evidence_refs"), "result.evidence_refs"),
+    }
+    if metadata:
+        result["metadata"] = metadata
+    return result
 
 
 def validate_result_for_task(
@@ -1171,16 +1422,7 @@ def validate_result_for_task(
         raise TaskctlError("result.task_revision is invalid for the task")
     if require_current_revision and result_revision != task["revision"]:
         raise TaskctlError("result.task_revision does not match the current task contract")
-    changed_files = [
-        validate_relative(value, "result.changed_files[]", allow_glob=False)
-        for value in string_list(raw.get("changed_files"), "result.changed_files")
-    ]
-    invalidated_ids = string_list(
-        raw.get("invalidated_source_ids"), "result.invalidated_source_ids"
-    )
-    metadata = raw.get("metadata", {})
-    if not isinstance(metadata, dict):
-        raise TaskctlError("result.metadata must be an object")
+    result = normalize_result_body(raw, task, result_revision)
     inline_snapshot = source_snapshot_map(
         raw.get("source_snapshot"), "result.source_snapshot"
     )
@@ -1196,26 +1438,43 @@ def validate_result_for_task(
             risk="the completion would create two competing sources for execution provenance",
             recovery="use the captured reference or the legacy inline map, not both",
         )
-    result = {
-        "schema": "task.result",
-        "task_id": task["id"],
-        "task_revision": result_revision,
-        "outcome": semantic_string(raw.get("outcome"), "result.outcome"),
-        "outputs": string_list(raw.get("outputs"), "result.outputs"),
-        "changed_files": changed_files,
-        "verification": string_list(raw.get("verification"), "result.verification"),
-        "unresolved": string_list(raw.get("unresolved"), "result.unresolved"),
-        "invalidated_source_ids": invalidated_ids,
-        "evidence_for": string_list(raw.get("evidence_for"), "result.evidence_for"),
-        "evidence_refs": evidence_ref_list(raw.get("evidence_refs"), "result.evidence_refs"),
-    }
     if inline_snapshot:
         result["source_snapshot"] = inline_snapshot
     if snapshot_ref is not None:
         result["source_snapshot_ref"] = snapshot_ref
-    if metadata:
-        result["metadata"] = metadata
     return result
+
+
+def normalize_completion_result(
+    raw: Any, task: dict[str, Any], task_revision: int
+) -> tuple[dict[str, Any], bool]:
+    if not isinstance(raw, dict):
+        raise TaskctlError("completion result input must be an object")
+    if raw.get("schema") == "task.result":
+        return (
+            validate_result_for_task(raw, task, require_current_revision=True),
+            True,
+        )
+    machine_fields = sorted(
+        field
+        for field in (
+            "schema",
+            "task_id",
+            "task_revision",
+            "source_snapshot",
+            "source_snapshot_ref",
+        )
+        if field in raw
+    )
+    if machine_fields:
+        raise TaskctlError(
+            "semantic completion input contains machine-owned fields: "
+            + ", ".join(machine_fields),
+            risk="the model result would duplicate task identity, revision, or provenance owned by the completion command",
+            recovery="remove the reported fields; pass task identity, expected revisions, and the snapshot receipt as command arguments",
+            retryable=True,
+        )
+    return normalize_result_body(raw, task, task_revision), False
 
 
 def hydrate_result_source_snapshot(
@@ -2128,7 +2387,9 @@ def command_draft(args: argparse.Namespace) -> dict[str, Any]:
 
 def command_add(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.task_dir)
-    candidate = validate_task(read_json(Path(args.file).expanduser().resolve()))
+    candidate, legacy_task_envelope = normalize_task_authoring_input(
+        read_json(Path(args.file).expanduser().resolve())
+    )
     with workspace_lock(root):
         table = load_table(root)
         task_dir, state_dir, _ = table_paths(root, table)
@@ -2179,6 +2440,11 @@ def command_add(args: argparse.Namespace) -> dict[str, Any]:
             *storage_diagnostics,
             *index_diagnostics,
             *(
+                [{"kind": "legacy_task_envelope_normalized"}]
+                if legacy_task_envelope
+                else []
+            ),
+            *(
                 [{"kind": "non_initial_task_revision", "revision": candidate["revision"]}]
                 if candidate["revision"] != 1
                 else []
@@ -2204,7 +2470,9 @@ def command_add(args: argparse.Namespace) -> dict[str, Any]:
 
 def command_update(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.task_dir)
-    candidate = validate_task(read_json(Path(args.file).expanduser().resolve()))
+    candidate, legacy_task_envelope = normalize_task_authoring_input(
+        read_json(Path(args.file).expanduser().resolve())
+    )
     with workspace_lock(root):
         table = load_table(root)
         tasks, states, storage_diagnostics = load_query_storage(root, table)
@@ -2259,6 +2527,11 @@ def command_update(args: argparse.Namespace) -> dict[str, Any]:
             *storage_diagnostics,
             *transition_diagnostics,
             *index_diagnostics,
+            *(
+                [{"kind": "legacy_task_envelope_normalized"}]
+                if legacy_task_envelope
+                else []
+            ),
             *task_diagnostics(candidate, proposed, states, index),
         ]
         task_dir, _, _ = table_paths(root, table)
@@ -3534,7 +3807,27 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
                 recovery="repair the matching task/state record or choose a current task ID",
             )
         task = tasks[args.id]
-        result = validate_result(raw_result, task)
+        if args.expected_task_revision is None:
+            raise TaskctlError(
+                "complete requires --expected-task-revision",
+                gate_id="TASK-REVISION",
+                risk="the completion has no caller-observed task contract revision and could bind an older execution to a newer contract",
+                recovery="read the task revision used for execution and retry with --expected-task-revision",
+                retryable=True,
+            )
+        if task["revision"] != args.expected_task_revision:
+            raise TaskctlError(
+                f"task revision conflict: expected {args.expected_task_revision}, current {task['revision']}",
+                gate_id="TASK-REVISION",
+                risk="the completion result was produced against a different task contract revision",
+                recovery="reload the current task contract, reconcile or redo the result, and retry with its revision",
+                retryable=True,
+            )
+        state = states[args.id]
+        check_expected_state(state, args.expected_state_revision)
+        result, legacy_result_envelope = normalize_completion_result(
+            raw_result, task, args.expected_task_revision
+        )
         inline_snapshot = result.pop("source_snapshot", None)
         result_file_snapshot_ref = result.get("source_snapshot_ref")
         argument_snapshot_ref = None
@@ -3567,14 +3860,18 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
             )
         elif argument_snapshot_ref is not None:
             result["source_snapshot_ref"] = argument_snapshot_ref
-        state = states[args.id]
-        check_expected_state(state, args.expected_state_revision)
+        if result.get("source_snapshot_ref") is not None:
+            require_completion_source_snapshot(
+                root, table, result["source_snapshot_ref"], args.id
+            )
         index, index_diagnostics = maybe_load_index(root, table)
         diagnostics = [
             *storage_diagnostics,
             *index_diagnostics,
             *owner_diagnostics(state, args.owner),
         ]
+        if legacy_result_envelope:
+            diagnostics.append({"kind": "legacy_result_envelope_normalized"})
         if legacy_snapshot_externalized:
             diagnostics.append(
                 {
@@ -3606,7 +3903,9 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
         next_state = validate_state(next_state, args.id)
         recovered_partial_write = result_path.exists()
         if recovered_partial_write:
-            existing_result = validate_result(read_json(result_path), task)
+            existing_result = validate_result_for_task(
+                read_json(result_path), task, require_current_revision=True
+            )
             if existing_result != result:
                 raise TaskctlError(
                     f"conflicting partial result: {result_path}",
@@ -3762,26 +4061,34 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
         "",
         "## 状态统计",
         "",
-        "| 状态 | 数量 |",
-        "| --- | ---: |",
     ]
-    for status in counts:
-        lines.append(f"| {status} | {counts[status]} |")
-    lines.extend(
-        [
-            "",
-            "## 复核与结果",
-            "",
-            f"- 需复核任务：{counts['review']}",
-            f"- 当前状态引用结果：{storage['result_count']}",
-            f"- 含验证结果：{storage['result_with_verification_count']}",
-            f"- 含未决结果：{storage['result_with_unresolved_count']}",
-            f"- 含结果诊断：{storage['result_with_diagnostics_count']}",
-            f"- 任务合同 revision 陈旧结果：{storage['task_revision_stale_result_count']}",
-            f"- 含来源快照问题结果：{storage['source_snapshot_issue_result_count']}",
-            f"- 结果诊断条目：{storage['result_diagnostic_count']}",
-        ]
-    )
+    nonzero_statuses = [(status, count) for status, count in counts.items() if count]
+    if nonzero_statuses:
+        lines.extend(["| 状态 | 数量 |", "| --- | ---: |"])
+        lines.extend(f"| {status} | {count} |" for status, count in nonzero_statuses)
+    else:
+        lines.append("- 无任务")
+    lines.extend(["", "## 复核与结果", ""])
+    if counts["review"]:
+        lines.append(f"- 需复核任务：{counts['review']}")
+    if storage["result_count"]:
+        lines.extend(
+            [
+                f"- 当前状态引用结果：{storage['result_count']}",
+                f"- 含验证结果：{storage['result_with_verification_count']}",
+            ]
+        )
+        for label, key in (
+            ("含未决结果", "result_with_unresolved_count"),
+            ("含结果诊断", "result_with_diagnostics_count"),
+            ("任务合同 revision 陈旧结果", "task_revision_stale_result_count"),
+            ("含来源快照问题结果", "source_snapshot_issue_result_count"),
+            ("结果诊断条目", "result_diagnostic_count"),
+        ):
+            if storage[key]:
+                lines.append(f"- {label}：{storage[key]}")
+    else:
+        lines.append("- 当前没有结果引用")
     if index is not None:
         summary = index.get("summary", {})
         lines.extend(
@@ -3790,10 +4097,12 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
                 "## 上游状态",
                 "",
                 f"- 用户确认快照：{index.get('protected_baseline', {}).get('status')}",
-                f"- 可修订上游未决：{summary.get('unresolved_count')}",
-                f"- 延后讨论项：{summary.get('deferred_change_count', 0)}",
             ]
         )
+        if summary.get("unresolved_count"):
+            lines.append(f"- 可修订上游未决：{summary['unresolved_count']}")
+        if summary.get("deferred_change_count"):
+            lines.append(f"- 延后讨论项：{summary['deferred_change_count']}")
     all_storage_diagnostics = [
         *storage_diagnostics,
         *storage.get("diagnostics", []),
@@ -3804,36 +4113,38 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
             f"- {markdown_cell(item.get('kind'))}: {markdown_cell(item.get('message', ''))}"
             for item in all_storage_diagnostics[:DEFAULT_LIMIT]
         )
-    lines.extend(
-        [
-            "",
-            "## 任务",
-            "",
-            "| ID | 状态 | Owner | 标题 | 依赖 | 结果 | 合同修订 |",
-            "| --- | --- | --- | --- | --- | --- | ---: |",
-        ]
-    )
-    for task_id in sorted(tasks):
-        task = tasks[task_id]
-        state = states[task_id]
-        dependencies = ", ".join(
-            f"{dependency['id']}:{dependency['type']}" for dependency in task["dependencies"]
+    lines.extend(["", "## 任务", ""])
+    if tasks:
+        lines.extend(
+            [
+                "| ID | 状态 | Owner | 标题 | 依赖 | 结果 | 合同修订 |",
+                "| --- | --- | --- | --- | --- | --- | ---: |",
+            ]
         )
-        lines.append(
-            "| "
-            + " | ".join(
-                [
-                    markdown_table_cell(task_id),
-                    markdown_table_cell(state["status"]),
-                    markdown_table_cell(state["owner"]),
-                    markdown_table_cell(task["title"]),
-                    markdown_table_cell(dependencies),
-                    markdown_table_cell(state["result_ref"]),
-                    str(task["revision"]),
-                ]
+        for task_id in sorted(tasks):
+            task = tasks[task_id]
+            state = states[task_id]
+            dependencies = ", ".join(
+                f"{dependency['id']}:{dependency['type']}"
+                for dependency in task["dependencies"]
             )
-            + " |"
-        )
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        markdown_table_cell(task_id),
+                        markdown_table_cell(state["status"]),
+                        markdown_table_cell(state["owner"]),
+                        markdown_table_cell(task["title"]),
+                        markdown_table_cell(dependencies),
+                        markdown_table_cell(state["result_ref"]),
+                        str(task["revision"]),
+                    ]
+                )
+                + " |"
+            )
+    else:
+        lines.append("- 无任务")
     atomic_write_text(output_path, "\n".join(lines) + "\n")
     return {
         "ok": True,
@@ -4020,6 +4331,7 @@ def build_parser() -> argparse.ArgumentParser:
     complete_parser.add_argument("--id", required=True)
     complete_parser.add_argument("--owner", required=True)
     complete_parser.add_argument("--result-file", required=True)
+    complete_parser.add_argument("--expected-task-revision", type=int)
     complete_parser.add_argument("--source-snapshot-ref")
     complete_parser.add_argument("--diagnostic-limit", type=int, default=20)
     add_state_revision(complete_parser)
@@ -4044,6 +4356,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(impact_parser)
     add_limit(impact_parser)
     impact_parser.add_argument("--id", required=True)
+    impact_parser.add_argument("--after-id")
     impact_parser.set_defaults(handler=command_impact)
 
     render_parser = subparsers.add_parser("render")

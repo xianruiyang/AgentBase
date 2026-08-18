@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
     [ValidateSet("Check", "Install")]
-    [string]$Action = "Check"
+    [string]$Action = "Check",
+
+    [ValidateSet("Model", "Machine")]
+    [string]$View = "Model"
 )
 
 $ErrorActionPreference = "Stop"
@@ -303,18 +306,86 @@ function Install-AstGrep {
     }
 }
 
-function Write-HostPrerequisiteState {
+function ConvertTo-ModelLiteral {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return "null"
+    }
+    if ($Value -is [string] -and $Value -match '^[A-Za-z0-9._/@+-]+$') {
+        return [string]$Value
+    }
+    return ConvertTo-Json -InputObject $Value -Compress
+}
+
+function New-HostPrerequisiteResult {
     param(
         [object[]]$States,
         [string]$RequestedAction
     )
 
     $ready = @($States | Where-Object { -not $_.supported }).Count -eq 0
-    [ordered]@{
+    return [pscustomobject][ordered]@{
         action = $RequestedAction
         ready = $ready
         tools = $States
-    } | ConvertTo-Json -Depth 5
+    }
+}
+
+function Format-HostPrerequisiteModelResult {
+    param([object]$Result)
+
+    if ([bool]$Result.ready) {
+        return "{ready:true}"
+    }
+    if (-not [string]::IsNullOrWhiteSpace([string]$Result.error)) {
+        return "{ready:false error:$(ConvertTo-ModelLiteral $Result.error)}"
+    }
+
+    $unsupported = @()
+    foreach ($state in @($Result.tools)) {
+        if ([bool]$state.supported) {
+            continue
+        }
+        $fields = @("name:$(ConvertTo-ModelLiteral $state.name)")
+        if (-not [string]::IsNullOrWhiteSpace([string]$state.version)) {
+            $fields += "version:$(ConvertTo-ModelLiteral $state.version)"
+        }
+        $toolRecovery = if ([bool]$state.available) { [string]$state.remediation } else { "install" }
+        $fields += "next:$(ConvertTo-ModelLiteral $toolRecovery)"
+        $unsupported += "{$($fields -join ' ')}"
+    }
+    $next = if ([string]$Result.action -eq "Check") {
+        "rerun with -Action Install"
+    }
+    else {
+        "restart Codex; rerun with -Action Check"
+    }
+    return "{ready:false tools:[$($unsupported -join ',')] next:$(ConvertTo-ModelLiteral $next)}"
+}
+
+function Write-HostPrerequisiteResult {
+    param(
+        [object]$Result,
+        [ValidateSet("Model", "Machine")]
+        [string]$ResultView
+    )
+
+    if ($ResultView -eq "Machine") {
+        $Result | ConvertTo-Json -Depth 5
+        return
+    }
+    Format-HostPrerequisiteModelResult -Result $Result
+}
+
+trap {
+    $failure = [pscustomobject][ordered]@{
+        action = $Action
+        ready = $false
+        error = $_.Exception.Message
+    }
+    Write-HostPrerequisiteResult -Result $failure -ResultView $View
+    exit 2
 }
 
 $states = @(Get-HostPrerequisiteState)
@@ -341,10 +412,8 @@ if ($Action -eq "Install") {
 }
 
 $ready = @($states | Where-Object { -not $_.supported }).Count -eq 0
-Write-HostPrerequisiteState -States $states -RequestedAction $Action
+$result = New-HostPrerequisiteResult -States $states -RequestedAction $Action
+Write-HostPrerequisiteResult -Result $result -ResultView $View
 if (-not $ready) {
-    if ($Action -eq "Check") {
-        throw "AgentBase host prerequisites are missing or unsupported; rerun with -Action Install"
-    }
-    throw "Host prerequisite installation completed but the required commands are not available yet; restart Codex and rerun -Action Check"
+    exit 1
 }

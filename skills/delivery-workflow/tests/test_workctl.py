@@ -194,6 +194,111 @@ class WorkctlTests(unittest.TestCase):
         self.assertEqual(payload["semantic"]["section_count"], 8)
         self.assertIn("section_count:8", model.stdout)
 
+    def test_protect_model_receipt_omits_machine_snapshot_details(self) -> None:
+        model = self.run_default_cli(
+            "protect",
+            "--work-dir",
+            str(self.root),
+            "--confirmed-by",
+            "user",
+            "--confirmation-ref",
+            "conversation:confirmed",
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("baseline:{status:protected", model.stdout)
+        self.assertIn("cycle_id:cycle-001", model.stdout)
+        self.assertIn("confirmed_by:user", model.stdout)
+        self.assertIn('confirmation_ref:"conversation:confirmed"', model.stdout)
+        self.assertNotIn("path:", model.stdout)
+        self.assertNotIn("history_count", model.stdout)
+        self.assertNotIn("schema", model.stdout)
+        self.assertNotIn("documents", model.stdout)
+
+        stored = json.loads(
+            (self.root / "protected-baseline.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(stored["schema"], "delivery.protected-baseline")
+        self.assertIn("documents", stored)
+
+    def test_baseline_issue_model_uses_status_and_deduplicates_status_diagnostics(
+        self,
+    ) -> None:
+        module = load_workctl_module()
+        diagnostic = {"kind": "baseline_source_drift", "document": "requirements.md"}
+        baseline = {
+            "status": "drifted",
+            "cycle_id": "cycle-001",
+            "confirmed_by": "user",
+            "confirmation_ref": "conversation:confirmed",
+            "diagnostics": [diagnostic],
+        }
+        status = module.work_model_projection(
+            {
+                "ok": True,
+                "command": "status",
+                "semantic": {"section_count": 1},
+                "protected_baseline": baseline,
+                "tasks": {},
+                "diagnostics": [diagnostic],
+                "truncated": False,
+            }
+        )
+        self.assertEqual(status["protected_baseline"]["status"], "drifted")
+        self.assertEqual(
+            status["protected_baseline"]["confirmation_ref"],
+            "conversation:confirmed",
+        )
+        self.assertNotIn("aligned", status["protected_baseline"])
+        self.assertNotIn("diagnostics", status["protected_baseline"])
+        self.assertEqual(status["diagnostics"], [diagnostic])
+
+        coverage = module.work_model_projection(
+            {
+                "ok": True,
+                "command": "coverage",
+                "counts": {},
+                "protected_baseline": baseline,
+                "unresolved_ids": [],
+                "unreferenced_upstream_ids": [],
+                "truncated": False,
+            }
+        )
+        self.assertEqual(
+            coverage["protected_baseline"]["diagnostics"], [diagnostic]
+        )
+
+    def test_render_model_receipt_reuses_sparse_status_projection(self) -> None:
+        self.protect()
+        model = self.run_default_cli("render", "--work-dir", str(self.root))
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("output:", model.stdout)
+        self.assertIn("semantic:{section_count:8", model.stdout)
+        self.assertNotIn("prefix_counts", model.stdout)
+        self.assertNotIn("status:available", model.stdout)
+        self.assertNotIn("_count:0", model.stdout)
+
+        machine = self.run_cli("render", "--work-dir", str(self.root))
+        self.assertEqual(machine.returncode, 0, machine.stderr)
+        payload = self.payload(machine)
+        self.assertIn("prefix_counts", payload["semantic"])
+        self.assertEqual(payload["tasks"]["status"], "partial")
+        self.assertEqual(payload["tasks"]["result_count"], 0)
+
+    def test_impact_model_omits_count_when_full_list_is_visible(self) -> None:
+        model = self.run_default_cli(
+            "impact",
+            "--work-dir",
+            str(self.root),
+            "--id",
+            "REQ-001",
+            "--max-items",
+            "100",
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("affected:", model.stdout)
+        self.assertNotIn("affected_count", model.stdout)
+        self.assertNotIn("truncated", model.stdout)
+
     def test_context_model_budget_preserves_section_and_recovery(self) -> None:
         model = self.run_default_cli(
             "context",
@@ -307,15 +412,16 @@ class WorkctlTests(unittest.TestCase):
         self.assertIn("确认引用：conversation:confirmed", view)
         self.assertIn("## 可修订语义闭合", view)
         self.assertIn("## 任务执行状态", view)
-        self.assertIn("需复核任务：0", view)
+        self.assertIn("无任务", view)
+        self.assertIn("任务读取状态：partial", view)
         self.assertIn("## 任务结果证据", view)
-        self.assertIn("任务状态引用结果：0", view)
-        self.assertIn("含验证结果：0", view)
-        self.assertIn("含未决结果：0", view)
-        self.assertIn("含结果诊断：0", view)
-        self.assertIn("任务合同 revision 陈旧结果：0", view)
-        self.assertIn("含来源快照问题结果：0", view)
-        self.assertIn("结果诊断条目：0", view)
+        self.assertIn("当前没有结果引用", view)
+        self.assertNotIn("任务状态引用结果：0", view)
+        self.assertNotIn("含验证结果：0", view)
+        self.assertNotIn("| todo | 0 |", view)
+        self.assertNotIn("| 未决条目 | 0 |", view)
+        self.assertNotIn("| 未解析引用 | 0 |", view)
+        self.assertNotIn("| 延后讨论项 | 0 |", view)
         self.assertIn("不定义语义、READY 或最终完成状态", view)
 
     def test_render_isolates_a_corrupt_current_task_result(self) -> None:

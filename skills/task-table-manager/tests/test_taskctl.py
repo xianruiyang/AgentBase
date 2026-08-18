@@ -124,6 +124,15 @@ class TaskctlTests(unittest.TestCase):
                     arguments.extend(
                         ["--expected-state-revision", str(state["revision"])]
                     )
+        if command == "complete" and "--expected-task-revision" not in arguments:
+            if "--id" in arguments:
+                task_id = arguments[arguments.index("--id") + 1]
+                task_path = self.root / "tasks" / f"{task_id}.json"
+                if task_path.is_file():
+                    task = json.loads(task_path.read_text(encoding="utf-8"))
+                    arguments.extend(
+                        ["--expected-task-revision", str(task["revision"])]
+                    )
         if command == "update" and "--expected-task-revision" not in arguments:
             if "--file" in arguments:
                 candidate_path = Path(arguments[arguments.index("--file") + 1])
@@ -232,7 +241,6 @@ class TaskctlTests(unittest.TestCase):
         scope: list[str] | None = None,
     ) -> dict:
         return {
-            "schema": "task.record",
             "id": task_id,
             "title": title,
             "outcome": f"{title}完成并可由后继任务消费",
@@ -243,8 +251,10 @@ class TaskctlTests(unittest.TestCase):
             "verification": [f"验证{title}的实际行为"],
             "suggested_skills": [],
             "reasoning_hint": "medium",
-            "revision": 1,
         }
+
+    def legacy_task_payload(self, task: dict, revision: int = 1) -> dict:
+        return {"schema": "task.record", **task, "revision": revision}
 
     def add_task(self, task: dict) -> dict:
         candidate = Path(self.temp.name) / f"{task['id']}.json"
@@ -253,11 +263,8 @@ class TaskctlTests(unittest.TestCase):
         )
         return self.run_task("add", "--file", str(candidate))
 
-    def result_payload(self, task_id: str = "T001") -> dict:
+    def result_payload(self) -> dict:
         return {
-            "schema": "task.result",
-            "task_id": task_id,
-            "task_revision": 1,
             "outcome": "导出职责已经实现",
             "outputs": ["正式导出接口"],
             "changed_files": ["src/export/service.py"],
@@ -270,11 +277,56 @@ class TaskctlTests(unittest.TestCase):
             ],
         }
 
+    def legacy_result_payload(self, task_id: str = "T001") -> dict:
+        return {
+            "schema": "task.result",
+            "task_id": task_id,
+            "task_revision": 1,
+            **self.result_payload(),
+        }
+
     def read_snapshot(self, reference: str) -> dict:
         digest = reference.removeprefix("sha256:")
         return json.loads(
             (self.root / "snapshots" / f"{digest}.json").read_text(encoding="utf-8")
         )
+
+    def assert_completion_snapshot_gate(
+        self, result_file: Path, reference: str, issue_kind: str
+    ) -> None:
+        task = json.loads(
+            (self.root / "tasks" / "T001.json").read_text(encoding="utf-8")
+        )
+        state_path = self.root / "state" / "T001.json"
+        state_before = json.loads(state_path.read_text(encoding="utf-8"))
+        results_before = sorted((self.root / "results").glob("*.json"))
+        failed = self.run_cli(
+            TASKCTL,
+            "complete",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--source-snapshot-ref",
+            reference,
+            "--expected-task-revision",
+            str(task["revision"]),
+            "--expected-state-revision",
+            str(state_before["revision"]),
+        )
+        self.assertEqual(failed.returncode, 2, failed.stdout)
+        payload = json.loads(failed.stderr)
+        self.assertEqual(payload["gate"]["id"], "TASK-INPUT-UNREADABLE")
+        self.assertEqual(payload["gate"]["scope"], "current completion write")
+        self.assertIn(issue_kind, payload["error"])
+        self.assertEqual(
+            json.loads(state_path.read_text(encoding="utf-8")), state_before
+        )
+        self.assertEqual(sorted((self.root / "results").glob("*.json")), results_before)
 
     def complete_t001(self) -> dict:
         context = self.run_task(
@@ -327,6 +379,225 @@ class TaskctlTests(unittest.TestCase):
         payload = json.loads(machine.stdout)
         self.assertEqual(payload["task_count"], 2)
         self.assertIn("total:2", model.stdout)
+
+    def test_contract_write_model_receipt_omits_machine_defaults(self) -> None:
+        candidate = self.task("T003", "补充交付", ["SOL-001"])
+        candidate_file = Path(self.temp.name) / "T003.json"
+        candidate_file.write_text(
+            json.dumps(candidate, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        model = self.run_default_cli(
+            TASKCTL,
+            "add",
+            "--task-dir",
+            str(self.root),
+            "--file",
+            str(candidate_file),
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertEqual(
+            model.stdout.strip().splitlines(),
+            ["task_id:T003", "task_revision:1", "state_revision:1"],
+        )
+        self.assertNotIn("recovered_partial_write:false", model.stdout)
+        self.assertNotIn("diagnostic_count:0", model.stdout)
+
+        stored_task = json.loads(
+            (self.root / "tasks" / "T003.json").read_text(encoding="utf-8")
+        )
+        stored_state = json.loads(
+            (self.root / "state" / "T003.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(stored_task["schema"], "task.record")
+        self.assertEqual(stored_task["revision"], 1)
+        self.assertEqual(stored_state["schema"], "task.state")
+        self.assertEqual(stored_state["task_id"], "T003")
+
+    def test_state_write_model_receipt_omits_state_envelope_and_zero_counts(self) -> None:
+        model = self.run_default_cli(
+            TASKCTL,
+            "claim",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--expected-state-revision",
+            "1",
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertEqual(
+            model.stdout.strip().splitlines(),
+            ["id:T001", "state:{status:claimed,owner:agent-a,revision:2}"],
+        )
+        self.assertNotIn("schema", model.stdout)
+        self.assertNotIn("task_id", model.stdout)
+        self.assertNotIn("warning_count:0", model.stdout)
+        self.assertNotIn("diagnostic_count:0", model.stdout)
+
+        stored = json.loads(
+            (self.root / "state" / "T001.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(stored["schema"], "task.state")
+        self.assertEqual(stored["task_id"], "T001")
+        self.assertEqual(stored["revision"], 2)
+
+    def test_complete_model_receipt_keeps_only_visible_issues_and_total_overflow(
+        self,
+    ) -> None:
+        module = load_taskctl_module()
+        payload = {
+            "ok": True,
+            "command": "complete",
+            "id": "T001",
+            "state": {
+                "schema": "task.state",
+                "task_id": "T001",
+                "status": "done",
+                "owner": "agent-a",
+                "note": "",
+                "blocked_reason": "",
+                "next_action": "",
+                "result_ref": "results/T001.r4.json",
+                "revision": 4,
+            },
+            "result_ref": "results/T001.r4.json",
+            "recovered_partial_write": False,
+            "diagnostics": [{"kind": "first"}, {"kind": "second"}],
+            "diagnostic_count": 3,
+        }
+
+        projected = module.task_model_projection(payload)
+        self.assertEqual(
+            projected,
+            {
+                "id": "T001",
+                "state": {"status": "done", "owner": "agent-a", "revision": 4},
+                "result_ref": "results/T001.r4.json",
+                "diagnostics": [{"kind": "first"}, {"kind": "second"}],
+                "diagnostic_count": 3,
+            },
+        )
+
+    def test_render_model_receipt_reuses_sparse_status_summary(self) -> None:
+        model = self.run_default_cli(
+            TASKCTL, "render", "--task-dir", str(self.root)
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("output:", model.stdout)
+        self.assertIn("tasks:{total:2,states:{todo:2}}", model.stdout)
+        self.assertNotIn("results:", model.stdout)
+        self.assertNotIn("_count:0", model.stdout)
+
+        machine = self.run_cli(TASKCTL, "render", "--task-dir", str(self.root))
+        self.assertEqual(machine.returncode, 0, machine.stderr)
+        payload = json.loads(machine.stdout)
+        self.assertEqual(payload["task_count"], 2)
+        self.assertEqual(payload["results"]["referenced_result_count"], 0)
+
+    def test_show_model_removes_repeated_record_envelopes(self) -> None:
+        self.complete_t001()
+        model = self.run_default_cli(
+            TASKCTL, "show", "--task-dir", str(self.root), "--id", "T001"
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("id:T001", model.stdout)
+        self.assertIn("task:", model.stdout)
+        self.assertIn("state:", model.stdout)
+        self.assertIn("result:", model.stdout)
+        self.assertIn("task_revision:1", model.stdout)
+        self.assertIn("source_snapshot_count:", model.stdout)
+        self.assertNotIn("schema:", model.stdout)
+        self.assertNotIn("task_id:", model.stdout)
+        self.assertNotIn("current_for_task_revision:true", model.stdout)
+        self.assertNotIn("source_snapshot:", model.stdout)
+
+        machine = self.run_cli(
+            TASKCTL, "show", "--task-dir", str(self.root), "--id", "T001"
+        )
+        self.assertEqual(machine.returncode, 0, machine.stderr)
+        payload = json.loads(machine.stdout)
+        self.assertEqual(payload["task"]["schema"], "task.record")
+        self.assertEqual(payload["state"]["schema"], "task.state")
+        self.assertEqual(payload["result"]["schema"], "task.result")
+
+    def test_list_model_keeps_nonzero_state_summary_without_page_defaults(self) -> None:
+        model = self.run_default_cli(
+            TASKCTL, "list", "--task-dir", str(self.root), "--limit", "10"
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("counts:{todo:2}", model.stdout)
+        self.assertIn("items:", model.stdout)
+        self.assertNotIn("matched_count", model.stdout)
+        self.assertNotIn("truncated:false", model.stdout)
+        self.assertNotIn("diagnostic_count:0", model.stdout)
+        self.assertNotIn("done:0", model.stdout)
+
+    def test_empty_relation_and_next_queries_keep_semantic_zero(self) -> None:
+        dependencies = self.run_default_cli(
+            TASKCTL,
+            "deps",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T001",
+        )
+        self.assertEqual(dependencies.returncode, 0, dependencies.stderr)
+        self.assertEqual(
+            dependencies.stdout.strip().splitlines(),
+            ["id:T001", "dependency_count:0"],
+        )
+
+        module = load_taskctl_module()
+        projected = module.task_model_projection(
+            {
+                "ok": True,
+                "command": "next",
+                "items": [],
+                "candidate_count": 0,
+                "recommended_count": 0,
+                "next_after_id": None,
+                "truncated": False,
+                "diagnostics": [],
+                "diagnostic_count": 0,
+            }
+        )
+        self.assertEqual(module.render_model(projected), "candidate_count:0")
+
+    def test_impact_entry_supports_its_declared_query_contract(self) -> None:
+        model = self.run_default_cli(
+            TASKCTL,
+            "impact",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T001",
+            "--limit",
+            "10",
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("id:T001", model.stdout)
+        self.assertIn("id:T002", model.stdout)
+        self.assertNotIn("dependent_count", model.stdout)
+        self.assertNotIn("truncated:false", model.stdout)
+
+        continued = self.run_default_cli(
+            TASKCTL,
+            "impact",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T001",
+            "--after-id",
+            "T002",
+        )
+        self.assertEqual(continued.returncode, 0, continued.stderr)
+        self.assertEqual(
+            continued.stdout.strip().splitlines(),
+            ["id:T001", "dependent_count:1"],
+        )
 
     def test_context_model_budget_preserves_core_and_provenance(self) -> None:
         model = self.run_default_cli(
@@ -726,6 +997,9 @@ class TaskctlTests(unittest.TestCase):
         completed = self.complete_t001()
         result_path = self.root / completed["result_ref"]
         result = json.loads(result_path.read_text(encoding="utf-8"))
+        self.assertEqual(result["schema"], "task.result")
+        self.assertEqual(result["task_id"], "T001")
+        self.assertEqual(result["task_revision"], 1)
         self.assertEqual(result["evidence_for"], ["SOL-001"])
         self.assertEqual(result["evidence_refs"][0]["kind"], "test")
         self.assertNotIn("source_snapshot", result)
@@ -765,6 +1039,38 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(status["results"]["result_diagnostic_count"], 1)
         self.assertEqual(status["diagnostic_count"], 1)
 
+    def test_legacy_result_envelope_is_normalized_by_the_only_write_entry(self) -> None:
+        context = self.run_task(
+            "context", "--id", "T001", "--budget", "12000", "--capture"
+        )
+        result_file = Path(self.temp.name) / "legacy-result-envelope.json"
+        result_file.write_text(
+            json.dumps(self.legacy_result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        completed = self.run_task(
+            "complete",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--source-snapshot-ref",
+            context["source_snapshot_ref"],
+        )
+        self.assertIn(
+            "legacy_result_envelope_normalized",
+            {item["kind"] for item in completed["diagnostics"]},
+        )
+        stored = json.loads(
+            (self.root / completed["result_ref"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(stored["schema"], "task.result")
+        self.assertEqual(stored["task_id"], "T001")
+        self.assertEqual(stored["task_revision"], 1)
+        self.assertNotIn("source_snapshot", stored)
+
     def test_completion_preserves_execution_snapshot_and_diagnoses_missing_snapshot(self) -> None:
         context = self.run_task(
             "context", "--id", "T001", "--budget", "12000", "--capture"
@@ -800,7 +1106,7 @@ class TaskctlTests(unittest.TestCase):
         self.add_task(self.task("T003", "记录无快照结果", ["REQ-001"]))
         missing_file = Path(self.temp.name) / "missing-snapshot-result.json"
         missing_file.write_text(
-            json.dumps(self.result_payload("T003"), ensure_ascii=False, indent=2),
+            json.dumps(self.result_payload(), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         missing = self.run_task(
@@ -822,7 +1128,7 @@ class TaskctlTests(unittest.TestCase):
 
         self.add_task(self.task("T004", "记录部分来源快照", ["REQ-001"]))
         partial_context = self.run_task("context", "--id", "T004", "--budget", "12000")
-        partial_result = self.result_payload("T004")
+        partial_result = self.legacy_result_payload("T004")
         partial_result["source_snapshot"] = {
             "REQ-001": partial_context["source_snapshot"]["REQ-001"]
         }
@@ -857,7 +1163,7 @@ class TaskctlTests(unittest.TestCase):
             },
         )
 
-    def test_missing_snapshot_asset_is_diagnosed_without_losing_result(self) -> None:
+    def test_complete_rejects_missing_snapshot_asset_without_mutation(self) -> None:
         context = self.run_task(
             "context", "--id", "T001", "--budget", "12000", "--capture"
         )
@@ -873,23 +1179,22 @@ class TaskctlTests(unittest.TestCase):
             json.dumps(self.result_payload(), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        completed = self.run_task(
-            "complete",
-            "--id",
-            "T001",
-            "--owner",
-            "agent-a",
-            "--result-file",
-            str(result_file),
-            "--source-snapshot-ref",
-            reference,
+        self.assert_completion_snapshot_gate(
+            result_file, reference, "result_source_snapshot_asset_missing"
         )
-        kinds = {item["kind"] for item in completed["diagnostics"]}
-        self.assertIn("result_source_snapshot_asset_missing", kinds)
+
+    def test_snapshot_asset_loss_after_completion_remains_a_diagnostic(self) -> None:
+        completed = self.complete_t001()
         stored = json.loads(
             (self.root / completed["result_ref"]).read_text(encoding="utf-8")
         )
-        self.assertEqual(stored["source_snapshot_ref"], reference)
+        reference = stored["source_snapshot_ref"]
+        snapshot_path = (
+            self.root
+            / "snapshots"
+            / f"{reference.removeprefix('sha256:')}.json"
+        )
+        snapshot_path.unlink()
         shown = self.run_task("show", "--id", "T001", "--budget", "12000")
         self.assertEqual(
             [
@@ -917,7 +1222,7 @@ class TaskctlTests(unittest.TestCase):
             },
         )
 
-    def test_modified_snapshot_asset_reports_identity_mismatch(self) -> None:
+    def test_complete_rejects_snapshot_asset_identity_mismatch(self) -> None:
         context = self.run_task(
             "context", "--id", "T001", "--budget", "12000", "--capture"
         )
@@ -937,23 +1242,13 @@ class TaskctlTests(unittest.TestCase):
             json.dumps(self.result_payload(), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        completed = self.run_task(
-            "complete",
-            "--id",
-            "T001",
-            "--owner",
-            "agent-a",
-            "--result-file",
-            str(result_file),
-            "--source-snapshot-ref",
+        self.assert_completion_snapshot_gate(
+            result_file,
             reference,
-        )
-        self.assertIn(
             "result_source_snapshot_asset_identity_mismatch",
-            {item["kind"] for item in completed["diagnostics"]},
         )
 
-    def test_unreadable_snapshot_asset_reports_invalid(self) -> None:
+    def test_complete_rejects_unreadable_snapshot_asset(self) -> None:
         context = self.run_task(
             "context", "--id", "T001", "--budget", "12000", "--capture"
         )
@@ -970,28 +1265,15 @@ class TaskctlTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-        completed = self.run_task(
-            "complete",
-            "--id",
-            "T001",
-            "--owner",
-            "agent-a",
-            "--result-file",
-            str(result_file),
-            "--source-snapshot-ref",
-            reference,
-        )
-
-        self.assertIn(
-            "result_source_snapshot_asset_invalid",
-            {item["kind"] for item in completed["diagnostics"]},
+        self.assert_completion_snapshot_gate(
+            result_file, reference, "result_source_snapshot_asset_invalid"
         )
 
     def test_complete_rejects_competing_snapshot_inputs(self) -> None:
         context = self.run_task(
             "context", "--id", "T001", "--budget", "12000", "--capture"
         )
-        result = self.result_payload()
+        result = self.legacy_result_payload()
         result["source_snapshot"] = context["source_snapshot"]
         result_file = Path(self.temp.name) / "conflicting-snapshot-result.json"
         result_file.write_text(
@@ -1009,6 +1291,8 @@ class TaskctlTests(unittest.TestCase):
             str(result_file),
             "--source-snapshot-ref",
             context["source_snapshot_ref"],
+            "--expected-task-revision",
+            "1",
             "--expected-state-revision",
             "1",
             "--task-dir",
@@ -1044,7 +1328,7 @@ class TaskctlTests(unittest.TestCase):
         requirement = next(
             section for section in index["sections"] if section["id"] == "REQ-001"
         )
-        result = self.result_payload("T003")
+        result = self.legacy_result_payload("T003")
         result["evidence_for"] = ["REQ-001"]
         result["source_snapshot"] = {"REQ-001": requirement["fingerprint"]}
         result_file = Path(self.temp.name) / "T003-direct-evidence.json"
@@ -1083,7 +1367,7 @@ class TaskctlTests(unittest.TestCase):
         context = self.run_task(
             "context", "--id", "T002", "--budget", "12000", "--capture"
         )
-        later_result = self.result_payload("T002")
+        later_result = self.result_payload()
         later_result["evidence_for"] = ["REQ-001"]
         later_file = Path(self.temp.name) / "T002-current-evidence.json"
         later_file.write_text(
@@ -1267,8 +1551,7 @@ class TaskctlTests(unittest.TestCase):
         task["mutation_scope"] = ["C:/external/**", "C:/external/**"]
         task["outputs"] = ["协调结果", "协调结果"]
         task["reasoning_hint"] = "extreme"
-        task["revision"] = 7
-        added = self.add_task(task)
+        added = self.add_task(self.legacy_task_payload(task, revision=7))
         kinds = {item["kind"] for item in added["diagnostics"]}
         self.assertTrue(
             {
@@ -1294,7 +1577,7 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(stored["revision"], 7)
 
     def test_parseable_non_standard_result_values_are_diagnostics(self) -> None:
-        result = self.result_payload()
+        result = self.legacy_result_payload()
         result["outcome"] = ""
         result["changed_files"] = ["C:/external/output.txt"]
         result["evidence_for"] = ["custom-goal"]
@@ -1495,6 +1778,106 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(task_payload["gate"]["id"], "TASK-REVISION")
         self.assertIn("--expected-task-revision", task_payload["gate"]["recovery"])
 
+    def test_complete_requires_and_compares_the_executed_task_revision(self) -> None:
+        result_file = Path(self.temp.name) / "semantic-completion-result.json"
+        result_file.write_text(
+            json.dumps(self.result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        state_path = self.root / "state" / "T001.json"
+        state_before = json.loads(state_path.read_text(encoding="utf-8"))
+        missing = self.run_cli(
+            TASKCTL,
+            "complete",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--expected-state-revision",
+            str(state_before["revision"]),
+        )
+        self.assertEqual(missing.returncode, 2)
+        missing_payload = json.loads(missing.stderr)
+        self.assertEqual(missing_payload["gate"]["id"], "TASK-REVISION")
+        self.assertIn("--expected-task-revision", missing_payload["gate"]["recovery"])
+        self.assertEqual(
+            json.loads(state_path.read_text(encoding="utf-8")), state_before
+        )
+        self.assertEqual(list((self.root / "results").glob("*.json")), [])
+
+        candidate = json.loads(
+            (self.root / "tasks" / "T001.json").read_text(encoding="utf-8")
+        )
+        candidate["title"] = "执行后发生合同修订"
+        candidate_file = Path(self.temp.name) / "T001-after-execution.json"
+        candidate_file.write_text(
+            json.dumps(candidate, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        self.run_task(
+            "update",
+            "--file",
+            str(candidate_file),
+            "--expected-task-revision",
+            "1",
+        )
+        conflict = self.run_cli(
+            TASKCTL,
+            "complete",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--expected-task-revision",
+            "1",
+            "--expected-state-revision",
+            str(state_before["revision"]),
+        )
+        self.assertEqual(conflict.returncode, 2)
+        conflict_payload = json.loads(conflict.stderr)
+        self.assertEqual(conflict_payload["gate"]["id"], "TASK-REVISION")
+        self.assertIn("different task contract revision", conflict_payload["gate"]["risk"])
+        self.assertEqual(
+            json.loads(state_path.read_text(encoding="utf-8")), state_before
+        )
+        self.assertEqual(list((self.root / "results").glob("*.json")), [])
+
+    def test_semantic_completion_input_rejects_machine_owned_fields(self) -> None:
+        result = self.result_payload()
+        result["task_id"] = "T001"
+        result_file = Path(self.temp.name) / "mixed-completion-result.json"
+        result_file.write_text(
+            json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        failed = self.run_cli(
+            TASKCTL,
+            "complete",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--expected-task-revision",
+            "1",
+            "--expected-state-revision",
+            "1",
+        )
+        self.assertEqual(failed.returncode, 2)
+        payload = json.loads(failed.stderr)
+        self.assertEqual(payload["gate"]["id"], "TASK-INPUT-UNREADABLE")
+        self.assertIn("task_id", payload["error"])
+        self.assertEqual(list((self.root / "results").glob("*.json")), [])
+
     def test_parallel_scope_overlap_is_a_warning(self) -> None:
         self.add_task(
             self.task(
@@ -1531,13 +1914,12 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(rendered["results"]["referenced_result_count"], 0)
         self.assertIn("| review | 1 |", table)
         self.assertIn("需复核任务：1", table)
-        self.assertIn("当前状态引用结果：0", table)
-        self.assertIn("含验证结果：0", table)
-        self.assertIn("含未决结果：0", table)
-        self.assertIn("含结果诊断：0", table)
-        self.assertIn("任务合同 revision 陈旧结果：0", table)
-        self.assertIn("含来源快照问题结果：0", table)
-        self.assertIn("结果诊断条目：0", table)
+        self.assertIn("当前没有结果引用", table)
+        self.assertNotIn("当前状态引用结果：0", table)
+        self.assertNotIn("含验证结果：0", table)
+        self.assertNotIn("| todo | 0 |", table)
+        self.assertNotIn("可修订上游未决：0", table)
+        self.assertNotIn("延后讨论项：0", table)
         self.assertIn("只是任务合同与状态的可重建视图", table)
 
     def test_render_uses_visible_placeholders_for_empty_task_cells(self) -> None:
@@ -1635,6 +2017,23 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(drafted["id"], "T010")
         self.assertNotIn("task", drafted)
 
+        model = self.run_default_cli(
+            TASKCTL,
+            "draft",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T011",
+            "--title",
+            "生成模型候选任务",
+            "--outcome",
+            "形成模型可修改语义",
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("id:T011", model.stdout)
+        self.assertNotIn("schema:", model.stdout)
+        self.assertNotIn("revision:", model.stdout)
+
     def test_add_and_update_return_advisory_contract_diagnostics(self) -> None:
         candidate = self.task("T010", "带诊断的候选任务", ["SOL-999"])
         candidate["outputs"] = []
@@ -1645,6 +2044,11 @@ class TaskctlTests(unittest.TestCase):
         self.assertIn("outputs_empty", added_kinds)
         self.assertIn("verification_empty", added_kinds)
         self.assertIn("advisory", added["note"])
+        stored = json.loads(
+            (self.root / "tasks" / "T010.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(stored["schema"], "task.record")
+        self.assertEqual(stored["revision"], 1)
         context = self.run_task("context", "--id", "T010", "--budget", "12000")
         self.assertFalse(context["source_snapshot_complete"])
         self.assertEqual(context["source_snapshot"], {})
@@ -1665,6 +2069,69 @@ class TaskctlTests(unittest.TestCase):
         self.assertIn("unknown_source_id", updated_kinds)
         self.assertIn("outputs_empty", updated_kinds)
         self.assertIn("verification_empty", updated_kinds)
+        stored = json.loads(
+            (self.root / "tasks" / "T010.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(stored["schema"], "task.record")
+        self.assertEqual(stored["revision"], 2)
+
+    def test_legacy_task_envelope_is_normalized_by_add_and_update(self) -> None:
+        task = self.task("T010", "兼容上一版任务输入", ["SOL-001"])
+        candidate = Path(self.temp.name) / "T010-legacy-add.json"
+        candidate.write_text(
+            json.dumps(
+                self.legacy_task_payload(task), ensure_ascii=False, indent=2
+            ),
+            encoding="utf-8",
+        )
+        added = self.run_task("add", "--file", str(candidate))
+        self.assertIn(
+            "legacy_task_envelope_normalized",
+            {item["kind"] for item in added["diagnostics"]},
+        )
+        stored_path = self.root / "tasks" / "T010.json"
+        stored = json.loads(stored_path.read_text(encoding="utf-8"))
+        stored["title"] = "兼容上一版任务更新"
+        update_file = Path(self.temp.name) / "T010-legacy-update.json"
+        update_file.write_text(
+            json.dumps(stored, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        updated = self.run_task(
+            "update",
+            "--file",
+            str(update_file),
+            "--expected-task-revision",
+            "1",
+        )
+        self.assertIn(
+            "legacy_task_envelope_normalized",
+            {item["kind"] for item in updated["diagnostics"]},
+        )
+        self.assertEqual(
+            json.loads(stored_path.read_text(encoding="utf-8"))["revision"], 2
+        )
+
+    def test_semantic_task_input_rejects_partial_machine_fields(self) -> None:
+        task = self.task("T010", "混合任务输入", ["SOL-001"])
+        task["revision"] = 1
+        candidate = Path(self.temp.name) / "T010-mixed-task.json"
+        candidate.write_text(
+            json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        failed = self.run_cli(
+            TASKCTL,
+            "add",
+            "--task-dir",
+            str(self.root),
+            "--file",
+            str(candidate),
+        )
+        self.assertEqual(failed.returncode, 2)
+        payload = json.loads(failed.stderr)
+        self.assertEqual(payload["gate"]["id"], "TASK-INPUT-UNREADABLE")
+        self.assertIn("revision", payload["error"])
+        self.assertFalse((self.root / "tasks" / "T010.json").exists())
+        self.assertFalse((self.root / "state" / "T010.json").exists())
 
     def test_add_isolates_unrelated_state_storage_damage(self) -> None:
         orphan = {
@@ -2125,7 +2592,8 @@ class TaskctlTests(unittest.TestCase):
         )
         orphan = self.root / "results" / f"T001.r{started['state']['revision'] + 1}.json"
         orphan.write_text(
-            json.dumps(self.result_payload(), ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(self.legacy_result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
         )
         result_file = Path(self.temp.name) / "retry-result.json"
         result_file.write_text(
@@ -2202,7 +2670,10 @@ class TaskctlTests(unittest.TestCase):
         task = self.task("T020", "恢复部分写入", ["SOL-001"])
         task_path = self.root / "tasks" / "T020.json"
         task_path.write_text(
-            json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(
+                self.legacy_task_payload(task), ensure_ascii=False, indent=2
+            ),
+            encoding="utf-8",
         )
         candidate = Path(self.temp.name) / "T020.json"
         candidate.write_text(
@@ -2481,7 +2952,8 @@ class TaskctlTests(unittest.TestCase):
         for revision in range(2, 203):
             path = self.root / "results" / f"T001.r{revision}.json"
             path.write_text(
-                json.dumps(self.result_payload(), ensure_ascii=False), encoding="utf-8"
+                json.dumps(self.legacy_result_payload(), ensure_ascii=False),
+                encoding="utf-8",
             )
         shown = self.run_task("show", "--id", "T001", "--budget", "5000")
         self.assertIsNone(shown["result"])
@@ -2489,7 +2961,8 @@ class TaskctlTests(unittest.TestCase):
     def test_far_ahead_result_history_is_isolated_as_a_diagnostic(self) -> None:
         invalid = self.root / "results" / "T001.r999.json"
         invalid.write_text(
-            json.dumps(self.result_payload(), ensure_ascii=False), encoding="utf-8"
+            json.dumps(self.legacy_result_payload(), ensure_ascii=False),
+            encoding="utf-8",
         )
         shown = self.run_task("show", "--id", "T001")
         self.assertIsNone(shown["result"])
@@ -2504,7 +2977,8 @@ class TaskctlTests(unittest.TestCase):
     def test_invalid_result_history_name_is_isolated_as_a_diagnostic(self) -> None:
         invalid = self.root / "results" / "T001.rbad.json"
         invalid.write_text(
-            json.dumps(self.result_payload(), ensure_ascii=False), encoding="utf-8"
+            json.dumps(self.legacy_result_payload(), ensure_ascii=False),
+            encoding="utf-8",
         )
         shown = self.run_task("show", "--id", "T001")
         self.assertIsNone(shown["result"])

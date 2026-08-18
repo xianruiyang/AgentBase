@@ -30,7 +30,9 @@ render    生成 WORK_STATUS.md 只读视图
 
 这些命令都是可选辅助；文件量小或 CLI 不可用时可直接读写阶段 Markdown 真源。`outline` 从当前 `workflow.json` 返回阶段实际登记的文档路径，不用内置模板文件名替代项目正式位置。索引及查询结果中每个条目的 `document` 同样保留该完整工作区相对路径，不退化为文件名；不同目录中的同名文档仍可唯一定位。默认输出为有界 model 视图，程序解析时显式使用 machine 视图。`context` 的 model 视图按语义 section 选择当前 ID、直接关系和必要正文，预算不足时保留目标身份、位置和精确恢复；machine 视图继续使用既有 `--budget` 字符预算，仍需更多内容时按返回 ID 精确读取。
 
-`render` 只重建 `WORK_STATUS.md`；模型不得直接编辑该视图来改变阶段或任务状态。语义修改进入对应 Markdown 条目，结构化 manifest、快照和缓存只通过本合同定义的入口维护。
+`protect` 的 model 回执只保留当前保护 status、cycle、确认来源、保护 ID 数和当前目标数，详细诊断只返回一次；完整快照结构与历史只在永久资产或 machine 视图中出现。`status` 的 baseline 异常使用 canonical `status` 字段并在顶层诊断中给出细节；`coverage` 没有独立诊断列表，因此在 baseline 节点保留同一细节。`render` 的 model 回执复用 status 的稀疏 semantic/task 摘要并附加输出路径，正常 `tasks.status=available` 省略，非正常状态保留。`impact` 只在 affected 列表被 `--max-items` 截断时额外返回总数和截断标志。
+
+`render` 只重建 `WORK_STATUS.md`；摘要只展开实际非零状态、进展和问题，没有任务、结果或未决 ID 时用一句明确结论区分已读取的空集合与未知，partial/unavailable 仍显式保留。模型不得直接编辑该视图来改变阶段或任务状态。语义修改进入对应 Markdown 条目，结构化 manifest、快照和缓存只通过本合同定义的入口维护。
 
 `workflow.json` 中 `protected-baseline.json`、`.work-cache/index.json`、`WORK_STATUS.md` 和 `task-table.json` 的管理路径固定；阶段文档路径可按项目正式位置配置。固定管理路径只防止缓存或视图覆盖语义真源、任务合同或结果。
 

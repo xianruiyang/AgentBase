@@ -7,10 +7,10 @@ import path from "node:path";
 import test from "node:test";
 
 import {
-  extractConfiguredEffortFromSnapshotTail,
+  createSnapshotFieldScanner,
   parseArgs,
-  parseSnapshotEnvelope,
   readReasoningEffort,
+  renderModelResult,
   updateReasoningEffort,
 } from "../scripts/reasoning-governor.mjs";
 
@@ -99,6 +99,15 @@ function sendSnapshot(socket, conversationId, effort) {
   );
 }
 
+function scanSnapshotInChunks(message, chunkSize = 7) {
+  const payload = Buffer.from(JSON.stringify(message), "utf8");
+  const scanner = createSnapshotFieldScanner();
+  for (let offset = 0; offset < payload.length; offset += chunkSize) {
+    scanner.append(payload.subarray(offset, Math.min(payload.length, offset + chunkSize)));
+  }
+  return scanner.finish(payload.length);
+}
+
 test("parses status, explicit set, and the legacy set form", () => {
   assert.deepEqual(parseArgs(["status", "--thread-id", "thread-123"]), {
     action: "status",
@@ -107,6 +116,7 @@ test("parses status, explicit set, and the legacy set form", () => {
     hostId: null,
     pipePath: null,
     timeoutMs: 20_000,
+    view: "model",
     debug: false,
     help: false,
   });
@@ -114,6 +124,8 @@ test("parses status, explicit set, and the legacy set form", () => {
   assert.equal(parseArgs(["set", "--effort", "max"]).effort, "max");
   assert.equal(parseArgs(["high"]).action, "set");
   assert.equal(parseArgs(["high"]).effort, "high");
+  assert.equal(parseArgs(["status", "--view", "machine"]).view, "machine");
+  assert.equal(parseArgs(["status", "--machine"]).view, "machine");
 });
 
 test("rejects an effort value for status", () => {
@@ -199,51 +211,148 @@ test("sets and reads back next-turn effort without sending a turn", async () => 
   assert.equal(result.sentTurn, false);
 });
 
-test("extracts the direct effort from latestThreadSettings", () => {
-  const tail = JSON.stringify({
-    turns: [
-      {
-        text: 'example: "latestThreadSettings":{"effort":"low"}',
-      },
-    ],
-    latestThreadSettings: {
-      model: "gpt-test",
-      effort: "xhigh",
-      collaborationMode: {
-        settings: { reasoning_effort: "xhigh" },
+test("stream scanner follows the structural settings path across chunk boundaries", () => {
+  const result = scanSnapshotInChunks(
+    {
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      params: {
+        conversationId: "thread-structural",
+        hostId: "local",
+        change: {
+          type: "snapshot",
+          conversationState: {
+            turns: [
+              {
+                text: 'example: "latestThreadSettings":{"effort":"low"}',
+              },
+            ],
+            latestThreadSettings: {
+              model: "gpt-test",
+              effort: "xhigh",
+              collaborationMode: {
+                settings: { reasoning_effort: "low" },
+              },
+            },
+          },
+        },
       },
     },
-  });
+    1,
+  );
 
-  assert.deepEqual(extractConfiguredEffortFromSnapshotTail(tail), {
-    found: true,
-    effort: "xhigh",
-  });
+  assert.equal(result.conversationId, "thread-structural");
+  assert.equal(result.hostId, "local");
+  assert.equal(result.found, true);
+  assert.equal(result.effort, "xhigh");
+  assert.ok(result.bodyLength > 0);
 });
 
 test("distinguishes a null setting from an unreadable snapshot", () => {
-  assert.deepEqual(
-    extractConfiguredEffortFromSnapshotTail('{"latestThreadSettings":null}'),
-    { found: true, effort: null },
-  );
-  assert.deepEqual(extractConfiguredEffortFromSnapshotTail('{"latestModel":"gpt-test"}'), {
-    found: false,
-    effort: null,
-  });
+  const base = {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    params: {
+      conversationId: "thread-null",
+      hostId: "local",
+      change: { type: "snapshot", conversationState: {} },
+    },
+  };
+  base.params.change.conversationState.latestThreadSettings = null;
+  const nullResult = scanSnapshotInChunks(base);
+  assert.equal(nullResult.conversationId, "thread-null");
+  assert.equal(nullResult.hostId, "local");
+  assert.equal(nullResult.found, true);
+  assert.equal(nullResult.effort, null);
+
+  delete base.params.change.conversationState.latestThreadSettings;
+  const missingResult = scanSnapshotInChunks(base);
+  assert.equal(missingResult.conversationId, "thread-null");
+  assert.equal(missingResult.hostId, "local");
+  assert.equal(missingResult.found, false);
+  assert.equal(missingResult.effort, null);
 });
 
-test("parses snapshot envelope metadata without parsing conversation history", () => {
-  const prefix =
-    '{"type":"broadcast","method":"thread-stream-state-changed","params":' +
-    '{"conversationId":"thread-123","hostId":"local","change":{"type":"snapshot"';
-  const tail =
-    '{"latestThreadSettings":{"model":"gpt-test","effort":"high"},"latestModel":"gpt-test"}}}';
+test("reads settings from the middle of a frame larger than the normal parse limit", async () => {
+  const before = "a".repeat(5 * 1024 * 1024);
+  const after = `${'example: "latestThreadSettings":{"effort":"low"}'}${"b".repeat(
+    5 * 1024 * 1024,
+  )}`;
+  const result = await withFakeIpc(
+    (message, socket) => {
+      if (respondToInitialize(message, socket)) {
+        return;
+      }
+      if (
+        message.type === "broadcast" &&
+        message.method === "thread-stream-following-changed" &&
+        message.params?.following === true
+      ) {
+        socket.write(
+          encodeFrame({
+            type: "broadcast",
+            method: "thread-stream-state-changed",
+            params: {
+              conversationId: message.params.conversationId,
+              hostId: "local",
+              change: {
+                type: "snapshot",
+                conversationState: {
+                  before,
+                  latestThreadSettings: { model: "gpt-test", effort: "high" },
+                  after,
+                },
+              },
+            },
+          }),
+        );
+      }
+    },
+    (pipePath) =>
+      readReasoningEffort({
+        pipePath,
+        threadId: "thread-large-middle",
+        hostId: "local",
+        timeoutMs: 5_000,
+        debug: false,
+      }),
+  );
 
-  assert.deepEqual(parseSnapshotEnvelope(prefix, tail, 84_000_000), {
-    conversationId: "thread-123",
-    hostId: "local",
-    bodyLength: 84_000_000,
-    found: true,
-    effort: "high",
-  });
+  assert.equal(result.ok, true);
+  assert.equal(result.currentConfiguredEffort, "high");
+  assert.ok(result.readbackSnapshotBytes > 8 * 1024 * 1024);
+});
+
+test("renders only minimal model evidence while canonical receipts stay complete", () => {
+  assert.equal(
+    renderModelResult({
+      ok: true,
+      operation: "status",
+      currentConfiguredEffort: "max",
+      readbackVerified: true,
+      pipePath: "ignored",
+    }),
+    "{ok:true op:status effort:max}",
+  );
+  assert.equal(
+    renderModelResult({
+      ok: false,
+      operation: "set",
+      updateAccepted: true,
+      readbackVerified: true,
+      matchesRequestedEffort: false,
+      requestedEffort: "max",
+      currentConfiguredEffort: "high",
+    }),
+    "{ok:false op:set reason:readback_mismatch requested:max effort:high}",
+  );
+  assert.equal(
+    renderModelResult({
+      ok: false,
+      operation: "status",
+      readbackVerified: false,
+      readbackError: "timed out",
+    }),
+    '{ok:false op:status reason:readback_unavailable detail:"timed out"}',
+  );
 });

@@ -34,16 +34,32 @@ function Assert-True {
 
 function Invoke-InstallerJson {
     param([string[]] $Arguments)
-    $text = & $powershellExe -NoProfile -ExecutionPolicy Bypass -File $installer @Arguments
+    $machineArguments = @($Arguments) + @("-View", "Machine")
+    $text = & $powershellExe -NoProfile -ExecutionPolicy Bypass -File $installer @machineArguments
     if ($LASTEXITCODE -ne 0) { throw "installer failed: $text" }
     ($text -join "`n") | ConvertFrom-Json
 }
 
 function Invoke-InstallerJsonFailure {
     param([string[]] $Arguments)
-    $text = & $powershellExe -NoProfile -ExecutionPolicy Bypass -File $installer @Arguments
+    $machineArguments = @($Arguments) + @("-View", "Machine")
+    $text = & $powershellExe -NoProfile -ExecutionPolicy Bypass -File $installer @machineArguments
     if ($LASTEXITCODE -eq 0) { throw "installer unexpectedly succeeded: $text" }
     ($text -join "`n") | ConvertFrom-Json
+}
+
+function Invoke-InstallerModel {
+    param([string[]] $Arguments)
+    $text = @(& $powershellExe -NoProfile -ExecutionPolicy Bypass -File $installer @Arguments)
+    if ($LASTEXITCODE -ne 0) { throw "installer failed: $text" }
+    ($text -join "`n").Trim()
+}
+
+function Invoke-InstallerModelFailure {
+    param([string[]] $Arguments)
+    $text = @(& $powershellExe -NoProfile -ExecutionPolicy Bypass -File $installer @Arguments)
+    if ($LASTEXITCODE -eq 0) { throw "installer unexpectedly succeeded: $text" }
+    ($text -join "`n").Trim()
 }
 
 try {
@@ -68,15 +84,23 @@ try {
     $second = Invoke-InstallerJson -Arguments (@("Install", "-Archive", $ArchiveV1) + $common)
     Assert-True ($second.changed -eq $false) "repeat install was not idempotent"
     Assert-True ([IO.File]::ReadAllText($pathFile) -eq $pathAfterFirst) "repeat install changed PATH"
+    $installModel = Invoke-InstallerModel -Arguments (@("Install", "-Archive", $ArchiveV1) + $common)
+    Assert-True ($installModel -eq "{ok:true op:install changed:false version:$ExpectedVersionV1}") "default install output is not the compact model receipt"
 
     $status = Invoke-InstallerJson -Arguments (@("Status") + $common)
     Assert-True ($status.installed -eq $true -and $status.ready -eq $true -and $status.integrity -eq 'verified' -and $status.version -eq $ExpectedVersionV1) "status did not verify the installed version and integrity"
     Assert-True ($status.pathReady -eq $true -and $status.pathEntryCount -eq 1) "status did not verify the unique managed PATH entry"
+    $statusModel = Invoke-InstallerModel -Arguments (@("Status") + $common)
+    Assert-True ($statusModel.StartsWith("{ready:true version:$ExpectedVersionV1 binary:")) "default status output omitted the compact readiness receipt"
+    Assert-True (-not $statusModel.Contains("schema") -and -not $statusModel.Contains("installRoot") -and -not $statusModel.Contains("pathReady")) "default status output exposed machine-only fields"
 
     $originalBinary = [IO.File]::ReadAllBytes($binary)
     [IO.File]::WriteAllBytes($binary, [byte[]]@($originalBinary + 0))
     $tamperedBinaryStatus = Invoke-InstallerJsonFailure -Arguments (@("Status") + $common)
     Assert-True ($tamperedBinaryStatus.ready -eq $false -and $tamperedBinaryStatus.integrity -eq 'invalid') "status accepted a tampered installed binary"
+    $tamperedStatusModel = Invoke-InstallerModelFailure -Arguments (@("Status") + $common)
+    Assert-True ($tamperedStatusModel.StartsWith("{ready:false reason:integrity_invalid detail:")) "default failed status output omitted the actionable diagnosis"
+    Assert-True (-not $tamperedStatusModel.Contains("schema") -and -not $tamperedStatusModel.Contains("installRoot")) "default failed status output exposed machine-only fields"
     $binaryRepair = Invoke-InstallerJson -Arguments (@("Install", "-Archive", $ArchiveV1) + $common)
     Assert-True ($binaryRepair.changed -eq $true) "reinstall did not repair a tampered installed binary"
 
@@ -145,6 +169,8 @@ try {
 
     $upgrade = Invoke-InstallerJson -Arguments (@("Upgrade", "-Archive", $ArchiveV2) + $common)
     Assert-True ($upgrade.version -eq $ExpectedVersionV2) "upgrade did not install $ExpectedVersionV2"
+    $upgradeModel = Invoke-InstallerModel -Arguments (@("Upgrade", "-Archive", $ArchiveV2) + $common)
+    Assert-True ($upgradeModel -eq "{ok:true op:upgrade changed:false version:$ExpectedVersionV2}") "default upgrade output is not the compact model receipt"
     $version = & $binary --version
     Assert-True ($version -eq "srcq $ExpectedVersionV2") "upgraded binary version mismatch"
     Assert-True ((Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash -eq $configHash) "upgrade changed user config"
@@ -169,6 +195,9 @@ try {
     Assert-True ($pathAfterUninstall.Contains("C:\after-install")) "uninstall lost a concurrent PATH edit"
     Assert-True ((Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash -eq $configHash) "uninstall changed user config"
     Assert-True ((Get-FileHash -LiteralPath $cache -Algorithm SHA256).Hash -eq $cacheHash) "default uninstall changed cache"
+
+    $uninstallModel = Invoke-InstallerModel -Arguments (@("Uninstall") + $common)
+    Assert-True ($uninstallModel -eq "{ok:true op:uninstall removed:false reason:not-installed}") "default uninstall output is not the compact model receipt"
 
     Remove-Item -LiteralPath (Join-Path $entry "user-owned.txt") -Force
     if (-not (Get-ChildItem -LiteralPath $entry -Force | Select-Object -First 1)) { Remove-Item -LiteralPath $entry -Force }

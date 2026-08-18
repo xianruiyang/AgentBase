@@ -18,8 +18,8 @@ python <SkillDir>/scripts/taskctl.py <command> --task-dir <AbsoluteTaskDir>
 
 ```text
 init        建立固定 tasks/state/results/snapshots 目录和 task-table.json
-draft       输出最小候选任务，不写文件；准备直接保存 JSON 时使用 machine 视图
-add/update  保存模型已编写的任务合同
+draft       输出最小候选任务，不写文件；model 省略 schema/revision，machine 返回完整 canonical
+add/update  从含稳定 ID 的模型语义正文生成完整永久任务合同
 show/list   有界返回任务、状态、结果和局部诊断
 deps/dependents/impact  查询任务图；后继查询返回首条路径与该边消费内容
 next/context  生成选择建议；context --capture 产生最终模型可见来源的持久收据
@@ -27,15 +27,19 @@ completion-context  从当前 Markdown 分页返回 REQ/AC/UDES、CON、全部 D
 status/render  生成可重建的执行摘要和 TASK_TABLE.md
 ```
 
-查询默认使用有界 model 视图；程序解析时显式使用 machine 视图。当任务很少或 CLI 不可用时仍按正式合同继续；CLI 可用时，永久任务、状态和结果 JSON 通过带 revision 的写命令维护，不直接编辑生成视图或绕过存储职责。CLI 不是开始、推进、完成或重开任务的许可者。
+查询默认使用有界 model 视图；程序解析时显式使用 machine 视图。`draft` 的 model 视图保留稳定任务 ID 与非空语义字段，可作为模型 authoring 指引；显式 machine draft 保持完整 `task.record`，供程序和永久格式检查，不要求模型把其 schema/revision 复制回输入。当任务很少或 CLI 不可用时仍按正式合同继续；CLI 可用时，永久任务、状态和结果 JSON 通过带 revision 的写命令维护，不直接编辑生成视图或绕过存储职责。CLI 不是开始、推进、完成或重开任务的许可者。
+
+`show` 的 model 视图以顶层 ID 标识对象，task/state/result 不重复 schema 或 task ID；task/state revision、结果 task revision、结果引用、语义正文、诊断与来源收据摘要仍保留。`list/deps/dependents/impact/next` 的完整非空页不重复列表长度、`truncated:false` 或零诊断计数；截断时返回总数和精确 `after_id`，`impact` 与 dependents 一样接受该续页参数。空页仍明确返回 matched/dependency/dependent/candidate 数，因为“没有候选或关系”是查询结论而不是默认成功值。
 
 `status` 和 `render` 的结果摘要使用明确作用域：`referenced_result_count` 表示当前状态文件实际引用的结果数，`task_revision_stale_result_count` 只表示结果记录的任务 revision 与当前合同不一致，`source_snapshot_issue_result_count` 表示至少含一项收据缺失、资产异常、覆盖不完整或逐来源陈旧诊断的结果数；同时返回含诊断结果数、结果诊断条目数和按 kind 计数。上述字段互不替代，也不表示目标证据充分或整体完成。
 
 `status` 的 model 视图只显示非零状态、异常、结果进展和实际诊断；正常空诊断、完整 protected baseline 及所有零计数只保留在 machine 视图。`context` 的 model 视图保留当前任务合同、状态、直接依赖、必要上游正文、异常、恢复信息和 `{ref,count,complete}` 来源收据，不输出完整指纹映射；无 `--capture` 时只提示捕获入口。快照成员从最终 Token 预算投影实际保留的上游生成，预算移除正文时同步移除成员并标记不完整。machine 视图继续返回完整映射。`completion-context` 的 model 视图保留目标、约束、DCR、候选结果摘要、诊断、证据引用、快照 ID 和精确游标，但省略完整来源映射。
 
+写命令的 model 回执只确认后续动作需要的事实：`add/update` 返回目标和写后 revision；状态命令返回顶层任务 ID 与去掉 schema、重复 task ID 和空字段的写后语义状态；`complete` 另在顶层返回一次结果引用。空诊断、空警告、零计数和 `recovered_partial_write:false` 省略，恢复确实发生时保留 true，问题条目被输出上限截断时才额外返回总数。`render` 复用 `status` 的非零摘要并附加生成路径。完整写入回执仍由 `--view machine` 提供。
+
 `task-table.json` 的 `tasks/`、`state/`、`results/`、`snapshots/`、`.work-cache/index.json` 和 `TASK_TABLE.md` 路径固定，只为防止生成物覆盖语义真源、结果或不可变来源证据。
 
-`render` 生成的任务表固定保留全部列；没有可显示值的单元格使用 `—` 占位，避免长文本换行时产生列错位错觉。占位符只属于生成视图，不写回任务合同、状态或结果，也不表示模型已经裁决该字段语义为“无”。模型不得直接编辑 `TASK_TABLE.md` 改变任务；修改通过任务合同或状态命令进入唯一结构化真源，再重新生成视图。
+`render` 生成的摘要只列实际非零状态、进展和问题；没有任务或没有结果引用时用一句明确结论区分已读取的空集合与未知。存在结果时即使带验证数为零也保留该缺口。任务明细固定保留全部列；没有可显示值的单元格使用 `—` 占位，避免长文本换行时产生列错位错觉。占位符只属于生成视图，不写回任务合同、状态或结果，也不表示模型已经裁决该字段语义为“无”。模型不得直接编辑 `TASK_TABLE.md` 改变任务；修改通过任务合同或状态命令进入唯一结构化真源，再重新生成视图。
 
 ## 状态与结果命令
 
@@ -48,13 +52,15 @@ reopen      记录完成结论或合同已失效
 release     清除领取意图并回到 todo
 ```
 
-写命令返回新 revision。`add` 创建新记录，不需要预期 revision；`update` 必须传调用方刚读到的 `--expected-task-revision`，所有状态写命令必须传调用方刚读到的 `--expected-state-revision`。缺少预期 revision 或与当前值不匹配都用 `TASK-REVISION` 阻断，因为 CLI 无法证明不会覆盖并发写入。owner 不一致、已 done、从非典型状态 complete/reopen/release，以及阻塞原因与状态不一致都返回诊断，由模型根据文档和真实工作判断。
+写命令返回新 revision。`add/update --file` 的新模型输入包含任务 `id` 和语义字段，不包含 schema/revision；`add` 注入初始 revision，`update` 必须传调用方刚读到的 `--expected-task-revision` 并注入下一 revision。上一版完整 task envelope 仍由相同入口规范化并返回兼容诊断。所有状态写命令必须传调用方刚读到的 `--expected-state-revision`。缺少预期 revision 或与当前值不匹配都用 `TASK-REVISION` 阻断，因为 CLI 无法证明不会覆盖并发写入。owner 不一致、已 done、从非典型状态 complete/reopen/release，以及阻塞原因与状态不一致都返回诊断，由模型根据文档和真实工作判断。
+
+`complete` 除 state revision 外还必须传调用方执行时读取的 `--expected-task-revision`。两项 CAS 分别证明没有把结果绑定到更新后的任务合同、没有覆盖更新后的执行状态；任一缺少或冲突都在创建快照兼容资产、结果或新状态前阻断。
 
 `retired` 表示任务不再属于当前执行投影，应在 note 中记录原因及替代任务或上游决策 ID。这不删除历史。
 
 内置状态、依赖类型、来源 ID 格式、reasoning hint、项目相对 mutation scope 和去重列表是推荐合同。只要 JSON 结构仍可解释，空白、缺失或非标准的语义文本会以空值或原值保存并返回诊断，不借助 CLI 把文档语义强制改写成内置枚举。只有任务 ID、revision、`result_ref` 等 CLI 实际用于定位记录、并发比较或解引用存储的字段必须满足机械门禁。
 
-结果 JSON 在原有 `outcome/outputs/changed_files/verification/unresolved/invalidated_source_ids` 外可包含：
+模型通过 `--result-file` 提交的 JSON 只写 `outcome/outputs/changed_files/verification/unresolved/invalidated_source_ids/evidence_for/evidence_refs/metadata` 等语义字段；空列表可以省略。`schema/task_id/task_revision/source_snapshot/source_snapshot_ref` 由命令目标、CAS 和收据参数维护，不属于新模型输入。永久结果仍保持完整 `task.result` 机器合同，其中：
 
 - `evidence_for`：本结果声称支持的 `REQ/AC/UDES/DES/SOL` 等上游 ID。
 - `evidence_refs`：可直接查看的测试、日志、文件、页面或其他证据引用；至少包含 `ref`，可附 `kind` 和 `note`。
@@ -62,7 +68,7 @@ release     清除领取意图并回到 todo
 
 `context` 从任务 `source_ids` 沿当前语义引用读取传递祖先。`--capture` 在最终模型预算候选确定后保存实际返回正文对应的完整映射，并返回可传给 `complete` 的引用、成员数和完整性；若输出截断或来源无法唯一定位，模型先补齐输入并重新捕获，或明确限定结果边界。
 
-`complete --source-snapshot-ref <REF>` 保存模型语义结果并附加已有收据；它解引用实际捕获映射，再以当前索引比较资产缺失、无效、身份不一致、覆盖不足和逐来源陈旧，不在完成时生成当前指纹冒充实际输入。历史内联结果继续读取；旧式内联完成输入由该入口内容寻址外部化并返回兼容诊断，新永久结果不得同时持有引用和映射。上述语义问题只返回诊断，不阻断结果记录。
+`complete --expected-task-revision <REV> --source-snapshot-ref <REF>` 保存模型语义结果并附加已有收据；它先确认引用资产存在、结构可读且内容身份一致，再以当前索引比较覆盖不足和逐来源陈旧，不在完成时生成当前指纹冒充实际输入。前三项在新写入时属于无法兑现显式持久引用的机械失败，使用 `TASK-INPUT-UNREADABLE` 阻断且不改变结果或状态；未提供收据、覆盖不足和陈旧只诊断。历史结果后来出现同类资产异常仍只在读取时诊断。历史内联结果继续读取；上一版完整完成输入由该入口规范化，旧式内联快照内容寻址外部化并返回兼容诊断，新永久结果不得同时持有引用和映射。
 
 每个 `completion-context` 响应页只在顶层 `candidate_tasks` 中返回一次完整候选任务证据。该对象以任务 ID 为键，值保留状态、合同修订、结果引用与摘要、产出、验证、未决项、失效来源、证据关联与引用、执行来源快照和结果诊断；值内不重复任务 ID。每个 `targets[]` 用有序 `candidate_task_ids` 引用本目标当前候选页，并继续返回该目标的候选总数、返回数、结果数、带验证结果数、截断状态和精确游标。顶层目录必须恰好覆盖当前页目标实际引用的任务，不得重复完整对象、产生悬空 ID，或在预算移除目标后保留无人引用任务。
 
@@ -82,7 +88,7 @@ release     清除领取意图并回到 todo
 
 - `TASK-PATH` / `TASK-OVERWRITE`：路径越界、生成视图覆盖真源，或破坏性覆盖已有记录。
 - `TASK-LOCK` / `TASK-REVISION`：工作区并发写入，或已有记录写入缺少调用方已读 revision、期望 revision 已过期。
-- `TASK-LIMIT` / `TASK-INPUT-UNREADABLE`：当前命令无法有界读取，JSON/schema/必需字段的类型与身份使当前对象无法确定解释，最终复核续页游标无法标识当前快照中的续点，或续页时无法重建当前 Markdown 以核对快照身份；不得用它阻断仍可保留并诊断的非标准语义值。批量查询中单个损坏记录应被隔离并诊断，不阻断其他记录。
+- `TASK-LIMIT` / `TASK-INPUT-UNREADABLE`：当前命令无法有界读取，JSON/schema/必需字段的类型与身份使当前对象无法确定解释，显式 completion 收据无法解析为存在且身份一致的不可变资产，最终复核续页游标无法标识当前快照中的续点，或续页时无法重建当前 Markdown 以核对快照身份；不得用它阻断仍可保留并诊断的非标准语义值。批量查询和历史读取中的单个损坏记录应被隔离并诊断，不阻断其他记录。
 - `TASK-AMBIGUOUS-TARGET`：精确写入或查询需要唯一 ID，但当前匹配不唯一。
 - `TASK-SNAPSHOT-CONFLICT`：一次捕获或完成输入同时指定两个不同来源快照，工具无法证明实际使用版本；改用同一收据后重试。
 - `TASK-PAGINATION-SNAPSHOT`：`completion-context` 续页会混用两个任务/文档快照。

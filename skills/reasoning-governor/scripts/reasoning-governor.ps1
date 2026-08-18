@@ -9,6 +9,9 @@ param(
 
     [string] $HostId,
 
+    [ValidateSet("model", "machine")]
+    [string] $View = "model",
+
     [switch] $DebugLog
 )
 
@@ -69,6 +72,8 @@ if ($ThreadId) {
 if ($HostId) {
     $argsList += @("--host-id", $HostId)
 }
+
+$argsList += @("--view", $View.ToLowerInvariant())
 
 if ($DebugLog) {
     $argsList += "--debug"

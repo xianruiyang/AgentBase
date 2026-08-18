@@ -1,34 +1,49 @@
 # AgentBase 当前接手状态
 
-更新时间：2026-08-17
+状态截点：2026-08-18 09:34 发布完成后（Asia/Shanghai）
 
-## 当前已发布版本
+## 一句话状态
 
-- 仓库闭合提交 `94d32d1671b376e87cac0f598609e814ddea5ca3` 已于 2026-08-17 20:12 按用户针对该次操作的明确授权发布到 `C:\Users\gzxt\.codex`，模式为 `DirectCompatibility + 可移植设置`，实际写入 12 项。功能主体提交是 `fc1215b8d54939217fe82c7d830b8722713e6948`；本文件所在的后续提交只维护发布后状态，不改变已发布 payload。
-- 发布后只读 `Status` 返回 `managed_payload_formally_published=true`、`formal_publication_gap_count=0`。来源、安装与合同 bundle 均为 `8D66756E8D0E0E3028A52C6E2A2394E4FD5ECAE48C289C293670A5A36F5E127A`，发布清单同时匹配来源、安装、路由证据和生命周期；退役路径、退役配置键、直接兼容冲突均为 0，独立 `srcq` 0.3.1 完整性与 doctor 均通过。
-- 最新发布清单是 `C:\Users\gzxt\.codex\backups\AgentBase-20260817-201245-41645e36\manifest.json`。需要回滚时，从仓库根执行：
+当前 Codex 受管理 payload 候选已通过正式验证并发布到本机；项目级实施项均已闭环，但仓库工作区仍有未提交改动，发布内容不能等同于当前任一 Git 提交。下个对话应先恢复这一边界，再按用户的新目标决定是否审查、提交或继续开发。
 
-```powershell
-& '.\development\codex-deployment\manage_agentbase.ps1' -Action Rollback -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -BackupPath 'C:\Users\gzxt\.codex\backups\AgentBase-20260817-201245-41645e36'
-```
+## 仓库与发布状态
 
-发布只证明安装合同成立；当前 Codex 运行不会追溯加载新规则，行为验证应在新任务或重启后的运行中进行。
+- 当前分支为 `main`，读取时 `HEAD` 与 `origin/main` 均为 `5b9523e`（`test: refresh routing evidence`）。工作区包含本轮及此前连续改进的已跟踪修改和新增交付链；这些属于现有工作，不得清理、回退或用旧提交覆盖。
+- 2026-08-18 09:34 已在用户针对该次操作的明确同意下，通过唯一部署入口发布到 `C:\Users\gzxt\.codex`。模式为 `DirectCompatibility + InstallPortableSettings`，实际改变 3 项；没有混入插件迁移。
+- 发布前独立 `srcq` 状态为 `{ready:true version:0.3.1}`，`srcq doctor` 返回 `ok`；发布后使用同一模式读回 `published : true`。
+- 本次回滚资产是 `C:\Users\gzxt\.codex\backups\AgentBase-20260818-093442-e6af20a4`。需要回滚时必须使用该路径和[部署说明](../development/codex-deployment/README.md)中的正式 `Rollback` 入口。
+- 发布只证明受管理安装合同成立。发布当时的任务不会追溯加载新规则；新建任务或重启 Codex 后才使用本次安装内容。
+- 本交接和总计划是在发布后维护的仓库文档，不属于 Codex payload，也不使上述安装状态失效。
 
-## 本次交付
+## 当前候选已完成的能力
 
-- 该[交付链](work/20260817_persistent_context_surface/completion-audit.md)分别审计 `global/AGENTS.md`、11 个项目 skill description 和 handoff，并只采纳通过质量门后的完整输入收益。routing bundle 为 `CDE243F4E0C58F73D335EA5E2CE978D645AB5F612170B4EA42D80F997082693C`。
-- 相对上一已发布基线，常驻全局规则与 descriptions 减少 294 个 `o200k_base` tokens（5.0%），交付时 handoff 从 2,972 降为 1,247 tokens（58.0%）。
-- 本版本不改变跨任务 `source_snapshot` 的事实表示、引用池或时效语义，也不实施插件迁移。
+- 模型交互面已从“统一完整序列化”转为同一 canonical 结果的消费者视图：模型面按动作保留最小充分证据，machine 面保留完整稳定合同。Task/Work CLI 的 authoring、completion、查询、写入回执和生成式导航均已沿各自 owner 闭合；详细索引在[总计划](plan.md)第 4 节。
+- `source_snapshot` 已完成收据化交互面：最终模型预算投影决定捕获成员，模型传递最小收据，机器面持有内容寻址映射；进一步压缩或语义迁移仍是独立候选，不能据此视为开放任务。
+- 部署、Windows bootstrap 和 `srcq` 安装器的直接控制台输出已采用紧凑模型投影，完整程序合同保留在显式 machine 视图；旧版受管理资产由生命周期合同清理，不靠手工删除。
+- 执行控制已明确：架构或职责证据使原方案失效时先重裁再实现；是否建立计划由任务的跨步骤控制需要决定。
+- Skill 每个 new turn 重新路由；完整正文仍在有效上下文且来源未变时不重复读取，压缩后只恢复当前重新选中的 skill 及必要引用。
+- 推理档位控制已从 Goal 解耦：先独立判断目标档位，只有状态证据会改变动作时查询，只有错配且剩余工作能摊销切换成本时设置；用户固定档位始终优先，Goal 只承载本来需要的续轮。
 
-## 直接证据与后继入口
+## 直接证据与正式入口
 
-- 上一版本的模型交互面证据保留在[完成审计](work/20260817_model_interaction_surface_contract/completion-audit.md)，部署状态与生命周期合同由[部署说明](../development/codex-deployment/README.md)和 [`managed_asset_lifecycle.json`](../development/codex-deployment/managed_asset_lifecycle.json)持有；本文件不复制历史实现展开。
-- 本次交付的逐项 owner 与删改裁决在[读取面审计](work/20260817_persistent_context_surface/context-surface-audit.md)，capsule 身份、Routing/Policy/References、恢复清单、Token 与部署 `Validate` 在[验证记录](work/20260817_persistent_context_surface/verification.md)，跨目标和消费者闭合在[完成审计](work/20260817_persistent_context_surface/completion-audit.md)。
-- 当前没有开放的实现任务；出现审计中列出的重开条件时回到该交付链，而不是在 handoff 展开历史实现。
+- 项目方向、所有闭环子计划、owner、消费者和重开条件以[总计划](plan.md)为唯一索引；当前没有未闭环的项目级实施项。
+- 最新全局规则与 skill 候选通过静态合同：90 个场景，49 个严格路由场景、6 个严格引用场景，11/11 项目 skill 均有正向与非触发覆盖。
+- 最新 detached 评估为 Routing `90/90`、Policy `90/90`、References `21/21`；候选 bundle 为 `24CC35AECD613FAAED13E45A2B2FE69D724FFA9E53009E049CA8942FC12EBA18`。身份、输入声明和 capsule 哈希由 [`evidence/current.json`](../development/skill-routing/evidence/current.json)持有，不在本文件复制完整结果。
+- 推理生命周期的 Node 回归为 `8/8`，skill 结构校验、PowerShell 解析、路由静态合同和正式部署 `Validate` 均通过；详细证据在[推理生命周期验证](work/20260818_reasoning_effort_lifecycle/verification.md)与[执行控制验证](work/20260818_execution_control_lifecycle/verification.md)。
+- 真实安装状态不能由本文件推断；使用[部署说明](../development/codex-deployment/README.md)中的只读 `Status`，并保持 `DirectCompatibility + InstallPortableSettings` 范围一致。
 
 ## 未决边界
 
-- 当前没有阻断已发布版本的已知失败。Policy 单次结果的兼容附加标签限制已保留在验证记录；正式期望、禁选、严格 Routing 和 References 均通过，不能把该诊断外推为运行行为已经改变。
-- `source_snapshot` 压缩和插件迁移仍是独立候选，只有各自 owner 出现新的直接证据时单独重开，不混入当前版本。
-- 任何再次执行真实 `Publish` 都需要用户针对那一次操作重新明确同意；本次发布授权已经消费。Git 提交和远端同步按项目现有授权维护，但不能替代发布授权。
-- 项目不使用远程 CI；验证只走 Windows 主机上的正式本地入口，远端仅同步源码与历史。
+- 当前没有已知失败阻断已发布候选，也没有仅因计划存在而应继续实施的任务。新的直接失败、协议变化、真实消费者或可重复共享机制出现后，才按[总计划](plan.md)中的重开条件继续。
+- 插件迁移尚未进行。直接 skill 安装与 `agentbase-core` 插件不得同时启用；迁移必须作为独立工作验证安装、启停、hook 信任、卸载和回滚。
+- 仓库仍为 dirty worktree，尚未为当前发布候选形成职责清晰的提交，也未在本次交接中执行 Git 提交或远端同步。
+- 任何下一次真实 `Publish` 都必须重新取得用户针对那一次发布的明确同意；本次授权已经消费。Git 授权也不能替代发布授权。
+- 项目不使用远程 CI；正式验证在 Windows 本机执行，远端只承担源码与历史同步。
+
+## 下个对话的最小恢复步骤
+
+1. 先读取根 `README.md` 和本文件；只有需要选择、重开或替代子计划时再读取[总计划](plan.md)。
+2. 运行 `git status --short`，确认并保留现有 dirty worktree；不要把 `5b9523e` 误当作当前已发布候选的完整源码版本。
+3. 若任务依赖真实安装状态，按部署说明以 `DirectCompatibility + InstallPortableSettings` 运行只读 `Status`；不要从 handoff 或 Git 历史推断安装状态。
+4. 根据用户的新请求定位总计划中的现有 owner。只有命中重开条件才继续开发；若目标是整理 Git，则先审查实际差异并取得当前操作所需授权。
+5. 只读取所选专项的 `solution.md`、`verification.md` 或 `completion-audit.md` 中当前判断缺少的部分，不批量重读全部历史交付链。

@@ -11,7 +11,10 @@ param(
     [string] $PathBackend = "User",
 
     [string] $PathValueFile,
-    [switch] $RemoveCache
+    [switch] $RemoveCache,
+
+    [ValidateSet("Model", "Machine")]
+    [string] $View = "Model"
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,6 +33,84 @@ $ExpectedMembers = @(
 function Write-Utf8NoBom {
     param([string] $Path, [string] $Text)
     [IO.File]::WriteAllText($Path, $Text, [Text.UTF8Encoding]::new($false))
+}
+
+function ConvertTo-ModelLiteral {
+    param([object] $Value)
+
+    if ($null -eq $Value) {
+        return "null"
+    }
+    if ($Value -is [string] -and $Value -match '^[A-Za-z0-9._/@+-]+$') {
+        return [string]$Value
+    }
+    return ConvertTo-Json -InputObject $Value -Compress
+}
+
+function Format-InstallModelResult {
+    param(
+        [object] $Result,
+        [string] $Operation
+    )
+
+    $operationName = $Operation.ToLowerInvariant()
+    if ($Result.PSObject.Properties.Name -contains 'ok' -and -not [bool]$Result.ok) {
+        return "{ok:false op:$operationName error:$(ConvertTo-ModelLiteral $Result.error)}"
+    }
+
+    if ($Operation -eq "Status") {
+        if ([bool]$Result.ready) {
+            return "{ready:true version:$(ConvertTo-ModelLiteral $Result.version) binary:$(ConvertTo-ModelLiteral $Result.binary)}"
+        }
+        $reason = if ([bool]$Result.installed) { "integrity_invalid" } else { "not_installed" }
+        $fields = @("ready:false", "reason:$reason")
+        if (-not [string]::IsNullOrWhiteSpace([string]$Result.error)) {
+            $fields += "detail:$(ConvertTo-ModelLiteral $Result.error)"
+        }
+        if (-not [string]::IsNullOrWhiteSpace([string]$Result.recovery)) {
+            $fields += "next:$(ConvertTo-ModelLiteral $Result.recovery)"
+        }
+        return "{$($fields -join ' ')}"
+    }
+
+    if ($Operation -eq "Uninstall") {
+        $fields = @("ok:true", "op:uninstall", "removed:$(([bool]$Result.removed).ToString().ToLowerInvariant())")
+        if (-not [bool]$Result.removed -and -not [string]::IsNullOrWhiteSpace([string]$Result.reason)) {
+            $fields += "reason:$(ConvertTo-ModelLiteral $Result.reason)"
+        }
+        if ([bool]$Result.cacheRemoved) {
+            $fields += "cache_removed:true"
+        }
+        return "{$($fields -join ' ')}"
+    }
+
+    $changed = ([bool]$Result.changed).ToString().ToLowerInvariant()
+    $fields = @("ok:true", "op:$operationName", "changed:$changed")
+    if (-not [string]::IsNullOrWhiteSpace([string]$Result.version)) {
+        $fields += "version:$(ConvertTo-ModelLiteral $Result.version)"
+    }
+    if ([bool]$Result.pathEntryAdded) {
+        $fields += "restart:true"
+        if (-not [string]::IsNullOrWhiteSpace([string]$Result.binary)) {
+            $fields += "binary:$(ConvertTo-ModelLiteral $Result.binary)"
+        }
+    }
+    return "{$($fields -join ' ')}"
+}
+
+function Write-InstallResult {
+    param(
+        [object] $Result,
+        [string] $Operation,
+        [ValidateSet("Model", "Machine")]
+        [string] $ResultView
+    )
+
+    if ($ResultView -eq "Machine") {
+        $Result | ConvertTo-Json -Depth 8
+        return
+    }
+    Format-InstallModelResult -Result $Result -Operation $Operation
 }
 
 function Get-FullPath {
@@ -389,6 +470,17 @@ function Remove-ManagedCache {
     if (Test-Path -LiteralPath $cache) { Remove-Item -LiteralPath $cache -Recurse -Force }
 }
 
+trap {
+    $failure = [pscustomobject][ordered]@{
+        schema = $StateSchema
+        ok = $false
+        action = $Action.ToLowerInvariant()
+        error = $_.Exception.Message
+    }
+    Write-InstallResult -Result $failure -Operation $Action -ResultView $View
+    exit 2
+}
+
 if (-not $InstallRoot) {
     if (-not $env:LOCALAPPDATA) { throw "LOCALAPPDATA is required when -InstallRoot is omitted" }
     $InstallRoot = Join-Path $env:LOCALAPPDATA "Programs\srcq"
@@ -402,11 +494,12 @@ if ($Action -eq "Status") {
     try {
         $state = Read-InstallState -StatePath $StatePath -Root $InstallRoot
         if ($null -eq $state) {
-            [pscustomobject]@{ schema = $StateSchema; installed = $false; ready = $false; installRoot = $InstallRoot; recovery = "install a validated srcq release archive" } | ConvertTo-Json -Depth 4
+            $result = [pscustomobject]@{ schema = $StateSchema; installed = $false; ready = $false; installRoot = $InstallRoot; recovery = "install a validated srcq release archive" }
+            Write-InstallResult -Result $result -Operation $Action -ResultView $View
             exit 1
         }
         $health = Get-InstalledPackageHealth -State $state -Root $InstallRoot
-        [pscustomobject]@{
+        $result = [pscustomobject]@{
             schema = $StateSchema
             installed = $true
             ready = $true
@@ -419,10 +512,11 @@ if ($Action -eq "Status") {
             path = $state.path
             pathReady = $health.PathReady
             pathEntryCount = $health.PathEntryCount
-        } | ConvertTo-Json -Depth 6
+        }
+        Write-InstallResult -Result $result -Operation $Action -ResultView $View
         exit 0
     } catch {
-        [pscustomobject]@{
+        $result = [pscustomobject]@{
             schema = $StateSchema
             installed = (Test-Path -LiteralPath $StatePath -PathType Leaf)
             ready = $false
@@ -430,7 +524,8 @@ if ($Action -eq "Status") {
             installRoot = $InstallRoot
             error = $_.Exception.Message
             recovery = "reinstall from a validated release archive and repair the managed PATH entry"
-        } | ConvertTo-Json -Depth 5
+        }
+        Write-InstallResult -Result $result -Operation $Action -ResultView $View
         exit 2
     }
 }
@@ -439,7 +534,8 @@ if ($Action -eq "Uninstall") {
     $state = Read-InstallState -StatePath $StatePath -Root $InstallRoot
     if ($null -eq $state) {
         if ($RemoveCache) { Remove-ManagedCache }
-        [pscustomobject]@{ schema = $StateSchema; removed = $false; reason = "not-installed" } | ConvertTo-Json
+        $result = [pscustomobject]@{ schema = $StateSchema; removed = $false; reason = "not-installed" }
+        Write-InstallResult -Result $result -Operation $Action -ResultView $View
         exit 0
     }
     if ($state.path.backend -ne $PathBackend) { throw "PATH backend does not match install state" }
@@ -462,7 +558,8 @@ if ($Action -eq "Uninstall") {
     if ((Test-Path -LiteralPath $InstallRoot) -and -not (Get-ChildItem -LiteralPath $InstallRoot -Force | Select-Object -First 1)) {
         Remove-Item -LiteralPath $InstallRoot -Force
     }
-    [pscustomobject]@{ schema = $StateSchema; removed = $true; cacheRemoved = [bool]$RemoveCache } | ConvertTo-Json
+    $result = [pscustomobject]@{ schema = $StateSchema; removed = $true; cacheRemoved = [bool]$RemoveCache }
+    Write-InstallResult -Result $result -Operation $Action -ResultView $View
     exit 0
 }
 
@@ -490,7 +587,15 @@ try {
     if ($existingState -and $existingState.version -eq $package.Manifest.version -and $existingState.target -eq $package.Manifest.target -and
         (Test-ManagedFilesMatch -ExpectedRoot $package.Root -ActualRoot $CurrentDir -Members @($package.Members))) {
         $pathResult = Ensure-PathEntry -Backend $PathBackend -ValueFile $PathValueFile -Entry $CurrentDir
-        [pscustomobject]@{ schema = $StateSchema; changed = [bool]$pathResult.Added; version = $existingState.version; installRoot = $InstallRoot; pathEntryAdded = [bool]$pathResult.Added } | ConvertTo-Json
+        $result = [pscustomobject]@{
+            schema = $StateSchema
+            changed = [bool]$pathResult.Added
+            version = $existingState.version
+            installRoot = $InstallRoot
+            binary = (Join-Path $CurrentDir $existingState.binary)
+            pathEntryAdded = [bool]$pathResult.Added
+        }
+        Write-InstallResult -Result $result -Operation $Action -ResultView $View
         exit 0
     }
     if (Test-Path -LiteralPath $CurrentDir) {
@@ -523,7 +628,7 @@ try {
     }
     Write-InstallState -StatePath $StatePath -State $state
     if (Test-Path -LiteralPath $backupDir) { Remove-Item -LiteralPath $backupDir -Recurse -Force }
-    [pscustomobject]@{
+    $result = [pscustomobject]@{
         schema = $StateSchema
         changed = $true
         version = $state.version
@@ -531,7 +636,8 @@ try {
         installRoot = $InstallRoot
         binary = (Join-Path $CurrentDir $state.binary)
         pathEntryAdded = $pathResult.Added
-    } | ConvertTo-Json -Depth 5
+    }
+    Write-InstallResult -Result $result -Operation $Action -ResultView $View
 } catch {
     Set-PathValue -Backend $PathBackend -ValueFile $PathValueFile -Value $oldPathValue
     if ($newCurrentCommitted -and (Test-Path -LiteralPath $CurrentDir)) { Remove-Item -LiteralPath $CurrentDir -Recurse -Force }

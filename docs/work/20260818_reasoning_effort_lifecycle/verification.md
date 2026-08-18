@@ -1,0 +1,46 @@
+# 推理深度生命周期：验证
+
+## 平台与因果证据
+
+- OpenAI [Model guidance](https://developers.openai.com/api/docs/guides/latest-model) 明确要求有意选择 `reasoning.effort`，并按工作负载比较质量、延迟和成本；它没有把档位选择绑定到 Goal。
+- OpenAI [Follow a goal](https://learn.chatgpt.com/use-cases/follow-goals) 把 Goal 定义为跨轮持续执行 durable objective 的入口，适用于需要自动继续直到可验证停止条件的长期工作。
+- 当前真实 Codex 线程的 max→high→max 实验中，两次设置都返回 `updateAccepted=true`、`readbackVerified=true`、`matchesRequestedEffort=true`、`sentTurn=false`；设置当轮保持原档位，由 Goal 拉起的真实下一轮才采用新档位。历史同一线程还存在无 Goal 的配置变化。合并证据只支持“设置影响 next turn；Goal 可续轮”，不支持“只有 Goal 才能设置”。
+
+## 组件与真实线程
+
+| 检查 | 结果 | 直接证明范围 |
+| --- | --- | --- |
+| `node --check skills/reasoning-governor/scripts/reasoning-governor.mjs` | 通过 | Node 模块语法有效 |
+| `node --test skills/reasoning-governor/tests/test_reasoning_governor.mjs` | 8/8 通过 | 小帧读写、设置读回、1-byte 结构分块、null/缺失、10 MiB 中段字段、正文伪字段和默认模型回执 |
+| `skill-creator/scripts/quick_validate.py`（Python UTF-8 模式） | 通过 | `SKILL.md` frontmatter、名称与基础结构有效；Windows 系统默认 GBK 不作为 UTF-8 项目文件的失败 oracle |
+| 修改前真实 `-Status` | 19,062,770-byte snapshot 返回 `readbackVerified=false`、档位 null、无传输错误 | 固定 4 MiB tail 对当前长对话产生误判 |
+| 修改后真实默认 `-Status` | `exit=0`，`{ok:true op:status effort:max}` | 仓库脚本能从当前长对话读回实际 next-turn 配置，且默认模型视图最小充分 |
+| 修改后真实 `-View machine` | `readbackVerified=true`、`currentConfiguredEffort=max`，snapshot 随对话增长至约 19.2 MB | 完整 machine receipt 与默认模型视图来自同一次 canonical 语义 |
+
+同一次真实成功状态的默认模型回执为 30 个 ASCII 字符，完整 machine JSON 为 599 个字符；前者只保留 `ok/op/effort`。字符差只证明表示规模，是否充分由上述真实读回、machine 对照和组件场景共同证明，不把字符比例冒充固定 Token 收益。
+
+## 后继负担门控实测
+
+当前对话先直接观察到一次漏判：较长的 skill 生命周期探索包含真实会话取证、平台合同、跨 owner 设计和三阶段验证，但执行前没有调用 governor。后继实施本修正时，模型先把下一段目标判断为 `high`，再运行真实 `-Status`，读回 `{ok:true op:status effort:max}`；由于设置只影响下一轮、当前任务预计能在本轮闭合，降到 high 不能摊销中断和恢复成本，因此没有设置。该结果直接覆盖“目标判断可以触发查询，但查询不必触发切换”，不证明尚未发布规则已经改变当前运行。
+
+以 `o200k_base` 计，候选全局规则由后继修改前 4,730 增至 4,784 tokens；Reasoning Governor 的 description 由 82 增至 118 tokens，按需加载正文由 1,197 增至 1,398 tokens。新增常驻成本为 90 tokens，正文增量只在 skill 被选中时加载；它换取长探索不漏判以及短任务、已有充分读回不做固定查询的可验证边界，不把单次状态调用或潜在模型质量收益伪装成固定节省比例。
+
+## 规则、路由与独立证据
+
+`validate_contract.ps1` 通过：90 cases、49 strict routing、6 strict references，11/11 项目 skill 同时具有正向和非触发覆盖。后继严格场景覆盖无 Goal 的可摊销错配、长探索与治理 skill 共存、短任务不查询、当前读回已经充分、显式短状态查询仍执行、用户固定范围和纯设计讨论。
+
+首次独立 Routing 输入把“固定 low 不升档”和“高风险迁移审查”放在同一场景，独立模型合理额外选择 `change-governance`，严格门禁拒绝该结果。测试 oracle 随后只把工作对象收敛为高难度纯逻辑证明，保留档位冲突而移除无关治理触发；没有放宽禁止额外 skill 的门禁，也没有复用失败结果。
+
+最终三阶段证据由三个不同 evaluator run 生成并合并到 `development/skill-routing/evidence/current.json`：
+
+| 阶段 | 结果 | Capsule SHA-256 |
+| --- | --- | --- |
+| Routing | 90/90，严格额外 skill 检查通过 | `F6B6B4946221DE5BABD8858DBD18CADD9AD89B47922AC29A56350BC09D53E89F` |
+| Policy | 90/90 满足期望和禁选标签 | `5848B33EA94810EF04894F5CAF144084D3C5222333AAC763840A18BE49BCA39C` |
+| References | 21/21 满足条件引用合同 | `ADAC255B8C128BF66049B4E7BF932BEDC8566813D4063F30BA4403FBC6827454` |
+
+候选 bundle 为 `24CC35AECD613FAAED13E45A2B2FE69D724FFA9E53009E049CA8942FC12EBA18`。Policy 中未声明且未禁选的兼容标签按项目既有合同保留为诊断；正式期望、禁选与 Routing/References 严格集合全部通过。第一次后继 capsule 评估进行时，主审发现 description 可能让短任务非触发覆盖用户显式查询，随即停止并作废；新候选增加显式短查询严格正例后重新独立评估，没有复用旧结果。
+
+## 部署候选与边界
+
+`manage_agentbase.ps1 -Action Validate` 返回 `valid=true`，证明当前仓库候选的全局规则、skills、路由证据、受管资产和部署合同一致。该动作没有写入真实 Codex；本轮没有执行 `Publish`，当前已启动任务也不会追溯加载仓库候选。

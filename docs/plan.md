@@ -10,7 +10,7 @@
 
 AgentBase 持续把根需求落实为可跨项目复用的 Codex 协作维护能力：有效洞察并与用户共同校准需求，以证据形成和维护权威职责，让方案、任务、消费者与验证沿目标闭环，并可靠维护规则、skill、工具、配置、部署和发布链。
 
-所有改进依次保证需求对齐、正确性、授权、安全、可维护性和完成证据；质量同等充分时降低端到端 Token，前两者不变差时再提升速度。有效规划后优先沿当前目标链形成最近的可验证闭环；思考深度随真实不确定性、后果、可逆性和验证负担调整，不按任务形式固定。
+所有改进依次保证需求对齐、正确性、授权、安全、可维护性和完成证据；质量同等充分时降低端到端 Token，前两者不变差时再提升速度。有效规划后优先沿当前目标链形成最近的可验证闭环；用户固定的思考深度在其范围内优先，未固定时随真实不确定性、后果、可逆性和验证负担调整，不按任务形式或 Goal 状态固定。
 
 ## 3. 跨计划决策合同
 
@@ -33,14 +33,22 @@ AgentBase 持续把根需求落实为可跨项目复用的 Codex 协作维护能
 | Task completion-context 证据去重 | [方案](work/20260816_task_completion_context_dedup/solution.md)、[完成审计](work/20260816_task_completion_context_dedup/completion-audit.md) | 已闭环；页级目录只返回一次完整任务证据，目标以 ID 保持关系，预算与分页闭包不变 | `task-table-manager` | 承接交付链最终复核与任务结果；路由证据和部署 payload 消费变更后的 skill | 目标关联、证据字段、预算闭包或分页退化，出现真实旧格式消费者，或进一步重复已对完整决策链造成可证实成本 |
 | Task 结果诊断与证据时效语义 | [方案](work/20260816_task_result_diagnostic_semantics/solution.md)、[完成审计](work/20260816_task_result_diagnostic_semantics/completion-audit.md) | 已闭环；查询诊断、结果诊断、任务 revision 陈旧和来源快照问题分层表达，后继当前证据不改写历史结果 | `task-table-manager` | 承接完成复核输出、状态与生成视图；`delivery-workflow` 状态视图、路由证据和部署 payload 消费新合同 | 分层计数与唯一候选目录不一致，旧歧义字段复现，后继结果自动抑制旧诊断，或新证据没有明确覆盖目标与当前来源 |
 | Task 来源快照收据 | [方案](work/20260817_task_source_snapshot_receipt/solution.md)、[完成审计](work/20260817_task_source_snapshot_receipt/completion-audit.md) | 已闭环；最终模型预算投影决定捕获成员，模型只携带收据，新结果引用内容寻址机器快照 | `task-table-manager` | `delivery-workflow` 初始化和状态摘要消费任务存储及结果诊断；历史内联结果由只读兼容路径消费 | 收据与最终模型可见来源不一致，机器映射或逐来源诊断退化，新写入重新产生内联映射，或发现未迁移的真实写入消费者 |
+| Task completion 写入合同 | [方案](work/20260817_task_completion_write_contract/solution.md)、[完成审计](work/20260817_task_completion_write_contract/completion-audit.md) | 已闭环；模型只写结果语义，CLI 以命令身份、task/state 双 CAS 和写前收据校验形成单一永久结果 | `task-table-manager` | 承接来源快照收据和模型交互面合同；历史结果、上一版完成输入与 Delivery Workflow 摘要已复核 | 语义输入重新维护机器身份，新写入能形成不可解引用收据，task/state CAS、历史读取或单向兼容退化，或发现未闭合的真实完成写入消费者 |
+| Task 合同 authoring 交互面 | [方案](work/20260817_task_contract_authoring_surface/solution.md)、[完成审计](work/20260817_task_contract_authoring_surface/completion-audit.md) | 已闭环；模型 authoring 保留稳定任务 ID 与交付语义，schema/revision 由 add/update 注入，draft model/machine 同源分层 | `task-table-manager` | 永久任务、上一版完整输入、状态/结果/查询与 Delivery Workflow 消费者已复核 | 新 authoring 重新维护 schema/revision，draft model/machine 同源性、CAS、部分写、历史任务读取或单向兼容退化 |
+| Task 写入回执投影 | [方案](work/20260817_task_write_receipt_projection/solution.md)、[完成审计](work/20260817_task_write_receipt_projection/completion-audit.md) | 已闭环；写入 model 回执只保留身份、revision、有效异常和截断恢复，machine/永久记录不变 | `task-table-manager` model projection | 承接模型可见输出双视图与 Task authoring/completion 写入合同；machine/永久记录消费者不变 | 写入回执新增真实程序消费者、诊断截断合同变化或完整回归失败 |
+| Task 查询模型投影 | [方案](work/20260817_task_query_model_projection/solution.md)、[完成审计](work/20260817_task_query_model_projection/completion-audit.md) | 已闭环；查询按完整页、截断页和语义空结果投影，真实工作区 impact 崩溃已修复 | `task-table-manager` query model projection 与 impact parser | 承接模型可见输出双视图；machine、永久记录、图算法与 source snapshot 消费者不变 | 查询语义零丢失、分页恢复不完整、impact parser/handler 再失配或完整回归失败 |
+| workctl 模型回执投影 | [方案](work/20260817_workctl_model_receipt_projection/solution.md)、[完成审计](work/20260817_workctl_model_receipt_projection/completion-audit.md) | 已闭环；protect/status/impact/render 按动作投影，baseline 语义和诊断分层一致 | `delivery-workflow` model projection | 承接模型可见输出双视图；阶段真源、machine 输出、保护快照、索引和生成视图消费者不变 | baseline machine 合同变化、诊断分层退化、impact 恢复信息丢失或完整回归失败 |
+| 生成式模型导航摘要 | [方案](work/20260817_generated_model_navigation/solution.md)、[完成审计](work/20260817_generated_model_navigation/completion-audit.md) | 已闭环；语义空结果显式、零机器统计省略，任务明细与异常仍完整 | taskctl/workctl Markdown render owner | 承接模型交互面与两项 CLI model projection；machine 摘要、阶段/任务真源和历史生成物不变 | 语义空结果消失、必要任务列缺失、partial/unavailable 不可见或完整回归失败 |
 | 模型可见工具输出双视图 | [方案](work/20260817_model_visible_tool_output_contract/solution.md)、[输出审计](work/20260817_model_visible_tool_output_contract/output-audit.md)、[消费者复核](work/20260817_model_visible_tool_output_contract/consumer-impact.md)、[完成审计](work/20260817_model_visible_tool_output_contract/completion-audit.md) | 已闭环；taskctl/workctl 默认模型视图只投影当前动作所需证据，显式 machine 视图保留稳定完整合同，两者由同一 canonical 计算与 owner 维护 | `global/AGENTS.md`、`task-table-manager`、`delivery-workflow` | `srcq` 提供既有模型输出成本估算实践；任务与交付消费者、路由验证和部署 payload 消费新合同；其余模型可见入口保持各自 owner，未被误标为已迁移 | 模型视图遗漏完成当前动作的必要证据、重新暴露机器信封或完整快照、machine 合同退化、预算恢复不可定位，真实 tokenizer/阅读质量比较不再成立，或其他 owner 出现可证实的同类高成本输出 |
 | 模型交互面与资产职责 | [方案](work/20260817_model_interaction_surface_contract/solution.md)、[交互审计](work/20260817_model_interaction_surface_contract/interaction-audit.md)、[完成审计](work/20260817_model_interaction_surface_contract/completion-audit.md) | 已闭环；模型读取、模型修改、机器表示和派生物先按事实 owner、消费者、当前责任与生命周期裁决，Event Logger 已接入同源 model/machine 恢复视图 | `global/AGENTS.md`、`delivery-workflow`、`task-table-manager`、`codex-event-logger` | 承接工具双视图并把上位合同扩展到模型阅读或修改的文件；路由、独立评估和部署候选验证消费新合同 | 模型读取面遗漏必要证据、模型修改需同步多个同责位置、生成物反向成为真源、Event Logger 恢复或 machine 兼容退化，或新 owner 出现有直接证据的同类缺口 |
 | 常驻模型上下文与恢复面收敛 | [方案](work/20260817_persistent_context_surface/solution.md)、[读取面审计](work/20260817_persistent_context_surface/context-surface-audit.md)、[验证](work/20260817_persistent_context_surface/verification.md)、[完成审计](work/20260817_persistent_context_surface/completion-audit.md) | 已闭环；全局同责重复规则合并，11 个 description 保持预加载边界，handoff 收敛为当前恢复索引；常驻面在同质量门禁后减少 5.0% tokens | `global/AGENTS.md`、11 个项目 skill、`docs/handoff.md`、`development/skill-routing` | 承接模型交互面合同；Routing、Policy、References 与部署 Validate 消费候选，真实 Codex 仍停留在已发布基线 | 严格路由、条件引用、全局行为或恢复充分性退化，description 重新承载正文执行细节，handoff 复制历史展开，或同 tokenizer 成本收益不再成立 |
+| 推理深度生命周期 | [方案](work/20260818_reasoning_effort_lifecycle/solution.md)、[验证](work/20260818_reasoning_effort_lifecycle/verification.md)、[完成审计](work/20260818_reasoning_effort_lifecycle/completion-audit.md) | 已闭环；用户固定档位优先；自主控制先独立判断目标，再按决策价值查询状态、按剩余工作净收益设置；Goal 只承载续轮，长 snapshot 与双视图合同保持 | `global/AGENTS.md`、`reasoning-governor` | `delivery-workflow`、`task-table-manager`、路由三阶段 evidence 与部署 Validate 已消费新合同；真实安装状态由部署 `Status` 读取 | 用户覆盖被自主升降，内容型 skill 再次掩盖负担判断，短任务固定查询、有效读回重复查询或转换成本不能摊销，Goal 再成设置门槛，临时配置泄漏，长帧读回、双视图或宿主 IPC 退化 |
+| 执行控制与 Skill 上下文生命周期 | [现状与证据](work/20260818_execution_control_lifecycle/current-state.md)、[方案](work/20260818_execution_control_lifecycle/solution.md)、[验证](work/20260818_execution_control_lifecycle/verification.md)、[完成审计](work/20260818_execution_control_lifecycle/completion-audit.md) | 已闭环；失效架构先重裁、计划按控制需要建立，skill 每轮重路由但正文只按实际失效恢复 | `global/AGENTS.md`、`development/skill-routing` | 承接常驻上下文与模型交互面合同；requirements、README、三阶段 evidence 与部署 Validate 已消费候选；真实安装状态由部署 `Status` 读取 | 未压缩重复读取复发、压缩后遗漏已选正文或批量重载历史 skill、已知变化仍沿用旧正文、计划明显错配，或架构判断失效后仍按旧方案完成 |
 | Source Query Gateway | [分支计划](../development/source-query-gateway/plan.md) | P0—P10 已闭环；当前身份达到质量与 Token 采纳门槛，未证明速度改善 | `tools/srcq`、`source-query`、`vscode-lsp-mcp` | 替代代码搜索早期方案，消费 LSP Companion 的公开查询能力，并由 `source-query` skill 与部署 payload 使用 | 新查询失败、后端/协议变化、新消费者或可重复共享缺口 |
 | VS Code LSP MCP Companion | [组件方案](../mcp/vscode-lsp-mcp/PLAN.md)、[当前组件入口](../mcp/vscode-lsp-mcp/README.md) | 已形成组件与受验证 Windows release；PLAN 保留架构基线，不作为开放任务表 | `mcp/vscode-lsp-mcp` | Source Query Gateway 消费其查询协议；公开工具或协议变化需回到该分支复核 | 安全边界、Provider 协议、公开工具或发布生命周期改变 |
 | 代码搜索早期改进 | [历史记录](../development/code-search-workflow-improvement-plan.md) | 已由 Source Query Gateway 替代，只保留迁移前证据 | 无当前运行 owner | 迁移证据由 Source Query Gateway 保留；没有当前执行消费者 | 仅作证据追溯，不重新启用旧 skill/sgy 入口 |
 
-当前没有未闭环的项目级实施阶段。组件的常规维护由其 README、需求、设计和测试合同承接，不因列入本表自动创建任务。
+当前没有未闭环的项目级实施项。常规维护由各组件 README、需求、设计和测试合同承接；只有出现新的直接失败、协议变化、真实消费者或可重复共享机制时才重开所属子计划，不因列入本表自动创建任务。
 
 ## 5. 2026-08-16 实践结论
 
@@ -66,13 +74,29 @@ Source Query Gateway P10 的真实代理实践表明：局部输出更短、默�
 
 来源快照后继实践确认：执行来源身份必须在最终模型预算投影选定后捕获，否则机器记录会声称模型读过实际已被裁掉的正文。完整 ID—指纹映射由 Task Table Manager 作为内容寻址机器资产维护，模型只读取并传递会影响完成动作的引用、成员数和完整性；机器视图在同一 owner 中展开映射并保持缺失、损坏、不完整和逐来源陈旧诊断。旧内联结果继续可读，但唯一完成入口把旧输入单向外部化，新结果不再让模型复制机器指纹。具体格式、预算场景和迁移证据只由[来源快照完成审计](work/20260817_task_source_snapshot_receipt/completion-audit.md)维护。
 
+后继 CLI 与生成导航审计进一步确认：模型面不能机械删除所有零值。表示“当前没有候选、依赖或结果”的语义零需要显式保留，而机器信封中的计数零、`truncated:false` 和正常状态默认值可以省略；只有截断时才增加总数与精确恢复位置。写入回执、查询页和生成 Markdown 应分别由当前命令 owner 投影，不能用一个通用稀疏函数猜测字段意义。具体命令与相近非触发场景由[最终横向完成审计](work/20260817_generated_model_navigation/completion-audit.md)及本文件的四项后继索引维护。
+
 ## 8. 2026-08-17 常驻读取面实践结论
 
 常驻规则、skill description 和接手文档虽然都会被模型读取，但读取时点与 owner 不同，不能统一按篇幅压缩：全局规则只合并同一 owner 内的重复不变量；description 只保留正文加载前会改变选择的正向、相近非触发和必要协同边界；handoff 只维护当前版本、真实安装、直接证据、未决边界和下一入口，历史展开由正式审计持有。当前平台存在相似指令、句式相近或文件接近上限都不能证明语义可删除。
 
 候选先通过静态合同、detached Routing/Policy/References、恢复清单和部署 Validate，再使用同一 tokenizer 比较成本。具体合并项、单项 Token 和 Policy 诊断限制只保留在[读取面审计](work/20260817_persistent_context_surface/context-surface-audit.md)与[验证记录](work/20260817_persistent_context_surface/verification.md)，不提升为固定压缩比例，也不扩张到 `source_snapshot` 或插件迁移。
 
-## 9. 重开与维护
+## 9. 2026-08-18 推理深度生命周期实践结论
+
+推理深度设置、设置在 next turn 生效和下一轮是否自动开始是三个独立机制：线程设置入口只更新并读回 conversation state，不发送 turn；Goal 只在需要跨轮持续执行时承载续轮。因此，用户未固定档位时的自主选择不应以 Goal 为前提，用户明确固定的范围则作为更高优先约束，不能被最低充分原则或额度动机猜测覆盖。临时配置只服务当前工作，不需要任务表、Hook、Goal 字段或脚本状态形成第二真源。
+
+长对话下的配置读回不能依赖字段位于固定尾部。当前约 19 MB 的真实 snapshot 已证明固定窗口会把存在的配置误报为不可读；有界实现应扫描真实 JSON 结构路径并忽略正文字符串中的同名文本。该工具直接供模型读取，因此默认只投影成功、操作和实际档位，完整传输、线程、host 与诊断字段保留在显式 machine 视图。具体实验、帧大小、测试和证据身份只由[验证记录](work/20260818_reasoning_effort_lifecycle/verification.md)维护。
+
+后继实践确认，目标档位判断、当前状态查询和实际设置还具有不同成本，不能压成一句“需要变化才使用”。目标判断应在下一段实质工作前独立于领域 skill、计划和 Goal；只有状态证据能改变动作时才查询，只有实际错配且剩余工作能摊销当前轮中断、续轮等待与恢复时才设置。这样长探索不会因内容路由漏判，短任务、已有充分读回和纯设计讨论也不会承担固定工具成本；用户显式状态或设置请求仍直接触发。
+
+## 10. 2026-08-18 执行控制与 Skill 上下文生命周期实践结论
+
+Skill 的适用性与正文有效性是两个生命周期：每个 new turn 都应按当前请求重新路由，但 turn 边界本身不会使同一来源、仍在有效上下文且未变化的完整正文失效；上下文压缩使正文不可用时，只恢复本轮重新选中的 skill 及当前动作所缺引用。名称、摘要和历史使用记录不能代替正文，也不应触发历史 skill 的批量恢复。这样既不跳过规则，又避免用持久缓存、版本账本或每轮文件探测制造第二状态源。真实重复读取、压缩替换历史、官方渐进披露合同、Token 对照和独立用例保留在[验证记录](work/20260818_execution_control_lifecycle/verification.md)。
+
+同一轮还明确了执行控制的两个前置边界：计划是模型为跨步骤保持关键状态而选择的控制手段，用户是否说出“计划”只影响可见交付；职责或架构证据使方案失效时，应先回到最早失效层重裁，再继续已授权实现，不能先按旧架构做完后才告知。两者与 skill 生命周期都在 `global/AGENTS.md` 的全局内核收口，专项 skill 只按触发承担领域方法。
+
+## 11. 重开与维护
 
 - 新需求或新证据先定位到现有子计划和 owner；能由现有入口承接时不新增计划。
 - 跨计划共享职责、根需求或正式入口变化时，更新本文件的方向、索引和影响结论；专项细节只写回对应子计划。

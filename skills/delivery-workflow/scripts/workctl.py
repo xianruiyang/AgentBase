@@ -272,19 +272,22 @@ def without_zero_counts(value: Any) -> Any:
     return value
 
 
-def protected_baseline_issue(value: Any) -> dict[str, Any]:
+def protected_baseline_issue(
+    value: Any, *, include_diagnostics: bool = True
+) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     diagnostics = value.get("diagnostics", [])
-    aligned = value.get("aligned")
-    if not diagnostics and aligned is not False:
+    status = value.get("status")
+    if not diagnostics and status in {None, "protected"}:
         return {}
     return without_zero_counts(
         {
-            "aligned": aligned,
+            "status": status,
             "cycle_id": value.get("cycle_id"),
             "confirmed_by": value.get("confirmed_by"),
-            "diagnostics": diagnostics,
+            "confirmation_ref": value.get("confirmation_ref"),
+            "diagnostics": diagnostics if include_diagnostics else None,
         }
     )
 
@@ -311,7 +314,9 @@ def work_status_model(payload: dict[str, Any]) -> dict[str, Any]:
     )
     if semantic:
         projected["semantic"] = semantic
-    baseline = protected_baseline_issue(payload.get("protected_baseline"))
+    baseline = protected_baseline_issue(
+        payload.get("protected_baseline"), include_diagnostics=False
+    )
     if baseline:
         projected["protected_baseline"] = baseline
     source_tasks = payload.get("tasks", {})
@@ -326,9 +331,12 @@ def work_status_model(payload: dict[str, Any]) -> dict[str, Any]:
             if isinstance(source_tasks, dict)
             else None,
             "states": task_counts,
-            "status": source_tasks.get("status")
-            if isinstance(source_tasks, dict)
-            else None,
+            "status": (
+                source_tasks.get("status")
+                if isinstance(source_tasks, dict)
+                and source_tasks.get("status") != "available"
+                else None
+            ),
             "result_count": source_tasks.get("result_count")
             if isinstance(source_tasks, dict)
             else None,
@@ -376,6 +384,51 @@ def work_context_model(payload: dict[str, Any]) -> dict[str, Any]:
     return projected
 
 
+def work_protect_model(payload: dict[str, Any]) -> dict[str, Any]:
+    source_baseline = payload.get("baseline", {})
+    baseline = without_zero_counts(
+        {
+            key: copy.deepcopy(source_baseline.get(key))
+            for key in (
+                "status",
+                "cycle_id",
+                "confirmed_by",
+                "confirmation_ref",
+                "protected_ids",
+                "current_target_count",
+            )
+            if isinstance(source_baseline, dict)
+        }
+    )
+    projected: dict[str, Any] = {"baseline": baseline}
+    if payload.get("diagnostics"):
+        projected["diagnostics"] = copy.deepcopy(payload["diagnostics"])
+    return sparse_model_value(projected)
+
+
+def work_impact_model(payload: dict[str, Any]) -> dict[str, Any]:
+    projected: dict[str, Any] = {
+        "id": payload.get("id"),
+        "affected": copy.deepcopy(payload.get("affected", [])),
+    }
+    if payload.get("truncated"):
+        projected["more"] = {
+            "affected_count": payload.get("affected_count"),
+            "truncated": True,
+        }
+    return sparse_model_value(projected)
+
+
+def work_render_model(payload: dict[str, Any]) -> dict[str, Any]:
+    summary = work_status_model(
+        {
+            "semantic": payload.get("semantic", {}),
+            "tasks": payload.get("tasks", {}),
+        }
+    )
+    return sparse_model_value({"output": payload.get("output"), **summary})
+
+
 def work_model_projection(payload: dict[str, Any]) -> dict[str, Any]:
     if payload.get("ok") is False:
         return sparse_model_value(payload, root=True)
@@ -384,8 +437,14 @@ def work_model_projection(payload: dict[str, Any]) -> dict[str, Any]:
         return work_status_model(payload)
     if command == "context":
         return work_context_model(payload)
+    if command == "protect":
+        return work_protect_model(payload)
+    if command == "impact":
+        return work_impact_model(payload)
+    if command == "render":
+        return work_render_model(payload)
     candidate = copy.deepcopy(payload)
-    if command in {"coverage", "index"}:
+    if command == "coverage":
         candidate["protected_baseline"] = protected_baseline_issue(
             candidate.get("protected_baseline")
         )
@@ -1646,41 +1705,56 @@ def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
     ]
     for prefix, count in sorted(index["summary"]["prefix_counts"].items()):
         lines.append(f"| {markdown_escape(prefix)} | {count} |")
-    lines.extend(
-        [
-            f"| 未决条目 | {index['summary']['unresolved_count']} |",
-            f"| 未解析引用 | {index['summary']['unknown_reference_count']} |",
-            f"| 延后讨论项 | {index['summary']['deferred_change_count']} |",
-            "",
-            "## 任务执行状态",
-            "",
-            "| 状态 | 数量 |",
-            "| --- | ---: |",
-        ]
-    )
+    for label, key in (
+        ("未决条目", "unresolved_count"),
+        ("未解析引用", "unknown_reference_count"),
+        ("延后讨论项", "deferred_change_count"),
+    ):
+        if index["summary"][key]:
+            lines.append(f"| {label} | {index['summary'][key]} |")
+    lines.extend(["", "## 任务执行状态", ""])
     if task_summary["status"] in {"available", "partial"}:
-        for status, count in task_summary["counts"].items():
-            lines.append(f"| {status} | {count} |")
-    else:
-        lines.append("| unavailable | 未知 |")
-    lines.extend(
-        [
-            "",
-            f"- 任务总数：{task_summary['task_count'] if task_summary['task_count'] is not None else '未知'}",
-            f"- 需复核任务：{task_summary['counts'].get('review', '未知')}",
-            "",
-            "## 任务结果证据",
-            "",
-            f"- 任务状态引用结果：{task_summary['result_count'] if task_summary['result_count'] is not None else '未知'}",
-            f"- 含验证结果：{task_summary['result_with_verification_count'] if task_summary['result_with_verification_count'] is not None else '未知'}",
-            f"- 含未决结果：{task_summary['result_with_unresolved_count'] if task_summary['result_with_unresolved_count'] is not None else '未知'}",
-            f"- 含结果诊断：{task_summary['result_with_diagnostics_count'] if task_summary['result_with_diagnostics_count'] is not None else '未知'}",
-            f"- 任务合同 revision 陈旧结果：{task_summary['task_revision_stale_result_count'] if task_summary['task_revision_stale_result_count'] is not None else '未知'}",
-            f"- 含来源快照问题结果：{task_summary['source_snapshot_issue_result_count'] if task_summary['source_snapshot_issue_result_count'] is not None else '未知'}",
-            f"- 结果诊断条目：{task_summary['result_diagnostic_count'] if task_summary['result_diagnostic_count'] is not None else '未知'}",
-            f"- 使上游失效的 ID：{len(task_summary['invalidated_source_ids'])}",
+        nonzero_statuses = [
+            (status, count)
+            for status, count in task_summary["counts"].items()
+            if count
         ]
-    )
+        if nonzero_statuses:
+            lines.extend(["| 状态 | 数量 |", "| --- | ---: |"])
+            lines.extend(
+                f"| {status} | {count} |" for status, count in nonzero_statuses
+            )
+        else:
+            lines.append("- 无任务")
+        if task_summary["status"] == "partial":
+            lines.append("- 任务读取状态：partial")
+    else:
+        lines.append("- 任务状态不可用")
+    lines.extend(["", "## 任务结果证据", ""])
+    if task_summary["result_count"] is None:
+        lines.append("- 结果摘要未知")
+    elif task_summary["result_count"] == 0:
+        lines.append("- 当前没有结果引用")
+    else:
+        lines.extend(
+            [
+                f"- 任务状态引用结果：{task_summary['result_count']}",
+                f"- 含验证结果：{task_summary['result_with_verification_count']}",
+            ]
+        )
+        for label, key in (
+            ("含未决结果", "result_with_unresolved_count"),
+            ("含结果诊断", "result_with_diagnostics_count"),
+            ("任务合同 revision 陈旧结果", "task_revision_stale_result_count"),
+            ("含来源快照问题结果", "source_snapshot_issue_result_count"),
+            ("结果诊断条目", "result_diagnostic_count"),
+        ):
+            if task_summary[key]:
+                lines.append(f"- {label}：{task_summary[key]}")
+        if task_summary["invalidated_source_ids"]:
+            lines.append(
+                f"- 使上游失效的 ID：{len(task_summary['invalidated_source_ids'])}"
+            )
     if task_summary.get("diagnostics"):
         lines.extend(["", "## 任务读取诊断", ""])
         lines.extend(

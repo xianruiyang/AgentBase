@@ -40,7 +40,11 @@
     "quality_token_speed_order",
     "vertical_validation_closure",
     "model_interaction_surface",
-    "minimal_evidence_closure"
+    "minimal_evidence_closure",
+    "user_reasoning_override",
+    "reasoning_effort_economy",
+    "adaptive_execution_plan",
+    "skill_context_lifecycle"
   ],
   "behavior_tag_definitions": {
     "read_only": "请求只授权分析、解释、审查或查询，不修改文件、进程或外部状态。",
@@ -49,7 +53,7 @@
     "challenge_false_premise": "已证明前提错误、不完整或有害时，明确指出并修正，不迎合执行。",
     "no_alternative_execution": "审查、解释或建议请求不得被升级为执行模型自行选择的替代方案。",
     "long_term_total_cost": "在可行方案间按长期净收益与整个系统总成本裁决，而非按最少改动或最快结束。",
-    "architecture_integrated": "把请求行为接入正确的长期职责和正式入口，而非形成孤立补丁或平行入口。",
+    "architecture_integrated": "把请求行为接入正确的长期职责和正式入口；执行中发现原 owner 或架构判断失效时，在继续依赖旧方案前回退裁决，不先完成孤立补丁再把问题作为残留风险交付。",
     "authority_lifecycle": "本次动作必须裁决、新建、迁移或改变长期行为的权威 owner、正式入口或生命周期；仅用生命周期差异说明两个对象不应合并时不适用。",
     "impact_closure": "共享或权威契约改变后，完成前必须覆盖受影响消费者与派生结果的更新、退出或重验。",
     "no_scope_expansion": "可以指出相关风险或边界，但不实施未获授权且不影响本次结果的附带改造。",
@@ -62,7 +66,11 @@
     "quality_token_speed_order": "先选择需求对齐、正确、安全、可维护且有完成证据的方案；质量同等充分时降低 Token，前两者不变差时再提速。",
     "vertical_validation_closure": "有效规划后，在依赖、关键风险、共享前置和质量允许时限制无必要的横向展开，优先沿当前目标链形成最近可验证闭环，并用证据确认或修正方案、设计和需求达成状态。",
     "model_interaction_surface": "当前请求要求设计、选择或改变模型直接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面最小充分且可局部修改，机器面保持稳定完整，生成物不作为语义修改入口。",
-    "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。"
+    "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
+    "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
+    "reasoning_effort_economy": "用户未固定时，在下一段实质工作前独立判断目标档位；只在档位证据不足且错配可能实质影响质量或总体成本时查询，只在实际不同且剩余工作足以摊销设置、结束当前轮和恢复成本时切换。",
+    "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定是否建立执行计划；用户要求查看计划只决定交付形式，不替代该控制判断。",
+    "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。"
   },
   "peer_skills": [
     {
@@ -108,14 +116,30 @@
     "ue-mechanical-field-with-peer",
     "qq-troubleshooting-with-powershell",
     "qq-direct-message-required",
-    "vertical-validation-closure-selection"
+    "vertical-validation-closure-selection",
+    "no-goal-reasoning-shift",
+    "explicit-thread-reasoning-status",
+    "fixed-thread-reasoning-scope",
+    "user-fixed-reasoning-no-autonomous-shift",
+    "reasoning-depth-discussion-only",
+    "reasoning-long-domain-work-assessment",
+    "reasoning-short-task-no-transition",
+    "reasoning-current-effort-sufficient",
+    "architecture-risk-discovered-during-implementation",
+    "adaptive-plan-without-user-prompt",
+    "simple-task-no-formal-plan",
+    "skill-intact-context-reuse",
+    "skill-after-compaction-reload",
+    "skill-after-compaction-unselected",
+    "skill-known-change-reload"
   ],
   "strict_reference_case_ids": [
     "qq-troubleshooting-with-powershell",
     "delivery-requirements-contract",
     "delivery-planning-contract",
     "delivery-task-contract",
-    "delivery-feedback-contract"
+    "delivery-feedback-contract",
+    "reasoning-long-domain-work-assessment"
   ],
   "cases": [
     {
@@ -259,6 +283,25 @@
       "forbidden_skills": [
         "source-query",
         "symbol-structure-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "lifecycle-and-entry.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "architecture_integrated"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "architecture-risk-discovered-during-implementation",
+      "kind": "behavior",
+      "request": "已授权修复现有 CLI 的模型输出。实施到一半才取得直接证据：当前局部改法会复制共享投影 owner、形成第二正式入口并让问题复发。不要先按旧方案做完再汇报风险；请据此继续完成当前任务。",
+      "expected_skills": [
+        "change-governance"
+      ],
+      "forbidden_skills": [
         "task-table-manager"
       ],
       "expected_change_governance_references": [
@@ -833,8 +876,98 @@
         "task-table-manager"
       ],
       "expected_change_governance_references": [],
-      "expected_behavior_tags": [],
+      "expected_behavior_tags": [
+        "reasoning_effort_economy"
+      ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "no-goal-reasoning-shift",
+      "kind": "positive",
+      "request": "当前没有 active Goal，用户也没有固定推理深度，当前有效读回为 effort:medium。下一段是较长的高难度形式化证明，需要构造反例并做独立校验，最低充分档位是 high，剩余工作足以摊销 next-turn 切换；请在继续前按需调整。",
+      "expected_skills": [
+        "reasoning-governor"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "reasoning_effort_economy"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "reasoning-long-domain-work-assessment",
+      "kind": "behavior",
+      "request": "当前没有 active Goal，用户也没有固定推理深度，当前档位没有有效读回。下一段要较长地查清一个反复失效的跨模块共享状态机制，裁决唯一 owner、实际消费者和旧路径退出，并完成因果及跨消费者验证；在第一个实质动作前同时处理领域方法和推理档位。",
+      "expected_skills": [
+        "change-governance",
+        "reasoning-governor"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "causal-analysis.md",
+        "lifecycle-and-entry.md",
+        "verification-and-gates.md"
+      ],
+      "expected_behavior_tags": [
+        "fact_first",
+        "reasoning_effort_economy"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "reasoning-short-task-no-transition",
+      "kind": "boundary",
+      "request": "用户没有固定推理深度，当前档位也未读回。唯一工作是把已定位的一处错字替换并检查 Markdown，能够在已经开始的当前轮可靠闭合；不要为知道精确档位增加不能影响本任务的状态查询或 next-turn 切换。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "reasoning-governor",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "reasoning_effort_economy"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "reasoning-current-effort-sufficient",
+      "kind": "boundary",
+      "request": "用户没有固定推理深度；当前上下文已有同一线程、此后无配置变化的验证读回 effort:high，下一段长篇纯逻辑证明的最低充分档位也是 high。直接继续，不重复查询或设置。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "reasoning-governor",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "reasoning_effort_economy"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "explicit-thread-reasoning-status",
+      "kind": "positive",
+      "request": "只读取并报告当前 Codex 线程的 next-turn 推理深度，不修改配置；即使动作很短，也按我的明确要求返回验证读回。",
+      "expected_skills": [
+        "reasoning-governor"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "explicit-thread-reasoning-setting",
@@ -851,9 +984,41 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "fixed-thread-reasoning-scope",
+      "kind": "positive",
+      "request": "把当前 Codex 对话的推理深度固定为 low，直到我明确解除；设置后读回确认，不要自行升档。",
+      "expected_skills": [
+        "reasoning-governor"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "user_reasoning_override"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "user-fixed-reasoning-no-autonomous-shift",
+      "kind": "boundary",
+      "request": "我已明确把当前对话固定为 low 且已经确认设置；现在继续分析一个高难度的纯逻辑证明，保持 low，除非我要求否则不要读取或改变线程设置。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "reasoning-governor",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "user_reasoning_override"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
       "id": "reasoning-depth-discussion-only",
       "kind": "negative",
-      "request": "解释为什么没有 active Goal 时不应让模型自主切换当前线程推理深度；只讨论设计，不读取或修改线程设置。",
+      "request": "解释 next-turn 推理深度设置、下一轮生效和 Goal 自动续轮为什么是三个独立机制；只讨论设计，不读取或修改线程设置。",
       "expected_skills": [],
       "forbidden_skills": [
         "reasoning-governor",
@@ -962,6 +1127,110 @@
         "verification-and-gates.md"
       ],
       "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "adaptive-plan-without-user-prompt",
+      "kind": "behavior",
+      "request": "实现一个已经完整指定的本地发布合同：必须按顺序更新 manifest、安装器和两个已知消费者，再分别验证直接行为与兼容读取；所有 owner 已唯一确认，用户没有提到是否建立计划。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "adaptive_execution_plan"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "simple-task-no-formal-plan",
+      "kind": "boundary",
+      "request": "把 README 中已经明确定位的一处错字改正并检查 Markdown；任务只有这一个动作，不需要保持跨步骤状态。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "adaptive_execution_plan"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "skill-intact-context-reuse",
+      "kind": "behavior",
+      "request": "同一当前 Codex 对话没有发生上下文压缩；上一轮已经完整读取 powershell-usage 的同一来源 SKILL.md，文件没有变化。现在继续编写一个尚无模板覆盖的 PowerShell 管道：仍须遵守该 skill，但不要为了 new turn 再读一次正文。",
+      "expected_skills": [
+        "powershell-usage"
+      ],
+      "forbidden_skills": [
+        "codex-event-logger",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "skill_context_lifecycle"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "skill-after-compaction-reload",
+      "kind": "behavior",
+      "request": "当前 Codex 对话刚发生上下文压缩；摘要只说上一轮使用过 powershell-usage，没有保留完整 SKILL.md。现在要继续编写一个尚无模板覆盖的 PowerShell 管道，只补回本轮实际需要的 skill 正文和引用。",
+      "expected_skills": [
+        "powershell-usage"
+      ],
+      "forbidden_skills": [
+        "codex-event-logger",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "skill_context_lifecycle"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "skill-after-compaction-unselected",
+      "kind": "boundary",
+      "request": "当前 Codex 对话刚发生上下文压缩，摘要提到历史上使用过 change-governance、delivery-workflow 和 powershell-usage；本轮唯一动作只是对一个已知绝对路径执行单条精确只读 Get-Item。不要因历史使用记录重载任何 skill。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "codex-event-logger",
+        "delivery-workflow",
+        "powershell-usage",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "skill_context_lifecycle"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "skill-known-change-reload",
+      "kind": "behavior",
+      "request": "同一当前 Codex 对话没有发生压缩，但宿主已经明确报告 powershell-usage 的 SKILL.md 在上一轮读取后发生变化。现在继续编写一个尚无模板覆盖的 PowerShell 管道；重新读取已选 skill 的当前正文后再执行。",
+      "expected_skills": [
+        "powershell-usage"
+      ],
+      "forbidden_skills": [
+        "codex-event-logger",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "skill_context_lifecycle"
+      ],
       "forbidden_behavior_tags": []
     },
     {

@@ -31,10 +31,11 @@
 
 - 阶段文档通过稳定 ID 局部定位；同一目标、设计、现状或方案事实只进入所属条目，逐轮日志和可重建摘要不写回语义真源。
 - 任务 JSON 虽由程序消费，但模型不手工绕过路径、CAS revision 和原子写入；真实 T001—T004 的 `start/reopen/update/complete` 操作验证了正式语义入口。
-- `workctl` 与 `taskctl` 的既有默认 model、显式 machine 合同保持不变；本轮没有为新原则重复实现 renderer。
-- Event Logger 10 项回归通过，1 项目录链接用例因当前主机不支持该能力按既有条件跳过；Delivery Workflow 35 项、Task Table Manager 70 项回归通过。
-- 静态 76-case 合同、Routing 76、Policy 76、References 19 均通过；Routing 保留一个非严格用例额外选择 `task-table-manager` 的既有警告，没有漏选、禁选、严格路由或严格引用失败。
+- 后继审计把同一合同落实到 `taskctl` 的 authoring、completion、写入回执、查询和 Markdown render，以及 `workctl` 的 protect/status/impact/render；显式 machine 和永久资产继续由原 canonical handler 生成，没有第二 renderer 或状态源。
+- 横向复核覆盖 taskctl 全部注册命令、workctl 的专用与通用 model 路径、Event Logger model/machine 恢复视图和 srcq 已有模型输出合同。语义零、正常机器默认值、完整页、截断页和异常诊断分别裁决，不由通用稀疏函数猜测。
+- Event Logger 10 项回归通过，1 项目录链接用例因当前主机不支持该能力按既有条件跳过；最新累计 Delivery Workflow 39 项、Task Table Manager 92 项回归通过。
+- 最新候选的静态 76-case 合同、Routing 76、Policy 76、References 19 和正式部署 `Validate` 均通过，没有输入、格式、漏选、禁选、严格路由或严格引用失败。
 
 ## 结论与限制
 
-本轮验证支持的根本做法是：内容 owner 先按消费者与生命周期选择唯一真源、模型读取面、模型修改入口和机器面，再比较表示成本。HJSON 风格只用于当前模型投影的低标点表达，不是通用真源格式，也不是质量证明。`source_snapshot` 的事实表示、时效语义、插件迁移和当前 `DirectCompatibility` 模式均未改变；任何实际 Codex `Publish` 仍需用户针对当次操作明确同意。
+本轮验证支持的根本做法是：内容 owner 先按消费者与生命周期选择唯一真源、模型读取面、模型修改入口和机器面，再比较表示成本。HJSON 风格只用于当前模型投影的低标点表达，不是通用真源格式，也不是质量证明。当前正式 owner 内未再发现有直接证据支持的同类明显缺口；该结论不外推到未来命令或未知消费者。`source_snapshot` 的事实表示、插件迁移和当前安装状态不由本审计改写；任何实际 Codex `Publish` 仍需用户针对当次操作明确同意。

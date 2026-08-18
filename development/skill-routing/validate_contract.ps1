@@ -149,12 +149,23 @@ $requiredGlobalFragments = @(
     '内容仍需专业组织时'
     '默认属于长期资产'
     '仍须完成实施后的必要验收'
-    '首次读取 skill 可例外使用一次精确路径'
+    '首次文件读取可用一次精确路径'
+    '完整 `SKILL.md` 仍在上下文且无已知变化时复用'
+    '压缩后只补回本轮已选 skill'
+    '不以名称、摘要或历史记录代替原文或重读未选 skill'
+    '必须在继续原方案前说明'
+    '不得按失效方案做完后再作为风险交付'
+    '模型按已授权任务是否需跨步骤保持'
+    '用户要求查看计划只决定交付形式'
     '模块测试只证模块契约'
     '原场景、同类变体和相近非触发场景'
     '长期资产还须接入正确职责和唯一正式入口'
     '沿实际依赖复核直接与间接消费者'
-    '选择最低充分 next-turn 深度'
+    '独立于领域 skill、计划和 Goal'
+    '档位缺少有效读回且错配可能实质影响质量或总体成本'
+    '剩余工作足以摊销设置、结束当前轮和恢复成本'
+    '用户明确固定当前对话或工作范围的推理深度时'
+    '设置和读回不依赖 active Goal'
     '简单有界输出不建日志'
     '新一轮调试前只清理会干扰当前判断且目标范围明确的旧日志'
     '工作流程的目标、阶段、状态、依赖、完成和例外由文档定义'
@@ -192,7 +203,7 @@ $descriptionBoundaryFragments = @{
     "cpp-engineering-rules" = "仅正文提及 C++ 不触发"
     "delivery-workflow" = "不用于规格完整的单轮实现"
     "powershell-usage" = "不用于单条精确只读"
-    "reasoning-governor" = "无 active Goal 不自主切换"
+    "reasoning-governor" = "无 active Goal 仍可触发"
     "symbol-structure-workflow" = "不用于只读文本"
     "task-table-manager" = "不用于单轮修改"
     "understand-space" = "正文偶有空间词不触发"
@@ -287,12 +298,22 @@ Assert-True (Test-Path -LiteralPath (Join-Path $PSScriptRoot "merge_routing_evid
 
 $governorSkillPath = Join-Path $ProjectRoot "skills\reasoning-governor\SKILL.md"
 $governorScriptPath = Join-Path $ProjectRoot "skills\reasoning-governor\scripts\reasoning-governor.mjs"
+$governorPowerShellPath = Join-Path $ProjectRoot "skills\reasoning-governor\scripts\reasoning-governor.ps1"
 $governorSkillContent = Get-Content -LiteralPath $governorSkillPath -Raw -Encoding UTF8
 $governorScriptContent = Get-Content -LiteralPath $governorScriptPath -Raw -Encoding UTF8
+$governorPowerShellContent = Get-Content -LiteralPath $governorPowerShellPath -Raw -Encoding UTF8
 Assert-True ($governorSkillContent.Contains('不使用 `Stop` hook')) "reasoning-governor must keep Stop hooks outside its continuation contract"
-Assert-True ($governorSkillContent.Contains("不保存 pending、previous effort 或自动恢复状态")) "reasoning-governor must not create a second reasoning state source"
+Assert-True ($governorSkillContent.Contains("不把临时基线、用户覆盖或自动恢复义务保存")) "reasoning-governor must not create a second reasoning state source"
+Assert-True ($governorSkillContent.Contains("不要求 active Goal")) "reasoning-governor must keep setting independent from Goal continuation"
+Assert-True ($governorSkillContent.Contains("先独立判断目标档位")) "reasoning-governor must assess target effort before status or setting"
+Assert-True ($governorSkillContent.Contains("先判断精确状态能否改变动作")) "reasoning-governor must gate status reads by decision value"
+Assert-True ($governorSkillContent.Contains("比较剩余工作的质量或成本收益")) "reasoning-governor must gate setting by remaining-work benefit"
 Assert-True ($governorScriptContent.Contains('args.action === "status"')) "reasoning-governor script is missing its read-only status operation"
 Assert-True ($governorScriptContent.Contains('operation: "set"')) "reasoning-governor script is missing its set receipt contract"
+Assert-True ($governorScriptContent.Contains('createSnapshotFieldScanner')) "reasoning-governor script is missing structural large-frame readback"
+Assert-True ($governorScriptContent.Contains('renderModelResult')) "reasoning-governor script is missing its minimal model receipt projection"
+Assert-True ($governorScriptContent.Contains('args.view === "machine"')) "reasoning-governor script is missing its explicit machine view"
+Assert-True ($governorPowerShellContent.Contains('[ValidateSet("model", "machine")]')) "reasoning-governor PowerShell entry is missing explicit output views"
 
 $taskTableSkillPath = Join-Path $ProjectRoot "skills\task-table-manager\SKILL.md"
 $taskTableSkillContent = Get-Content -LiteralPath $taskTableSkillPath -Raw -Encoding UTF8
@@ -569,6 +590,7 @@ $requiredCases = @(
     "collaborative-requirement-insight"
     "quality-token-speed-priority"
     "architecture-discovery-before-implementation"
+    "architecture-risk-discovered-during-implementation"
     "implicit-architecture-integration"
     "shared-responsibility-discovery-and-adoption"
     "authority-change-impact-closure"
@@ -596,9 +618,22 @@ $requiredCases = @(
     "protected-baseline-change-discovered"
     "workflow-cli-gate-boundary"
     "single-task-cli-formatting"
+    "adaptive-plan-without-user-prompt"
+    "simple-task-no-formal-plan"
+    "skill-intact-context-reuse"
+    "skill-after-compaction-reload"
+    "skill-after-compaction-unselected"
+    "skill-known-change-reload"
     "active-goal-reasoning-shift"
+    "no-goal-reasoning-shift"
+    "explicit-thread-reasoning-status"
     "explicit-thread-reasoning-setting"
+    "fixed-thread-reasoning-scope"
+    "user-fixed-reasoning-no-autonomous-shift"
     "reasoning-depth-discussion-only"
+    "reasoning-long-domain-work-assessment"
+    "reasoning-short-task-no-transition"
+    "reasoning-current-effort-sufficient"
     "coordinate-frame-conversion"
     "transform-formula-convention"
     "bug-root-cause-fix"
