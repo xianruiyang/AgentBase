@@ -88,6 +88,9 @@
     "specified-local-implementation",
     "one-off-generated-artifact",
     "literal-text-search",
+    "ordinary-scc-summary",
+    "advanced-scc-hotspots",
+    "ordinary-hyperfine-benchmark",
     "source-query-rule-review",
     "complete-known-name-position-list",
     "known-small-definition-range",
@@ -565,6 +568,59 @@
       "expected_change_governance_references": [],
       "expected_behavior_tags": [],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "ordinary-scc-summary",
+      "kind": "negative",
+      "request": "统计当前项目各语言的文件数、代码行、注释和空行，直接使用 srcq scc 的普通模型输出；不要加载高级查询 skill，也不要把复杂度或成本估算当作质量结论。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "advanced-scc-hotspots",
+      "kind": "positive",
+      "request": "普通 scc 汇总不足，请用 srcq query scc 的 hotspots 视图取得文件级复杂度候选并沿精确 cursor 续页；结果只用于选择人工复核范围，不把启发式指标解释为缺陷。",
+      "expected_skills": [
+        "source-query"
+      ],
+      "forbidden_skills": [
+        "symbol-structure-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "ordinary-hyperfine-benchmark",
+      "kind": "negative",
+      "request": "用 hyperfine 比较两个已验证正确且无外部写入的命令，固定工作目录和输入并做预热，只返回有界的人读摘要；不需要源码查询 skill。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "source-query-rule-review",

@@ -7,7 +7,7 @@
 定向比较当前构建：
 
 ```powershell
-python.exe -X utf8 .\compare_ast_baseline.py --srcq D:\path\to\srcq.exe --expected-version 0.3.1
+python.exe -X utf8 .\compare_ast_baseline.py --srcq D:\path\to\srcq.exe --expected-version <current-version>
 ```
 
 这份基线是项目测试资产，不进入 Codex payload。

@@ -4,14 +4,14 @@
 
 本文件记录相对 [requirements.md](requirements.md)、[user-design.md](user-design.md) 和 [design.md](design.md) 的当前直接观察、已经闭环的实现边界与剩余差距。观察对象是当前 AgentBase 工作树；项目正式入口已迁移，实际 Codex 安装态仍须取得当次发布同意。历史测试只按其冻结候选身份保留，不自动覆盖后续源码、skill 或 payload。
 
-## OBS-SQG-001 srcq 已承载三个并列命令域
+## OBS-SQG-001 srcq 已承载四个并列命令域
 
 - 状态: verified
 - 关联: DES-SQG-001, DES-SQG-002, DES-SQG-003
 
-当前 `srcq 0.3.1` 保留迁移前 AST 顶层命令，并以 `srcq rg <native argv...>`、`srcq fd <native argv...>` 提供不抢占任何原生 token 的普通入口；定向 model、machine、native、artifact、diagnostic 与 continuation 位于独立的 `srcq query <rg|fd> ...` 控制面。rg/fd 原生 argv 保留顺序、重复、空值和 Windows 非 UTF 参数，机器参数插入原生命令 `--` 之前；不能安全结构化的调用可用 native、artifact 或 passthrough 保持原生字节和副作用语义。迁移前 `_sgy` 与 `sgy.*` 数据协议继续保留以读取既有 AST 产物，但仓库不提供 `sgy.exe` 命令别名。
+当前 `srcq 0.4.0` 保留迁移前 AST 顶层命令，并以 `srcq rg <native argv...>`、`srcq fd <native argv...>`、`srcq scc <native argv...>` 提供不抢占任何原生 token 的普通入口；定向 model、machine、native、artifact、diagnostic 与 continuation 位于独立的 `srcq query <rg|fd|scc> ...` 控制面。原生 argv 保留顺序、重复、空值和 Windows 非 UTF 参数，机器参数插入原生命令 `--` 之前；不能安全结构化的调用可用 native、artifact 或 passthrough 保持原生字节和副作用语义。迁移前 `_sgy` 与 `sgy.*` 数据协议继续保留以读取既有 AST 产物，但仓库不提供 `sgy.exe` 命令别名。
 
-29 个 ripgrep 15.1.0 与 fd 10.4.2 公开模式样本均有唯一分类，7 个 raw/artifact oracle 已逐字回放。`defaults` 只解释参数和模式，不发现或启动引擎。
+29 个 ripgrep 15.1.0/fd 10.4.2 与 7 个 scc 3.7.0 公开模式样本均有唯一分类，9 个 raw/artifact oracle 已逐字或规范化回放。`defaults` 只解释参数和模式，不发现或启动引擎。
 
 ## OBS-SQG-002 查询结果按所选证据单元投影并按需持久化快照
 
@@ -36,7 +36,7 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 - 状态: verified
 - 关联: DES-SQG-008, DES-SQG-009, CON-SQG-003
 
-正式 `skills/source-query` 用一个精炼主文件按“已知正文直接读取 → srcq rg/fd 普通入口 → 按需 AST → 渐进 LSP”组织，只有完整性、分页、特殊协议或定向输出才读取 rg/fd 细则。正式 payload 只有 `SKILL.md`、`agents/openai.yaml` 和三份按需引用；私有 `sgy.exe`、runtime manifest、来源与许可副本已经退出，消费者只调用用户 PATH 中的 `srcq.exe`。`candidate-skill/source-query` 仅作为隔离 benchmark 输入保留；测试、fixture、runner、corpus、result 和 audit 资产仍由项目开发目录承担。旧 `ast-grep-token-safe`、`fd-usage` 与 `rg-token-safe` 安装路径由 `development/codex-deployment/managed_asset_lifecycle.json` 以稳定身份持有退役状态，使旧主机升级时由正式 Publish 备份并移除残留，而不是仅凭当前 payload 不再列出它们。
+正式 `skills/source-query` 用一个精炼主文件按“已知正文直接读取 → srcq rg/fd/scc 普通入口 → 按需高级 scc/AST → 渐进 LSP”组织，只有完整性、分页、特殊协议或定向输出才读取对应细则。正式 payload 只有 `SKILL.md`、`agents/openai.yaml` 和四份按需引用；私有 `sgy.exe`、runtime manifest、来源与许可副本已经退出，消费者只调用用户 PATH 中的 `srcq.exe`。`candidate-skill/source-query` 仅作为隔离 benchmark 输入保留；测试、fixture、runner、corpus、result 和 audit 资产仍由项目开发目录承担。旧 `ast-grep-token-safe`、`fd-usage` 与 `rg-token-safe` 安装路径由 `development/codex-deployment/managed_asset_lifecycle.json` 以稳定身份持有退役状态，使旧主机升级时由正式 Publish 备份并移除残留，而不是仅凭当前 payload 不再列出它们。
 
 ## OBS-SQG-005 benchmark owner 已具备隔离运行合同
 
@@ -69,9 +69,9 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 
 隔离生命周期测试覆盖幂等安装、状态读回、新 PowerShell 进程 PATH 解析、升级提交失败回滚、恶意 ZIP 与篡改状态拒绝、正常升级、保留并发 PATH 修改、未知安装文件、用户配置和默认 cache，以及显式 cache 清理。`Status` 现会复核 manifest 身份、全部受管文件哈希、实际版本和唯一 PATH 项；同版本 `Install` 能修复被篡改二进制或缺失 PATH。真实 Codex Publish 在写入前复用该状态与 `doctor`，缺失运行时会局部阻断；部署沙箱不消费宿主安装。正式 skill、部署与插件合同已经退出私有运行时和旧查询 skill。
 
-首个独立运行时 `0.3.0` 的源码快照和归档只保留为历史安装证据。当前 `0.3.1` 归档已通过从 `0.3.0` 升级的隔离生命周期：安装、幂等、完整性读回、受管漂移修复、新进程 PATH、失败回滚、恶意 ZIP、篡改 state、真实升级、doctor、卸载边界、并发 PATH、配置/cache 保留与显式 cache 清理全部通过；测试没有写入真实用户安装位置。
+首个独立运行时 `0.3.0` 与后续 `0.3.1` 的源码快照和归档保留为历史安装证据。当前 `0.4.0` 归档已通过从 `0.3.1` 升级的隔离生命周期：安装、幂等、完整性读回、受管漂移修复、新进程 PATH、失败回滚、恶意 ZIP、篡改 state、真实升级、doctor、卸载边界、并发 PATH、配置/cache 保留与显式 cache 清理全部通过；测试没有写入真实用户安装位置。
 
-上一冻结 AST 身份以本机受支持的原生 ast-grep 0.44.1 绑定明确版本 oracle 后，15 项 ignored 真实引擎测试通过，覆盖 run/scan/rewrite、cache/process、LSP、TTY、completion、new/test、失败/取消和 Windows Console Ctrl-C。后续 `0.3.1` 仍用只投影 AST 表面的基线比较证明新增 rg/fd/query 行没有造成 AST help/schema/capabilities 回退。
+上一冻结 AST 身份以本机受支持的原生 ast-grep 0.44.1 绑定明确版本 oracle 后，15 项 ignored 真实引擎测试通过，覆盖 run/scan/rewrite、cache/process、LSP、TTY、completion、new/test、失败/取消和 Windows Console Ctrl-C。`0.4.0` 继续用只投影 AST 表面的基线比较证明新增 scc/query 行没有造成 AST help/schema/capabilities 回退。
 
 ## OBS-SQG-008 LSP 原生渐进发现已经通过候选侧实测
 
@@ -226,6 +226,17 @@ candidate-only identity `93931b4c…9eac2` 的总 Token 为 `736,203`、27 次�
 最终 v21 identity `0cfb891986cb89c96077427564f91720ed52619f82828e05fa84d420174859d5` 完成六类任务各两次：12/12 required、12/12 可见行限和 12/12 evidence complete 通过，45 次命令全部成功，usage 完整且 postflight 无漂移。总 Token `1,066,470`，其中普通输入 `187,534`、缓存输入 `870,144`、输出 `8,792`、推理输出 `3,925`、可见输出 `4,867`；耗时 `480.739 s`，短/长价格等价 `327,300.4` / `628,224.8`。
 
 相对 P9 同为 12/12 的最终候选，Token 少 `84,058`（`-7.31%`），命令少 3 次（`-6.25%`），但耗时增加 `117.576 s`（`+32.38%`）。质量不退化且第二优先级 Token 明显下降，因此采纳；速度没有改善，不外推为全面性能提升。detached auditor 只读取指定 capsule，复算 experiment identity、canonical capsule hash、usage、环境差异和逐案质量后通过；结果见 [iteration-audit-p10-v21.md](evidence/iteration-audit-p10-v21.md)、[audit-result-p10-v21.json](evidence/audit-result-p10-v21.json) 与 [capsule-verification-p10-v21.json](evidence/capsule-verification-p10-v21.json)。最终规则身份又由三个不同 evaluator 完成 69/69 首次路由、69/69 行为策略和 13/13 引用选择，当前 bundle 为 `E721424A…A63DEB`。
+
+## OBS-SQG-026 P11 已接入 scc 指标与主机基准工具
+
+- 状态: verified within deterministic scope
+- 关联: REQ-SQG-001, DES-SQG-001, DES-SQG-003, DES-SQG-004, DES-SQG-008, DES-SQG-011
+
+`srcq 0.4.0` 已增加 scc 直接入口、query 控制面、doctor、summary/languages/files/hotspots/lossless/raw、machine、artifact、分页快照和同次捕获协议回退；指标 parser 与排序保留在 backend 模块，公共网关只承载既有执行、预算和恢复职责。Windows bootstrap 以 `BenBoyter.scc` 与 `sharkdp.hyperfine` 安装并读回两个外部工具；全局规则让普通 scc/hyperfine 无需加载专项 skill，高级 scc 才读取新增引用。hyperfine 不进入 srcq 或发布 payload。
+
+workspace、真实 scc、36 模式/9 oracle、AST 基线、bootstrap、插件、真实 tokenizer、release 和 0.3.1→0.4.0 安装生命周期均通过。源码快照为 `sha256:c7795a6bc25ed6a2ccc477de60a76fad5d9723f9395784f521e5aceabebde300`；两次 clean build 均得到 2725761-byte 归档和 SHA-256 `65734560168a3471c6f907e156ab61ef68fcb88db7a1add93d0014e28648d942`，manifest 明确声明非捆绑 `scc.exe`/3.7.0。
+
+本轮按用户约束未启动独立 Codex。静态路由为 96 cases、55 strict routing、10 strict references；旧 `current.json` 不属于新 bundle，正式 Validate 正确拒绝，不能据此声称新模型行为已验证。实际用户 srcq 仍为 0.3.1，且没有本次 Publish 授权；这些是后继 evidence/安装/发布状态，不是未闭合源码实现。
 
 ## GAP-SQG-008 高成本查询的共享明显改进已经收敛
 

@@ -45,12 +45,19 @@ MODE_SAMPLES: dict[str, list[str]] = {
     "FD-EXEC-BATCH": ["--exec-batch", "cmd.exe", "/d", "/c", "echo", "{}"],
     "FD-HELP": ["--help"],
     "FD-VERSION": ["--version"],
+    "SCC-LANGUAGES": ["."],
+    "SCC-FILES": ["--by-file", "."],
+    "SCC-FORMAT": ["--format", "csv", "."],
+    "SCC-OUTPUT": ["--output", "report.json", "."],
+    "SCC-LANGUAGE-LIST": ["--languages"],
+    "SCC-HELP": ["--help"],
+    "SCC-VERSION": ["--version"],
 }
 
 
 def contract_modes() -> set[str]:
     matrix = json.loads((ROOT / "mode-matrix.json").read_text(encoding="utf-8"))
-    return {item["id"] for item in matrix["modes"] if item["backend"] in {"rg", "fd"}}
+    return {item["id"] for item in matrix["modes"] if item["backend"] in {"rg", "fd", "scc"}}
 
 
 def check_contract() -> None:
@@ -63,7 +70,7 @@ def check_contract() -> None:
 def run_defaults(srcq: Path) -> int:
     checked = 0
     for mode_id, argv in MODE_SAMPLES.items():
-        backend = "rg" if mode_id.startswith("RG-") else "fd"
+        backend = "rg" if mode_id.startswith("RG-") else "fd" if mode_id.startswith("FD-") else "scc"
         completed = subprocess.run(
             [
                 str(srcq),
@@ -97,7 +104,7 @@ def replay_oracle(srcq: Path) -> int:
     checked = 0
     with tempfile.TemporaryDirectory(prefix="srcq-oracle-") as temporary:
         for case in oracle["cases"]:
-            if case["backend"] not in {"rg", "fd"}:
+            if case["backend"] not in {"rg", "fd", "scc"}:
                 continue
             artifact = Path(temporary) / f"{case['id']}.bin"
             if case["id"] == "fd-print0":

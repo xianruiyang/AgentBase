@@ -197,6 +197,8 @@ $requiredGlobalFragments = @(
     '全集、不存在或唯一结论先从最近项目正式来源确认权威源码范围，并只查询该范围'
     'PATH 中的 `srcq fd <fd argv...>`'
     '`srcq rg <rg argv...>`'
+    'PATH 中的 `srcq scc <scc argv...>`'
+    'PATH 中的 `hyperfine <hyperfine argv...>`'
     '已知或唯一定位后按命中范围直接有界读取所缺正文且不再搜索重读'
     '文本不足才按需通过 srcq 升级 AST'
     '真实符号语义不足才用 LSP'
@@ -288,6 +290,7 @@ $sourceQueryRoot = Join-Path $ProjectRoot "skills\source-query"
 $sourceQueryContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "SKILL.md") -Raw -Encoding UTF8
 $sourceQueryAstContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "references\ast.md") -Raw -Encoding UTF8
 $sourceQueryLspContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "references\lsp.md") -Raw -Encoding UTF8
+$sourceQuerySccContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "references\scc.md") -Raw -Encoding UTF8
 $symbolSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\symbol-structure-workflow\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($sourceQueryContent.Contains('PATH 中的 `srcq.exe`')) "source-query must use the installed PATH runtime"
 Assert-True ($sourceQueryContent.Contains('不搜索项目构建目录、Skill、插件或 Codex 缓存中的私有副本')) "source-query must not discover private runtime copies"
@@ -296,6 +299,12 @@ Assert-True ($sourceQueryContent.Contains('证据充分即停止')) "source-quer
 Assert-True ($sourceQueryContent.Contains('续页沿用同一 snapshot 和精确 cursor')) "source-query must preserve continuation identity"
 Assert-True ($globalContent.Contains('PATH 中的 `srcq fd <fd argv...>`')) "global rules must expose the minimal direct fd syntax"
 Assert-True ($globalContent.Contains('`srcq rg <rg argv...>`')) "global rules must expose the minimal direct rg syntax"
+Assert-True ($globalContent.Contains('PATH 中的 `srcq scc <scc argv...>`')) "global rules must expose the minimal direct scc syntax"
+Assert-True ($globalContent.Contains('PATH 中的 `hyperfine <hyperfine argv...>`')) "global rules must expose the independent hyperfine syntax"
+Assert-True ($sourceQueryContent.Contains('普通 rg/fd/scc、hyperfine、规则审查或工具名提及不触发')) "source-query must exclude ordinary scc and hyperfine use from skill routing"
+Assert-True ($sourceQuerySccContent.Contains('`summary`、`languages`、`files`、`hotspots`、`lossless` 与 `raw`')) "source-query must document every scc projection"
+Assert-True ($sourceQuerySccContent.Contains('默认模型投影有意省略 COCOMO')) "source-query must preserve the scc estimation boundary"
+Assert-True ($sourceQuerySccContent.Contains('同一次捕获的有界回退，不重复执行扫描')) "source-query must not rerun scc after a protocol fallback"
 Assert-True ($sourceQueryAstContent.Contains('“完整定义”是验收结果，不是 AST 触发词')) "source-query must not trigger AST from the requested result wording alone"
 Assert-True ($sourceQueryAstContent.Contains('无匹配不是继续猜 pattern 的依据')) "source-query must require new source evidence before another AST pattern"
 Assert-True ($sourceQueryAstContent.Contains('`_sgy.total/files/shown/omitted/complete/cache`')) "source-query must preserve the stable AST result protocol"
@@ -507,12 +516,13 @@ $expectedSourceQueryFiles = @(
     'agents\openai.yaml',
     'references\ast.md',
     'references\lsp.md',
-    'references\rg-fd.md'
+    'references\rg-fd.md',
+    'references\scc.md'
 )
 $actualSourceQueryFiles = @(Get-ChildItem -LiteralPath $sourceQueryRoot -Recurse -File | ForEach-Object {
     $_.FullName.Substring($sourceQueryRoot.Length + 1)
 })
-Assert-True ($actualSourceQueryFiles.Count -eq $expectedSourceQueryFiles.Count) "source-query payload must contain only its five protocol files"
+Assert-True ($actualSourceQueryFiles.Count -eq $expectedSourceQueryFiles.Count) "source-query payload must contain only its six protocol files"
 foreach ($relativePath in $expectedSourceQueryFiles) {
     Assert-True ($actualSourceQueryFiles -contains $relativePath) "source-query payload is missing $relativePath"
 }

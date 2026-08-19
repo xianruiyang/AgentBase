@@ -40,7 +40,7 @@ AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、ski
 - 源码与工程：`source-query`、`symbol-structure-workflow`、`powershell-usage`、`cpp-engineering-rules`、`understand-space`。
 - 运行协作：`codex-event-logger`、`codex-qq-hook`。
 
-`source-query` 统一消费 PATH 中独立安装的 `srcq.exe`，并在真实符号身份、类型、引用或层级仍有歧义时渐进使用 `vscode-lsp-mcp`。插件包不复制 MCP 或 `srcq.exe`，也不建立第二套安装入口。
+`source-query` 统一消费 PATH 中独立安装的 `srcq.exe`：普通文本、文件和源码统计分别直接使用 `srcq rg`、`srcq fd` 与 `srcq scc`，高级投影、续页和语义查询才按需加载 skill；可重复命令基准直接使用独立安装的 `hyperfine`。真实符号身份、类型、引用或层级仍有歧义时再渐进使用 `vscode-lsp-mcp`。插件包不复制 MCP、`srcq.exe`、scc 或 hyperfine，也不建立第二套安装入口。
 
 组件许可证独立生效：`mcp/vscode-lsp-mcp` 使用 Apache-2.0，`tools/srcq` 使用 MIT OR Apache-2.0。仓库根目前没有统一 `LICENSE`，不能把组件许可证外推为整个 AgentBase 的授权。
 

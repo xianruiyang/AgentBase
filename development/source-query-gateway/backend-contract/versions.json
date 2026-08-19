@@ -1,7 +1,7 @@
 {
   "schema": "agentbase.source-query-backend-versions/v1",
   "platform": "windows-x86_64",
-  "capturedDate": "2026-08-15",
+  "capturedDate": "2026-08-19",
   "backends": [
     {
       "id": "rg-15.1.0",
@@ -18,6 +18,14 @@
       "versionOutput": "fd 10.4.2",
       "commands": ["search", "exec", "exec-batch", "help", "version"],
       "help": ["help/fd-10.4.2.txt"]
+    },
+    {
+      "id": "scc-3.7.0",
+      "backend": "scc",
+      "version": "3.7.0",
+      "versionOutput": "scc version 3.7.0",
+      "commands": ["languages", "files", "format", "output", "language-list", "help", "version"],
+      "help": ["help/scc-3.7.0.txt"]
     },
     {
       "id": "ast-grep-0.41.1",

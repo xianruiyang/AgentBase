@@ -678,6 +678,8 @@ function Get-ValidatedSource {
         'Format-HostPrerequisiteModelResult'
         'Microsoft.PowerShell'
         'sharkdp.fd'
+        'BenBoyter.scc'
+        'sharkdp.hyperfine'
         'Python.Python.3.13'
         'OpenJS.NodeJS.LTS'
         '@ast-grep/cli@0.44.1'
@@ -702,7 +704,8 @@ function Get-ValidatedSource {
         -not $deploymentReadmeContent.Contains('-View Machine')) {
         throw "Deployment README does not document the Windows host bootstrap lifecycle"
     }
-    if (-not $deploymentReadmeContent.Contains('install-srcq.ps1') -or -not $deploymentReadmeContent.Contains('ready=true') -or -not $deploymentReadmeContent.Contains('srcq doctor')) {
+    if (-not $deploymentReadmeContent.Contains('install-srcq.ps1') -or -not $deploymentReadmeContent.Contains('ready=true') -or
+        -not $deploymentReadmeContent.Contains('srcq doctor') -or -not $deploymentReadmeContent.Contains('srcq query scc doctor')) {
         throw "Deployment README does not retain the independent srcq runtime preflight"
     }
     $portableConfigPath = Join-Path $Root "global\config.toml"
@@ -943,6 +946,20 @@ function Get-SrcqRuntimePreflight {
         if ($LASTEXITCODE -ne 0) {
             throw "srcq doctor failed: $($doctorText -join ' ')"
         }
+        $sccDoctorText = @(& $binary query scc doctor --output machine 2>&1)
+        $sccDoctorExit = $LASTEXITCODE
+        $sccDoctorDocument = $sccDoctorText -join [Environment]::NewLine
+        $sccVersionMatch = [regex]::Match($sccDoctorDocument, '(?m)^"observed_version": (?<value>"(?:[^"\\]|\\.)*")\s*$')
+        $sccObservedVersion = if ($sccVersionMatch.Success) {
+            try { [string]($sccVersionMatch.Groups['value'].Value | ConvertFrom-Json) } catch { $null }
+        } else { $null }
+        if ($sccDoctorExit -ne 0 -or
+            $sccDoctorDocument -notmatch '(?m)^\s+"schema": "sgy\.query\.doctor/v1"\s*$' -or
+            $sccDoctorDocument -notmatch '(?m)^\s+"backend": "scc"\s*$' -or
+            $sccDoctorDocument -notmatch '(?m)^\s+"ok": true\s*$' -or
+            $sccObservedVersion -notmatch '^scc version \d+\.\d+\.\d+') {
+            throw "srcq scc doctor failed: $($sccDoctorText -join ' '). Run development\codex-deployment\bootstrap_windows.ps1 -Action Install, restart the Codex desktop host if PATH changed, then retry."
+        }
         return [pscustomobject]@{
             in_scope = $true
             ready = $true
@@ -951,6 +968,8 @@ function Get-SrcqRuntimePreflight {
             integrity = [string]$status.integrity
             path_entry_count = [int]$status.pathEntryCount
             doctor_ok = $true
+            scc_doctor_ok = $true
+            scc_version = $sccObservedVersion
         }
     }
     catch {
@@ -963,6 +982,8 @@ function Get-SrcqRuntimePreflight {
             integrity = $null
             path_entry_count = 0
             doctor_ok = $false
+            scc_doctor_ok = $false
+            scc_version = $null
             error = $_.Exception.Message
         }
     }
@@ -1008,7 +1029,7 @@ if ($Action -eq "Status") {
     $lifecycleManifest = if ($null -eq $lifecyclePublishRecord) { $null } else { $lifecyclePublishRecord.document }
     $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode -PreviousManifest $lifecycleManifest
     $srcqRuntime = if (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot) {
-        [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null }
+        [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null; scc_doctor_ok = $null; scc_version = $null }
     } else {
         Get-SrcqRuntimePreflight -Root $ProjectRoot -Required $false
     }
@@ -1093,6 +1114,8 @@ if ($Action -eq "Status") {
         srcq_integrity = $srcqRuntime.integrity
         srcq_path_entry_count = $srcqRuntime.path_entry_count
         srcq_doctor_ok = $srcqRuntime.doctor_ok
+        srcq_scc_doctor_ok = $srcqRuntime.scc_doctor_ok
+        scc_version = $srcqRuntime.scc_version
         srcq_runtime_error = if ($srcqRuntime.PSObject.Properties.Name -contains 'error') { $srcqRuntime.error } else { $null }
     }
     Set-AgentBaseResultType -Result $result -Kind Status
@@ -1101,7 +1124,7 @@ if ($Action -eq "Status") {
 
 if ($Action -eq "Publish") {
     $srcqRuntime = if (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot) {
-        [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null }
+        [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null; scc_doctor_ok = $null; scc_version = $null }
     } else {
         Get-SrcqRuntimePreflight -Root $ProjectRoot -Required $true
     }
@@ -1201,6 +1224,8 @@ if ($Action -eq "Publish") {
             srcq_integrity = $srcqRuntime.integrity
             srcq_path_entry_count = $srcqRuntime.path_entry_count
             srcq_doctor_ok = $srcqRuntime.doctor_ok
+            srcq_scc_doctor_ok = $srcqRuntime.scc_doctor_ok
+            scc_version = $srcqRuntime.scc_version
             installed_bundle_sha256 = $null
             installed_contract_bundle_sha256 = $null
             targets = $targetStates
@@ -1315,6 +1340,8 @@ if ($Action -eq "Publish") {
         srcq_integrity = $srcqRuntime.integrity
         srcq_path_entry_count = $srcqRuntime.path_entry_count
         srcq_doctor_ok = $srcqRuntime.doctor_ok
+        srcq_scc_doctor_ok = $srcqRuntime.scc_doctor_ok
+        scc_version = $srcqRuntime.scc_version
     }
     Set-AgentBaseResultType -Result $result -Kind Publish
     return

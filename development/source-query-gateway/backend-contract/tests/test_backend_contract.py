@@ -61,7 +61,7 @@ class BackendContractTests(unittest.TestCase):
         modes = matrix["modes"]
         ids = [mode["id"] for mode in modes]
         self.assertEqual(len(ids), len(set(ids)))
-        self.assertEqual({mode["backend"] for mode in modes}, {"rg", "fd", "ast-grep"})
+        self.assertEqual({mode["backend"] for mode in modes}, {"rg", "fd", "scc", "ast-grep"})
         self.assertTrue(
             {mode["handling"] for mode in modes}
             <= set(matrix["handling"]),
@@ -69,8 +69,11 @@ class BackendContractTests(unittest.TestCase):
         ast_selectors = " ".join(mode["selector"] for mode in modes if mode["backend"] == "ast-grep")
         for command in ("run", "scan", "test", "new", "lsp", "outline", "completions"):
             self.assertIn(command, ast_selectors)
+        scc_selectors = " ".join(mode["selector"] for mode in modes if mode["backend"] == "scc")
+        for command in ("by-file", "format", "output", "languages", "help", "version"):
+            self.assertIn(command, scc_selectors)
 
-    def test_candidate_verifier_samples_every_rg_fd_mode(self) -> None:
+    def test_candidate_verifier_samples_every_rg_fd_scc_mode(self) -> None:
         completed = subprocess.run(
             [
                 sys.executable,
@@ -96,6 +99,8 @@ class BackendContractTests(unittest.TestCase):
         self.assertEqual(cases["rg-no-match-json"]["exitCode"], 1)
         self.assertEqual(cases["fd-no-match"]["exitCode"], 0)
         self.assertEqual(cases["ast-run-no-match"]["exitCode"], 1)
+        self.assertEqual(cases["scc-language-json"]["exitCode"], 0)
+        self.assertEqual(cases["scc-files-json"]["exitCode"], 0)
         encoded = cases["fd-print0"]["stdoutBase64"]
         self.assertIsInstance(encoded, str)
         self.assertIn(b"\0", base64.b64decode(encoded))

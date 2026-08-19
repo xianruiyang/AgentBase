@@ -305,6 +305,20 @@ P10 保留真实运行所携带的目标项目 `AGENTS.md`，不为得到更好�
 
 任何 `inspect` 类命令仍不进入规则、skill、CLI help 或发布 payload。若详细审计证明最低充分能力确实缺失，应先修订需求、设计与 DEC-SQG-001，经职责裁决后再实现，而不是把预设结论写回工具。
 
+### P11 scc 指标 backend 与主机工具接入
+
+| ID | 任务 | 依赖 | 产出 | 验证与闭环 |
+| --- | --- | --- | --- | --- |
+| TSQG-086 | 冻结 scc/hyperfine 当前行为、用户合同和 owner | TSQG-085 | [P11 交付链](../../docs/work/20260819_source_metrics_and_benchmark_tooling/requirements.md)及职责设计 | 区分 scc 指标事实、srcq 输出治理、hyperfine benchmark 与 bootstrap 安装状态；不形成同责入口 |
+| TSQG-087 | 实现 `srcq scc` 直接入口和高级控制面 | TSQG-086 | scc backend、稳定 machine schema、有界 model、native/artifact 与 doctor | 真实 scc 汇总/逐文件/大结果/错误/版本漂移通过；argv、退出、特殊格式和 rg/fd/AST 不退化 |
+| TSQG-088 | 接入 Windows bootstrap 与部署消费者 | TSQG-086 | scc/hyperfine Check/Install、状态读回、静态部署校验和安装说明 | 精确 winget ID、缺失/过期、幂等安装、PATH 重启和发布 payload 边界通过测试 |
+| TSQG-089 | 接入全局路由与 source-query 高级合同 | TSQG-087, TSQG-088 | 普通 `srcq scc`/`hyperfine` 选择、scc 按需引用及路由案例 | 普通任务不预加载 skill；高级控制能发现；静态 Routing/Policy/References 通过；本轮不启动独立 Codex |
+| TSQG-090 | 完成受影响验证、release 候选和影响审计 | TSQG-087, TSQG-088, TSQG-089 | 定向/完整/真实工具/tokenizer/release/installer/部署结果与完成审计 | 无已知适用失败；独立 Codex 与真实 Publish 按用户约束保持未执行并明确证据上限 |
+
+P11 只抽取已经由 rg/fd/scc 证明相同的执行、预算、快照和输出职责；scc 参数分类、指标记录和投影保留 backend 语义。hyperfine 不进入 srcq，也不成为完成裁判。用户明确限制当前单 turn 不运行独立 Codex，因此 TSQG-090 的本轮闭环只覆盖确定性与真实本地运行，后继模型采纳验证不得被静态证据替代。
+
+P11 实施状态（2026-08-19）：TSQG-086 至 TSQG-090 的项目源码、消费者接入、release 和确定性验证均已完成，没有开放实施任务。独立路由 evidence 因当轮额度约束保持旧 bundle，正式 Validate 正确拒绝；真实 srcq 安装升级与 Codex Publish 也未获当次授权。这三项属于后继证据或外部状态转换，不以未完成源码掩盖，也不由 P11 自动授权。
+
 ## 5. 停止与重开条件
 
 - AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断或 release gate 任一发生非必要变化时，停止并回到设计裁决。

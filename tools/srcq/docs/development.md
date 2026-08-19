@@ -4,6 +4,7 @@
 
 - Rust 1.85.0，最小 profile；`rust-toolchain.toml` 固定版本及 rustfmt/clippy。
 - ast-grep 0.42.0 用于固定版真实集成；多版本矩阵还使用 0.41.1 与 0.44.1。
+- scc 3.7.0 用于 query gateway 的真实汇总、逐文件、json2、显式格式与输出副作用集成；fixture 另覆盖未来字段形状、协议变化和错误退出。
 - Node/Python 不是构建或运行依赖。
 
 ## Workspace
@@ -25,7 +26,7 @@ cargo lint
 cargo fmt-check
 ```
 
-真实 ast-grep ignored 测试需要设置 `SRCQ_AST_GREP` 和 `SRCQ_AST_GREP_EXPECTED_VERSION`，并按 package/版本顺序运行；不要并行执行共享 fixture 的全部 ignored 测试。
+真实 ast-grep ignored 测试需要设置 `SRCQ_AST_GREP` 和 `SRCQ_AST_GREP_EXPECTED_VERSION`，并按 package/版本顺序运行；真实 scc 测试使用 PATH 或 `SRCQ_SCC_PATH`。不要并行执行共享 fixture 的全部 ignored 测试。
 
 `cargo lint` 与 `cargo ci-test` 都包含 `--all-targets --all-features`；不要用缺少 `test-helper` feature 的普通 workspace test 替代正式门禁。真实引擎测试还需要显式传入 `-- --ignored`。
 

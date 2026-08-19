@@ -13,14 +13,15 @@
 
 - [ ] 在 Windows x86_64 原生 runner 上 clean build；`srcq --version` 可启动。
 - [ ] archive checksum、精确成员集合、manifest 文件 hash、target 和 SBOM 可验证。
-- [ ] 安装 → `doctor` → 核心 `exec`/cache/process smoke → 同版幂等安装 → 升级/失败回滚 → 卸载通过。
+- [ ] 安装 → `doctor` → `query scc doctor` → 核心 AST/rg/fd/scc、cache/process smoke → 同版幂等安装 → 升级/失败回滚 → 卸载通过。
 - [ ] ast-grep 固定版 0.42.0 可用；兼容声明中的其他版本只按已有精确矩阵声明。
+- [ ] scc 3.7.0 的 summary/languages/files/hotspots、json2、分页、协议回退、错误退出与输出副作用边界通过；缺失 scc 时发布前置检查失败而不是静默降级。
 - [ ] 验证 PowerShell 5.1、用户 PATH、配置/cache 路径和失败回滚。
 - [ ] TTY/LSP 只在原生协议证据存在时签署，不能从普通 batch smoke 推断。
 
 ## 3. 共存与安全
 
-- [ ] `srcq` 不安装或覆盖 `ast-grep`/`sg`，不修改 ast-grep 自身安装。
+- [ ] `srcq` 不安装或覆盖 `ast-grep`/`sg`、scc 或 hyperfine，不修改这些工具自身安装。
 - [ ] srcq 配置/cache/安装根与 `source-query`、vscode-lsp-mcp 和其他语义编辑组件无路径冲突。
 - [ ] 安装、失败回滚和卸载前后，其他组件与用户配置/cache 的 hash 不变。
 - [ ] 卸载只删除 install state 声明的受管文件和自身 PATH 条目；未知文件、预存 PATH 条目与并发 PATH 编辑保留。

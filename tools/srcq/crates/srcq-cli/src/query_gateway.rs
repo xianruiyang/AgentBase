@@ -1,4 +1,6 @@
-//! Native-argv-compatible rg/fd gateway. AST commands deliberately remain in their existing path.
+//! Native-argv-compatible rg/fd/scc gateway. AST commands deliberately remain in their existing path.
+
+mod scc;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -23,8 +25,39 @@ use srcq_core::invocation::OutputFormat;
 const MAX_STDOUT_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_STDERR_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_SPOOL_ENTRIES: usize = 32;
-const DIRECT_COMPLETE_MAX_UNITS: usize = 512;
+pub(super) const DIRECT_COMPLETE_MAX_UNITS: usize = 512;
 const DIRECT_SINGLE_PATH_MAX_TEXT_CHARS: usize = 1024;
+const SCC_SHORT_VALUE_OPTIONS: &[char] = &['x', 'n', 'i', 'M', 'f', 'o', 's'];
+const SCC_LONG_VALUE_OPTIONS: &[&str] = &[
+    "--avg-wage",
+    "--cocomo-project-type",
+    "--count-as",
+    "--currency-symbol",
+    "--directory-walker-job-workers",
+    "--eaf",
+    "--exclude-dir",
+    "--exclude-ext",
+    "--exclude-file",
+    "--file-gc-count",
+    "--file-list-queue-size",
+    "--file-process-job-workers",
+    "--file-summary-job-queue-size",
+    "--format",
+    "--format-multi",
+    "--generated-markers",
+    "--include-ext",
+    "--large-byte-count",
+    "--large-line-count",
+    "--min-gen-line-length",
+    "--not-match",
+    "--output",
+    "--overhead",
+    "--remap-all",
+    "--remap-unknown",
+    "--size-unit",
+    "--sort",
+    "--sql-project",
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Handling {
@@ -143,6 +176,7 @@ fn engine_name(backend: GatewayBackend) -> &'static str {
     match backend {
         GatewayBackend::Rg => "rg.exe",
         GatewayBackend::Fd => "fd.exe",
+        GatewayBackend::Scc => "scc.exe",
     }
 }
 
@@ -150,6 +184,7 @@ fn backend_name(backend: GatewayBackend) -> &'static str {
     match backend {
         GatewayBackend::Rg => "rg",
         GatewayBackend::Fd => "fd",
+        GatewayBackend::Scc => "scc",
     }
 }
 
@@ -165,6 +200,7 @@ fn resolve_engine(
     let variable = match backend {
         GatewayBackend::Rg => "SRCQ_RG_PATH",
         GatewayBackend::Fd => "SRCQ_FD_PATH",
+        GatewayBackend::Scc => "SRCQ_SCC_PATH",
     };
     if let Some(path) = std::env::var_os(variable) {
         return PathBuf::from(path)
@@ -397,6 +433,22 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
     }
     let projection_result = match command.backend {
         GatewayBackend::Fd => render_fd(&rendering, cwd, &snapshot, offset),
+        GatewayBackend::Scc => scc::render(
+            &rendering,
+            mode.id == "SCC-FILES",
+            &snapshot.stdout,
+            snapshot.native_exit,
+            offset,
+        )
+        .map(|projection| Projection {
+            value: projection.value,
+            model: projection.model,
+            displayed: projection.displayed,
+            total: projection.total,
+            view: projection.view,
+            display_complete: projection.display_complete,
+        })
+        .map_err(GatewayError::input),
         GatewayBackend::Rg
             if matches!(
                 mode.id,
@@ -438,9 +490,11 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
     let result_complete = match command.backend {
         GatewayBackend::Rg => matches!(snapshot.native_exit, 0 | 1),
         GatewayBackend::Fd => snapshot.native_exit == 0,
+        GatewayBackend::Scc => snapshot.native_exit == 0,
     };
     let content_complete = match command.backend {
         GatewayBackend::Fd => projection.view != "summary" || projection.total == 0,
+        GatewayBackend::Scc => true,
         GatewayBackend::Rg
             if matches!(
                 mode.id,
@@ -655,6 +709,16 @@ fn validate_view(backend: GatewayBackend, view: &str) -> Result<(), GatewayError
         GatewayBackend::Fd => {
             ["auto", "tree", "flat", "summary", "lossless", "raw"].contains(&view)
         }
+        GatewayBackend::Scc => [
+            "auto",
+            "summary",
+            "languages",
+            "files",
+            "hotspots",
+            "lossless",
+            "raw",
+        ]
+        .contains(&view),
     };
     valid.then_some(()).ok_or_else(|| {
         GatewayError::input(format!(
@@ -682,6 +746,13 @@ fn validate_mode_view(
         (GatewayBackend::Fd, _, "FD-PATHS") => matches!(
             view,
             "auto" | "tree" | "flat" | "summary" | "lossless" | "raw"
+        ),
+        (GatewayBackend::Scc, _, "SCC-LANGUAGES") => {
+            matches!(view, "auto" | "summary" | "languages" | "lossless" | "raw")
+        }
+        (GatewayBackend::Scc, _, "SCC-FILES") => matches!(
+            view,
+            "auto" | "summary" | "languages" | "files" | "hotspots" | "lossless" | "raw"
         ),
         (
             GatewayBackend::Rg,
@@ -721,6 +792,7 @@ fn has(backend: GatewayBackend, args: &[OsString], names: &[&str]) -> bool {
             'A', 'B', 'C', 'd', 'E', 'e', 'f', 'g', 'j', 'M', 'm', 'r', 't', 'T',
         ],
         GatewayBackend::Fd => &['d', 'E', 't', 'e', 'S', 'c', 'j', 'C', 'x', 'X'],
+        GatewayBackend::Scc => SCC_SHORT_VALUE_OPTIONS,
     };
     let long_values: &[&str] = match backend {
         GatewayBackend::Rg => &[
@@ -784,6 +856,7 @@ fn has(backend: GatewayBackend, args: &[OsString], names: &[&str]) -> bool {
             "--path-separator",
             "--search-path",
         ],
+        GatewayBackend::Scc => SCC_LONG_VALUE_OPTIONS,
     };
     let short_targets = names
         .iter()
@@ -838,6 +911,58 @@ fn has(backend: GatewayBackend, args: &[OsString], names: &[&str]) -> bool {
         index += 1;
     }
     false
+}
+
+fn scc_format(args: &[OsString]) -> Option<&str> {
+    let mut index = 0;
+    while index < args.len() {
+        let Some(value) = args[index].to_str() else {
+            index += 1;
+            continue;
+        };
+        if value == "--" {
+            return None;
+        }
+        if let Some(format) = value.strip_prefix("--format=") {
+            return Some(format);
+        }
+        if value == "--format" || value == "-f" {
+            return args.get(index + 1)?.to_str();
+        }
+        if value.starts_with("--") {
+            let option = value.split('=').next().unwrap_or(value);
+            index += if !value.contains('=') && SCC_LONG_VALUE_OPTIONS.contains(&option) {
+                2
+            } else {
+                1
+            };
+            continue;
+        }
+        if let Some(format) = value.strip_prefix("-f=") {
+            return Some(format);
+        }
+        if value.starts_with('-') && value != "-" {
+            let body = &value[1..];
+            for (offset, flag) in body.char_indices() {
+                let remainder = &body[offset + flag.len_utf8()..];
+                if flag == 'f' {
+                    return if remainder.is_empty() {
+                        args.get(index + 1)?.to_str()
+                    } else {
+                        Some(remainder.trim_start_matches('='))
+                    };
+                }
+                if SCC_SHORT_VALUE_OPTIONS.contains(&flag) {
+                    if remainder.is_empty() {
+                        index += 1;
+                    }
+                    break;
+                }
+            }
+        }
+        index += 1;
+    }
+    None
 }
 
 fn classify(backend: GatewayBackend, args: &[OsString]) -> Mode {
@@ -1003,6 +1128,46 @@ fn classify(backend: GatewayBackend, args: &[OsString]) -> Mode {
                 }
             }
         }
+        GatewayBackend::Scc => {
+            if has(backend, args, &["-o", "--output", "--format-multi"]) {
+                Mode {
+                    id: "SCC-OUTPUT",
+                    handling: Handling::Passthrough,
+                }
+            } else if has(backend, args, &["-h", "--help"]) {
+                Mode {
+                    id: "SCC-HELP",
+                    handling: Handling::BoundedText,
+                }
+            } else if has(backend, args, &["--version"]) {
+                Mode {
+                    id: "SCC-VERSION",
+                    handling: Handling::BoundedText,
+                }
+            } else if has(backend, args, &["-l", "--languages"]) {
+                Mode {
+                    id: "SCC-LANGUAGE-LIST",
+                    handling: Handling::BoundedText,
+                }
+            } else if scc_format(args).is_some_and(|format| {
+                !format.eq_ignore_ascii_case("json") && !format.eq_ignore_ascii_case("json2")
+            }) {
+                Mode {
+                    id: "SCC-FORMAT",
+                    handling: Handling::BoundedText,
+                }
+            } else if has(backend, args, &["--by-file"]) {
+                Mode {
+                    id: "SCC-FILES",
+                    handling: Handling::Structured,
+                }
+            } else {
+                Mode {
+                    id: "SCC-LANGUAGES",
+                    handling: Handling::Structured,
+                }
+            }
+        }
     }
 }
 
@@ -1049,6 +1214,13 @@ fn injected_argv(backend: GatewayBackend, mode: Mode, args: &[OsString]) -> Vec<
                 OsString::from("--color=never"),
                 OsString::from("--path-separator=/"),
             ]
+        }
+        GatewayBackend::Scc if matches!(mode.id, "SCC-LANGUAGES" | "SCC-FILES") => {
+            if has(backend, args, &["-f", "--format"]) {
+                Vec::new()
+            } else {
+                vec![OsString::from("--format=json")]
+            }
         }
         _ => Vec::new(),
     }
@@ -3082,7 +3254,7 @@ fn os_args_json(args: &[OsString]) -> Result<Vec<String>, GatewayError> {
         .collect()
 }
 
-fn model_text_cost(text: &str) -> usize {
+pub(super) fn model_text_cost(text: &str) -> usize {
     let mut total = 0_usize;
     let mut ascii_word = 0_usize;
     for character in text.chars() {
@@ -3105,7 +3277,7 @@ fn model_representation_key(text: &str) -> (usize, usize) {
     (model_text_cost(text), text.chars().count())
 }
 
-fn model_page_end(
+pub(super) fn model_page_end(
     offset: usize,
     maximum_end: usize,
     budget: usize,
@@ -3213,6 +3385,27 @@ mod tests {
             classify(GatewayBackend::Fd, &args(&["--", "--print0", "."])).id
         );
         assert_eq!(
+            "SCC-FILES",
+            classify(GatewayBackend::Scc, &args(&["--by-file", "."])).id
+        );
+        assert_eq!(
+            "SCC-LANGUAGES",
+            classify(GatewayBackend::Scc, &args(&["--sort", "--by-file", "."])).id,
+            "an option value must not be reinterpreted as a selector"
+        );
+        assert_eq!(
+            "SCC-FORMAT",
+            classify(GatewayBackend::Scc, &args(&["-fcsv", "."])).id
+        );
+        assert_eq!(
+            "SCC-OUTPUT",
+            classify(GatewayBackend::Scc, &args(&["-oreport.json", "."])).id
+        );
+        assert_eq!(
+            "SCC-LANGUAGES",
+            classify(GatewayBackend::Scc, &args(&["--", "--by-file"])).id
+        );
+        assert_eq!(
             args(&["-F", "--json", "--color=never", "--", "-needle", "."]),
             effective_argv(
                 &args(&["-F", "--", "-needle", "."]),
@@ -3222,7 +3415,7 @@ mod tests {
     }
 
     #[test]
-    fn covers_every_documented_rg_and_fd_primary_selector() {
+    fn covers_every_documented_rg_fd_and_scc_primary_selector() {
         let rg_cases = [
             (&["--json"][..], "RG-SEARCH-JSON"),
             (&["--files"], "RG-FILES"),
@@ -3270,6 +3463,31 @@ mod tests {
                 "{argv:?}"
             );
         }
+        let scc_cases = [
+            (&["--by-file"][..], "SCC-FILES"),
+            (&["--format", "json"], "SCC-LANGUAGES"),
+            (&["--format", "json2"], "SCC-LANGUAGES"),
+            (&["--format", "csv"], "SCC-FORMAT"),
+            (&["--format-multi", "json:a.json"], "SCC-OUTPUT"),
+            (&["--output", "report.json"], "SCC-OUTPUT"),
+            (&["--languages"], "SCC-LANGUAGE-LIST"),
+            (&["--help"], "SCC-HELP"),
+            (&["--version"], "SCC-VERSION"),
+            (&["."], "SCC-LANGUAGES"),
+        ];
+        for (argv, expected) in scc_cases {
+            assert_eq!(
+                expected,
+                classify(GatewayBackend::Scc, &args(argv)).id,
+                "{argv:?}"
+            );
+        }
+        assert!(injected_argv(
+            GatewayBackend::Scc,
+            classify(GatewayBackend::Scc, &args(&["--format"])),
+            &args(&["--format"]),
+        )
+        .is_empty());
     }
 
     #[test]

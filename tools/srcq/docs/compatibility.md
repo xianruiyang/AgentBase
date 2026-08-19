@@ -35,8 +35,12 @@ srcq 的基本契约是“显式原生 argv 优先，缺省时做安全补全”
 - Token-Safe no-match（code 1、空 stdout/stderr）在 model 保持空 stdout，在 machine 返回空上下文并保留 code 1；lossless 不制造原生不存在的 JSON value。
 - stdin/EOF 透传给原生命令；`process` 未指定 input/cache 时则从 stdin 读取。
 
+## rg/fd/scc 网关
+
+普通 `srcq rg|fd|scc` 将 backend 后的原生 argv 保持为独立参数数组。rg/fd 的结构化、NUL、文本、二进制和副作用模式按[查询网关](query-gateway.md)分类；scc 常规汇总注入 JSON，`--by-file` 形成逐文件记录，json2 从 `languageSummary` 读取语言事实，显式非 JSON 格式保持有界文本，输出文件模式只透传一次。machine 使用稳定的 srcq query schema，lossless/raw 保留原生协议；解析失败、非零退出或未知字段不得伪装成完整空结果。
+
 ## 版本与平台声明
 
-当前固定基线为 ast-grep 0.42.0；Windows x86_64 还精确验证了 0.41.1 与 0.44.1。支持声明只覆盖这三个精确版本，不把中间未运行版本推断为兼容。未知命令继续使用 raw fallback，不能据此宣称其全部语义已认证。
+当前固定基线为 ast-grep 0.42.0；Windows x86_64 还精确验证了 0.41.1 与 0.44.1。scc backend 当前精确验证 `scc 3.7.0`。支持声明只覆盖这些精确版本，不把中间未运行版本推断为兼容。未知命令继续使用 raw fallback，不能据此宣称其全部语义已认证。
 
 唯一维护平台是 Windows x86_64 MSVC，现有证据覆盖三版本真实 run/scan/rewrite/cache、TTY/LSP、确定性 release 和 PowerShell 5.1 安装生命周期。其他平台不进入构建、测试、安装或发布范围。

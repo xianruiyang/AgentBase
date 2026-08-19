@@ -51,12 +51,113 @@ fn default_model_output_contains_only_requested_evidence() {
     assert!(!fd.contains("|file"));
     assert!(!fd.contains("root_aliases"));
 
+    let scc = srcq(directory.path(), local.path())
+        .args(["scc", "src"])
+        .output()
+        .expect("model scc");
+    assert!(
+        scc.status.success(),
+        "{}",
+        String::from_utf8_lossy(&scc.stderr)
+    );
+    let scc = String::from_utf8(scc.stdout).expect("UTF-8 scc model output");
+    assert!(scc.contains("TypeScript files=2"));
+    assert!(!scc.contains("COCOMO"));
+    assert!(!scc.contains("estimatedCost"));
+
     let none = srcq(directory.path(), local.path())
         .args(["rg", "-F", "absent", "."])
         .output()
         .expect("model no match");
     assert_eq!(none.status.code(), Some(1));
     assert!(none.stdout.is_empty());
+}
+
+#[test]
+fn real_scc_json2_files_lossless_and_explicit_text_formats_keep_their_contracts() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let files = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "scc",
+            "exec",
+            "--output",
+            "machine",
+            "--view",
+            "files",
+            "--",
+            "--by-file",
+            "--format",
+            "json2",
+            "src",
+        ])
+        .output()
+        .expect("real scc json2 files");
+    assert!(
+        files.status.success(),
+        "{}",
+        String::from_utf8_lossy(&files.stderr)
+    );
+    let files = yaml(&files.stdout);
+    assert_eq!(files["files"].as_array().expect("scc files").len(), 2);
+    assert!(files["files"]
+        .as_array()
+        .expect("scc files")
+        .iter()
+        .all(|record| record["path"]
+            .as_str()
+            .is_some_and(|path| path.contains("src/"))));
+    assert!(files.get("estimatedCost").is_none());
+
+    let lossless = srcq(directory.path(), local.path())
+        .args([
+            "query", "scc", "exec", "--view", "lossless", "--", "--format", "json2", "src",
+        ])
+        .output()
+        .expect("real scc lossless");
+    assert!(lossless.status.success());
+    let lossless = yaml(&lossless.stdout);
+    assert!(lossless["native"]["estimatedCost"].is_number());
+
+    let csv = srcq(directory.path(), local.path())
+        .args([
+            "query", "scc", "exec", "--output", "machine", "--limit", "2", "--", "--format", "csv",
+            "src",
+        ])
+        .output()
+        .expect("real scc csv");
+    assert!(csv.status.success());
+    let csv = yaml(&csv.stdout);
+    assert_eq!(csv["_sgy"]["schema"], "sgy.query.bounded-text/v2");
+    let csv_lines = csv["lines"].as_array().expect("bounded CSV lines");
+    assert!(csv_lines.len() <= 2);
+    assert_eq!(
+        csv["_sgy"]["total_lines"].as_u64(),
+        Some(csv_lines.len() as u64)
+    );
+    assert_eq!(csv["_sgy"]["complete"]["display"], true);
+}
+
+#[test]
+fn real_scc_empty_directory_is_a_complete_zero_summary() {
+    let directory = fixture();
+    let empty = directory.path().join("empty");
+    fs::create_dir(&empty).expect("empty directory");
+    let local = tempfile::tempdir().expect("local app data");
+    let output = srcq(directory.path(), local.path())
+        .args(["scc", "empty"])
+        .output()
+        .expect("empty scc directory");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("empty model output"),
+        "total languages=0 files=0 lines=0 code=0 comments=0 blanks=0 complexity=0 bytes=0\n"
+    );
 }
 
 #[test]
@@ -283,7 +384,7 @@ fn internal_model_budget_pages_complete_evidence_units_with_exact_cursor() {
 fn doctors_report_available_engines_without_version_admission() {
     let directory = fixture();
     let local = tempfile::tempdir().expect("local app data");
-    for backend in ["rg", "fd"] {
+    for backend in ["rg", "fd", "scc"] {
         let output = srcq(directory.path(), local.path())
             .args(["query", backend, "doctor", "--output", "machine"])
             .output()
@@ -298,6 +399,278 @@ fn doctors_report_available_engines_without_version_admission() {
         assert!(document["observed_version"].is_string());
         assert!(document.get("expected_version").is_none());
     }
+}
+
+#[test]
+fn scc_future_protocol_projects_pages_and_preserves_snapshot_identity() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let engine = env!("CARGO_BIN_EXE_srcq-native-fixture");
+    let first = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "scc",
+            "exec",
+            "--output",
+            "machine",
+            "--view",
+            "files",
+            "--limit",
+            "2",
+            "--engine",
+            engine,
+            "--",
+            "--by-file",
+            "--fixture-scc-files=5",
+            ".",
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .output()
+        .expect("future scc first page");
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let first = yaml(&first.stdout);
+    assert_eq!(first["files"].as_array().expect("files").len(), 2);
+    assert_eq!(first["files"][0]["path"], "src/file-0.rs");
+    assert_eq!(first["_sgy"]["result_total"], 5);
+    assert_eq!(first["_sgy"]["complete"]["display"], false);
+    let cursor = first["_sgy"]["next_cursor"]
+        .as_str()
+        .expect("cursor")
+        .to_owned();
+    let snapshot = first["_sgy"]["query_snapshot"]
+        .as_str()
+        .expect("snapshot")
+        .to_owned();
+
+    let second = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "scc",
+            "exec",
+            "--output",
+            "machine",
+            "--view",
+            "auto",
+            "--limit",
+            "2",
+            "--engine",
+            engine,
+            "--after",
+            &cursor,
+            "--",
+            "--by-file",
+            "--fixture-scc-files=5",
+            ".",
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .output()
+        .expect("future scc second page");
+    assert!(second.status.success());
+    let second = yaml(&second.stdout);
+    assert_eq!(second["files"].as_array().expect("files").len(), 2);
+    assert_eq!(second["files"][0]["path"], "src/file-2.rs");
+    assert_eq!(second["_sgy"]["query_snapshot"], snapshot);
+}
+
+#[test]
+fn direct_scc_large_file_sets_obey_the_hard_complete_limit() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let output = srcq(directory.path(), local.path())
+        .args(["scc", "--by-file", "--fixture-scc-files=513", "."])
+        .env("SRCQ_SCC_PATH", env!("CARGO_BIN_EXE_srcq-native-fixture"))
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .output()
+        .expect("large direct scc result");
+    assert!(output.status.success());
+    let model = String::from_utf8(output.stdout).expect("large scc model");
+    assert!(model.contains("@more shown="));
+    assert!(model.contains("omitted="));
+    assert!(model.lines().count() <= 81);
+}
+
+#[test]
+fn scc_json2_discards_cost_estimates_and_changed_model_protocol_falls_back_once() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let engine = env!("CARGO_BIN_EXE_srcq-native-fixture");
+    let json2 = srcq(directory.path(), local.path())
+        .args([
+            "query", "scc", "exec", "--output", "machine", "--engine", engine, "--", "--format",
+            "json2", ".",
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .output()
+        .expect("scc json2");
+    assert!(json2.status.success());
+    let json2 = yaml(&json2.stdout);
+    assert_eq!(json2["languages"][0]["name"], "Rust");
+    assert!(json2.get("estimatedCost").is_none());
+
+    let log = directory.path().join("scc-invocations.log");
+    let changed = srcq(directory.path(), local.path())
+        .args(["query", "scc", "exec", "--engine", engine, "--", "."])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "changed")
+        .env("SRCQ_FIXTURE_INVOCATION_LOG", &log)
+        .output()
+        .expect("changed scc protocol");
+    assert!(changed.status.success());
+    assert_eq!(changed.stdout, b"future-scc-protocol\n");
+    assert!(String::from_utf8_lossy(&changed.stderr).contains("bounded native output"));
+    assert_eq!(
+        fs::read_to_string(&log)
+            .expect("scc invocation log")
+            .lines()
+            .count(),
+        1
+    );
+
+    fs::write(&log, b"").expect("reset scc invocation log");
+    let machine = srcq(directory.path(), local.path())
+        .args([
+            "query", "scc", "exec", "--output", "machine", "--engine", engine, "--", ".",
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "changed")
+        .env("SRCQ_FIXTURE_INVOCATION_LOG", &log)
+        .output()
+        .expect("changed scc machine protocol");
+    assert_eq!(machine.status.code(), Some(124));
+    assert!(machine.stdout.is_empty());
+    assert_eq!(
+        fs::read_to_string(&log)
+            .expect("scc machine invocation log")
+            .lines()
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn scc_missing_format_value_is_not_hidden_and_files_view_requires_by_file() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let defaults = srcq(directory.path(), local.path())
+        .args([
+            "query", "scc", "defaults", "--output", "machine", "--", "--format",
+        ])
+        .output()
+        .expect("scc missing format defaults");
+    assert!(defaults.status.success());
+    let defaults = yaml(&defaults.stdout);
+    assert_eq!(
+        defaults["injected_argv"]
+            .as_array()
+            .expect("injected")
+            .len(),
+        0
+    );
+    assert_eq!(
+        defaults["effective_argv"]
+            .as_array()
+            .expect("effective")
+            .len(),
+        1
+    );
+
+    let invocation_log = directory.path().join("invalid-scc-view.log");
+    let rejected = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "scc",
+            "exec",
+            "--view",
+            "files",
+            "--engine",
+            env!("CARGO_BIN_EXE_srcq-native-fixture"),
+            "--",
+            ".",
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .env("SRCQ_FIXTURE_INVOCATION_LOG", &invocation_log)
+        .output()
+        .expect("invalid scc files view");
+    assert_eq!(rejected.status.code(), Some(125));
+    assert!(
+        !invocation_log.exists(),
+        "invalid view must fail before engine execution"
+    );
+}
+
+#[test]
+fn scc_native_errors_and_output_side_effects_are_not_replayed() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let engine = env!("CARGO_BIN_EXE_srcq-native-fixture");
+    let error = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "scc",
+            "exec",
+            "--engine",
+            engine,
+            "--",
+            "--fixture-exit=7",
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .output()
+        .expect("scc native error");
+    assert_eq!(error.status.code(), Some(7));
+
+    let empty_error = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "scc",
+            "exec",
+            "--engine",
+            engine,
+            "--",
+            "--fixture-empty",
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .output()
+        .expect("empty scc native error");
+    assert_eq!(empty_error.status.code(), Some(2));
+    assert!(empty_error.stdout.is_empty());
+
+    let log = directory.path().join("scc-side-effect.log");
+    let created = directory.path().join("scc-created.txt");
+    let side_effect = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "scc",
+            "exec",
+            "--engine",
+            engine,
+            "--",
+            "--output",
+            "report.json",
+            &format!("--fixture-create={}", created.display()),
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_INVOCATION_LOG", &log)
+        .output()
+        .expect("scc output passthrough");
+    assert!(side_effect.status.success());
+    assert!(created.is_file());
+    assert_eq!(
+        fs::read_to_string(log)
+            .expect("side effect invocation log")
+            .lines()
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -744,6 +1117,10 @@ fn summary_views_are_terminal_across_structured_modes() {
             "-F",
             "alpha",
             ".",
+        ],
+        vec![
+            "query", "scc", "exec", "--output", "machine", "--view", "summary", "--limit", "1",
+            "--", ".",
         ],
     ];
     for args in cases {

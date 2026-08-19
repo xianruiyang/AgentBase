@@ -40,6 +40,14 @@
     {"id":"FD-HELP","backend":"fd","selector":"-h|--help","handling":"bounded-text","sideEffects":"none"},
     {"id":"FD-VERSION","backend":"fd","selector":"-V|--version","handling":"bounded-text","sideEffects":"none"},
 
+    {"id":"SCC-LANGUAGES","backend":"scc","selector":"default or explicit json/json2 language summary","handling":"structured","sideEffects":"read-only"},
+    {"id":"SCC-FILES","backend":"scc","selector":"--by-file with default or explicit json/json2","handling":"structured","sideEffects":"read-only"},
+    {"id":"SCC-FORMAT","backend":"scc","selector":"explicit non-json --format|-f","handling":"bounded-text","sideEffects":"read-only-output-transform"},
+    {"id":"SCC-OUTPUT","backend":"scc","selector":"--output|-o|--format-multi","handling":"passthrough","sideEffects":"writes-requested-output-files"},
+    {"id":"SCC-LANGUAGE-LIST","backend":"scc","selector":"-l|--languages","handling":"bounded-text","sideEffects":"none"},
+    {"id":"SCC-HELP","backend":"scc","selector":"-h|--help","handling":"bounded-text","sideEffects":"none"},
+    {"id":"SCC-VERSION","backend":"scc","selector":"--version","handling":"bounded-text","sideEffects":"none"},
+
     {"id":"AST-RUN-STRUCTURED","backend":"ast-grep","selector":"run with wrapper-injected or explicit JSON","handling":"structured","sideEffects":"read-only-or-preview"},
     {"id":"AST-RUN-TEXT","backend":"ast-grep","selector":"run with explicit text/files/debug output","handling":"bounded-text","sideEffects":"read-only-or-preview"},
     {"id":"AST-RUN-APPLY","backend":"ast-grep","selector":"run rewrite with -U|--update-all","handling":"structured","sideEffects":"writes-matched-files"},
@@ -68,6 +76,10 @@
     {"id":"FD-METADATA","backend":"fd","examples":["size","changed-before/within","owner","permissions"]},
     {"id":"FD-REPRESENTATION","backend":"fd","examples":["absolute-path","base-directory","path-separator","strip-cwd-prefix","color"]},
     {"id":"FD-ORDER-BUDGET","backend":"fd","examples":["max-results","threads","quiet","show-errors"]},
+    {"id":"SCC-TRAVERSAL","backend":"scc","examples":["exclude/include extension","ignore files","symlinks","large files","worker counts"]},
+    {"id":"SCC-DETECTION","backend":"scc","examples":["generated","minified","binary","duplicates","language remap"]},
+    {"id":"SCC-METRICS","backend":"scc","examples":["complexity","ULOC","DRYness","character length","size"]},
+    {"id":"SCC-REPRESENTATION","backend":"scc","examples":["sort","wide","percent","CI","COCOMO settings"]},
     {"id":"AST-NATIVE-ARGV","backend":"ast-grep","examples":["language","pattern/rule","globs","selector/context","json/report","rewrite","config"]}
   ]
 }

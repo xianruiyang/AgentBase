@@ -8,9 +8,21 @@ srcq defaults [wrapper options] -- <ast-grep argv...>
 srcq cache <get|query|info|remove|gc> ...
 srcq process <validate|select|filter|count|group|sort|dedupe|merge|to-jsonl|from-jsonl|containing|group-locations> ...
 srcq <schema|capabilities|doctor> ...
+srcq <rg|fd|scc> <native argv...>
+srcq query <rg|fd|scc> <exec|defaults|doctor> ...
 ```
 
-`--` 是强制边界。左侧由 srcq 解析，右侧 token 作为参数数组交给 ast-grep，不经二次 shell 解析。显式原生参数保持值和顺序；不要把 wrapper 参数放到右侧。
+AST `exec/defaults` 与 query `exec/defaults` 的 `--` 是强制边界。左侧由 srcq 解析，右侧 token 作为参数数组交给对应原生引擎，不经二次 shell 解析。普通 `srcq rg|fd|scc` 入口没有 wrapper 参数，其 backend 后全部 token 都是原生 argv。
+
+## 文本、文件与源码指标
+
+```powershell
+srcq rg -n -F 'needle' -g '*.rs' .
+srcq fd -t f 'Cargo.toml' .
+srcq scc --exclude-dir target .
+```
+
+普通 scc 自动返回语言汇总，原生 `--by-file` 返回文件指标。只有明确需要固定 view、machine、lossless/raw、artifact、诊断或续页时进入 `srcq query scc`；`hotspots` 只是按启发式复杂度排序复核候选，不证明缺陷。完整合同见[查询网关](query-gateway.md)。
 
 ## 搜索、扫描与改写
 
@@ -156,11 +168,13 @@ srcq --version
 srcq capabilities
 srcq schema
 srcq doctor
+srcq query scc doctor
 ```
 
 - 原生命令退出码被保留；无匹配和执行错误应按 ast-grep 语义区分。
 - 缺省 model 遇到退出码 1 且 stdout/stderr 均为空时保持空 stdout；machine Token-Safe 返回显式空集合，lossless 保持原生空字节。
 - `doctor` 成功时 model 只输出 `ok`；失败时输出失败项与 machine 重试入口并退出 1。`--output machine` 返回完整 `sgy.doctor/v1`。
+- `srcq query scc doctor` 独立确认 scc 引擎身份；它不扫描源码，也不能替代主 `srcq doctor` 的 AST、配置和 cache 检查。
 - 120–127 保留给 wrapper 自身的解析、转换、缓存、I/O 或协议错误。
 - stderr 与 YAML stdout 分离；需要结构化 sidecar 时使用 `--stderr-yaml PATH`。`--meta-out PATH` 适用于 batch、TTY 和 LSP，并记录 argv hash、引擎版本、耗时与退出状态，不记录源码正文。
 

@@ -40,7 +40,7 @@ The files under `global/agents/` follow the [official Codex custom-agent schema]
 
 ## Prepare a Windows host
 
-PowerShell 7, `fd`, Python 3, Node.js LTS, ast-grep and the independently installed `srcq.exe` are host prerequisites, not part of the AgentBase payload. Codex on Windows prefers `pwsh.exe` when it is available, but the Codex package does not install it; a clean Windows host can otherwise run commands through the older system shell. AgentBase therefore standardizes on PowerShell 7, requires an `fd` build that supports `--max-results`, Python 3.11+, Node.js `>=22.9 <27` and ast-grep 0.44.1。`srcq` 必须从 `tools/srcq` 的受验证 Windows release 通过 `scripts/install-srcq.ps1` 安装到用户 PATH；skill、插件和 Codex 发布不会复制或回退到私有二进制。
+PowerShell 7, `fd`, `scc`, `hyperfine`, Python 3, Node.js LTS, ast-grep and the independently installed `srcq.exe` are host prerequisites, not part of the AgentBase payload. Codex on Windows prefers `pwsh.exe` when it is available, but the Codex package does not install it; a clean Windows host can otherwise run commands through the older system shell. AgentBase therefore standardizes on PowerShell 7, requires an `fd` build that supports `--max-results`, an `scc` build that supports `--by-file`, JSON and json2 output, a `hyperfine` build that supports warmup and JSON export, Python 3.11+, Node.js `>=22.9 <27` and ast-grep 0.44.1。`srcq` 必须从 `tools/srcq` 的受验证 Windows release 通过 `scripts/install-srcq.ps1` 安装到用户 PATH；skill、插件和 Codex 发布不会复制或回退到私有二进制。
 
 When the user asks Codex to prepare, reproduce, or deploy AgentBase on a new Windows machine, that request authorizes installation of these prerequisites through the project entry point. Run it before Validate or Publish:
 
@@ -48,13 +48,14 @@ When the user asks Codex to prepare, reproduce, or deploy AgentBase on a new Win
 & '.\development\codex-deployment\bootstrap_windows.ps1' -Action Install
 ```
 
-The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerShell`, `sharkdp.fd`, `Python.Python.3.13`, and `OpenJS.NodeJS.LTS`, then uses that Node installation to install the exact npm package `@ast-grep/cli@0.44.1`. It changes only missing or unsupported prerequisites and reads back every resolved executable and version plus `fd --max-results` support. Use `-Action Check` for a read-only audit. Direct output defaults to the model view: success is `{ready:true}`, while failure lists only unsupported tools and the recovery action. Add `-View Machine` when automation needs the complete tool, package, path and version JSON. If PowerShell or another PATH-providing prerequisite was installed, fully exit and restart the Codex desktop host before continuing so the new process inherits the persisted PATH. Starting another task inside the same host does not prove that PATH was refreshed.
+The script is idempotent. It uses the exact winget package IDs `Microsoft.PowerShell`, `sharkdp.fd`, `BenBoyter.scc`, `sharkdp.hyperfine`, `Python.Python.3.13`, and `OpenJS.NodeJS.LTS`, then uses that Node installation to install the exact npm package `@ast-grep/cli@0.44.1`. It changes only missing or unsupported prerequisites and reads back every resolved executable and version plus the required fd, scc and hyperfine capabilities. Use `-Action Check` for a read-only audit. Direct output defaults to the model view: success is `{ready:true}`, while failure lists only unsupported tools and the recovery action. Add `-View Machine` when automation needs the complete tool, package, path, version and capability JSON. If any PATH-providing prerequisite was installed, fully exit and restart the Codex desktop host before continuing so the new process inherits the persisted PATH. Starting another task inside the same host does not prove that PATH was refreshed.
 
-Before publishing a payload that contains `source-query`, run the independent runtime owner's status entry and require `ready=true`, then run `srcq doctor`. The status command verifies the installed manifest, managed file hashes, binary version and unique PATH entry; `manage_agentbase.ps1` does not copy or repair that external runtime:
+Before publishing a payload that contains `source-query`, run the independent runtime owner's status entry and require `ready=true`, then run both the AST and scc doctors. The status command verifies the installed manifest, managed file hashes, binary version and unique PATH entry; `manage_agentbase.ps1` does not copy or repair that external runtime or the scc engine:
 
 ```powershell
 & '.\tools\srcq\scripts\install-srcq.ps1' Status
 srcq doctor
+srcq query scc doctor
 ```
 
 The installer also defaults to a compact model receipt. Ready `Status` retains only `ready`, `version` and the exact `binary`; failures retain the reason, direct diagnosis and recovery. Install and upgrade add the binary only when a PATH change requires an immediate explicit doctor call. Use `-View Machine` for the stable complete JSON consumed by deployment validation and other programs.

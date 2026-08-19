@@ -1,6 +1,6 @@
 # srcq
 
-`srcq` 是 Windows 本地源码查询适配器。现有 ast-grep 命令、profile、cache、process、TTY/LSP 和 rewrite 合同保持不变；`srcq rg <native argv...>` 与 `srcq fd <native argv...>` 直接接受原生参数，并只在安全等价时压缩模型可见输出。
+`srcq` 是 Windows 本地源码查询与指标适配器。现有 ast-grep 命令、profile、cache、process、TTY/LSP 和 rewrite 合同保持不变；`srcq rg <native argv...>`、`srcq fd <native argv...>` 与 `srcq scc <native argv...>` 直接接受原生参数，并只在安全等价时压缩模型可见输出。
 
 ```text
 完整事实源 → model 干净证据 / machine 稳定结构 / native 原生通道
@@ -8,12 +8,13 @@
 
 ## 当前状态
 
-- 当前版本：`srcq 0.3.1`。
+- 当前版本：`srcq 0.4.0`。
 - 当前固定验证引擎：`ast-grep 0.42.0`。
 - 精确验证的 ast-grep 版本：`0.41.1`、`0.42.0`、`0.44.1`；不外推为连续版本范围。
 - rg/fd 候选命令域已在 `ripgrep 15.1.0`、Codex PATH 中的 `ripgrep 15.2.0` 与 `fd 10.4.2` 上验证；29 个公开主模式均有持久分类，版本只标识证据范围，不参与运行准入。
+- scc 查询域已在 `scc 3.7.0` 上验证，覆盖语言汇总、逐文件记录、json2、显式文本格式、输出文件、分页、快照、协议变化回退与非零退出；版本只标识证据范围，不参与运行准入。
 - 唯一维护平台是 Windows x86_64 MSVC，已完成真实引擎、协议、release 和安装生命周期。
-- `srcq` 不包含 ast-grep、ripgrep 或 fd，也不安装语言运行时；必须另行提供可启动的原生引擎。
+- `srcq` 不包含 ast-grep、ripgrep、fd 或 scc，也不安装语言运行时；必须另行提供可启动的原生引擎。hyperfine 是 AgentBase 独立的命令基准工具，不是 srcq backend 或运行依赖。
 - 为保持迁移前 AST 结果与缓存可读，版本化数据合同继续使用既有 `_sgy` 字段和 `sgy.*` schema 命名；它们是协议兼容标识，不是可执行文件、安装目录或第二运行时入口。
 - 发布生成的 `THIRD_PARTY_LICENSES.txt` 使用 `SRCQ THIRD-PARTY LICENSES` 产品标题；兼容协议标识不得重新成为发布产物品牌。
 
@@ -58,6 +59,7 @@ srcq exec --profile lossless --cache off -- run -p 'foo($A)' -l ts src
 ```powershell
 srcq rg -n -F 'needle' -g '*.cpp' .
 srcq fd -t f 'CommandDispatch' .
+srcq scc --exclude-dir target,node_modules .
 ```
 
 若把 `files`、`--files` 或 AST 原生命令误写到根级，srcq 只返回上述唯一入口的一行修正，不创建别名或猜测执行。
@@ -68,9 +70,10 @@ srcq fd -t f 'CommandDispatch' .
 srcq query rg exec --output machine --receipt full -- -n -F 'needle' .
 srcq query rg defaults --view grouped -- -n -F 'needle' .
 srcq query fd doctor
+srcq query scc doctor
 ```
 
-普通 rg、fd 与 AST 查询默认使用 model 输出：只输出干净证据，正常成功、完整和空结果不附 envelope 或回执；rg/fd 在取得真实结果后比较单行、文件 heading、路径树及组合表示。直接入口会在完整结果机械可证有界且整体表示足够小时一次闭环，其他结果才按内部预算和完整证据单元分页；只有分页、截断、歧义或写入事实追加最短 `@` 记录。parser、round-trip、完整诊断或旧结构化消费者通过 `srcq query` 或 AST 显式 `--output machine`；`--receipt full`、`--yaml-out`、`lossless` 和 `custom` 也保持机器合同。二进制、TTY、LSP 与完整原生字节走 native/artifact 通道。详见 [模型可见输出合同](docs/model-output.md) 和 [rg/fd 查询网关](docs/query-gateway.md)。
+普通 rg、fd、scc 与 AST 查询默认使用 model 输出：只输出干净证据，正常成功、完整和空结果不附 envelope 或回执；rg/fd 在取得真实结果后比较单行、文件 heading、路径树及组合表示，scc 从同一次完整捕获投影语言或逐文件指标并省略成本估算。直接入口会在完整结果机械可证有界且整体表示足够小时一次闭环，其他结果才按内部预算和完整证据单元分页；只有分页、截断、歧义或写入事实追加最短 `@` 记录。parser、round-trip、完整诊断或旧结构化消费者通过 `srcq query` 或 AST 显式 `--output machine`；`--receipt full`、`--yaml-out`、`lossless` 和 `custom` 也保持机器合同。二进制、TTY、LSP 与完整原生字节走 native/artifact 通道。详见 [模型可见输出合同](docs/model-output.md) 和 [rg/fd/scc 查询网关](docs/query-gateway.md)。
 
 ## Profile
 
@@ -94,7 +97,7 @@ srcq query fd doctor
 - [缓存与取回](docs/cache.md)
 - [安全边界](docs/security.md)
 - [命令兼容](docs/compatibility.md)
-- [rg/fd 查询网关](docs/query-gateway.md)
+- [rg/fd/scc 查询网关](docs/query-gateway.md)
 - [模型可见输出合同](docs/model-output.md)
 - [排障](docs/troubleshooting.md)
 - [开发与发布](docs/development.md)

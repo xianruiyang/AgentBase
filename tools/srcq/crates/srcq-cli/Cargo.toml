@@ -1,6 +1,6 @@
 [package]
 name = "srcq-cli"
-description = "Windows token-safe source query adapter for ast-grep, ripgrep, and fd"
+description = "Windows token-safe source query adapter for ast-grep, ripgrep, fd, and scc"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -41,4 +41,18 @@ python benches/budget_sweep.py `
 python benches/validate_results.py D:\benchmark-output\benchmark-results.json D:\benchmark-output\budget-sweep.json
 ```
 
+## scc 模型投影
+
+`scc_projection_benchmark.py` 在同一源码快照上比较完整 json2 与完整 srcq 任务投影，并用真实 `cl100k_base`、`o200k_base` tokenizer 计数。它同时拒绝未闭合分页和成本估算泄漏；结果只证明静态输出面的直接指标压缩，不证明端到端模型行为：
+
+```powershell
+python benches/scc_projection_benchmark.py `
+  --srcq target\release\srcq.exe `
+  --scc C:\path\to\scc.exe `
+  --root D:\path\to\project `
+  --output target\scc-projection-benchmark.json
+```
+
+启动耗时或多命令分布不由该脚本复制实现；固定工作目录、输入、预热和命令版本后直接使用 AgentBase 主机前置中的 `hyperfine`，需要程序消费时由 hyperfine 写 JSON artifact。
+
 Qwen tokenizer 固定为 `Qwen/Qwen2.5-Coder-7B-Instruct@c03e6d358207e414f1eca0bb1891e29f1db0e242`。首次运行需要下载 tokenizer 文件；之后可从 Hugging Face cache 离线复用。

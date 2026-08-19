@@ -41,6 +41,7 @@ pub fn command() -> Command {
         .subcommand(process_subcommand())
         .subcommand(direct_gateway_subcommand("rg", "ripgrep"))
         .subcommand(direct_gateway_subcommand("fd", "fd"))
+        .subcommand(direct_gateway_subcommand("scc", "scc"))
         .subcommand(query_subcommand())
         .subcommand(
             Command::new("schema")
@@ -71,7 +72,7 @@ pub fn command() -> Command {
                 ),
         )
         .after_help(
-            "Operational syntax: srcq <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: srcq <schema|capabilities|doctor> ...\nCache syntax: srcq cache <get|query|info|remove|gc> ...\nProcess syntax: srcq process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...\nText/file syntax: srcq <rg|fd> <native argv...>\nExplicit query controls: srcq query <rg|fd> <exec|defaults> [options] -- <native argv...>",
+            "Operational syntax: srcq <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: srcq <schema|capabilities|doctor> ...\nCache syntax: srcq cache <get|query|info|remove|gc> ...\nProcess syntax: srcq process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...\nSource syntax: srcq <rg|fd|scc> <native argv...>\nExplicit query controls: srcq query <rg|fd|scc> <exec|defaults|doctor> [options] -- <native argv...>",
         )
 }
 
@@ -94,10 +95,11 @@ fn direct_gateway_subcommand(name: &'static str, engine_name: &'static str) -> C
 
 fn query_subcommand() -> Command {
     Command::new("query")
-        .about("Explicit rg/fd projection and diagnostic controls")
+        .about("Explicit rg/fd/scc projection and diagnostic controls")
         .subcommand_required(true)
         .subcommand(gateway_backend_subcommand("rg", "ripgrep"))
         .subcommand(gateway_backend_subcommand("fd", "fd"))
+        .subcommand(gateway_backend_subcommand("scc", "scc"))
 }
 
 fn gateway_backend_subcommand(name: &'static str, engine_name: &'static str) -> Command {
@@ -114,7 +116,7 @@ fn gateway_backend_subcommand(name: &'static str, engine_name: &'static str) -> 
                 .arg(gateway_cwd_arg()),
         )
         .after_help(
-            "Wrapper options belong before --; native arguments belong after --.\nUse `srcq <backend> exec -- --help` for native engine help.",
+            "Wrapper options belong before --; native arguments belong after --.\nUse `srcq <backend> --help` for native engine help.",
         )
 }
 
@@ -131,6 +133,15 @@ fn gateway_operation_subcommand(name: &'static str, backend: &'static str) -> Co
             "raw",
         ],
         "fd" => vec!["auto", "tree", "flat", "summary", "lossless", "raw"],
+        "scc" => vec![
+            "auto",
+            "summary",
+            "languages",
+            "files",
+            "hotspots",
+            "lossless",
+            "raw",
+        ],
         _ => unreachable!("gateway backend is fixed by command construction"),
     };
     let native = Arg::new("native")
@@ -157,7 +168,7 @@ fn gateway_operation_subcommand(name: &'static str, backend: &'static str) -> Co
                 .visible_alias("max-items")
                 .value_name("N")
                 .default_value("80")
-                .help("Maximum records displayed in this page")
+                .help("Maximum records or bounded text lines displayed in this page")
                 .value_parser(clap::value_parser!(u64).range(1..=10000)),
         )
         .arg(
@@ -489,6 +500,7 @@ pub enum CliAction {
 pub enum GatewayBackend {
     Rg,
     Fd,
+    Scc,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -805,6 +817,7 @@ pub fn parse_cli_from(
             || value == OsStr::new("doctor")
             || value == OsStr::new("rg")
             || value == OsStr::new("fd")
+            || value == OsStr::new("scc")
             || value == OsStr::new("query")
     }) {
         if matches!(raw.get(1).and_then(|value| value.to_str()), Some("query"))
@@ -844,12 +857,19 @@ pub fn parse_cli_from(
                 GatewayBackend::Fd,
                 values,
             ))),
+            Some(("scc", values)) => Ok(CliAction::Gateway(parse_direct_gateway_command(
+                GatewayBackend::Scc,
+                values,
+            ))),
             Some(("query", values)) => match values.subcommand() {
                 Some(("rg", backend)) => {
                     parse_gateway_command(GatewayBackend::Rg, backend).map(CliAction::Gateway)
                 }
                 Some(("fd", backend)) => {
                     parse_gateway_command(GatewayBackend::Fd, backend).map(CliAction::Gateway)
+                }
+                Some(("scc", backend)) => {
+                    parse_gateway_command(GatewayBackend::Scc, backend).map(CliAction::Gateway)
                 }
                 _ => Err(CliParseError::MissingDelimiter),
             },
@@ -1420,6 +1440,50 @@ mod tests {
         assert!(matches!(
             action,
             CliAction::Gateway(command) if command.receipt == "full"
+        ));
+    }
+
+    #[test]
+    fn parses_scc_direct_and_explicit_metric_views() {
+        let direct = parse_cli_from(os_args(&[
+            "srcq",
+            "scc",
+            "--by-file",
+            "--sort",
+            "complexity",
+            ".",
+        ]))
+        .expect("direct scc");
+        let CliAction::Gateway(direct) = direct else {
+            panic!("expected scc gateway")
+        };
+        assert_eq!(GatewayBackend::Scc, direct.backend);
+        assert_eq!("auto", direct.view);
+        assert_eq!(
+            os_args(&["--by-file", "--sort", "complexity", "."]),
+            direct.native_argv
+        );
+
+        let explicit = parse_cli_from(os_args(&[
+            "srcq",
+            "query",
+            "scc",
+            "exec",
+            "--view",
+            "hotspots",
+            "--limit",
+            "12",
+            "--",
+            "--by-file",
+            ".",
+        ]))
+        .expect("explicit scc");
+        assert!(matches!(
+            explicit,
+            CliAction::Gateway(command)
+                if command.backend == GatewayBackend::Scc
+                    && command.view == "hotspots"
+                    && command.limit == 12
         ));
     }
 

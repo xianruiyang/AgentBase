@@ -4,6 +4,7 @@
   "versions": {
     "rg": "ripgrep 15.1.0 (rev af60c2de9d)\n\nfeatures:+pcre2\nsimd(compile):+SSE2,-SSSE3,-AVX2\nsimd(runtime):+SSE2,+SSSE3,+AVX2\n\nPCRE2 10.45 is available (JIT is available)",
     "fd": "fd 10.4.2",
+    "scc": "scc version 3.7.0",
     "ast-grep": "ast-grep 0.44.1"
   },
   "cases": [
@@ -154,6 +155,43 @@
       "stdoutUtf8": "./docs\\read me.txt\u0000./src\\a.ts\u0000./src\\nested\\b.ts\u0000./unicode\\文件.txt\u0000",
       "stderrUtf8": "",
       "stdoutBase64": "Li9kb2NzXHJlYWQgbWUudHh0AC4vc3JjXGEudHMALi9zcmNcbmVzdGVkXGIudHMALi91bmljb2RlXOaWh+S7ti50eHQA"
+    },
+    {
+      "id": "scc-language-json",
+      "backend": "scc",
+      "argv": [
+        "--format",
+        "json",
+        "."
+      ],
+      "normalizer": "json-sort-arrays",
+      "exitCode": 0,
+      "stdoutBytes": 353,
+      "stderrBytes": 0,
+      "stdoutSha256": "ea3bf4df67d7ae0444b6249d26742305c7965cb0deb53bcc69854fe2dd1ffbb6",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": "[{\"Blank\":0,\"Bytes\":72,\"Code\":3,\"CodeBytes\":0,\"Comment\":0,\"Complexity\":0,\"Count\":3,\"Files\":[],\"LineLength\":null,\"Lines\":3,\"Name\":\"Plain Text\",\"ULOC\":0,\"WeightedComplexity\":0},{\"Blank\":3,\"Bytes\":262,\"Code\":10,\"CodeBytes\":0,\"Comment\":0,\"Complexity\":0,\"Count\":2,\"Files\":[],\"LineLength\":null,\"Lines\":13,\"Name\":\"TypeScript\",\"ULOC\":0,\"WeightedComplexity\":0}]\n",
+      "stderrUtf8": "",
+      "stdoutBase64": null
+    },
+    {
+      "id": "scc-files-json",
+      "backend": "scc",
+      "argv": [
+        "--by-file",
+        "--format",
+        "json",
+        "."
+      ],
+      "normalizer": "json-sort-arrays",
+      "exitCode": 0,
+      "stdoutBytes": 1961,
+      "stderrBytes": 0,
+      "stdoutSha256": "2197c28aded2cfece6cd7a4428d0073a90eb3a76395f6ec87e6b032f0b84610d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutUtf8": "[{\"Blank\":0,\"Bytes\":72,\"Code\":3,\"CodeBytes\":0,\"Comment\":0,\"Complexity\":0,\"Count\":3,\"Files\":[{\"Binary\":false,\"Blank\":0,\"Bytes\":18,\"Code\":1,\"Comment\":0,\"Complexity\":0,\"EndPoint\":0,\"Extension\":\"txt\",\"Filename\":\"secret.txt\",\"Generated\":false,\"Hash\":null,\"Language\":\"Plain Text\",\"Lines\":1,\"Location\":\".hidden\\\\secret.txt\",\"Minified\":false,\"PossibleLanguages\":[\"Plain Text\"],\"Symlocation\":\"\",\"Uloc\":0,\"WeightedComplexity\":0},{\"Binary\":false,\"Blank\":0,\"Bytes\":19,\"Code\":1,\"Comment\":0,\"Complexity\":0,\"EndPoint\":0,\"Extension\":\"txt\",\"Filename\":\"文件.txt\",\"Generated\":false,\"Hash\":null,\"Language\":\"Plain Text\",\"Lines\":1,\"Location\":\"unicode\\\\文件.txt\",\"Minified\":false,\"PossibleLanguages\":[\"Plain Text\"],\"Symlocation\":\"\",\"Uloc\":0,\"WeightedComplexity\":0},{\"Binary\":false,\"Blank\":0,\"Bytes\":35,\"Code\":1,\"Comment\":0,\"Complexity\":0,\"EndPoint\":0,\"Extension\":\"txt\",\"Filename\":\"read me.txt\",\"Generated\":false,\"Hash\":null,\"Language\":\"Plain Text\",\"Lines\":1,\"Location\":\"docs\\\\read me.txt\",\"Minified\":false,\"PossibleLanguages\":[\"Plain Text\"],\"Symlocation\":\"\",\"Uloc\":0,\"WeightedComplexity\":0}],\"LineLength\":null,\"Lines\":3,\"Name\":\"Plain Text\",\"ULOC\":0,\"WeightedComplexity\":0},{\"Blank\":3,\"Bytes\":262,\"Code\":10,\"CodeBytes\":0,\"Comment\":0,\"Complexity\":0,\"Count\":2,\"Files\":[{\"Binary\":false,\"Blank\":1,\"Bytes\":133,\"Code\":5,\"Comment\":0,\"Complexity\":0,\"EndPoint\":0,\"Extension\":\"ts\",\"Filename\":\"a.ts\",\"Generated\":false,\"Hash\":null,\"Language\":\"TypeScript\",\"Lines\":6,\"Location\":\"src\\\\a.ts\",\"Minified\":false,\"PossibleLanguages\":[\"TypeScript\"],\"Symlocation\":\"\",\"Uloc\":0,\"WeightedComplexity\":0},{\"Binary\":false,\"Blank\":2,\"Bytes\":129,\"Code\":5,\"Comment\":0,\"Complexity\":0,\"EndPoint\":0,\"Extension\":\"ts\",\"Filename\":\"b.ts\",\"Generated\":false,\"Hash\":null,\"Language\":\"TypeScript\",\"Lines\":7,\"Location\":\"src\\\\nested\\\\b.ts\",\"Minified\":false,\"PossibleLanguages\":[\"TypeScript\"],\"Symlocation\":\"\",\"Uloc\":0,\"WeightedComplexity\":0}],\"LineLength\":null,\"Lines\":13,\"Name\":\"TypeScript\",\"ULOC\":0,\"WeightedComplexity\":0}]\n",
+      "stderrUtf8": "",
+      "stdoutBase64": null
     },
     {
       "id": "ast-run-json",

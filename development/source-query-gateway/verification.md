@@ -6,18 +6,20 @@
 
 ## 2. 已完成验证
 
+下表中的“当前”均指 P0—P10 各自冻结身份；P11 的新身份和证据单独列在表后，不用后继源码反向改写历史运行数字。
+
 | 范围 | 入口 | 结果 |
 | --- | --- | --- |
 | P0 backend 合同 | `backend-contract/tests` | 6 项通过；版本、模式表、fixture、语义分类与原生 no-match oracle 一致 |
 | AST 精确版本 | P0 ast-grep 0.41.1/0.42.0/0.44.1 矩阵 | 30 项通过 |
-| srcq Rust workspace 当前门禁 | `cargo ci-test`、`cargo ci-build`、`cargo lint`、`cargo fmt-check` | `srcq 0.3.1` 的全部 workspace、all-targets、all-features 非 ignored 测试、构建、Clippy `-D warnings` 与格式检查通过；真实引擎发现的 machine 消费者遗漏修正后做了定向复验 |
-| 当前真实 ast-grep 0.44.1 | `SRCQ_AST_GREP=<native exe>`、`SRCQ_AST_GREP_EXPECTED_VERSION='ast-grep 0.44.1'` 后运行受影响 ignored 套件 | CLI 3 项、core profile 1 项、integration workflow 4 项通过；默认 model 与显式 machine 消费边界已覆盖 |
-| rg/fd 当前定向单元 | `cargo test -p srcq-cli --lib` | 37 项通过；覆盖原生 token 不被 wrapper 抢占、有序路径树、前缀重入回退、cursor 与模式分类 |
-| rg/fd 当前真实集成 | `cargo test -p srcq-cli --test query_gateway_real` | 25 项通过；除直接入口、表示选择、预算、续页和三输出面外，覆盖同预算小结果闭环、宽多文件保持分页、rg 15.2、未来版本、变化协议安全降级、machine 转换错误和副作用不重放 |
-| srcq-cli 当前静态质量 | `cargo clippy -p srcq-cli --all-targets --all-features -- -D warnings`、`cargo fmt --all -- --check` | 通过 |
-| release helper | `cargo test -p srcq-release`、当前 `build-release.ps1` | 4 项通过；生成绑定源码快照的 `srcq 0.3.1` Windows x86_64 MSVC manifest、SBOM、许可证和受校验归档；归档 SHA-256 为 `2ce4c7351ca7d7e469f66b473852e3a6b97c52e1935fe5e4544042df602b2915` |
-| backend 候选矩阵 | `backend-contract/verify_candidate.py --srcq <srcq.exe>` | 当前直接/显式入口下 29 个模式样本、7 个原生 oracle 通过 |
-| AST 候选非回退 | `ast-baseline/compare_ast_baseline.py --expected-version 0.3.1` | 通过；比较器只剔除新增 rg/fd/query 行，不改写历史 AST 期望 |
+| P9 srcq Rust workspace 门禁 | `cargo ci-test`、`cargo ci-build`、`cargo lint`、`cargo fmt-check` | `srcq 0.3.1` 的全部 workspace、all-targets、all-features 非 ignored 测试、构建、Clippy `-D warnings` 与格式检查通过；真实引擎发现的 machine 消费者遗漏修正后做了定向复验 |
+| P9 真实 ast-grep 0.44.1 | `SRCQ_AST_GREP=<native exe>`、`SRCQ_AST_GREP_EXPECTED_VERSION='ast-grep 0.44.1'` 后运行受影响 ignored 套件 | CLI 3 项、core profile 1 项、integration workflow 4 项通过；默认 model 与显式 machine 消费边界已覆盖 |
+| P9 rg/fd 定向单元 | `cargo test -p srcq-cli --lib` | 37 项通过；覆盖原生 token 不被 wrapper 抢占、有序路径树、前缀重入回退、cursor 与模式分类 |
+| P9 rg/fd 真实集成 | `cargo test -p srcq-cli --test query_gateway_real` | 25 项通过；除直接入口、表示选择、预算、续页和三输出面外，覆盖同预算小结果闭环、宽多文件保持分页、rg 15.2、未来版本、变化协议安全降级、machine 转换错误和副作用不重放 |
+| P9 srcq-cli 静态质量 | `cargo clippy -p srcq-cli --all-targets --all-features -- -D warnings`、`cargo fmt --all -- --check` | 通过 |
+| P9 release helper | `cargo test -p srcq-release`、当时的 `build-release.ps1` | 4 项通过；生成绑定源码快照的 `srcq 0.3.1` Windows x86_64 MSVC manifest、SBOM、许可证和受校验归档；归档 SHA-256 为 `2ce4c7351ca7d7e469f66b473852e3a6b97c52e1935fe5e4544042df602b2915` |
+| P9 backend 候选矩阵 | `backend-contract/verify_candidate.py --srcq <srcq.exe>` | 当时直接/显式入口下 29 个模式样本、7 个原生 oracle 通过 |
+| P9 AST 候选非回退 | `ast-baseline/compare_ast_baseline.py --expected-version 0.3.1` | 通过；比较器只剔除新增 rg/fd/query 行，不改写历史 AST 期望 |
 | 候选 skill | skill-creator `quick_validate.py` | 有效 |
 | 候选 payload | `verify_candidate_payload.py` | 5 个允许文件，无二进制、私有运行时或开发资产泄漏 |
 | Windows 安装生命周期 | `tools/srcq/scripts/test-install-srcq.ps1`，0.3.0 → 0.3.1 | 当前归档安装、幂等、完整性读回、受管漂移修复、新进程 PATH、失败回滚、恶意包/篡改拒绝、真实升级、doctor、卸载边界、并发 PATH、配置/cache 保留与显式清理通过 |
@@ -39,6 +41,17 @@
 | P9 最终候选 | `evidence/audit-result-v15.json`、`evidence/capsule-verification-v15.json` | identity `e32871ba…`；12/12 语义与可见行限通过，1,150,528 Token、363.163 s、48 次命令无失败；作为 P10 当前可比较的同质量参照 |
 | P10 最终候选 | `evidence/audit-result-p10-v21.json`、`evidence/capsule-verification-p10-v21.json` | identity `0cfb8919…59d5`；12/12 required、12/12 行限与 12/12 evidence complete，通过 45 次成功命令、1,066,470 Token、480.739 s；detached auditor 复算身份、usage、环境差异和逐案质量后通过 |
 
+### P11 scc 指标与 hyperfine 主机能力
+
+| 范围 | 结果 |
+| --- | --- |
+| srcq 0.4.0 | `cargo ci-test` 全 workspace 通过；受影响定向 lib 45/45、真实 query gateway 32/32；`cargo ci-build`、`cargo lint`、`cargo fmt-check` 与 release helper 6/6 通过 |
+| 后端与 AST | backend 合同 6/6、36 个 rg/fd/scc 模式、9 个原生 oracle 通过；0.4.0 AST baseline 通过；ast-grep 0.44.1 受影响真实套件此前为 CLI 3/3、core 1/1、integration 4/4 |
+| 主机与发布消费者 | bootstrap 回归和真实只读 Check 通过，7 个工具全部 supported，读回 scc 3.7.0 与 hyperfine 1.20.0；portable config/agent/lifecycle、插件构建及部署 scc doctor 解析烟测通过 |
+| 模型读取面 | AgentBase 16 种语言、1149 文件；o200k languages `1008→457`（-54.6627%），files `124642→43248`（-65.3022%）；只证明完整静态投影 |
+| release/install | 源码快照 `c7795a6b…de300`；两次 clean build 均得到 2725761-byte、SHA-256 `65734560…8d942` 的 0.4.0 ZIP；manifest 含 scc 3.7.0；0.3.1→0.4.0 隔离生命周期及最终 release summary/files/doctor 烟测通过 |
+| 路由 | 静态 96 cases、55 strict routing、10 strict references、11/11 skills 通过；独立 Codex 按用户额度约束未运行，旧 evidence 因 bundle 不同被正式 Validate 拒绝 |
+
 ## 3. 证据边界
 
 冻结五-skill 历史记录为实际总 Token 1,157,111、508.509 s、核心 12/12、严格整体 11/12；按用户要求未重跑。当前候选的 1,150,528 Token 和 363.163 s 方向性分别低 0.57% 与 28.58%，独立审计按可见 prompt 判定 12/12；历史 identity 与 prompt 明示程度不同，因此不把差额声明为严格因果收益。
@@ -59,6 +72,8 @@ SOL-SQG-010 已实现：rg/fd 普通调用只传原生 argv，显式控制进入
 
 ## 5. 最终逐项审计
 
+以下表格与结论冻结 P10 身份；P11 的增量完成结论见第 6 节。
+
 | 状态 | 条目 | 当前证据边界 |
 | --- | --- | --- |
 | 已证明 | REQ-SQG-001；AC-SQG-001 至 AC-SQG-008；CON-SQG-001 至 CON-SQG-003 | 组件、release/install、路由、LSP 渐进三案、P10 12-run usage、独立语义审计和确定性 capsule 校验共同覆盖 |
@@ -67,3 +82,7 @@ SOL-SQG-010 已实现：rg/fd 普通调用只传原生 argv，显式控制进入
 | 项目已完成、待发布授权 | GAP-SQG-008 / P10 | v21 以 12/12 质量和 `-7.31%` 总 Token 关闭缺口；项目真源已实现，Codex 安装态仍是 P9，不能把项目验证外推为已发布 |
 
 因此 requirements 与 user-design 的项目实现和证据已经完成；P10 的真实模型收益由 v21 而不是方案文档证明。当前唯一未执行的是需要逐次单独授权的 Codex 发布，它不属于项目真源完成证据。
+
+## 6. P11 增量完成边界
+
+P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真实 scc、真实 tokenizer、release manifest、可复现归档和安装生命周期已经闭合，没有已知适用失败或开放实施项。独立模型采纳证据因用户明确的额度约束未运行，`development/skill-routing/evidence/current.json` 因身份过期不能用于当前候选；正式 Validate 的拒绝正是预期门禁。实际用户安装仍为 srcq 0.3.1，本轮也未获真实 Publish 的逐次授权，因此不得把 0.4.0 项目完成外推为已安装或已发布。

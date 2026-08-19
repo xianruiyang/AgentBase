@@ -99,6 +99,86 @@ function Get-FdState {
     }
 }
 
+function Get-SccState {
+    $command = Get-ApplicationCommand -Name "scc.exe"
+    if ($null -eq $command) {
+        return [pscustomobject]@{
+            name = "scc"
+            command = "scc.exe"
+            package_id = "BenBoyter.scc"
+            installer = "winget"
+            remediation = "upgrade"
+            available = $false
+            supported = $false
+            path = $null
+            version = $null
+        }
+    }
+
+    $versionOutput = @(& $command.Source --version 2>$null)
+    $versionExit = $LASTEXITCODE
+    $helpOutput = @(& $command.Source --help 2>$null)
+    $helpExit = $LASTEXITCODE
+    $version = $null
+    if ($versionExit -eq 0 -and $versionOutput.Count -gt 0 -and ([string]$versionOutput[-1]) -match '^scc version (?<version>\d+\.\d+\.\d+)$') {
+        $version = $Matches.version
+    }
+    $help = $helpOutput -join [Environment]::NewLine
+    $supportsGateway = $helpExit -eq 0 -and $help.Contains("--by-file") -and $help.Contains("--format string") -and $help.Contains("json2")
+
+    return [pscustomobject]@{
+        name = "scc"
+        command = "scc.exe"
+        package_id = "BenBoyter.scc"
+        installer = "winget"
+        remediation = "upgrade"
+        available = $true
+        supported = ($null -ne $version -and $supportsGateway)
+        path = $command.Source
+        version = $version
+    }
+}
+
+function Get-HyperfineState {
+    $command = Get-ApplicationCommand -Name "hyperfine.exe"
+    if ($null -eq $command) {
+        return [pscustomobject]@{
+            name = "hyperfine"
+            command = "hyperfine.exe"
+            package_id = "sharkdp.hyperfine"
+            installer = "winget"
+            remediation = "upgrade"
+            available = $false
+            supported = $false
+            path = $null
+            version = $null
+        }
+    }
+
+    $versionOutput = @(& $command.Source --version 2>$null)
+    $versionExit = $LASTEXITCODE
+    $helpOutput = @(& $command.Source --help 2>$null)
+    $helpExit = $LASTEXITCODE
+    $version = $null
+    if ($versionExit -eq 0 -and $versionOutput.Count -gt 0 -and ([string]$versionOutput[-1]) -match '^hyperfine (?<version>\d+\.\d+\.\d+)$') {
+        $version = $Matches.version
+    }
+    $help = $helpOutput -join [Environment]::NewLine
+    $supportsBenchmarkContract = $helpExit -eq 0 -and $help.Contains("--warmup") -and $help.Contains("--export-json")
+
+    return [pscustomobject]@{
+        name = "hyperfine"
+        command = "hyperfine.exe"
+        package_id = "sharkdp.hyperfine"
+        installer = "winget"
+        remediation = "upgrade"
+        available = $true
+        supported = ($null -ne $version -and $supportsBenchmarkContract)
+        path = $command.Source
+        version = $version
+    }
+}
+
 function Get-NodeState {
     $command = Get-ApplicationCommand -Name "node.exe"
     if ($null -eq $command) {
@@ -244,6 +324,8 @@ function Get-HostPrerequisiteState {
     $states = @(
         Get-PwshState
         Get-FdState
+        Get-SccState
+        Get-HyperfineState
         Get-PythonState
         Get-NodeState
         Get-AstGrepState

@@ -3,8 +3,8 @@
 ## 前置条件
 
 1. 从同一发布批次取得 Windows x86_64 ZIP、对应 `.sha256` 和安装脚本。
-2. 单独安装精确受支持的 ast-grep；第一版推荐固定 `0.42.0`，已验证版本还包括 `0.41.1` 与 `0.44.1`。
-3. 安装后运行 `srcq doctor`；srcq 不下载 ast-grep，也不安装 Node/Python 或语言运行时。
+2. 单独安装精确受支持的 ast-grep；第一版推荐固定 `0.42.0`，已验证版本还包括 `0.41.1` 与 `0.44.1`。若使用源码指标入口，还要单独安装支持 `--by-file`、JSON 与 json2 的 scc；当前精确验证版本为 `3.7.0`。
+3. 安装后运行 `srcq doctor`，使用 scc backend 时再运行 `srcq query scc doctor`；srcq 不下载 ast-grep 或 scc，也不安装 Node/Python、hyperfine 或语言运行时。
 
 ## Windows
 
@@ -28,6 +28,7 @@
 ```powershell
 srcq --version
 srcq doctor
+srcq query scc doctor
 ```
 
 ## 数据保留

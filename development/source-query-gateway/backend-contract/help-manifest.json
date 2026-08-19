@@ -122,6 +122,11 @@
       "path": "help/ripgrep-15.1.0.txt",
       "bytes": 76018,
       "sha256": "1027a6117bcc61a5109b61d6affaba313a37504df7a44f4cd8a284f49616680d"
+    },
+    {
+      "path": "help/scc-3.7.0.txt",
+      "bytes": 6640,
+      "sha256": "ede23ccb3f459d4aea60932f4669784528544a707f41755a1cdfa8b0c667b14d"
     }
   ]
 }

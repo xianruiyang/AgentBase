@@ -139,6 +139,72 @@ fn main() -> io::Result<()> {
         }
     }
 
+    if let Ok(protocol) = env::var("SRCQ_FIXTURE_SCC_PROTOCOL") {
+        if protocol == "valid" {
+            let count = numeric_flag(&args, "--fixture-scc-files=").unwrap_or(2);
+            let files = args.iter().any(|arg| arg == "--by-file").then(|| {
+                (0..count)
+                    .map(|ordinal| {
+                        json!({
+                            "Language":"Rust",
+                            "PossibleLanguages":["Rust"],
+                            "Filename":format!("file-{ordinal}.rs"),
+                            "Extension":"rs",
+                            "Location":format!("src\\file-{ordinal}.rs"),
+                            "Symlocation":"",
+                            "Bytes":100 + ordinal,
+                            "Lines":10 + ordinal,
+                            "Code":8 + ordinal,
+                            "Comment":1,
+                            "Blank":1,
+                            "Complexity":ordinal + 1,
+                            "WeightedComplexity":0,
+                            "Hash":null,
+                            "Binary":false,
+                            "Minified":false,
+                            "Generated":false,
+                            "EndPoint":0,
+                            "Uloc":0
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            });
+            let language = json!({
+                "Name":"Rust",
+                "Bytes":(0..count).map(|ordinal| 100 + ordinal).sum::<usize>(),
+                "CodeBytes":0,
+                "Lines":(0..count).map(|ordinal| 10 + ordinal).sum::<usize>(),
+                "Code":(0..count).map(|ordinal| 8 + ordinal).sum::<usize>(),
+                "Comment":count,
+                "Blank":count,
+                "Complexity":(1..=count).sum::<usize>(),
+                "Count":count,
+                "WeightedComplexity":0,
+                "Files":files.unwrap_or_default(),
+                "LineLength":null,
+                "ULOC":0
+            });
+            if format_flag(&args) == Some("json2") {
+                serde_json::to_writer(
+                    io::stdout().lock(),
+                    &json!({
+                        "languageSummary":[language],
+                        "estimatedCost":999999,
+                        "estimatedScheduleMonths":99,
+                        "estimatedPeople":99
+                    }),
+                )?;
+            } else {
+                serde_json::to_writer(io::stdout().lock(), &json!([language]))?;
+            }
+            process::exit(exit_flag(&args));
+        }
+        if protocol == "changed" {
+            io::stdout().write_all(b"future-scc-protocol\n")?;
+            process::exit(exit_flag(&args));
+        }
+    }
+
     let mut stdin = Vec::new();
     if args
         .iter()

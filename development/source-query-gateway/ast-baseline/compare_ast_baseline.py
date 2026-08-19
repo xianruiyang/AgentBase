@@ -32,9 +32,9 @@ def project_top_level_ast_help(text: str) -> str:
         if index == 0:
             lines.append("Token-safe YAML adapter for ast-grep\n")
             continue
-        if re.match(r"^  (?:rg|fd|query)\s", line):
+        if re.match(r"^  (?:rg|fd|scc|query)\s", line):
             continue
-        if line.startswith(("Text/file syntax:", "Explicit query controls:")):
+        if line.startswith(("Text/file syntax:", "Source syntax:", "Explicit query controls:")):
             continue
         lines.append(line)
     return "".join(lines)

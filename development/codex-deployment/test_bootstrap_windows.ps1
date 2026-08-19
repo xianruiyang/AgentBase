@@ -44,14 +44,19 @@ $machineReady = Invoke-BootstrapProcess -Arguments @("-Action", "Check", "-View"
 Assert-True ($machineReady.exit_code -eq 0) "machine readiness check failed on the prepared host"
 $machineReadyResult = $machineReady.text | ConvertFrom-Json
 Assert-True ([bool]$machineReadyResult.ready) "machine readiness result is not ready"
-Assert-True (@($machineReadyResult.tools).Count -eq 5) "machine readiness result omitted prerequisite states"
+Assert-True (@($machineReadyResult.tools).Count -eq 7) "machine readiness result omitted prerequisite states"
 Assert-True (-not [string]::IsNullOrWhiteSpace([string]$machineReadyResult.tools[0].package_id)) "machine readiness result omitted package identity"
+$packageIds = @($machineReadyResult.tools | ForEach-Object { [string]$_.package_id })
+Assert-True ($packageIds -contains "BenBoyter.scc") "machine readiness result omitted the scc package identity"
+Assert-True ($packageIds -contains "sharkdp.hyperfine") "machine readiness result omitted the hyperfine package identity"
 
 $modelMissing = Invoke-BootstrapProcess -Arguments @("-Action", "Check") -EmptyPath
 Assert-True ($modelMissing.exit_code -eq 1) "missing prerequisites did not retain the check failure exit code"
 Assert-True ($modelMissing.text.StartsWith("{ready:false tools:[")) "missing prerequisites did not produce the compact model diagnosis"
 Assert-True ($modelMissing.text.Contains('next:"rerun with -Action Install"')) "model diagnosis omitted the recovery action"
 Assert-True ($modelMissing.text.Contains("{name:fd next:install}")) "model diagnosis did not distinguish a missing tool from an outdated tool"
+Assert-True ($modelMissing.text.Contains("{name:scc next:install}")) "model diagnosis omitted the missing scc recovery"
+Assert-True ($modelMissing.text.Contains("{name:hyperfine next:install}")) "model diagnosis omitted the missing hyperfine recovery"
 Assert-True (-not $modelMissing.text.Contains("package_id") -and -not $modelMissing.text.Contains("path:")) "model diagnosis exposed machine-only prerequisite fields"
 
 $machineMissing = Invoke-BootstrapProcess -Arguments @("-Action", "Check", "-View", "Machine") -EmptyPath
@@ -72,3 +77,4 @@ $machineInstallErrorResult = $machineInstallError.text | ConvertFrom-Json
 Assert-True (-not [bool]$machineInstallErrorResult.ready -and $machineInstallErrorResult.action -eq "Install") "bootstrap machine failure lost the structured error contract"
 
 "tests : pass"
+exit 0

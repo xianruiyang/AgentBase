@@ -65,9 +65,28 @@ def strip_timing(value: Any) -> Any:
     return value
 
 
+def sort_json_arrays(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: sort_json_arrays(item) for key, item in value.items()}
+    if isinstance(value, list):
+        normalized = [sort_json_arrays(item) for item in value]
+        return sorted(
+            normalized,
+            key=lambda item: json.dumps(
+                item, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ),
+        )
+    return value
+
+
 def normalize_stdout(data: bytes, normalizer: str) -> bytes:
     if normalizer == "raw":
         return data
+    if normalizer in {"json", "json-sort-arrays"}:
+        value = json.loads(data.decode("utf-8"))
+        if normalizer == "json-sort-arrays":
+            value = sort_json_arrays(value)
+        return (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
     if normalizer not in {"jsonl", "jsonl-strip-timing"}:
         raise ValueError(f"unknown normalizer: {normalizer}")
     documents = []
@@ -131,18 +150,20 @@ def version_output(path: Path) -> str:
     return completed.stdout.decode("utf-8").strip()
 
 
-def build_oracle(ast_grep: str | None) -> dict[str, Any]:
+def build_oracle(ast_grep: str | None, scc: str | None) -> dict[str, Any]:
     if os.name != "nt":
         raise SystemExit("the source-query backend contract is maintained only on Windows")
     engines = {
         "rg": resolve_executable("rg"),
         "fd": resolve_executable("fd"),
+        "scc": resolve_executable("scc", scc),
         "ast-grep": resolve_executable("ast-grep", ast_grep),
     }
     versions = {backend: version_output(path) for backend, path in engines.items()}
     expected = {
         "rg": "ripgrep 15.1.0",
         "fd": "fd 10.4.2",
+        "scc": "scc version 3.7.0",
         "ast-grep": "ast-grep 0.44.1",
     }
     for backend, prefix in expected.items():
@@ -189,6 +210,18 @@ def build_oracle(ast_grep: str | None) -> dict[str, Any]:
             "argv": ["-0", "-t", "f", "--threads", "1", ".", "."],
         },
         {
+            "id": "scc-language-json",
+            "backend": "scc",
+            "argv": ["--format", "json", "."],
+            "normalizer": "json-sort-arrays",
+        },
+        {
+            "id": "scc-files-json",
+            "backend": "scc",
+            "argv": ["--by-file", "--format", "json", "."],
+            "normalizer": "json-sort-arrays",
+        },
+        {
             "id": "ast-run-json",
             "backend": "ast-grep",
             "argv": ["run", "-p", "alpha($A)", "-l", "ts", "--json=stream", "src"],
@@ -218,10 +251,11 @@ def build_oracle(ast_grep: str | None) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ast-grep")
+    parser.add_argument("--scc")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--verify", type=Path)
     args = parser.parse_args()
-    oracle = build_oracle(args.ast_grep)
+    oracle = build_oracle(args.ast_grep, args.scc)
     if args.verify:
         expected = json.loads(args.verify.read_text(encoding="utf-8"))
         if oracle != expected:

@@ -12,6 +12,8 @@ const FIXED_AST_GREP: &str = "0.42.0";
 const VERIFIED_AST_GREP: [&str; 3] = ["0.41.1", "0.42.0", "0.44.1"];
 const VERIFIED_RIPGREP: [&str; 2] = ["15.1.0", "15.2.0"];
 const VERIFIED_FD: [&str; 1] = ["10.4.2"];
+const VERIFIED_SCC: [&str; 1] = ["3.7.0"];
+const REQUIRED_EXECUTABLES: [&str; 4] = ["ast-grep", "rg.exe", "fd.exe", "scc.exe"];
 const THIRD_PARTY_LICENSES_TITLE: &str = "SRCQ THIRD-PARTY LICENSES";
 
 fn main() {
@@ -214,14 +216,10 @@ fn package(request: &PackageRequest) -> Result<PackageOutput, String> {
             "fixed": FIXED_AST_GREP,
             "verified": VERIFIED_AST_GREP
         },
-        "nativeEngineCompatibility": {
-            "astGrep": {"executable": "ast-grep", "bundled": false, "verified": VERIFIED_AST_GREP},
-            "ripgrep": {"executable": "rg.exe", "bundled": false, "verified": VERIFIED_RIPGREP},
-            "fd": {"executable": "fd.exe", "bundled": false, "verified": VERIFIED_FD}
-        },
+        "nativeEngineCompatibility": native_engine_compatibility(),
         "runtime": {
             "requiredExecutable": "ast-grep",
-            "requiredExecutables": ["ast-grep", "rg.exe", "fd.exe"],
+            "requiredExecutables": REQUIRED_EXECUTABLES,
             "node": false,
             "python": false
         },
@@ -272,6 +270,15 @@ fn package(request: &PackageRequest) -> Result<PackageOutput, String> {
         manifest: manifest_name,
         sbom: sbom_name,
         third_party_licenses: third_party_name,
+    })
+}
+
+fn native_engine_compatibility() -> Value {
+    json!({
+        "astGrep": {"executable": "ast-grep", "bundled": false, "verified": VERIFIED_AST_GREP},
+        "ripgrep": {"executable": "rg.exe", "bundled": false, "verified": VERIFIED_RIPGREP},
+        "fd": {"executable": "fd.exe", "bundled": false, "verified": VERIFIED_FD},
+        "scc": {"executable": "scc.exe", "bundled": false, "verified": VERIFIED_SCC}
     })
 }
 
@@ -797,8 +804,8 @@ fn crc32(bytes: &[u8]) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        allowed_license_expression, crc32, deterministic_zip, third_party_licenses_preamble,
-        unix_to_rfc3339, ZipEntry,
+        allowed_license_expression, crc32, deterministic_zip, native_engine_compatibility,
+        third_party_licenses_preamble, unix_to_rfc3339, ZipEntry, REQUIRED_EXECUTABLES,
     };
 
     #[test]
@@ -830,6 +837,17 @@ mod tests {
         let preamble = third_party_licenses_preamble("x86_64-pc-windows-msvc", 52);
         assert!(preamble.starts_with("SRCQ THIRD-PARTY LICENSES\n"));
         assert!(!preamble.contains("SGY THIRD-PARTY LICENSES"));
+    }
+
+    #[test]
+    fn release_contract_declares_every_external_query_engine() {
+        let engines = native_engine_compatibility();
+        assert_eq!(engines["scc"]["executable"], "scc.exe");
+        assert_eq!(engines["scc"]["verified"][0], "3.7.0");
+        assert_eq!(
+            REQUIRED_EXECUTABLES,
+            ["ast-grep", "rg.exe", "fd.exe", "scc.exe"]
+        );
     }
 
     #[test]
