@@ -42,6 +42,10 @@ tools/srcq/fuzz/artifacts/
 **/runtimeLogs/
 *.log
 
+# Recoverable local independent-evaluation staging
+development/skill-routing/evidence/pending/
+development/skill-routing/evidence/*.lock
+
 # Deployment simulations
 development/codex-deployment/sandbox/
 

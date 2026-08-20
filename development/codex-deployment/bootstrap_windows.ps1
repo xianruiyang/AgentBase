@@ -13,6 +13,8 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     throw "bootstrap_windows.ps1 supports Windows only"
 }
 
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'common\codex_cli_runtime.ps1')
+
 function Get-ApplicationCommand {
     param(
         [string]$Name
@@ -320,6 +322,89 @@ function Get-AstGrepState {
     }
 }
 
+function Test-UserNpmPathPrecedence {
+    param(
+        [string]$NpmPrefix
+    )
+
+    if ([string]::IsNullOrWhiteSpace($NpmPrefix)) {
+        return $false
+    }
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $entries = @($userPath -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $npmIndex = -1
+    $windowsAppsIndex = -1
+    for ($index = 0; $index -lt $entries.Count; $index++) {
+        $expanded = [Environment]::ExpandEnvironmentVariables([string]$entries[$index]).Trim().TrimEnd('\')
+        if ($expanded.Equals($NpmPrefix.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase) -and $npmIndex -lt 0) {
+            $npmIndex = $index
+        }
+        if ($expanded.EndsWith('\WindowsApps', [StringComparison]::OrdinalIgnoreCase) -and $windowsAppsIndex -lt 0) {
+            $windowsAppsIndex = $index
+        }
+    }
+    return $npmIndex -ge 0 -and ($windowsAppsIndex -lt 0 -or $npmIndex -lt $windowsAppsIndex)
+}
+
+function Get-CodexCliState {
+    $npmPrefix = Get-AgentBaseUserNpmPrefix
+    $binaryPath = $null
+    try {
+        $binaryPath = Resolve-AgentBaseCodexNativeExecutable -NpmPrefix $npmPrefix
+    }
+    catch {
+        $binaryPath = $null
+    }
+    if ([string]::IsNullOrWhiteSpace($binaryPath)) {
+        return [pscustomobject]@{
+            name = "Codex CLI"
+            command = "codex.exe"
+            package_id = "@openai/codex@0.148.0"
+            installer = "npm"
+            remediation = "install"
+            available = $false
+            supported = $false
+            path = $null
+            version = $null
+            npm_prefix = $npmPrefix
+            isolation_options_supported = $false
+            path_precedes_windowsapps = Test-UserNpmPathPrecedence -NpmPrefix $npmPrefix
+        }
+    }
+
+    $versionOutput = @(& $binaryPath --version 2>$null)
+    $versionExit = $LASTEXITCODE
+    $helpOutput = @(& $binaryPath exec --help 2>$null)
+    $helpExit = $LASTEXITCODE
+    $version = $null
+    $versionObject = $null
+    if ($versionExit -eq 0 -and $versionOutput.Count -gt 0 -and ([string]$versionOutput[-1]) -match '^codex-cli\s+(?<version>\d+\.\d+\.\d+)') {
+        $version = $Matches.version
+        try { $versionObject = [version]$version } catch { $versionObject = $null }
+    }
+    $help = $helpOutput -join [Environment]::NewLine
+    $supportsIsolation = $helpExit -eq 0
+    foreach ($requiredOption in @("--sandbox", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--output-schema", "--json", "--cd")) {
+        $supportsIsolation = $supportsIsolation -and $help.Contains($requiredOption)
+    }
+    $pathReady = Test-UserNpmPathPrecedence -NpmPrefix $npmPrefix
+    $versionReady = $null -ne $versionObject -and $versionObject -eq [version]"0.148.0"
+    return [pscustomobject]@{
+        name = "Codex CLI"
+        command = "codex.exe"
+        package_id = "@openai/codex@0.148.0"
+        installer = "npm"
+        remediation = if ($versionReady -and $supportsIsolation -and -not $pathReady) { "configure_path" } else { "install" }
+        available = $true
+        supported = ($versionReady -and $supportsIsolation -and $pathReady)
+        path = $binaryPath
+        version = $version
+        npm_prefix = $npmPrefix
+        isolation_options_supported = $supportsIsolation
+        path_precedes_windowsapps = $pathReady
+    }
+}
+
 function Get-HostPrerequisiteState {
     $states = @(
         Get-PwshState
@@ -329,6 +414,7 @@ function Get-HostPrerequisiteState {
         Get-PythonState
         Get-NodeState
         Get-AstGrepState
+        Get-CodexCliState
     )
     return $states
 }
@@ -386,6 +472,42 @@ function Install-AstGrep {
     if ($npmExit -ne 0) {
         throw "npm install failed for @ast-grep/cli@0.44.1 with exit code $npmExit"
     }
+}
+
+function Install-CodexCli {
+    $npm = Get-ApplicationCommand -Name "npm.cmd"
+    if ($null -eq $npm) {
+        $npm = Get-ApplicationCommand -Name "npm.exe"
+    }
+    if ($null -eq $npm) {
+        throw "npm is required to install the verified Codex CLI runtime"
+    }
+    & $npm.Source install --global "@openai/codex@0.148.0" --no-audit --no-fund
+    $npmExit = $LASTEXITCODE
+    if ($npmExit -ne 0) {
+        throw "npm install failed for @openai/codex@0.148.0 with exit code $npmExit"
+    }
+}
+
+function Set-UserNpmPathPrecedence {
+    $npmPrefix = Get-AgentBaseUserNpmPrefix
+    if ([string]::IsNullOrWhiteSpace($npmPrefix)) {
+        throw "Unable to resolve the user npm prefix for Codex CLI command precedence"
+    }
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $entries = @($userPath -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $retained = @($entries | Where-Object {
+        $expanded = [Environment]::ExpandEnvironmentVariables([string]$_).Trim().TrimEnd('\')
+        -not $expanded.Equals($npmPrefix.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)
+    })
+    $newUserPath = (@($npmPrefix) + $retained) -join ';'
+    [Environment]::SetEnvironmentVariable("Path", $newUserPath, "User")
+    $currentEntries = @($env:PATH -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $currentRetained = @($currentEntries | Where-Object {
+        $expanded = [Environment]::ExpandEnvironmentVariables([string]$_).Trim().TrimEnd('\')
+        -not $expanded.Equals($npmPrefix.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)
+    })
+    $env:PATH = (@($npmPrefix) + $currentRetained) -join ';'
 }
 
 function ConvertTo-ModelLiteral {
@@ -490,6 +612,12 @@ if ($Action -eq "Install") {
         Install-AstGrep
         Add-PersistedPathEntries
     }
+    $codexState = Get-CodexCliState
+    if (-not $codexState.available -or [string]$codexState.version -ne "0.148.0" -or -not [bool]$codexState.isolation_options_supported) {
+        Install-CodexCli
+        Add-PersistedPathEntries
+    }
+    Set-UserNpmPathPrecedence
     $states = @(Get-HostPrerequisiteState)
 }
 

@@ -1,17 +1,22 @@
 # Skill routing validation
 
-本目录维护 AgentBase 全局规则与关键 skill 的静态触发合同，以及只读取脱离仓库 capsule、不读取隐藏期望的分阶段独立评估。它证明候选在给定请求下应选择哪些 skill、适用哪些粗粒度行为和应读取哪些治理引用；不证明 skill 内步骤或具体任务执行已经正确完成。
+本目录维护 AgentBase 全局规则与关键 skill 的静态触发合同，以及只读取脱离仓库 capsule、不读取隐藏期望的分阶段独立评估。它证明候选在给定请求下应选择哪些 skill、适用哪些粗粒度行为和应读取哪些条件引用；不证明 skill 内步骤或具体任务执行已经正确完成。
 
 ## 正式产物
 
-- [`trigger-cases.json`](trigger-cases.json)：所需 skill、触发用例、严格路由用例、策略标签和条件引用选择的测试 oracle。
+- [`trigger-cases.json`](trigger-cases.json)：所需 skill、触发用例、严格路由用例、策略标签和条件引用选择的隐藏 oracle。
 - [`validate_contract.ps1`](validate_contract.ps1)：规则、skill、项目入口、相对引用和触发集合的静态合同。
-- [`build_routing_evaluation.ps1`](build_routing_evaluation.ps1)：构建 Routing、Policy 或 References 阶段的 detached capsule。
-- [`validate_routing_results.ps1`](validate_routing_results.ps1)：验证独立结果的身份、输入声明、完整性和期望。
-- [`record_routing_attempt.ps1`](record_routing_attempt.ps1)：正式尝试生命周期的唯一 owner；评估执行前 `Begin`，执行后以结果或执行失败 `Finish`，所有结局都落入有界分类收据。
-- [`merge_routing_evidence.ps1`](merge_routing_evidence.ps1)：唯一正式证据合并入口；只接受三份已经完成且通过的 attempt ID 与对应结果，再原子刷新当前证据。
+- [`routing_evaluation_common.ps1`](routing_evaluation_common.ps1) 与 [`routing_fingerprint.ps1`](routing_fingerprint.ps1)：三阶段 capsule、真实模型可见身份、cases-only 输出 schema、当前 oracle 和整体 generation 的唯一 owner。
+- [`get_routing_evaluation_plan.ps1`](get_routing_evaluation_plan.ps1)：只读增量计划；默认返回低 Token model 视图，`-View machine` 返回同一 canonical 计划的完整 JSON。
+- [`build_routing_evaluation.ps1`](build_routing_evaluation.ps1)：只构建指定阶段 capsule，供审计或外部受控运行使用。
+- [`development/common/codex_cli_runtime.ps1`](../common/codex_cli_runtime.ps1) 与 [`routing_evaluator_runtime.ps1`](routing_evaluator_runtime.ps1)：前者唯一维护 bootstrap 与 evaluator 共享的 npm 原生可执行布局和安全解析，后者只维护 evaluator 专属的 sandbox 后备、最小模型目录投影、禁用能力参数和有界诊断。
+- [`invoke_routing_evaluation.ps1`](invoke_routing_evaluation.ps1)：单阶段隔离 Codex CLI runner。
+- [`refresh_routing_evidence.ps1`](refresh_routing_evidence.ps1)：正式刷新入口；先计划，只启动必需阶段，Routing 与 Policy 可并行，最后原子合并。
+- [`test_routing_infrastructure.ps1`](test_routing_infrastructure.ps1)：零模型 Token 的统一确定性测试入口；解析全部 PowerShell 脚本并并行验证指纹、capsule、planner、隔离 runtime、attempt ledger 与崩溃恢复。
+- [`record_routing_attempt.ps1`](record_routing_attempt.ps1)：正式尝试生命周期的唯一 owner；真实评估使用 `Begin`/`Finish`，证明复用使用 `Reuse`。
+- [`merge_routing_evidence.ps1`](merge_routing_evidence.ps1)：唯一正式证据合并入口；只接受当前 generation 内三份已通过收据及语义一致的阶段结果。
 - [`evidence/current.json`](evidence/current.json)：本地 Validate 与 Publish 使用的唯一当前路由策略证据。
-- [`evidence/attempts.json`](evidence/attempts.json)：当前评估周期的有界尝试账本；部署 Validate 只用它证明没有未完成尝试且当前三阶段结果各有通过收据，不从它反推 skill 正确性。
+- [`evidence/attempts.json`](evidence/attempts.json)：当前 generation 的有界收据账本；只证明运行或复用来源、失败和重试边界，不反推 skill 正确性。
 
 ## 静态合同
 
@@ -23,29 +28,69 @@
 
 静态通过只证明文件结构、必要语义、项目入口和测试 oracle 自洽，不证明模型行为已经改变。
 
-## 独立评估
-
-首次 Routing capsule 只包含路由前可见的候选全局规则、skill frontmatter、外部 skill 摘要和请求。首次结果通过隐藏 oracle 后，Policy capsule 只加入始终可见规则与行为标签；References capsule 只加入首次路由已选中的条件引用型 skill 正文及相应用例，当前覆盖 `change-governance`、`delivery-workflow` 与 `task-table-manager`。三个阶段必须由不同的独立运行完成：
+修改评估基础设施时运行统一确定性入口；默认 model 视图只返回一行摘要，`-View Machine` 返回同一结果的结构化投影。入口对子进程设置只允许阻止 evaluator 的测试边界，invoker 在该边界内会先于 Begin 和外部进程拒绝执行，因此回归走错分支也不会消耗模型 Token。它不刷新 `current.json`：
 
 ```powershell
-& '.\development\skill-routing\build_routing_evaluation.ps1' -ProjectRoot (Get-Location).Path
-& '.\development\skill-routing\record_routing_attempt.ps1' -Action Begin -Phase Routing -ProjectRoot (Get-Location).Path -EvaluatorId '<routing-run-id>' -EvaluatorModel '<model>' -EvaluatorRuntime '<runtime>'
-# 在独立运行中执行 Routing capsule；无论是否得到结果都必须 Finish。
-& '.\development\skill-routing\record_routing_attempt.ps1' -Action Finish -Phase Routing -ProjectRoot (Get-Location).Path -AttemptId '<routing-attempt-id>' -ResultsPath '<routing-result>.json'
-& '.\development\skill-routing\build_routing_evaluation.ps1' -Phase Policy -ProjectRoot (Get-Location).Path -RoutingResultsPath '<routing-result>.json'
-& '.\development\skill-routing\build_routing_evaluation.ps1' -Phase References -ProjectRoot (Get-Location).Path -RoutingResultsPath '<routing-result>.json'
-# Policy 与 References 同样各自 Begin、独立执行并 Finish 后再合并。
-& '.\development\skill-routing\merge_routing_evidence.ps1' -ProjectRoot (Get-Location).Path -RoutingResultsPath '<routing-result>.json' -PolicyResultsPath '<policy-result>.json' -ReferenceResultsPath '<reference-result>.json' -RoutingAttemptId '<routing-attempt-id>' -PolicyAttemptId '<policy-attempt-id>' -ReferenceAttemptId '<reference-attempt-id>' -OutputPath '.\development\skill-routing\evidence\current.json'
+& '.\development\skill-routing\test_routing_infrastructure.ps1' -ProjectRoot (Get-Location).Path
 ```
 
-每个结果必须记录唯一运行 ID、实际模型、运行环境、UTC 时间、`detached-capsule` 模式、未访问仓库/隐藏期望的声明和身份哈希。候选规则、skill 描述、外部 skill 摘要或请求集合变化后，旧证据失效。
+该脚本是测试结果投影 owner：维护者与模型消费默认一行摘要，部署自动化可显式消费 machine JSON；两种视图来自同一次套件结果。输出只存在于当前进程 stdout，不缓存、不写回 evidence，也不作为模型行为正确性的第二证明来源；失败时只返回有界套件诊断和可重跑的确定性入口。
 
-`record_routing_attempt.ps1` 是正式尝试生命周期的唯一 owner。每次真实 evaluator 执行必须先 `Begin`，使 `started` 收据先于外部运行持久化；随后必须用同一 attempt ID `Finish`。有结果时登记入口校验身份与 oracle 并记录 `passed`，或以 `identity_or_schema`、`oracle_violation` 记录失败；evaluator 没有产出结果时用 `-ExecutionFailureSummary` 记录 `execution_failed`。未完成的 `started` 收据会阻断正式 Validate 和 Publish，不能通过重新执行掩盖。
+## 阶段身份与影响计划
 
-每份收据只保存 phase、周期、候选/输入/capsule/result 哈希、evaluator 身份、开始与完成 UTC 时间、结果、最多 500 字符的失败摘要、与前一次相比发生变化的身份字段和可选重试理由，不保存原始模型日志。同一 phase、candidate、input 与 capsule 的第二次运行必须显式传入 `-RetryJustification`，并且每个不变输入最多两次；达到上限后必须改变候选或评估输入，不能原样刷到成功。
+三个阶段只绑定 evaluator 实际可见的内容：
 
-`evidence/attempts.json` 由登记入口在独占锁下原子维护，一个活跃周期最多六份收据。候选或 Routing 输入改变后，只有旧周期不存在未完成尝试才开始新周期；新账本保留上一周期 ID、账本 SHA-256 与收据数，旧正文通过 Git 历史恢复，不在当前模型读取面无限累积。`validate_routing_attempt_history.ps1` 负责结构、周期、唯一 evaluator、未完成尝试、每输入两次上限、六份收据上限及当前成功收据接入。它是开发与发布门禁消费的机器真源，不是模型默认读取面；人和模型通过本节合同、验证回执或精确 attempt ID 读取所需事实，不复制完整历史。
+- Routing：`global/AGENTS.md`、项目 skill description、peer skill description、请求和可用 peer；skill 正文与 `agents/openai.yaml` 不可见，也不进入身份。
+- Policy：`global/AGENTS.md`、行为标签定义和请求；它不读取或绑定 Routing 结果，因此两者可以并行。
+- References：当前 Routing 结果真正选中的 reference-aware skill 正文、相关请求和这些 skill 的选择投影；它不绑定完整 Routing evaluator、无关 skill 或未选中的正文。
 
-仓库首次引入该合同使用 `initialize_routing_attempt_history.ps1` 从已经验证的 `current.json` 通过 Begin/Finish 导入三份 `baseline_import` 收据，并明确声明更早尝试未被重建；此迁移入口拒绝覆盖已有历史。
+隐藏的 expected、forbidden 与 strict 字段只由 validator 消费。若阶段可见身份未变，planner 先用当前 oracle 重验旧结果：通过才返回 `reuse`；若新 oracle 拒绝旧结果则返回 `blocked`，不得以另一轮相同输入采样碰成功。evaluator 协议、输出 schema、指纹算法或无法证明边界的变化会改变 capsule 身份并触发相应完整阶段。
 
-`detached-capsule` 是输入隔离合同，不等于操作系统沙箱。尝试收据只证明正式验证输入、结果和重试边界可审计，也不证明行为正确；执行行为仍由 skill 回归、组件 release gate 和具体任务的直接验收负责。
+只读查看最小计划：
+
+```powershell
+& '.\development\skill-routing\get_routing_evaluation_plan.ps1' -ProjectRoot (Get-Location).Path
+& '.\development\skill-routing\get_routing_evaluation_plan.ps1' -ProjectRoot (Get-Location).Path -View machine
+```
+
+计划区分 `evaluate`、`reuse`、`pending-routing` 和 `blocked`。Routing 需要新结果时，References 先为 `pending-routing`；正式入口取得新 Routing 结果后用同一 planner 重新计算，而不是预先假设 References 必须运行。
+
+## 正式刷新与隔离 runner
+
+正常维护只调用一个入口：
+
+```powershell
+& '.\development\skill-routing\refresh_routing_evidence.ps1' -ProjectRoot (Get-Location).Path
+```
+
+若全部阶段仍有效，它返回 `already-current`，不启动 evaluator、不新增收据。需要刷新时，它先为不变阶段登记 `evidence_reuse`，再并行启动需要的 Routing/Policy，取得有效 Routing 后判断 References，最后通过 merge 原子更新 `current.json`。首次从旧协议迁移时三阶段都会运行；后续非 reference skill 正文变化为零运行，reference-aware skill 正文变化只运行 References，全局规则变化并行运行 Routing 与 Policy。
+
+阶段结果在 merge 完成前原子保存在被 Git 忽略的 `evidence/pending/<generation>/`。若模型阶段已经通过而外层编排随后失败，下一次刷新重新校验结果，并同时匹配 current generation 的 passed receipt、文件哈希、语义哈希、capsule 与 evaluator 后直接恢复，不重复调用模型。generation 改变时，刷新先把旧账本原样固化到新 staging；阶段可见身份仍有效且旧 stage、旧 passed receipt、账本链和当前 oracle 一致时登记零 Token `staged_carry_forward`，中途重启也沿这份账本快照继续搬运剩余阶段。merge 成功后才删除所有已消费 staging。该目录只是崩溃恢复资产，不是第二证据真源。
+
+runner 只接受可直接执行且不在 WindowsApps 下、不是 reparse point 的用户态 Codex CLI；共享 owner 依次识别用户 npm `@openai/codex` 的嵌套 optional package、提升 optional package 与主包 vendor 回退布局，evaluator 再以 `.codex/.sandbox-bin` 为已验证后备。正式模型默认为 `gpt-5.6-sol`、推理档位默认为 `medium`。每个阶段使用仓库外随机 workdir、临时 `CODEX_HOME`、只读且运行期间禁止写回的现有 `auth.json` 硬链接，并把用户级官方 `models_cache.json` 中所选模型投影为只含一个模型的临时目录，避免空 home 的远端目录刷新；缓存时间、etag、其他模型、用户配置和插件状态均不进入投影。runner 使用 `--ignore-user-config`、`--ignore-rules`、`--sandbox read-only`、`--ephemeral`、`--strict-config`、`analytics.enabled=false`、显式禁用插件/应用/hooks/skills/shell 等非评估能力和强制 JSON Schema。schema 只承担结构、枚举和必填字段，数组数量与唯一性由本地 validator 承担，以适配 Responses 的结构化输出子集。每个阶段要求模型在内部逐项检查正向与非触发边界，但不输出理由；模型仍只生成 cases。runner 生成带模型目录 SHA-256 与禁用能力清单的 evaluator envelope，检查 JSONL 中不存在工具调用、真实仓库或用户 skill 根访问痕迹，并确认真实认证文件哈希未变。临时 capsule、模型目录、schema、结果和诊断在结束后删除，不持久化原始模型日志。
+
+runner 在 Codex 进程前先 `Begin`，所有已取得 attempt ID 的退出路径都用相同 ID `Finish`。进程启动前的 runner/编排失败记为 `orchestration_failed`，进程启动后的 CLI/超时/隔离失败记为 `execution_failed`，结果身份或结构失败记为 `identity_or_schema`，当前 oracle 失败记为 `oracle_violation`。检查的输入、实现和环境未变化时不得原样重跑；修正真实原因后才使用明确的阶段 `-RetryJustification`。同一可见输入最多两次真实 evaluator 尝试；启动前失败另行有界为两次且不冒充模型采样，整个 generation 仍受六份收据总上限约束。
+
+冷目录准备、认证或模型目录投影在 `Begin` 前完成；这些步骤失败时没有外部 evaluator 尝试，不产生伪收据。`Begin` 后但进程启动前的失败会落盘为 `orchestration_failed`，进程启动后的失败才记为 `execution_failed`；有界诊断同时保留首尾，避免启动日志挤掉最终根因。
+
+审计时仍可单独构建 capsule；Policy 不接受 Routing 路径，References 必须传入已经通过的 Routing 结果：
+
+```powershell
+& '.\development\skill-routing\build_routing_evaluation.ps1' -Phase Routing -ProjectRoot (Get-Location).Path
+& '.\development\skill-routing\build_routing_evaluation.ps1' -Phase Policy -ProjectRoot (Get-Location).Path
+& '.\development\skill-routing\build_routing_evaluation.ps1' -Phase References -ProjectRoot (Get-Location).Path -RoutingResultsPath '<routing-result>.json'
+```
+
+## 收据、复用与恢复
+
+`record_routing_attempt.ps1` 是正式尝试生命周期的唯一 owner。每次真实 evaluator 执行必须先 `Begin`，使 `started` 收据先于外部运行持久化；随后必须用同一 attempt ID `Finish`。未完成的 `started` 收据会阻断正式 Validate 和 Publish，不能通过重新执行掩盖。
+
+`Reuse` 不把旧文件存在当作正确性证明。它重新构造当前阶段 capsule、运行当前 oracle，并记录来源 evidence SHA-256、来源 receipt ID、当前阶段身份、语义结果 SHA-256、既有 evaluator 身份和零运行 Token。merge 把新的 receipt ID 写回相应阶段；部署门禁从当前阶段沿 receipt、语义结果和 source link 验证，不从 evaluator 时间或文件变短推断可复用。
+
+每份收据只保存 phase、generation、候选/输入/capsule/语义结果哈希、evaluator 身份、开始与完成 UTC 时间、来源关系、耗时与 Token 计数、结果、最多 500 字符失败摘要、变化字段和可选重试理由，不保存原始模型日志。相同 phase、candidate、input 与 capsule 的后续正式收据必须显式说明理由；每个不变输入最多两次真实 evaluator 尝试和两次启动前编排失败，达到相应上限后必须改变原因或可见输入，不能原样刷到成功。
+
+`evidence/attempts.json` 由登记入口在独占锁下原子维护；被 Git 忽略的稳定 `.lock` 文件只提供跨进程句柄互斥，不在释放时删除，因此并行 writer 不存在“旧 owner 删除新 owner 锁文件”的竞态。一个活跃周期最多六份收据。这里的周期是 Routing capsule、Policy capsule和全部 reference-aware skill 正文组成的整体 generation，不再借用 Routing capsule 充当三阶段身份。generation 改变时，只有旧周期不存在未完成尝试才滚动；新账本保留上一周期 ID、账本 SHA-256 与收据数，旧正文通过 Git 历史恢复，不在当前模型读取面无限累积。
+
+`validate_routing_attempt_history.ps1` 负责 schema、generation、唯一 evaluator、未完成尝试、每输入的 evaluator/编排失败分类上限、六份收据上限，以及 `current.json` 中每个阶段 receipt 与语义结果的唯一绑定。仓库首次引入账本时，`initialize_routing_attempt_history.ps1` 可从已经验证的 current evidence 生成三份 `baseline_import` 收据，并明确声明更早尝试未被重建；它拒绝覆盖已有历史。
+
+这些证据只覆盖 skill 路由、粗粒度行为标签、条件引用选择、独立输入边界和运行/复用 provenance。组件回归、release gate、实际安装状态与具体任务结果仍由各自正式 owner 验证。

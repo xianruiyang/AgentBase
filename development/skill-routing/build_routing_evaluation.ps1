@@ -33,21 +33,25 @@ if ([string]::IsNullOrWhiteSpace($outputDirectory) -or -not (Test-Path -LiteralP
 
 $contractPath = Join-Path $PSScriptRoot "trigger-cases.json"
 $contract = Get-Content -LiteralPath $contractPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100
-if ($Phase -in @("Policy", "References")) {
+if ($Phase -eq "References") {
     if ([string]::IsNullOrWhiteSpace($RoutingResultsPath)) {
-        throw "RoutingResultsPath is required for the $Phase phase"
+        throw "RoutingResultsPath is required for the References phase"
     }
     $RoutingResultsPath = (Resolve-Path -LiteralPath $RoutingResultsPath).Path
     & (Join-Path $PSScriptRoot "validate_routing_results.ps1") -ProjectRoot $ProjectRoot -ResultsPath $RoutingResultsPath -RoutingOnly | Out-Null
     $routingResults = Get-Content -LiteralPath $RoutingResultsPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100 -DateKind String
-    $capsule = if ($Phase -eq "Policy") {
-        Get-AgentBasePolicyEvaluationCapsule -ProjectRoot $ProjectRoot -Contract $contract -RoutingResults $routingResults
+    $capsule = Get-AgentBaseReferenceEvaluationCapsule -ProjectRoot $ProjectRoot -Contract $contract -RoutingResults $routingResults
+}
+elseif ($Phase -eq "Policy") {
+    if (-not [string]::IsNullOrWhiteSpace($RoutingResultsPath)) {
+        throw "RoutingResultsPath is not accepted for the independent Policy phase"
     }
-    else {
-        Get-AgentBaseReferenceEvaluationCapsule -ProjectRoot $ProjectRoot -Contract $contract -RoutingResults $routingResults
-    }
+    $capsule = Get-AgentBasePolicyEvaluationCapsule -ProjectRoot $ProjectRoot -Contract $contract
 }
 else {
+    if (-not [string]::IsNullOrWhiteSpace($RoutingResultsPath)) {
+        throw "RoutingResultsPath is not accepted for the Routing phase"
+    }
     $capsule = Get-AgentBaseRoutingEvaluationCapsule -ProjectRoot $ProjectRoot -Contract $contract
 }
 $json = $capsule.payload | ConvertTo-Json -Depth 12

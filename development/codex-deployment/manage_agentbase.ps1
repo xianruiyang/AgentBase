@@ -364,6 +364,10 @@ function Get-ValidatedRoutingEvidence {
         evaluation_capsule_sha256 = [string]$evidence.evaluation_capsule_sha256
         candidate_bundle_sha256 = [string]$evidence.candidate_bundle_sha256
         evaluation_input_sha256 = [string]$evidence.evaluation_input_sha256
+        evaluation_generation_sha256 = [string]$evidence.evaluation_generation_sha256
+        routing_receipt_id = [string]$evidence.receipt_id
+        policy_receipt_id = [string]$evidence.policy_evaluation.receipt_id
+        reference_receipt_id = [string]$evidence.reference_evaluation.receipt_id
         case_count = @($evidence.cases).Count
     }
 }
@@ -683,6 +687,10 @@ function Get-ValidatedSource {
         'Python.Python.3.13'
         'OpenJS.NodeJS.LTS'
         '@ast-grep/cli@0.44.1'
+        '@openai/codex@0.148.0'
+        'Test-UserNpmPathPrecedence'
+        'isolation_options_supported'
+        '--ignore-user-config'
         '$version.Major -ge 7'
         '--max-results'
         '[version]"22.9.0"'
@@ -697,7 +705,8 @@ function Get-ValidatedSource {
     }
     $projectAgentsContent = Get-Content -LiteralPath (Join-Path $Root "AGENTS.md") -Raw -Encoding UTF8
     $deploymentReadmeContent = Get-Content -LiteralPath (Join-Path $Root "development\codex-deployment\README.md") -Raw -Encoding UTF8
-    if (-not $projectAgentsContent.Contains('bootstrap_windows.ps1') -or -not $projectAgentsContent.Contains('-Action Install')) {
+    if (-not $projectAgentsContent.Contains('bootstrap_windows.ps1') -or -not $projectAgentsContent.Contains('-Action Install') -or
+        -not $projectAgentsContent.Contains('用户级 Codex CLI')) {
         throw "Project AGENTS.md does not route Windows reproduction through the host bootstrap"
     }
     if (-not $deploymentReadmeContent.Contains('bootstrap_windows.ps1') -or -not $deploymentReadmeContent.Contains('-Action Check') -or
@@ -990,6 +999,10 @@ function Get-SrcqRuntimePreflight {
 }
 
 if ($Action -eq "Validate") {
+    & (Join-Path $ProjectRoot "development\skill-routing\test_routing_infrastructure.ps1") -ProjectRoot $ProjectRoot | Out-Null
+}
+
+if ($Action -eq "Validate") {
     $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $null -IncludePortableSettings $false -DeliveryMode $SkillDeliveryMode
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
     $result = [pscustomobject]@{
@@ -1021,6 +1034,10 @@ if ($Action -eq "Validate") {
 }
 
 $CodexRoot = Resolve-CodexRoot -RequestedRoot $CodexRoot -Create ($Action -eq "Publish")
+
+if ($Action -eq "Publish" -and -not (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot)) {
+    & (Join-Path $ProjectRoot "development\skill-routing\test_routing_infrastructure.ps1") -ProjectRoot $ProjectRoot | Out-Null
+}
 
 if ($Action -eq "Status") {
     $publishRecord = Get-LatestPublishedManifest -InstallRoot $CodexRoot -DeliveryMode $SkillDeliveryMode -PortableSettingsInstalled ([bool]$InstallPortableSettings)

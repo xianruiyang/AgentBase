@@ -116,8 +116,12 @@ foreach ($attemptContractPath in @(
     "development\skill-routing\routing_attempt_history.ps1",
     "development\skill-routing\record_routing_attempt.ps1",
     "development\skill-routing\validate_routing_attempt_history.ps1",
+    "development\skill-routing\get_routing_evaluation_plan.ps1",
+    "development\skill-routing\invoke_routing_evaluation.ps1",
+    "development\skill-routing\refresh_routing_evidence.ps1",
     "development\skill-routing\initialize_routing_attempt_history.ps1",
-    "development\skill-routing\test_routing_attempt_history.ps1"
+    "development\skill-routing\test_routing_attempt_history.ps1",
+    "development\skill-routing\test_routing_evaluation_plan.ps1"
 )) {
     Assert-True (Test-Path -LiteralPath (Join-Path $ProjectRoot $attemptContractPath) -PathType Leaf) "Routing attempt contract entry is missing: $attemptContractPath"
 }
@@ -129,8 +133,11 @@ Assert-True ($routingReadmeContent.Contains("更早尝试未被重建")) "Skill-
 $attemptRecorderContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "development\skill-routing\record_routing_attempt.ps1") -Raw -Encoding UTF8
 $attemptMergeContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "development\skill-routing\merge_routing_evidence.ps1") -Raw -Encoding UTF8
 $attemptHistoryContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "development\skill-routing\routing_attempt_history.ps1") -Raw -Encoding UTF8
-Assert-True ($attemptRecorderContent.Contains("[ValidateSet('Begin', 'Finish')]")) "Routing attempt recorder does not expose the two-phase lifecycle"
+Assert-True ($attemptRecorderContent.Contains("[ValidateSet('Begin', 'Finish', 'Reuse', 'CarryForward')]")) "Routing attempt recorder does not expose evaluation, evidence-reuse, and staged carry-forward lifecycles"
 Assert-True ($attemptRecorderContent.Contains("'execution_failed'")) "Routing attempt recorder does not preserve evaluator execution failures"
+Assert-True ($attemptRecorderContent.Contains("'orchestration_failed'")) "Routing attempt recorder does not distinguish pre-evaluator orchestration failures"
+Assert-True ($attemptRecorderContent.Contains("'staged_carry_forward'")) "Routing attempt recorder does not preserve prior-generation passed staging"
+Assert-True (-not $attemptRecorderContent.Contains('[IO.File]::Delete($lockPath)')) "Routing attempt recorder still deletes its shared lock file and can race a new owner"
 Assert-True ($attemptMergeContent.Contains('$RoutingAttemptId') -and $attemptMergeContent.Contains('$PolicyAttemptId') -and $attemptMergeContent.Contains('$ReferenceAttemptId')) "Routing evidence merge is not bound to three completed attempt IDs"
 Assert-True ($attemptHistoryContent.Contains('max_receipts_per_cycle')) "Routing attempt ledger does not expose its active-cycle bound"
 Assert-MarkdownRelativeLinks -Path $readmePath
@@ -301,7 +308,8 @@ Assert-True ($globalContent.Contains('PATH 中的 `srcq fd <fd argv...>`')) "glo
 Assert-True ($globalContent.Contains('`srcq rg <rg argv...>`')) "global rules must expose the minimal direct rg syntax"
 Assert-True ($globalContent.Contains('PATH 中的 `srcq scc <scc argv...>`')) "global rules must expose the minimal direct scc syntax"
 Assert-True ($globalContent.Contains('PATH 中的 `hyperfine <hyperfine argv...>`')) "global rules must expose the independent hyperfine syntax"
-Assert-True ($sourceQueryContent.Contains('普通 rg/fd/scc、hyperfine、规则审查或工具名提及不触发')) "source-query must exclude ordinary scc and hyperfine use from skill routing"
+Assert-True ($sourceQueryContent.Contains('普通 rg/fd/scc、hyperfine、规则审查或工具名提及也不触发')) "source-query must exclude ordinary scc and hyperfine use from skill routing"
+Assert-True ($sourceQueryContent.Contains('AST 无匹配后尚缺能改变下一次查询的源码证据时先回到普通文本或有界读取，不触发本 skill')) "source-query must keep post-miss evidence gathering outside advanced-query routing"
 Assert-True ($sourceQuerySccContent.Contains('`summary`、`languages`、`files`、`hotspots`、`lossless` 与 `raw`')) "source-query must document every scc projection"
 Assert-True ($sourceQuerySccContent.Contains('默认模型投影有意省略 COCOMO')) "source-query must preserve the scc estimation boundary"
 Assert-True ($sourceQuerySccContent.Contains('同一次捕获的有界回退，不重复执行扫描')) "source-query must not rerun scc after a protocol fallback"
@@ -317,7 +325,7 @@ $routingCommonPath = Join-Path $PSScriptRoot "routing_evaluation_common.ps1"
 $routingCommonContent = Get-Content -LiteralPath $routingCommonPath -Raw -Encoding UTF8
 Assert-True (-not ($routingCommonContent -match 'Get-ChildItem[^\r\n]+-Recurse')) "Routing evaluation must not collect recursive skill artifacts"
 Assert-True ($routingCommonContent.Contains('"SKILL.md"')) "Routing evaluation must bind each evaluated SKILL.md"
-Assert-True ($routingCommonContent.Contains('"agents\openai.yaml"')) "Routing evaluation must bind each evaluated agents/openai.yaml"
+Assert-True (-not $routingCommonContent.Contains('"agents\openai.yaml"')) "Routing evaluation must not invalidate semantic phases for presentation-only skill metadata"
 Assert-True ($routingCommonContent.Contains('detached capsule')) "Routing evaluation must declare its detached-capsule boundary"
 foreach ($routingScriptName in @("build_routing_evaluation.ps1", "validate_routing_results.ps1")) {
     $routingScriptContent = Get-Content -LiteralPath (Join-Path $PSScriptRoot $routingScriptName) -Raw -Encoding UTF8
@@ -327,7 +335,41 @@ Assert-True ($routingCommonContent.Contains('The skill catalog intentionally exp
 Assert-True ($routingCommonContent.Contains('Policy labels, post-selection skill bodies, and reference choices are intentionally unavailable in this stage')) "Routing evaluation exposes post-routing policy hints during first-stage skill selection"
 Assert-True ($routingCommonContent.Contains('evaluation_kind = "behavior-policy"')) "Routing evaluation is missing its post-routing behavior-policy phase"
 Assert-True ($routingCommonContent.Contains('routing-reference-policy')) "Routing evaluation is missing its post-selection change-governance reference phase"
+Assert-True ($routingCommonContent.Contains('independent of skill-routing output')) "Behavior-policy evaluation is still coupled to routing output"
+Assert-True ($routingCommonContent.Contains('routing_reference_selection_sha256')) "Reference evaluation does not bind only its relevant routing selection"
+Assert-True ($routingCommonContent.Contains('cases-only-v1')) "Independent evaluation still asks the model for redundant envelopes or rationales"
 Assert-True (Test-Path -LiteralPath (Join-Path $PSScriptRoot "merge_routing_evidence.ps1") -PathType Leaf) "Routing evaluation is missing its canonical staged evidence merge entry"
+$routingRuntimePath = Join-Path $PSScriptRoot "routing_evaluator_runtime.ps1"
+Assert-True (Test-Path -LiteralPath $routingRuntimePath -PathType Leaf) "Routing evaluation is missing its isolated Codex runtime owner"
+$routingRuntimeContent = Get-Content -LiteralPath $routingRuntimePath -Raw -Encoding UTF8
+$sharedCodexRuntimePath = Join-Path $ProjectRoot 'development\common\codex_cli_runtime.ps1'
+Assert-True (Test-Path -LiteralPath $sharedCodexRuntimePath -PathType Leaf) "Windows bootstrap and routing evaluator are missing their shared Codex native runtime owner"
+$sharedCodexRuntimeContent = Get-Content -LiteralPath $sharedCodexRuntimePath -Raw -Encoding UTF8
+Assert-True ($routingRuntimeContent.Contains('common\codex_cli_runtime.ps1') -and $sharedCodexRuntimeContent.Contains('Get-AgentBaseCodexNativeCandidatePaths')) "Routing evaluator does not consume the shared Codex native runtime owner"
+$bootstrapContentForRuntime = Get-Content -LiteralPath (Join-Path $ProjectRoot 'development\codex-deployment\bootstrap_windows.ps1') -Raw -Encoding UTF8
+Assert-True ($bootstrapContentForRuntime.Contains('common\codex_cli_runtime.ps1') -and $bootstrapContentForRuntime.Contains('Resolve-AgentBaseCodexNativeExecutable')) "Windows bootstrap does not consume the shared Codex native runtime owner"
+Assert-True ($routingRuntimeContent.Contains('New-AgentBaseCodexModelCatalogProjection')) "Routing evaluator runtime is missing its sanitized model-catalog projection"
+Assert-True ($routingRuntimeContent.Contains('model_catalog_json')) "Routing evaluator runtime does not pass the sanitized model catalog to Codex"
+Assert-True ($routingRuntimeContent.Contains('--strict-config')) "Routing evaluator runtime does not reject invalid CLI configuration"
+$routingInvokerContent = Get-Content -LiteralPath (Join-Path $PSScriptRoot "invoke_routing_evaluation.ps1") -Raw -Encoding UTF8
+Assert-True ($routingInvokerContent.Contains('routing_evaluator_runtime.ps1')) "Routing evaluator runner does not use the canonical runtime owner"
+Assert-True ($routingInvokerContent.Contains('AGENTBASE_ROUTING_EVALUATOR_DISABLED')) "Routing evaluator runner cannot enforce the deterministic test no-model boundary"
+Assert-True ($routingInvokerContent.Contains('auth_mode = "read-only-hardlink"')) "Routing evaluator runner does not attest read-only authentication"
+Assert-True ($routingInvokerContent.Contains('model_catalog_sha256')) "Routing evaluator runner does not attest its model catalog identity"
+Assert-True (Test-Path -LiteralPath (Join-Path $PSScriptRoot "test_routing_evaluator_runtime.ps1") -PathType Leaf) "Routing evaluator runtime is missing deterministic contract tests"
+Assert-True (Test-Path -LiteralPath (Join-Path $PSScriptRoot "test_routing_refresh_recovery.ps1") -PathType Leaf) "Routing evidence refresh is missing crash-recovery tests"
+Assert-True (Test-Path -LiteralPath (Join-Path $PSScriptRoot "test_routing_infrastructure.ps1") -PathType Leaf) "Routing evaluation is missing its canonical deterministic infrastructure test entry"
+$routingInfrastructureTestContent = Get-Content -LiteralPath (Join-Path $PSScriptRoot "test_routing_infrastructure.ps1") -Raw -Encoding UTF8
+Assert-True ($routingInfrastructureTestContent.Contains("AGENTBASE_ROUTING_EVALUATOR_DISABLED'] = '1'")) "Routing infrastructure tests do not mechanically disable model evaluator execution"
+$deploymentManagerContent = Get-Content -LiteralPath (Join-Path $ProjectRoot 'development\codex-deployment\manage_agentbase.ps1') -Raw -Encoding UTF8
+Assert-True ($deploymentManagerContent.Contains('test_routing_infrastructure.ps1')) "Deployment Validate and Publish do not consume the canonical routing infrastructure tests"
+$routingRefreshContent = Get-Content -LiteralPath (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -Raw -Encoding UTF8
+Assert-True ($routingRefreshContent.Contains('Get-AgentBasePendingReceipt')) "Routing evidence refresh cannot recover passed staged results"
+Assert-True ($routingRefreshContent.Contains('recovered_phase_count')) "Routing evidence refresh does not report recovered phases separately"
+Assert-True ($routingRefreshContent.Contains('source-attempts.json') -and $routingRefreshContent.Contains('previous_ledger_sha256')) "Routing evidence refresh cannot resume a partially carried generation from its immutable source ledger"
+$gitIgnoreContent = Get-Content -LiteralPath (Join-Path $ProjectRoot '.gitignore') -Raw -Encoding UTF8
+Assert-True ($gitIgnoreContent.Contains('development/skill-routing/evidence/pending/')) "Recoverable routing staging is not excluded from repository truth"
+Assert-True ($gitIgnoreContent.Contains('development/skill-routing/evidence/*.lock')) "Stable routing lock files are not excluded from repository truth"
 
 $governorSkillPath = Join-Path $ProjectRoot "skills\reasoning-governor\SKILL.md"
 $governorScriptPath = Join-Path $ProjectRoot "skills\reasoning-governor\scripts\reasoning-governor.mjs"
@@ -380,6 +422,7 @@ Assert-True ($taskTableScriptContent.Contains('compact_model')) "taskctl is miss
 Assert-True ($taskTableToolingContent.Contains('`--view model` 是默认值') -and $taskTableToolingContent.Contains('`--view machine` 面向程序')) "taskctl tooling does not define consumer output surfaces"
 Assert-True ($taskTableToolingContent.Contains('紧凑 HJSON 风格文本')) "taskctl tooling does not define the measured model representation"
 Assert-True ($taskTableSkillContent.Contains('再只增加当前命令族的一项')) "task-table-manager does not progressively select one CLI command family"
+Assert-True ($taskTableSkillContent.Contains('只读查询或只判断下一项工作且不领取、恢复、执行时不读取它')) "task-table-manager does not exclude execution.md from read-only next-work selection"
 Assert-True ($taskTableToolingContent.Contains('不要为发现命令而预读其他族')) "taskctl common tooling does not prohibit command-family preloading"
 Assert-True ($taskTableSkillContent.Contains('authoring-tooling.md') -and $taskTableSkillContent.Contains('query-tooling.md') -and $taskTableSkillContent.Contains('execution-tooling.md') -and $taskTableSkillContent.Contains('completion-tooling.md')) "task-table-manager main entry does not route every CLI command family"
 Assert-True ($taskTableSkillContent.Contains('任务合同、状态和结果是程序消费且由模型作出语义决定的结构化真源')) "task-table-manager does not declare its model-maintained structured source"

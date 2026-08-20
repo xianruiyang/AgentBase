@@ -44,11 +44,16 @@ $machineReady = Invoke-BootstrapProcess -Arguments @("-Action", "Check", "-View"
 Assert-True ($machineReady.exit_code -eq 0) "machine readiness check failed on the prepared host"
 $machineReadyResult = $machineReady.text | ConvertFrom-Json
 Assert-True ([bool]$machineReadyResult.ready) "machine readiness result is not ready"
-Assert-True (@($machineReadyResult.tools).Count -eq 7) "machine readiness result omitted prerequisite states"
+Assert-True (@($machineReadyResult.tools).Count -eq 8) "machine readiness result omitted prerequisite states"
 Assert-True (-not [string]::IsNullOrWhiteSpace([string]$machineReadyResult.tools[0].package_id)) "machine readiness result omitted package identity"
 $packageIds = @($machineReadyResult.tools | ForEach-Object { [string]$_.package_id })
 Assert-True ($packageIds -contains "BenBoyter.scc") "machine readiness result omitted the scc package identity"
 Assert-True ($packageIds -contains "sharkdp.hyperfine") "machine readiness result omitted the hyperfine package identity"
+Assert-True ($packageIds -contains "@openai/codex@0.148.0") "machine readiness result omitted the isolated Codex CLI package identity"
+$codexState = @($machineReadyResult.tools | Where-Object { [string]$_.name -eq "Codex CLI" })[0]
+Assert-True ([bool]$codexState.isolation_options_supported) "Codex CLI does not expose the isolated exec options required by routing evaluation"
+Assert-True ([bool]$codexState.path_precedes_windowsapps) "Codex CLI user npm prefix does not precede WindowsApps in the persisted user PATH"
+Assert-True (-not ([string]$codexState.path).Contains("\WindowsApps\", [StringComparison]::OrdinalIgnoreCase)) "Codex CLI readiness selected the package-identity-protected WindowsApps binary"
 
 $modelMissing = Invoke-BootstrapProcess -Arguments @("-Action", "Check") -EmptyPath
 Assert-True ($modelMissing.exit_code -eq 1) "missing prerequisites did not retain the check failure exit code"
