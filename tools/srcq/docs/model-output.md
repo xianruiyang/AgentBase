@@ -22,7 +22,7 @@
 | rg 正文 | 路径一次、行号、正文、真实 context 区分 | event kind 字段、absolute offset、submatches、native 副本、重复 summary | 请求位置范围时保留必要 submatch 列范围；正文截断才给 cut 信息 |
 | rg files/count/summary | 请求对象本身 | 与请求对象重复的 receipt | 分页才给续点；统计只在明确 summary/count 视图出现 |
 | scc summary/languages | 语言、文件、代码、注释、空行、行数、复杂度和字节的当前请求投影 | 原生键名、重复 totals、COCOMO、estimated cost、schedule、people | lossless/raw/artifact 才保留完整原生估算字段；复杂度只作复核候选指标 |
-| scc files/hotspots | 稳定规范化路径与直接指标 | 未请求的语言容器、成本估算、重复路径 | 分页给精确 cursor；hotspots 只排序候选，不声明缺陷 |
+| scc files/hotspots | 稳定规范化路径与直接指标；files 可用扁平行、单表头表格或目录树表格 | 未请求的语言容器、成本估算、重复路径 | files 仅在可逆、保序且实际更短时用树；分页给精确 cursor；hotspots 保持扁平排名且不声明缺陷 |
 | AST | 文件、完整范围、源码正文；当前查询确需且不与正文重复的捕获/规则/诊断 | `_sgy` envelope、ordinal、正文的重叠捕获、固定 profile/cache 字段 | 省略结果、正文截断或 cache 是继续取回的唯一入口时给最短恢复信息 |
 | doctor | 成功时 `ok` | 正常路径、cwd、expected/observed 重复、schema | 失败时给实际值、预期值和恢复入口 |
 | defaults | 分类结果及实际注入、抑制或不可推导差异 | engine、cwd、原始 argv、完整 effective argv、engine_started | `--output machine` 返回完整决策 |
@@ -36,7 +36,7 @@
 
 - fd 单根查询已由 argv 给出根时只写相对路径；无分叉链写成 `A/A0`，共享分支写成 `A/` 后以两空格缩进子链。只有该表示可逆且实际更短时使用树。
 - rg 可以按结果形状选择逐行 `path:line:text`、文件 heading，或把共享目录压成路径树并在文件叶子下写 `line:text`/位置；match 使用 `line:text`，context 使用 `line-context`。locations 只在真实列范围存在时写范围。
-- scc summary 使用一行 totals；languages 在多语言首个页面保留全局 totals，再列逐语言直接指标；files/hotspots 每行以稳定 `/` 路径开头。字段顺序固定，零值不被误删；模型格式不承诺原生 JSON round-trip。
+- scc summary 使用一行 totals；languages 在多语言首个页面保留全局 totals，再列逐语言直接指标；files 的扁平标注以完整稳定 `/` 路径开头，表格只定义一次固定列，目录树以 `path(tree)` 表头、末尾 `/` 的目录和两空格层级表达同一完整路径；hotspots 每行仍以完整稳定路径开头。字段顺序固定，零值不被误删；模型格式不承诺原生 JSON round-trip。
 - AST 每项先写 `file:startLine:startColumn-endLine:endColumn`，下一行起写源码正文；捕获只在不与正文重叠或调用方明确需要时追加。
 
 正常 model 输出依靠固定协议和进程退出表达成功、完整与无匹配，不逐次复述。只有偏离默认时追加一行 `@` 记录：

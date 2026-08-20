@@ -43,11 +43,12 @@ python benches/validate_results.py D:\benchmark-output\benchmark-results.json D:
 
 ## scc 模型投影
 
-`scc_projection_benchmark.py` 在同一源码快照上比较完整 json2 与完整 srcq 任务投影，并用真实 `cl100k_base`、`o200k_base` tokenizer 计数。它同时拒绝未闭合分页和成本估算泄漏；结果只证明静态输出面的直接指标压缩，不证明端到端模型行为：
+`scc_projection_benchmark.py` 在同一源码快照上比较完整 json2 与完整 srcq 任务投影，并用真实 `cl100k_base`、`o200k_base` tokenizer 计数。可选 `--baseline-srcq` 会用同一 scc、cwd、参数和快照测量旧 srcq 的完整 files 投影，并以二进制 SHA-256 绑定双方身份。它同时拒绝未闭合分页和成本估算泄漏；结果只证明静态输出面的直接指标压缩，不证明端到端模型行为：
 
 ```powershell
 python benches/scc_projection_benchmark.py `
   --srcq target\release\srcq.exe `
+  --baseline-srcq C:\path\to\previous\srcq.exe `
   --scc C:\path\to\scc.exe `
   --root D:\path\to\project `
   --output target\scc-projection-benchmark.json

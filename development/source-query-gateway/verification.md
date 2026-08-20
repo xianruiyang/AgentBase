@@ -45,12 +45,12 @@
 
 | 范围 | 结果 |
 | --- | --- |
-| srcq 0.4.0 | `cargo ci-test` 全 workspace 通过；受影响定向 lib 45/45、真实 query gateway 32/32；`cargo ci-build`、`cargo lint`、`cargo fmt-check` 与 release helper 6/6 通过 |
+| srcq 0.4.0 | `cargo ci-test` 全 workspace 通过；受影响定向 lib 51/51、真实 query gateway 33/33；`cargo ci-build`、`cargo lint`、`cargo fmt-check` 与 release helper 6/6 通过 |
 | 后端与 AST | backend 合同 6/6、36 个 rg/fd/scc 模式、9 个原生 oracle 通过；0.4.0 AST baseline 通过；ast-grep 0.44.1 受影响真实套件此前为 CLI 3/3、core 1/1、integration 4/4 |
-| 主机与发布消费者 | bootstrap 回归和真实只读 Check 通过，7 个工具全部 supported，读回 scc 3.7.0 与 hyperfine 1.20.0；portable config/agent/lifecycle、插件构建及部署 scc doctor 解析烟测通过 |
-| 模型读取面 | AgentBase 16 种语言、1149 文件；o200k languages `1008→457`（-54.6627%），files `124642→43248`（-65.3022%）；只证明完整静态投影 |
-| release/install | 源码快照 `c7795a6b…de300`；两次 clean build 均得到 2725761-byte、SHA-256 `65734560…8d942` 的 0.4.0 ZIP；manifest 含 scc 3.7.0；0.3.1→0.4.0 隔离生命周期及最终 release summary/files/doctor 烟测通过 |
-| 路由 | 静态 96 cases、55 strict routing、10 strict references、11/11 skills 通过；独立 Codex 按用户额度约束未运行，旧 evidence 因 bundle 不同被正式 Validate 拒绝 |
+| 主机与发布消费者 | bootstrap 回归和后继当前只读 Check 通过，8 个工具全部 supported，读回 scc 3.7.0 与 hyperfine 1.20.0；portable config/agent/lifecycle、插件构建及部署 scc doctor 解析烟测通过 |
+| 模型读取面 | AgentBase 16 种语言、1165 文件；o200k languages `1008→457`，files 原生 json2 `126325→25997`（-79.4205%），同快照旧扁平候选 `43836→25997`（-40.6949%）；cl100k 旧候选 `43723→25922`（-40.7131%）。v2 benchmark 绑定双方二进制和输出 SHA-256，只证明完整静态投影 |
+| release/install | 源码快照 `008117d7…67a3`；两次 clean build 均得到 2730989-byte、SHA-256 `b43ad3f1…ba6f` 的 0.4.0 ZIP；manifest 含 scc 3.7.0；0.3.1→0.4.0 隔离生命周期及最终 release AST/scc doctor、rg/fd、files tree、hotspots flat 烟测通过 |
+| 路由 | 静态 96 cases、55 strict routing、10 strict references、11/11 skills 及后继独立 Routing/Policy/References 96/96/26 已通过；本次未改变路由输入，不重复调用 evaluator |
 
 ## 3. 证据边界
 
@@ -85,4 +85,4 @@ SOL-SQG-010 已实现：rg/fd 普通调用只传原生 argv，显式控制进入
 
 ## 6. P11 增量完成边界
 
-P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真实 scc、真实 tokenizer、release manifest、可复现归档和安装生命周期已经闭合，没有已知适用失败或开放实施项。独立模型采纳证据因用户明确的额度约束未运行，`development/skill-routing/evidence/current.json` 因身份过期不能用于当前候选；正式 Validate 的拒绝正是预期门禁。实际用户安装仍为 srcq 0.3.1，本轮也未获真实 Publish 的逐次授权，因此不得把 0.4.0 项目完成外推为已安装或已发布。
+P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真实 scc、真实 tokenizer、release manifest、可复现归档和安装生命周期已经闭合；后继 files 目录树差距也已按同一交付链关闭，没有已知适用失败或开放实施项。当前独立路由 evidence 已由后继增量计划刷新，且本次路由输入未变；目录树的静态 Token 收益仍不冒充端到端模型行为。实际用户安装仍为 srcq 0.3.1，本轮也未获真实 Publish 的逐次授权，因此不得把 0.4.0 项目完成外推为已安装或已发布。

@@ -2203,7 +2203,7 @@ fn path_segments(path: &str) -> Vec<String> {
 
 fn insert_ordered_path(root: &mut OrderedPathNode, path: &str, annotations: &[String]) -> bool {
     let segments = path_segments(path);
-    if segments.is_empty() {
+    if segments.is_empty() || segments.join("/") != path {
         return false;
     }
     let mut node = root;
@@ -2227,7 +2227,16 @@ fn insert_ordered_path(root: &mut OrderedPathNode, path: &str, annotations: &[St
     true
 }
 
-fn render_ordered_path_annotations(entries: &[(String, Vec<String>)]) -> Option<String> {
+#[derive(Clone, Copy)]
+enum PathAnnotationLayout {
+    SeparateLines,
+    InlineSingle,
+}
+
+fn render_ordered_path_annotations_with_layout(
+    entries: &[(String, Vec<String>)],
+    layout: PathAnnotationLayout,
+) -> Option<String> {
     if entries.is_empty() {
         return None;
     }
@@ -2237,11 +2246,16 @@ fn render_ordered_path_annotations(entries: &[(String, Vec<String>)]) -> Option<
             return None;
         }
     }
-    fn valid(node: &OrderedPathNode) -> bool {
+    fn valid(node: &OrderedPathNode, layout: PathAnnotationLayout) -> bool {
         (!node.terminal || node.children.is_empty())
-            && node.children.iter().all(|(_, child)| valid(child))
+            && (!node.terminal
+                || !matches!(layout, PathAnnotationLayout::InlineSingle)
+                || (node.annotations.len() == 1
+                    && !node.annotations[0].contains('\r')
+                    && !node.annotations[0].contains('\n')))
+            && node.children.iter().all(|(_, child)| valid(child, layout))
     }
-    if !valid(&root) {
+    if !valid(&root, layout) {
         return None;
     }
     fn leaf_paths(node: &OrderedPathNode, prefix: &mut Vec<String>, output: &mut Vec<Vec<String>>) {
@@ -2263,7 +2277,12 @@ fn render_ordered_path_annotations(entries: &[(String, Vec<String>)]) -> Option<
     if rendered_order != source_order {
         return None;
     }
-    fn lines(node: &OrderedPathNode, depth: usize, output: &mut Vec<String>) {
+    fn lines(
+        node: &OrderedPathNode,
+        depth: usize,
+        layout: PathAnnotationLayout,
+        output: &mut Vec<String>,
+    ) {
         for (name, child) in &node.children {
             let mut chain = escape_segment(name);
             let mut tail = child;
@@ -2274,21 +2293,32 @@ fn render_ordered_path_annotations(entries: &[(String, Vec<String>)]) -> Option<
                 tail = next;
             }
             let directory = !tail.children.is_empty();
-            output.push(format!(
+            let mut line = format!(
                 "{}{}{}",
                 "  ".repeat(depth),
                 chain,
                 if directory { "/" } else { "" }
-            ));
-            for annotation in &tail.annotations {
-                output.push(format!("{}{}", "  ".repeat(depth + 1), annotation));
+            );
+            if !directory && matches!(layout, PathAnnotationLayout::InlineSingle) {
+                line.push('\t');
+                line.push_str(&tail.annotations[0]);
             }
-            lines(tail, depth + 1, output);
+            output.push(line);
+            if matches!(layout, PathAnnotationLayout::SeparateLines) {
+                for annotation in &tail.annotations {
+                    output.push(format!("{}{}", "  ".repeat(depth + 1), annotation));
+                }
+            }
+            lines(tail, depth + 1, layout, output);
         }
     }
     let mut output = Vec::new();
-    lines(&root, 0, &mut output);
+    lines(&root, 0, layout, &mut output);
     Some(output.join("\n"))
+}
+
+fn render_ordered_path_annotations(entries: &[(String, Vec<String>)]) -> Option<String> {
+    render_ordered_path_annotations_with_layout(entries, PathAnnotationLayout::SeparateLines)
 }
 
 fn render_path_tree_model(paths: &[String]) -> Option<String> {
@@ -2308,6 +2338,10 @@ fn render_paths_adaptive_model(paths: &[String]) -> String {
 
 fn render_path_annotations(entries: &[(String, Vec<String>)]) -> Option<String> {
     render_ordered_path_annotations(entries)
+}
+
+fn render_path_inline_annotations(entries: &[(String, Vec<String>)]) -> Option<String> {
+    render_ordered_path_annotations_with_layout(entries, PathAnnotationLayout::InlineSingle)
 }
 
 fn render_fd_tree(paths: &[String], types: &BTreeMap<String, String>, roots: &[FdRoot]) -> Value {
@@ -3638,6 +3672,34 @@ mod tests {
     fn model_tree_rejects_prefix_reentry_that_would_reorder_evidence() {
         let paths = vec!["A/one".to_owned(), "B/two".to_owned(), "A/three".to_owned()];
         assert!(render_path_tree_model(&paths).is_none());
+    }
+
+    #[test]
+    fn model_tree_can_inline_one_annotation_per_leaf() {
+        let entries = vec![
+            ("src/a.rs".to_owned(), vec!["Rust\t6\t5".to_owned()]),
+            ("src/nested/b.rs".to_owned(), vec!["Rust\t4\t3".to_owned()]),
+        ];
+        assert_eq!(
+            render_path_inline_annotations(&entries).expect("inline path annotations"),
+            "src/\n  a.rs\tRust\t6\t5\n  nested/b.rs\tRust\t4\t3"
+        );
+    }
+
+    #[test]
+    fn model_tree_rejects_noncanonical_paths_and_ambiguous_inline_annotations() {
+        assert!(render_path_tree_model(&["/src/a.rs".to_owned()]).is_none());
+        assert!(render_path_tree_model(&["src//a.rs".to_owned()]).is_none());
+        assert!(render_path_inline_annotations(&[(
+            "src/a.rs".to_owned(),
+            vec!["one".to_owned(), "two".to_owned()],
+        )])
+        .is_none());
+        assert!(render_path_inline_annotations(&[(
+            "src/a.rs".to_owned(),
+            vec!["line one\nline two".to_owned()],
+        )])
+        .is_none());
     }
 
     #[test]

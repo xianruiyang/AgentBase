@@ -479,6 +479,71 @@ fn scc_future_protocol_projects_pages_and_preserves_snapshot_identity() {
 }
 
 #[test]
+fn scc_files_model_uses_a_tree_but_hotspots_keep_rank_order() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let engine = env!("CARGO_BIN_EXE_srcq-native-fixture");
+    let files = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "scc",
+            "exec",
+            "--view",
+            "files",
+            "--limit",
+            "20",
+            "--model-token-budget",
+            "100000",
+            "--engine",
+            engine,
+            "--",
+            "--by-file",
+            "--fixture-scc-files=12",
+            ".",
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .output()
+        .expect("tree scc files");
+    assert!(
+        files.status.success(),
+        "{}",
+        String::from_utf8_lossy(&files.stderr)
+    );
+    let files = String::from_utf8(files.stdout).expect("UTF-8 tree files");
+    assert!(files.starts_with("path(tree)\tlanguage\tlines\tcode\tcomments"));
+    assert!(files.contains("\nsrc/\n  file-0.rs\tRust\t"));
+    assert!(!files.contains("src/file-0.rs language="));
+
+    let hotspots = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "scc",
+            "exec",
+            "--view",
+            "hotspots",
+            "--limit",
+            "20",
+            "--engine",
+            engine,
+            "--",
+            "--by-file",
+            "--fixture-scc-files=12",
+            ".",
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .output()
+        .expect("ranked scc hotspots");
+    assert!(hotspots.status.success());
+    let hotspots = String::from_utf8(hotspots.stdout).expect("UTF-8 hotspots");
+    assert!(!hotspots.contains("path(tree)"));
+    assert!(hotspots
+        .lines()
+        .all(|line| { line.starts_with("src/file-") || line.starts_with('@') || line.is_empty() }));
+}
+
+#[test]
 fn direct_scc_large_file_sets_obey_the_hard_complete_limit() {
     let directory = fixture();
     let local = tempfile::tempdir().expect("local app data");
@@ -493,7 +558,7 @@ fn direct_scc_large_file_sets_obey_the_hard_complete_limit() {
     let model = String::from_utf8(output.stdout).expect("large scc model");
     assert!(model.contains("@more shown="));
     assert!(model.contains("omitted="));
-    assert!(model.lines().count() <= 81);
+    assert!(model.contains("shown=80"));
 }
 
 #[test]

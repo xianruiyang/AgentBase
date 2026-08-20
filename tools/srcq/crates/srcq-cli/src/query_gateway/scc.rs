@@ -5,7 +5,10 @@ use srcq_core::invocation::OutputFormat;
 
 use crate::GatewayCommand;
 
-use super::{model_page_end, model_text_cost, DIRECT_COMPLETE_MAX_UNITS};
+use super::{
+    model_page_end, model_representation_key, model_text_cost, render_path_inline_annotations,
+    DIRECT_COMPLETE_MAX_UNITS,
+};
 
 #[derive(Clone, Debug)]
 struct LanguageMetric {
@@ -540,35 +543,98 @@ fn languages_model(languages: &[LanguageMetric], total: Totals, offset: usize) -
 }
 
 fn files_model(files: &[FileMetric], hotspots: bool) -> String {
+    if files.is_empty() {
+        return String::new();
+    }
+    if hotspots {
+        return hotspots_model(files);
+    }
+    // Every candidate grows monotonically across a stable path prefix, and an invalid tree cannot
+    // become valid later. The shared binary budget search can therefore maximize the same evidence
+    // prefix even when the selected representation changes.
+    let mut best = files_labeled_model(files);
+    for candidate in [files_table_model(files), files_tree_table_model(files)]
+        .into_iter()
+        .flatten()
+    {
+        if model_representation_key(&candidate) < model_representation_key(&best) {
+            best = candidate;
+        }
+    }
+    best
+}
+
+fn hotspots_model(files: &[FileMetric]) -> String {
     files
         .iter()
         .map(|file| {
-            if hotspots {
-                format!(
-                    "{} complexity={} code={} lines={} language={} bytes={}",
-                    model_atom(&file.path),
-                    file.complexity,
-                    file.code,
-                    file.lines,
-                    model_atom(&file.language),
-                    file.bytes
-                )
-            } else {
-                format!(
-                    "{} language={} lines={} code={} comments={} blanks={} complexity={} bytes={}",
-                    model_atom(&file.path),
-                    model_atom(&file.language),
-                    file.lines,
-                    file.code,
-                    file.comments,
-                    file.blanks,
-                    file.complexity,
-                    file.bytes
-                )
-            }
+            format!(
+                "{} complexity={} code={} lines={} language={} bytes={}",
+                model_atom(&file.path),
+                file.complexity,
+                file.code,
+                file.lines,
+                model_atom(&file.language),
+                file.bytes
+            )
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn files_labeled_model(files: &[FileMetric]) -> String {
+    files
+        .iter()
+        .map(|file| {
+            format!(
+                "{} language={} lines={} code={} comments={} blanks={} complexity={} bytes={}",
+                model_atom(&file.path),
+                model_atom(&file.language),
+                file.lines,
+                file.code,
+                file.comments,
+                file.blanks,
+                file.complexity,
+                file.bytes
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+const FILE_TABLE_COLUMNS: &str = "language\tlines\tcode\tcomments\tblanks\tcomplexity\tbytes";
+
+fn file_table_values(file: &FileMetric) -> String {
+    format!(
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+        model_atom(&file.language),
+        file.lines,
+        file.code,
+        file.comments,
+        file.blanks,
+        file.complexity,
+        file.bytes
+    )
+}
+
+fn files_table_model(files: &[FileMetric]) -> Option<String> {
+    (!files.is_empty()).then(|| {
+        let rows = files
+            .iter()
+            .map(|file| format!("{}\t{}", model_atom(&file.path), file_table_values(file)))
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("path\t{FILE_TABLE_COLUMNS}\n{rows}")
+    })
+}
+
+fn files_tree_table_model(files: &[FileMetric]) -> Option<String> {
+    let entries = files
+        .iter()
+        .map(|file| (file.path.clone(), vec![file_table_values(file)]))
+        .collect::<Vec<_>>();
+    render_path_inline_annotations(&entries)
+        .map(|tree| format!("path(tree)\t{FILE_TABLE_COLUMNS}\n{tree}"))
 }
 
 fn model_atom(value: &str) -> String {
@@ -619,6 +685,25 @@ mod tests {
             ]
         }]))
         .expect("fixture JSON")
+    }
+
+    fn file_metric(path: impl Into<String>, index: u64) -> FileMetric {
+        FileMetric {
+            path: path.into(),
+            language: "Rust".to_owned(),
+            possible_languages: vec!["Rust".to_owned()],
+            bytes: 100 + index,
+            lines: 10 + index,
+            code: 8 + index,
+            comments: 1,
+            blanks: 1,
+            complexity: 2 + index,
+            weighted_complexity: 0,
+            uloc: 0,
+            generated: false,
+            minified: false,
+            binary: false,
+        }
     }
 
     #[test]
@@ -680,6 +765,92 @@ mod tests {
         .expect("file order JSON");
         let projection = render(&command("files"), true, &data, 0, 0).expect("files");
         assert_eq!(projection.value["files"][0]["path"], "src/A.rs");
+    }
+
+    #[test]
+    fn files_model_selects_the_tree_table_for_shared_directories() {
+        let files = (0..12)
+            .map(|index| {
+                file_metric(
+                    format!("src/query_gateway/backends/scc/file-{index:02}.rs"),
+                    index,
+                )
+            })
+            .collect::<Vec<_>>();
+        let model = files_model(&files, false);
+        assert!(model.starts_with(&format!("path(tree)\t{FILE_TABLE_COLUMNS}\n")));
+        assert_eq!(model.matches("src/query_gateway/backends/scc").count(), 1);
+        assert_eq!(
+            model.lines().filter(|line| line.contains(".rs\t")).count(),
+            files.len()
+        );
+        assert!(!model.contains("language="));
+        assert!(
+            model_representation_key(&model)
+                < model_representation_key(&files_labeled_model(&files))
+        );
+    }
+
+    #[test]
+    fn files_model_uses_a_flat_fallback_when_a_tree_is_not_reversible() {
+        let singleton = vec![file_metric("README.md", 0)];
+        let singleton_model = files_model(&singleton, false);
+        assert!(!singleton_model.starts_with("path(tree)"));
+        assert!(singleton_model.contains("README.md"));
+
+        let duplicate = vec![file_metric("src/a.rs", 0), file_metric("src/a.rs", 1)];
+        assert!(!files_model(&duplicate, false).starts_with("path(tree)"));
+
+        let prefix = vec![file_metric("src/a", 0), file_metric("src/a/b.rs", 1)];
+        assert!(!files_model(&prefix, false).starts_with("path(tree)"));
+    }
+
+    #[test]
+    fn hotspots_keep_the_ranked_flat_format() {
+        let files = vec![
+            file_metric("src/deep/a.rs", 0),
+            file_metric("src/deep/b.rs", 1),
+        ];
+        let model = files_model(&files, true);
+        assert_eq!(
+            model,
+            "src/deep/a.rs complexity=2 code=8 lines=10 language=Rust bytes=100\n\
+             src/deep/b.rs complexity=3 code=9 lines=11 language=Rust bytes=101"
+        );
+        assert!(!model.contains("path(tree)"));
+    }
+
+    #[test]
+    fn adaptive_file_model_cost_is_monotonic_across_sorted_prefixes() {
+        let files = (0..128)
+            .map(|index| {
+                file_metric(
+                    format!("src/module-{:02}/nested/file-{index:03}.rs", index / 8),
+                    index,
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut costs = Vec::new();
+        let mut previous = 0;
+        for end in 1..=files.len() {
+            let cost = model_text_cost(&files_model(&files[..end], false));
+            assert!(cost >= previous, "model cost decreased at prefix {end}");
+            costs.push(cost);
+            previous = cost;
+        }
+        let budgets = costs
+            .iter()
+            .flat_map(|cost| [cost.saturating_sub(1), *cost])
+            .collect::<Vec<_>>();
+        for budget in budgets {
+            let expected = costs
+                .iter()
+                .rposition(|cost| *cost <= budget)
+                .map(|index| index + 1)
+                .unwrap_or(1);
+            let actual = model_page_end(0, files.len(), budget, |end| costs[end - 1]);
+            assert_eq!(actual, expected, "wrong page end for budget {budget}");
+        }
     }
 
     #[test]

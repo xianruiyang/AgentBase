@@ -232,11 +232,11 @@ candidate-only identity `93931b4c…9eac2` 的总 Token 为 `736,203`、27 次�
 - 状态: verified within deterministic scope
 - 关联: REQ-SQG-001, DES-SQG-001, DES-SQG-003, DES-SQG-004, DES-SQG-008, DES-SQG-011
 
-`srcq 0.4.0` 已增加 scc 直接入口、query 控制面、doctor、summary/languages/files/hotspots/lossless/raw、machine、artifact、分页快照和同次捕获协议回退；指标 parser 与排序保留在 backend 模块，公共网关只承载既有执行、预算和恢复职责。Windows bootstrap 以 `BenBoyter.scc` 与 `sharkdp.hyperfine` 安装并读回两个外部工具；全局规则让普通 scc/hyperfine 无需加载专项 skill，高级 scc 才读取新增引用。hyperfine 不进入 srcq 或发布 payload。
+`srcq 0.4.0` 已增加 scc 直接入口、query 控制面、doctor、summary/languages/files/hotspots/lossless/raw、machine、artifact、分页快照和同次捕获协议回退；files 进一步在同一证据页上比较扁平标注、单表头扁平表和可逆保序目录树，当前真实快照选择目录树，hotspots 继续保持扁平排名。指标 parser 与排序保留在 backend 模块，公共网关唯一维护可逆路径树及既有执行、预算和恢复职责。Windows bootstrap 以 `BenBoyter.scc` 与 `sharkdp.hyperfine` 安装并读回两个外部工具；全局规则让普通 scc/hyperfine 无需加载专项 skill，高级 scc 才读取新增引用。hyperfine 不进入 srcq 或发布 payload。
 
-workspace、真实 scc、36 模式/9 oracle、AST 基线、bootstrap、插件、真实 tokenizer、release 和 0.3.1→0.4.0 安装生命周期均通过。源码快照为 `sha256:c7795a6bc25ed6a2ccc477de60a76fad5d9723f9395784f521e5aceabebde300`；两次 clean build 均得到 2725761-byte 归档和 SHA-256 `65734560168a3471c6f907e156ab61ef68fcb88db7a1add93d0014e28648d942`，manifest 明确声明非捆绑 `scc.exe`/3.7.0。
+workspace、真实 scc、36 模式/9 oracle、AST 基线、bootstrap、插件、真实 tokenizer、release 和 0.3.1→0.4.0 安装生命周期均通过。1165 文件同快照的完整 files 投影由旧候选 43836 降至 25997 个 o200k Token（-40.6949%），规范化 machine 和分页身份不变。源码快照为 `sha256:008117d737fc377a1cee78bfa76f2faae58200e298edf61db32c1967ac3667a3`；两次 clean build 均得到 2730989-byte 归档和 SHA-256 `b43ad3f1c0fa4404f0f961ffba791cc3dfdfc07dd5641291bd51ded4bee0ba6f`，manifest 明确声明非捆绑 `scc.exe`/3.7.0。
 
-本轮按用户约束未启动独立 Codex。静态路由为 96 cases、55 strict routing、10 strict references；旧 `current.json` 不属于新 bundle，正式 Validate 正确拒绝，不能据此声称新模型行为已验证。实际用户 srcq 仍为 0.3.1，且没有本次 Publish 授权；这些是后继 evidence/安装/发布状态，不是未闭合源码实现。
+原 P11 实施轮按用户约束未启动独立 Codex；后继增量评估现已形成当前 96/96/26 evidence。本次目录树优化没有改变全局规则、skill 或触发输入，因此不重复运行 evaluator，真实 tokenizer 也不外推为端到端模型行为。只读部署 Status 确认实际用户 srcq 仍为 0.3.1，候选尚未 Publish；这些是已明确暂停或需要逐次授权的外部状态转换，不是未闭合源码实现。
 
 ## GAP-SQG-008 高成本查询的共享明显改进已经收敛
 

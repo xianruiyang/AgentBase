@@ -22,7 +22,7 @@ srcq query <rg|fd|scc> doctor [--engine PATH] [--cwd PATH]
 
 - 普通 rg 搜索追加原生 `--json --color=never`，完整事实保留 path、match/context、行、绝对偏移、submatch 和正文；model 在相同证据单元和顺序下比较逐行 locator、文件 heading、共享目录路径树与其位置/正文叶子，只选择实际更短者。投影先形成所选 view 的证据单元，再按上述有界完整闭环或分页策略处理：files 按去重匹配文件，locations 按匹配位置，grouped/records 按 match/context 记录，summary 对完整集合聚合且不产生续页。
 - rg 文件列表和 fd 普通路径追加 NUL 输出，完整解析后选择 flat/tree 或 files；model 只有在类型一致、路径可逆且实际文本更短时使用合并单子链的树，混合类型回退为带最小类型标记的 flat。machine tree 为每个显式根建立稳定别名，并保留类型、内部目录结果、重复计数和无法归根的 flat 项。
-- scc 常规统计在没有显式输出格式时追加 `--format=json`；原生 `--by-file` 决定 auto 使用文件记录，否则使用语言记录。summary 对完整捕获聚合，languages 保持原生语言顺序，files 按稳定路径分页，hotspots 按复杂度、代码行和路径稳定排序。默认 model 与规范化 machine 只保留文件、行数、代码、注释、空行、复杂度和字节等直接指标，并省略 COCOMO、estimated cost、schedule 和 people；这些估算字段只在 lossless/raw/artifact 中保留。复杂度是词法启发式指标，不等于缺陷或质量结论。
+- scc 常规统计在没有显式输出格式时追加 `--format=json`；原生 `--by-file` 决定 auto 使用文件记录，否则使用语言记录。summary 对完整捕获聚合，languages 保持原生语言顺序，files 按稳定路径分页，并在同一证据页内比较扁平标注、单表头扁平表和可逆保序目录树，严格更小时才使用合并单子链的树；hotspots 按复杂度、代码行和路径稳定排序并保持扁平排名。默认 model 与规范化 machine 只保留文件、行数、代码、注释、空行、复杂度和字节等直接指标，并省略 COCOMO、estimated cost、schedule 和 people；这些估算字段只在 lossless/raw/artifact 中保留。复杂度是词法启发式指标，不等于缺陷或质量结论。
 - scc 的显式非 JSON `--format`、help/version/languages 使用有界文本；显式 JSON、json2 与 `--by-file` 使用结构化投影。`--output`/`-o` 和 `--format-multi` 可能写文件，只透传一次且不创建写入授权。结构化协议变化只允许从同一次捕获形成有界回退，不为期待不同结果重跑扫描。
 - count、JSON、vimgrep 使用各自机器或稳定结构；`lossless` 保留完整原生 JSON 事件，其他 view 只投影声明的证据。显式 view 不适用于当前模式时局部拒绝，不静默换 view。
 - help/version/list-details/format/hyperlink/replace/passthru/pre/stats/quiet 等文本模式返回有界行；`--view raw` 或 `--artifact-out` 请求完整原生 stdout，stderr 在显式原生通道中保持，否则只转发有界诊断。

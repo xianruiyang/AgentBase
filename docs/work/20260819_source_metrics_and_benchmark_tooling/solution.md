@@ -31,3 +31,11 @@
 - 关联: AC-004, CON-001, CON-003
 
 更新 srcq、部署、发布、文档、skill 和路由消费者，运行确定性、真实工具、tokenizer、release/installer 沙箱和部署 Validate；有效失败修正后重验。确定性与真实本地范围已经验证；正式 Validate 正确拒绝过期的独立路由证据，独立 Codex 留作额度可用后的采纳验证，本轮不 Publish。
+
+## SOL-005 增加 files 自适应目录树表示
+
+- 状态: verified
+- 解决: GAP-003
+- 关联: DES-005, AC-005, AC-006
+
+扩展共享路径树以支持叶子同行指标且保留既有 rg/fd 格式；scc `files` 在同一证据页上比较扁平标注、扁平表和目录树表，严格更小时才切换。补充可逆性、转义、回退、排名非回退、分页身份、machine 稳定性和真实 tokenizer 对照，并刷新受影响 release 与交付证据；不升级真实安装，也不执行 Codex Publish。
