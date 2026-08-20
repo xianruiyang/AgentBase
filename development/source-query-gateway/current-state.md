@@ -9,7 +9,7 @@
 - 状态: verified
 - 关联: DES-SQG-001, DES-SQG-002, DES-SQG-003
 
-当前 `srcq 0.4.0` 保留迁移前 AST 顶层命令，并以 `srcq rg <native argv...>`、`srcq fd <native argv...>`、`srcq scc <native argv...>` 提供不抢占任何原生 token 的普通入口；定向 model、machine、native、artifact、diagnostic 与 continuation 位于独立的 `srcq query <rg|fd|scc> ...` 控制面。原生 argv 保留顺序、重复、空值和 Windows 非 UTF 参数，机器参数插入原生命令 `--` 之前；不能安全结构化的调用可用 native、artifact 或 passthrough 保持原生字节和副作用语义。迁移前 `_sgy` 与 `sgy.*` 数据协议继续保留以读取既有 AST 产物，但仓库不提供 `sgy.exe` 命令别名。
+当前 `srcq 0.4.1` 保留迁移前 AST 顶层命令，并以 `srcq rg <native argv...>`、`srcq fd <native argv...>`、`srcq scc <native argv...>` 提供不抢占任何原生 token 的普通入口；定向 model、machine、native、artifact、diagnostic 与 continuation 位于独立的 `srcq query <rg|fd|scc> ...` 控制面。原生 argv 保留顺序、重复、空值和 Windows 非 UTF 参数，机器参数插入原生命令 `--` 之前；不能安全结构化的调用可用 native、artifact 或 passthrough 保持原生字节和副作用语义。迁移前 `_sgy` 与 `sgy.*` 数据协议继续保留以读取既有 AST 产物，但仓库不提供 `sgy.exe` 命令别名。
 
 29 个 ripgrep 15.1.0/fd 10.4.2 与 7 个 scc 3.7.0 公开模式样本均有唯一分类，9 个 raw/artifact oracle 已逐字或规范化回放。`defaults` 只解释参数和模式，不发现或启动引擎。
 
@@ -20,7 +20,7 @@
 
 直接反例曾证明旧实现先按 rg 原始 match/context 事件分页、再投影 files/locations/summary：`summary --limit 1` 为已经完整的摘要生成无意义续页；files 把匹配事件数当作文件数；带 context 的 locations 第一页可为空却声称已展示一项。当前实现改为先形成视图自己的证据单元，再计算总量与分页；summary 是终止视图，files 按去重后的匹配文件分页，locations 只按匹配位置分页。相应真实集成回归已覆盖普通 rg、fd、native files、count 和 vimgrep。
 
-普通 model 成功结果只返回证据正文；完整结果不附加 envelope、schema、固定回执或 backend/version/view 等内部元数据。只有续页、截断、错误或恢复需要时才追加最短差异信息；显式 `--receipt full`、machine、native 与 artifact 仍可取得其请求对象。直接入口在完整结果不超过 512 个证据单元且完整表示仍落在原 2048 estimated-Token 总预算时越过初始 80 项限制；单文件只有在同一总预算内才把单行正文上限提高到 1024，多文件或更大结果仍分页。完整默认结果不再计算或持久化无消费者的 snapshot；只有续页或 full 回执需要身份时才计算 hash、原子持久化并返回精确 cursor。进程与持久 snapshot 的既有上限、hash 和混用拒绝仍保留。
+普通 model 成功结果只返回证据正文；完整结果不附加 envelope、schema、固定回执或 backend/version/view 等内部元数据。query 续页以 `@more` 返回剩余数量，并在 `@next` 后投影 PowerShell 7 可直接执行的完整命令；其他截断、错误或恢复仍只追加最短差异信息。显式 `--receipt full`、machine、native 与 artifact 仍可取得其请求对象。直接入口在完整结果不超过 512 个证据单元且完整表示仍落在原 2048 estimated-Token 总预算时越过初始 80 项限制；单文件只有在同一总预算内才把单行正文上限提高到 1024，多文件或更大结果仍分页。完整默认结果不再计算或持久化无消费者的 snapshot；只有续页或 full 回执需要身份时才计算 hash、原子持久化并返回精确 cursor。进程与持久 snapshot 的既有上限、hash 和混用拒绝仍保留。
 
 fd 会冻结对象类型并为每个显式根建立可逆 trie；只有估算 Token 确实低于 flat 时 auto 才选 tree。rg 普通 batch 消费原生 JSON 事件，grouped、records、locations、files、summary 与 lossless 均在相同证据签名内选择；count、vimgrep 和特殊模式使用独立严格解析或透传。
 
@@ -36,7 +36,7 @@ P0 冻结的 `sgy 0.1.2` AST version/help、命令 help、schema 与 capabilitie
 - 状态: verified
 - 关联: DES-SQG-008, DES-SQG-009, CON-SQG-003
 
-正式 `skills/source-query` 用一个精炼主文件按“已知正文直接读取 → srcq rg/fd/scc 普通入口 → 按需高级 scc/AST → 渐进 LSP”组织，只有完整性、分页、特殊协议或定向输出才读取对应细则。正式 payload 只有 `SKILL.md`、`agents/openai.yaml` 和四份按需引用；私有 `sgy.exe`、runtime manifest、来源与许可副本已经退出，消费者只调用用户 PATH 中的 `srcq.exe`。`candidate-skill/source-query` 仅作为隔离 benchmark 输入保留；测试、fixture、runner、corpus、result 和 audit 资产仍由项目开发目录承担。旧 `ast-grep-token-safe`、`fd-usage` 与 `rg-token-safe` 安装路径由 `development/codex-deployment/managed_asset_lifecycle.json` 以稳定身份持有退役状态，使旧主机升级时由正式 Publish 备份并移除残留，而不是仅凭当前 payload 不再列出它们。
+正式 `skills/source-query` 用一个精炼主文件按“已知正文直接读取 → srcq rg/fd/scc 普通入口 → 按需高级 scc/AST → 渐进 LSP”组织，只有完整性、分页、特殊协议或定向输出才读取对应细则。正式 payload 只有 `SKILL.md`、`agents/openai.yaml` 和四份按需引用；私有 `sgy.exe`、runtime manifest、来源与许可副本已经退出，消费者只调用用户 PATH 中的 `srcq.exe`。`candidate-skill/source-query` 及其 routing capsule helper 仅冻结 P9/P10 的隔离 benchmark 输入与复算入口，不是当前 payload 或模型消费者；当前模型入口是正式 `skills/source-query`，路由评估由 `development/skill-routing` 维护。测试、fixture、runner、corpus、result 和 audit 资产仍由项目开发目录承担。旧 `ast-grep-token-safe`、`fd-usage` 与 `rg-token-safe` 安装路径由 `development/codex-deployment/managed_asset_lifecycle.json` 以稳定身份持有退役状态，使旧主机升级时由正式 Publish 备份并移除残留，而不是仅凭当前 payload 不再列出它们。
 
 ## OBS-SQG-005 benchmark owner 已具备隔离运行合同
 
@@ -237,6 +237,27 @@ candidate-only identity `93931b4c…9eac2` 的总 Token 为 `736,203`、27 次�
 workspace、真实 scc、36 模式/9 oracle、AST 基线、bootstrap、插件、真实 tokenizer、release 和 0.3.1→0.4.0 安装生命周期均通过。1165 文件同快照的完整 files 投影由旧候选 43836 降至 25997 个 o200k Token（-40.6949%），规范化 machine 和分页身份不变。源码快照为 `sha256:008117d737fc377a1cee78bfa76f2faae58200e298edf61db32c1967ac3667a3`；两次 clean build 均得到 2730989-byte 归档和 SHA-256 `b43ad3f1c0fa4404f0f961ffba791cc3dfdfc07dd5641291bd51ded4bee0ba6f`，manifest 明确声明非捆绑 `scc.exe`/3.7.0。
 
 原 P11 实施轮按用户约束未启动独立 Codex；后继增量评估现已形成当前 96/96/26 evidence。本次目录树优化没有改变全局规则、skill 或触发输入，因此不重复运行 evaluator，真实 tokenizer 也不外推为端到端模型行为。只读部署 Status 确认实际用户 srcq 仍为 0.3.1，候选尚未 Publish；这些是已明确暂停或需要逐次授权的外部状态转换，不是未闭合源码实现。
+
+## OBS-SQG-027 P12 已把正常 scc 续页失败定位到页尾动作缺失
+
+- 状态: confirmed
+- 关联: AC-SQG-009, DES-SQG-015, UDES-SQG-015
+
+修复后的 evaluator v5 在真实 scc preflight、full access、WebSocket、代理端 DNS 与 ALL_PROXY fanout 均有效且零 retry/fallback 的边界下，第一页成功返回 `@more shown=80 omitted=97 after=<cursor>`；独立 Codex 随后执行 `srcq scc --after <cursor>`，原生 scc 拒绝未知参数，第二页未取得。query owner 已掌握完整续页命令却只投影 cursor 片段，这是可重复的模型交互缺口，不是网络、权限、backend 或 snapshot 能力缺失。
+
+## OBS-SQG-028 P13 v6 已完成可执行续页的真实模型闭环
+
+- 状态: verified
+- 关联: AC-SQG-009, DES-SQG-015, UDES-SQG-015
+
+同一 evaluator 边界下的 v6 preflight 读回 `srcq 0.4.1` 与真实 scc `ok`；subject 第一条直接查询返回 `@more shown=80 omitted=97` 和完整 `@next`，第二条命令逐字采用提示中的 `srcq query scc exec --after ... -- <原 argv>`，exit 0 并取得第二页首项 `D:/program/AgentBase/tools/srcq/crates/srcq-core/src/profile/paths.rs`。preflight/subject 均无 WebSocket 失败、sampling retry 或 HTTP fallback，postflight 无身份漂移；experiment identity 为 `27ac16beea6ef195bd443057fc229b17af603d4d5c2aa7f54fcc31ca74ad20f5`，capsule `fce108b55bce2871e2bb153e95725cebb5dd04d2530806aa28c07d31a6257926` 验真通过。
+
+## GAP-SQG-009 query model 续页动作已经闭环
+
+- 状态: resolved
+- 关联: REQ-SQG-001, AC-SQG-007, AC-SQG-009, DES-SQG-015, UDES-SQG-015, OBS-SQG-027, OBS-SQG-028
+
+P13 已在现有 query renderer 内把旧 cursor 片段替换为数量 `@more` 与完整 `@next`，正式 skill 只执行该动作。PowerShell 特殊 argv 往返与 fixture 调用日志证明续页保持 fingerprint 且 scc 只扫描一次；有效 v6 独立 Codex 原样执行 `@next`、取得第二页并正确报告首项，网络与 postflight 均有效。machine、cache/process、snapshot 状态、offset/length 和公共命令集合未改变，因此差距关闭。
 
 ## GAP-SQG-008 高成本查询的共享明显改进已经收敛
 

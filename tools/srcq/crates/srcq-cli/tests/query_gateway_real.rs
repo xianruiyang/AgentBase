@@ -1,4 +1,4 @@
-use std::{fs, path::Path, process::Command};
+use std::{env, fs, path::Path, process::Command};
 
 use serde_json::Value;
 use srcq_core::codec::parse_yaml_documents;
@@ -346,11 +346,18 @@ fn internal_model_budget_pages_complete_evidence_units_with_exact_cursor() {
         .expect("budgeted first page");
     assert!(first.status.success());
     let first = String::from_utf8(first.stdout).expect("UTF-8 first page");
-    let cursor = first
+    let next = first
         .lines()
-        .find_map(|line| line.split("after=").nth(1))
+        .find_map(|line| line.strip_prefix("@next "))
+        .expect("continuation command");
+    let cursor = next
+        .split_once("--after ")
+        .and_then(|(_, value)| value.split_whitespace().next())
         .expect("continuation cursor");
     assert!(first.contains("@more"));
+    assert!(!first
+        .lines()
+        .any(|line| line.starts_with("@more ") && line.contains("after=")));
     assert!(!first.lines().any(|line| line.trim().is_empty()));
 
     let second = srcq(directory.path(), local.path())
@@ -378,6 +385,90 @@ fn internal_model_budget_pages_complete_evidence_units_with_exact_cursor() {
         String::from_utf8_lossy(&second.stderr)
     );
     assert!(!second.stdout.is_empty());
+}
+
+#[test]
+fn model_next_command_round_trips_powershell_argv_without_rescanning_scc() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let engine = env!("CARGO_BIN_EXE_srcq-native-fixture");
+    let log = directory.path().join("scc-next-invocations.log");
+    let first = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "scc",
+            "exec",
+            "--view",
+            "files",
+            "--limit",
+            "2",
+            "--engine",
+            engine,
+            "--",
+            "--by-file",
+            "--fixture-scc-files=5",
+            "folder with space",
+            "money$;pipe|quote\"tick`apostrophe'",
+            "",
+            "line\nnext",
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .env("SRCQ_FIXTURE_INVOCATION_LOG", &log)
+        .output()
+        .expect("first model page");
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let first = String::from_utf8(first.stdout).expect("UTF-8 first page");
+    assert!(first.contains("@more shown=2 omitted=3"));
+    let next = first
+        .lines()
+        .find_map(|line| line.strip_prefix("@next "))
+        .expect("PowerShell continuation command");
+    assert!(next.starts_with("srcq query scc exec "));
+    assert!(next.contains("--after q1."));
+    assert!(next.contains("\"folder with space\""));
+    assert!(next.contains("money`$;pipe|quote`\"tick``apostrophe'"));
+    assert!(next.contains("\"line`u{A}next\""));
+
+    let srcq_directory = Path::new(env!("CARGO_BIN_EXE_srcq"))
+        .parent()
+        .expect("srcq binary directory");
+    let inherited_path = env::var_os("PATH").unwrap_or_default();
+    let command_path = env::join_paths(
+        std::iter::once(srcq_directory.to_path_buf()).chain(env::split_paths(&inherited_path)),
+    )
+    .expect("PowerShell PATH");
+    let second = Command::new("pwsh.exe")
+        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", next])
+        .current_dir(directory.path())
+        .env("PATH", command_path)
+        .env("LOCALAPPDATA", local.path())
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .env("SRCQ_FIXTURE_INVOCATION_LOG", &log)
+        .output()
+        .expect("execute model continuation command");
+    assert!(
+        second.status.success(),
+        "stdout={}\nstderr={}",
+        String::from_utf8_lossy(&second.stdout),
+        String::from_utf8_lossy(&second.stderr)
+    );
+    let second = String::from_utf8(second.stdout).expect("UTF-8 second page");
+    assert!(second.contains("file-2.rs"));
+    assert!(second.contains("@more shown=2 omitted=1"));
+    assert_eq!(
+        fs::read_to_string(log)
+            .expect("scc invocation log")
+            .lines()
+            .count(),
+        1,
+        "continuation must use the persisted snapshot"
+    );
 }
 
 #[test]
@@ -559,6 +650,10 @@ fn direct_scc_large_file_sets_obey_the_hard_complete_limit() {
     assert!(model.contains("@more shown="));
     assert!(model.contains("omitted="));
     assert!(model.contains("shown=80"));
+    assert!(model.contains("@next srcq query scc exec --after q1."));
+    assert!(!model
+        .lines()
+        .any(|line| line.starts_with("@more ") && line.contains("after=")));
 }
 
 #[test]

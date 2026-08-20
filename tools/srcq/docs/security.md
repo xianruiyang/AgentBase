@@ -31,7 +31,7 @@ srcq 不是 sandbox、权限系统或事务引擎。它会在用户授权的 cwd
 ## 完整性与信息泄漏
 
 - `lossless` 保留原生完整字段，适合机器处理，但不应默认进入模型上下文。
-- model 的 `@more`、`@cut`、`@unprojectable` 和 `@write` 是偏离默认的完整性或副作用信号；machine 的 `_sgy.complete=false`、`omitted` 和 `_sgy_text_truncated` 继续承担结构化完整性。不得删除信号后声称结果完整。
+- model 的 `@more`、query `@next`、`@cut`、`@unprojectable` 和 `@write` 是偏离默认的完整性、恢复或副作用信号；`@next` 的用户参数必须按 PowerShell 7 单行字面量无损转义，不得成为命令注入面。machine 的 `_sgy.complete=false`、`omitted` 和 `_sgy_text_truncated` 继续承担结构化完整性。不得删除信号后声称结果完整。
 - `cache auto/on` 可能保存完整原生输出；见 [缓存与取回](cache.md) 的清理和隐私要求。
 - stderr 可能包含原生路径、rule 或诊断；只有确有需要时才把 `--stderr-yaml` sidecar 提供给模型。
 

@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-- 当前版本：`srcq 0.4.0`。
+- 当前版本：`srcq 0.4.1`。
 - 当前固定验证引擎：`ast-grep 0.42.0`。
 - 精确验证的 ast-grep 版本：`0.41.1`、`0.42.0`、`0.44.1`；不外推为连续版本范围。
 - rg/fd 候选命令域已在 `ripgrep 15.1.0`、Codex PATH 中的 `ripgrep 15.2.0` 与 `fd 10.4.2` 上验证；29 个公开主模式均有持久分类，版本只标识证据范围，不参与运行准入。
@@ -73,7 +73,7 @@ srcq query fd doctor
 srcq query scc doctor
 ```
 
-普通 rg、fd、scc 与 AST 查询默认使用 model 输出：只输出干净证据，正常成功、完整和空结果不附 envelope 或回执；rg/fd 在取得真实结果后比较单行、文件 heading、路径树及组合表示，scc 从同一次完整捕获投影语言或逐文件指标并省略成本估算，files 还会在同一证据页上按实际成本选择扁平行、单表头表格或可逆目录树表格。直接入口会在完整结果机械可证有界且整体表示足够小时一次闭环，其他结果才按内部预算和完整证据单元分页；只有分页、截断、歧义或写入事实追加最短 `@` 记录。parser、round-trip、完整诊断或旧结构化消费者通过 `srcq query` 或 AST 显式 `--output machine`；`--receipt full`、`--yaml-out`、`lossless` 和 `custom` 也保持机器合同。二进制、TTY、LSP 与完整原生字节走 native/artifact 通道。详见 [模型可见输出合同](docs/model-output.md) 和 [rg/fd/scc 查询网关](docs/query-gateway.md)。
+普通 rg、fd、scc 与 AST 查询默认使用 model 输出：只输出干净证据，正常成功、完整和空结果不附 envelope 或回执；rg/fd 在取得真实结果后比较单行、文件 heading、路径树及组合表示，scc 从同一次完整捕获投影语言或逐文件指标并省略成本估算，files 还会在同一证据页上按实际成本选择扁平行、单表头表格或可逆目录树表格。直接入口会在完整结果机械可证有界且整体表示足够小时一次闭环，其他结果才按内部预算和完整证据单元分页；query 分页用 `@more` 表达剩余数量，并在 `@next` 后提供 PowerShell 7 可直接执行的完整同快照续页命令，其他截断、歧义或写入事实同样只追加必要 `@` 记录。parser、round-trip、完整诊断或旧结构化消费者通过 `srcq query` 或 AST 显式 `--output machine`；`--receipt full`、`--yaml-out`、`lossless` 和 `custom` 也保持机器合同。二进制、TTY、LSP 与完整原生字节走 native/artifact 通道。详见 [模型可见输出合同](docs/model-output.md) 和 [rg/fd/scc 查询网关](docs/query-gateway.md)。
 
 ## Profile
 

@@ -101,3 +101,11 @@ Token 成本按模型完成查找所实际消耗的完整链路核算，包含�
 - 关联: REQ-SQG-001, AC-SQG-004
 
 本分支的测试、fixture、benchmark 协议、语料、runner、monitor、原始事件、结果和审计都只属于仓库开发资产。Codex payload 只能包含模型实际运行查询能力所需的规则、skill、工具和运行时资源；发布构建与增量安装必须排除上述开发资产，并移除受管理范围内旧版遗留副本。
+
+## AC-SQG-009 query 分页提供可直接执行的唯一续页动作
+
+- 状态: confirmed
+- 来源: 用户 2026-08-20 选择 cursor + 完整 `@next` 命令并要求迭代到模型友好
+- 关联: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-007, AC-SQG-008
+
+未展示完的 query model 页面必须同时说明剩余证据并提供 PowerShell 7 可直接执行的完整同快照续页命令；模型不需要回忆控制面语法、自行拼 cursor 或重建原生 argv。续页不得重扫原生 backend，也不得新增 offset/length、第二 argv 状态或另一公共查询入口。是否模型友好由有效独立 Codex 的真实命令事件验证。

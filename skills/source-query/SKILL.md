@@ -9,7 +9,7 @@ description: 仅在 srcq 分页或截断阻断当前必要证据，需实际执�
 
 只读取当前缺口对应的引用：
 
-- 分页使必要结果尚未展示：只有 `@more` 时保持 backend、cwd 和原生 argv，以 `srcq query <backend> exec --after <cursor> -- <原 argv...>` 沿回执续页，不读取引用；正文截断实际影响判断时先按已返回定位有界直读。无法恢复、续页异常或明确需要特殊原生、machine/native/artifact 时，rg/fd 读取 [rg-fd.md](references/rg-fd.md)，scc 读取 [scc.md](references/scc.md)。
+- 分页使必要结果尚未展示：query 的 `@more` 后直接执行 `@next` 提供的完整命令，不自行重组 cursor、控制面或原生 argv，也不读取引用；正文截断实际影响判断时先按已返回定位有界直读。缺少 `@next`、续页异常或明确需要特殊原生、machine/native/artifact 时，rg/fd 读取 [rg-fd.md](references/rg-fd.md)，scc 读取 [scc.md](references/scc.md)。
 - 实际需要 scc 的 files、hotspots、lossless、raw、machine、native、artifact、输出副作用边界或结构化续页：读取 [scc.md](references/scc.md)。
 - 文本仍不能确定语法边界、控制流或结构关系，或明确需要 rule/rewrite：读取 [ast.md](references/ast.md)。
 - 实际文本候选仍有定义身份、重载、类型、精确引用、层级或 Provider 诊断歧义：读取 [lsp.md](references/lsp.md)，只发现当前缺失能力。

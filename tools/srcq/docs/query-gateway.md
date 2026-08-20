@@ -31,15 +31,15 @@ srcq query <rg|fd|scc> doctor [--engine PATH] [--cwd PATH]
 
 ## 完整性与快照
 
-结构化执行对 stdout 设置 256 MiB、stderr 设置 16 MiB 的硬捕获上限；超过上限会终止整个原生进程组并返回 wrapper 错误。成功捕获先保留在当前进程内；只有需要续页、machine full 或显式 full receipt 时才计算快照身份并持久化，最多保存 32 份。model 正常完整结果只写证据；分页追加 `@more shown=<N> omitted=<N> after=<CURSOR>`，正文或不可续读的结果/行省略追加 `@cut text|results|lines=<N>`。machine auto 保留 `sgy.query.result/v2`，full 保留 `sgy.query.result/v1`。rg 无匹配继续返回原生 exit 1 和空 stdout，原生错误不能伪装成完整空结果。raw、artifact 与 passthrough 保持原生或清单合同。
+结构化执行对 stdout 设置 256 MiB、stderr 设置 16 MiB 的硬捕获上限；超过上限会终止整个原生进程组并返回 wrapper 错误。成功捕获先保留在当前进程内；只有需要续页、machine full 或显式 full receipt 时才计算快照身份并持久化，最多保存 32 份。model 正常完整结果只写证据；query 分页追加 `@more shown=<N> omitted=<N>` 与 `@next <COMMAND>`，其中 `COMMAND` 是 PowerShell 7 可直接执行的完整同快照续页命令；正文或不可续读的结果/行省略追加 `@cut text|results|lines=<N>`。machine auto 保留 `sgy.query.result/v2`，full 保留 `sgy.query.result/v1`。rg 无匹配继续返回原生 exit 1 和空 stdout，原生错误不能伪装成完整空结果。raw、artifact 与 passthrough 保持原生或清单合同。
 
-model 首个可续页结果返回自带 snapshot 身份的 after；machine 返回 `query_snapshot` 与 `next_cursor`。续页必须再次提供相同原生 argv、cwd、backend 和引擎；model 路径只需传入：
+model 首个可续页结果在 `@next` 后返回自带 snapshot 身份的完整命令；machine 返回 `query_snapshot` 与 `next_cursor`。续页必须再次提供相同原生 argv、cwd、backend 和引擎；model 直接执行 `@next` 后的命令，例如：
 
 ```powershell
 srcq query rg exec --after <cursor> -- -n -F needle .
 ```
 
-`auto` 的首个实际 view 会写入 cursor，后续页固定复用，避免页形状变化导致表示切换。snapshot 身份绑定 backend、引擎路径与版本、cwd、原生 argv、退出、stdout、stderr 和 backend 所需的稳定补充状态；fd 另绑定类型快照，目录、文件、reparse point、大小与哈希均读回校验。未知、损坏、跨查询或跨 view 的续点局部拒绝。
+命令只重复显式 engine/cwd、影响分页的非默认 wrapper 值和原生 argv；安全 token 裸写，其他值按 PowerShell 7 单行字面量无损转义。`auto` 的首个实际 view 会写入 cursor，后续页固定复用，避免页形状变化导致表示切换。snapshot 身份绑定 backend、引擎路径与版本、cwd、原生 argv、退出、stdout、stderr 和 backend 所需的稳定补充状态；fd 另绑定类型快照，目录、文件、reparse point、大小与哈希均读回校验。未知、损坏、跨查询或跨 view 的续点局部拒绝。
 
 ## 失败与安全
 

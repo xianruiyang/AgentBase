@@ -34,7 +34,7 @@ srcq query scc doctor
 ## 配置、输出与 cache
 
 - 配置拒绝：执行 `srcq schema`，检查 `schema: sgy.config/v1`、scope、64 KiB 上限及未知字段。
-- `@more`：query 路径原样传回自带 snapshot 身份的 after，cache 路径沿 cache/after 续读；`@cut`：当前显示有不可续读省略或截断，收窄查询、提高对应预算或改用 machine/artifact。machine 的 `_sgy.complete=false` 仍按 `_sgy.cache` 取回。
+- `@more`：当前页仍有未展示证据；query 路径直接执行紧随其后的 `@next` 完整命令，cache 路径沿自身 cache/after 续读；`@cut`：当前显示有不可续读省略或截断，收窄查询、提高对应预算或改用 machine/artifact。machine 的 `_sgy.complete=false` 仍按 `_sgy.cache` 取回。
 - cache 权限：执行 `srcq doctor`；共享机器可临时使用 `--cache off`，但省略内容将不可恢复。
 - cache 损坏/过期：`cache info/query/get` 会拒绝 hash、TTL 或状态异常；重新运行有界查询，不直接读取内部文件。
 - YAML 太大：先用 `files` profile 或收窄目录/语言；不要把模型预算转成 ast-grep 扫描上限。

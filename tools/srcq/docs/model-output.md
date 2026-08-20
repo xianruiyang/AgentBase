@@ -42,13 +42,14 @@
 正常 model 输出依靠固定协议和进程退出表达成功、完整与无匹配，不逐次复述。只有偏离默认时追加一行 `@` 记录：
 
 ```text
-@more shown=<N> omitted=<N> after=<CURSOR>
+@more shown=<N> omitted=<N>
+@next srcq query <backend> exec [wrapper options] --after <CURSOR> -- <native argv...>
 @more shown=<N> omitted=<N> cache=<ID> [after=<OFFSET>]
 @cut text|results|lines=<N>
 @unprojectable <N>
 ```
 
-`@more` 只表示存在明确的同快照续读入口；query cursor 自带 snapshot 身份，model 续页只需原查询加 `--after <CURSOR>`，也兼容同时显式传 `--snapshot`。不能续读的结果或行省略使用 `@cut`。`@unprojectable` 表示 cache 中存在无法形成位置投影的记录。同一结果同时发生分页和正文截断时可分别出现两行。真正未知不得省略成默认；无法可靠表达时返回错误并建议 machine/artifact，而不是输出看似完整的正文。
+query 的 `@more` 只表示仍有未展示证据，紧随其后的 `@next` 值是 PowerShell 7 可直接执行的唯一下一动作；cursor 自带 snapshot 与实际 view，命令保持 backend、显式 engine/cwd、影响分页的非默认 wrapper 值和全部原生 argv。用户值以单行 PowerShell 字面量无损渲染，续页读取持久化快照而不重新运行原生查询。cache/process 继续用其独立的 `@more cache/after` 协议，不与 query cursor 混用。不能续读的结果或行省略使用 `@cut`。`@unprojectable` 表示 cache 中存在无法形成位置投影的记录。同一结果同时发生分页和正文截断时可分别出现信号。真正未知不得省略成默认；无法可靠表达时返回错误并建议 machine/artifact，而不是输出看似完整的正文。
 
 ## 选择与验证
 

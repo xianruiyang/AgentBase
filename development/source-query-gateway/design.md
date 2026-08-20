@@ -164,6 +164,13 @@ rg、fd 与 ast-grep 默认继续作为外部执行后端：srcq 负责 argv、�
 
 `srcq fd`、`srcq rg`、现有 AST 与渐进 LSP 继续是正式查询入口。模型负责查询语义和证据裁决；srcq 负责自己可见的完整结果形状、等价表示、机械有界闭环和分页，不解析自然语言、猜测项目权威或建立第二套任务规划器。只有受监控记录反复证明某类必要闭环无法由现有入口以可维护方式表达，且新增能力在质量不退化时显著降低总 Token 或失败率，才允许扩展现有 srcq owner。优先增强现有命令域和投影；只有其原生兼容职责无法承载时，才讨论新的高层命令。
 
+## DES-SQG-015 query model renderer 持有可执行续页动作
+
+- 状态: confirmed
+- 关联: REQ-SQG-001, AC-SQG-007, AC-SQG-009, UDES-SQG-015
+
+公共 `query_gateway` 已同时持有 backend、wrapper 状态、原生 argv、snapshot 与 cursor，因此由它唯一生成 `@more shown=<N> omitted=<N>` 和紧随其后的 `@next <PowerShell command>`。命令重放显式 engine/cwd、影响分页的非默认 wrapper 值、精确 cursor 与全部原生 argv；安全 token 裸写，其他值按 PowerShell 7 单行字面量无损转义。machine `next_cursor`、snapshot 身份、cache/process 分页和 native backend 保持现有 owner；模型或 skill 不维护第二份续页语法。
+
 ## 4. 版本与迁移边界
 
 当前以 ripgrep 15.1.0、Codex PATH 中的 ripgrep 15.2.0、fd 10.4.2 和迁移前已验证的 ast-grep 0.41.1、0.42.0、0.44.1 标记 Windows 行为证据；这些身份限定各项测试结论，不定义允许运行的连续或离散版本范围。完整兼容表示可启动后端的公开命令都能通过相应命令域调用并保持原生语义，不表示所有模式都能结构化压缩；未验证版本的质量声明只覆盖本次实际输出和退出，不能外推未执行模式。`tools/srcq/Cargo.toml` 的 workspace package version 是当前 srcq 候选版本的唯一默认来源；构建参数只允许显式制作另一个已声明的 srcq 版本，不能长期用覆盖值掩盖源码、README、SBOM、release helper 与运行时版本不一致。

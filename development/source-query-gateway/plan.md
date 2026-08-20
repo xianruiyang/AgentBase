@@ -332,6 +332,19 @@ P11 重开与再次闭合（2026-08-20）：真实 tokenizer 证明 files 扁平
 
 P12 的 runner 工作已经闭合，最终 experiment identity 为 `a37e3675d74dfca877f84fbccfc9814ff37cacc56fd796263c1335a3d31dc939`。它没有证明分页友善：第一页 `@more shown=80 omitted=97 after=<cursor>` 未提供可直接执行的续页入口，独立 Codex 把 cursor 传给直接 scc backend，原生 scc 以未知 `--after` 拒绝。该事实满足模型投影质量重开条件，但本轮只获评估框架修复授权；srcq 产品修正保持待用户裁决，不预建实现、不修改 release，也不继承 Publish 授权。
 
+### P13 query model 可执行续页动作
+
+| ID | 任务 | 依赖 | 产出 | 验证与闭环 |
+| --- | --- | --- | --- | --- |
+| TSQG-095 | 冻结 cursor + 完整 `@next` 用户合同与唯一 owner | TSQG-094 | [P13 交付链](../../docs/work/20260820_srcq_model_pagination_action/requirements.md)、AC-SQG-009、UDES-SQG-015、DES-SQG-015 | `@more` 只表达数量，`@next` 是 PowerShell 7 可执行完整命令；machine、cache/process 与 snapshot 状态不变 |
+| TSQG-096 | 实现命令投影并迁移当前消费者 | TSQG-095 | 公共 query renderer、PowerShell argv 格式器、source-query 文档/静态合同和 0.4.1 候选 | rg/fd/scc 共享行为；特殊 argv 单行无损；续页沿 snapshot 且原生 scc 只扫描一次 |
+| TSQG-097 | 运行有效独立 Codex 正常续页 | TSQG-096 | candidate-only experiment、事件级第二页命令与友善度结论 | preflight/subject 零网络降级、postflight 有效；模型执行 `@next`，第二页成功且 cursor/argv/扫描次数正确 |
+| TSQG-098 | 完成消费者、验证与发布边界审计 | TSQG-097 | GAP-SQG-009 结论、P13 验证和项目状态 | 组件、skill、evaluator 与 Git 闭合；真实安装保持暂停，未获逐次授权不 Publish |
+
+P13 只扩展现有 query model renderer，不增加 `srcq more`、offset/length、原生重扫或模型侧命令重建。若有效独立事件仍选择错误入口，先按实际可见输出裁决信息层级、命令歧义或 shell 表达机制；只有机制变化后才重跑，不用相同输入期待随机成功。
+
+TSQG-095—TSQG-098 已闭环。`srcq 0.4.1` 的特殊 argv PowerShell 往返、snapshot fingerprint 与单次 scc 扫描回归通过；全 workspace build/test/lint/fmt、skill 静态合同、零模型 Token 路由基础设施和部署 Validate 通过。v6 identity `27ac16be…20f5` 中，独立 Codex 直接执行 `@next` 并成功取得第二页，preflight/subject 网络计数全零、postflight 无漂移，capsule `fce108b5…7926` 验真通过。GAP-SQG-009 因此关闭；真实 srcq 安装仍按用户要求暂停，本轮没有 Publish 授权也未执行 Publish。
+
 ## 5. 停止与重开条件
 
 - AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断或 release gate 任一发生非必要变化时，停止并回到设计裁决。

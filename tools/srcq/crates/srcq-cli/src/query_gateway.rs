@@ -547,10 +547,14 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
             push_model_line(
                 &mut model,
                 &format!(
-                    "@more shown={} omitted={} after={cursor}",
+                    "@more shown={} omitted={}",
                     projection.displayed,
                     projection.total.saturating_sub(end)
                 ),
+            );
+            push_model_line(
+                &mut model,
+                &format!("@next {}", model_continuation_command(command, cursor)?),
             );
         }
         let cut = model_text_cut_count(command.backend, &projection.view, &root);
@@ -3288,6 +3292,88 @@ fn os_args_json(args: &[OsString]) -> Result<Vec<String>, GatewayError> {
         .collect()
 }
 
+fn model_continuation_command(
+    command: &GatewayCommand,
+    cursor: &str,
+) -> Result<String, GatewayError> {
+    let mut tokens = vec![
+        "srcq".to_owned(),
+        "query".to_owned(),
+        backend_name(command.backend).to_owned(),
+        "exec".to_owned(),
+    ];
+    if let Some(engine) = command.engine.as_deref() {
+        tokens.push("--engine".to_owned());
+        tokens.push(powershell_argument(model_path(engine, "engine")?));
+    }
+    if let Some(cwd) = command.cwd.as_deref() {
+        tokens.push("--cwd".to_owned());
+        tokens.push(powershell_argument(model_path(cwd, "cwd")?));
+    }
+    if command.view != "auto" {
+        tokens.push("--view".to_owned());
+        tokens.push(powershell_argument(&command.view));
+    }
+    if command.limit != 80 {
+        tokens.push("--limit".to_owned());
+        tokens.push(command.limit.to_string());
+    }
+    if command.max_text_chars != 240 {
+        tokens.push("--max-text-chars".to_owned());
+        tokens.push(command.max_text_chars.to_string());
+    }
+    if command.model_token_budget != 2048 {
+        tokens.push("--model-token-budget".to_owned());
+        tokens.push(command.model_token_budget.to_string());
+    }
+    tokens.push("--after".to_owned());
+    tokens.push(cursor.to_owned());
+    tokens.push("--".to_owned());
+    for argument in &command.native_argv {
+        let argument = argument.to_str().ok_or_else(|| {
+            GatewayError::input(
+                "native argv cannot be represented losslessly in a model continuation command",
+            )
+        })?;
+        tokens.push(powershell_argument(argument));
+    }
+    Ok(tokens.join(" "))
+}
+
+fn model_path<'a>(path: &'a Path, role: &str) -> Result<&'a str, GatewayError> {
+    path.to_str().ok_or_else(|| {
+        GatewayError::input(format!(
+            "{role} path cannot be represented losslessly in a model continuation command"
+        ))
+    })
+}
+
+fn powershell_argument(value: &str) -> String {
+    let safe = !value.is_empty()
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric()
+                || matches!(character, '_' | '-' | '.' | '/' | '\\' | ':' | '=')
+        });
+    if safe {
+        return value.to_owned();
+    }
+
+    let mut rendered = String::from("\"");
+    for character in value.chars() {
+        match character {
+            '`' => rendered.push_str("``"),
+            '$' => rendered.push_str("`$"),
+            '"' => rendered.push_str("`\""),
+            value if value.is_control() => {
+                rendered.push_str(&format!("`u{{{:X}}}", value as u32));
+            }
+            value => rendered.push(value),
+        }
+    }
+    rendered.push('"');
+    rendered
+}
+
 pub(super) fn model_text_cost(text: &str) -> usize {
     let mut total = 0_usize;
     let mut ascii_word = 0_usize;
@@ -3763,6 +3849,21 @@ mod tests {
             "snapshot-id"
         );
         assert!(cursor_snapshot("q1.invalid").is_err());
+    }
+
+    #[test]
+    fn powershell_continuation_arguments_are_single_line_and_lossless() {
+        assert_eq!(
+            powershell_argument("plain-path/file.rs"),
+            "plain-path/file.rs"
+        );
+        assert_eq!(powershell_argument(""), "\"\"");
+        assert_eq!(powershell_argument("with space"), "\"with space\"");
+        assert_eq!(
+            powershell_argument("money$|quote\"tick`apostrophe'"),
+            "\"money`$|quote`\"tick``apostrophe'\""
+        );
+        assert_eq!(powershell_argument("line\nnext"), "\"line`u{A}next\"");
     }
 
     #[test]

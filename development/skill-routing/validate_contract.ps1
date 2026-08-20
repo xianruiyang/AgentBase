@@ -304,6 +304,7 @@ Assert-True ($sourceQueryContent.Contains('不搜索项目构建目录、Skill�
 Assert-True ($sourceQueryContent.Contains('只读取当前缺口对应的引用')) "source-query must load only the reference needed by the current gap"
 Assert-True ($sourceQueryContent.Contains('证据充分即停止')) "source-query must stop when evidence is sufficient"
 Assert-True ($sourceQueryContent.Contains('续页沿用同一 snapshot 和精确 cursor')) "source-query must preserve continuation identity"
+Assert-True ($sourceQueryContent.Contains('直接执行 `@next` 提供的完整命令')) "source-query must consume the executable query continuation command"
 Assert-True ($globalContent.Contains('PATH 中的 `srcq fd <fd argv...>`')) "global rules must expose the minimal direct fd syntax"
 Assert-True ($globalContent.Contains('`srcq rg <rg argv...>`')) "global rules must expose the minimal direct rg syntax"
 Assert-True ($globalContent.Contains('PATH 中的 `srcq scc <scc argv...>`')) "global rules must expose the minimal direct scc syntax"

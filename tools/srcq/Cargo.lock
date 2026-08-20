@@ -709,7 +709,7 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "srcq-cli"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "clap",
  "saphyr-parser",
@@ -722,7 +722,7 @@ dependencies = [
 
 [[package]]
 name = "srcq-contract-tests"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "proptest",
  "serde_json",
@@ -733,7 +733,7 @@ dependencies = [
 
 [[package]]
 name = "srcq-core"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "atomic-write-file",
  "command-group",
@@ -751,7 +751,7 @@ dependencies = [
 
 [[package]]
 name = "srcq-integration-tests"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "serde_json",
  "sha2",
@@ -762,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "srcq-protocol-tests"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "portable-pty",
  "serde_json",
@@ -774,7 +774,7 @@ dependencies = [
 
 [[package]]
 name = "srcq-release"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "serde_json",
  "sha2",
@@ -782,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "srcq-stress-tests"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "serde_json",
  "srcq-core",

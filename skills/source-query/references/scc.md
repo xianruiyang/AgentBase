@@ -27,6 +27,6 @@ wrapper 参数只放在 `--` 前，原生参数只放在 `--` 后。`defaults` �
 
 ## 完整性与续页
 
-普通完整结果不带续页回执；未展示完的 model 结果返回 `@more`，machine 返回 `query_snapshot` 与 `next_cursor`。续页使用 `srcq query scc exec --after <cursor> -- <原 argv...>`，必须重用同一 cwd、原生 argv、引擎、实际 view 和 snapshot；未知、损坏或跨查询 cursor 不得猜测。
+普通完整结果不带续页回执；未展示完的 query model 结果先返回 `@more` 数量事实，再在 `@next` 后给出 PowerShell 7 可直接执行的完整命令；直接执行该命令，不自行重组 cursor、控制面或原生 argv。machine 返回 `query_snapshot` 与 `next_cursor`。续页必须重用同一 cwd、原生 argv、引擎、实际 view 和 snapshot；缺少 `@next`、未知、损坏或跨查询 cursor 时不得猜测。
 
 语言和文件总数只由完整捕获计算，分页只限制模型可见页而不缩小底层扫描集合。全集、不存在、最大值或热点排序结论必须覆盖所声明的权威源码范围，并明确 ignore、generated、vendor、minified 等原生 scc 选项是否改变了集合。

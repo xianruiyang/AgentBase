@@ -4,6 +4,8 @@
 
 本文件只汇总本分支候选的可重复验证结果。命令输出、测试代码、语料和独立评估原始文件仍由各自项目入口或项目外 capsule 承担；这里不复制大日志，也不把局部验证扩张为端到端模型收益。
 
+`candidate-skill/`、`build_routing_capsule.py`、`verify_candidate_payload.py` 与 `routing-cases.json` 只冻结 P9/P10 的历史评估输入和复算入口，不是当前发布 payload、运行时消费者或需要随 P13 合同迁移的派生真源。当前模型消费入口是仓库根 `skills/source-query/`，当前路由评估由 `development/skill-routing/` 维护。
+
 ## 2. 已完成验证
 
 下表中的“当前”均指 P0—P10 各自冻结身份；P11 的新身份和证据单独列在表后，不用后继源码反向改写历史运行数字。
@@ -86,3 +88,15 @@ SOL-SQG-010 已实现：rg/fd 普通调用只传原生 argv，显式控制进入
 ## 6. P11 增量完成边界
 
 P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真实 scc、真实 tokenizer、release manifest、可复现归档和安装生命周期已经闭合；后继 files 目录树差距也已按同一交付链关闭，没有已知适用失败或开放实施项。当前独立路由 evidence 已由后继增量计划刷新，且本次路由输入未变；目录树的静态 Token 收益仍不冒充端到端模型行为。实际用户安装仍为 srcq 0.3.1，本轮也未获真实 Publish 的逐次授权，因此不得把 0.4.0 项目完成外推为已安装或已发布。
+
+## 7. P13 query model 可执行续页动作
+
+| 范围 | 结果 |
+| --- | --- |
+| srcq 0.4.1 | `cargo ci-build`、`cargo ci-test`、`cargo lint`、`cargo fmt-check` 全部通过；query gateway 34/34，公共 query renderer 的 rg/fd/scc、machine、snapshot 与连续分页回归通过 |
+| PowerShell 与无重扫 | 特殊 argv 覆盖空值、空白、美元、管道、双引号、反引号、单引号和换行；测试实际在新 PowerShell 7 进程执行 `@next`，第二页成功且 fixture scc invocation log 仍为 1 |
+| skill 与部署消费者 | 静态合同 96 cases、55 strict routing、10 strict references、11/11 skills 通过；路由基础设施 6 suites/22 syntax files、0 evaluator runs；部署 `Validate` 通过 |
+| independent Codex v6 | experiment `27ac16beea6ef195bd443057fc229b17af603d4d5c2aa7f54fcc31ca74ad20f5`；preflight 33.149 s，读回 `srcq 0.4.1` 与 scc `ok`；subject 27.522 s，直接执行 `@next`、第二页 exit 0，首项为 `D:/program/AgentBase/tools/srcq/crates/srcq-core/src/profile/paths.rs` |
+| 环境与 capsule | preflight/subject 的 WebSocket failure、sampling retry、HTTP fallback 均为 0，postflight 无失败；capsule SHA-256 `fce108b55bce2871e2bb153e95725cebb5dd04d2530806aa28c07d31a6257926`，4 个原始文件和 2 个环境文件验真通过 |
+
+这些证据关闭 AC-SQG-009 与 GAP-SQG-009，范围只覆盖正常同一轮 query model 续页；压缩后恢复、cache/process offset 协议和完整端到端 A/B 收益没有改变也未被外推。正式 0.4.1 archive、真实用户 srcq 升级和 Codex Publish 未执行；后两者继续受用户暂停与逐次发布授权约束。

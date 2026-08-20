@@ -205,3 +205,16 @@ fd model renderer 使用可逆紧凑基数树并合并单子链；rg 按正文�
 最终 v21 扩大到六类 12-run：required、行限和 evidence complete 均 12/12，45 次命令全部成功，总 Token `1,066,470`，相对 P9 的 `1,150,528` 降低 `7.31%`；detached auditor 与确定性验真均通过。耗时从 `363.163 s` 增至 `480.739 s`，所以只在“质量相同、Token 更低”的前两级裁决中采纳，不声称速度提升。早期 v3 的 `542,658` 来自未通过封闭质量且有 benchmark 污染的身份，不能继续作为有效 6-run 总量硬门槛；它只保留为历史失败样本。冻结五-skill、P9 与已完成 P10 identity 均未为期待更好数字重复运行。
 
 当前没有共享失败、错误入口、截断或缺失能力支持下一项低风险高收益修改。继续增加固定锚点、调用次数、阅读顺序或默认输出预算会分别重现 v4 或 v5 的已证反作用；因此 SOL-SQG-015 在当前 corpus、模型、项目快照和 Provider 条件下达到收益边缘。只有新失败、协议变化、新消费者或可重复共享机制出现时重开。
+
+## SOL-SQG-016 将 query cursor 投影为完整 `@next` 动作
+
+- 状态: verified
+- 解决: GAP-SQG-009
+- 满足: REQ-SQG-001, AC-SQG-001, AC-SQG-002, AC-SQG-007, AC-SQG-008, AC-SQG-009, DES-SQG-015, UDES-SQG-015
+- 依赖: SOL-SQG-010, SOL-SQG-015
+
+在公共 query model renderer 中把旧 `@more ... after=<cursor>` 改为数量信号加唯一 `@next` 命令。命令格式器只投影当前 `GatewayCommand` 的必要状态，以 PowerShell 7 单行 argv 语义处理空值、空白、元字符、引号、反引号、美元符号和控制字符；继续由 cursor 绑定 snapshot 与实际 view，不新增状态或后端调用。正式 source-query skill 直接消费 `@next`，machine、cache/process 和 native/artifact 消费者保持原合同。
+
+组件验收覆盖共享 rg/fd/scc renderer、特殊 argv 的真实 PowerShell 往返、连续分页、snapshot fingerprint 和 scc 单次扫描；随后用 P12 修复后的 evaluator 运行一个新鲜 candidate subject，只有真实命令事件取得第二页且环境、网络和 postflight 有效时关闭差距。
+
+`srcq 0.4.1` 已实现该合同。全 workspace build/test/lint/fmt、query gateway 34/34、skill 静态合同与部署 Validate 通过；特殊 argv 测试实际把 `@next` 交给新 PowerShell 进程执行，第二页成功且 fixture 日志只有一次 scc 扫描。独立 v6 experiment `27ac16be…20f5` 的 preflight 与 subject 均为零 WebSocket 失败、零 sampling retry、零 HTTP fallback；subject 直接执行提示命令，27.522 秒取得第二页首项 `D:/program/AgentBase/tools/srcq/crates/srcq-core/src/profile/paths.rs`。capsule `fce108b5…7926` 验真通过。真实安装与 Publish 均未执行。
