@@ -9,16 +9,19 @@ import hashlib
 import json
 import os
 import random
+import re
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 
-EXPERIMENT_SCHEMA = "agentbase.source-query-experiment/v2"
-RESULT_SCHEMA = "agentbase.source-query-results/v2"
-CAPSULE_SCHEMA = "agentbase.source-query-audit-capsule/v2"
+EXPERIMENT_SCHEMA = "agentbase.source-query-experiment/v3"
+RESULT_SCHEMA = "agentbase.source-query-results/v3"
+CAPSULE_SCHEMA = "agentbase.source-query-audit-capsule/v3"
+LEGACY_CAPSULE_SCHEMAS = {"agentbase.source-query-audit-capsule/v2"}
 CAPSULE_VERIFICATION_SCHEMA = "agentbase.source-query-capsule-verification/v1"
 CORPUS_SCHEMA = "agentbase.source-query-corpus/v1"
 CAPSULE_HASH_SCHEME = "sha256-canonical-json-without-capsule_sha256"
@@ -61,18 +64,37 @@ TOKEN_PRICING = {
     ],
 }
 SECRET_OR_STATE_NAMES = {
-    ".sandbox_migration", "auth.json", "cap_sid", "installation_id", "history.jsonl", "models_cache.json",
+    ".env", ".sandbox_migration", "auth.json", "cap_sid", "installation_id", "history.jsonl", "models_cache.json",
 }
 STATE_SUFFIXES = {".sqlite", ".sqlite-shm", ".sqlite-wal"}
 STATE_DIRECTORIES = {"cache", "logs", "tmp", ".tmp", ".sandbox", ".sandbox-bin", "sessions", "archived_sessions", "thread-writer-locks"}
 MAX_ENV_FILES = 50_000
+RUNTIME_ENVIRONMENT_SCHEMA = "agentbase.codex-runtime-environment/v1"
+NETWORK_ENVIRONMENT_KEYS = (
+    "ALL_PROXY",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "CODEX_CA_CERTIFICATE",
+    "SSL_CERT_FILE",
+)
+ENVIRONMENT_KEY_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+NETWORK_TRANSPORT_PATTERNS = {
+    "websocket_connect_failures": ("failed to connect to websocket", "websocket connect failed"),
+    "sampling_retries": ("stream disconnected - retrying sampling request", "reconnecting..."),
+    "http_fallbacks": (
+        "falling back to http",
+        "falling back from websockets to https",
+        "falling back to https transport",
+    ),
+}
 READ_ONLY_PREFIX = (
     "这是只读源码查找基准。不得修改文件、配置、进程或外部状态；"
     "不得访问其他测试环境、历史答案、聚合结果或隐藏 oracle。请根据当前环境自主完成下列任务。\n\n"
 )
 PREFLIGHT_PROMPT = (
-    "这是独立基准运行能力预检。必须运行 PATH 中的 {command}，"
-    "只返回该命令输出；不得修改文件、配置、其他进程或外部状态。"
+    "这是独立基准运行能力预检。必须按顺序分别运行 PATH 中的以下命令，"
+    "并只返回各命令输出；不得修改文件、配置、其他进程或外部状态。\n\n{commands}"
 )
 
 
@@ -351,12 +373,14 @@ def validate_benchmark_codex(codex: dict[str, Any]) -> None:
         raise ExperimentError("independent benchmark requires service_tier=default")
     if codex.get("sandbox") != "danger-full-access":
         raise ExperimentError("independent benchmark requires sandbox=danger-full-access")
+    if codex.get("transport") not in {"websocket", "http-only"}:
+        raise ExperimentError("independent benchmark requires an explicit websocket or http-only transport")
     protected = {
-        "approval_policy", "model", "model_reasoning_effort", "sandbox_mode", "service_tier",
+        "approval_policy", "model", "model_provider", "model_reasoning_effort", "sandbox_mode", "service_tier",
     }
     for override in codex.get("extra_config", []):
         key = str(override).split("=", 1)[0].strip()
-        if key in protected:
+        if key in protected or key.startswith("model_providers."):
             raise ExperimentError(f"extra_config must not override benchmark execution identity: {key}")
 
 
@@ -554,8 +578,156 @@ def resolve_path_prepend(home: Path, value: str, name: str) -> Path:
     return path_prepend
 
 
-def codex_environment(environment: dict[str, Any]) -> dict[str, str]:
+def parse_dotenv_projection(path: Path) -> dict[str, str]:
+    if not path.is_file():
+        raise ExperimentError(f"Codex runtime dotenv does not exist: {path}")
+    allowed = set(NETWORK_ENVIRONMENT_KEYS)
+    projection: dict[str, str] = {}
+    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        if "=" not in line:
+            raise ExperimentError(f"invalid dotenv assignment at line {line_number}")
+        raw_key, raw_value = line.split("=", 1)
+        key = raw_key.strip()
+        if not ENVIRONMENT_KEY_PATTERN.fullmatch(key):
+            raise ExperimentError(f"invalid dotenv key at line {line_number}")
+        canonical_key = key.upper()
+        if canonical_key not in allowed:
+            continue
+        if canonical_key in projection:
+            raise ExperimentError(f"duplicate projected dotenv key: {canonical_key}")
+        value = raw_value.strip()
+        if value.startswith(("'", '"')):
+            quote = value[0]
+            if len(value) < 2 or not value.endswith(quote):
+                raise ExperimentError(f"unterminated projected dotenv value at line {line_number}")
+            value = value[1:-1]
+        else:
+            comment = value.find(" #")
+            if comment >= 0:
+                value = value[:comment].rstrip()
+        projection[canonical_key] = value
+    return projection
+
+
+def apply_runtime_environment_options(
+    projection: dict[str, str],
+    options: dict[str, str],
+) -> dict[str, str]:
+    proxy_dns = options.get("proxy_dns", "as-configured")
+    if proxy_dns not in {"as-configured", "remote"}:
+        raise ExperimentError("runtime_environment.proxy_dns must be as-configured or remote")
+    effective = dict(projection)
+    if proxy_dns == "remote":
+        for key in ("ALL_PROXY", "HTTP_PROXY", "HTTPS_PROXY"):
+            value = effective.get(key)
+            if not value:
+                continue
+            parsed = urlsplit(value)
+            if parsed.scheme.lower() == "socks5":
+                effective[key] = urlunsplit(("socks5h", parsed.netloc, parsed.path, parsed.query, parsed.fragment))
+    all_proxy_fanout = options.get("all_proxy_fanout", "none")
+    if all_proxy_fanout not in {"none", "http-and-https"}:
+        raise ExperimentError(
+            "runtime_environment.all_proxy_fanout must be none or http-and-https"
+        )
+    if all_proxy_fanout == "http-and-https" and effective.get("ALL_PROXY"):
+        effective.setdefault("HTTP_PROXY", effective["ALL_PROXY"])
+        effective.setdefault("HTTPS_PROXY", effective["ALL_PROXY"])
+    return effective
+
+
+def resolve_runtime_environment(raw: Any) -> tuple[dict[str, Any], dict[str, str]]:
+    if not isinstance(raw, dict):
+        raise ExperimentError("runtime_environment must be an object")
+    source = Path(os.path.expandvars(str(raw.get("dotenv_path", "")))).expanduser().resolve()
+    required_raw = raw.get("required_keys")
+    if not isinstance(required_raw, list) or not required_raw:
+        raise ExperimentError("runtime_environment.required_keys must be a non-empty list")
+    required: list[str] = []
+    allowed = set(NETWORK_ENVIRONMENT_KEYS)
+    for item in required_raw:
+        key = str(item).upper()
+        if key not in allowed:
+            raise ExperimentError(f"runtime environment key is not allowed: {key}")
+        if key not in required:
+            required.append(key)
+    source_projection = parse_dotenv_projection(source)
+    options = {
+        "proxy_dns": str(raw.get("proxy_dns", "as-configured")),
+        "all_proxy_fanout": str(raw.get("all_proxy_fanout", "none")),
+    }
+    projection = apply_runtime_environment_options(source_projection, options)
+    missing = [key for key in required if not projection.get(key)]
+    if missing:
+        raise ExperimentError(f"required runtime environment keys are missing or empty: {missing}")
+    descriptor = {
+        "schema": RUNTIME_ENVIRONMENT_SCHEMA,
+        "source_kind": "codex-dotenv-allowlist",
+        "source_path": str(source),
+        "allowed_keys": list(NETWORK_ENVIRONMENT_KEYS),
+        "required_keys": required,
+        "projected_keys": sorted(projection),
+        "projection_options": options,
+        "projection_sha256": sha256_bytes(canonical_bytes(projection)),
+        "values_redacted": True,
+    }
+    return descriptor, projection
+
+
+def materialize_runtime_environment(descriptor: dict[str, Any]) -> dict[str, str]:
+    if descriptor.get("schema") != RUNTIME_ENVIRONMENT_SCHEMA:
+        raise ExperimentError("runtime environment schema mismatch")
+    if descriptor.get("allowed_keys") != list(NETWORK_ENVIRONMENT_KEYS):
+        raise ExperimentError("runtime environment allowlist mismatch")
+    source = Path(str(descriptor.get("source_path", ""))).resolve()
+    source_projection = parse_dotenv_projection(source)
+    options = descriptor.get("projection_options")
+    if not isinstance(options, dict):
+        raise ExperimentError("runtime environment projection options mismatch")
+    projection = apply_runtime_environment_options(source_projection, options)
+    if sorted(projection) != descriptor.get("projected_keys"):
+        raise ExperimentError("runtime environment projected keys changed")
+    required = descriptor.get("required_keys", [])
+    if not isinstance(required, list) or any(not projection.get(str(key)) for key in required):
+        raise ExperimentError("runtime environment required keys changed")
+    if sha256_bytes(canonical_bytes(projection)) != descriptor.get("projection_sha256"):
+        raise ExperimentError("runtime environment projection changed")
+    return projection
+
+
+def network_transport_observation(jsonl_path: Path, stderr_path: Path) -> dict[str, Any]:
+    diagnostic_text = [stderr_path.read_text(encoding="utf-8", errors="replace")]
+    for line in jsonl_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        item = event.get("item", {})
+        if event.get("type") in {"error", "turn.failed"} or item.get("type") == "error":
+            diagnostic_text.append(json.dumps(event, ensure_ascii=False))
+    text = "\n".join(diagnostic_text).lower()
+    counts = {
+        name: sum(text.count(pattern) for pattern in patterns)
+        for name, patterns in NETWORK_TRANSPORT_PATTERNS.items()
+    }
+    return {"clean": not any(counts.values()), **counts}
+
+
+def codex_environment(
+    environment: dict[str, Any],
+    runtime_environment: dict[str, str],
+) -> dict[str, str]:
     env = os.environ.copy()
+    allowed = set(NETWORK_ENVIRONMENT_KEYS)
+    for key in list(env):
+        if key.upper() in allowed:
+            del env[key]
+    env.update(runtime_environment)
     env["CODEX_HOME"] = environment["codex_home"]
     if environment.get("path_prepend"):
         env["PATH"] = environment["path_prepend"] + os.pathsep + env.get("PATH", "")
@@ -575,6 +747,15 @@ def codex_exec_argv(
         "-c", f'model_reasoning_effort="{codex["reasoning_effort"]}"',
         "-c", f'service_tier="{codex["service_tier"]}"',
     ]
+    if codex["transport"] == "http-only":
+        argv.extend([
+            "-c", 'model_provider="agentbase_eval_http"',
+            "-c", 'model_providers.agentbase_eval_http.name="AgentBase ChatGPT HTTP"',
+            "-c", 'model_providers.agentbase_eval_http.base_url="https://chatgpt.com/backend-api/codex"',
+            "-c", 'model_providers.agentbase_eval_http.wire_api="responses"',
+            "-c", "model_providers.agentbase_eval_http.requires_openai_auth=true",
+            "-c", "model_providers.agentbase_eval_http.supports_websockets=false",
+        ])
     for override in codex.get("extra_config", []):
         argv.extend(["-c", str(override)])
     if "project_doc_max_bytes" in codex:
@@ -585,65 +766,80 @@ def codex_exec_argv(
     return argv
 
 
-def preflight_command(environment: dict[str, Any]) -> tuple[str, str]:
+def preflight_requirements(environment: dict[str, Any]) -> list[dict[str, str]]:
     home = Path(environment["codex_home"])
     srcq = home / "bin" / "srcq.exe"
     if srcq.is_file():
-        return "srcq.exe --version", "srcq "
-    return "rg.exe --version", "ripgrep "
+        return [
+            {"command": "srcq.exe --version", "expected_output": "srcq "},
+            {"command": "srcq query scc doctor", "expected_output": "ok", "output_match": "exact-line"},
+        ]
+    return [{"command": "rg.exe --version", "expected_output": "ripgrep "}]
 
 
-def validate_preflight_record(record: dict[str, Any], command: str, expected_output: str) -> None:
+def validate_preflight_record(record: dict[str, Any], requirements: list[dict[str, str]]) -> None:
     if record["exit_code"] != 0 or record["timed_out"]:
         raise ExperimentError(f"Codex preflight process failed: {record['environment']}")
     if not record["usage_complete"]:
         raise ExperimentError(f"Codex preflight usage is incomplete: {record['environment']}")
-    command_name = command.split()[0].lower()
-    successful = False
-    for item in record["tool_items"]:
-        if item.get("type") != "command_execution":
-            continue
-        invoked = str(item.get("command", "")).lower()
-        output = str(item.get("aggregated_output", item.get("output", "")))
-        if (
-            command_name in invoked
-            and item.get("status") in {None, "completed"}
-            and item.get("exit_code") in {None, 0}
-            and expected_output.lower() in (output + record["final_answer"]).lower()
-        ):
-            successful = True
-            break
-    if not successful:
-        raise ExperimentError(
-            f"Codex preflight did not execute the required command successfully: {record['environment']}/{command}"
-        )
+    if not record["network_transport"]["clean"]:
+        raise ExperimentError(f"Codex preflight network transport degraded: {record['environment']}")
+    for requirement in requirements:
+        command = requirement["command"]
+        expected_output = requirement["expected_output"]
+        successful = False
+        for item in record["tool_items"]:
+            if item.get("type") != "command_execution":
+                continue
+            invoked = str(item.get("command", "")).lower()
+            output = str(item.get("aggregated_output", item.get("output", "")))
+            expected_matches = (
+                expected_output.lower() in {line.strip().lower() for line in output.splitlines()}
+                if requirement.get("output_match") == "exact-line"
+                else expected_output.lower() in output.lower()
+            )
+            if (
+                command.lower() in invoked
+                and item.get("status") in {None, "completed"}
+                and item.get("exit_code") in {None, 0}
+                and expected_matches
+            ):
+                successful = True
+                break
+        if not successful:
+            raise ExperimentError(
+                "Codex preflight did not execute the required command successfully: "
+                f"{record['environment']}/{command}"
+            )
 
 
 def run_preflights(
     codex: dict[str, Any],
     environments: dict[str, dict[str, Any]],
+    selected_environments: list[str],
+    workspace: Path,
+    runtime_environment: dict[str, str],
     output: Path,
     timeout_seconds: int,
 ) -> dict[str, Any]:
     root = output / "preflight"
-    fixture = root / "workspace"
-    fixture.mkdir(parents=True)
+    root.mkdir(parents=True)
     records = []
-    for name in ("control", "candidate"):
+    for name in selected_environments:
         environment = environments[name]
-        command, expected_output = preflight_command(environment)
+        requirements = preflight_requirements(environment)
+        commands = [requirement["command"] for requirement in requirements]
         stdout_path = root / f"{name}.jsonl"
         stderr_path = root / f"{name}.stderr.txt"
         argv = codex_exec_argv(
             codex,
-            fixture,
-            PREFLIGHT_PROMPT.format(command=command),
-            skip_git_repo_check=True,
+            workspace,
+            PREFLIGHT_PROMPT.format(commands="\n".join(f"- {command}" for command in commands)),
         )
         monitored = monitor_command(
             argv,
-            fixture,
-            codex_environment(environment),
+            workspace,
+            codex_environment(environment, runtime_environment),
             stdout_path,
             stderr_path,
             timeout_seconds,
@@ -652,18 +848,22 @@ def run_preflights(
         record = {
             "run_id": f"preflight__{name}",
             "environment": name,
-            "command": command,
+            "commands": commands,
             **monitored,
             **parsed,
+            "network_transport": network_transport_observation(stdout_path, stderr_path),
             "actual_total_tokens": parsed["usage_breakdown"]["actual_total_tokens"],
             "price_equivalent": price_equivalent(parsed["usage_breakdown"], token_pricing_contract(codex)),
             "stdout": str(stdout_path.relative_to(output)),
             "stderr": str(stderr_path.relative_to(output)),
         }
-        validate_preflight_record(record, command, expected_output)
+        validate_preflight_record(record, requirements)
         records.append(record)
     return {
-        "prompt_contract": "execute the environment's installed query executable and return its version",
+        "prompt_contract": (
+            "execute the environment's installed query executable and, when srcq is present, "
+            "prove that it can spawn the real scc backend"
+        ),
         "timeout_seconds": timeout_seconds,
         "usage_report": aggregate_usage(records, token_pricing_contract(codex)),
         "records": records,
@@ -672,8 +872,15 @@ def run_preflights(
 
 def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
     config = json.loads(config_path.read_text(encoding="utf-8"))
+    if config.get("network_policy") != "configured":
+        raise ExperimentError("independent benchmark requires network_policy=configured")
+    runtime_environment, runtime_environment_values = resolve_runtime_environment(
+        config.get("runtime_environment")
+    )
     corpus_path = Path(config["corpus"]).resolve()
     corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
+    corpus_sha256 = sha256_file(corpus_path)
+    runner_sha256 = sha256_file(Path(__file__))
     case_ids = selected_case_ids(corpus, config.get("case_ids"))
     workspaces = {}
     for role, raw in config["workspaces"].items():
@@ -681,6 +888,17 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
         identity_paths = normalize_identity_paths(root, raw.get("identity_paths"))
         workspaces[role] = {"path": str(root), "identity_paths": identity_paths}
     validate_corpus_snapshot(corpus, workspaces, set(case_ids))
+    run_environments = list(config.get("run_environments", ["control", "candidate"]))
+    schedule = selected_schedule(
+        case_ids,
+        int(config["repetitions"]),
+        int(config["seed"]),
+        run_environments,
+    )
+    preflight_workspace_role = str(config.get("preflight_workspace_role", next(iter(workspaces))))
+    if preflight_workspace_role not in workspaces:
+        raise ExperimentError(f"unknown preflight_workspace_role: {preflight_workspace_role}")
+    preflight_workspace = Path(workspaces[preflight_workspace_role]["path"])
     environments = {}
     for name in ("control", "candidate"):
         raw_environment = config["environments"][name]
@@ -699,14 +917,29 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
             "utf-8", errors="replace"
         ).strip()
     output.mkdir(parents=True, exist_ok=False)
+    preflight_workspace_identities = {
+        role: git_identity(Path(workspace["path"]), workspace["identity_paths"])
+        for role, workspace in workspaces.items()
+    }
     preflight = run_preflights(
         codex,
         environments,
+        run_environments,
+        preflight_workspace,
+        runtime_environment_values,
         output,
         int(config.get("preflight_timeout_seconds", 180)),
     )
+    if sha256_file(Path(__file__)) != runner_sha256:
+        raise ExperimentError("Codex preflight modified runner source")
+    if sha256_file(corpus_path) != corpus_sha256:
+        raise ExperimentError("Codex preflight modified corpus")
+    materialize_runtime_environment(runtime_environment)
     for role, workspace in workspaces.items():
-        workspace["identity"] = git_identity(Path(workspace["path"]), workspace["identity_paths"])
+        observed = git_identity(Path(workspace["path"]), workspace["identity_paths"])
+        if observed != preflight_workspace_identities[role]:
+            raise ExperimentError(f"Codex preflight modified workspace: {role}")
+        workspace["identity"] = preflight_workspace_identities[role]
     trees = {}
     for name, environment in environments.items():
         tree = environment_tree(Path(environment["codex_home"]))
@@ -719,9 +952,10 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
     (output / "environment-trees.json").write_text(json.dumps(trees, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
     document = {
         "schema": EXPERIMENT_SCHEMA,
-        "corpus": {"path": str(corpus_path), "sha256": sha256_file(corpus_path), "version": corpus["version"]},
+        "corpus": {"path": str(corpus_path), "sha256": corpus_sha256, "version": corpus["version"]},
         "workspaces": workspaces,
         "codex": codex,
+        "runtime_environment": runtime_environment,
         "preflight": preflight,
         "tool_versions": tool_versions,
         "environments": environments,
@@ -729,16 +963,11 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
         "selected_case_ids": case_ids,
         "environment_diff_sha256": sha256_file(output / "environment-diff.json"),
         "environment_trees_sha256": sha256_file(output / "environment-trees.json"),
-        "schedule": selected_schedule(
-            case_ids,
-            int(config["repetitions"]),
-            int(config["seed"]),
-            list(config.get("run_environments", ["control", "candidate"])),
-        ),
+        "schedule": schedule,
         "timeout_seconds": int(config["timeout_seconds"]),
         "network_policy": config["network_policy"],
         "token_pricing": token_pricing_contract(codex),
-        "runner": {"schema": EXPERIMENT_SCHEMA, "source_sha256": sha256_file(Path(__file__)), "python": sys.version},
+        "runner": {"schema": EXPERIMENT_SCHEMA, "source_sha256": runner_sha256, "python": sys.version},
     }
     document["experiment_identity"] = experiment_identity_sha256(document)
     (output / "experiment.json").write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -810,6 +1039,13 @@ def parse_events(path: Path) -> dict[str, Any]:
 
 def verify_experiment_identity(experiment: dict[str, Any]) -> list[str]:
     failures = []
+    if experiment.get("schema") != EXPERIMENT_SCHEMA:
+        failures.append("experiment schema changed")
+    runner = experiment.get("runner", {})
+    if runner.get("source_sha256") != sha256_file(Path(__file__)):
+        failures.append("runner source changed")
+    if runner.get("python") != sys.version:
+        failures.append("runner Python changed")
     codex = experiment["codex"]
     executable = Path(codex["executable"])
     if not executable.is_file() or sha256_file(executable) != codex["executable_sha256"]:
@@ -824,6 +1060,10 @@ def verify_experiment_identity(experiment: dict[str, Any]) -> list[str]:
         tree = environment_tree(Path(environment["codex_home"]))
         if sha256_bytes(canonical_bytes(tree)) != environment["tree_sha256"]:
             failures.append(f"environment changed: {name}")
+    try:
+        materialize_runtime_environment(experiment["runtime_environment"])
+    except (ExperimentError, OSError, KeyError, ValueError):
+        failures.append("runtime environment changed")
     return failures
 
 
@@ -833,6 +1073,7 @@ def run_experiment(experiment_path: Path) -> dict[str, Any]:
     failures = verify_experiment_identity(experiment)
     if failures:
         raise ExperimentError(f"preflight identity mismatch: {failures}")
+    runtime_environment = materialize_runtime_environment(experiment["runtime_environment"])
     corpus = json.loads(Path(experiment["corpus"]["path"]).read_text(encoding="utf-8"))
     cases = {case["id"]: case for case in corpus["cases"]}
     root = experiment_path.resolve().parent
@@ -849,18 +1090,25 @@ def run_experiment(experiment_path: Path) -> dict[str, Any]:
         stderr_path = runs_root / f"{run_id}.stderr.txt"
         codex = experiment["codex"]
         argv = codex_exec_argv(codex, workspace, READ_ONLY_PREFIX + case["prompt"])
-        env = codex_environment(environment)
+        env = codex_environment(environment, runtime_environment)
         monitored = monitor_command(argv, workspace, env, stdout_path, stderr_path, experiment["timeout_seconds"])
         parsed = parse_events(stdout_path)
+        network_transport = network_transport_observation(stdout_path, stderr_path)
         pricing = experiment.get("token_pricing", TOKEN_PRICING)
         records.append({
             "run_id": run_id, **scheduled, "workspace_role": case["workspace_role"], **monitored,
             **parsed,
+            "network_transport": network_transport,
             "actual_total_tokens": parsed["usage_breakdown"]["actual_total_tokens"],
             "price_equivalent": price_equivalent(parsed["usage_breakdown"], pricing),
             "stdout": str(stdout_path.relative_to(root)), "stderr": str(stderr_path.relative_to(root)),
         })
     postflight = verify_experiment_identity(experiment)
+    postflight.extend(
+        f"network transport degraded: {record['run_id']}"
+        for record in records
+        if not record["network_transport"]["clean"]
+    )
     result = {
         "schema": RESULT_SCHEMA,
         "experiment_identity": experiment["experiment_identity"],
@@ -911,7 +1159,7 @@ def verify_capsule(capsule_path: Path) -> dict[str, Any]:
     root = capsule_path.parent
     capsule = json.loads(capsule_path.read_text(encoding="utf-8"))
     failures: list[str] = []
-    if capsule.get("schema") != CAPSULE_SCHEMA:
+    if capsule.get("schema") not in {CAPSULE_SCHEMA, *LEGACY_CAPSULE_SCHEMAS}:
         failures.append("capsule schema mismatch")
     if capsule.get("capsule_hash_scheme") != CAPSULE_HASH_SCHEME:
         failures.append("capsule hash scheme mismatch")

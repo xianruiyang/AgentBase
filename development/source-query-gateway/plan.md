@@ -322,6 +322,16 @@ P11 实施状态（2026-08-19）：TSQG-086 至 TSQG-090 的项目源码、消�
 
 P11 重开与再次闭合（2026-08-20）：真实 tokenizer 证明 files 扁平投影仍重复目录和字段名，满足重开条件。TSQG-091 已让同一规范化证据页按成本选择扁平标注、扁平表或可逆目录树，hotspots 和机器合同不变；workspace、真实 scc、同快照 tokenizer、可复现 release、backend smoke 与隔离升级均通过。当前路由 evidence 已由后继计划刷新且本次输入未变；真实安装升级继续暂停，未执行 Codex Publish，当前没有开放实施任务。
 
+### P12 独立 Codex 评估运行时与 scc 续页观察
+
+| ID | 任务 | 依赖 | 产出 | 验证与闭环 |
+| --- | --- | --- | --- | --- |
+| TSQG-092 | 裁决独立评估的网络、transport、sandbox 与真实工具边界 | TSQG-091 | [P12 交付链](../../docs/work/20260820_independent_codex_evaluation_runtime/requirements.md)、根因与 owner | 区分 runner 缺陷与 srcq 产品行为；不复制 `.env`、不修改真实 Codex 配置、不以 HTTP fallback 伪装网络健康 |
+| TSQG-093 | 实现可审计且低重复的 evaluator runtime | TSQG-092 | experiment v3、脱敏网络投影、显式 transport、candidate-only 预检、真实 scc doctor、网络/runner 身份门禁 | 36 项 benchmark 测试、10 项 home 测试、Python 编译、失败迭代和最终零重连 preflight 通过 |
+| TSQG-094 | 在修复后的边界验证正常同 turn scc 续页 | TSQG-093 | v5 identity、事件级命令链与负向友善度结论 | WebSocket + remote DNS + proxy fanout；preflight/subject 零 retry/fallback；第一页成功，第二条错误 `srcq scc --after` 直接可见 |
+
+P12 的 runner 工作已经闭合，最终 experiment identity 为 `a37e3675d74dfca877f84fbccfc9814ff37cacc56fd796263c1335a3d31dc939`。它没有证明分页友善：第一页 `@more shown=80 omitted=97 after=<cursor>` 未提供可直接执行的续页入口，独立 Codex 把 cursor 传给直接 scc backend，原生 scc 以未知 `--after` 拒绝。该事实满足模型投影质量重开条件，但本轮只获评估框架修复授权；srcq 产品修正保持待用户裁决，不预建实现、不修改 release，也不继承 Publish 授权。
+
 ## 5. 停止与重开条件
 
 - AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断或 release gate 任一发生非必要变化时，停止并回到设计裁决。

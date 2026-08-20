@@ -29,6 +29,134 @@ class ExperimentTests(unittest.TestCase):
             with self.assertRaisesRegex(MODULE.ExperimentError, "escapes codex home"):
                 MODULE.resolve_path_prepend(home.resolve(), "../outside", "candidate")
 
+    def test_independent_benchmark_requires_configured_network_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            config = Path(temp) / "config.json"
+            config.write_text(json.dumps({"network_policy": "ambient"}), encoding="utf-8")
+            with self.assertRaisesRegex(MODULE.ExperimentError, "network_policy=configured"):
+                MODULE.build_experiment(config, Path(temp) / "output")
+
+    def test_runtime_dotenv_projects_only_network_allowlist_and_redacts_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            dotenv = Path(temp) / ".env"
+            dotenv.write_text(
+                "# host settings\nOPENAI_API_KEY=must-not-project\nALL_PROXY='socks5://127.0.0.1:1080'\n",
+                encoding="utf-8",
+            )
+            descriptor, projection = MODULE.resolve_runtime_environment({
+                "dotenv_path": str(dotenv),
+                "required_keys": ["ALL_PROXY"],
+            })
+            self.assertEqual({"ALL_PROXY": "socks5://127.0.0.1:1080"}, projection)
+            self.assertEqual(["ALL_PROXY"], descriptor["projected_keys"])
+            serialized = json.dumps(descriptor)
+            self.assertNotIn("socks5://127.0.0.1:1080", serialized)
+            self.assertNotIn("must-not-project", serialized)
+            self.assertEqual(projection, MODULE.materialize_runtime_environment(descriptor))
+
+    def test_runtime_dotenv_change_invalidates_frozen_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            dotenv = Path(temp) / ".env"
+            dotenv.write_text("ALL_PROXY=socks5://127.0.0.1:1080\n", encoding="utf-8")
+            descriptor, _ = MODULE.resolve_runtime_environment({
+                "dotenv_path": str(dotenv),
+                "required_keys": ["ALL_PROXY"],
+            })
+            dotenv.write_text("ALL_PROXY=socks5://127.0.0.1:1081\n", encoding="utf-8")
+            with self.assertRaisesRegex(MODULE.ExperimentError, "projection changed"):
+                MODULE.materialize_runtime_environment(descriptor)
+
+    def test_runtime_dotenv_can_require_remote_dns_for_socks_proxy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            dotenv = Path(temp) / ".env"
+            dotenv.write_text("ALL_PROXY=socks5://127.0.0.1:1080\n", encoding="utf-8")
+            descriptor, projection = MODULE.resolve_runtime_environment({
+                "dotenv_path": str(dotenv),
+                "required_keys": ["ALL_PROXY"],
+                "proxy_dns": "remote",
+            })
+            self.assertEqual("socks5h://127.0.0.1:1080", projection["ALL_PROXY"])
+            self.assertEqual(
+                {"proxy_dns": "remote", "all_proxy_fanout": "none"},
+                descriptor["projection_options"],
+            )
+            self.assertEqual(projection, MODULE.materialize_runtime_environment(descriptor))
+
+    def test_runtime_dotenv_can_fan_out_all_proxy_for_websocket_clients(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            dotenv = Path(temp) / ".env"
+            dotenv.write_text("ALL_PROXY=socks5://127.0.0.1:1080\n", encoding="utf-8")
+            _, projection = MODULE.resolve_runtime_environment({
+                "dotenv_path": str(dotenv),
+                "required_keys": ["ALL_PROXY"],
+                "proxy_dns": "remote",
+                "all_proxy_fanout": "http-and-https",
+            })
+            self.assertEqual("socks5h://127.0.0.1:1080", projection["ALL_PROXY"])
+            self.assertEqual(projection["ALL_PROXY"], projection["HTTP_PROXY"])
+            self.assertEqual(projection["ALL_PROXY"], projection["HTTPS_PROXY"])
+
+    def test_codex_environment_replaces_unbound_parent_network_settings(self) -> None:
+        with mock.patch.dict(os.environ, {
+            "ALL_PROXY": "parent-proxy",
+            "HTTPS_PROXY": "parent-https-proxy",
+        }, clear=False):
+            env = MODULE.codex_environment(
+                {"codex_home": "D:/isolated", "path_prepend": "D:/isolated/bin"},
+                {"ALL_PROXY": "frozen-proxy"},
+            )
+        self.assertEqual("frozen-proxy", env["ALL_PROXY"])
+        self.assertNotIn("HTTPS_PROXY", env)
+        self.assertEqual("D:/isolated", env["CODEX_HOME"])
+        self.assertTrue(env["PATH"].startswith("D:/isolated/bin" + os.pathsep))
+
+    def test_experiment_identity_rejects_changed_runner_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            executable = root / "codex.exe"
+            executable.write_bytes(b"codex")
+            corpus = root / "corpus.json"
+            corpus.write_text("{}", encoding="utf-8")
+            experiment = {
+                "schema": MODULE.EXPERIMENT_SCHEMA,
+                "runner": {"source_sha256": "0" * 64, "python": sys.version},
+                "codex": {
+                    "executable": str(executable),
+                    "executable_sha256": MODULE.sha256_file(executable),
+                },
+                "corpus": {"path": str(corpus), "sha256": MODULE.sha256_file(corpus)},
+                "workspaces": {},
+                "environments": {},
+                "runtime_environment": {},
+            }
+            with mock.patch.object(MODULE, "materialize_runtime_environment", return_value={}):
+                failures = MODULE.verify_experiment_identity(experiment)
+            self.assertIn("runner source changed", failures)
+
+    def test_network_transport_observation_rejects_retry_and_http_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            jsonl = Path(temp) / "stdout.jsonl"
+            stderr = Path(temp) / "stderr.txt"
+            stderr.write_text(
+                "failed to connect to websocket\n"
+                "stream disconnected - retrying sampling request\n"
+                "falling back to HTTP\n",
+                encoding="utf-8",
+            )
+            jsonl.write_text(
+                json.dumps({"type": "item.completed", "item": {
+                    "type": "agent_message", "text": "Reconnecting... is source text",
+                }}) + "\n" + json.dumps({
+                    "type": "error", "message": "Reconnecting... 1/5",
+                }) + "\n",
+                encoding="utf-8",
+            )
+            observation = MODULE.network_transport_observation(jsonl, stderr)
+            self.assertFalse(observation["clean"])
+            self.assertEqual(1, observation["websocket_connect_failures"])
+            self.assertEqual(2, observation["sampling_retries"])
+            self.assertEqual(1, observation["http_fallbacks"])
+
     def test_workspace_identity_paths_are_relative_and_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp).resolve()
@@ -108,6 +236,10 @@ class ExperimentTests(unittest.TestCase):
             capsule_path.write_text(json.dumps(capsule), encoding="utf-8")
             verified = MODULE.verify_capsule(capsule_path)
             self.assertEqual(1, verified["verified_raw_files"])
+            capsule["schema"] = "agentbase.source-query-audit-capsule/v2"
+            capsule["capsule_sha256"] = MODULE.capsule_sha256(capsule)
+            capsule_path.write_text(json.dumps(capsule), encoding="utf-8")
+            self.assertEqual(1, MODULE.verify_capsule(capsule_path)["verified_raw_files"])
             (root / "runs" / "one.jsonl").write_bytes(b"changed\n")
             with self.assertRaisesRegex(MODULE.ExperimentError, "raw file sha256 mismatch"):
                 MODULE.verify_capsule(capsule_path)
@@ -121,6 +253,7 @@ class ExperimentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "AGENTS.md").write_text("rules", encoding="utf-8")
+            (root / ".env").write_text("ALL_PROXY=secret", encoding="utf-8")
             (root / ".sandbox_migration").write_text("v2", encoding="utf-8")
             (root / "state_5.sqlite").write_bytes(b"state")
             self.assertEqual({"AGENTS.md": MODULE.sha256_file(root / "AGENTS.md")}, MODULE.environment_tree(root))
@@ -318,37 +451,95 @@ class ExperimentTests(unittest.TestCase):
         )
 
     def test_independent_benchmark_rejects_fast_service_tier(self) -> None:
-        MODULE.validate_benchmark_codex({"service_tier": "default", "sandbox": "danger-full-access"})
+        MODULE.validate_benchmark_codex({
+            "service_tier": "default", "sandbox": "danger-full-access", "transport": "http-only",
+        })
         with self.assertRaisesRegex(MODULE.ExperimentError, "service_tier=default"):
-            MODULE.validate_benchmark_codex({"service_tier": "fast", "sandbox": "danger-full-access"})
+            MODULE.validate_benchmark_codex({
+                "service_tier": "fast", "sandbox": "danger-full-access", "transport": "http-only",
+            })
         with self.assertRaisesRegex(MODULE.ExperimentError, "sandbox=danger-full-access"):
-            MODULE.validate_benchmark_codex({"service_tier": "default", "sandbox": "read-only"})
+            MODULE.validate_benchmark_codex({
+                "service_tier": "default", "sandbox": "read-only", "transport": "http-only",
+            })
+        with self.assertRaisesRegex(MODULE.ExperimentError, "explicit websocket or http-only"):
+            MODULE.validate_benchmark_codex({
+                "service_tier": "default", "sandbox": "danger-full-access", "transport": "auto",
+            })
         with self.assertRaisesRegex(MODULE.ExperimentError, "execution identity"):
             MODULE.validate_benchmark_codex({
                 "service_tier": "default",
                 "sandbox": "danger-full-access",
+                "transport": "http-only",
                 "extra_config": ['service_tier="fast"'],
             })
 
+    def test_codex_exec_uses_frozen_http_only_chatgpt_provider(self) -> None:
+        argv = MODULE.codex_exec_argv(
+            {
+                "executable": "codex.exe",
+                "model": "gpt-5.6-sol",
+                "reasoning_effort": "medium",
+                "service_tier": "default",
+                "sandbox": "danger-full-access",
+                "transport": "http-only",
+            },
+            Path("D:/workspace"),
+            "prompt",
+        )
+        joined = " ".join(argv)
+        self.assertIn('model_provider="agentbase_eval_http"', joined)
+        self.assertIn('base_url="https://chatgpt.com/backend-api/codex"', joined)
+        self.assertIn("supports_websockets=false", joined)
+
     def test_preflight_requires_successful_representative_command(self) -> None:
+        requirements = [
+            {"command": "srcq.exe --version", "expected_output": "srcq "},
+            {"command": "srcq query scc doctor", "expected_output": "ok", "output_match": "exact-line"},
+        ]
         record = {
             "environment": "candidate",
             "exit_code": 0,
             "timed_out": False,
             "usage_complete": True,
+            "network_transport": {
+                "clean": True,
+                "websocket_connect_failures": 0,
+                "sampling_retries": 0,
+                "http_fallbacks": 0,
+            },
             "final_answer": "srcq 0.3.0",
-            "tool_items": [{
-                "type": "command_execution",
-                "command": "srcq.exe --version",
-                "status": "completed",
-                "exit_code": 0,
-                "aggregated_output": "srcq 0.3.0\n",
-            }],
+            "tool_items": [
+                {
+                    "type": "command_execution",
+                    "command": "srcq.exe --version",
+                    "status": "completed",
+                    "exit_code": 0,
+                    "aggregated_output": "srcq 0.3.0\n",
+                },
+                {
+                    "type": "command_execution",
+                    "command": "srcq query scc doctor",
+                    "status": "completed",
+                    "exit_code": 0,
+                    "aggregated_output": "ok\n",
+                },
+            ],
         }
-        MODULE.validate_preflight_record(record, "srcq.exe --version", "srcq ")
-        record["tool_items"] = []
-        with self.assertRaisesRegex(MODULE.ExperimentError, "required command"):
-            MODULE.validate_preflight_record(record, "srcq.exe --version", "srcq ")
+        MODULE.validate_preflight_record(record, requirements)
+        record["network_transport"]["sampling_retries"] = 1
+        record["network_transport"]["clean"] = False
+        with self.assertRaisesRegex(MODULE.ExperimentError, "network transport degraded"):
+            MODULE.validate_preflight_record(record, requirements)
+        record["network_transport"]["sampling_retries"] = 0
+        record["network_transport"]["clean"] = True
+        record["tool_items"][1]["aggregated_output"] = "backend is not ok\n"
+        with self.assertRaisesRegex(MODULE.ExperimentError, "srcq query scc doctor"):
+            MODULE.validate_preflight_record(record, requirements)
+        record["tool_items"][1]["aggregated_output"] = "ok\n"
+        record["tool_items"] = record["tool_items"][:1]
+        with self.assertRaisesRegex(MODULE.ExperimentError, "srcq query scc doctor"):
+            MODULE.validate_preflight_record(record, requirements)
 
     def test_codex_identity_is_bound_to_executable_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -358,6 +549,7 @@ class ExperimentTests(unittest.TestCase):
                 "executable": str(executable),
                 "service_tier": "default",
                 "sandbox": "danger-full-access",
+                "transport": "http-only",
             }
             with mock.patch.object(MODULE, "run_capture", return_value=b"codex-cli 1.2.3\n"):
                 identity = MODULE.resolve_codex_identity(raw)
@@ -401,6 +593,8 @@ class ExperimentTests(unittest.TestCase):
                 environments[name] = {"codex_home": str(home)}
             executable = root / "codex.exe"
             executable.write_bytes(b"codex")
+            dotenv = root / ".env"
+            dotenv.write_text("ALL_PROXY=socks5://127.0.0.1:1080\n", encoding="utf-8")
             config = root / "config.json"
             config.write_text(json.dumps({
                 "corpus": str(corpus),
@@ -410,27 +604,57 @@ class ExperimentTests(unittest.TestCase):
                 "codex": {
                     "executable": str(executable), "model": "gpt-5.6-sol", "reasoning_effort": "medium",
                     "service_tier": "default", "sandbox": "danger-full-access",
+                    "transport": "http-only",
                 },
                 "repetitions": 1,
                 "seed": 1,
                 "run_environments": ["candidate"],
                 "timeout_seconds": 10,
                 "network_policy": "configured",
+                "runtime_environment": {
+                    "dotenv_path": str(dotenv),
+                    "required_keys": ["ALL_PROXY"],
+                },
             }), encoding="utf-8")
             codex_identity = {
                 "executable": str(executable.resolve()), "executable_sha256": MODULE.sha256_file(executable),
                 "executable_size_bytes": executable.stat().st_size, "observed_version": "codex-cli test",
                 "model": "gpt-5.6-sol", "reasoning_effort": "medium", "service_tier": "default",
-                "sandbox": "danger-full-access",
+                "sandbox": "danger-full-access", "transport": "http-only",
             }
             preflight = {"records": [], "usage_report": {"all": {"run_count": 0}}}
+            def mutate_workspace(*_args, **_kwargs):
+                source.write_text("mutated", encoding="utf-8")
+                return preflight
+
+            with mock.patch.object(MODULE, "resolve_codex_identity", return_value=codex_identity), mock.patch.object(
+                MODULE, "run_preflights", side_effect=mutate_workspace
+            ):
+                with self.assertRaisesRegex(MODULE.ExperimentError, "preflight modified workspace"):
+                    MODULE.build_experiment(config, root / "invalid-output")
+            source.write_text("target", encoding="utf-8")
+
+            def mutate_dotenv(*_args, **_kwargs):
+                dotenv.write_text("ALL_PROXY=socks5://127.0.0.1:1081\n", encoding="utf-8")
+                return preflight
+
+            with mock.patch.object(MODULE, "resolve_codex_identity", return_value=codex_identity), mock.patch.object(
+                MODULE, "run_preflights", side_effect=mutate_dotenv
+            ):
+                with self.assertRaisesRegex(MODULE.ExperimentError, "runtime environment projection changed"):
+                    MODULE.build_experiment(config, root / "invalid-runtime-output")
+            dotenv.write_text("ALL_PROXY=socks5://127.0.0.1:1080\n", encoding="utf-8")
             with mock.patch.object(MODULE, "resolve_codex_identity", return_value=codex_identity), mock.patch.object(
                 MODULE, "run_preflights", return_value=preflight
-            ):
+            ) as run_preflights:
                 document = MODULE.build_experiment(config, root / "output")
             self.assertEqual(["Source"], document["workspaces"]["workspace"]["identity_paths"])
             self.assertEqual(preflight, document["preflight"])
+            self.assertEqual(["ALL_PROXY"], document["runtime_environment"]["projected_keys"])
+            self.assertNotIn("socks5://127.0.0.1:1080", json.dumps(document))
             self.assertEqual(1, len(document["schedule"]))
+            self.assertEqual(["candidate"], run_preflights.call_args.args[2])
+            self.assertEqual(workspace, run_preflights.call_args.args[3])
 
     def test_usage_rejects_conflicting_aliases_and_invalid_subsets(self) -> None:
         conflicting = MODULE.normalize_usage({

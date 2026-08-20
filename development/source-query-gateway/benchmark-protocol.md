@@ -38,16 +38,18 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 
 - corpus schema、版本和内容 hash；
 - 每个工作区的仓库标识、声明的相对 identity scope、commit/tree hash、该范围 dirty patch hash 和快照 hash；
-- Codex CLI 绝对路径、文件大小、SHA-256、实际版本、模型、reasoning effort、service tier、sandbox、approval 和网络策略；
+- Codex CLI 绝对路径、文件大小、SHA-256、实际版本、模型、reasoning effort、service tier、sandbox、approval、显式 transport 和网络策略；网络策略还须绑定显式 Codex `.env` 来源、固定 allowlist、实际投影键、代理转换选项和脱敏整体 hash，不得记录原值；
 - Token 用量字段语义、价格系数基准、适用模型族、价格来源日期和长上下文阈值；
 - 全局/项目规则、config、skill、插件、MCP、可执行工具版本及环境树 hash；
 - control/candidate 唯一允许差异清单及其内容 hash；
 - 重复次数、平衡顺序、随机种子、单回合超时和整体预算；
 - runner、monitor、汇总器和 audit schema 版本。
 
-正式独立基准固定使用正常速度 `service_tier = "default"`、`sandbox = "danger-full-access"` 和 `approval_policy = "never"`。full access 用于避免 Codex 路由层在真实查询进程启动前误拦截 `srcq` 等只读命令，不授权 subject 写入；prompt 仍明确禁止修改，运行前后身份读回负责发现越界副作用。Fast/Priority、其他 sandbox 或可覆盖上述身份的额外配置不得进入默认收益对照；环境准备器和 runner 都必须拒绝。若未来专门研究服务层级或 sandbox，须建立独立实验身份和结论，不能混入本基准。
+正式独立基准固定使用正常速度 `service_tier = "default"`、`sandbox = "danger-full-access"` 和 `approval_policy = "never"`，并把 transport 显式冻结为 `websocket` 或 `http-only`。WebSocket 使用内置 ChatGPT provider；HTTP-only 使用 runner 固定的同一 ChatGPT OAuth endpoint provider，不得由自由 `extra_config` 改写。full access 用于避免 Codex 路由层在真实查询进程启动前误拦截 `srcq` 等只读命令，不授权 subject 写入；prompt 仍明确禁止修改，运行前后身份读回负责发现越界副作用。Fast/Priority、隐式 transport、其他 sandbox 或可覆盖上述身份的额外配置不得进入默认收益对照；环境准备器和 runner 都必须拒绝。
 
 control 与 candidate 除允许差异外必须逐项相等。环境构建不得把数据库、历史、缓存或信任状态复制进结果；认证文件只可从既有安全 home 链接到隔离 home，不复制进实验结果或环境树。隔离 home 不得位于系统临时目录，避免 Codex 拒绝建立命令 helper；默认只复制当前对照的因果 skill 集与系统 skill，不加载会触发扫描上限或注入无关上下文的大型知识 skill。预检发现额外差异时停止实验，不让 agent 运行后再解释混杂。
+
+subject 的代理与证书环境由 runner 从 config 明确指定的 Codex `.env` 只读投影。固定 allowlist 之外的 `.env` 项不进入 child environment；runner 在注入前移除父 shell 的同类键，避免未记录继承。SOCKS 的代理端 DNS 与 ALL_PROXY 到 HTTP/HTTPS 键的 fanout 只能由 config 显式选择并进入身份，不能根据一次成功隐式猜测。`.env` 文件和原值不得复制到隔离 home、原始事件、manifest 或 capsule；prepare 只冻结键集合、转换选项与有效投影 hash，run 时重新读取，不匹配即在启动 subject 前停止。
 
 当前 srcq 迁移对照由 [prepare_benchmark_homes.py](prepare_benchmark_homes.py) 从同一个 Codex home 构建。初始迁移 control 保留旧的 rg/fd/AST 查询 skills，candidate 退出它们并从项目真源安装 `source-query`；增量对照则让两侧都保留基线 `source-query`，只替换 candidate 的当前版本。两种模式共同保留 `powershell-usage`、`symbol-structure-workflow` 与系统 skill；只有专门研究完整安装态时才显式复制其他 skills。候选二进制必须先通过真实 `srcq rg <native argv...>` 探针，再进入私有 `bin`。允许差异必须逐文件限于相应 bundle，不能把整个 skills 目录列为通配差异。正式 subject 会访问的每个工作区必须在两侧 `config.toml` 中以相同规范路径预登记为 trusted；不得依赖首次运行自动写入信任状态，否则冻结后的环境身份已变化，该批结果无效。
 
@@ -60,10 +62,10 @@ python -X utf8 development\source-query-gateway\prepare_benchmark_homes.py --ins
 ## 5. 单次可重复流程
 
 1. coordinator 冻结 corpus、候选差异、运行参数和工作区 identity scope；oracle 来源必须落在相应 scope 内，已登记且 identity 完全相同的历史基线才可复用。
-2. 为每个环境建立新的最小 Codex home；绑定真实 Codex 可执行文件身份，并用正式 sandbox、模型、推理深度和 PATH 各执行一次代表性版本命令。预检必须取得成功工具事件与完整 usage，并单独归档 setup Token；失败时不进入 subject 调度。
-3. 首次初始化完成后冻结环境树和声明范围内的源码快照，确认差异恰好等于 allowlist，再生成最终 manifest 与 hash。
+2. 为每个环境建立新的最小 Codex home；绑定真实 Codex 可执行文件身份，并只对本次实际调度的环境用正式 sandbox、模型、推理深度、PATH、transport 和冻结网络投影执行一次能力预检。预检工作目录必须是 home preparer 已在两侧同等预登记的正式工作区，runner 须在预检前后核对所有声明 workspace identity，不能把预检副作用冻结成基线；也不得让单侧首次访问临时工作区后新增 trust 状态。含 srcq 的环境须在同一 Codex 预检中分别成功执行 `srcq.exe --version` 与 `srcq query scc doctor`，从 command event stdout 证明 wrapper 与真实 scc 后端均可启动；无 srcq 的历史 control 执行 `rg.exe --version`。预检必须取得完整 usage，且 JSONL/stderr 中没有 WebSocket 连接失败、sampling retry 或 HTTP fallback；失败时不进入 subject 调度且不静默重试。
+3. 首次初始化完成后冻结环境树和声明范围内的源码快照，确认差异恰好等于 allowlist，再生成最终 manifest 与 hash；run 前还须核对 runner 源码 hash 与 Python 版本未变。
 4. 按预先记录的平衡顺序运行。两环境、每项两次时使用 A-B-B-A；更多重复使用预生成的平衡随机区块，不能查看中间结果后改变次数或顺序。
-5. monitor 启动一个无历史 subject，持续读取事件流并保存原始 JSONL、stderr、退出状态和 wall time。超时、事件损坏或进程异常作为该次真实失败保留；不得用静默重试替换记录。
+5. monitor 启动一个无历史 subject，持续读取事件流并保存原始 JSONL、stderr、退出状态和 wall time。超时、事件损坏、进程异常、WebSocket 连接失败、sampling retry 或 HTTP fallback 作为该次真实失败保留并使 experiment postflight 无效；不得用静默重试替换记录。
 6. monitor 从最后一个 `turn.completed.usage` 记录 input、cached input、cache write input（事件提供时）、output、reasoning output，并保存完整工具调用顺序、失败和最终答案。它校验非负整数与子集关系，但不判断质量；缺失 cache write 不得静默按零处理。
 7. 全部 subject 结束后生成 detached audit capsule，只包含冻结 manifest、corpus/oracle、环境差异证明、setup 与 subject 原始文件 hash、规范化记录和答案，不包含凭据、候选讨论或既有结论；capsule 同时声明可独立复算的规范化哈希算法及排除字段。
 8. auditor 先核对缺项、重复、配对、事件/summary 一致性和计量恒等式，再按结构化语义 oracle 逐案裁决质量；oracle 缺陷与答案缺陷分别记录。
