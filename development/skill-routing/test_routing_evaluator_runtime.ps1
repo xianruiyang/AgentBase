@@ -66,7 +66,13 @@ try {
         throw "Shared Codex runtime owner did not prefer the nested npm layout"
     }
 
-    $arguments = @(Get-AgentBaseCodexEvaluatorArguments -Model "gpt-5.6-sol" -ReasoningEffort "medium" -ModelCatalogPath $projection.path -SchemaPath $schemaPath -LastMessagePath $messagePath -WorkPath $workPath)
+    $shellPolicy = Get-AgentBaseCodexShellEnvironmentPolicy
+    if ([string]$shellPolicy.descriptor.sha256 -notmatch '^[0-9a-f]{64}$' -or
+        [string]$shellPolicy.policy.filters.'GIT_*' -ne 'exclude' -or
+        $shellPolicy.policy.ignore_default_excludes -ne $false) {
+        throw 'Shared Codex shell environment policy identity or filters are invalid'
+    }
+    $arguments = @(Get-AgentBaseCodexEvaluatorArguments -Model "gpt-5.6-sol" -ReasoningEffort "medium" -ModelCatalogPath $projection.path -SchemaPath $schemaPath -LastMessagePath $messagePath -WorkPath $workPath -ShellPolicySha256 $shellPolicy.descriptor.sha256)
     $disabled = New-Object 'System.Collections.Generic.List[string]'
     for ($index = 0; $index -lt $arguments.Count; $index++) {
         if ($arguments[$index] -eq "--disable") {
@@ -83,6 +89,16 @@ try {
     }
     if ($arguments -notcontains 'analytics.enabled=false') {
         throw "Evaluator arguments do not disable unrelated analytics delivery"
+    }
+    foreach ($requiredPolicy in @(
+        'shell_environment_policy.ignore_default_excludes=false'
+        'shell_environment_policy.filters."ALL_PROXY"="exclude"'
+        'shell_environment_policy.filters."GIT_*"="exclude"'
+        'shell_environment_policy.filters."SSH_*"="exclude"'
+    )) {
+        if ($arguments -notcontains $requiredPolicy) {
+            throw "Evaluator arguments omit shared model-shell isolation: $requiredPolicy"
+        }
     }
     $catalogArgument = @($arguments | Where-Object { $_ -like 'model_catalog_json=*' })
     if ($catalogArgument.Count -ne 1 -or $catalogArgument[0].Contains('\')) {
@@ -106,6 +122,44 @@ try {
     $structuredDiagnostic = Get-AgentBaseCodexFailureDiagnostic -StandardOutput '{"type":"error","message":"structured failure"}' -StandardError "" -MaximumLength 120
     if ($structuredDiagnostic -ne "structured failure") {
         throw "Evaluator diagnostics did not recover a JSONL error from stdout"
+    }
+
+    $jsonlLines = @(
+        ([pscustomobject]@{ type = 'item.completed'; item = [pscustomobject]@{ type = 'command_execution' } } | ConvertTo-Json -Compress)
+        ([pscustomobject]@{ type = 'item.completed'; item = [pscustomobject]@{ type = 'mcp_tool_call' } } | ConvertTo-Json -Compress)
+        ([pscustomobject]@{
+            type = 'turn.completed'
+            usage = [pscustomobject]@{ input_tokens = 120; cached_input_tokens = 20; output_tokens = 30 }
+        } | ConvertTo-Json -Compress)
+    )
+    $jsonlSummary = Get-AgentBaseCodexJsonlSummary -Text ($jsonlLines -join "`n")
+    if ($jsonlSummary.event_count -ne 3 -or $jsonlSummary.turn_completed_count -ne 1 -or
+        -not $jsonlSummary.usage_complete -or $jsonlSummary.usage.input_tokens -ne 120 -or
+        $jsonlSummary.usage.cached_input_tokens -ne 20 -or $jsonlSummary.usage.output_tokens -ne 30 -or
+        @($jsonlSummary.tool_event_types).Count -ne 2 -or
+        @($jsonlSummary.tool_event_types) -notcontains 'command_execution' -or
+        @($jsonlSummary.tool_event_types) -notcontains 'mcp_tool_call') {
+        throw 'Shared Codex JSONL parser did not preserve event, tool, or usage evidence'
+    }
+    $invalidJsonRejected = $false
+    try {
+        Get-AgentBaseCodexJsonlSummary -Text "not-json" | Out-Null
+    }
+    catch {
+        $invalidJsonRejected = $_.Exception.Message.Contains('non-JSON')
+    }
+    if (-not $invalidJsonRejected) {
+        throw 'Shared Codex JSONL parser accepted non-JSON channel output'
+    }
+    $negativeUsageRejected = $false
+    try {
+        Get-AgentBaseCodexJsonlSummary -Text '{"type":"turn.completed","usage":{"input_tokens":-1}}' | Out-Null
+    }
+    catch {
+        $negativeUsageRejected = $_.Exception.Message.Contains('negative input_tokens')
+    }
+    if (-not $negativeUsageRejected) {
+        throw 'Shared Codex JSONL parser accepted negative usage'
     }
 
     $missingModelRejected = $false
@@ -137,7 +191,7 @@ try {
         throw "Deterministic test boundary did not reject evaluator execution before output or Begin"
     }
 
-    Write-Output "Routing evaluator runtime tests passed: native npm layouts, one-model catalog projection, disabled capabilities, strict isolation flags, no-model test guard, and head-tail diagnostics are valid."
+    Write-Output "Routing evaluator runtime tests passed: native npm layouts, one-model catalog projection, shared model-shell policy, disabled capabilities, strict isolation flags, JSONL evidence parsing, no-model test guard, and head-tail diagnostics are valid."
 }
 finally {
     $resolved = [IO.Path]::GetFullPath($testRoot)

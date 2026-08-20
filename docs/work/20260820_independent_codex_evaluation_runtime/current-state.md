@@ -15,7 +15,8 @@
 - 仅注入 `.env` 的 `ALL_PROXY=socks5://...` 仍可能让 WebSocket 发生五次 TLS retry；本机定向探针显示相同端点以本地 DNS 的 SOCKS5 超时，而代理端 DNS 的 SOCKS5H 可达。进一步把有效 ALL_PROXY 显式 fanout 到 HTTP/HTTPS 客户端后，WebSocket preflight 与 subject 都达到零 retry。
 - HTTP-only custom provider 能消除 WebSocket retry，但本次两工具 subject 用时 391.046 秒；它保留为显式身份选项，不作为本机最终速度候选。最终本机候选为 WebSocket + remote DNS + HTTP/HTTPS fanout，subject 用时 82.626 秒。
 - 网络和权限前置闭合后，独立 Codex 仍把第一页的 `after=<cursor>` 直觉执行为 `srcq scc --after <cursor>`，原生 scc 拒绝未知参数；这是 srcq 分页提示的真实模型交互缺口，不再归因评估框架。
+- 2026-08-21 跨 evaluator 审计确认：把冻结 proxy 注入 Codex 子进程只能证明服务连接稳定，若没有 `shell_environment_policy`，full-access subject 的工具 shell 仍可继承该值及父进程的其他控制变量。共享 Python sanitizer 也需要覆盖 Git/SSH、云/包管理器和语言注入前缀，而不只是一组常见 token 名。
 
 ## 最早失效层
 
-失效 owner 是 benchmark runner 的子进程运行时合同和预检 oracle，不是 srcq 分页实现。修复应落在该 owner：以脱敏身份冻结 `.env` 网络投影、覆盖父 shell 同类键、保持正式 full-access sandbox，并把真实 scc backend 纳入 Codex 内预检。不得复制 `.env` 到隔离 home，也不得在 srcq 中加入权限绕行。
+失效 owner 是 benchmark runner 的子进程运行时合同和预检 oracle，不是 srcq 分页实现。修复应落在共享 runtime 与 benchmark 消费边界：以脱敏身份冻结 `.env` 网络投影、覆盖父 shell 同类键、用独立 hash-pinned policy 隔离模型 shell、保持正式 full-access sandbox，并把真实 scc backend 纳入 Codex 内预检。不得复制 `.env` 到隔离 home，也不得在 srcq 中加入权限绕行。

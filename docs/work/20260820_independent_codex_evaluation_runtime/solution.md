@@ -27,3 +27,10 @@ run 复核 experiment v3、Codex 二进制、corpus、workspace、home tree、ru
 - 关联: AC-005, DES-005
 
 最终 identity `a37e3675d74dfca877f84fbccfc9814ff37cacc56fd796263c1335a3d31dc939` 使用 WebSocket、代理端 DNS、ALL_PROXY fanout、full access 和 candidate-only schedule。网络、身份和 scc 边界均有效；模型取得第一页后把 `after=<cursor>` 误接到直接入口，第二条命令失败。因此框架目标已闭合，srcq 正常续页友善度未通过，未在本任务内擅自修改产品合同。
+
+## SOL-005 共享并冻结模型 shell 环境策略
+
+- 状态: implemented
+- 关联: AC-006, DES-001, DES-006
+
+网络投影与 ambient sanitizer 收口到 `development/common/codex_runtime.py`，模型 shell 过滤表收口到 `development/common/codex_shell_environment_policy.json`。benchmark Codex identity 记录策略 SHA-256，每次 preflight/subject 从同一文件生成确定性 `-c` overrides，并拒绝 `extra_config` 覆盖或 prepare 后策略漂移；launcher sanitizer 同时清除 Git/SSH、云/包管理器、语言注入与 CI 控制变量。既有分页行为结论绑定旧 identity 保留为历史证据，新运行必须取得包含共享策略的新 identity。

@@ -4,7 +4,7 @@
 
 must: 本文件只补充 `AgentBase` 项目约定，继承全局 `AGENTS.md`；项目架构、正式入口和当前状态以 `README.md` 为索引，不在本文件重复维护易失效的数量、哈希或发布日期
 
-must: 本项目的权威来源按职责划分：`docs/requirements.md` 维护项目长期用户目标、可验收结果和约束，`docs/plan.md` 维护项目级总体方向、跨计划决策、子计划索引、实践结论和重开条件，`global/AGENTS.md` 维护候选全局规则，`global/config.toml`、`global/hooks.template.json` 与 `global/agents/` 维护可移植 Codex 设置、hooks 模板和自定义子代理，`skills/` 维护 skill，`.agents/plugins/marketplace.json` 只维护仓库级插件发现入口，`mcp/` 维护 MCP，`tools/` 维护非 MCP 工具，`development/` 只维护验证、打包、部署和开发资料
+must: 权威 owner：`docs/requirements.md`（目标合同）、`docs/plan.md`（方向/决策/子计划/实践/重开）、`global/AGENTS.md`（候选全局规则）、`global/config.toml`/`global/hooks.template.json`/`global/agents/`（可移植设置）；`skills/`、`.agents/plugins/marketplace.json`、`mcp/`、`tools/`、`development/agent-evaluation/` 依次管 skill/插件发现/MCP/非 MCP 工具/最终评测，其他 `development/` 只放开发/验证/打包/部署资料
 
 must: 由部署入口显式传入的 Codex 根目录中的同名内容是安装目标，不是项目真源；不得从安装副本反向决定项目内容，也不得绕过项目正式入口形成双向同步
 
@@ -22,7 +22,7 @@ must: 不手工创建 `backup`、`copy`、`draft` 等冗余副本；只有正式
 
 must: `.codex/`、`codexRuntimeLogFile/`、`node_modules/`、`dist/`、`target/`、运行日志、覆盖率和部署沙箱是本地状态或可重建产物，不得作为项目真源提交
 
-must: 自动化测试、测试 fixture、benchmark 语料、runner、原始结果和审计产物是仓库内开发资产，不得进入 Codex 发布 payload；公共 payload 合同必须同时约束插件和直接兼容发布，并从受管理安装范围移除旧版遗留测试。具有真实运行时消费者的 doctor 或自检命令按运行职责裁决，不得把项目测试伪装成运行时能力发布
+must: 测试、fixture、benchmark 语料、runner、原始结果与审计仅属开发资产，不进 Codex payload；`Plugin`/`DirectCompatibility` 同受 payload 合同且须移除受管旧测试。有消费者的 doctor/自检按运行职责裁决，不得把项目测试当运行能力
 
 must: 新增、退役或移交由正式 Codex 部署入口管理的路径或配置键时，在 `development/codex-deployment/managed_asset_lifecycle.json` 中维护稳定身份和显式生命周期转换；不得把当前来源不再枚举直接解释为安装目标应删除，也不得在对应旧版本直接升级边界仍受支持时删除历史身份
 
@@ -51,6 +51,8 @@ must: 全局规则或 skill 变更至少运行：
 ```
 
 must: 路由基础设施变化后运行同目录 `test_routing_infrastructure.ps1`（并行、零模型调用）；规则、skill 或触发合同变化后，`Validate`/`Publish` 前按同目录 `get_routing_evaluation_plan.ps1` 刷新 evidence：只执行 `evaluate`，`reuse` 须经 oracle 与来源链证明，`pending-routing` 待 Routing 后重算；同输入 oracle 失败不得重采样，身份或来源异常须阻断；`Validate`/`Publish` 自动运行确定性测试
+
+must: 最终评测合同变更后运行 `development/agent-evaluation/test_agent_evaluation_infrastructure.ps1`；门禁禁用 evaluator，外部 clone 仅由显式 `prepare`/单题 `oracle`，依赖与 Verifier 仅由单题 `oracle`/`run`，qualification 仅由 `oracle`、模型仅由 `run` 触发
 
 must: 修改 `global/config.toml`、`global/hooks.template.json`、`global/agents/` 或部署合同后运行：
 

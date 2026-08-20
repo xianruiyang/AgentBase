@@ -9,6 +9,13 @@
 
 runner 先从父环境移除 allowlist 的所有大小写变体，再注入冻结投影，避免父 shell 成为未记录的第二网络状态源。认证仍由既有隔离 home 的安全链接承担；API key 等非 allowlist `.env` 项不进入投影。
 
+## DES-006 服务 launcher 与模型 shell 分层
+
+- 状态: confirmed
+- 关联目标: REQ-001, REQ-002, AC-006
+
+`development/common/codex_runtime.py` 唯一维护 launcher 的网络投影和 ambient 环境净化，`development/common/codex_shell_environment_policy.json` 唯一维护模型 shell 过滤表。benchmark 在解析 Codex 身份时固定策略 SHA-256，并把同一策略序列化为每次 CLI 的 `-c` 参数；runner config 不能覆盖。服务保留连接所需 proxy，模型执行真实工具时看不到这些键或宿主 Git/SSH/语言注入状态。
+
 ## DES-002 sandbox 解除进程阻断，身份读回约束副作用
 
 - 状态: confirmed

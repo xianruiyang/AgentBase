@@ -110,6 +110,58 @@ class ExperimentTests(unittest.TestCase):
         self.assertEqual("D:/isolated", env["CODEX_HOME"])
         self.assertTrue(env["PATH"].startswith("D:/isolated/bin" + os.pathsep))
 
+    def test_shared_runtime_scrubs_ambient_credentials_and_control_paths(self) -> None:
+        env = MODULE.sanitized_process_environment(
+            {"ALL_PROXY": "frozen-proxy", "CODEX_CA_CERTIFICATE": "D:/trusted-ca.pem"},
+            base={
+                "PATH": "D:/tools",
+                "OPENAI_API_KEY": "secret",
+                "AZURE_OPENAI_API_KEY": "secret",
+                "CODEX_HOME": "D:/ambient-codex",
+                "CODEX_CA_CERTIFICATE": "D:/ambient-ca.pem",
+                "GITHUB_TOKEN": "secret",
+                "NPM_TOKEN": "secret",
+                "GIT_DIR": "D:/ambient-git",
+                "GIT_ASKPASS": "D:/ambient-askpass.cmd",
+                "SSH_AUTH_SOCK": "ambient-agent",
+                "NODE_OPTIONS": "--require=D:/ambient.js",
+                "PYTHONPATH": "D:/ambient-python",
+                "CI": "true",
+                "PWD": "D:/ambient-working-directory",
+            },
+        )
+        self.assertEqual("D:/tools", env["PATH"])
+        self.assertEqual("frozen-proxy", env["ALL_PROXY"])
+        self.assertEqual("D:/trusted-ca.pem", env["CODEX_CA_CERTIFICATE"])
+        for name in (
+            "OPENAI_API_KEY",
+            "AZURE_OPENAI_API_KEY",
+            "CODEX_HOME",
+            "GITHUB_TOKEN",
+            "NPM_TOKEN",
+            "GIT_DIR",
+            "GIT_ASKPASS",
+            "SSH_AUTH_SOCK",
+            "NODE_OPTIONS",
+            "PYTHONPATH",
+            "CI",
+            "PWD",
+        ):
+            self.assertNotIn(name, env)
+        descriptor, policy = MODULE.resolve_shell_environment_policy()
+        self.assertEqual("agentbase.codex-shell-environment-policy/v1", descriptor["schema"])
+        self.assertEqual("exclude", policy["filters"]["GIT_*"])
+        self.assertEqual("exclude", policy["filters"]["SSH_*"])
+        self.assertFalse(policy["ignore_default_excludes"])
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            (home / "config.toml").write_text(
+                '[shell_environment_policy]\ninherit = "none"\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(MODULE.ExperimentError, "only owner"):
+                MODULE.validate_shared_shell_policy_owner(home)
+
     def test_experiment_identity_rejects_changed_runner_source(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -473,8 +525,16 @@ class ExperimentTests(unittest.TestCase):
                 "transport": "http-only",
                 "extra_config": ['service_tier="fast"'],
             })
+        with self.assertRaisesRegex(MODULE.ExperimentError, "execution identity"):
+            MODULE.validate_benchmark_codex({
+                "service_tier": "default",
+                "sandbox": "danger-full-access",
+                "transport": "http-only",
+                "extra_config": ['shell_environment_policy.inherit="none"'],
+            })
 
     def test_codex_exec_uses_frozen_http_only_chatgpt_provider(self) -> None:
+        shell_policy_descriptor, _ = MODULE.resolve_shell_environment_policy()
         argv = MODULE.codex_exec_argv(
             {
                 "executable": "codex.exe",
@@ -483,6 +543,7 @@ class ExperimentTests(unittest.TestCase):
                 "service_tier": "default",
                 "sandbox": "danger-full-access",
                 "transport": "http-only",
+                "shell_environment_policy": shell_policy_descriptor,
             },
             Path("D:/workspace"),
             "prompt",
@@ -491,6 +552,8 @@ class ExperimentTests(unittest.TestCase):
         self.assertIn('model_provider="agentbase_eval_http"', joined)
         self.assertIn('base_url="https://chatgpt.com/backend-api/codex"', joined)
         self.assertIn("supports_websockets=false", joined)
+        self.assertIn('shell_environment_policy.filters."ALL_PROXY"="exclude"', joined)
+        self.assertIn('shell_environment_policy.filters."GIT_*"="exclude"', joined)
 
     def test_preflight_requires_successful_representative_command(self) -> None:
         requirements = [
@@ -554,6 +617,11 @@ class ExperimentTests(unittest.TestCase):
             with mock.patch.object(MODULE, "run_capture", return_value=b"codex-cli 1.2.3\n"):
                 identity = MODULE.resolve_codex_identity(raw)
                 self.assertEqual(MODULE.sha256_file(executable), identity["executable_sha256"])
+                shell_policy_descriptor, _ = MODULE.resolve_shell_environment_policy()
+                self.assertEqual(
+                    shell_policy_descriptor,
+                    identity["shell_environment_policy"],
+                )
                 with self.assertRaisesRegex(MODULE.ExperimentError, "sha256"):
                     MODULE.resolve_codex_identity({**raw, "executable_sha256": "0" * 64})
 
@@ -621,6 +689,7 @@ class ExperimentTests(unittest.TestCase):
                 "executable_size_bytes": executable.stat().st_size, "observed_version": "codex-cli test",
                 "model": "gpt-5.6-sol", "reasoning_effort": "medium", "service_tier": "default",
                 "sandbox": "danger-full-access", "transport": "http-only",
+                "shell_environment_policy": MODULE.resolve_shell_environment_policy()[0],
             }
             preflight = {"records": [], "usage_report": {"all": {"run_count": 0}}}
             def mutate_workspace(*_args, **_kwargs):

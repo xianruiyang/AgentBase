@@ -1,0 +1,565 @@
+{
+  "$schema": "./schema.json",
+  "schema": "agentbase.windows-swe-corpus/v2",
+  "id": "agentbase-windows-swe-v1",
+  "source": {
+    "name": "DeepSWE",
+    "version": "v1.1",
+    "repository": "https://github.com/datacurve-ai/deep-swe.git",
+    "commit": "435ee89ec2f2e2289f33b0da4f992f0b7b7266b9",
+    "task_root": "tasks"
+  },
+  "adapter": {
+    "name": "agentbase-windows-swe",
+    "version": "1.0.0",
+    "platform": "windows",
+    "workspace_contract": "candidate-patch-verifier",
+    "qualification_repetitions": 2,
+    "upstream_grader_sha256": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
+  },
+  "codex": {
+    "auth_mode": "existing-codex-auth-json",
+    "transport_overlay": "codex-eval-overlay.toml",
+    "sandbox_implementation": "elevated",
+    "candidate_permission_profile": "agentbase_candidate",
+    "verifier_permission_profile": "agentbase_verifier"
+  },
+  "profiles": {
+    "sol": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium"
+    },
+    "luna": {
+      "model": "gpt-5.6-luna",
+      "reasoning_effort": "max"
+    }
+  },
+  "suites": {
+    "smoke": [
+      "returns-validated-error-accumulation",
+      "sql-formatter-bigquery-pipe-formatting"
+    ],
+    "core": [
+      "returns-validated-error-accumulation",
+      "sql-formatter-bigquery-pipe-formatting",
+      "httpx-multipart-response-parsing",
+      "awilix-async-container-initialization",
+      "bandit-interprocedural-taint-checks",
+      "fastapi-implicit-head-options"
+    ],
+    "rotation": [
+      "meriyah-explicit-resource-declarations",
+      "clack-async-autocomplete-options",
+      "superjson-error-stack-serialization"
+    ],
+    "all": [
+      "returns-validated-error-accumulation",
+      "sql-formatter-bigquery-pipe-formatting",
+      "httpx-multipart-response-parsing",
+      "awilix-async-container-initialization",
+      "bandit-interprocedural-taint-checks",
+      "fastapi-implicit-head-options",
+      "meriyah-explicit-resource-declarations",
+      "clack-async-autocomplete-options",
+      "superjson-error-stack-serialization"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "returns-validated-error-accumulation",
+      "title": "Add an error-accumulating Validated container",
+      "difficulty": "easy",
+      "difficulty_evidence": {
+        "kind": "deepswe-v1-successful-rollouts",
+        "successful_rollouts": 76,
+        "total_rollouts": 116,
+        "source": "https://deepswe.datacurve.ai/data/v1/tasks/returns-validated-error-accumulation"
+      },
+      "language": "python",
+      "repository": "https://github.com/dry-python/returns",
+      "upstream_base_commit": "41607fae1289de2787523c452d75212206b9c7c0",
+      "capabilities": ["public-api", "type-hierarchy", "error-accumulation", "cross-module-integration"],
+      "allowed_patch_paths": ["returns/**"],
+      "assets": {
+        "instruction.md": "fc884672cc46c520d51e2f90c798a612dfff1ed65fd088e4879126b44fc81937",
+        "task.toml": "f436423eea4a9fe69c1c8f3e55f5152e9a58e02e154181f94bf855da34c0cd84",
+        "solution/solution.patch": "182edfdf9cc8e0148b7a19da1d3f39ccf0c42e71759a7a402b767fefd9ba6067",
+        "tests/test.patch": "584c5de38d7035eb8f0244791d9b68ab70d2d8a954d5796116edb6b253d51249",
+        "tests/config.json": "b9f0f49c76baac5ca0194414a7f750260c440178050fb7a0fae269fae007ec22",
+        "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
+      },
+      "toolchain": { "kind": "python", "minimum_version": "3.11" },
+      "setup": [
+        {
+          "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "-e", ".[check-laws]", "pytest-subtests", "anyio"],
+          "timeout_seconds": 1200
+        }
+      ],
+      "setup_cleanup": { "restore_tracked": [], "remove_untracked": [] },
+      "checks": [
+        {
+          "id": "base",
+          "bucket": "base",
+          "argv": ["{python}", "-m", "pytest", "tests/test_result/test_result_bind.py", "tests/test_iterables/test_fold/test_collect.py", "tests/test_converters/", "-q", "--no-header", "--tb=short", "--override-ini=addopts=", "-p", "no:randomly", "-p", "no:cacheprovider", "--junitxml={report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit", "path": "base.xml" }
+        },
+        {
+          "id": "new",
+          "bucket": "new",
+          "argv": ["{python}", "-m", "pytest", "tests/test_validated/", "-q", "--no-header", "--tb=short", "--override-ini=addopts=", "-p", "no:randomly", "-p", "no:cacheprovider", "--junitxml={report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit", "path": "new.xml" }
+        }
+      ]
+    },
+    {
+      "id": "sql-formatter-bigquery-pipe-formatting",
+      "title": "Format BigQuery pipe syntax queries correctly",
+      "difficulty": "easy",
+      "difficulty_evidence": {
+        "kind": "deepswe-v1-successful-rollouts",
+        "successful_rollouts": 70,
+        "total_rollouts": 116,
+        "source": "https://deepswe.datacurve.ai/data/v1/tasks/sql-formatter-bigquery-pipe-formatting"
+      },
+      "language": "typescript",
+      "repository": "https://github.com/sql-formatter-org/sql-formatter",
+      "upstream_base_commit": "954e5a474b9e3d45ca58f02a3a4eac8e1947acc5",
+      "capabilities": ["lexer", "parser", "formatting", "regression-compatibility"],
+      "allowed_patch_paths": ["src/formatter/**", "src/languages/bigquery/**", "src/lexer/**", "src/parser/**"],
+      "assets": {
+        "instruction.md": "48703ea8182b6eb20962ff725cffa96955171b56e73c590eb5e85628b0c62825",
+        "task.toml": "c8cd5b17ce7c819900f6035ae950a0c22bd7eb58289264fb880c41dc1817c761",
+        "solution/solution.patch": "0ad1971d88dabb39f5b771d74cb08dacb730283179a678f967c0c6da1ae196d2",
+        "tests/test.patch": "c848fe6cc682d2404fdce9105162ff4b0ccab22bca0d8f8c42b218d419cb46c9",
+        "tests/config.json": "4b06927dcb353fb5349955fb124dddbb9d8b10bf3a9116637d9c84feffe01898",
+        "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
+      },
+      "toolchain": { "kind": "node", "minimum_version": "20", "package_manager": "npm" },
+      "setup": [
+        {
+          "argv": ["{npm}", "install", "--ignore-scripts"],
+          "env": { "NODE_ENV": "development" },
+          "timeout_seconds": 1200
+        }
+      ],
+      "setup_cleanup": { "restore_tracked": ["yarn.lock"], "remove_untracked": ["package-lock.json"] },
+      "checks": [
+        {
+          "id": "grammar-gate",
+          "bucket": "gate",
+          "argv": ["{workspace}/node_modules/.bin/nearleyc.cmd", "src/parser/grammar.ne", "-o", "src/parser/grammar.ts"],
+          "timeout_seconds": 300,
+          "report": { "kind": "gate-ctrf", "path": "grammar-gate-ctrf.json", "name": "[gate] nearleyc codegen", "tool": "nearleyc" }
+        },
+        {
+          "id": "base",
+          "bucket": "base",
+          "argv": ["{workspace}/node_modules/.bin/jest.cmd", "--testPathIgnorePatterns=test/bigquery-pipe.test.ts", "--no-coverage", "--maxWorkers=2", "--json", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "jest-json-to-ctrf", "raw_path": "base-jest.json", "path": "base-ctrf.json", "tool": "jest" }
+        },
+        {
+          "id": "new",
+          "bucket": "new",
+          "argv": ["{workspace}/node_modules/.bin/jest.cmd", "test/bigquery-pipe.test.ts", "--no-coverage", "--maxWorkers=2", "--json", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "jest-json-to-ctrf", "raw_path": "new-jest.json", "path": "new-ctrf.json", "tool": "jest" }
+        }
+      ]
+    },
+    {
+      "id": "httpx-multipart-response-parsing",
+      "title": "Parse multipart responses in synchronous and asynchronous streams",
+      "difficulty": "medium",
+      "difficulty_evidence": {
+        "kind": "deepswe-v1-successful-rollouts",
+        "successful_rollouts": 48,
+        "total_rollouts": 116,
+        "source": "https://deepswe.datacurve.ai/data/v1/tasks/httpx-multipart-response-parsing"
+      },
+      "language": "python",
+      "repository": "https://github.com/encode/httpx",
+      "upstream_base_commit": "b5addb64f0161ff6bfe94c124ef76f6a1fba5254",
+      "capabilities": ["streaming-parser", "sync-async-contract", "protocol-boundaries", "error-handling"],
+      "allowed_patch_paths": ["httpx/**"],
+      "assets": {
+        "instruction.md": "66c11374a6b5e77c8ce801e41ec635d154c9a3ff7d190e442dcfa90cb85ae54f",
+        "task.toml": "7e5e51bbbe05335a20a14a5d1c900c26aef2419fa62b47344e49f1b898edbb9b",
+        "solution/solution.patch": "7779c270f7109d2488ba95c4466ab678ccf8f818d1c6d36adab0090a382f48b5",
+        "tests/test.patch": "26a4f657823399b64504902638256750080f094cb25ae6ba1beae458957f5203",
+        "tests/config.json": "0deef4291e8a34334d91b2bc0da9fa8b1dd5497798e64362d1064733383943ad",
+        "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
+      },
+      "toolchain": { "kind": "python", "minimum_version": "3.11" },
+      "setup": [
+        {
+          "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "-r", "requirements.txt"],
+          "timeout_seconds": 1200
+        }
+      ],
+      "setup_cleanup": { "restore_tracked": [], "remove_untracked": [] },
+      "checks": [
+        {
+          "id": "base",
+          "bucket": "base",
+          "argv": ["{python}", "-m", "pytest", "-q", "--ignore=tests/test_multipart_response.py", "--ignore=tests/test_main.py", "-k", "not test_write_timeout and not test_multipart_encode_files_raises_exception_with_text_mode_file", "-p", "no:cacheprovider", "--junitxml={report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit", "path": "base.xml" }
+        },
+        {
+          "id": "new",
+          "bucket": "new",
+          "argv": ["{python}", "-m", "pytest", "-q", "tests/test_multipart_response.py", "-p", "no:cacheprovider", "--junitxml={report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit", "path": "new.xml" }
+        }
+      ]
+    },
+    {
+      "id": "awilix-async-container-initialization",
+      "title": "Add transactional asynchronous container initialization",
+      "difficulty": "medium",
+      "difficulty_evidence": {
+        "kind": "deepswe-v1-successful-rollouts",
+        "successful_rollouts": 44,
+        "total_rollouts": 116,
+        "source": "https://deepswe.datacurve.ai/data/v1/tasks/awilix-async-container-initialization"
+      },
+      "language": "typescript",
+      "repository": "https://github.com/jeffijoe/awilix",
+      "upstream_base_commit": "82ac179c1de4c216c4e333093044fac643303f0c",
+      "capabilities": ["dependency-graph", "async-lifecycle", "rollback", "idempotency"],
+      "allowed_patch_paths": ["src/**"],
+      "assets": {
+        "instruction.md": "066a1d9029b86ebe23859912a206b46817b9dc19b414827ec9efc4a4e97acba0",
+        "task.toml": "79fcf8648a726aae44f62e8e9e46a968d052a079d205e817c99cabff7dfddcef",
+        "solution/solution.patch": "0f6736ba431cb7c774eb5d171ab3d2cf7678168885744111fe82d4d57b9d18dd",
+        "tests/test.patch": "63a1cc71bd097e15b46bd1c3c0efbe4aae38b4187184a00763238ac013f1207f",
+        "tests/config.json": "3dbb5e5040b9e47231c0921480eb961ac7d18fe1704bb087e28107c2d83033a1",
+        "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
+      },
+      "toolchain": { "kind": "node", "minimum_version": "20", "package_manager": "npm" },
+      "setup": [
+        {
+          "argv": ["{npm}", "install", "--include=dev"],
+          "timeout_seconds": 1200
+        }
+      ],
+      "setup_cleanup": { "restore_tracked": ["package-lock.json"], "remove_untracked": [] },
+      "checks": [
+        {
+          "id": "build-gate",
+          "bucket": "gate",
+          "argv": ["{npm}", "run", "build"],
+          "timeout_seconds": 900,
+          "report": { "kind": "gate-ctrf", "path": "gate-ctrf.json", "name": "[gate] npm run build", "tool": "npm" }
+        },
+        {
+          "id": "base",
+          "bucket": "base",
+          "argv": ["{workspace}/node_modules/.bin/jest.cmd", "--testPathIgnorePatterns=async-initialization", "--maxWorkers=2", "--json", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "jest-json-to-ctrf", "raw_path": "base-jest.json", "path": "base-ctrf.json", "tool": "jest" }
+        },
+        {
+          "id": "new",
+          "bucket": "new",
+          "argv": ["{workspace}/node_modules/.bin/jest.cmd", "src/__tests__/async-initialization.test.ts", "--maxWorkers=2", "--json", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "jest-json-to-ctrf", "raw_path": "new-jest.json", "path": "new-ctrf.json", "tool": "jest" }
+        }
+      ]
+    },
+    {
+      "id": "bandit-interprocedural-taint-checks",
+      "title": "Add interprocedural taint checks to Bandit",
+      "difficulty": "medium",
+      "difficulty_evidence": {
+        "kind": "deepswe-v1-successful-rollouts",
+        "successful_rollouts": 42,
+        "total_rollouts": 116,
+        "source": "https://deepswe.datacurve.ai/data/v1/tasks/bandit-interprocedural-taint-checks"
+      },
+      "language": "python",
+      "repository": "https://github.com/PyCQA/bandit.git",
+      "upstream_base_commit": "b46fa3a2723635aa29cc012538df4867ac2ac006",
+      "capabilities": ["ast", "interprocedural-data-flow", "security-analysis", "plugin-registration"],
+      "allowed_patch_paths": ["bandit/**", "setup.cfg"],
+      "assets": {
+        "instruction.md": "ece548dd0b967e967d1101c8770e5c5fbfe17c4572d009b574254c9198a7746f",
+        "task.toml": "ece20bcd192236c191a9bb7d54206f05eb83703d76618ea8d73610324ebd4f0b",
+        "solution/solution.patch": "a19f864c04b83acb5854f69ec8180f4bc7abcc0c9cca536daae9c28c1fed9773",
+        "tests/test.patch": "a98bec39ab20b6dba1832adaa19fc4d4849e3196d255e98fb4e82092d7f26f1e",
+        "tests/config.json": "de6c9b037cee2ec40765f669877adbf6448cc10567d3453fb19e8ab21968fd5f",
+        "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
+      },
+      "toolchain": { "kind": "python", "minimum_version": "3.11" },
+      "setup": [
+        {
+          "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "pytest", "testtools", "stestr", "GitPython", "beautifulsoup4", "sarif-om>=1.0.4", "jschema-to-python>=1.2.3", "PyYAML", "tomli", "lxml", "fixtures"],
+          "timeout_seconds": 1200
+        },
+        {
+          "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "--no-build-isolation", "-e", "."],
+          "timeout_seconds": 600
+        }
+      ],
+      "setup_cleanup": { "restore_tracked": [], "remove_untracked": [] },
+      "checks": [
+        {
+          "id": "base",
+          "bucket": "base",
+          "before": [
+            { "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "--no-build-isolation", "-e", "."], "timeout_seconds": 600 }
+          ],
+          "argv": ["{python}", "-m", "pytest", "tests/", "--ignore=tests/functional/test_taint_new.py", "-v", "-p", "no:cacheprovider", "--junitxml={report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit", "path": "base.xml" }
+        },
+        {
+          "id": "new",
+          "bucket": "new",
+          "before": [
+            { "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "--no-build-isolation", "-e", "."], "timeout_seconds": 600 }
+          ],
+          "argv": ["{python}", "-m", "pytest", "tests/functional/test_taint_new.py", "-v", "-p", "no:cacheprovider", "--junitxml={report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit", "path": "new.xml" }
+        }
+      ]
+    },
+    {
+      "id": "fastapi-implicit-head-options",
+      "title": "Add configurable implicit HEAD and OPTIONS handling",
+      "difficulty": "hard",
+      "difficulty_evidence": {
+        "kind": "deepswe-v1-successful-rollouts",
+        "successful_rollouts": 29,
+        "total_rollouts": 116,
+        "source": "https://deepswe.datacurve.ai/data/v1/tasks/fastapi-implicit-head-options"
+      },
+      "language": "python",
+      "repository": "https://github.com/fastapi/fastapi",
+      "upstream_base_commit": "11614be9021aa4ac078d4d0693a8b5250a1010d8",
+      "capabilities": ["configuration-precedence", "routing", "middleware", "openapi"],
+      "allowed_patch_paths": ["fastapi/**"],
+      "assets": {
+        "instruction.md": "62feae7b177ec18c750eb38ac31217c2623502972d188f1661f5f35102c9b57b",
+        "task.toml": "b99f84667f49c660053305981aed71747ed4c65cebe9b96a8929cbfc25ec8de5",
+        "solution/solution.patch": "79fd1d02e3796d4392bb76f4749465ead0224247894cc4e531b1ef9967204155",
+        "tests/test.patch": "ede675b9a02aaa8f2bf41ec962f58d9747592499f9b73fdec88a8ebf789a51fe",
+        "tests/config.json": "72d7e39ca3c3f1039c4541a4383624c9157ebd8f4914288261a935c888e5250f",
+        "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
+      },
+      "toolchain": { "kind": "python", "minimum_version": "3.11" },
+      "setup": [
+        {
+          "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "-e", ".[all]", "pytest>=9.0.0", "pytest-timeout>=2.4.0", "pytest-xdist[psutil]>=2.5.0", "pytest-cov>=4.0.0", "pytest-sugar>=1.0.0", "anyio[trio]>=3.2.1", "httpx>=0.23.0", "inline-snapshot[black]>=0.21.1", "dirty-equals>=0.9.0", "orjson>=3.9.3", "ujson>=5.8.0", "python-multipart>=0.0.18", "sqlmodel>=0.0.31", "flask>=3.0.0", "pyjwt>=2.9.0", "pwdlib[argon2]>=0.2.1", "a2wsgi>=1.9.0", "pyyaml>=5.3.1", "strawberry-graphql>=0.200.0,<1.0.0", "coverage", "sqlalchemy"],
+          "timeout_seconds": 1800
+        }
+      ],
+      "setup_cleanup": { "restore_tracked": [], "remove_untracked": [] },
+      "checks": [
+        {
+          "id": "base",
+          "bucket": "base",
+          "argv": ["{python}", "-m", "pytest", "-o", "filterwarnings=ignore::PendingDeprecationWarning", "tests/", "--ignore=tests/test_implicit_head_options.py", "-q", "-p", "no:cacheprovider", "--junitxml={report}"],
+          "env": { "INLINE_SNAPSHOT_DEFAULT_FLAGS": "report" },
+          "timeout_seconds": 1800,
+          "report": { "kind": "junit", "path": "base.xml" }
+        },
+        {
+          "id": "new",
+          "bucket": "new",
+          "argv": ["{python}", "-m", "pytest", "-o", "filterwarnings=ignore::PendingDeprecationWarning", "tests/test_implicit_head_options.py", "-v", "--tb=short", "-p", "no:cacheprovider", "--junitxml={report}"],
+          "env": { "INLINE_SNAPSHOT_DEFAULT_FLAGS": "report" },
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit", "path": "new.xml" }
+        }
+      ]
+    },
+    {
+      "id": "meriyah-explicit-resource-declarations",
+      "title": "Parse explicit resource management declarations",
+      "difficulty": "hard",
+      "difficulty_evidence": {
+        "kind": "deepswe-v1-successful-rollouts",
+        "successful_rollouts": 25,
+        "total_rollouts": 116,
+        "source": "https://deepswe.datacurve.ai/data/v1/tasks/meriyah-explicit-resource-declarations"
+      },
+      "language": "typescript",
+      "repository": "https://github.com/meriyah/meriyah",
+      "upstream_base_commit": "d141eb14a40b79c04d1b1db5c20c6afa3844c0d9",
+      "capabilities": ["parser-context", "error-precedence", "language-semantics", "snapshot-compatibility"],
+      "allowed_patch_paths": ["src/**", "test/parser/miscellaneous/__snapshots__/**"],
+      "assets": {
+        "instruction.md": "16a0c9d80a620cfb308c414f450f0f1d7b48d703d64b558869ef30daae2ea6fa",
+        "task.toml": "998652bfca85c9481d60d91bc296c46fc687597a75cd96a477836136a042da18",
+        "solution/solution.patch": "63c883ecff4b4286d9f3393e2631b2e578bf4a06e9bdbead10490a6f9d32934e",
+        "tests/test.patch": "21bb97ba10758966bc8631efd83178602de5c8c6c63e94af16687c088d33d461",
+        "tests/config.json": "d291b87a42ddec38082d8deb3a6dad9473ad3039148aec887a9c5b521d7a6115",
+        "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
+      },
+      "toolchain": { "kind": "node", "minimum_version": "20", "package_manager": "npm" },
+      "setup": [
+        {
+          "argv": ["{npm}", "install", "--ignore-scripts"],
+          "env": { "NODE_ENV": "development" },
+          "timeout_seconds": 1200
+        }
+      ],
+      "setup_cleanup": { "restore_tracked": [], "remove_untracked": [] },
+      "checks": [
+        {
+          "id": "base",
+          "bucket": "base",
+          "argv": ["{workspace}/node_modules/.bin/vitest.cmd", "run", "--exclude=test/parser/declarations/using.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit-to-ctrf", "raw_path": "base.xml", "path": "base-ctrf.json", "tool": "vitest", "fold_whitespace": true }
+        },
+        {
+          "id": "new",
+          "bucket": "new",
+          "argv": ["{workspace}/node_modules/.bin/vitest.cmd", "run", "test/parser/declarations/using.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit-to-ctrf", "raw_path": "new.xml", "path": "new-ctrf.json", "tool": "vitest", "fold_whitespace": true }
+        }
+      ]
+    },
+    {
+      "id": "clack-async-autocomplete-options",
+      "title": "Add async autocomplete options and fetch lifecycle handling",
+      "difficulty": "very-hard",
+      "difficulty_evidence": {
+        "kind": "deepswe-v1-successful-rollouts",
+        "successful_rollouts": 18,
+        "total_rollouts": 116,
+        "source": "https://deepswe.datacurve.ai/data/v1/tasks/clack-async-autocomplete-options"
+      },
+      "language": "typescript",
+      "repository": "https://github.com/bombshell-dev/clack",
+      "upstream_base_commit": "8a96e2dcd7f821d1250b58cf71c327679f94de25",
+      "capabilities": ["cancellation", "race-control", "debounce", "cache-and-retry"],
+      "allowed_patch_paths": ["packages/core/src/prompts/**", "packages/prompts/src/**"],
+      "assets": {
+        "instruction.md": "762a778fbf7a6eb7f9b6583fa7b8d11ce4df8eb41fb895a176853c4f0d232d26",
+        "task.toml": "556a475627a6c901bdb4d3e92e74b805dd31114e9a5382bd7b01e1b69f3cbfea",
+        "solution/solution.patch": "d5b05448d22b83a5cd20c71712086aa380f099ee2d147db53561761f813e9937",
+        "tests/test.patch": "70decd9204312b5151409232757b652899bde6e69d70de985c6cb08e86616a76",
+        "tests/config.json": "7ddcaa5b740c7227d469d36672fc73001fb4e4960bb1323a48df8253c920c1b6",
+        "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
+      },
+      "toolchain": { "kind": "node", "minimum_version": "20", "package_manager": "pnpm" },
+      "setup": [
+        {
+          "argv": ["{pnpm}", "install", "--no-frozen-lockfile"],
+          "env": { "NODE_ENV": "development", "NPM_CONFIG_PRODUCTION": "false" },
+          "timeout_seconds": 1800
+        }
+      ],
+      "setup_cleanup": { "restore_tracked": ["pnpm-lock.yaml"], "remove_untracked": [] },
+      "checks": [
+        {
+          "id": "build-gate",
+          "bucket": "gate",
+          "argv": ["{pnpm}", "run", "build"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "gate-ctrf", "path": "gate-ctrf.json", "name": "[gate] pnpm run build", "tool": "pnpm" }
+        },
+        {
+          "id": "base-prompts",
+          "bucket": "base",
+          "argv": ["{pnpm}", "test", "--filter=@clack/prompts", "--", "--exclude=**/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit-to-ctrf", "raw_path": "base1.xml", "path": "base1-ctrf.json", "tool": "vitest" }
+        },
+        {
+          "id": "base-core",
+          "bucket": "base",
+          "argv": ["{pnpm}", "test", "--filter=@clack/core", "--", "--exclude=**/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit-to-ctrf", "raw_path": "base2.xml", "path": "base2-ctrf.json", "tool": "vitest" }
+        },
+        {
+          "id": "new-core",
+          "bucket": "new",
+          "argv": ["{pnpm}", "test", "--filter=@clack/core", "--", "test/prompts/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit-to-ctrf", "raw_path": "new1.xml", "path": "new1-ctrf.json", "tool": "vitest" }
+        },
+        {
+          "id": "new-prompts",
+          "bucket": "new",
+          "argv": ["{pnpm}", "test", "--filter=@clack/prompts", "--", "test/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit-to-ctrf", "raw_path": "new2.xml", "path": "new2-ctrf.json", "tool": "vitest" }
+        }
+      ]
+    },
+    {
+      "id": "superjson-error-stack-serialization",
+      "title": "Add configurable Error stack serialization",
+      "difficulty": "very-hard",
+      "difficulty_evidence": {
+        "kind": "deepswe-v1-successful-rollouts",
+        "successful_rollouts": 17,
+        "total_rollouts": 116,
+        "source": "https://deepswe.datacurve.ai/data/v1/tasks/superjson-error-stack-serialization"
+      },
+      "language": "typescript",
+      "repository": "https://github.com/flightcontrolhq/superjson.git",
+      "upstream_base_commit": "010c4bdb4b8758844fd44eacf38e42b22eba8aea",
+      "capabilities": ["serialization", "cycle-handling", "path-redaction", "error-cause-chain"],
+      "allowed_patch_paths": ["src/**"],
+      "assets": {
+        "instruction.md": "0482440333c68c46d423f173ae101d539e921f2f1d03adea9d3f0c4de658bff4",
+        "task.toml": "68274641e104991c67794bbbab07bf1d4348fdc15ac9d66f039fa91acf1fdc75",
+        "solution/solution.patch": "f204e4b63de4f2eab409dc1a6ec1227d864418e1882fd8ed8c575f2c09cd27c9",
+        "tests/test.patch": "7f85ec15c6c42d78044eb6690ca6e8914abcba02a4e68504507eca022f45e9e8",
+        "tests/config.json": "5819512a2f752bb5aba7fc7d9fe2953149df33951da573eb6ea27cfd9601f3be",
+        "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
+      },
+      "toolchain": { "kind": "node", "minimum_version": "20", "package_manager": "npm" },
+      "setup": [
+        {
+          "argv": ["{npm}", "ci", "--include=dev"],
+          "timeout_seconds": 1200
+        }
+      ],
+      "setup_cleanup": { "restore_tracked": [], "remove_untracked": [] },
+      "checks": [
+        {
+          "id": "base",
+          "bucket": "base",
+          "argv": ["{workspace}/node_modules/.bin/vitest.cmd", "run", "-t", "^(?!.*performance regression)", "src/accessDeep.test.ts", "src/index.test.ts", "src/is.test.ts", "src/pathstringifier.test.ts", "src/registry.test.ts", "src/transformer.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit-to-ctrf", "raw_path": "base.xml", "path": "base-ctrf.json", "tool": "vitest" }
+        },
+        {
+          "id": "new",
+          "bucket": "new",
+          "argv": ["{workspace}/node_modules/.bin/vitest.cmd", "run", "src/error-stack.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "timeout_seconds": 1200,
+          "report": { "kind": "junit-to-ctrf", "raw_path": "new.xml", "path": "new-ctrf.json", "tool": "vitest" }
+        }
+      ]
+    }
+  ],
+  "assessment": {
+    "correctness_owner": "Pinned DeepSWE grader.py grade over AgentBase Windows adapter reports after a current no-op/reference qualification",
+    "reward_range": [0, 1],
+    "dimensions": [
+      "windows-native-contract",
+      "candidate-verifier-isolation",
+      "routing-behavior",
+      "external-generalization-reward",
+      "cost-and-time",
+      "infrastructure-health"
+    ],
+    "composite_score": null,
+    "leaderboard_comparable": false
+  }
+}

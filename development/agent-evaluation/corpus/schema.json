@@ -1,0 +1,258 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentbase.local/schemas/windows-swe-corpus-v2.json",
+  "title": "AgentBase Windows SWE corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "source", "adapter", "codex", "profiles", "suites", "tasks", "assessment"],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schema": { "const": "agentbase.windows-swe-corpus/v2" },
+    "id": { "const": "agentbase-windows-swe-v1" },
+    "source": { "$ref": "#/$defs/source" },
+    "adapter": { "$ref": "#/$defs/adapter" },
+    "codex": { "$ref": "#/$defs/codex" },
+    "profiles": {
+      "type": "object",
+      "required": ["sol", "luna"],
+      "additionalProperties": false,
+      "properties": {
+        "sol": { "$ref": "#/$defs/profile" },
+        "luna": { "$ref": "#/$defs/profile" }
+      }
+    },
+    "suites": {
+      "type": "object",
+      "required": ["smoke", "core", "rotation", "all"],
+      "additionalProperties": false,
+      "properties": {
+        "smoke": { "$ref": "#/$defs/taskIds" },
+        "core": { "$ref": "#/$defs/taskIds" },
+        "rotation": { "$ref": "#/$defs/taskIds" },
+        "all": { "$ref": "#/$defs/taskIds" }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": { "$ref": "#/$defs/task" }
+    },
+    "assessment": { "$ref": "#/$defs/assessment" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "repository", "commit", "task_root"],
+      "properties": {
+        "name": { "const": "DeepSWE" },
+        "version": { "const": "v1.1" },
+        "repository": { "const": "https://github.com/datacurve-ai/deep-swe.git" },
+        "commit": { "$ref": "#/$defs/gitSha" },
+        "task_root": { "const": "tasks" }
+      }
+    },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "platform", "workspace_contract", "qualification_repetitions", "upstream_grader_sha256"],
+      "properties": {
+        "name": { "const": "agentbase-windows-swe" },
+        "version": { "type": "string", "minLength": 1 },
+        "platform": { "const": "windows" },
+        "workspace_contract": { "const": "candidate-patch-verifier" },
+        "qualification_repetitions": { "type": "integer", "minimum": 2 },
+        "upstream_grader_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "codex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["auth_mode", "transport_overlay", "sandbox_implementation", "candidate_permission_profile", "verifier_permission_profile"],
+      "properties": {
+        "auth_mode": { "const": "existing-codex-auth-json" },
+        "transport_overlay": { "const": "codex-eval-overlay.toml" },
+        "sandbox_implementation": { "const": "elevated" },
+        "candidate_permission_profile": { "const": "agentbase_candidate" },
+        "verifier_permission_profile": { "const": "agentbase_verifier" }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "reasoning_effort"],
+      "properties": {
+        "model": { "type": "string", "pattern": "^gpt-" },
+        "reasoning_effort": { "enum": ["low", "medium", "high", "xhigh", "max", "ultra"] }
+      }
+    },
+    "taskIds": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+      "uniqueItems": true
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "difficulty", "difficulty_evidence", "language", "repository", "upstream_base_commit", "capabilities", "allowed_patch_paths", "assets", "toolchain", "setup", "setup_cleanup", "checks"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+        "title": { "type": "string", "minLength": 1 },
+        "difficulty": { "enum": ["easy", "medium", "hard", "very-hard"] },
+        "difficulty_evidence": { "$ref": "#/$defs/difficultyEvidence" },
+        "language": { "enum": ["python", "typescript"] },
+        "repository": { "type": "string", "format": "uri" },
+        "upstream_base_commit": { "$ref": "#/$defs/gitSha" },
+        "capabilities": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "allowed_patch_paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["instruction.md", "task.toml", "solution/solution.patch", "tests/test.patch", "tests/config.json", "tests/grader.py"],
+          "properties": {
+            "instruction.md": { "$ref": "#/$defs/sha256" },
+            "task.toml": { "$ref": "#/$defs/sha256" },
+            "solution/solution.patch": { "$ref": "#/$defs/sha256" },
+            "tests/test.patch": { "$ref": "#/$defs/sha256" },
+            "tests/config.json": { "$ref": "#/$defs/sha256" },
+            "tests/grader.py": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "toolchain": { "$ref": "#/$defs/toolchain" },
+        "setup": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/command" }
+        },
+        "setup_cleanup": { "$ref": "#/$defs/setupCleanup" },
+        "checks": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/check" }
+        }
+      }
+    },
+    "difficultyEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "successful_rollouts", "total_rollouts", "source"],
+      "properties": {
+        "kind": { "const": "deepswe-v1-successful-rollouts" },
+        "successful_rollouts": { "type": "integer", "minimum": 0 },
+        "total_rollouts": { "const": 116 },
+        "source": { "type": "string", "format": "uri" }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "minimum_version"],
+      "properties": {
+        "kind": { "enum": ["python", "node"] },
+        "minimum_version": { "type": "string", "minLength": 1 },
+        "package_manager": { "enum": ["npm", "pnpm"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "node" } }, "required": ["kind"] },
+          "then": { "required": ["package_manager"] },
+          "else": { "not": { "required": ["package_manager"] } }
+        }
+      ]
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv", "timeout_seconds"],
+      "properties": {
+        "argv": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "timeout_seconds": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "setupCleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["restore_tracked", "remove_untracked"],
+      "properties": {
+        "restore_tracked": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "remove_untracked": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "bucket", "argv", "timeout_seconds", "report"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "bucket": { "enum": ["gate", "base", "new"] },
+        "argv": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "before": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/command" }
+        },
+        "report": { "$ref": "#/$defs/report" }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path"],
+      "properties": {
+        "kind": { "enum": ["junit", "jest-json-to-ctrf", "junit-to-ctrf", "gate-ctrf"] },
+        "path": { "type": "string", "minLength": 1 },
+        "raw_path": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "tool": { "type": "string", "minLength": 1 },
+        "fold_whitespace": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "enum": ["jest-json-to-ctrf", "junit-to-ctrf"] } }, "required": ["kind"] },
+          "then": { "required": ["raw_path"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "gate-ctrf" } }, "required": ["kind"] },
+          "then": { "required": ["name"] }
+        }
+      ]
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correctness_owner", "reward_range", "dimensions", "composite_score", "leaderboard_comparable"],
+      "properties": {
+        "correctness_owner": { "type": "string", "minLength": 1 },
+        "reward_range": {
+          "type": "array",
+          "prefixItems": [{ "const": 0 }, { "const": 1 }],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "composite_score": { "type": "null" },
+        "leaderboard_comparable": { "const": false }
+      }
+    }
+  }
+}

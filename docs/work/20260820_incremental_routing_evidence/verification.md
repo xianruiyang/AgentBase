@@ -2,13 +2,14 @@
 
 ## 确定性基础设施
 
-- `test_routing_infrastructure.ps1 -View Machine` 通过：22 个 PowerShell 文件语法有效，6 组套件并行通过，`model_evaluator_runs=0`，共享 runtime 抽取后一次实测约 16.9 秒。
-- 套件覆盖阶段指纹、最小 capsule、cases-only schema、planner、用户 npm Codex 的 nested/hoisted/vendor 布局与安全解析、单模型目录投影、禁用能力、环境清理、Begin/Finish、复用与跨代收据、稳定锁、分类限额、同代恢复、跨代搬运及搬运中断续传。
+- `test_routing_infrastructure.ps1 -View Machine` 通过：22 个 PowerShell 文件语法有效，6 组套件并行通过，`model_evaluator_runs=0`；2026-08-21 共享 shell policy 接入后的读回为 `ready:true`、约 17.8 秒。
+- 套件覆盖阶段指纹、最小 capsule、cases-only schema、planner、用户 npm Codex 的 nested/hoisted/vendor 布局与安全解析、单模型目录投影、共享 policy 哈希/严格 CLI 参数、禁用能力、环境清理、Begin/Finish、复用与跨代收据、稳定锁、分类限额、同代恢复、跨代搬运及搬运中断续传。
 - invoker 的测试边界行为验证通过：`AGENTBASE_ROUTING_EVALUATOR_DISABLED=1` 时在生成输出或 Begin 前拒绝，确定性回归不能意外启动模型。
 
 ## 独立模型 evidence
 
 - 当前 generation 为 `4CE359AE0B4873D9D910ADB7371DF62E909678BE7C80CE6DD50167C5DD41E311`。正式 validator 通过 96 个 Routing、96 个 Policy 和 26 个 References 用例；attempt history 为 schema 3、3/6 收据，无 `started`。
+- 共享 shell policy 加强后只读 planner 仍返回 Routing、Policy、References 全部 `reuse/visible_identity_and_oracle_valid`，`evaluation_count:0`，generation/capsule/可见输入均未变化；既有成功 runner 已拒绝所有 tool event，因此没有模型可见环境变化，也没有重采样依据。
 - 最终刷新以两份 `staged_carry_forward` 收据复用 Routing 与 Policy，只启动一次 References evaluator；该次 CLI 报告 18,391 input、0 cached input、3,766 output Token。紧接着再次调用正式 refresh 返回 `already-current`、`evaluator_run_count=0`，没有新增收据。
 - 真实失败均先改变机制或可见输入再继续：WindowsApps package-identity ACL 改由官方用户 npm 原生 CLI；冷 home 远端目录刷新改为单模型目录投影；PowerShell 环境清理 stdout 污染、结构化 schema 不支持字段、并发锁删除竞态、预执行失败分类和引用过选分别形成实现或触发边界修正。没有对未变输入盲目重跑。
 
@@ -21,5 +22,6 @@
 ## Windows 主机与部署门禁
 
 - `bootstrap_windows.ps1 -Action Check -View Machine` 读回 `ready=true`、8 个前置均受支持；Codex CLI 为 0.148.0，路径是用户 npm nested optional-package 布局下的原生 `codex.exe`，隔离选项受支持，用户 npm prefix 位于 WindowsApps 前。bootstrap 与 evaluator 对该路径使用同一个共享解析 owner。
+- 当前原生 Codex 的无模型 `features list` 已在临时空 home 中接受共享 policy 的全部 33 个 `-c` overrides，证明 PowerShell 生成的通配符 dotted-key 参数可被真实 CLI 解析；临时 home 已清理。
 - `test_bootstrap_windows.ps1`、managed asset lifecycle、portable agents、portable config 和完整 `test_manage_agentbase.ps1` 均通过。沙箱 Publish 不重复嵌套基础设施套件；真实 CodexRoot Publish 仍执行。
 - `manage_agentbase.ps1 -Action Validate` 通过；本轮未执行 Codex Publish，也未升级真实 srcq 安装。

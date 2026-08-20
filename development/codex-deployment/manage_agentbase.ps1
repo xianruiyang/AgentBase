@@ -1000,6 +1000,7 @@ function Get-SrcqRuntimePreflight {
 
 if ($Action -eq "Validate") {
     & (Join-Path $ProjectRoot "development\skill-routing\test_routing_infrastructure.ps1") -ProjectRoot $ProjectRoot | Out-Null
+    & (Join-Path $ProjectRoot "development\agent-evaluation\test_agent_evaluation_infrastructure.ps1") -ProjectRoot $ProjectRoot | Out-Null
 }
 
 if ($Action -eq "Validate") {
@@ -1037,6 +1038,7 @@ $CodexRoot = Resolve-CodexRoot -RequestedRoot $CodexRoot -Create ($Action -eq "P
 
 if ($Action -eq "Publish" -and -not (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot)) {
     & (Join-Path $ProjectRoot "development\skill-routing\test_routing_infrastructure.ps1") -ProjectRoot $ProjectRoot | Out-Null
+    & (Join-Path $ProjectRoot "development\agent-evaluation\test_agent_evaluation_infrastructure.ps1") -ProjectRoot $ProjectRoot | Out-Null
 }
 
 if ($Action -eq "Status") {

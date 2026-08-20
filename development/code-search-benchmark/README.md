@@ -1,6 +1,6 @@
 # 代码搜索收益基准
 
-本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule。两者不实现查询语义，也不进入 srcq 或 Codex 发布 payload。
+本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule，并消费 `development/common/codex_runtime.py` 的共享脱敏 launcher 环境与 `development/common/codex_shell_environment_policy.json` 的模型 shell 合同。两者不实现查询语义，也不进入 srcq 或 Codex 发布 payload。
 
 正式语料在 `corpus/`；`v10.json` 是绑定 srcq 直觉入口、同预算自动闭环、权威范围、普通续页、规则审查非触发和当前源码路径的现行六类语料，`v1.json` 至 `v9.json` 只服务引用它们的已完成历史结果复核。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
 
@@ -14,7 +14,9 @@ python -X utf8 development\code-search-benchmark\experiment.py capsule --experim
 
 每个 subject 都由新的 `codex exec --json --ephemeral --sandbox danger-full-access` 进程执行，并强制 `approval_policy = "never"`、正常速度 `service_tier = "default"`。config 还必须把 `codex.transport` 明确冻结为 `websocket` 或 `http-only`；前者使用内置 ChatGPT provider，后者使用 runner 内建且同样绑定 ChatGPT OAuth endpoint 的 HTTP-only provider。full access 只解除 Codex 路由层对真实查询命令的误拦截，不改变 prompt 的只读合同；运行前后的身份读回负责发现越界修改。Fast/Priority、隐式 transport、其他 sandbox 或不匹配的 Codex 可执行文件都不属于正式基准，prepare 与 run 会拒绝对应 manifest。
 
-正式 config 必须提供 `runtime_environment.dotenv_path` 和非空 `runtime_environment.required_keys`。runner 只从该文件投影 `ALL_PROXY`、`HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY`、`CODEX_CA_CERTIFICATE`、`SSL_CERT_FILE`，先清除父 shell 中未冻结的同类键，再注入 subject。SOCKS 环境可显式用 `proxy_dns = "remote"` 把 `socks5` 规范化为 `socks5h`，并用 `all_proxy_fanout = "http-and-https"` 在原文件没有专用键时把有效 ALL_PROXY 投影到 HTTP/HTTPS 客户端；两项都进入实验身份，不作隐式猜测。`.env` 本身及变量值不复制进隔离 home、experiment、日志或 capsule；manifest 只保存来源、键名、转换选项和整体投影 SHA-256。prepare 后有效投影变化会使 run 在启动 subject 前拒绝。当前 Codex 使用代理时，配置应显式指向当前安全 Codex home 的 `.env`，不能假设启动 shell 已经加载它。
+正式 config 必须提供 `runtime_environment.dotenv_path` 和非空 `runtime_environment.required_keys`。共享 runtime owner 只从该文件投影 `ALL_PROXY`、`HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY`、`CODEX_CA_CERTIFICATE`、`SSL_CERT_FILE`；启动 subject 前先清除父 shell 中未冻结的网络别名、OpenAI/Codex 凭据、常见 token、Git/SSH/语言注入与工作目录控制键，再注入冻结投影和当前 subject 自己的 `CODEX_HOME`。这些键只服务 Codex 连接：每次 preflight/subject 的 CLI 参数同时固定 `development/common/codex_shell_environment_policy.json`，从模型 shell 过滤 proxy、OpenAI/Codex、Git/SSH、云/包管理器凭据命名空间及语言注入变量，策略 SHA-256 进入 experiment identity，`extra_config` 不得覆盖。SOCKS 环境可显式用 `proxy_dns = "remote"` 把 `socks5` 规范化为 `socks5h`，并用 `all_proxy_fanout = "http-and-https"` 在原文件没有专用键时把有效 ALL_PROXY 投影到 HTTP/HTTPS 客户端；两项都进入实验身份，不作隐式猜测。`.env` 本身及变量值不复制进隔离 home、experiment、日志或 capsule；manifest 只保存来源、键名、转换选项和整体投影 SHA-256。prepare 后有效投影或共享 shell policy 变化会使 run 在启动 subject 前拒绝。当前 Codex 使用代理时，配置应显式指向当前安全 Codex home 的 `.env`，不能假设启动 shell 已经加载它。
+
+control/candidate home 的 `config.toml` 不得再定义 `shell_environment_policy`；prepare 会在模型前拒绝第二 owner。两侧差异继续由 home tree identity 维护，模型 shell 过滤只由共享 policy 决定。
 
 ```json
 {

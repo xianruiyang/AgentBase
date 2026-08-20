@@ -5,9 +5,11 @@
 | 检查 | 结果 | 证明范围 |
 | --- | --- | --- |
 | `python -X utf8 -m py_compile development/code-search-benchmark/experiment.py development/source-query-gateway/prepare_benchmark_homes.py` | pass | Python 语法与导入 |
-| code-search benchmark unittest | 36/36 pass | dotenv allowlist/脱敏/变更拒绝、remote DNS、proxy fanout、transport/网络策略身份、真实后端预检 oracle、网络降级观察、runner 身份及既有实验合同 |
+| code-search benchmark unittest | 34/34 pass | 共享 dotenv/policy owner、ambient Git/SSH/语言注入净化、policy 身份与 override 防篡改、remote DNS、proxy fanout、transport、真实后端预检 oracle、网络降级观察、runner 身份及既有实验合同 |
 | benchmark home unittest | 10/10 pass | Windows 隔离 home、full-access 配置、候选 bundle 与入口探针 |
 | 主机 `srcq query scc doctor` | `ok` | 当前主机 srcq 可发现并启动真实 scc；不单独证明 Codex sandbox |
+
+2026-08-21 额外无模型兼容探针把共享 policy 的全部 33 个 `-c` overrides 交给当前用户 npm 原生 Codex CLI；临时空 home 下 `features list` 返回 0，直接证明通配符 dotted-key 配置可被当前 CLI 解析。临时 home 已删除，未读取认证、运行 subject、安装或发布。
 
 ## 因果迭代
 

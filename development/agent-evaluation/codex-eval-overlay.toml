@@ -1,0 +1,10 @@
+# Evaluation-only transport. This is merged into a generated config outside the
+# repository; it is not an AgentBase portable-setting source.
+model_provider = "agentbase_eval_http"
+
+[model_providers.agentbase_eval_http]
+name = "AgentBase evaluation ChatGPT HTTP"
+base_url = "https://chatgpt.com/backend-api/codex"
+wire_api = "responses"
+requires_openai_auth = true
+supports_websockets = false

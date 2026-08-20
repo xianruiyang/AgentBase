@@ -550,7 +550,7 @@ hyperfine 只负责在调用方已经界定的输入、环境与命令之间取�
 
 - 状态: confirmed
 - 来源: 用户要求完成评估测试基础架构，避免后续每次测试和评估重复出现相同问题；同时要求独立验证降低耗时与 Token
-- 关联: AC-055, AC-056, AC-057, CON-001, CON-007
+- 关联: AC-055, AC-056, AC-057, AC-064, CON-001, CON-007
 
 AgentBase 应把可机械证明的评估基础设施正确性与必须由模型判断的行为质量分层验证，通过统一 Windows 本地入口持续覆盖两者的边界；在不降低隔离、质量和可追溯性的前提下，只运行真实受影响的模型阶段，并使已经取得的有效结果能够在失败或中断后恢复。
 
@@ -577,6 +577,72 @@ AgentBase 应把可机械证明的评估基础设施正确性与必须由模型�
 - 关联: REQ-014, REQ-008, AC-031
 
 每次真实 evaluator 尝试在启动前登记并在退出时完成，区分启动前编排失败、执行失败、身份或结构失败和 oracle 失败；相同可见输入只允许有理由的有限重试。已通过阶段在正式合并前以非真源 staging 和不可变账本链恢复，同代或跨代编排中断不得迫使相同模型工作重做；正式 Validate 和真实 Publish 消费确定性测试与当前 evidence，但不会静默启动或无限重试模型。
+
+## REQ-015 建立可逐项选择的整体最终评测集
+
+- 状态: confirmed
+- 来源: 用户确认把差异化 DeepSWE 任务接入现有测试与评价框架，作为以后可主动逐项选择的整体项目最终评测集
+- 关联: AC-058, AC-059, AC-060, AC-061, AC-062, AC-063, AC-064, REQ-014, CON-006, CON-007
+
+AgentBase 应以固定、可审计的任务语料组合 Windows 原生合同、现有路由行为证据与第三方仓库级编码任务，使维护者能够按变更风险主动选择单题、小集合或完整集合评价最终成果；不同证据范围、缺失、隔离、正确性与成本必须保持可见。
+
+## AC-058 最终语料固定来源、分组与隔离状态
+
+- 状态: confirmed
+- 来源: REQ-015 对用户选择的原子化
+- 关联: REQ-015
+
+最终语料固定 DeepSWE v1.1 精确提交中的九个 Python/TypeScript 任务及逐题 base commit、六项 task asset 哈希、能力标签和成功 rollout/116 难度证据；分为六个 core、三个 rotation 和两题 smoke。Windows adapter、任务命令与允许 patch 范围由同一 corpus 维护，旧 Pier/Linux 语料不再形成兼容入口。
+
+## AC-059 单题运行先 oracle，官方 reward 决定外部正确性
+
+- 状态: confirmed
+- 来源: REQ-015 与 REQ-014 的 oracle、失败语义要求
+- 关联: REQ-015, REQ-014, AC-057
+
+外部入口一次只运行一个显式 case；候选启动前必须存在相同 corpus、行为相关 framework、task tree、上游 base、实际 dependency 与 Verifier runtime identity 的 Windows qualification 收据。资格验证至少重复两次证明未修改源码 reward 为 0、固定参考补丁 reward 为 1；固定 DeepSWE grader 的 task-local reward 是该派生题唯一正确性数值，零分也是有效终态，不通过重采样改变。上游 patch 只允许在已声明 hunk 内机械补齐缺失的空 context 前缀，源/应用哈希和补齐数必须留证，不维护修订参考补丁的第二真源。
+
+## AC-060 候选、运行环境、尝试与恢复可追溯
+
+- 状态: confirmed
+- 来源: REQ-015 复用已确认的独立评估运行条件
+- 关联: REQ-015, REQ-014, AC-055, AC-057
+
+运行身份覆盖实际投影的 AGENTS、生效配置、自定义 agents、skills、Windows adapter、模型 profile、网络投影、工具二进制、外部源码、依赖及其执行工具；当前 Codex `.env` 只投影脱敏网络 allowlist，子进程环境先移除 ambient OpenAI/Codex 凭据、常见 token、Git 工作区覆盖和未冻结网络别名，认证不进入仓库或收据。尝试在子进程前登记，终态收据不可变；缺少资格是前置条件而非基础设施失败，有效结果和候选越界零分不重跑，没有可恢复产物的基础设施失败只允许一次带理由重试。已有候选输出时必须从同一 attempt 复用 patch/不可变 Verifier 收据或重建 Verifier，不能重新调用模型；死进程锁只在 PID 已证明失活时回收。
+
+## AC-061 最终评价保持证据向量
+
+- 状态: confirmed
+- 来源: REQ-015 对整体项目评价的原子化
+- 关联: REQ-015, AC-056
+
+最终报告分别显示当前项目身份的 Windows 原生验证、候选能力合同及真实权限验收、路由 evidence、所选 Windows SWE 任务资格、覆盖与 reward、Token/时间成本和基础设施健康。投影、配置、运行前身份、真实 sandbox 探测与另行取证能力必须分层表达；合同失败、宿主前置条件阻塞和待补外部证据分别列出。证据齐备与整体质量判断分开表达，`composite_score` 保持为空，不用任意加权总分掩盖未测范围或某一合同失败；派生结果不得表示为官方 DeepSWE leaderboard 成绩。
+
+## AC-062 日常验证只检查最终评测基础设施
+
+- 状态: confirmed
+- 来源: REQ-015 与用户降低独立验证耗时、Token 的既有要求
+- 关联: REQ-015, AC-055, CON-007
+
+corpus、权限配置、选择、身份、收据、恢复、patch 边界、报告转换和评价投影由 evaluator 禁用的 Windows 本地确定性入口覆盖，并由正式 Validate 与真实 Publish 前置消费；这些入口不得克隆外部任务、安装题目依赖、执行 qualification、运行外部 Verifier 或启动模型。
+
+## AC-063 候选与 Verifier 使用独立 Windows 信任边界
+
+- 状态: confirmed
+- 来源: 用户确认独立代理与 verifier 指环境隔离并要求完善
+- 关联: REQ-015, AC-059, AC-060
+
+候选只能看到任务说明、基础源码、仓库自身指令与公开测试。Windows elevated permission profile 必须以宿主根默认 deny、最小运行时 read、候选 workspace read/write、完整 `.agents/skills` 投影 read-only、单一 attempt tmpdir write 和 network disabled 形成边界，并实际通过权限与工具 preflight：隐藏状态、项目根 canary、staged auth 与原始 installed auth 不可读；skill 的 `SKILL.md`、references、scripts 与 assets 全树按清单固定哈希且全部可读、不可写；workspace 写探针通过，`TEMP/TMP/TMPDIR/APPDATA/LOCALAPPDATA` 只指向该 attempt 临时面。launcher 校验 child stdout，并把能够决定模型未启动与 `blocked-precondition` 的结构化结果写入 denied state，候选可写的 workspace 副本只用于诊断。模型前冻结的基础 CLI 及该题实际 venv Python 或 npm/pnpm 运行时必须经同一 workspace 清单绑定绝对路径、可执行文件 SHA-256 和参数，sandbox child 验证清单哈希后按这些精确路径执行；除 `srcq`/scc doctor 外，还必须实际完成 AST/cache、rg 分页续读、fd tree、scc machine 和 artifact 往返。候选 prompt 必须显式指向该题已经准备并固定身份的 Python venv 或 npm/pnpm scripts，不能让公开检查静默落到另一套依赖。Codex 服务连接所需网络投影不得进入模型 shell：`shell_environment_policy` 必须启用默认 secret-name 排除，并显式过滤 proxy、OpenAI/Codex、认证、凭据与 Git 控制变量；无模型 `sandbox-check` 的 launcher 环境也必须经过同一共享净化 owner。shell、`apply_patch`、公开测试和自定义 subagent 属于候选模型动作，配置或无模型 preflight 不冒充其行为证据；host/thread/MCP 依赖能力由各自 owner 另行评价。原生 unelevated 后端不能完整执行该读写拆分时不得作为等价降级；宿主 elevated 初始化未就绪必须报告为可恢复前置条件，而非能力通过或候选失败。候选结束后才从相同 base 创建独立 Verifier 工作区。两边不共享依赖、测试配置或运行残留，唯一数据通道是按题目路径、数量、大小和 Git mode 校验的 binary patch；Verifier 先在原始提交安装第三方依赖，再注入候选 patch 与隐藏测试。题目必需的 patch 后 build/codegen/可编辑元数据刷新和测试只在独立 network-disabled profile 中运行并留证。
+
+候选 prompt 的逐题允许修改范围必须直接来自同一 corpus `allowed_patch_paths`；不得以通用禁令排除官方解法所需的配置或 snapshot，也不得放宽最终 patch 门禁。
+
+## AC-064 独立 Codex 服务环境与模型 shell 使用同一共享隔离合同
+
+- 状态: confirmed
+- 来源: 用户要求修复独立 Codex 的 `.env`/权限边界并在完整能力复核后继续完善
+- 关联: REQ-014, REQ-015, AC-055, AC-056, AC-060, AC-063
+
+独立 Codex 的服务进程可以消费经过脱敏、冻结并进入运行身份的连接环境，但该投影不得自动进入模型 shell。所有会允许模型执行工具的 evaluator 必须消费 `development/common/codex_shell_environment_policy.json` 这一个机器真源：启用 Codex 默认 secret-name 排除，并过滤 proxy、OpenAI/Codex、Git/SSH、云/包管理器凭据命名空间、语言注入变量与工作流控制变量；策略文件哈希进入运行身份，调用方不得通过自由 config 覆盖。只返回结构化 cases 且任何 tool event 都判失败的路由 evaluator 也使用同一策略，但策略加强不改变成功运行的模型可见 capsule，不要求对相同语义重采样。服务 launcher 自身的 ambient 凭据与控制变量继续由共享 runtime 净化，网络投影只在确有连接消费者时显式重加。
 
 ## CON-001 质量、Token、速度按序优化
 

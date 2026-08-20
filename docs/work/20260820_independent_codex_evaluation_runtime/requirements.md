@@ -4,7 +4,7 @@
 
 - 状态: confirmed
 - 来源: 用户 2026-08-20 指出独立运行未使用当前 Codex `.env` 设置并发生五次重连
-- 关联: AC-001, AC-002, AC-003, UDES-001
+- 关联: AC-001, AC-002, AC-003, AC-006, UDES-001
 
 独立 Codex 评估必须显式取得当前宿主用于联网的最小环境投影，不得依赖启动 runner 的父 shell 恰好已经加载相同变量。
 
@@ -50,6 +50,14 @@ prepare 后 `.env` 的实际投影键或值变化会使 run 在 subject 启动�
 - 关联: REQ-002
 
 一次新鲜、无历史、正常同 turn 的 independent Codex 运行应先取得含 `@more` 的 `srcq scc --by-file` 页面，再使用返回的精确 cursor 执行一次续页；不得重新运行原生 scc 扫描。结论以命令事件和输出为准，不用最终回答代替工具证据，也不覆盖压缩后恢复。
+
+## AC-006 服务网络投影不得进入模型 shell
+
+- 状态: confirmed
+- 来源: 用户继续要求独立 Codex 权限与能力边界完善
+- 关联: REQ-001, REQ-002, AC-001, AC-003, AC-004
+
+冻结的 proxy/证书键只供 Codex 服务连接。preflight 与 subject 必须消费仓库共享、哈希固定的模型 shell policy，过滤网络、OpenAI/Codex、Git/SSH、云/包管理器凭据命名空间、语言注入与工作流控制变量；策略进入 experiment identity，自由 extra config 不得覆盖，prepare 后变化必须在新 subject 前拒绝。
 
 ## CON-001 不以重试掩盖相同失败
 

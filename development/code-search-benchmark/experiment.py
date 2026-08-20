@@ -9,13 +9,30 @@ import hashlib
 import json
 import os
 import random
-import re
 import subprocess
 import sys
 import time
+import tomllib
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
+
+
+COMMON_DIR = Path(__file__).resolve().parents[1] / "common"
+if str(COMMON_DIR) not in sys.path:
+    sys.path.insert(0, str(COMMON_DIR))
+
+from codex_runtime import (  # noqa: E402
+    CodexRuntimeError as ExperimentError,
+    NETWORK_ENVIRONMENT_KEYS,
+    RUNTIME_ENVIRONMENT_SCHEMA,
+    apply_runtime_environment_options,
+    codex_shell_environment_overrides,
+    materialize_runtime_environment,
+    parse_dotenv_projection,
+    resolve_runtime_environment,
+    resolve_shell_environment_policy,
+    sanitized_process_environment,
+)
 
 
 EXPERIMENT_SCHEMA = "agentbase.source-query-experiment/v3"
@@ -69,16 +86,6 @@ SECRET_OR_STATE_NAMES = {
 STATE_SUFFIXES = {".sqlite", ".sqlite-shm", ".sqlite-wal"}
 STATE_DIRECTORIES = {"cache", "logs", "tmp", ".tmp", ".sandbox", ".sandbox-bin", "sessions", "archived_sessions", "thread-writer-locks"}
 MAX_ENV_FILES = 50_000
-RUNTIME_ENVIRONMENT_SCHEMA = "agentbase.codex-runtime-environment/v1"
-NETWORK_ENVIRONMENT_KEYS = (
-    "ALL_PROXY",
-    "HTTP_PROXY",
-    "HTTPS_PROXY",
-    "NO_PROXY",
-    "CODEX_CA_CERTIFICATE",
-    "SSL_CERT_FILE",
-)
-ENVIRONMENT_KEY_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 NETWORK_TRANSPORT_PATTERNS = {
     "websocket_connect_failures": ("failed to connect to websocket", "websocket connect failed"),
     "sampling_retries": ("stream disconnected - retrying sampling request", "reconnecting..."),
@@ -96,12 +103,6 @@ PREFLIGHT_PROMPT = (
     "这是独立基准运行能力预检。必须按顺序分别运行 PATH 中的以下命令，"
     "并只返回各命令输出；不得修改文件、配置、其他进程或外部状态。\n\n{commands}"
 )
-
-
-class ExperimentError(ValueError):
-    pass
-
-
 def canonical_bytes(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
@@ -209,6 +210,21 @@ def environment_tree(root: Path) -> dict[str, str]:
         if len(entries) > MAX_ENV_FILES:
             raise ExperimentError(f"environment tree exceeds {MAX_ENV_FILES} files: {root}")
     return entries
+
+
+def validate_shared_shell_policy_owner(home: Path) -> None:
+    config_path = home.resolve() / "config.toml"
+    if not config_path.is_file():
+        return
+    try:
+        config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise ExperimentError(f"benchmark Codex config is invalid: {config_path}: {exc}") from exc
+    if "shell_environment_policy" in config:
+        raise ExperimentError(
+            "benchmark Codex homes must not define shell_environment_policy; "
+            "the shared repository policy is the only owner"
+        )
 
 
 def allowed(path: str, patterns: list[str]) -> bool:
@@ -376,11 +392,16 @@ def validate_benchmark_codex(codex: dict[str, Any]) -> None:
     if codex.get("transport") not in {"websocket", "http-only"}:
         raise ExperimentError("independent benchmark requires an explicit websocket or http-only transport")
     protected = {
-        "approval_policy", "model", "model_provider", "model_reasoning_effort", "sandbox_mode", "service_tier",
+        "approval_policy", "model", "model_provider", "model_reasoning_effort", "sandbox_mode",
+        "service_tier", "shell_environment_policy",
     }
     for override in codex.get("extra_config", []):
         key = str(override).split("=", 1)[0].strip()
-        if key in protected or key.startswith("model_providers."):
+        if (
+            key in protected
+            or key.startswith("model_providers.")
+            or key.startswith("shell_environment_policy.")
+        ):
             raise ExperimentError(f"extra_config must not override benchmark execution identity: {key}")
 
 
@@ -394,6 +415,7 @@ def resolve_codex_identity(raw: dict[str, Any]) -> dict[str, Any]:
         "utf-8", errors="replace"
     ).strip()
     observed_sha256 = sha256_file(executable)
+    shell_policy_descriptor, _ = resolve_shell_environment_policy()
     configured_version = codex.get("observed_version")
     configured_sha256 = codex.get("executable_sha256")
     if configured_version is not None and configured_version != observed_version:
@@ -405,6 +427,7 @@ def resolve_codex_identity(raw: dict[str, Any]) -> dict[str, Any]:
         "observed_version": observed_version,
         "executable_sha256": observed_sha256,
         "executable_size_bytes": executable.stat().st_size,
+        "shell_environment_policy": shell_policy_descriptor,
     })
     return codex
 
@@ -578,128 +601,6 @@ def resolve_path_prepend(home: Path, value: str, name: str) -> Path:
     return path_prepend
 
 
-def parse_dotenv_projection(path: Path) -> dict[str, str]:
-    if not path.is_file():
-        raise ExperimentError(f"Codex runtime dotenv does not exist: {path}")
-    allowed = set(NETWORK_ENVIRONMENT_KEYS)
-    projection: dict[str, str] = {}
-    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[7:].lstrip()
-        if "=" not in line:
-            raise ExperimentError(f"invalid dotenv assignment at line {line_number}")
-        raw_key, raw_value = line.split("=", 1)
-        key = raw_key.strip()
-        if not ENVIRONMENT_KEY_PATTERN.fullmatch(key):
-            raise ExperimentError(f"invalid dotenv key at line {line_number}")
-        canonical_key = key.upper()
-        if canonical_key not in allowed:
-            continue
-        if canonical_key in projection:
-            raise ExperimentError(f"duplicate projected dotenv key: {canonical_key}")
-        value = raw_value.strip()
-        if value.startswith(("'", '"')):
-            quote = value[0]
-            if len(value) < 2 or not value.endswith(quote):
-                raise ExperimentError(f"unterminated projected dotenv value at line {line_number}")
-            value = value[1:-1]
-        else:
-            comment = value.find(" #")
-            if comment >= 0:
-                value = value[:comment].rstrip()
-        projection[canonical_key] = value
-    return projection
-
-
-def apply_runtime_environment_options(
-    projection: dict[str, str],
-    options: dict[str, str],
-) -> dict[str, str]:
-    proxy_dns = options.get("proxy_dns", "as-configured")
-    if proxy_dns not in {"as-configured", "remote"}:
-        raise ExperimentError("runtime_environment.proxy_dns must be as-configured or remote")
-    effective = dict(projection)
-    if proxy_dns == "remote":
-        for key in ("ALL_PROXY", "HTTP_PROXY", "HTTPS_PROXY"):
-            value = effective.get(key)
-            if not value:
-                continue
-            parsed = urlsplit(value)
-            if parsed.scheme.lower() == "socks5":
-                effective[key] = urlunsplit(("socks5h", parsed.netloc, parsed.path, parsed.query, parsed.fragment))
-    all_proxy_fanout = options.get("all_proxy_fanout", "none")
-    if all_proxy_fanout not in {"none", "http-and-https"}:
-        raise ExperimentError(
-            "runtime_environment.all_proxy_fanout must be none or http-and-https"
-        )
-    if all_proxy_fanout == "http-and-https" and effective.get("ALL_PROXY"):
-        effective.setdefault("HTTP_PROXY", effective["ALL_PROXY"])
-        effective.setdefault("HTTPS_PROXY", effective["ALL_PROXY"])
-    return effective
-
-
-def resolve_runtime_environment(raw: Any) -> tuple[dict[str, Any], dict[str, str]]:
-    if not isinstance(raw, dict):
-        raise ExperimentError("runtime_environment must be an object")
-    source = Path(os.path.expandvars(str(raw.get("dotenv_path", "")))).expanduser().resolve()
-    required_raw = raw.get("required_keys")
-    if not isinstance(required_raw, list) or not required_raw:
-        raise ExperimentError("runtime_environment.required_keys must be a non-empty list")
-    required: list[str] = []
-    allowed = set(NETWORK_ENVIRONMENT_KEYS)
-    for item in required_raw:
-        key = str(item).upper()
-        if key not in allowed:
-            raise ExperimentError(f"runtime environment key is not allowed: {key}")
-        if key not in required:
-            required.append(key)
-    source_projection = parse_dotenv_projection(source)
-    options = {
-        "proxy_dns": str(raw.get("proxy_dns", "as-configured")),
-        "all_proxy_fanout": str(raw.get("all_proxy_fanout", "none")),
-    }
-    projection = apply_runtime_environment_options(source_projection, options)
-    missing = [key for key in required if not projection.get(key)]
-    if missing:
-        raise ExperimentError(f"required runtime environment keys are missing or empty: {missing}")
-    descriptor = {
-        "schema": RUNTIME_ENVIRONMENT_SCHEMA,
-        "source_kind": "codex-dotenv-allowlist",
-        "source_path": str(source),
-        "allowed_keys": list(NETWORK_ENVIRONMENT_KEYS),
-        "required_keys": required,
-        "projected_keys": sorted(projection),
-        "projection_options": options,
-        "projection_sha256": sha256_bytes(canonical_bytes(projection)),
-        "values_redacted": True,
-    }
-    return descriptor, projection
-
-
-def materialize_runtime_environment(descriptor: dict[str, Any]) -> dict[str, str]:
-    if descriptor.get("schema") != RUNTIME_ENVIRONMENT_SCHEMA:
-        raise ExperimentError("runtime environment schema mismatch")
-    if descriptor.get("allowed_keys") != list(NETWORK_ENVIRONMENT_KEYS):
-        raise ExperimentError("runtime environment allowlist mismatch")
-    source = Path(str(descriptor.get("source_path", ""))).resolve()
-    source_projection = parse_dotenv_projection(source)
-    options = descriptor.get("projection_options")
-    if not isinstance(options, dict):
-        raise ExperimentError("runtime environment projection options mismatch")
-    projection = apply_runtime_environment_options(source_projection, options)
-    if sorted(projection) != descriptor.get("projected_keys"):
-        raise ExperimentError("runtime environment projected keys changed")
-    required = descriptor.get("required_keys", [])
-    if not isinstance(required, list) or any(not projection.get(str(key)) for key in required):
-        raise ExperimentError("runtime environment required keys changed")
-    if sha256_bytes(canonical_bytes(projection)) != descriptor.get("projection_sha256"):
-        raise ExperimentError("runtime environment projection changed")
-    return projection
-
-
 def network_transport_observation(jsonl_path: Path, stderr_path: Path) -> dict[str, Any]:
     diagnostic_text = [stderr_path.read_text(encoding="utf-8", errors="replace")]
     for line in jsonl_path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -722,12 +623,7 @@ def codex_environment(
     environment: dict[str, Any],
     runtime_environment: dict[str, str],
 ) -> dict[str, str]:
-    env = os.environ.copy()
-    allowed = set(NETWORK_ENVIRONMENT_KEYS)
-    for key in list(env):
-        if key.upper() in allowed:
-            del env[key]
-    env.update(runtime_environment)
+    env = sanitized_process_environment(runtime_environment)
     env["CODEX_HOME"] = environment["codex_home"]
     if environment.get("path_prepend"):
         env["PATH"] = environment["path_prepend"] + os.pathsep + env.get("PATH", "")
@@ -747,6 +643,15 @@ def codex_exec_argv(
         "-c", f'model_reasoning_effort="{codex["reasoning_effort"]}"',
         "-c", f'service_tier="{codex["service_tier"]}"',
     ]
+    shell_policy_identity = codex.get("shell_environment_policy")
+    if not isinstance(shell_policy_identity, dict) or not isinstance(
+        shell_policy_identity.get("sha256"), str
+    ):
+        raise ExperimentError("Codex shell environment policy identity is missing")
+    for override in codex_shell_environment_overrides(
+        expected_sha256=str(shell_policy_identity["sha256"])
+    ):
+        argv.extend(["-c", override])
     if codex["transport"] == "http-only":
         argv.extend([
             "-c", 'model_provider="agentbase_eval_http"',
@@ -903,6 +808,7 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
     for name in ("control", "candidate"):
         raw_environment = config["environments"][name]
         home = Path(raw_environment["codex_home"]).resolve()
+        validate_shared_shell_policy_owner(home)
         environments[name] = {
             "codex_home": str(home),
             "auth_mode": "inherited-secure-environment",

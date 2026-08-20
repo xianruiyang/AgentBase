@@ -64,7 +64,7 @@ Policy 不依赖 Routing 的 evaluator 身份或选择结果；两者都需刷�
 - 状态: confirmed
 - 关联: REQ-003
 
-正式 runner 使用仓库外临时工作目录、read-only sandbox、ephemeral session、临时 Codex home 和结构化输出；只以运行期间只读的硬链接使用现有认证，并从用户级官方模型缓存提取所选模型的一份临时最小目录，禁止插件、应用、hooks、skills、shell 与其他非评估能力。它不得加载真实用户配置、AGENTS、项目 oracle 或模型目录之外的缓存状态，并在 evaluator 执行前 Begin、结束后必定 Finish。
+正式 runner 使用仓库外临时工作目录、read-only sandbox、ephemeral session、临时 Codex home 和结构化输出；只以运行期间只读的硬链接使用现有认证，并从用户级官方模型缓存提取所选模型的一份临时最小目录，禁止插件、应用、hooks、skills、shell 与其他非评估能力。它不得加载真实用户配置、AGENTS、项目 oracle 或模型目录之外的缓存状态；Codex 服务环境与模型 shell 必须分离，模型 shell 消费共享且哈希固定的 secret/network/control 过滤策略。任何 tool event 继续使 cases-only 结果失败，因此该策略加强不改变成功证据的模型可见输入，也不为相同 capsule 创建重采样理由。runner 在 evaluator 执行前 Begin、结束后必定 Finish。
 
 ## AC-007 复用收据与当前证据唯一绑定
 

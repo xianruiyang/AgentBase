@@ -347,12 +347,13 @@ $sharedCodexRuntimePath = Join-Path $ProjectRoot 'development\common\codex_cli_r
 Assert-True (Test-Path -LiteralPath $sharedCodexRuntimePath -PathType Leaf) "Windows bootstrap and routing evaluator are missing their shared Codex native runtime owner"
 $sharedCodexRuntimeContent = Get-Content -LiteralPath $sharedCodexRuntimePath -Raw -Encoding UTF8
 Assert-True ($routingRuntimeContent.Contains('common\codex_cli_runtime.ps1') -and $sharedCodexRuntimeContent.Contains('Get-AgentBaseCodexNativeCandidatePaths')) "Routing evaluator does not consume the shared Codex native runtime owner"
+$routingInvokerPath = Join-Path $PSScriptRoot "invoke_routing_evaluation.ps1"
+$routingInvokerContent = Get-Content -LiteralPath $routingInvokerPath -Raw -Encoding UTF8
 $bootstrapContentForRuntime = Get-Content -LiteralPath (Join-Path $ProjectRoot 'development\codex-deployment\bootstrap_windows.ps1') -Raw -Encoding UTF8
 Assert-True ($bootstrapContentForRuntime.Contains('common\codex_cli_runtime.ps1') -and $bootstrapContentForRuntime.Contains('Resolve-AgentBaseCodexNativeExecutable')) "Windows bootstrap does not consume the shared Codex native runtime owner"
-Assert-True ($routingRuntimeContent.Contains('New-AgentBaseCodexModelCatalogProjection')) "Routing evaluator runtime is missing its sanitized model-catalog projection"
+Assert-True ($sharedCodexRuntimeContent.Contains('function New-AgentBaseCodexModelCatalogProjection') -and $routingInvokerContent.Contains('New-AgentBaseCodexModelCatalogProjection')) "Routing evaluator does not consume the shared sanitized model-catalog projection"
 Assert-True ($routingRuntimeContent.Contains('model_catalog_json')) "Routing evaluator runtime does not pass the sanitized model catalog to Codex"
 Assert-True ($routingRuntimeContent.Contains('--strict-config')) "Routing evaluator runtime does not reject invalid CLI configuration"
-$routingInvokerContent = Get-Content -LiteralPath (Join-Path $PSScriptRoot "invoke_routing_evaluation.ps1") -Raw -Encoding UTF8
 Assert-True ($routingInvokerContent.Contains('routing_evaluator_runtime.ps1')) "Routing evaluator runner does not use the canonical runtime owner"
 Assert-True ($routingInvokerContent.Contains('AGENTBASE_ROUTING_EVALUATOR_DISABLED')) "Routing evaluator runner cannot enforce the deterministic test no-model boundary"
 Assert-True ($routingInvokerContent.Contains('auth_mode = "read-only-hardlink"')) "Routing evaluator runner does not attest read-only authentication"

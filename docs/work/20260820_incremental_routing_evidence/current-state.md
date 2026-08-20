@@ -59,3 +59,18 @@ Policy 被迫等待 Routing，模型重复生成 evaluator envelope 与 215 个�
 - 关联: OBS-004, DES-006
 
 没有统一确定性入口和部署消费者时，维护者需要人工记忆测试集合；恢复路径退化可能直到正式模型运行才暴露，甚至让本应零 Token 的测试调用外部 evaluator。
+
+## OBS-005 服务进程环境与模型 shell 曾只有一个继承面
+
+- 状态: confirmed
+- 证据: 2026-08-21 shared runtime、路由 runner 与 Codex config reference 对照
+- 关联: GAP-005
+
+路由 evaluator 的成功合同禁止任何 tool event，所以既有成功 evidence 没有通过 shell 观察宿主环境；但 runner 仍缺少一条显式、共享并固定身份的模型 shell 过滤策略。以后如果模型偏离并尝试工具，结果虽会失败，却不应先获得 proxy、Git/SSH 或其他 ambient 控制变量。
+
+## GAP-005 模型 shell 隔离曾依赖“成功时不用工具”的间接边界
+
+- 状态: superseded
+- 关联: OBS-005, DES-003, AC-006
+
+runner 必须在保持 cases-only/tool-event failure oracle 的同时注入共享 shell policy，并把 policy hash 记入新运行 runtime；因为通过结果从未消费工具且 capsule 未变化，该安全加强不使当前 oracle-valid evidence 失效，也不能作为重新采样理由。

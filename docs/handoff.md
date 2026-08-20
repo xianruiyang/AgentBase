@@ -1,45 +1,47 @@
 # AgentBase 当前接手状态
 
-状态截点：2026-08-20 scc files 自适应目录树与刷新 release 闭环，未升级真实 srcq、未执行新的 Codex Publish（Asia/Shanghai）
+状态截点：2026-08-21，AgentBase Windows SWE 最终评测基础设施与跨 owner 评价闭合；未安装、未运行真实 elevated sandbox/qualification/候选模型，未执行新的 Codex Publish（Asia/Shanghai）。
 
 ## 一句话状态
 
-AgentBase 的增量独立路由评估基础设施保持 96/96/26 evidence；srcq 0.4.0 的 scc files 已能按实际成本选择可逆目录树，受影响本地门禁与刷新 release 均通过，没有开放实施项。真实 srcq 安装仍为 0.3.1，真实 Codex 仍是上一轮发布态。
+仓库内实现已经闭合：Windows 原生九题语料、候选/Verifier 双信任边界、完整 skill 树只读发现、attempt 临时面、模型 shell/launcher 环境隔离、题目固定运行时提示、srcq 关键工作流、逐题 qualification、不可变收据、恢复、能力合同、权限验收、分页报告与六维总评均已接入正式本地验证；45 个组件测试、路由基础设施、96-case 合同、三阶段 evidence 复用计划和部署 `Validate` 全部通过。外部仍缺管理员批准后的真实 elevated sandbox acceptance，以及九题逐题 qualification；它们是明确的环境/授权前置条件，不是未完成的仓库实现。
 
-## 仓库、候选与真实发布状态
+## 当前源码、安装与发布边界
 
-- 当前分支为 `main`；增量评估、测试基础设施、验证记录和本交接按持续 Git 授权提交并非强制推送到私有 `origin/main`。正常接手时上游与工作区应一致，若 dirty 必须先确认归属并保留。
-- 项目源码版本为 `srcq 0.4.0`。最终源码快照为 `sha256:008117d737fc377a1cee78bfa76f2faae58200e298edf61db32c1967ac3667a3`；本机忽略目录中的可复现 ZIP 为 2730989 bytes，SHA-256 `b43ad3f1c0fa4404f0f961ffba791cc3dfdfc07dd5641291bd51ded4bee0ba6f`。
-- 独立用户级 srcq 安装仍为 0.3.1；0.4.0 只完成隔离升级和 release 沙箱验证，没有写入真实安装根。
-- scc 3.7.0 与 hyperfine 1.20.0 已由 winget 安装；官方用户 npm `@openai/codex@0.148.0` 也已安装，持久 User PATH 中 npm prefix 位于 WindowsApps 前。bootstrap 与路由 runner 共用 `development/common/codex_cli_runtime.ps1` 解析 nested/hoisted/vendor 布局下的绝对原生 `codex.exe`，当前桌面宿主要通过命令名继承新 PATH 时仍需完全退出并重启。
-- 最新真实 Codex 发布仍是上一轮 `DirectCompatibility + InstallPortableSettings`；回滚备份仍为 `C:\Users\gzxt\.codex\backups\AgentBase-20260819-001202-f1169bf2`。P11 的 `global/AGENTS.md`、`source-query` 和部署候选尚未 Publish。
-- 上一次 Publish 授权已经消耗；任何再次 Publish 必须取得用户针对当次操作的明确同意。持续 Git 维护与私有远端非强制同步授权继续有效，但不能替代发布授权。
+- 当前源码的 srcq 版本为 `0.4.1`（`tools/srcq/Cargo.toml`）；不得把旧交接中的 0.4.0、历史 HEAD 或已安装副本当成当前完整源码。
+- AgentBase Windows SWE 的唯一 owner 是 `development/agent-evaluation/`；正式目标和外部缺口见 `docs/work/20260820_agentbase_final_evaluation_set/`。最终集固定 9 个任务、2 个 profile（Sol medium、Luna max）、18 个候选结果槽位。
+- 本轮没有执行安装、Upgrade 或 Codex Publish。真实 srcq 安装最后已知为 0.3.1，真实 Codex 发布最后已知为此前的 `DirectCompatibility + InstallPortableSettings`；本轮任务不依赖安装状态，因此没有重跑部署 `Status`，这些值只能作为“最后已知”，不能冒充当前只读核验。
+- 每次新的 Codex Publish 仍必须取得用户针对当次操作的明确同意；持续 Git 维护与私有远端非强制推送授权不替代发布授权。
+- 仓库验证资产、语料、runner、测试和收据不进入 Codex payload；正式 `Validate` 已证明 Plugin payload 为 11 skills、2 custom agents、96 routing cases。
 
-## 当前评估与工具能力
+## 最终评测与权限状态
 
-- 普通源码统计使用 `srcq scc <scc argv...>`；高级控制使用 `srcq query scc <exec|defaults|doctor>`，覆盖 summary/languages/files/hotspots/lossless/raw、machine、artifact、稳定分页与同次捕获协议回退。files 在相同证据页上按估算成本选择扁平标注、单表头扁平表或 `path(tree)` 目录树，hotspots 保持扁平排名。
-- 规范化指标保留文件、行、代码、注释、空行、复杂度和字节；COCOMO/cost/schedule/people 只在 lossless/raw/artifact 中保留，复杂度不作为缺陷或质量结论。
-- Windows bootstrap 现在管理 8 个前置工具，并以精确包身份安装/检查 scc、hyperfine 与用户 npm Codex CLI；hyperfine 保持独立 benchmark 职责，不进入 srcq 或发布 payload。
-- `global/AGENTS.md` 提供普通 scc/hyperfine 的低固定成本路由；`source-query` 只在 scc 定向视图、machine/raw/artifact、分页或 AST/LSP 证据升级时触发。
-- release manifest 已声明非捆绑 `scc.exe` 与验证版本 3.7.0，安装器与部署 preflight 会分别验证 srcq 完整性、AST doctor 和 scc doctor。
-- `test_routing_infrastructure.ps1` 一次解析 22 个评估及共享 runtime PowerShell，并行运行指纹、capsule、planner、隔离 runtime、attempt ledger 和恢复套件；进程环境机械禁止 evaluator，实测约 17 秒、零模型调用。
-- `get_routing_evaluation_plan.ps1` 与 `refresh_routing_evidence.ps1` 只运行可见语义变化阶段；passed stage 可同代恢复、跨代搬运并在搬运中断后继续，未变化再次刷新为 `already-current`。
+- 候选能力按 projected/configured/identity/probed/separate/excluded 六层表达。完整项目 `skills/` 每次派生到候选根 `.agents/skills/`，清单固定全部 `SKILL.md`、references、scripts 与 assets，preflight 必须证明逐文件可读且整个投影不可写；它通过 Git exclude 和 patch owner 排除于题目改动。
+- 基础 CLI、Codex 和任务依赖运行时先冻结真实路径/哈希/版本；sandbox preflight 再消费 workspace 内哈希固定的“绝对路径 + 可执行文件 SHA-256 + argv”清单，不维护第二套工具名映射。除 doctor 外，同一 `srcq` 还实际运行 AST/cache、三页 rg 续读、fd tree、scc machine 和 artifact 往返。
+- 每次候选把实际 venv Python，或 Node 题的实际 npm/pnpm（以及任何不同于基础身份的任务 Node）加入同一清单。`srcq doctor` 与 `srcq query scc doctor` 复用清单中已经验证哈希的同一 `srcq`。
+- `development/common/codex_shell_environment_policy.json` 是 benchmark、路由 evaluator 与 Windows SWE 共用的模型 shell 过滤真源；policy SHA-256 进入各自运行身份，当前原生 Codex 已无模型实测接受全部 33 个严格 config overrides。Codex 服务进程只消费冻结网络投影；模型 shell 过滤 proxy、OpenAI/Codex、Git/SSH、云/包管理器凭据命名空间、语言注入与工作流控制变量，无模型 sandbox-check 由共享 runtime owner 构造空投影净化环境。候选 prompt 明确使用该题已经准备并固定身份的 Python venv 或 npm/pnpm scripts，并从同一 corpus allowlist 展示逐题合法修改范围，避免通用禁令误伤 Bandit `setup.cfg` 或 Meriyah snapshot；这些配置仍不冒充真实模型 shell/公开测试行为证据。
+- child 从 stdout 返回 preflight；launcher 校验并持久化。候选可写 workspace 副本只供诊断，只有 launcher 在模型启动前写入 denied state 的受信结果才能形成 `blocked-precondition`，因此候选后续修改不能伪装成未调用模型。
+- 安装 Codex 根目录是 `run`/`recover`/`sandbox-check`/`assess` 的同一显式输入，默认取 `CODEX_HOME` 或 `%USERPROFILE%\.codex`；候选配置和身份整体拒绝该根，launcher 不再另由 `USERPROFILE` 推导认证来源。使用非默认根时，恢复必须传入同一值。
+- 正式权限合同固定 native Windows `elevated`：显式 profile 以 `:root = deny` 默认拒绝宿主读取、`:minimal = read` 保留公共运行时、候选根 write、`.agents/skills/.git/.codex` read，并以 `:tmpdir = write` 只重开 denied state 内的当前 attempt 临时面；完整 project/state/installed Codex root 继续显式 deny。preflight v9 要求 state/project canary、staged/installed auth 均不可读，核对 skill 全树只读、workspace 写入与 `TEMP/TMP/TMPDIR/APPDATA/LOCALAPPDATA` 范围。最后一次真实无模型探测在管理员 setup helper 处以 Windows 1223 取消；`unelevated` 又明确拒绝所需 split policy。没有环境变化时不得原样重跑，不能用 weaker fallback 或 mock 声称权限通过。
+- shell、`apply_patch`、公开测试和自定义 subagent 已在能力合同 v4 中作为候选模型动作表达，但没有被无模型 preflight 标记为行为通过；需要 host/thread/MCP 的 skill 也由对应组件 owner 另行验证。hooks、网络、安装与发布仍排除于 SWE 候选权限。
+- `sandbox-check` 不运行模型、网络、安装或 Publish，但首次成功建立 elevated backend 可能请求管理员批准并改变本机 sandbox 配置，必须在获得相应外部操作授权后显式运行。通过/真实 acceptance 失败/已知宿主前置阻塞分别退出 0/2/3。
+- 九题源码当前均未 prepare，qualification 全部 pending，18 个 task/profile 行全部 unqualified，候选结果为 0。`prepare`、`oracle`、`run` 都不是日常门禁；以后先完成真实 sandbox acceptance，再逐题明确运行 qualification。
 
-## 验证与未跨越边界
+## 当前验证证据
 
-- srcq 全 workspace 门禁通过；受影响定向为 lib 51/51、真实 query gateway 33/33、release 6/6。backend verifier 为 36 模式、9 oracle，最终 release 的 AST/scc doctor、rg/fd、files tree 与 hotspots flat smoke 通过。
-- 同一 1165 文件快照的完整 files 投影由旧候选 43836 降至 25997 个 o200k Token（-40.6949%），相对原生 json2 减少 79.4205%；v2 benchmark 绑定候选/基线二进制及输出 SHA-256，只证明静态投影。
-- bootstrap 回归与真实只读 Check 的既有证据保持：8/8 supported；插件、portable config/agent/lifecycle、0.3.1→0.4.0 隔离安装生命周期和最终 release 烟测通过。
-- 静态路由合同为 96 cases、55 strict routing、10 strict references，11/11 skills 有正向与非触发覆盖。
-- 当前独立 evidence generation 为 `4CE359AE0B4873D9D910ADB7371DF62E909678BE7C80CE6DD50167C5DD41E311`：Routing 96/96、Policy 96/96、References 26/26；当前账本 3/6 收据，两阶段跨代零 Token 搬运、References 一次正式运行，随后同输入 refresh 为零运行。
-- 统一评估基础设施、bootstrap、managed lifecycle、portable agents/config、完整部署回归与上一候选 `manage_agentbase -Action Validate` 均通过。当前三 capsule 同口径为 35,537 Token；仅 References 工作集为 7,920，非引用 skill 正文变化为零模型调用。本次未改变规则、skill 或触发输入，因此没有重复 evaluator。
-- 本轮只读 `DirectCompatibility + InstallPortableSettings Status` 返回 `published:false`，差异为安装 payload/发布清单落后于当前源码和路由证据；srcq machine Status 确认真实 0.3.1 安装完整性 verified、PATH ready 且只有一个受管条目。
-- 本机没有 `cargo-audit`，未新增 advisory scan；未安装该工具。未执行真实 srcq Upgrade，未执行 Codex Publish。
+- `development/agent-evaluation/test_agent_evaluation_infrastructure.ps1`：45 tests passed，模型 evaluator 禁用；包含 Python/PowerShell policy 序列化一致性、完整 skill 投影、模型 shell/launcher 环境过滤、题目固定运行时提示、真实 PowerShell `.CMD` 精确路径 probe、五项 srcq 工作流、双清单篡改回执、宿主默认 deny、项目/state/双认证不可读、attempt temp/appdata 和受信失败结果边界。
+- `development/code-search-benchmark/tests/test_experiment.py`：34 tests passed；共享 policy/launcher sanitizer、benchmark identity、CLI overrides 与 override 防篡改均通过。
+- `development/skill-routing/test_routing_infrastructure.ps1`：`ready:true`、6 suites、22 个 PowerShell syntax files、0 模型调用。
+- `development/skill-routing/validate_contract.ps1`：96 cases；55 strict routing、10 strict references、11/11 skills 正负触发覆盖。
+- 路由 generation 仍为 `4CE359AE0B4873D9D910ADB7371DF62E909678BE7C80CE6DD50167C5DD41E311`；Routing、Policy、References 均为 `reuse/visible_identity_and_oracle_valid`，本轮无需模型运行。
+- 正式部署 `Validate` 返回 `valid:true` 并再次消费 45 个评测基础设施测试；本轮未安装、未调用模型、未发布，安装状态未重新核对。
+- 只读 host `check` 找到全部必需工具且 `missing:[]`；真实 `ast-grep` 路径为 npm `ast-grep.cmd`。完整验证记录见 `docs/work/20260820_agentbase_final_evaluation_set/verification.md`。
 
 ## 下个对话的最小恢复步骤
 
-1. 读取根 `README.md` 和本文件，运行 `git status --short`；正常状态应为 clean，若出现 dirty 内容先确认归属并保留用户改动。
-2. 当前没有开放实施项。只有需要选择、替代或重开子计划时读取 `docs/plan.md`；本轮详细证据见 `docs/work/20260820_incremental_routing_evidence/verification.md` 与 `completion-audit.md`。
-3. 修改路由基础设施时运行零模型 `test_routing_infrastructure.ps1`；规则、skill 或触发合同变化后先查看 planner，再由正式 refresh 只运行 `evaluate` 阶段。Validate/真实 Publish 会运行确定性套件并拒绝陈旧 evidence，但不会替用户静默启动模型。
-4. 若任务依赖真实安装状态，按部署说明只读核对 `DirectCompatibility + InstallPortableSettings Status` 和 srcq `Status`；不要把 0.4.0 本地 release 候选当作已安装版本。
-5. 只有用户针对当次操作明确同意后，才可升级真实 srcq 或执行新的 Codex Publish；PATH 发生变化后先重启 Codex 桌面宿主并在新任务中验证。
+1. 读取根 `README.md` 和本文件，运行 `git status --short`；正常应为 clean 且当前分支已与既有私有上游同步。若 dirty，先确认归属并保留用户改动。
+2. 仓库内没有开放实施项。只有需要选择、替代或重开项目子计划，或重新裁决跨组件方向时再读取 `docs/plan.md`；最终评测细节按需读取 `docs/work/20260820_agentbase_final_evaluation_set/`。
+3. 若任务依赖真实安装/发布状态，严格按部署说明只读运行 `DirectCompatibility + InstallPortableSettings Status` 和 srcq `Status`；不要用本文件的最后已知值替代读回。
+4. 若用户授权改变宿主 sandbox 配置，先显式运行 `sandbox-check`；通过后再另行取得外部依赖/qualification 授权，按 smoke → core 余项 → rotation 逐题运行 `prepare/oracle`。没有这些授权时只维护仓库和确定性验证。
+5. 规则、skill 或触发合同变化时先运行路由确定性入口并读取 evaluation plan，只执行 `evaluate` 阶段；相同身份与 oracle 有效时复用，不为期待不同结果重采样。
+6. 任何向真实 Codex 根目录的 Publish 都必须再次取得当次明确同意；发布成功只证明安装文件，行为变化仍需新任务或重启后的运行验证。

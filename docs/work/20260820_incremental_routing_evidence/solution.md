@@ -22,7 +22,7 @@
 - 解决: GAP-003, GAP-002
 - 关联: DES-003, REQ-002, REQ-003
 
-把 bootstrap 与 evaluator 共享的 npm 原生 CLI 布局收口到 `development/common/codex_cli_runtime.ps1`，并把临时 home/auth hardlink、仓库外 workdir、read-only/ephemeral、结构化输出和 Begin/Finish 收口到唯一 runner；失败保存有界分类收据并清理临时状态，不保存模型原始日志。
+把 bootstrap 与 evaluator 共享的 npm 原生 CLI 布局收口到 `development/common/codex_cli_runtime.ps1`，把模型 shell 过滤收口到同目录的共享 JSON policy，并把临时 home/auth hardlink、仓库外 workdir、read-only/ephemeral、结构化输出和 Begin/Finish 收口到唯一 runner。runner 校验 policy hash 后生成严格 `-c` 参数，未来 evaluator runtime 记录该 hash；cases-only 成功路径仍拒绝所有 tool event，当前 capsule/evidence 不因不可见安全加强重采样。失败保存有界分类收据并清理临时状态，不保存模型原始日志。
 
 ## SOL-004 完成一次 schema 迁移与独立刷新
 

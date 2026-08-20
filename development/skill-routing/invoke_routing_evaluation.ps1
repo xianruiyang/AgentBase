@@ -86,6 +86,7 @@ $capsule = switch ($Phase) {
 $outputSchema = Get-AgentBaseRoutingOutputJsonSchema -Phase $Phase -Capsule $capsule
 $codexExecutable = Resolve-AgentBaseCodexExecutable -ExplicitPath $CodexExecutablePath
 $codexVersion = Get-AgentBaseCodexVersion -ExecutablePath $codexExecutable
+$shellEnvironmentPolicy = Get-AgentBaseCodexShellEnvironmentPolicy
 $evaluatorId = "agentbase-$($Phase.ToLowerInvariant())-$([guid]::NewGuid().ToString('N'))"
 $beginParameters = @{
     Action = 'Begin'
@@ -140,14 +141,14 @@ try {
     $authLock = [IO.File]::Open($authSourcePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
     [IO.File]::WriteAllText($schemaPath, ($outputSchema | ConvertTo-Json -Depth 30) + [Environment]::NewLine, $utf8NoBom)
 
-    $evaluatorRuntime = "$codexVersion/windows/read-only/ephemeral/cases-only-v4/catalog-$(([string]$modelCatalog.sha256).Substring(0, 16))"
+    $evaluatorRuntime = "$codexVersion/windows/read-only/ephemeral/cases-only-v4/catalog-$(([string]$modelCatalog.sha256).Substring(0, 16))/shell-$(([string]$shellEnvironmentPolicy.descriptor.sha256).Substring(0, 16))"
     $beginParameters.EvaluatorRuntime = $evaluatorRuntime
     $begin = & (Join-Path $PSScriptRoot "record_routing_attempt.ps1") @beginParameters
     $attemptId = [string]$begin.attempt_id
 
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $codexExecutable
-    foreach ($argument in @(Get-AgentBaseCodexEvaluatorArguments -Model $Model -ReasoningEffort $ReasoningEffort -ModelCatalogPath $modelCatalog.path -SchemaPath $schemaPath -LastMessagePath $lastMessagePath -WorkPath $tempWork)) {
+    foreach ($argument in @(Get-AgentBaseCodexEvaluatorArguments -Model $Model -ReasoningEffort $ReasoningEffort -ModelCatalogPath $modelCatalog.path -SchemaPath $schemaPath -LastMessagePath $lastMessagePath -WorkPath $tempWork -ShellPolicySha256 $shellEnvironmentPolicy.descriptor.sha256)) {
         $startInfo.ArgumentList.Add([string]$argument)
     }
     $startInfo.WorkingDirectory = $tempWork
@@ -191,27 +192,10 @@ try {
         throw "Codex evaluator did not produce its schema-constrained final result"
     }
 
-    $toolEvents = New-Object 'System.Collections.Generic.List[string]'
-    $usage = [ordered]@{ input_tokens = $null; cached_input_tokens = $null; output_tokens = $null }
-    foreach ($line in @($stdout -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
-        try {
-            $event = $line | ConvertFrom-Json -Depth 50 -DateKind String
-        }
-        catch {
-            throw "Codex evaluator emitted non-JSON data on its JSONL channel"
-        }
-        $itemType = [string]$event.item.type
-        if ($itemType -in @("command_execution", "mcp_tool_call", "web_search", "file_change", "tool_call", "function_call", "image_generation")) {
-            $toolEvents.Add($itemType)
-        }
-        if ([string]$event.type -eq "turn.completed" -and $null -ne $event.usage) {
-            foreach ($field in @("input_tokens", "cached_input_tokens", "output_tokens")) {
-                if ($null -ne $event.usage.$field) { $usage[$field] = [long]$event.usage.$field }
-            }
-        }
-    }
-    if ($toolEvents.Count -gt 0) {
-        throw "Detached evaluator attempted forbidden tool activity: $(@($toolEvents | Sort-Object -Unique) -join ', ')"
+    $jsonlSummary = Get-AgentBaseCodexJsonlSummary -Text $stdout
+    $usage = $jsonlSummary.usage
+    if (@($jsonlSummary.tool_event_types).Count -gt 0) {
+        throw "Detached evaluator attempted forbidden tool activity: $(@($jsonlSummary.tool_event_types) -join ', ')"
     }
     if ($stdout.Contains($ProjectRoot, [StringComparison]::OrdinalIgnoreCase) -or
         $stderr.Contains($ProjectRoot, [StringComparison]::OrdinalIgnoreCase) -or
