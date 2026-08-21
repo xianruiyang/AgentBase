@@ -64,6 +64,8 @@
 - `reasoning_hint`：`low/medium/high/xhigh/max/ultra` 的非权威起始建议。
 - `revision`：永久机器记录由工具维护；语义 add 固定从 `1` 开始，update 前读取当前值并以 CAS 参数传回，再由工具递增，避免并发覆盖。模型 authoring 文件不复制该字段。
 
+`started_at` 和 `ended_at` 属于 `state/<ID>.json` 的机器生命周期字段，不属于任务合同或模型 authoring 输入。任务合同更新不改变执行起止时间；状态命令依据真实状态转换在同一次 CAS 写入中维护它们。
+
 以上枚举、语义 ID 格式和项目相对描述是文档合同。CLI 对空白、缺失或其他可解析偏差保留原值（缺失文本以空值表达）并报告诊断，由模型决定修订、扩展合同或继续使用；它只对真实存储身份、revision、路径和无法解释的字段类型设门禁。已发布上一版的完整 `task.record` authoring 输入继续由 `add/update` 校验并规范化，但只出现 schema/revision 等部分机器字段的混合输入会被拒绝；兼容不产生第二种永久任务格式。
 
 ## 依赖类型

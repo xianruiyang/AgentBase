@@ -413,6 +413,8 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(stored_task["revision"], 1)
         self.assertEqual(stored_state["schema"], "task.state")
         self.assertEqual(stored_state["task_id"], "T003")
+        self.assertIsNone(stored_state["started_at"])
+        self.assertIsNone(stored_state["ended_at"])
 
     def test_state_write_model_receipt_omits_state_envelope_and_zero_counts(self) -> None:
         model = self.run_default_cli(
@@ -444,6 +446,124 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(stored["task_id"], "T001")
         self.assertEqual(stored["revision"], 2)
 
+    def test_state_timestamps_follow_execution_lifecycle_and_render(self) -> None:
+        claimed = self.run_task("claim", "--id", "T001", "--owner", "agent-a")
+        self.assertIsNone(claimed["state"]["started_at"])
+        self.assertIsNone(claimed["state"]["ended_at"])
+
+        started = self.run_task(
+            "start",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--expected-state-revision",
+            str(claimed["state"]["revision"]),
+        )
+        started_at = started["state"]["started_at"]
+        self.assertRegex(started_at, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+        self.assertIsNone(started["state"]["ended_at"])
+
+        state_path = self.root / "state" / "T001.json"
+        state_before_contract_update = json.loads(
+            state_path.read_text(encoding="utf-8")
+        )
+        revised_task = self.task(
+            "T001", "实现导出职责修订", ["SOL-001"], scope=["src/export/**"]
+        )
+        revised_file = Path(self.temp.name) / "T001-revised.json"
+        revised_file.write_text(
+            json.dumps(revised_task, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        self.run_task("update", "--file", str(revised_file), "--owner", "agent-a")
+        self.assertEqual(
+            json.loads(state_path.read_text(encoding="utf-8")),
+            state_before_contract_update,
+        )
+
+        blocked = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--blocked-reason",
+            "等待输入",
+            "--expected-state-revision",
+            str(started["state"]["revision"]),
+        )
+        self.assertEqual(blocked["state"]["started_at"], started_at)
+        self.assertIsNone(blocked["state"]["ended_at"])
+
+        completed = self.complete_t001()
+        ended_at = completed["state"]["ended_at"]
+        self.assertEqual(completed["state"]["started_at"], started_at)
+        self.assertRegex(ended_at, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+        self.run_task("render")
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn("| ID | 状态 | Owner | 开始时间 | 结束时间 |", rendered)
+        self.assertIn(started_at, rendered)
+        self.assertIn(ended_at, rendered)
+
+        reopened = self.run_task(
+            "reopen",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--reason",
+            "需要修订",
+        )
+        self.assertEqual(reopened["state"]["started_at"], started_at)
+        self.assertIsNone(reopened["state"]["ended_at"])
+
+        retired = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--status",
+            "retired",
+            "--message",
+            "由新任务替代",
+        )
+        self.assertEqual(retired["state"]["started_at"], started_at)
+        self.assertRegex(
+            retired["state"]["ended_at"],
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$",
+        )
+
+        released = self.run_task(
+            "release", "--id", "T001", "--owner", "agent-a"
+        )
+        self.assertEqual(released["state"]["started_at"], started_at)
+        self.assertIsNone(released["state"]["ended_at"])
+
+    def test_legacy_state_timestamps_remain_unknown_until_a_real_transition(self) -> None:
+        state_path = self.root / "state" / "T001.json"
+        legacy = json.loads(state_path.read_text(encoding="utf-8"))
+        legacy.pop("started_at")
+        legacy.pop("ended_at")
+        state_path.write_text(
+            json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        shown = self.run_task("show", "--id", "T001")
+        self.assertIsNone(shown["state"]["started_at"])
+        self.assertIsNone(shown["state"]["ended_at"])
+        unchanged = json.loads(state_path.read_text(encoding="utf-8"))
+        self.assertNotIn("started_at", unchanged)
+        self.assertNotIn("ended_at", unchanged)
+
+        claimed = self.run_task("claim", "--id", "T001", "--owner", "agent-a")
+        self.assertIsNone(claimed["state"]["started_at"])
+        self.assertIsNone(claimed["state"]["ended_at"])
+        stored = json.loads(state_path.read_text(encoding="utf-8"))
+        self.assertIsNone(stored["started_at"])
+        self.assertIsNone(stored["ended_at"])
+
     def test_complete_model_receipt_keeps_only_visible_issues_and_total_overflow(
         self,
     ) -> None:
@@ -461,6 +581,8 @@ class TaskctlTests(unittest.TestCase):
                 "blocked_reason": "",
                 "next_action": "",
                 "result_ref": "results/T001.r4.json",
+                "started_at": "2026-08-21T10:00:00Z",
+                "ended_at": "2026-08-21T10:05:00Z",
                 "revision": 4,
             },
             "result_ref": "results/T001.r4.json",
@@ -474,7 +596,13 @@ class TaskctlTests(unittest.TestCase):
             projected,
             {
                 "id": "T001",
-                "state": {"status": "done", "owner": "agent-a", "revision": 4},
+                "state": {
+                    "status": "done",
+                    "owner": "agent-a",
+                    "started_at": "2026-08-21T10:00:00Z",
+                    "ended_at": "2026-08-21T10:05:00Z",
+                    "revision": 4,
+                },
                 "result_ref": "results/T001.r4.json",
                 "diagnostics": [{"kind": "first"}, {"kind": "second"}],
                 "diagnostic_count": 3,
@@ -1926,11 +2054,11 @@ class TaskctlTests(unittest.TestCase):
         rendered = self.run_task("render")
         table = Path(rendered["output"]).read_text(encoding="utf-8")
         self.assertIn(
-            "| T001 | todo | — | 实现导出职责 | — | — | 1 |",
+            "| T001 | todo | — | — | — | 实现导出职责 | — | — | 1 |",
             table,
         )
         self.assertIn(
-            "| T002 | todo | — | 接入界面 | T001:hard | — | 1 |",
+            "| T002 | todo | — | — | — | 接入界面 | T001:hard | — | 1 |",
             table,
         )
 

@@ -655,8 +655,8 @@
       "selected_peer_skills": []
     }
   ],
-  "receipt_id": "3fd892e0375c4750ba0eb9315a9427b0",
-  "evaluation_generation_sha256": "E38A690BE9B9EA2D6C02580F7D88420307F2B275AADE498175877875813B6C76",
+  "receipt_id": "211f04ad24ae4c71b3e0a99dc6eaab19",
+  "evaluation_generation_sha256": "52FF138151171DBE38188C3F523E8472B7E694BE514D2F6E94A97555005C3BD2",
   "policy_evaluation": {
     "schema_version": 4,
     "evaluation_kind": "behavior-policy",
@@ -1567,17 +1567,17 @@
         ]
       }
     ],
-    "receipt_id": "4916c57a265a4268b71a7b6c01ed83be"
+    "receipt_id": "dcd8181686e24016acfd475faf777359"
   },
   "reference_evaluation": {
     "schema_version": 4,
     "evaluation_kind": "routing-reference-policy",
     "fingerprint_schema": "phase-visible-lf-v2",
     "evaluator": {
-      "id": "agentbase-references-d9b8b9f3ae27438ba574b9b0a63bd7a9",
+      "id": "agentbase-references-071f9e5112c948729f874739a289ca77",
       "model": "gpt-5.6-sol",
       "runtime": "codex-cli 0.148.0/windows/read-only/ephemeral/cases-only-v4/catalog-86CF3CC43D8BB25F/shell-38fed52b24194b4f",
-      "evaluated_at_utc": "2026-08-21T10:06:17.1494778+00:00",
+      "evaluated_at_utc": "2026-08-21T12:02:17.7150330+00:00",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false,
@@ -1609,8 +1609,8 @@
         "workspace_dependencies"
       ]
     },
-    "evaluation_capsule_sha256": "BB5CD24E3AAAEB8CDA53D75179ED9F4C9C4AD33E157F5A36400E1E8D8D59EB7C",
-    "candidate_bundle_sha256": "F5228A6CBBCCB7EFDFDB305955ECA1C70024F07EB29F58B5FEC8EE028FB5DA11",
+    "evaluation_capsule_sha256": "9F0834493B885357A1DA2DECDAFA624DC35806892F9D4272AE17F0B7DAFE5361",
+    "candidate_bundle_sha256": "1FD59E252ECB2BE1B7CC481FAB556E250D73CDAACCC7D4DEDDBC5F8AD8B2D433",
     "evaluation_input_sha256": "4105FE1F1E2863CB2BA512C1AE71030AB6214CB9C2C3D30C25283623722A4F9B",
     "routing_reference_selection_sha256": "FCB17476CC9A6487606F6CF3B5B815375712986802BB59DA7C838365D3343EE8",
     "cases": [
@@ -1632,7 +1632,8 @@
             "skill": "change-governance",
             "references": [
               "causal-analysis.md",
-              "lifecycle-and-entry.md"
+              "lifecycle-and-entry.md",
+              "verification-and-gates.md"
             ]
           }
         ]
@@ -1789,10 +1790,7 @@
           {
             "skill": "task-table-manager",
             "references": [
-              "execution-tooling.md",
-              "execution.md",
-              "query-tooling.md",
-              "tooling.md"
+              "execution.md"
             ]
           }
         ]
@@ -1883,6 +1881,7 @@
           {
             "skill": "change-governance",
             "references": [
+              "lifecycle-and-entry.md",
               "verification-and-gates.md"
             ]
           },
@@ -1891,6 +1890,7 @@
             "references": [
               "artifact-contracts.md",
               "execution-contracts.md",
+              "iteration.md",
               "planning-contracts.md",
               "target-contracts.md",
               "tooling.md"
@@ -1900,6 +1900,8 @@
             "skill": "task-table-manager",
             "references": [
               "authoring-tooling.md",
+              "completion-tooling.md",
+              "execution-tooling.md",
               "query-tooling.md",
               "task-contracts.md",
               "tooling.md"
@@ -2031,6 +2033,6 @@
         ]
       }
     ],
-    "receipt_id": "d11df0bceefd4c2495055c39b2a2ec3d"
+    "receipt_id": "cb77959ef16c4573936c89afd39b89e9"
   }
 }

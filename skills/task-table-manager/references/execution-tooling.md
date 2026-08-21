@@ -21,9 +21,11 @@ release     清除领取意图并回到 todo
 
 所有状态写命令必须传调用方刚读到的 `--expected-state-revision`。命令记录模型已经作出的判断，不决定该判断是否被允许。`retired` 表示任务不再属于当前执行投影，应在 note 中记录原因和替代任务或上游决策 ID；它不删除历史。
 
+`state/<ID>.json` 的 `started_at` 与 `ended_at` 由 CLI 以 UTC RFC3339 秒级时间维护，模型不提供时间参数：显式 `start` 或状态首次进入 `in_progress` 时填充尚为空的 `started_at`；状态进入 `done/retired` 时填充 `ended_at`；离开终态时清空 `ended_at`，但保留同一任务第一次实际开始时间。旧状态缺少字段时按 `null` 读取，不推测历史时间，只在后续真实转换中写入。时间与状态、revision、结果引用在同一锁和 CAS 边界内提交。
+
 内置状态、依赖类型、来源 ID 格式、reasoning hint、项目相对 mutation scope 和去重列表是推荐合同。可解析的非标准语义值保留原值并返回诊断，不用 argparse 枚举把文档语义改写成工具许可。
 
-状态写入的 model 回执返回顶层任务 ID、写后 revision 和去掉 schema、重复 task ID、空字段后的语义状态；`complete` 另在顶层返回一次 `result_ref`。空诊断与正常默认值省略，完整回执由 machine 视图提供。
+状态写入的 model 回执返回顶层任务 ID、写后 revision 和去掉 schema、重复 task ID、空字段后的语义状态，已有起止时间保持可见；`complete` 另在顶层返回一次 `result_ref`。空诊断与正常默认值省略，完整回执由 machine 视图提供。
 
 ## 完成写入
 

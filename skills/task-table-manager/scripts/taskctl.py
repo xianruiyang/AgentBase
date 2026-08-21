@@ -15,6 +15,7 @@ import sys
 import tempfile
 from collections import Counter, deque
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
@@ -39,8 +40,10 @@ SOURCE_ID_RE = re.compile(
     r"^(?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-[A-Za-z0-9][A-Za-z0-9._-]*$"
 )
 SOURCE_SNAPSHOT_REF_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+STATE_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 STATUSES = ("todo", "claimed", "in_progress", "review", "blocked", "done", "retired")
 ACTIVE_STATUSES = {"claimed", "in_progress", "review", "blocked"}
+TERMINAL_STATUSES = {"done", "retired"}
 DEPENDENCY_TYPES = ("hard", "ordering", "informational")
 REASONING_HINTS = ("low", "medium", "high", "xhigh", "max", "ultra")
 WORKFLOW_STAGES = (
@@ -445,6 +448,8 @@ def task_state_write_model(payload: dict[str, Any]) -> dict[str, Any]:
             "blocked_reason",
             "next_action",
             "result_ref",
+            "started_at",
+            "ended_at",
             "revision",
         )
         if isinstance(source_state, dict)
@@ -1339,6 +1344,27 @@ def normalize_task_authoring_input(raw: Any) -> tuple[dict[str, Any], bool]:
     return normalize_task_body(raw, task_id, 1), False
 
 
+def utc_now_timestamp() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def optional_state_timestamp(value: Any, field: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not STATE_TIMESTAMP_RE.fullmatch(value):
+        raise TaskctlError(f"{field} must be a UTC RFC3339 timestamp or null")
+    try:
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise TaskctlError(f"{field} must be a valid UTC RFC3339 timestamp") from exc
+    return value
+
+
 def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
     if not isinstance(raw, dict) or raw.get("schema") != "task.state":
         raise TaskctlError(f"state for {task_id} must use schema task.state")
@@ -1369,6 +1395,12 @@ def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
         "status": status,
         "owner": owner,
         "revision": revision,
+        "started_at": optional_state_timestamp(
+            raw.get("started_at"), f"state.started_at[{task_id}]"
+        ),
+        "ended_at": optional_state_timestamp(
+            raw.get("ended_at"), f"state.ended_at[{task_id}]"
+        ),
         "note": semantic_string(raw.get("note", ""), f"state.note[{task_id}]"),
         "blocked_reason": blocked_reason,
         "next_action": semantic_string(
@@ -2413,6 +2445,8 @@ def command_add(args: argparse.Namespace) -> dict[str, Any]:
                 "status": "todo",
                 "owner": None,
                 "revision": 1,
+                "started_at": None,
+                "ended_at": None,
                 "note": "",
                 "blocked_reason": "",
                 "next_action": "",
@@ -3647,11 +3681,55 @@ def owner_diagnostics(state: dict[str, Any], owner: str) -> list[dict[str, Any]]
     return []
 
 
+def apply_state_timestamps(
+    previous_state: dict[str, Any],
+    next_state: dict[str, Any],
+    *,
+    start_event: bool = False,
+    end_event: bool = False,
+) -> dict[str, Any]:
+    previous_status = previous_state["status"]
+    next_status = next_state["status"]
+    transition_timestamp: str | None = None
+
+    def timestamp() -> str:
+        nonlocal transition_timestamp
+        if transition_timestamp is None:
+            transition_timestamp = utc_now_timestamp()
+        return transition_timestamp
+
+    if next_state.get("started_at") is None and (
+        start_event
+        or (next_status == "in_progress" and previous_status != "in_progress")
+    ):
+        next_state["started_at"] = timestamp()
+
+    if next_status not in TERMINAL_STATUSES and previous_status in TERMINAL_STATUSES:
+        next_state["ended_at"] = None
+    elif next_state.get("ended_at") is None and (
+        end_event
+        or (
+            next_status in TERMINAL_STATUSES
+            and previous_status not in TERMINAL_STATUSES
+        )
+    ):
+        next_state["ended_at"] = timestamp()
+    return next_state
+
+
 def write_state(
-    root: Path, table: dict[str, Any], state: dict[str, Any]
+    root: Path,
+    table: dict[str, Any],
+    state: dict[str, Any],
+    previous_state: dict[str, Any],
+    *,
+    start_event: bool = False,
 ) -> dict[str, Any]:
     _, state_dir, _ = table_paths(root, table)
     state["revision"] += 1
+    state = apply_state_timestamps(
+        previous_state, state, start_event=start_event
+    )
     normalized = validate_state(state, state["task_id"])
     atomic_write_json(state_dir / f"{state['task_id']}.json", normalized)
     return normalized
@@ -3671,6 +3749,7 @@ def command_claim(args: argparse.Namespace) -> dict[str, Any]:
             )
         state = states[args.id]
         check_expected_state(state, args.expected_state_revision)
+        previous_state = dict(state)
         _, index_diagnostics = maybe_load_index(root, table)
         diagnostics = [
             *storage_diagnostics,
@@ -3684,7 +3763,7 @@ def command_claim(args: argparse.Namespace) -> dict[str, Any]:
         state["owner"] = args.owner
         if state["status"] in {"todo", "done", "retired"}:
             state["status"] = "claimed"
-        state = write_state(root, table, state)
+        state = write_state(root, table, state, previous_state)
         warnings = mutation_overlap_warnings(args.id, tasks, {**states, args.id: state})
     return {
         "ok": True,
@@ -3712,6 +3791,7 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
             )
         state = states[args.id]
         check_expected_state(state, args.expected_state_revision)
+        previous_state = dict(state)
         _, index_diagnostics = maybe_load_index(root, table)
         diagnostics = [
             *storage_diagnostics,
@@ -3724,7 +3804,9 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
             )
         state["owner"] = args.owner
         state["status"] = "in_progress"
-        state = write_state(root, table, state)
+        state = write_state(
+            root, table, state, previous_state, start_event=True
+        )
         warnings = mutation_overlap_warnings(args.id, tasks, {**states, args.id: state})
     return {
         "ok": True,
@@ -3757,6 +3839,7 @@ def command_note(args: argparse.Namespace) -> dict[str, Any]:
             )
         state = states[args.id]
         check_expected_state(state, args.expected_state_revision)
+        previous_state = dict(state)
         _, index_diagnostics = maybe_load_index(root, table)
         diagnostics = [
             *storage_diagnostics,
@@ -3787,7 +3870,7 @@ def command_note(args: argparse.Namespace) -> dict[str, Any]:
                 )
         if args.next_action is not None:
             state["next_action"] = semantic_string(args.next_action, "note.next_action")
-        state = write_state(root, table, state)
+        state = write_state(root, table, state, previous_state)
         diagnostics.extend(state_diagnostics(args.id, state))
     return {
         "ok": True,
@@ -3906,6 +3989,7 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
         next_state["result_ref"] = relative_ref
         next_state["blocked_reason"] = ""
         next_state["next_action"] = ""
+        next_state = apply_state_timestamps(state, next_state, end_event=True)
         next_state = validate_state(next_state, args.id)
         recovered_partial_write = result_path.exists()
         if recovered_partial_write:
@@ -3963,6 +4047,7 @@ def command_reopen(args: argparse.Namespace) -> dict[str, Any]:
             )
         state = states[args.id]
         check_expected_state(state, args.expected_state_revision)
+        previous_state = dict(state)
         _, index_diagnostics = maybe_load_index(root, table)
         diagnostics = [
             *storage_diagnostics,
@@ -3979,7 +4064,7 @@ def command_reopen(args: argparse.Namespace) -> dict[str, Any]:
         state["blocked_reason"] = ""
         state["next_action"] = ""
         state["result_ref"] = None
-        state = write_state(root, table, state)
+        state = write_state(root, table, state, previous_state)
         diagnostics.extend(state_diagnostics(args.id, state))
     return {
         "ok": True,
@@ -4005,6 +4090,7 @@ def command_release(args: argparse.Namespace) -> dict[str, Any]:
             )
         state = states[args.id]
         check_expected_state(state, args.expected_state_revision)
+        previous_state = dict(state)
         _, index_diagnostics = maybe_load_index(root, table)
         diagnostics = [
             *storage_diagnostics,
@@ -4020,7 +4106,7 @@ def command_release(args: argparse.Namespace) -> dict[str, Any]:
         state["blocked_reason"] = ""
         state["next_action"] = ""
         state["result_ref"] = None
-        state = write_state(root, table, state)
+        state = write_state(root, table, state, previous_state)
         diagnostics.extend(state_diagnostics(args.id, state))
     return {
         "ok": True,
@@ -4123,8 +4209,8 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
     if tasks:
         lines.extend(
             [
-                "| ID | 状态 | Owner | 标题 | 依赖 | 结果 | 合同修订 |",
-                "| --- | --- | --- | --- | --- | --- | ---: |",
+                "| ID | 状态 | Owner | 开始时间 | 结束时间 | 标题 | 依赖 | 结果 | 合同修订 |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | ---: |",
             ]
         )
         for task_id in sorted(tasks):
@@ -4141,6 +4227,8 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
                         markdown_table_cell(task_id),
                         markdown_table_cell(state["status"]),
                         markdown_table_cell(state["owner"]),
+                        markdown_table_cell(state["started_at"]),
+                        markdown_table_cell(state["ended_at"]),
                         markdown_table_cell(task["title"]),
                         markdown_table_cell(dependencies),
                         markdown_table_cell(state["result_ref"]),

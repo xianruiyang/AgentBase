@@ -19,7 +19,7 @@ description: 设计并用低 Token 管理长期任务合同、依赖图、状态
 
 - 完整读取 [task-contracts.md](references/task-contracts.md) 创建、修改任务或判断尚未写入的依赖；只有进入实际执行、恢复或并行领取时才读取 [execution.md](references/execution.md)，只读查询或只判断下一项工作且不领取、恢复、执行时不读取它。读取多个任务及上下游且 CLI 能降低成本时，同时读取共享 [tooling.md](references/tooling.md) 与 [query-tooling.md](references/query-tooling.md)；其他 CLI 调用先读 `tooling.md`，再只增加当前命令族的一项：[authoring-tooling.md](references/authoring-tooling.md) 用于 `init/draft/add/update`，[execution-tooling.md](references/execution-tooling.md) 用于 `context`、状态命令和 `complete`，[completion-tooling.md](references/completion-tooling.md) 用于 `completion-context`；请求跨命令族时才组合。
 - 工具入口是 `<SkillDir>/scripts/taskctl.py`。只在它能降低编辑、查询或恢复成本时使用，并显式传绝对 `--task-dir`；CLI 不可用时仍按同一文档合同继续。默认 `--view model` 返回当前动作所需的稀疏证据，程序、测试或确需完整身份与字段时显式使用 `--view machine`；两种视图来自同一次任务事实计算，具体字段与恢复入口由当前命令族引用维护。
-- `task-table.json` 登记目录；`tasks/<ID>.json` 持有任务合同，`state/<ID>.json` 持有执行状态，`results/<ID>.r<state-revision>.json` 持有可追溯的结果摘要，`snapshots/<sha256>.json` 持有内容寻址的不可变执行来源映射，状态文件只指向当前结果。
+- `task-table.json` 登记目录；`tasks/<ID>.json` 持有任务合同，`state/<ID>.json` 持有执行状态和 CLI 维护的 UTC 起止时间，`results/<ID>.r<state-revision>.json` 持有可追溯的结果摘要，`snapshots/<sha256>.json` 持有内容寻址的不可变执行来源映射，状态文件只指向当前结果。
 - `TASK_TABLE.md` 是生成视图，`.work-cache/index.json` 是上游索引；两者都不是任务或语义真源。
 - 任务合同、状态和结果是程序消费且由模型作出语义决定的结构化真源；CLI 可用时，模型通过 `draft/add/update` 的语义输入和带 revision 的状态命令维护，不直接改永久 JSON 绕过路径、原子写入或并发比较。`add/update` 注入任务 schema/revision，`complete` 注入结果 envelope；模型查询默认使用按当前动作投影的视图，完整结构只供显式机器消费者。生成表格和索引不得作为修改入口。
 
