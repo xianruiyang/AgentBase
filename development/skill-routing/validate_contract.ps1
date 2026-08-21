@@ -162,7 +162,7 @@ $requiredGlobalFragments = @(
     '`should` 表示默认执行'
     '`must not` 表示不得执行'
     '对象与范围更具体且不反转上位目标'
-    '把用户表达视为共同理解目标的权威输入而非必然完整的目标'
+    '不把其措辞、术语、原因判断或实现设想直接等同于目标'
     '规范来源只确定适用目标契约；有效证据才判断系统现状、原因、约束和结果'
     '系统事实不得静默改写目标或扩大授权'
     '不得为迎合而接受错误前提或弱化结论'
@@ -679,10 +679,11 @@ Assert-True ($changeSkillContent.Contains("多个入口或第二状态源的方�
 Assert-True ($changeSkillContent.Contains("临时路径风险评审")) "change-governance does not expose its temporary-path review trigger"
 $qqSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($qqSkillContent.Contains('同时使用 `$change-governance`')) "codex-qq-hook troubleshooting does not route unknown causes through change-governance"
-Assert-True ($globalContent.Contains("把用户表达视为共同理解目标的权威输入而非必然完整的目标")) "Global kernel is missing collaborative requirement insight"
+Assert-True ($globalContent.Contains("实际场景、期望改变的可观察结果")) "Global kernel is missing scenario-based intent reconstruction"
 Assert-True ($globalContent.Contains("质量同等充分时再以较低上下文与 Token 成本为优，前两者均不变差时再提升速度")) "Global kernel is missing the quality-token-speed priority"
 $deliverySkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\delivery-workflow\SKILL.md") -Raw -Encoding UTF8
-Assert-True ($deliverySkillContent.Contains("把初始请求作为共同理解问题的起点")) "delivery-workflow is missing collaborative requirement discovery"
+Assert-True ($deliverySkillContent.Contains("区分结果、事实陈述、原因猜测与实现建议")) "delivery-workflow is missing intent reconstruction boundaries"
+Assert-True ((Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\delivery-workflow\references\target-contracts.md") -Raw -Encoding UTF8).Contains('期望结果进入 `REQ`，待核实的现状或原因保持为证据问题')) "delivery-workflow target contract is missing intent-to-artifact projection"
 Assert-True ($deliverySkillContent.Contains("整体结果未以局部正确偏离目标")) "delivery-workflow is missing final requirement-alignment review"
 Assert-True ($deliverySkillContent.Contains('运行前沿与扩量/重裁归 `$execution-governor`')) "delivery-workflow must delegate the live execution frontier"
 Assert-True ($deliverySkillContent.Contains('共享前提的证明和首个消费者按真实消费形成依赖')) "delivery-workflow must persist the execution dependency projection"
