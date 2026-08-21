@@ -23,7 +23,8 @@
 - 确定性 stored ZIP；内部固定文件顺序、时间戳和权限位；
 - `<archive>.sha256`；
 - 外部 release manifest；
-- SPDX 2.3 JSON SBOM。
+- SPDX 2.3 JSON SBOM；
+- 外部第三方完整许可证。
 
 ZIP 内含 `srcq.exe`、README、项目双许可证、NOTICE、target-filtered 第三方完整许可证、manifest 和 SBOM。二进制本身不依赖 Node 或 Python；运行 ast-grep 功能时仍需可发现的 `ast-grep` 可执行文件。
 

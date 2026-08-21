@@ -13,7 +13,7 @@
 
 - [ ] 在 Windows x86_64 原生 runner 上 clean build；`srcq --version` 可启动。
 - [ ] archive checksum、精确成员集合、manifest 文件 hash、target 和 SBOM 可验证。
-- [ ] GitHub Release 同批上传 archive、`.sha256`、外部 manifest、外部 SBOM、`install-srcq.ps1` 与 `install-srcq-release.ps1`；私有仓库中以有读取权限的 `gh` 身份完成一次真实下载。
+- [ ] GitHub Release 同批上传 archive、`.sha256`、外部 manifest、外部 SBOM、外部第三方许可证、`install-srcq.ps1` 与 `install-srcq-release.ps1`；私有仓库中以有读取权限的 `gh` 身份完成一次真实下载。
 - [ ] 安装 → `doctor` → `query scc doctor` → 核心 AST/rg/fd/scc、cache/process smoke → 同版幂等安装 → 升级/失败回滚 → 卸载通过。
 - [ ] ast-grep 固定版 0.42.0 可用；兼容声明中的其他版本只按已有精确矩阵声明。
 - [ ] scc 3.7.0 的 summary/languages/files/hotspots、json2、分页、协议回退、错误退出与输出副作用边界通过；缺失 scc 时发布前置检查失败而不是静默降级。
