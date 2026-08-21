@@ -450,6 +450,8 @@ class TaskctlTests(unittest.TestCase):
         claimed = self.run_task("claim", "--id", "T001", "--owner", "agent-a")
         self.assertIsNone(claimed["state"]["started_at"])
         self.assertIsNone(claimed["state"]["ended_at"])
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn("| T001 | claimed | agent-a | — | — |", rendered)
 
         started = self.run_task(
             "start",
@@ -463,6 +465,8 @@ class TaskctlTests(unittest.TestCase):
         started_at = started["state"]["started_at"]
         self.assertRegex(started_at, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
         self.assertIsNone(started["state"]["ended_at"])
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn(f"| T001 | in_progress | agent-a | {started_at} | — |", rendered)
 
         state_path = self.root / "state" / "T001.json"
         state_before_contract_update = json.loads(
@@ -494,17 +498,21 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(blocked["state"]["started_at"], started_at)
         self.assertIsNone(blocked["state"]["ended_at"])
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn(f"| T001 | blocked | agent-a | {started_at} | — |", rendered)
 
         completed = self.complete_t001()
         ended_at = completed["state"]["ended_at"]
         self.assertEqual(completed["state"]["started_at"], started_at)
         self.assertRegex(ended_at, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
-        self.run_task("render")
         rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
         self.assertIn("| ID | 状态 | Owner | 开始时间 | 结束时间 |", rendered)
         self.assertIn(started_at, rendered)
         self.assertIn(ended_at, rendered)
+        self.assertIn(
+            f"| T001 | done | agent-a | {started_at} | {ended_at} |", rendered
+        )
 
         reopened = self.run_task(
             "reopen",
@@ -517,6 +525,8 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(reopened["state"]["started_at"], started_at)
         self.assertIsNone(reopened["state"]["ended_at"])
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn(f"| T001 | todo | — | {started_at} | — |", rendered)
 
         retired = self.run_task(
             "note",
@@ -534,12 +544,43 @@ class TaskctlTests(unittest.TestCase):
             retired["state"]["ended_at"],
             r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$",
         )
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn(
+            f"| T001 | retired | agent-a | {started_at} | {retired['state']['ended_at']} |",
+            rendered,
+        )
 
         released = self.run_task(
             "release", "--id", "T001", "--owner", "agent-a"
         )
         self.assertEqual(released["state"]["started_at"], started_at)
         self.assertIsNone(released["state"]["ended_at"])
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn(f"| T001 | todo | — | {started_at} | — |", rendered)
+
+    def test_state_write_preserves_truth_when_generated_view_refresh_fails(self) -> None:
+        table_view_path = self.root / "TASK_TABLE.md"
+        table_view_path.unlink()
+        table_view_path.mkdir()
+
+        claimed = self.run_task("claim", "--id", "T001", "--owner", "agent-a")
+
+        self.assertEqual(claimed["state"]["status"], "claimed")
+        self.assertEqual(claimed["table_view"]["status"], "stale")
+        self.assertIn(
+            "task_table_refresh_failed",
+            {item["kind"] for item in claimed["diagnostics"]},
+        )
+        module = load_taskctl_module()
+        model_receipt = module.render_model(module.task_model_projection(claimed))
+        self.assertIn("table_view:{", model_receipt)
+        self.assertIn("status:stale", model_receipt)
+        self.assertIn("task_table_refresh_failed", model_receipt)
+        stored = json.loads(
+            (self.root / "state" / "T001.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(stored["status"], "claimed")
+        self.assertEqual(stored["revision"], claimed["state"]["revision"])
 
     def test_legacy_state_timestamps_remain_unknown_until_a_real_transition(self) -> None:
         state_path = self.root / "state" / "T001.json"
@@ -2177,6 +2218,8 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(stored["schema"], "task.record")
         self.assertEqual(stored["revision"], 1)
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn("带诊断的候选任务", rendered)
         context = self.run_task("context", "--id", "T010", "--budget", "12000")
         self.assertFalse(context["source_snapshot_complete"])
         self.assertEqual(context["source_snapshot"], {})
@@ -2202,6 +2245,9 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(stored["schema"], "task.record")
         self.assertEqual(stored["revision"], 2)
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn("更新后的候选任务", rendered)
+        self.assertNotIn("带诊断的候选任务", rendered)
 
     def test_legacy_task_envelope_is_normalized_by_add_and_update(self) -> None:
         task = self.task("T010", "兼容上一版任务输入", ["SOL-001"])

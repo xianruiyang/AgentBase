@@ -655,8 +655,8 @@
       "selected_peer_skills": []
     }
   ],
-  "receipt_id": "211f04ad24ae4c71b3e0a99dc6eaab19",
-  "evaluation_generation_sha256": "52FF138151171DBE38188C3F523E8472B7E694BE514D2F6E94A97555005C3BD2",
+  "receipt_id": "58cdceab0fbb45f1b10e7f38df86ef59",
+  "evaluation_generation_sha256": "873F92B3AF22D8C32E5BA18D58C074675EE504DCDA88C39C9D3F797A4E7427D0",
   "policy_evaluation": {
     "schema_version": 4,
     "evaluation_kind": "behavior-policy",
@@ -1567,17 +1567,17 @@
         ]
       }
     ],
-    "receipt_id": "dcd8181686e24016acfd475faf777359"
+    "receipt_id": "312a79e28a754e24b983fecb10e7c11c"
   },
   "reference_evaluation": {
     "schema_version": 4,
     "evaluation_kind": "routing-reference-policy",
     "fingerprint_schema": "phase-visible-lf-v2",
     "evaluator": {
-      "id": "agentbase-references-071f9e5112c948729f874739a289ca77",
+      "id": "agentbase-references-3410a57bd57841788e99c388f1648c13",
       "model": "gpt-5.6-sol",
       "runtime": "codex-cli 0.148.0/windows/read-only/ephemeral/cases-only-v4/catalog-86CF3CC43D8BB25F/shell-38fed52b24194b4f",
-      "evaluated_at_utc": "2026-08-21T12:02:17.7150330+00:00",
+      "evaluated_at_utc": "2026-08-21T13:19:09.7220351+00:00",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false,
@@ -1609,8 +1609,8 @@
         "workspace_dependencies"
       ]
     },
-    "evaluation_capsule_sha256": "9F0834493B885357A1DA2DECDAFA624DC35806892F9D4272AE17F0B7DAFE5361",
-    "candidate_bundle_sha256": "1FD59E252ECB2BE1B7CC481FAB556E250D73CDAACCC7D4DEDDBC5F8AD8B2D433",
+    "evaluation_capsule_sha256": "E4EE60E2F50C01B237498D89749BC837B320E2F1D1B6BCB80F2894C1CA162106",
+    "candidate_bundle_sha256": "4542A38DA743794E8C5AD6D3459061C8E24E3015AE77CA739AAA0A9E27936A77",
     "evaluation_input_sha256": "4105FE1F1E2863CB2BA512C1AE71030AB6214CB9C2C3D30C25283623722A4F9B",
     "routing_reference_selection_sha256": "FCB17476CC9A6487606F6CF3B5B815375712986802BB59DA7C838365D3343EE8",
     "cases": [
@@ -1632,8 +1632,7 @@
             "skill": "change-governance",
             "references": [
               "causal-analysis.md",
-              "lifecycle-and-entry.md",
-              "verification-and-gates.md"
+              "lifecycle-and-entry.md"
             ]
           }
         ]
@@ -1678,7 +1677,6 @@
             "skill": "task-table-manager",
             "references": [
               "authoring-tooling.md",
-              "completion-tooling.md",
               "execution-tooling.md",
               "execution.md",
               "query-tooling.md",
@@ -1737,15 +1735,13 @@
               "execution-contracts.md",
               "iteration.md",
               "planning-contracts.md",
-              "target-contracts.md",
-              "tooling.md"
+              "target-contracts.md"
             ]
           },
           {
             "skill": "task-table-manager",
             "references": [
               "authoring-tooling.md",
-              "completion-tooling.md",
               "execution-tooling.md",
               "execution.md",
               "query-tooling.md",
@@ -1790,7 +1786,10 @@
           {
             "skill": "task-table-manager",
             "references": [
-              "execution.md"
+              "execution-tooling.md",
+              "execution.md",
+              "query-tooling.md",
+              "tooling.md"
             ]
           }
         ]
@@ -1881,7 +1880,6 @@
           {
             "skill": "change-governance",
             "references": [
-              "lifecycle-and-entry.md",
               "verification-and-gates.md"
             ]
           },
@@ -1890,21 +1888,13 @@
             "references": [
               "artifact-contracts.md",
               "execution-contracts.md",
-              "iteration.md",
-              "planning-contracts.md",
-              "target-contracts.md",
-              "tooling.md"
+              "planning-contracts.md"
             ]
           },
           {
             "skill": "task-table-manager",
             "references": [
-              "authoring-tooling.md",
-              "completion-tooling.md",
-              "execution-tooling.md",
-              "query-tooling.md",
-              "task-contracts.md",
-              "tooling.md"
+              "task-contracts.md"
             ]
           }
         ]
@@ -2033,6 +2023,6 @@
         ]
       }
     ],
-    "receipt_id": "cb77959ef16c4573936c89afd39b89e9"
+    "receipt_id": "ac497719892d481c991ee1847f17e65c"
   }
 }

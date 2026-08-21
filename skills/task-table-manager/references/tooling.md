@@ -36,3 +36,5 @@ completion-context                           completion-tooling.md
 门禁只保护路径/对象身份、破坏性覆盖、锁与 CAS 并发、输入输出上限、显式不可变收据身份和最终复核快照一致性。门禁错误返回 `gate.id`、`gate.risk`、`gate.scope`、`gate.recovery` 和 `gate.retryable`；当前命令族的具体门禁由对应引用维护。
 
 依赖环、owner、状态流转、可解析非标准语义、重复值、上游未决、覆盖度、验证充分性、结果来源时效和整体完成均只诊断并交由模型按文档与证据裁决。
+
+`TASK_TABLE.md` 是可重建派生物。`add/update` 与状态写命令在真源提交后刷新它；刷新失败只返回 `task_table_refresh_failed`、`table_view.status: stale` 和显式 `render` 恢复动作，不得把已提交的 task/state/result 回滚、伪装为未提交或变成生成视图门禁。machine 回执保留成功刷新状态，model 回执省略正常成功，只保留会改变恢复动作的失败诊断。

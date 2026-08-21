@@ -432,6 +432,9 @@ def task_contract_write_model(payload: dict[str, Any]) -> dict[str, Any]:
     }
     if payload.get("recovered_partial_write") is True:
         projected["recovered_partial_write"] = True
+    table_view = payload.get("table_view")
+    if isinstance(table_view, dict) and table_view.get("status") == "stale":
+        projected["table_view"] = sparse_model_value(copy.deepcopy(table_view))
     add_bounded_issues(projected, payload, "diagnostics", "diagnostic_count")
     return sparse_model_value(projected)
 
@@ -464,6 +467,9 @@ def task_state_write_model(payload: dict[str, Any]) -> dict[str, Any]:
         projected["result_ref"] = payload.get("result_ref")
         if payload.get("recovered_partial_write") is True:
             projected["recovered_partial_write"] = True
+    table_view = payload.get("table_view")
+    if isinstance(table_view, dict) and table_view.get("status") == "stale":
+        projected["table_view"] = sparse_model_value(copy.deepcopy(table_view))
     add_bounded_issues(projected, payload, "warnings", "warning_count")
     add_bounded_issues(projected, payload, "diagnostics", "diagnostic_count")
     return sparse_model_value(projected)
@@ -2495,12 +2501,24 @@ def command_add(args: argparse.Namespace) -> dict[str, Any]:
             atomic_write_json(task_path, candidate)
         if existing_state is None:
             atomic_write_json(state_path, initial_state)
+        table_view, table_view_diagnostic = refresh_task_table_after_mutation(
+            root,
+            table,
+            proposed,
+            proposed_states,
+            storage_diagnostics,
+            index,
+            index_diagnostics,
+        )
+        if table_view_diagnostic is not None:
+            diagnostics.append(table_view_diagnostic)
     return {
         "ok": True,
         "command": "add",
         "task_id": candidate["id"],
         "task_revision": candidate["revision"],
         "state_revision": 1,
+        "table_view": table_view,
         "recovered_partial_write": existing_task is not None or existing_state is not None,
         "diagnostics": diagnostics[:DEFAULT_LIMIT],
         "diagnostic_count": len(diagnostics),
@@ -2576,11 +2594,23 @@ def command_update(args: argparse.Namespace) -> dict[str, Any]:
         ]
         task_dir, _, _ = table_paths(root, table)
         atomic_write_json(task_dir / f"{task_id}.json", candidate)
+        table_view, table_view_diagnostic = refresh_task_table_after_mutation(
+            root,
+            table,
+            proposed,
+            states,
+            storage_diagnostics,
+            index,
+            index_diagnostics,
+        )
+        if table_view_diagnostic is not None:
+            diagnostics.append(table_view_diagnostic)
     return {
         "ok": True,
         "command": "update",
         "task_id": task_id,
         "task_revision": candidate["revision"],
+        "table_view": table_view,
         "diagnostics": diagnostics[:DEFAULT_LIMIT],
         "diagnostic_count": len(diagnostics),
         "note": "diagnostics are advisory and do not accept or reject task semantics",
@@ -3750,7 +3780,7 @@ def command_claim(args: argparse.Namespace) -> dict[str, Any]:
         state = states[args.id]
         check_expected_state(state, args.expected_state_revision)
         previous_state = dict(state)
-        _, index_diagnostics = maybe_load_index(root, table)
+        index, index_diagnostics = maybe_load_index(root, table)
         diagnostics = [
             *storage_diagnostics,
             *index_diagnostics,
@@ -3765,11 +3795,23 @@ def command_claim(args: argparse.Namespace) -> dict[str, Any]:
             state["status"] = "claimed"
         state = write_state(root, table, state, previous_state)
         warnings = mutation_overlap_warnings(args.id, tasks, {**states, args.id: state})
+        table_view, table_view_diagnostic = refresh_task_table_after_mutation(
+            root,
+            table,
+            tasks,
+            {**states, args.id: state},
+            storage_diagnostics,
+            index,
+            index_diagnostics,
+        )
+        if table_view_diagnostic is not None:
+            diagnostics.append(table_view_diagnostic)
     return {
         "ok": True,
         "command": "claim",
         "id": args.id,
         "state": state,
+        "table_view": table_view,
         "warnings": warnings[:DEFAULT_LIMIT],
         "warning_count": len(warnings),
         "diagnostics": (diagnostics + state_diagnostics(args.id, state))[:DEFAULT_LIMIT],
@@ -3792,7 +3834,7 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
         state = states[args.id]
         check_expected_state(state, args.expected_state_revision)
         previous_state = dict(state)
-        _, index_diagnostics = maybe_load_index(root, table)
+        index, index_diagnostics = maybe_load_index(root, table)
         diagnostics = [
             *storage_diagnostics,
             *index_diagnostics,
@@ -3808,11 +3850,23 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
             root, table, state, previous_state, start_event=True
         )
         warnings = mutation_overlap_warnings(args.id, tasks, {**states, args.id: state})
+        table_view, table_view_diagnostic = refresh_task_table_after_mutation(
+            root,
+            table,
+            tasks,
+            {**states, args.id: state},
+            storage_diagnostics,
+            index,
+            index_diagnostics,
+        )
+        if table_view_diagnostic is not None:
+            diagnostics.append(table_view_diagnostic)
     return {
         "ok": True,
         "command": "start",
         "id": args.id,
         "state": state,
+        "table_view": table_view,
         "warnings": warnings[:DEFAULT_LIMIT],
         "warning_count": len(warnings),
         "diagnostics": (diagnostics + state_diagnostics(args.id, state))[:DEFAULT_LIMIT],
@@ -3840,7 +3894,7 @@ def command_note(args: argparse.Namespace) -> dict[str, Any]:
         state = states[args.id]
         check_expected_state(state, args.expected_state_revision)
         previous_state = dict(state)
-        _, index_diagnostics = maybe_load_index(root, table)
+        index, index_diagnostics = maybe_load_index(root, table)
         diagnostics = [
             *storage_diagnostics,
             *index_diagnostics,
@@ -3872,11 +3926,23 @@ def command_note(args: argparse.Namespace) -> dict[str, Any]:
             state["next_action"] = semantic_string(args.next_action, "note.next_action")
         state = write_state(root, table, state, previous_state)
         diagnostics.extend(state_diagnostics(args.id, state))
+        table_view, table_view_diagnostic = refresh_task_table_after_mutation(
+            root,
+            table,
+            tasks,
+            {**states, args.id: state},
+            storage_diagnostics,
+            index,
+            index_diagnostics,
+        )
+        if table_view_diagnostic is not None:
+            diagnostics.append(table_view_diagnostic)
     return {
         "ok": True,
         "command": "note",
         "id": args.id,
         "state": state,
+        "table_view": table_view,
         "diagnostics": diagnostics[:DEFAULT_LIMIT],
         "diagnostic_count": len(diagnostics),
     }
@@ -4019,12 +4085,24 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
             diagnostics.append(
                 {"kind": "result_has_unresolved", "count": len(result["unresolved"])}
             )
+        table_view, table_view_diagnostic = refresh_task_table_after_mutation(
+            root,
+            table,
+            tasks,
+            states,
+            storage_diagnostics,
+            index,
+            index_diagnostics,
+        )
+        if table_view_diagnostic is not None:
+            diagnostics.append(table_view_diagnostic)
     return {
         "ok": True,
         "command": "complete",
         "id": args.id,
         "state": state,
         "result_ref": relative_ref,
+        "table_view": table_view,
         "recovered_partial_write": recovered_partial_write,
         "diagnostics": diagnostics[: args.diagnostic_limit],
         "diagnostic_count": len(diagnostics),
@@ -4048,7 +4126,7 @@ def command_reopen(args: argparse.Namespace) -> dict[str, Any]:
         state = states[args.id]
         check_expected_state(state, args.expected_state_revision)
         previous_state = dict(state)
-        _, index_diagnostics = maybe_load_index(root, table)
+        index, index_diagnostics = maybe_load_index(root, table)
         diagnostics = [
             *storage_diagnostics,
             *index_diagnostics,
@@ -4066,11 +4144,23 @@ def command_reopen(args: argparse.Namespace) -> dict[str, Any]:
         state["result_ref"] = None
         state = write_state(root, table, state, previous_state)
         diagnostics.extend(state_diagnostics(args.id, state))
+        table_view, table_view_diagnostic = refresh_task_table_after_mutation(
+            root,
+            table,
+            tasks,
+            {**states, args.id: state},
+            storage_diagnostics,
+            index,
+            index_diagnostics,
+        )
+        if table_view_diagnostic is not None:
+            diagnostics.append(table_view_diagnostic)
     return {
         "ok": True,
         "command": "reopen",
         "id": args.id,
         "state": state,
+        "table_view": table_view,
         "diagnostics": diagnostics[:DEFAULT_LIMIT],
         "diagnostic_count": len(diagnostics),
     }
@@ -4091,7 +4181,7 @@ def command_release(args: argparse.Namespace) -> dict[str, Any]:
         state = states[args.id]
         check_expected_state(state, args.expected_state_revision)
         previous_state = dict(state)
-        _, index_diagnostics = maybe_load_index(root, table)
+        index, index_diagnostics = maybe_load_index(root, table)
         diagnostics = [
             *storage_diagnostics,
             *index_diagnostics,
@@ -4108,11 +4198,23 @@ def command_release(args: argparse.Namespace) -> dict[str, Any]:
         state["result_ref"] = None
         state = write_state(root, table, state, previous_state)
         diagnostics.extend(state_diagnostics(args.id, state))
+        table_view, table_view_diagnostic = refresh_task_table_after_mutation(
+            root,
+            table,
+            tasks,
+            {**states, args.id: state},
+            storage_diagnostics,
+            index,
+            index_diagnostics,
+        )
+        if table_view_diagnostic is not None:
+            diagnostics.append(table_view_diagnostic)
     return {
         "ok": True,
         "command": "release",
         "id": args.id,
         "state": state,
+        "table_view": table_view,
         "diagnostics": diagnostics[:DEFAULT_LIMIT],
         "diagnostic_count": len(diagnostics),
     }
@@ -4138,11 +4240,15 @@ def markdown_table_cell(value: Any, maximum: int = 120) -> str:
     return text if text.strip() else "—"
 
 
-def command_render(args: argparse.Namespace) -> dict[str, Any]:
-    root = resolve_root(args.task_dir)
-    table = load_table(root)
-    tasks, states, storage_diagnostics = load_query_storage(root, table)
-    index, index_diagnostics = maybe_load_index(root, table)
+def render_task_table_locked(
+    root: Path,
+    table: dict[str, Any],
+    tasks: dict[str, dict[str, Any]],
+    states: dict[str, dict[str, Any]],
+    storage_diagnostics: list[dict[str, Any]],
+    index: dict[str, Any] | None,
+    index_diagnostics: list[dict[str, Any]],
+) -> dict[str, Any]:
     storage = summarize_loaded_task_storage(root, table, tasks, states, index)
     output_path = resolve_inside(root, str(table.get("table_view", "TASK_TABLE.md")))
     counts = storage["counts"]
@@ -4272,6 +4378,62 @@ def command_render(args: argparse.Namespace) -> dict[str, Any]:
         "storage_diagnostics": all_storage_diagnostics[:DEFAULT_LIMIT],
         "storage_diagnostic_count": len(all_storage_diagnostics),
     }
+
+
+def refresh_task_table_after_mutation(
+    root: Path,
+    table: dict[str, Any],
+    tasks: dict[str, dict[str, Any]],
+    states: dict[str, dict[str, Any]],
+    storage_diagnostics: list[dict[str, Any]],
+    index: dict[str, Any] | None,
+    index_diagnostics: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    try:
+        rendered = render_task_table_locked(
+            root,
+            table,
+            tasks,
+            states,
+            storage_diagnostics,
+            index,
+            index_diagnostics,
+        )
+    except Exception as exc:
+        table_view = {
+            "status": "stale",
+            "output": str(root / str(table.get("table_view", "TASK_TABLE.md"))),
+            "error_type": type(exc).__name__,
+            "error": str(exc),
+            "recovery": "run taskctl render for the same absolute --task-dir after repairing the generated-view path or filesystem",
+        }
+        return table_view, {
+            "kind": "task_table_refresh_failed",
+            "error_type": table_view["error_type"],
+            "error": table_view["error"],
+            "recovery": table_view["recovery"],
+        }
+    return {
+        "status": "refreshed",
+        "output": rendered["output"],
+    }, None
+
+
+def command_render(args: argparse.Namespace) -> dict[str, Any]:
+    root = resolve_root(args.task_dir)
+    with workspace_lock(root):
+        table = load_table(root)
+        tasks, states, storage_diagnostics = load_query_storage(root, table)
+        index, index_diagnostics = maybe_load_index(root, table)
+        return render_task_table_locked(
+            root,
+            table,
+            tasks,
+            states,
+            storage_diagnostics,
+            index,
+            index_diagnostics,
+        )
 
 
 def add_common(parser: argparse.ArgumentParser) -> None:

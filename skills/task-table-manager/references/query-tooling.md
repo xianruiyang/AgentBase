@@ -19,7 +19,7 @@ status/render               生成可重建的执行摘要和 TASK_TABLE.md
 
 `status` 和 `render` 的结果摘要按明确作用域区分：`referenced_result_count` 是当前状态文件实际引用的结果数；`task_revision_stale_result_count` 是结果记录的 task revision 与当前合同不一致；`source_snapshot_issue_result_count` 是至少含一项收据缺失、资产异常、覆盖不完整或逐来源陈旧诊断的结果数。它们与含诊断结果数、结果诊断条目数和按 kind 计数互不替代，也不表示目标证据充分或整体完成。model `status` 只显示非零状态、异常、结果进展和实际诊断；正常空诊断、完整 protected baseline 和机器零计数只保留在 machine 视图。
 
-`render` 复用 `status` 的非零摘要并附加生成路径。`TASK_TABLE.md` 只列当前非零状态、进展和问题；任务明细保留全部列并投影 state 真源中的 UTC `started_at/ended_at`，空单元格用 `—` 占位。占位符不写回任务合同，也不表示模型已裁决字段为“无”。没有任务或结果引用时使用明确结论区分已读取空集合与未知；存在结果但带验证数为零时保留该缺口。
+`render` 复用 `status` 的非零摘要并附加生成路径，并在工作区锁内取得一致任务快照。`add/update` 与状态写命令会自动调用同一 renderer；显式 `render` 用于主动重建或恢复已报告的陈旧展示。`TASK_TABLE.md` 只列当前非零状态、进展和问题；任务明细保留全部列并投影 state 真源中的 UTC `started_at/ended_at`，空单元格用 `—` 占位。占位符不写回任务合同，也不表示模型已裁决字段为“无”。没有任务或结果引用时使用明确结论区分已读取空集合与未知；存在结果但带验证数为零时保留该缺口。
 
 `task-table.json`、`.work-cache/index.json` 和 `TASK_TABLE.md` 分别是登记、缓存和生成视图，不是任务或语义修改入口。
 
