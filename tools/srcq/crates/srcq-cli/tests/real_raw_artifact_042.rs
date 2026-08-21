@@ -108,7 +108,7 @@ fn srcq(cwd: &Path, engine: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_srcq"));
     command
         .current_dir(cwd)
-        .args(["exec", "--engine"])
+        .args(["exec", "--output", "machine", "--engine"])
         .arg(engine)
         .args(["--cache", "off"]);
     command

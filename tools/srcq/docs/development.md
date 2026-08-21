@@ -26,7 +26,7 @@ cargo lint
 cargo fmt-check
 ```
 
-真实 ast-grep ignored 测试需要设置 `SRCQ_AST_GREP` 和 `SRCQ_AST_GREP_EXPECTED_VERSION`，并按 package/版本顺序运行；真实 scc 测试使用 PATH 或 `SRCQ_SCC_PATH`。不要并行执行共享 fixture 的全部 ignored 测试。
+真实 ast-grep ignored 测试需要把 `SRCQ_AST_GREP` 指向原生文件，并把 `SRCQ_AST_GREP_EXPECTED_VERSION` 设置为完整 `--version` 行（0.42.0 对应 `ast-grep 0.42.0`），再按 package/版本顺序运行；真实 scc 测试使用 PATH 或 `SRCQ_SCC_PATH`。不要并行执行共享 fixture 的全部 ignored 测试。
 
 `cargo lint` 与 `cargo ci-test` 都包含 `--all-targets --all-features`；不要用缺少 `test-helper` feature 的普通 workspace test 替代正式门禁。真实引擎测试还需要显式传入 `-- --ignored`。
 
@@ -47,6 +47,12 @@ cargo fmt-check
 5. 两次 clean 构建的归档哈希。
 
 发布生成物只进入 `dist/`，临时对象只进入 `target/release-build/<target>/`。不要把本机路径、临时 fixture 或验证用 source revision 写入正式文档/manifest。
+
+GitHub Release 另外上传 `scripts/install-srcq.ps1` 与 `scripts/install-srcq-release.ps1`。前者是安装生命周期和归档验证的唯一 owner；后者只承担私有 Release 的认证下载，并用以下入口在候选归档上验证下载、安装、Status 读回和缺失资产拒绝：
+
+```powershell
+& '.\scripts\test-install-srcq-release.ps1' -Archive .\dist\srcq-<version>-x86_64-pc-windows-msvc.zip -ExpectedVersion <version>
+```
 
 正式发布逐项执行 [release checklist](release-checklist.md)。源码目录没有 Git metadata 时，先运行：
 

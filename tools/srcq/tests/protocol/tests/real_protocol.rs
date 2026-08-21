@@ -168,7 +168,7 @@ fn real_completion_artifact_is_exact_and_loadable_by_the_target_shell() {
         .expect("native completion");
     assert!(native.status.success());
     let wrapped = srcq(directory.path())
-        .args(["exec", "--engine"])
+        .args(["exec", "--output", "machine", "--engine"])
         .arg(&engine)
         .args(["--cache", "off", "--artifact-out"])
         .arg(&artifact)
@@ -205,7 +205,7 @@ fn real_new_and_test_preserve_native_status_and_side_effects() {
         .output()
         .expect("native new");
     let wrapped_new = srcq(&wrapped_root)
-        .args(["exec", "--engine"])
+        .args(["exec", "--output", "machine", "--engine"])
         .arg(&engine)
         .args(["--cache", "off", "--", "new", "project", "-y"])
         .output()
@@ -226,7 +226,7 @@ fn real_new_and_test_preserve_native_status_and_side_effects() {
         .output()
         .expect("native test");
     let wrapped_test = srcq(&wrapped_root)
-        .args(["exec", "--engine"])
+        .args(["exec", "--output", "machine", "--engine"])
         .arg(&engine)
         .args(["--cache", "off", "--", "test", "-c", "sgconfig.yml"])
         .output()

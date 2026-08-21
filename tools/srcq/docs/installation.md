@@ -2,11 +2,24 @@
 
 ## 前置条件
 
-1. 从同一发布批次取得 Windows x86_64 ZIP、对应 `.sha256` 和安装脚本。
+1. 在线安装需要 GitHub CLI，并以具有私有仓库读取权限的账号执行 `gh auth login --hostname github.com`；目标机不需要 Rust、Cargo 或源码工作区。离线安装则从同一发布批次取得 Windows x86_64 ZIP、对应 `.sha256` 和安装脚本。
 2. 单独安装精确受支持的 ast-grep；第一版推荐固定 `0.42.0`，已验证版本还包括 `0.41.1` 与 `0.44.1`。若使用源码指标入口，还要单独安装支持 `--by-file`、JSON 与 json2 的 scc；当前精确验证版本为 `3.7.0`。
 3. 安装后运行 `srcq doctor`，使用 scc backend 时再运行 `srcq query scc doctor`；srcq 不下载 ast-grep 或 scc，也不安装 Node/Python、hyperfine 或语言运行时。
 
 ## Windows
+
+私有 Release 的正式下载入口只负责通过 `gh release download` 取得指定 tag 的精确资产；归档校验、安装状态、升级和回滚仍全部由下载到的 `install-srcq.ps1` 负责：
+
+```powershell
+gh release download srcq-v0.4.1 --repo xianruiyang/AgentBase --pattern install-srcq-release.ps1
+.\install-srcq-release.ps1 Install -Version 0.4.1
+```
+
+`install-srcq-release.ps1` 默认从 `xianruiyang/AgentBase` 的 `srcq-v<version>` 下载 `install-srcq.ps1`、Windows x86_64 ZIP 和对应 `.sha256`。`-Repository` 与 `-Tag` 只用于明确选择其他受信来源；下载失败、权限不足或任一资产缺失时不会进入安装。需要升级时把动作改为 `Upgrade` 并指定新版本。
+
+没有 GitHub CLI 时，也可以在已登录且有仓库读取权限的浏览器中，从同一个 Release 手工下载 Windows ZIP、对应 `.sha256` 与 `install-srcq.ps1`，再按下面的本地入口安装；仍不需要编译环境。
+
+已有本地发布资产时直接使用底层安装器：
 
 ```powershell
 .\scripts\install-srcq.ps1 Install -Archive .\dist\srcq-<version>-x86_64-pc-windows-msvc.zip

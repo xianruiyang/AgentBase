@@ -20,7 +20,15 @@
 
 ## 快速开始
 
-安装正式候选并检查环境：
+从私有 GitHub Release 认证下载正式版本并安装，不需要 Rust 或本仓库工作区；目标账号必须有仓库读取权限，且本机 `gh` 已完成认证：
+
+```powershell
+gh release download srcq-v0.4.1 --repo xianruiyang/AgentBase --pattern install-srcq-release.ps1
+.\install-srcq-release.ps1 Install -Version 0.4.1
+& (Join-Path $env:LOCALAPPDATA 'Programs\srcq\current\srcq.exe') doctor
+```
+
+已有同一发布批次的本地归档、校验和与安装脚本时可离线安装：
 
 ```powershell
 .\scripts\install-srcq.ps1 Install -Archive .\dist\srcq-<version>-x86_64-pc-windows-msvc.zip
@@ -113,4 +121,5 @@ cargo ci-build
 cargo lint
 cargo fmt-check
 & '.\scripts\test-install-srcq-views.ps1'
+& '.\scripts\test-install-srcq-release.ps1' -Archive <release-zip> -ExpectedVersion <version>
 ```

@@ -26,3 +26,5 @@
 - SPDX 2.3 JSON SBOM。
 
 ZIP 内含 `srcq.exe`、README、项目双许可证、NOTICE、target-filtered 第三方完整许可证、manifest 和 SBOM。二进制本身不依赖 Node 或 Python；运行 ast-grep 功能时仍需可发现的 `ast-grep` 可执行文件。
+
+发布到 GitHub 时还要把 `install-srcq.ps1` 和 `install-srcq-release.ps1` 作为同一 Release 的独立资产上传。下载入口不复制安装逻辑：它只通过已认证的 GitHub CLI 下载精确 tag 的归档、校验和与底层安装器。
