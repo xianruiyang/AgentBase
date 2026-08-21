@@ -1,21 +1,26 @@
 # 执行控制与 Skill 上下文生命周期：完成审计
 
+## 重开原因
+
+2026-08-21 的九题评测准备证明，原 AC-036 证据只覆盖“是否建立计划”和“条件相当时优先纵向闭环”，没有覆盖多个任务共享未证前提、首个真实消费者、失败遮蔽和昂贵批量验证。原完成判定在该范围内被反例推翻；本文件以当前候选重新审计，不沿用旧结论为运行期行为证明。
+
 ## 目标证据
 
 | 目标 | 当前结果与直接证据 | 判定 |
 | --- | --- | --- |
-| AC-007 按端到端成本渐进加载上下文 | 每轮重新路由与正文有效性已经分离；未压缩复用、压缩后按需恢复、历史未选 skill 不重载、已知变化重读均有独立场景 | 满足 |
-| AC-024 纳入目标成立所需的职责调整 | 全局规则要求在继续失效方案前说明并返回最早失效层；实施中发现共享 owner 被复制的场景选择 `change-governance` 与 `architecture_integrated` | 满足 |
-| AC-036 有效规划后优先形成纵向验证闭环 | 建立计划改由跨步骤不确定性、依赖、顺序、分工、验收或恢复状态决定；复杂正例和简单反例均通过独立 Policy | 满足 |
+| AC-007 按端到端成本渐进加载上下文 | skill 选择、正文有效性和引用生命周期仍分离；新增 skill 只按两类控制问题加载引用 | 满足 |
+| AC-024 纳入目标成立所需的职责调整 | 架构与长期 owner 仍由 `change-governance`；新执行 owner 明确排除单个领域故障和职责裁决，没有吸收治理职责 | 满足 |
+| AC-036 共享前提先闭合真实消费者 | 全局不变量、`execution-governor` 控制循环、Delivery 投影和 Task `hard` 依赖形成单向职责链；独立切片已验证 Routing、Policy 与 References | 仓库合同满足；真实执行未验证 |
+| AC-050 目标档位、状态查询与切换收益分层 | 复杂执行的目标与状态价值归执行控制，稳定工作由模型直接判断，`reasoning-governor` 只承担线程读写与生命周期 | 仓库合同满足；真实自主切换未验证 |
 
 ## 职责与消费者闭合
 
-- `docs/requirements.md` 持有长期验收语义；`global/AGENTS.md` 持有跨项目执行控制和 skill 上下文生命周期不变量。生命周期属于全局选择与上下文 owner，不复制到 11 个 skill 正文。
-- `global/README.md` 只更新稳定能力索引；`development/skill-routing/trigger-cases.json`、`validate_contract.ps1` 和 `evidence/current.json` 分别消费标签定义、机械合同和独立证据，没有建立第二套行为真源。
-- 没有新增 skill 缓存、版本账本、Hook、每轮文件探测或 Goal 状态；当前上下文决定正文是否可用，已知内容变化直接使旧正文失效。
-- 11/11 skill 的正向与非触发覆盖仍成立；三阶段证据和部署 validator 消费同一候选 bundle，没有用静态规则存在或 Token 变短替代行为 oracle。
-- 没有改变 `source_snapshot`、插件迁移、远程 CI、工具输出合同或真实 Codex 安装内容。
+- `docs/requirements.md` 持有纵向消费者目标；`global/AGENTS.md` 只保留共享未知先证实、成立前不扩量和反例熔断的不变量。
+- `execution-governor` 是运行期下一动作 owner，但不持有计划、任务状态或完成结论；`delivery-workflow`、`task-table-manager`、`change-governance` 与 `reasoning-governor` 各自只消费其控制结论并维护原职责。
+- `development/skill-routing` 已把第 12 个 skill 接入必需清单、正反例、条件引用与当前 evidence；DirectCompatibility 生命周期清单包含稳定资产身份，插件 payload 仍由同一必需 skill 集生成。
+- 没有新增控制日志、状态文件、缓存、Hook、Goal 字段或 CLI 门禁；任务中的 `hard` 关系只在真实消费证明或首个消费者证据时成立。
+- 96/96 Routing、96/96 Policy、27/27 References 与零模型基础设施均通过；它们不被提升为 skill 内实际行为证明。
 
 ## 完成判定
 
-当前范围的需求、正式 owner、正反例、压缩边界、成本边界、独立 Routing/Policy/References 和部署候选均已闭合，没有适用验证失败或同责第二入口。当前范围作为未发布仓库候选已完成；由于本轮没有当次发布授权，真实 Codex 继续使用上一次已发布内容，候选行为尚未在新任务中做运行时验收。
+第一版仓库候选的职责、规则、skill、任务投影、路由、引用和资产生命周期已经闭合。只包含本次暂存内容与原 HEAD 的独立临时 Git tree 已通过 skill 校验、96-case 合同、6-suite 路由基础设施和正式部署 Validate，其中基线 Windows SWE 确定性入口为 45 tests；当前组合工作树的 Validate 也通过并运行 66 tests。后一个数量包含接手时已有的评测 dirty 候选，只证明两者当前组合没有触发适用失败，不把该候选纳入本次完成范围。该结论只证明未发布仓库候选，不证明真实 Codex 已加载或运行期行为已改变；安装状态保持不变，真实行为验收留到用户另行授权发布后的新任务。

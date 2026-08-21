@@ -9,7 +9,7 @@
 
 这些证据共同支持把生命周期拆为三项：每轮重新路由、正文按上下文可用性复用或恢复、引用按当前动作渐进加载。它们不支持跨对话持久缓存，也不支持压缩后按历史使用记录批量重读。
 
-## 规则、路由与独立证据
+## 2026-08-18 原范围规则、路由与独立证据
 
 `validate_contract.ps1` 通过：86 cases、45 strict routing、5 strict references，11/11 项目 skill 同时具有正向和非触发覆盖。新增严格场景覆盖实施中架构判断失效、复杂任务未显式要求计划、简单任务不建形式计划、未压缩正文复用、压缩后补回已选 skill、压缩后不加载历史未选 skill，以及已知内容变化后的重读。
 
@@ -23,12 +23,34 @@
 
 候选 bundle 为 `88CBCDCCBADE2DF6904CC95D631F04963D088D114713F5B159AAA5F35E7D66B9`。三个结果都声明 `detached-capsule`、未访问仓库和未访问隐藏期望；Routing 与 Policy 各覆盖 86 项，References 覆盖实际触发的 20 项。
 
-## 上下文成本边界
+## 2026-08-18 原范围上下文成本边界
 
 以 `tiktoken 0.13.0 / o200k_base` 计，当前 11 个项目 `SKILL.md` 主文件合计 11,591 tokens，单项 260—2,049 tokens；真实重复读取的 `openai-docs/SKILL.md` 为 1,103 tokens。三项机制进入 `global/AGENTS.md` 后，候选常驻正文由本轮修改前的 4,621 增至 4,730 tokens，增加 109；对已观察到的一次 1,103-token 重复读取，净减少约 994 tokens。该差值只说明已观察路径，不作为固定节省比例，也不允许跳过应选 skill 或必要引用。
 
-## 部署候选与边界
+## 2026-08-18 原范围部署候选与边界
 
 - `validate_contract.ps1` 的 PowerShell 语法解析通过。
 - `manage_agentbase.ps1 -Action Validate` 返回 `valid=true`，证明当前仓库候选的全局规则、路由证据、受管资产和部署合同一致。
 - 本轮没有执行 `Publish`，没有写入真实 Codex，也没有提交或推送 Git。当前运行不会追溯加载候选规则；真实行为只能在用户另行明确同意发布后，于新任务中验证。
+
+## 2026-08-21 重开验证
+
+原完成证据只证明计划启动、架构失效回退和 skill 正文生命周期，没有证明 AC-036 的运行期纵向闭环。九题评测准备在首个真实消费者尚未成立时横向展开，并由前置失败逐层遮蔽下游，构成直接重开证据；本轮据此新增 `execution-governor` 并重新划分五项 owner，而不是在原软优先级上继续追加特例。
+
+静态与零模型验证结果：
+
+- `skill-creator/scripts/quick_validate.py` 在显式 UTF-8 解释器模式下验证 `execution-governor` 结构通过；系统默认 GBK 导致的首次 `UnicodeDecodeError` 只证明校验器宿主编码，不是 skill 内容失败。
+- `validate_contract.ps1` 通过：96 cases、55 strict routing、10 strict references，12/12 skill 都有正向与非触发覆盖；全局与项目指令合计保持在项目 28,672-byte 上限内。
+- `test_routing_infrastructure.ps1` 通过 6 个 suite，解析 22 个 PowerShell 文件，模型调用为 0。
+
+正式 detached 路由证据已原子合并到 generation `B7A173D895A435B78D523CD39A190DF30581CC68A81A5CDE4FC12D95F3B968B6`：
+
+| 阶段 | 结果 | Capsule SHA-256 |
+| --- | --- | --- |
+| Routing | 96/96；共享前提切片选择 `execution-governor` 与 `task-table-manager` | `D5235B47CA6BA45FAA6F143C32CFF09DA579481C4E6BBB6F146B50E6D28EC42C` |
+| Policy | 96/96；该切片包含 `fact_first` 与 `vertical_validation_closure` | `EFFEFE0E9D51C59BB7545924997B76706DFCAB3C3BA9275F90D9253F9FE0161F` |
+| References | 27/27；该切片选择两项执行控制引用及任务查询/依赖引用 | `810431901E627B90339F5FE0A3ED37A14D60FCEA5A9272E2A3685C5E77C5D802` |
+
+References 最终 candidate bundle 为 `BBDC80FA6E84CF1EE599A72715778B582FDA18E2A304552CB873B340C33CD1B4`。最后一次刷新只运行 References 一次，并复用已通过的 Routing 与 Policy；没有对相同失败输入重采样。
+
+这些证据直接覆盖规则结构、skill 发现、粗粒度行为标签和条件引用选择，不证明新 skill 的控制循环会在真实项目中按预期执行。只包含本次暂存内容与原 HEAD 的独立临时 Git tree 通过 skill 校验、同一合同与路由基础设施，并由 `manage_agentbase.ps1 -Action Validate` 运行 45 项基线 Windows SWE 确定性测试后返回 `valid:true`；临时 worktree 随后删除。当前组合工作树的同一 Validate 也通过并运行 66 tests；该数量包含接手时已有且继续保留的评测 dirty 候选，只证明组合兼容。模型 evaluator 保持禁用；真实 Codex 继续使用已安装版本，本轮没有 Publish 授权，也没有新任务运行时验收。

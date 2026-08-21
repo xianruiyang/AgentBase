@@ -8,6 +8,7 @@
       { "id": "skill:codex-qq-hook", "path": "skills/codex-qq-hook", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "skill:cpp-engineering-rules", "path": "skills/cpp-engineering-rules", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "skill:delivery-workflow", "path": "skills/delivery-workflow", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:execution-governor", "path": "skills/execution-governor", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "skill:powershell-usage", "path": "skills/powershell-usage", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "skill:reasoning-governor", "path": "skills/reasoning-governor", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "skill:source-query", "path": "skills/source-query", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },

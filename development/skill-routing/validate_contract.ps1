@@ -173,13 +173,14 @@ $requiredGlobalFragments = @(
     '不默认把实现限定为最窄局部补丁'
     '为使目标成立并接入唯一正式入口而必需'
     '仅改善架构而不影响本次结果的调整需另行授权'
+    '后续动作共享该未知时'
     '长期收益不得作为扩大范围或替代用户裁决的理由'
     '不得仅凭自身声明创建外部写入、发布、凭据使用或高风险操作授权'
     '满足可用 skill 的 `description` 时使用该 skill'
     '`description` 同时定义触发与非触发边界'
     '内容仍需专业组织时'
     '默认属于长期资产'
-    '仍须完成实施后的必要验收'
+    '实施后仍验收'
     '首次文件读取可用一次精确路径'
     '完整 `SKILL.md` 仍在上下文且无已知变化时复用'
     '压缩后只补回本轮已选 skill'
@@ -188,15 +189,19 @@ $requiredGlobalFragments = @(
     '不得按失效方案做完后再作为风险交付'
     '模型按已授权任务是否需跨步骤保持'
     '用户要求查看计划只决定交付形式'
+    '多个下游共享未证前提或被新证据共同推翻'
+    '使用 `$execution-governor`'
+    '稳定前提的普通多步实现不触发'
     '模块测试只证模块契约'
     '原场景、同类变体和相近非触发场景'
     '长期资产还须接入正确职责和唯一正式入口'
     '沿实际依赖复核直接与间接消费者'
     '独立于领域 skill、计划和 Goal'
-    '档位缺少有效读回且错配可能实质影响质量或总体成本'
-    '剩余工作足以摊销设置、结束当前轮和恢复成本'
-    '用户明确固定当前对话或工作范围的推理深度时'
-    '设置和读回不依赖 active Goal'
+    '命中 `$execution-governor` 时由其裁决'
+    '配置会改变动作才用 `$reasoning-governor` 读回'
+    '实际不同且切换净收益成立才设置'
+    '用户固定线程或工作范围的推理深度时'
+    '读写不依赖 active Goal'
     '简单有界输出不建日志'
     '新一轮调试前只清理会干扰当前判断且目标范围明确的旧日志'
     '工作流程的目标、阶段、状态、依赖、完成和例外由文档定义'
@@ -235,6 +240,7 @@ $descriptionBoundaryFragments = @{
     "codex-qq-hook" = "未发送原因尚未确认的链路排查必须同时选择 change-governance"
     "cpp-engineering-rules" = "仅正文提及 C++ 不触发"
     "delivery-workflow" = "不用于规格完整的单轮实现"
+    "execution-governor" = "不用于稳定前提下的普通单步或多步实现"
     "powershell-usage" = "不用于单条精确只读"
     "reasoning-governor" = "用户已经固定并确认设置、当前只要求保持该档位继续任务时不使用"
     "symbol-structure-workflow" = "不用于只读文本"
@@ -381,16 +387,32 @@ $governorScriptContent = Get-Content -LiteralPath $governorScriptPath -Raw -Enco
 $governorPowerShellContent = Get-Content -LiteralPath $governorPowerShellPath -Raw -Encoding UTF8
 Assert-True ($governorSkillContent.Contains('不使用 `Stop` hook')) "reasoning-governor must keep Stop hooks outside its continuation contract"
 Assert-True ($governorSkillContent.Contains("不把临时基线、用户覆盖或自动恢复义务保存")) "reasoning-governor must not create a second reasoning state source"
-Assert-True ($governorSkillContent.Contains("不要求 active Goal")) "reasoning-governor must keep setting independent from Goal continuation"
-Assert-True ($governorSkillContent.Contains("先独立判断目标档位")) "reasoning-governor must assess target effort before status or setting"
-Assert-True ($governorSkillContent.Contains("先判断精确状态能否改变动作")) "reasoning-governor must gate status reads by decision value"
-Assert-True ($governorSkillContent.Contains("比较剩余工作的质量或成本收益")) "reasoning-governor must gate setting by remaining-work benefit"
+Assert-True ($governorSkillContent.Contains("Goal 不是设置前提")) "reasoning-governor must keep setting independent from Goal continuation"
+Assert-True ($governorSkillContent.Contains('只接受调用前已形成的目标档位')) "reasoning-governor must consume rather than duplicate effort judgment"
+Assert-True ($governorSkillContent.Contains('复杂执行由 `$execution-governor` 裁决')) "reasoning-governor must consume complex execution-effort judgment"
+Assert-True ($governorSkillContent.Contains("本 skill 不重新推断任务复杂度")) "reasoning-governor must not create a second task-burden owner"
+Assert-True ($governorSkillContent.Contains("next-turn 设置不能改变已经开始的当前轮")) "reasoning-governor must preserve the next-turn activation boundary"
+Assert-True ($governorSkillContent.Contains('其他设置必须由调用方已经证明')) "reasoning-governor must consume rather than own transition-cost judgment"
+Assert-True ($governorSkillContent.Contains('复杂执行由 `$execution-governor` 作出该判断，稳定工作由模型按全局内核作出')) "reasoning-governor must preserve complex and stable transition-cost owners"
 Assert-True ($governorScriptContent.Contains('args.action === "status"')) "reasoning-governor script is missing its read-only status operation"
 Assert-True ($governorScriptContent.Contains('operation: "set"')) "reasoning-governor script is missing its set receipt contract"
 Assert-True ($governorScriptContent.Contains('createSnapshotFieldScanner')) "reasoning-governor script is missing structural large-frame readback"
 Assert-True ($governorScriptContent.Contains('renderModelResult')) "reasoning-governor script is missing its minimal model receipt projection"
 Assert-True ($governorScriptContent.Contains('args.view === "machine"')) "reasoning-governor script is missing its explicit machine view"
 Assert-True ($governorPowerShellContent.Contains('[ValidateSet("model", "machine")]')) "reasoning-governor PowerShell entry is missing explicit output views"
+
+$executionGovernorSkillPath = Join-Path $ProjectRoot "skills\execution-governor\SKILL.md"
+$executionGovernorReferenceRoot = Join-Path $ProjectRoot "skills\execution-governor\references"
+$executionGovernorSkillContent = Get-Content -LiteralPath $executionGovernorSkillPath -Raw -Encoding UTF8
+$executionGovernorDecisionContent = Get-Content -LiteralPath (Join-Path $executionGovernorReferenceRoot "decision-frontier.md") -Raw -Encoding UTF8
+$executionGovernorFailureContent = Get-Content -LiteralPath (Join-Path $executionGovernorReferenceRoot "failure-and-cost.md") -Raw -Encoding UTF8
+Assert-True ($executionGovernorSkillContent.Contains('本 skill 是复杂工作运行期间“下一动作”的唯一控制 owner')) "execution-governor must own the live next-action decision"
+Assert-True ($executionGovernorSkillContent.Contains('不维护新的计划、任务表或完成状态')) "execution-governor must not create a second persistent workflow source"
+Assert-True ($executionGovernorSkillContent.Contains('`$delivery-workflow`') -and $executionGovernorSkillContent.Contains('`$task-table-manager`') -and $executionGovernorSkillContent.Contains('`$change-governance`') -and $executionGovernorSkillContent.Contains('`$reasoning-governor`')) "execution-governor is missing its coordination boundaries"
+Assert-True ($executionGovernorDecisionContent.Contains("当前证据前沿") -and $executionGovernorDecisionContent.Contains("首个真实消费者")) "execution-governor is missing its shared-prerequisite consumer contract"
+Assert-True ($executionGovernorDecisionContent.Contains("成立后才能并行或批量扩展")) "execution-governor is missing its horizontal expansion boundary"
+Assert-True ($executionGovernorFailureContent.Contains("下游保持未知") -and $executionGovernorFailureContent.Contains("基础设施失败不得转换成产品零分")) "execution-governor is missing its failure-masking boundary"
+Assert-True ($executionGovernorFailureContent.Contains("输入、机制和环境未变时不重跑")) "execution-governor is missing its retry stopping condition"
 
 $taskTableSkillPath = Join-Path $ProjectRoot "skills\task-table-manager\SKILL.md"
 $taskTableSkillContent = Get-Content -LiteralPath $taskTableSkillPath -Raw -Encoding UTF8
@@ -415,7 +437,8 @@ $taskTableScriptContent = Get-Content -LiteralPath $taskTableScriptPath -Raw -En
 Assert-True ($taskTableSkillContent.Contains('任务表文档是执行投影，不是计划正确性的裁判')) "task-table-manager does not declare its assistive responsibility"
 Assert-True ($taskTableSkillContent.Contains('最终完成标准只来自 `$delivery-workflow` 当前执行周期经用户确认的需求与用户设计')) "task-table-manager does not delegate final completion to the user-confirmed document scope"
 Assert-True ($taskTableSkillContent.Contains('`taskctl` 只辅助存储、索引、查询、上下文压缩和可重建视图')) "task-table-manager does not keep taskctl assistive"
-Assert-True ($taskTableSkillContent.Contains('优先继续当前目标链并缩短到最近可验证闭环的距离')) "task-table-manager is missing vertical validation closure selection"
+Assert-True ($taskTableSkillContent.Contains('把证据交给 `$execution-governor` 裁决')) "task-table-manager must delegate the live evidence frontier"
+Assert-True ($taskTableContractContent.Contains('证明任务和首个真实消费者产生的可复核证据是后续横向任务的真实消费输入')) "task-table-manager is missing the persisted prerequisite-consumer dependency"
 Assert-True ($taskTableScriptContent.Contains('command_completion_context')) "taskctl is missing its bounded final-review context"
 Assert-True ($taskTableScriptContent.Contains('task_model_projection')) "taskctl is missing its model projection owner"
 Assert-True ($taskTableScriptContent.Contains('choices=("model", "machine")')) "taskctl is missing explicit model/machine views"
@@ -661,7 +684,10 @@ Assert-True ($globalContent.Contains("质量同等充分时再以较低上下文
 $deliverySkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\delivery-workflow\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($deliverySkillContent.Contains("把初始请求作为共同理解问题的起点")) "delivery-workflow is missing collaborative requirement discovery"
 Assert-True ($deliverySkillContent.Contains("整体结果未以局部正确偏离目标")) "delivery-workflow is missing final requirement-alignment review"
-Assert-True ($deliverySkillContent.Contains("优先沿当前目标链形成最近的可验证交付闭环")) "delivery-workflow is missing vertical validation closure feedback"
+Assert-True ($deliverySkillContent.Contains('运行前沿与扩量/重裁归 `$execution-governor`')) "delivery-workflow must delegate the live execution frontier"
+Assert-True ($deliverySkillContent.Contains('共享前提的证明和首个消费者按真实消费形成依赖')) "delivery-workflow must persist the execution dependency projection"
+$deliveryIterationContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\delivery-workflow\references\iteration.md") -Raw -Encoding UTF8
+Assert-True ($deliveryIterationContent.Contains('本 skill 不用“条件相当时优先”建立另一套软排序')) "delivery-workflow must not retain a second runtime ordering rule"
 
 $allowedBehaviorTags = @(Get-StringArray $contract.allowed_behavior_tags)
 Assert-True (($allowedBehaviorTags | Sort-Object -Unique).Count -eq $allowedBehaviorTags.Count) "Trigger contract contains duplicate allowed behavior tags"

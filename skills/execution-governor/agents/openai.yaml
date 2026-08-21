@@ -1,0 +1,4 @@
+interface:
+  display_name: "Execution Governor"
+  short_description: "控制共享未证前提、纵向消费者、失败熔断与昂贵验证成本"
+  default_prompt: "使用 $execution-governor 确定当前证据前沿，先闭合真实消费者路径，并据失败与成本决定继续、扩量或重裁。"

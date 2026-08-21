@@ -37,7 +37,7 @@ AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、ski
 
 全局内核只保留跨项目成立的目标、证据、授权、工具路由、修改、验证、记录和交付约束。领域协议按需进入对应 skill：
 
-- 交付与维护：`delivery-workflow`、`task-table-manager`、`change-governance`、`reasoning-governor`。
+- 执行与交付：`execution-governor` 控制复杂工作的当前证据前沿与下一动作；`delivery-workflow`、`task-table-manager`、`change-governance`、`reasoning-governor` 分别维护交付语义、任务存储、深层治理和线程设置。
 - 源码与工程：`source-query`、`symbol-structure-workflow`、`powershell-usage`、`cpp-engineering-rules`、`understand-space`。
 - 运行协作：`codex-event-logger`、`codex-qq-hook`。
 

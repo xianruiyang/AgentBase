@@ -1,6 +1,6 @@
 ---
 name: task-table-manager
-description: 用低 Token 管理长期任务合同、依赖图、状态、结果摘要和恢复上下文。用于必须创建、更新或查询长期任务记录，交付执行证据要求更新既有任务合同、依赖、状态或结果，或多人领取与恢复上下游产出时；不用于单轮修改、只读消费关系分析、简单清单、一次性诊断，也不裁决需求、设计、现状或方案。
+description: 设计并用低 Token 管理长期任务合同、依赖图、状态、结果摘要和恢复上下文。用于定义任务与结果字段，创建、更新或查询长期任务记录，用 taskctl 取得最终复核上下文，交付执行证据要求更新既有任务合同、依赖、状态或结果，或多人领取与恢复上下游产出时；不用于单轮修改、只读消费关系分析、简单清单、一次性诊断，也不裁决需求、设计、现状或方案。
 ---
 
 # Task Table Manager
@@ -9,14 +9,15 @@ description: 用低 Token 管理长期任务合同、依赖图、状态、结果
 
 ## 路由与协同
 
+- 多个候选共享未证前提、需要先闭合一个真实消费者、存在昂贵批量验证或反复失效时使用 `$execution-governor` 裁决当前动作；本 skill 只保存已经投影的证明、消费和依赖关系，不按任务深度或数量重新决定前沿。
 - 需要需求分析、目标设计、现状分析或方案设计时使用 `$delivery-workflow`；本 skill 只消费其稳定 ID 和索引。
 - 根因、职责、权威入口、共享职责形成、权威变化的跨消费者影响或共享阻断门禁需要专项裁决时使用 `$change-governance`；其结论应进入上游阶段文档，不进入 CLI 规则。
 - 执行任务时继续按真实工作触发 C++、符号、搜索、PowerShell、空间等领域 skill。任务可记录建议 skill，但不能强制或替代运行时路由。
-- 推理深度使用 `$reasoning-governor`；任务可提供非权威初始建议，但不保存线程设置，也不在用户明确覆盖之外限制执行中的动态升降。
+- 任务的推理提示只是非权威输入；复杂执行由 `$execution-governor` 判断目标档位和状态价值，再按需使用 `$reasoning-governor` 读写线程设置。任务表不保存线程设置，也不限制执行中的动态裁决。
 
 ## 真源与工具
 
-- 完整读取 [task-contracts.md](references/task-contracts.md) 创建或修改任务；只有进入实际执行、恢复或并行领取时才读取 [execution.md](references/execution.md)，只读查询或只判断下一项工作且不领取、恢复、执行时不读取它。实际使用 CLI 时先读取共享 [tooling.md](references/tooling.md)，再只增加当前命令族的一项：[authoring-tooling.md](references/authoring-tooling.md) 用于 `init/draft/add/update`，[query-tooling.md](references/query-tooling.md) 用于 `show/list/deps/dependents/impact/next/status/render`，[execution-tooling.md](references/execution-tooling.md) 用于 `context`、状态命令和 `complete`，[completion-tooling.md](references/completion-tooling.md) 用于 `completion-context`；请求跨命令族时才组合。
+- 完整读取 [task-contracts.md](references/task-contracts.md) 创建、修改任务或判断尚未写入的依赖；只有进入实际执行、恢复或并行领取时才读取 [execution.md](references/execution.md)，只读查询或只判断下一项工作且不领取、恢复、执行时不读取它。读取多个任务及上下游且 CLI 能降低成本时，同时读取共享 [tooling.md](references/tooling.md) 与 [query-tooling.md](references/query-tooling.md)；其他 CLI 调用先读 `tooling.md`，再只增加当前命令族的一项：[authoring-tooling.md](references/authoring-tooling.md) 用于 `init/draft/add/update`，[execution-tooling.md](references/execution-tooling.md) 用于 `context`、状态命令和 `complete`，[completion-tooling.md](references/completion-tooling.md) 用于 `completion-context`；请求跨命令族时才组合。
 - 工具入口是 `<SkillDir>/scripts/taskctl.py`。只在它能降低编辑、查询或恢复成本时使用，并显式传绝对 `--task-dir`；CLI 不可用时仍按同一文档合同继续。默认 `--view model` 返回当前动作所需的稀疏证据，程序、测试或确需完整身份与字段时显式使用 `--view machine`；两种视图来自同一次任务事实计算，具体字段与恢复入口由当前命令族引用维护。
 - `task-table.json` 登记目录；`tasks/<ID>.json` 持有任务合同，`state/<ID>.json` 持有执行状态，`results/<ID>.r<state-revision>.json` 持有可追溯的结果摘要，`snapshots/<sha256>.json` 持有内容寻址的不可变执行来源映射，状态文件只指向当前结果。
 - `TASK_TABLE.md` 是生成视图，`.work-cache/index.json` 是上游索引；两者都不是任务或语义真源。
@@ -26,7 +27,7 @@ description: 用低 Token 管理长期任务合同、依赖图、状态、结果
 
 1. 模型根据上游 `SOL/GAP/DES/AC/REQ` 和真实工作范围编写任务合同语义；公共产出与消费者接入拆分时必须声明真实消费依赖，需要模板时可用默认 model `taskctl draft`，其结果保留稳定 ID 和语义字段但不返回 schema/revision。CLI 不自动把文档变成任务。
 2. 需要结构化存储时用 `add` 或 `update`。模型输入只维护稳定 ID 与任务语义，CLI 注入机器 schema/revision，并用调用方已读 revision 保护并发写入；语义问题只诊断，不把工具变成任务裁判。
-3. 用 `next`、`deps`、`dependents` 和 `context` 以有界模型视图选择工作。先考虑用户优先级、硬依赖、关键风险、共享前置、冲突和当前能力；条件相当时，优先继续当前目标链并缩短到最近可验证闭环的距离，避免打开更多未闭合的平级分支。任务深度只作线索，CLI 排序只是建议；开始实际执行时用 `context --capture` 固化最终模型可见来源。
+3. 用 `next`、`deps`、`dependents` 和 `context` 取得有界候选、依赖与结果证据。稳定上游的单一候选可直接执行；候选共享未证前提、昂贵验证或失效关系时，把证据交给 `$execution-governor` 裁决，不能由 CLI 排序、任务深度或完成数量替代。开始实际执行时用 `context --capture` 固化最终模型可见来源。
 4. 需要跨轮跟踪时用 `claim/start/note/complete/reopen/release`，每次先读取当前 state revision 并传 `--expected-state-revision`；不再执行的任务可标记 `retired`。命令记录模型已作出的判断，不决定该判断是否被允许。
 5. 模型结果文件只写实际结果、验证、未决问题和证据等语义正文；`complete` 从命令目标、调用方实际执行的 task/state revision 和已捕获来源收据形成完整永久结果。后继验证提交自己的收据和直接证据，不改写或隐藏旧结果诊断。
 6. 上游改变时用 `$delivery-workflow` 的 `impact`、本工具的递归 `impact` 和实际系统依赖逐项判断消费者与结果，按结论更新、重开或退休任务并重新验证；CLI 只返回路径和陈旧诊断，不自动重置状态或宣布结果失效。
