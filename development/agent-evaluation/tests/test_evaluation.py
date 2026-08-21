@@ -217,6 +217,23 @@ class SandboxConfigTests(unittest.TestCase):
     def setUp(self) -> None:
         self.corpus = evaluation_core.load_corpus(CORPUS_PATH)
 
+    @unittest.skipUnless(os.name == "nt", "WinGet aliases are Windows-only")
+    def test_application_resolution_prefers_native_winget_alias_over_path_shim(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            local_app_data = Path(directory)
+            alias = local_app_data / "Microsoft" / "WinGet" / "Links" / "rg.exe"
+            alias.parent.mkdir(parents=True)
+            alias.write_bytes(b"native executable placeholder")
+            path_shim = local_app_data / "path" / "rg.exe"
+            path_shim.parent.mkdir()
+            path_shim.write_bytes(b"shim placeholder")
+            with (
+                mock.patch.dict(os.environ, {"LOCALAPPDATA": str(local_app_data)}),
+                mock.patch.object(agentbase_codex.shutil, "which", return_value=str(path_shim)),
+            ):
+                resolved = agentbase_codex._resolve_application(("rg.exe", "rg"))
+        self.assertEqual(resolved, alias.resolve())
+
     def test_candidate_config_defaults_host_to_deny_and_keeps_workspace_runtime_minimum(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / "held-out-state"
