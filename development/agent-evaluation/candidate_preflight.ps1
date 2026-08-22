@@ -582,10 +582,10 @@ if (
         try {
             $paginationResults = @()
             $paginationPageCount = 0
-            $cursor = $null
+            $continuationHandle = $null
             $paginationComplete = $false
             while ($paginationPageCount -lt 8 -and -not $paginationComplete) {
-                $pageOutput = if ($null -eq $cursor) {
+                $pageOutput = if ($null -eq $continuationHandle) {
                     @(
                         & $srcqProbe.path query rg exec `
                             --engine $probeById['rg'].path `
@@ -596,12 +596,7 @@ if (
                 }
                 else {
                     @(
-                        & $srcqProbe.path query rg exec `
-                            --engine $probeById['rg'].path `
-                            --cwd $workspaceRoot `
-                            --limit 1 `
-                            --after $cursor `
-                            -- -n -F 'agentbase-pagination' $paginationPath 2>&1
+                        & $srcqProbe.path more $continuationHandle 2>&1
                     )
                 }
                 $pageExit = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
@@ -637,10 +632,10 @@ if (
                     [ref]$parseTokens,
                     [ref]$parseErrors
                 )
-                if (@($parseErrors).Count -ne 0 -or $nextCommand -cnotmatch '--after\s+([A-Za-z0-9._-]+)\s+--') {
+                if (@($parseErrors).Count -ne 0 -or $nextCommand -cnotmatch '^srcq more (q[1-9][0-9]*)$') {
                     throw [IO.InvalidDataException]::new('srcq @next is not a valid bounded PowerShell command')
                 }
-                $cursor = $Matches[1]
+                $continuationHandle = $Matches[1]
             }
             $paginationPassed = (
                 $paginationComplete -and
@@ -650,7 +645,7 @@ if (
             )
             $srcqSmoke['rg-pagination'] = [ordered]@{
                 passed = $paginationPassed
-                summary = if ($paginationPassed) { 'three one-result model pages resumed through validated @next cursors' } else {
+                summary = if ($paginationPassed) { 'three one-result model pages resumed through validated short @next handles' } else {
                     "pages=$paginationPageCount results=$($paginationResults.Count) complete=$paginationComplete"
                 }
             }

@@ -358,6 +358,8 @@ TSQG-095—TSQG-098 已闭环。`srcq 0.4.1` 的特殊 argv PowerShell 往返、
 
 P14 以 TSQG-100 的 scc 首屏—续页—单次扫描作为首个真实消费者；该路径成立后才扩到并发、全 workspace、release 与部署。句柄按十进制单调增长而不固定填充六位；受管保留周期内不复用，过期只返回重跑原查询，不误指其他 snapshot 或隐式重扫。
 
+TSQG-099—TSQG-102 已闭环。`srcq 0.4.2` 以 revision `ef65946f…9c04` 生成两份 SHA-256 相同的 clean Windows archive，并经私有 GitHub Release 安装到真实 PATH；Status、AST/scc doctor 与已安装短句柄续页通过。source-query 路由合同、36 项 query gateway、workspace build/test/lint/fmt 和 release gates 通过；正式部署还暴露并修正了 Windows SWE 预检仍解析旧 `--after` 长命令的真实消费者缺口，聚焦测试后 Validate/Publish 各 67 项通过。DirectCompatibility + InstallPortableSettings 发布后 gap 为 0，P14 不再保留开放仓库实施项。
+
 ## 5. 停止与重开条件
 
 - AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断或 release gate 任一发生非必要变化时，停止并回到设计裁决。

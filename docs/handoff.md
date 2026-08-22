@@ -1,19 +1,19 @@
 # AgentBase 当前接手状态
 
-状态截点：2026-08-21，执行控制、用户意图重组和 taskctl 任务起止时间已提交、推送并发布；AgentBase Windows SWE 确定性基础设施验证闭合，未运行真实 elevated sandbox/qualification/候选模型（Asia/Shanghai）。
+状态截点：2026-08-22，srcq 短句柄续页 P14 已发布、安装、部署并同步；AgentBase Windows SWE 确定性基础设施验证闭合，未运行真实 elevated sandbox/qualification/候选模型（Asia/Shanghai）。
 
 ## 一句话状态
 
-执行控制、用户意图重组和 taskctl 任务起止时间已经闭合：`state/<ID>.json` 由 CLI 在状态 CAS 写入中维护 UTC `started_at/ended_at`，任务合同更新不改执行时间，`TASK_TABLE.md` 只投影 state 真源。路由基础设施、96-case 合同、96/96/27 三阶段 evidence、taskctl 94 项回归、部署 `Validate` 和正式 Publish 全部通过。接手时已有的 Windows SWE 评测候选仍保留在 dirty worktree，本次版本不替它裁决提交或完成状态。外部仍缺管理员批准后的真实 elevated sandbox acceptance、九题逐题 qualification，以及新任务中的真实规则行为验收。
+srcq 短句柄续页 P14 已闭环：模型页尾只暴露 `srcq more q<number>`，不可变有界记录恢复 engine/cwd/view/budget/native argv，machine cursor 与 snapshot 显式入口保持兼容；0.4.2 私有 Release、真实安装、哈希固定 Windows SWE 消费者、路由合同、部署 `Validate` 和正式 Publish 全部通过。接手时已有的 Windows SWE 评测候选仍保留在 dirty worktree，本次版本不替它裁决提交或完成状态。外部仍缺管理员批准后的真实 elevated sandbox acceptance、九题逐题 qualification，以及新任务中的真实规则行为验收。
 
 ## 当前源码、安装与发布边界
 
-- 当前源码的 srcq 版本为 `0.4.1`（`tools/srcq/Cargo.toml`）；不得把旧交接中的 0.4.0、历史 HEAD 或已安装副本当成当前完整源码。
+- 当前源码与真实安装的 srcq 版本均为 `0.4.2`；源码提交 `ef65946f` 已推送私有 `origin/main`，私有 Release 为 `srcq-v0.4.2`。不得把旧交接中的 0.4.1、历史 HEAD 或已安装副本当成当前完整源码。
 - AgentBase Windows SWE 的唯一 owner 是 `development/agent-evaluation/`；正式目标和外部缺口见 `docs/work/20260820_agentbase_final_evaluation_set/`。最终集固定 9 个任务、2 个 profile（Sol medium、Luna max）、18 个候选结果槽位。
 - 执行控制第一版由 `skills/execution-governor/` 持有运行期算法，`global/AGENTS.md` 只持有共享未知先证实、成立前不扩量与反例熔断；`delivery-workflow`、`task-table-manager`、`change-governance`、`reasoning-governor` 分别只保存交付投影、任务依赖、长期治理和线程设置。正式证据见 `docs/work/20260818_execution_control_lifecycle/`。
 - 用户意图重组的跨项目不变量由 `global/AGENTS.md` 持有，`skills/delivery-workflow/` 只维护交付链中的澄清与投影：用户明确指定且经澄清的技术约束仍进入 `UDES`，仅用于表达期望结果或尚未经证据支持的原因、解法才保持为候选，不得据此静默替换用户目标或扩大授权。
 - taskctl 起止时间的唯一 owner 是 `skills/task-table-manager/scripts/taskctl.py` 的 `task.state` 生命周期：第一次真实开始后保留 `started_at`，进入 `done/retired` 写 `ended_at`，离开终态只清空结束时间；旧状态缺字段时保持未知，不推测历史时间。skill 合同、model/machine 投影、render 和回归测试已经迁移。
-- 本轮没有安装或 Upgrade；只读核对确认主机 ready、srcq 0.4.1 与 AST/scc doctor 正常。提交 `8cef38a` 已推送私有 `origin/main`，随后以 `DirectCompatibility + InstallPortableSettings` 正式 Publish，发布后 `Status` 为 `published:true`；变更 6 个受管资产，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260821-200700-08bb8136`。
+- 本轮通过私有 Release 从 srcq 0.4.1 Upgrade 到 0.4.2；Status 为 ready、完整性 verified、PATH 条目 1，AST/scc doctor 与已安装 `srcq more q2` 续页正常。随后以 `DirectCompatibility + InstallPortableSettings` 正式 Publish，发布后 `managed_payload_formally_published:true`、gap 0；变更 3 个受管资产，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260822-153600-61708e97`。
 - 每次新的 Codex Publish 仍必须取得用户针对当次操作的明确同意；持续 Git 维护与私有远端非强制推送授权不替代发布授权。
 - 仓库验证资产、语料、runner、测试和收据不进入 Codex payload；正式 `Validate` 已证明 Plugin payload 为 12 skills、2 custom agents、96 routing cases。
 
@@ -32,19 +32,19 @@
 
 ## 当前验证证据
 
-- `development/agent-evaluation/test_agent_evaluation_infrastructure.ps1`：66 tests passed，模型 evaluator 禁用；包含 Python/PowerShell policy 序列化一致性、完整 skill 投影、模型 shell/launcher 环境过滤、题目固定运行时提示、真实 PowerShell `.CMD` 精确路径 probe、五项 srcq 工作流、双清单篡改回执、宿主默认 deny、项目/state/双认证不可读、attempt temp/appdata 和受信失败结果边界。
+- `development/agent-evaluation/test_agent_evaluation_infrastructure.ps1`：67 tests passed，模型 evaluator 禁用；包含 Python/PowerShell policy 序列化一致性、完整 skill 投影、模型 shell/launcher 环境过滤、题目固定运行时提示、真实 PowerShell `.CMD` 精确路径 probe、五项 srcq 工作流、短句柄三页续读、双清单篡改回执、宿主默认 deny、项目/state/双认证不可读、attempt temp/appdata 和受信失败结果边界。
 - `development/code-search-benchmark/tests/test_experiment.py`：34 tests passed；共享 policy/launcher sanitizer、benchmark identity、CLI overrides 与 override 防篡改均通过。
 - `development/skill-routing/test_routing_infrastructure.ps1`：`ready:true`、6 suites、22 个 PowerShell syntax files、0 模型调用。
 - `development/skill-routing/validate_contract.ps1`：96 cases；55 strict routing、10 strict references、12/12 skills 正负触发覆盖。
-- 当前路由 generation 为 `52FF138151171DBE38188C3F523E8472B7E694BE514D2F6E94A97555005C3BD2`；Routing 96/96、Policy 96/96、References 27/27。本轮因 task-table-manager 可见引用身份变化只运行一次 References，Routing/Policy 各复用一次；当前 plan 为 0 evaluate、3 reuse、0 blocked、0 pending。
+- 当前路由 generation 为 `C27D84237B4B8944905C34E1C452D5F460229C81DB76FDFB9922D8437A07F066`；当前 plan 为 0 evaluate、3 reuse、0 blocked、0 pending，refresh 为 `already-current`，本轮没有模型重采样。
 - `skills/task-table-manager/tests/test_taskctl.py`：94 tests passed；覆盖开始、阻塞、恢复、完成、render、重开、退休、release、旧状态兼容、任务合同更新不改时间和 model/machine 时间投影。第一次全量回归只暴露旧 7 列 render 断言，修正为 9 列 oracle 后受影响单项与全量均通过。
-- 当前组合工作树的正式部署 `Validate` 与 Publish 内置门禁均返回成功并各消费 66 个 Windows SWE 基础设施测试；其中评测框架改动属于接手时保留的 dirty 候选，不是本次 taskctl 提交内容。路由 evaluator 只验证引用选择，不证明 skill 已在当前旧任务中追溯加载；已发布行为需新任务使用。
+- 当前组合工作树的正式部署 `Validate` 与 Publish 内置门禁均返回成功并各消费 67 个 Windows SWE 基础设施测试；首次 Validate 暴露预检仍解析旧 `--after` 长命令，迁移到哈希固定 `srcq.exe more q<number>` 并通过聚焦测试后，全量门禁通过。路由 evaluator 只验证引用选择，不证明 skill 已在当前旧任务中追溯加载；已发布行为需新任务使用。
 - 只读 host `check` 找到全部必需工具且 `missing:[]`；真实 `ast-grep` 路径为 npm `ast-grep.cmd`。完整验证记录见 `docs/work/20260820_agentbase_final_evaluation_set/verification.md`。
 
 ## 下个对话的最小恢复步骤
 
-1. 读取根 `README.md` 和本文件，运行 `git status --short`。taskctl 起止时间提交后仍应保留接手时已有的 `development/agent-evaluation/` 修改与 `vendor/`、根 `README.md` 的 sandbox 导航 hunk，以及 `docs/requirements.md` 的评测合同 hunk；不得清理或并入无关提交。当前分支的已提交版本应与既有私有上游同步。
-2. 执行控制、用户意图重组和 taskctl 起止时间没有开放仓库实施项；Windows SWE 最终评测已由失败审计重开，保留的 dirty 候选属于另一工作边界，需用户确认新的 smoke/anti-cheat 架构后再实施。只有处理该重开项、选择或替代其他子计划，或重新裁决跨组件方向时再读取 `docs/plan.md`；最终评测细节按需读取 `docs/work/20260820_agentbase_final_evaluation_set/`。
+1. 读取根 `README.md` 和本文件，运行 `git status --short`。仍应保留接手时已有的 `development/agent-evaluation/` 修改与 `vendor/`、根 `README.md` 的 sandbox 导航 hunk，以及 `docs/requirements.md` 的评测合同 hunk；不得清理或并入无关提交。当前分支的已提交版本应与既有私有上游同步。
+2. Source Query Gateway P14 与此前执行控制、用户意图重组和 taskctl 起止时间均没有开放仓库实施项；Windows SWE 最终评测保留的 dirty 候选属于另一工作边界。只有处理该重开项、选择或替代其他子计划，或重新裁决跨组件方向时再读取 `docs/plan.md`；最终评测细节按需读取 `docs/work/20260820_agentbase_final_evaluation_set/`。
 3. 若任务依赖真实安装/发布状态，严格按部署说明只读运行 `DirectCompatibility + InstallPortableSettings Status` 和 srcq `Status`；不要用本文件的最后已知值替代读回。
 4. 若用户授权改变宿主 sandbox 配置，先显式运行 `sandbox-check`；通过后再另行取得外部依赖/qualification 授权，按 smoke → core 余项 → rotation 逐题运行 `prepare/oracle`。没有这些授权时只维护仓库和确定性验证。
 5. 规则、skill 或触发合同变化时先运行路由确定性入口并读取 evaluation plan，只执行 `evaluate` 阶段；相同身份与 oracle 有效时复用，不为期待不同结果重采样。
