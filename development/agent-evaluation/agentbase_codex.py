@@ -462,7 +462,28 @@ def build_verifier_config(corpus: Mapping[str, Any]) -> str:
     )
 
 
+def _windows_winget_application(candidates: Sequence[str]) -> Path | None:
+    if os.name != "nt":
+        return None
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return None
+    alias_root = Path(local_app_data) / "Microsoft" / "WinGet" / "Links"
+    for candidate in candidates:
+        if Path(candidate).suffix.casefold() != ".exe":
+            continue
+        alias = alias_root / candidate
+        if alias.is_file():
+            path = alias.resolve()
+            if "\\WindowsApps\\" not in str(path):
+                return path
+    return None
+
+
 def _resolve_application(candidates: Sequence[str]) -> Path:
+    winget_path = _windows_winget_application(candidates)
+    if winget_path is not None:
+        return winget_path
     for candidate in candidates:
         value = shutil.which(candidate)
         if value:
