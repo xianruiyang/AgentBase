@@ -66,7 +66,7 @@ try {
         'web_search = "live"'
         'service_tier = "default"'
         'default_subagent_model = "gpt-5.6-luna"'
-        'default_subagent_reasoning_effort = "max"'
+        'default_subagent_reasoning_effort = "medium"'
         'keep-host-agent-setting = true'
         '[windows]'
         'sandbox = "unelevated"'

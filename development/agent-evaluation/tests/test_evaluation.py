@@ -809,10 +809,20 @@ class SandboxConfigTests(unittest.TestCase):
         contract = agentbase_codex.candidate_capability_contract(PROJECT_ROOT, self.corpus)
         configured = contract["configured_capabilities"]
         self.assertEqual(configured["multi_agent"]["default_model"], "gpt-5.6-luna")
-        self.assertEqual(configured["multi_agent"]["default_reasoning_effort"], "max")
+        self.assertEqual(configured["multi_agent"]["default_reasoning_effort"], "medium")
         self.assertEqual(
-            contract["projected_assets"]["custom_agents"]["sol"],
-            {"model": "gpt-5.6-sol", "reasoning_effort": "medium"},
+            contract["projected_assets"]["custom_agents"],
+            {
+                "evidence": {"model": "gpt-5.6-luna", "reasoning_effort": "medium"},
+                "experiment": {"model": "gpt-5.6-sol", "reasoning_effort": "low"},
+            },
+        )
+        self.assertEqual(
+            contract["evaluator_profiles"],
+            {
+                "sol": {"model": "gpt-5.6-sol", "reasoning_effort": "medium"},
+                "luna": {"model": "gpt-5.6-luna", "reasoning_effort": "max"},
+            },
         )
         self.assertTrue(contract["projected_assets"]["skills"]["full_tree_hash_pinned"])
         self.assertTrue(contract["projected_assets"]["skills"]["projection_read_only"])

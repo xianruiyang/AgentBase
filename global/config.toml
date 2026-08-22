@@ -3,7 +3,7 @@
 # This file intentionally contains only reviewed, machine-independent settings.
 # Authentication, project trust, plugin/cache state, MCP paths, hook trust hashes,
 # runtime-generated notify/node_repl settings, and local secrets are excluded.
-# Custom luna/sol profiles live in global/agents and share this payload.
+# Custom evidence/experiment profiles live in global/agents and share this payload.
 # The deployment entry point merges only the settings declared below into the
 # target config.toml and preserves host-owned MCP, trust, plugin, and runtime state.
 
@@ -19,7 +19,7 @@ project_doc_max_bytes = 65536
 [agents]
 enabled = true
 default_subagent_model = "gpt-5.6-luna"
-default_subagent_reasoning_effort = "max"
+default_subagent_reasoning_effort = "medium"
 
 [features]
 hooks = true

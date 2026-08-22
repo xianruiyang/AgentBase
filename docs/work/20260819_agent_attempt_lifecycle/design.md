@@ -2,7 +2,7 @@
 
 ## DES-001 Agent 配置唯一 owner
 
-- 状态: confirmed
+- 状态: superseded
 - 关联目标: REQ-001, UDES-001
 
 `global/config.toml` 唯一维护默认子代理与默认档位，`global/agents/luna.toml`、`global/agents/sol.toml` 各自唯一维护角色身份、职责和显式档位。部署 validator 只校验合同，不复制角色正文。Terra 通过 `managed_asset_lifecycle.json` 完成从受管 present 到 retired 的单向转换。
@@ -20,3 +20,17 @@
 - 关联目标: AC-004, AC-005
 
 `evidence/attempts.json` 只保存一个活跃 Routing capsule 周期，每周期最多六份收据，每个不变输入最多两份。周期变化时在新账本保留上一周期 ID、完整文件 SHA-256 和收据数；旧正文由 Git 历史承担恢复，不建立无限增长的第二历史文件。
+
+## DES-004 语义角色与易变模型配置分层
+
+- 状态: confirmed
+- 关联目标: REQ-003, UDES-003
+
+`global/AGENTS.md` 唯一维护主代理何时选择 `evidence` 或 `experiment` 以及不可移交的正式责任；`global/agents/evidence.toml`、`experiment.toml` 各自唯一维护实际模型、档位和角色自身约束；`global/config.toml` 只维护未分类子代理的回退。部署 validator 校验可移植 schema 与安全边界，不复制当前模型或档位。
+
+## DES-005 编排 skill 持有有界交接协议
+
+- 状态: confirmed
+- 关联目标: REQ-003, AC-009
+
+`subagent-orchestration` 持有委派净收益、最小 capsule、evidence packet、主代理逐项接纳、实验隔离、反例熔断和无后代代理合同。静态证据、实验结果和主代理生产实现形成单向链；子代理输出不成为状态真源或完成裁判。

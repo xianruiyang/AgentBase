@@ -189,7 +189,9 @@ try {
         $managedFixturePath = Join-Path $codexRoot ([string]$retiredPath.path).Replace('/', '\')
         $fixtureProbePath = Get-RetiredFixtureProbePath -Root $codexRoot -LifecycleEntry $retiredPath
         New-Item -ItemType Directory -Path (Split-Path -Parent $fixtureProbePath) -Force | Out-Null
-        Write-FixtureText -Path $fixtureProbePath -Text ("retired fixture: $([string]$retiredPath.id)" + [Environment]::NewLine)
+        if (-not (Test-Path -LiteralPath $fixtureProbePath -PathType Leaf)) {
+            Write-FixtureText -Path $fixtureProbePath -Text ("retired fixture: $([string]$retiredPath.id)" + [Environment]::NewLine)
+        }
         if ([string]$retiredPath.kind -eq 'directory') {
             Write-FixtureText -Path (Join-Path $managedFixturePath 'host-note.txt') -Text ("must be recoverable" + [Environment]::NewLine)
         }
@@ -401,7 +403,7 @@ try {
         'service_tier = "default"'
         'project_doc_max_bytes = 65536'
         'default_subagent_model = "gpt-5.6-luna"'
-        'default_subagent_reasoning_effort = "max"'
+        'default_subagent_reasoning_effort = "medium"'
         'conversationDetailMode = "STEPS_COMMANDS"'
         'ambient-suggestions-enabled = false'
     )) {
@@ -447,7 +449,7 @@ try {
     if ($manifestTargets -notcontains "config.toml" -or $manifestTargets -notcontains "hooks.json") {
         throw "Portable settings are missing from the rollback manifest"
     }
-    foreach ($agentName in @("luna", "sol")) {
+    foreach ($agentName in @("evidence", "experiment")) {
         if ($manifestTargets -notcontains "agents\$agentName.toml") {
             throw "Portable custom agent is missing from the rollback manifest: $agentName"
         }
@@ -483,7 +485,7 @@ try {
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\luna.toml") -Algorithm SHA256).Hash -ne $originalLunaHash) {
         throw "Rollback did not restore the original luna agent"
     }
-    foreach ($agentName in @("sol")) {
+    foreach ($agentName in @("evidence", "experiment")) {
         if (Test-Path -LiteralPath (Join-Path $codexRoot "agents\$agentName.toml")) {
             throw "Rollback did not remove the newly installed custom agent: $agentName"
         }
@@ -496,7 +498,8 @@ try {
     }
     foreach ($retiredPath in $retiredPortablePaths) {
         $restoredProbePath = Get-RetiredFixtureProbePath -Root $codexRoot -LifecycleEntry $retiredPath
-        if (-not (Test-Path -LiteralPath $restoredProbePath -PathType Leaf)) {
+        if (-not (Test-Path -LiteralPath $restoredProbePath -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $restoredProbePath -Algorithm SHA256).Hash -ne $retiredFixtureHashes[[string]$retiredPath.id]) {
             throw "Portable-settings rollback did not restore a retired managed path: $([string]$retiredPath.path)"
         }
     }

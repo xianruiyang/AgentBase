@@ -116,7 +116,7 @@ def candidate_capability_contract(
     features = portable_config.get("features", {})
     if agents.get("enabled") is not True or features.get("multi_agent") is not True:
         raise EvaluationError("portable candidate config must enable custom agents and multi-agent")
-    expected_profiles = {
+    evaluator_profiles = {
         name: {
             "model": profile["model"],
             "reasoning_effort": profile["reasoning_effort"],
@@ -130,8 +130,6 @@ def candidate_capability_contract(
         }
         for name, value in agent_profiles.items()
     }
-    if actual_profiles != expected_profiles:
-        raise EvaluationError("custom agent profiles differ from the fixed evaluation profiles")
     package_managers = sorted(
         {
             str(task["toolchain"]["package_manager"])
@@ -144,6 +142,7 @@ def candidate_capability_contract(
     return {
         "schema": "agentbase.windows-swe-candidate-capabilities/v4",
         "candidate_surface_identity_sha256": surface["identity_sha256"],
+        "evaluator_profiles": evaluator_profiles,
         "projected_assets": {
             "global_rules": "global/AGENTS.md",
             "portable_config": "global/config.toml with evaluation transport overrides",

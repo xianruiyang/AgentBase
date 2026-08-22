@@ -62,59 +62,72 @@ try {
 
     $baselineRoot = New-AgentFixture -Name "baseline"
     if (@(Get-ValidatedPortableAgentSources -Path $baselineRoot).Count -ne 2) {
-        throw "Portable agent contract did not accept the current two source roles"
+        throw "Portable agent contract did not accept the current two semantic roles"
     }
 
     $independentTextRoot = New-AgentFixture -Name "independent-text"
-    Write-FixtureText -Path (Join-Path $independentTextRoot "luna.toml") -Text ((@(
-        'name = "luna"'
-        'description = "用于输入明确且可以快速核对结果的独立窄任务。"'
+    Write-FixtureText -Path (Join-Path $independentTextRoot "evidence.toml") -Text ((@(
+        'name = "evidence"'
+        'description = "用于只读整理有界事实并向主代理返回证据。"'
         'model = "gpt-5.6-luna"'
-        'model_reasoning_effort = "max"'
+        'model_reasoning_effort = "medium"'
         'developer_instructions = """'
-        '只处理已经给出完整边界的工作；出现影响范围不明或需要共同职责裁决时，把未知项返回给调用方。'
+        '只处理给出权威范围的事实问题；范围不足时返回未知，不修改项目。'
         '"""'
     ) -join [Environment]::NewLine) + [Environment]::NewLine)
     if (@(Get-ValidatedPortableAgentSources -Path $independentTextRoot).Count -ne 2) {
-        throw "Portable agent contract still depends on the current Luna prose"
+        throw "Portable agent contract still depends on the current evidence prose"
+    }
+
+    $futureModelRoot = New-AgentFixture -Name "future-model"
+    $futureModel = (Get-Content -LiteralPath (Join-Path $futureModelRoot "evidence.toml") -Raw -Encoding UTF8).Replace('model = "gpt-5.6-luna"', 'model = "gpt-6.0-fast"')
+    $futureModel = $futureModel.Replace('model_reasoning_effort = "medium"', 'model_reasoning_effort = "high"')
+    Write-FixtureText -Path (Join-Path $futureModelRoot "evidence.toml") -Text $futureModel
+    if (@(Get-ValidatedPortableAgentSources -Path $futureModelRoot).Count -ne 2) {
+        throw "Portable agent contract incorrectly couples a semantic role to the current model or effort"
     }
 
     $englishRoot = New-AgentFixture -Name "english-prose"
-    Write-FixtureText -Path (Join-Path $englishRoot "luna.toml") -Text ((@(
-        'name = "luna"'
-        'description = "Use Luna for narrow tasks."'
+    Write-FixtureText -Path (Join-Path $englishRoot "evidence.toml") -Text ((@(
+        'name = "evidence"'
+        'description = "Read-only evidence mapper."'
         'model = "gpt-5.6-luna"'
-        'model_reasoning_effort = "max"'
+        'model_reasoning_effort = "medium"'
         'developer_instructions = """'
-        'Complete narrow tasks and return evidence.'
+        'Return bounded evidence and do not edit files.'
         '"""'
     ) -join [Environment]::NewLine) + [Environment]::NewLine)
     Assert-Rejected -Label "English model-facing prose" -FixtureRoot $englishRoot -ExpectedMessage "*must use Chinese semantics*"
 
     $wrongIdentityRoot = New-AgentFixture -Name "wrong-identity"
-    $wrongIdentity = (Get-Content -LiteralPath (Join-Path $wrongIdentityRoot "sol.toml") -Raw -Encoding UTF8).Replace('model = "gpt-5.6-sol"', 'model = "gpt-5.6-luna"')
-    Write-FixtureText -Path (Join-Path $wrongIdentityRoot "sol.toml") -Text $wrongIdentity
-    Assert-Rejected -Label "filename/model identity mismatch" -FixtureRoot $wrongIdentityRoot -ExpectedMessage "*does not match its file identity*"
+    $wrongIdentity = (Get-Content -LiteralPath (Join-Path $wrongIdentityRoot "experiment.toml") -Raw -Encoding UTF8).Replace('name = "experiment"', 'name = "probe"')
+    Write-FixtureText -Path (Join-Path $wrongIdentityRoot "experiment.toml") -Text $wrongIdentity
+    Assert-Rejected -Label "filename/name identity mismatch" -FixtureRoot $wrongIdentityRoot -ExpectedMessage "*name does not match its file identity*"
+
+    $wrongModelRoot = New-AgentFixture -Name "wrong-model"
+    $wrongModel = (Get-Content -LiteralPath (Join-Path $wrongModelRoot "experiment.toml") -Raw -Encoding UTF8).Replace('model = "gpt-5.6-sol"', 'model = "invalid model"')
+    Write-FixtureText -Path (Join-Path $wrongModelRoot "experiment.toml") -Text $wrongModel
+    Assert-Rejected -Label "unsafe model identifier" -FixtureRoot $wrongModelRoot -ExpectedMessage "*explicit safe model identifier*"
 
     $duplicateRoot = New-AgentFixture -Name "duplicate-role"
-    $lunaText = Get-Content -LiteralPath (Join-Path $duplicateRoot "luna.toml") -Raw -Encoding UTF8
-    $duplicateSol = $lunaText.Replace('name = "luna"', 'name = "sol"').Replace('model = "gpt-5.6-luna"', 'model = "gpt-5.6-sol"').Replace('model_reasoning_effort = "max"', 'model_reasoning_effort = "medium"')
-    Write-FixtureText -Path (Join-Path $duplicateRoot "sol.toml") -Text $duplicateSol
+    $evidenceText = Get-Content -LiteralPath (Join-Path $duplicateRoot "evidence.toml") -Raw -Encoding UTF8
+    $duplicateExperiment = $evidenceText.Replace('name = "evidence"', 'name = "experiment"').Replace('model = "gpt-5.6-luna"', 'model = "gpt-5.6-sol"').Replace('model_reasoning_effort = "medium"', 'model_reasoning_effort = "low"')
+    Write-FixtureText -Path (Join-Path $duplicateRoot "experiment.toml") -Text $duplicateExperiment
     Assert-Rejected -Label "duplicate role semantics" -FixtureRoot $duplicateRoot -ExpectedMessage "*must have distinct descriptions*"
 
     $wrongEffortRoot = New-AgentFixture -Name "wrong-effort"
-    $wrongEffort = (Get-Content -LiteralPath (Join-Path $wrongEffortRoot "sol.toml") -Raw -Encoding UTF8).Replace('model_reasoning_effort = "medium"', 'model_reasoning_effort = "max"')
-    Write-FixtureText -Path (Join-Path $wrongEffortRoot "sol.toml") -Text $wrongEffort
-    Assert-Rejected -Label "role reasoning effort mismatch" -FixtureRoot $wrongEffortRoot -ExpectedMessage "*reasoning effort does not match its role contract*"
+    $wrongEffort = (Get-Content -LiteralPath (Join-Path $wrongEffortRoot "experiment.toml") -Raw -Encoding UTF8).Replace('model_reasoning_effort = "low"', 'model_reasoning_effort = "impossible"')
+    Write-FixtureText -Path (Join-Path $wrongEffortRoot "experiment.toml") -Text $wrongEffort
+    Assert-Rejected -Label "unsupported reasoning effort" -FixtureRoot $wrongEffortRoot -ExpectedMessage "*reasoning effort is not supported*"
 
     $extraFieldRoot = New-AgentFixture -Name "extra-field"
-    $extraFieldText = (Get-Content -LiteralPath (Join-Path $extraFieldRoot "sol.toml") -Raw -Encoding UTF8) + "extra = true" + [Environment]::NewLine
-    Write-FixtureText -Path (Join-Path $extraFieldRoot "sol.toml") -Text $extraFieldText
+    $extraFieldText = (Get-Content -LiteralPath (Join-Path $extraFieldRoot "experiment.toml") -Raw -Encoding UTF8) + "extra = true" + [Environment]::NewLine
+    Write-FixtureText -Path (Join-Path $extraFieldRoot "experiment.toml") -Text $extraFieldText
     Assert-Rejected -Label "unreviewed extra field" -FixtureRoot $extraFieldRoot -ExpectedMessage "*must contain only name, description, model, model_reasoning_effort*"
 
     $sensitiveRoot = New-AgentFixture -Name "sensitive-field"
-    $sensitiveText = (Get-Content -LiteralPath (Join-Path $sensitiveRoot "sol.toml") -Raw -Encoding UTF8).Replace('复杂问题', 'password 配置问题')
-    Write-FixtureText -Path (Join-Path $sensitiveRoot "sol.toml") -Text $sensitiveText
+    $sensitiveText = (Get-Content -LiteralPath (Join-Path $sensitiveRoot "experiment.toml") -Raw -Encoding UTF8).Replace('实现路径', 'password 配置路径')
+    Write-FixtureText -Path (Join-Path $sensitiveRoot "experiment.toml") -Text $sensitiveText
     Assert-Rejected -Label "sensitive assignment vocabulary" -FixtureRoot $sensitiveRoot -ExpectedMessage "*contains a machine path, external dependency, or sensitive setting*"
 
     Write-Output "tests : pass"

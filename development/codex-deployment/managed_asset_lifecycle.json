@@ -12,19 +12,22 @@
       { "id": "skill:powershell-usage", "path": "skills/powershell-usage", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "skill:reasoning-governor", "path": "skills/reasoning-governor", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "skill:source-query", "path": "skills/source-query", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
+      { "id": "skill:subagent-orchestration", "path": "skills/subagent-orchestration", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "skill:symbol-structure-workflow", "path": "skills/symbol-structure-workflow", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "skill:task-table-manager", "path": "skills/task-table-manager", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "skill:understand-space", "path": "skills/understand-space", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "settings:config", "path": "config.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
       { "id": "settings:hooks", "path": "hooks.json", "kind": "file", "modes": ["DirectCompatibility"], "requires_portable_settings": true },
-      { "id": "agent:luna", "path": "agents/luna.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
-      { "id": "agent:sol", "path": "agents/sol.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true }
+      { "id": "agent:evidence", "path": "agents/evidence.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
+      { "id": "agent:experiment", "path": "agents/experiment.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true }
     ],
     "retired": [
       { "id": "skill:ast-grep-token-safe", "path": "skills/ast-grep-token-safe", "kind": "directory", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": false, "since": "045656f", "reason": "replaced by the unified source-query owner", "replaced_by": "skill:source-query", "legacy_import": true },
       { "id": "skill:fd-usage", "path": "skills/fd-usage", "kind": "directory", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": false, "since": "045656f", "reason": "replaced by the unified source-query owner", "replaced_by": "skill:source-query", "legacy_import": true },
       { "id": "skill:rg-token-safe", "path": "skills/rg-token-safe", "kind": "directory", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": false, "since": "045656f", "reason": "replaced by the unified source-query owner", "replaced_by": "skill:source-query", "legacy_import": true },
-      { "id": "agent:terra", "path": "agents/terra.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true, "since": "2026-08-18", "reason": "the user retired the intermediate Terra role; Luna and Sol remain the only managed custom-agent roles" }
+      { "id": "agent:terra", "path": "agents/terra.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true, "since": "2026-08-18", "reason": "the intermediate Terra role was retired when the original two-role policy was adopted" },
+      { "id": "agent:luna", "path": "agents/luna.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true, "since": "2026-08-23", "reason": "replaced by a model-independent static-evidence role", "replaced_by": "agent:evidence" },
+      { "id": "agent:sol", "path": "agents/sol.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true, "since": "2026-08-23", "reason": "replaced by a model-independent implementation-path experiment role", "replaced_by": "agent:experiment" }
     ],
     "transferred": []
   },

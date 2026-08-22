@@ -2,7 +2,7 @@
 
 ## REQ-001 收敛自定义 Agent 角色
 
-- 状态: confirmed
+- 状态: superseded
 - 来源: 用户 2026-08-18/19 明确要求“luna 默认就是 max，terra 不要了，sol 默认 medium”
 - 关联: AC-001, AC-002, AC-003, UDES-001
 
@@ -10,14 +10,14 @@ Codex 可移植设置只管理 Luna 与 Sol 两个自定义角色，并按用户
 
 ## AC-001 Luna 默认 max
 
-- 状态: confirmed
+- 状态: superseded
 - 关联: REQ-001
 
 `global/config.toml` 的默认子代理为 Luna/max，`global/agents/luna.toml` 也显式声明 `max`。
 
 ## AC-002 Sol 默认 medium
 
-- 状态: confirmed
+- 状态: superseded
 - 关联: REQ-001
 
 `global/agents/sol.toml` 显式声明 `medium`，部署校验拒绝其他档位。
@@ -28,6 +28,42 @@ Codex 可移植设置只管理 Luna 与 Sol 两个自定义角色，并按用户
 - 关联: REQ-001
 
 候选源码与受管当前资产不再包含 Terra；部署生命周期把历史 `agents/terra.toml` 声明为退役资产，并且不影响目标主机的无关个人代理。
+
+## REQ-003 以语义角色降低证据与实验成本
+
+- 状态: confirmed
+- 来源: 用户 2026-08-23 要求 Luna 整理静态证据与现状地图、Sol low 快速迭代实验，主代理规划并正式实现；模型和档位应可在全局配置中独立更新
+- 关联: AC-006, AC-007, AC-008, AC-009, UDES-003
+
+AgentBase 只管理 `evidence` 与 `experiment` 两个语义稳定的自定义角色。前者低成本交付可逐项接纳的静态证据，后者用最小实验寻找实现路径和真实约束；主代理保留正式交付责任。
+
+## AC-006 Evidence 使用 Luna medium
+
+- 状态: confirmed
+- 关联: REQ-003
+
+`global/agents/evidence.toml` 显式选择 `gpt-5.6-luna` 与 `medium`，默认只读取证并交付带范围、直接来源、反例、否定检查和未知项的证据包。
+
+## AC-007 Experiment 使用 Sol low
+
+- 状态: confirmed
+- 关联: REQ-003
+
+`global/agents/experiment.toml` 显式选择 `gpt-5.6-sol` 与 `low`，只在隔离范围运行主代理给出的最小判别实验，不修改生产真源或执行 Git、Publish 与完成状态动作。
+
+## AC-008 角色语义与模型身份解耦
+
+- 状态: confirmed
+- 关联: REQ-003
+
+全局规则和编排 skill 只使用 `evidence`、`experiment` 的稳定语义身份；具体模型与档位只由对应代理 TOML 管理。部署校验检查固定语义角色集合、schema、安全模型标识和受支持档位，但不得要求角色名匹配模型后缀或复制当前模型、档位选择。
+
+## AC-009 主代理逐项接纳并保留正式责任
+
+- 状态: confirmed
+- 关联: REQ-003
+
+只有子问题独立有界且预计降低总体 Token 或墙钟时间时才委派。主代理逐项接纳静态证据 ID，只把已接纳事实交给路径实验，并保留目标、授权、规划、正式实现、验证、状态、完成、Git 与发布责任；子代理不继续委派，输出不扩大授权或直接成为完成证据。
 
 ## REQ-002 正式评估失败可追溯
 
@@ -78,3 +114,11 @@ AgentBase 内已授权并验证的项目改动默认由模型自行形成职责�
 - 来源: 用户接手要求与项目规则
 
 保留并合并本轮开始前 `docs/plan.md`、`docs/handoff.md` 的 dirty 内容，不回退无关改动。
+
+## CON-005 保留 Windows SWE 评测候选并允许本次发布
+
+- 状态: confirmed
+- 来源: 用户要求完善后发布；接手边界要求保留既有 dirty worktree
+- 关联: REQ-003, AC-006, AC-007, AC-008, AC-009
+
+本次角色、规则、skill、部署生命周期和路由证据完成后，允许按真实安装模式向当前 Codex 根目录 Publish 一次；既有 `development/agent-evaluation/`、根 README 与 requirements 评测合同改动继续排除于本版本提交和行为声明。

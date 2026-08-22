@@ -41,6 +41,14 @@
 
 候选 bundle 为 `24CC35AECD613FAAED13E45A2B2FE69D724FFA9E53009E049CA8942FC12EBA18`。Policy 中未声明且未禁选的兼容标签按项目既有合同保留为诊断；正式期望、禁选与 Routing/References 严格集合全部通过。第一次后继 capsule 评估进行时，主审发现 description 可能让短任务非触发覆盖用户显式查询，随即停止并作废；新候选增加显式短查询严格正例后重新独立评估，没有复用旧结果。
 
+## 2026-08-23 长期阶段迟滞验证
+
+- `reasoning-governor` 的结构校验在 Python UTF-8 模式通过；系统默认 GBK 首次读取 UTF-8 中文时报 `UnicodeDecodeError`，输入环境改为项目编码合同后通过，不把相同失败原样重跑。
+- `validate_contract.ps1` 通过：106 cases、65 strict routing、17 strict references，13/13 skill 均有正向与非触发覆盖。新增严格场景分别证明可预期长期阶段允许进入 governor、孤立高难项和短机械尾段不得因自主切换触发 governor。
+- `test_routing_infrastructure.ps1` 通过：6 suites、22 个 PowerShell syntax files、0 模型调用。
+- 当前 generation 为 `E71F2D718163322E5F4BA6804C38A57F0681B988A4C32DED06F25A4BB44CF75A`。Routing、Policy、References 三阶段均由当前来源链恢复或零 Token 重验，计划为 `reuse=3`、`evaluate=0`、`blocked=0`；活跃账本 5/6 收据、没有 `started`。
+- 首次 Policy 结果把概念讨论误选为实际委派行为，oracle 保持 skill 禁选并移除不适用行为标签；首次 References 结果又暴露两个旧严格场景漏列真实必需引用。修正 oracle 后只对原已通过结果按精确来源收据重验，没有重采样或放宽选择门禁。
+
 ## 部署候选与边界
 
-`manage_agentbase.ps1 -Action Validate` 返回 `valid=true`，证明当前仓库候选的全局规则、skills、路由证据、受管资产和部署合同一致。该动作没有写入真实 Codex；本轮没有执行 `Publish`，当前已启动任务也不会追溯加载仓库候选。
+从暂存候选生成的独立干净 worktree 中，`test_manage_agentbase.ps1` 全部通过，随后正式 `manage_agentbase.ps1 -Action Validate` 返回 `valid=true`，证明长期阶段迟滞、代理角色、路由证据、受管资产与部署合同在同一提交态一致。该动作没有写入真实 Codex；当前已启动任务也不会追溯加载仓库候选。

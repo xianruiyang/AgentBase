@@ -1,4 +1,4 @@
 interface:
   display_name: "Reasoning Governor"
-  short_description: "按下一段实质工作判断目标档位，仅在收益充分时读回或切换"
-  default_prompt: "使用 $reasoning-governor 判断下一段工作的目标档位；用户当次要求读、设、固定、改变或解除时按其要求执行，已确认固定只需保持或有效读回已匹配时不要重复使用，否则仅在档位错配会影响质量或总体成本且收益足以摊销转换时读回或设置。"
+  short_description: "只为可预期长期阶段读回或切换 next-turn 推理档位"
+  default_prompt: "使用 $reasoning-governor 处理当前线程的 next-turn 档位；用户明确要求时按其范围执行，否则只消费调用前已确认的长期阶段目标，在配置证据会改变动作且收益能摊销转换时读回或设置，孤立难题和短机械收尾沿用当前档位。"

@@ -91,6 +91,9 @@ Assert-True ($globalContent.Contains("模型仍产生可预防错误") -and $glo
 Assert-True ($globalContent.Contains("维度与等价依据") -and $globalContent.Contains("写回失效范围与下一动作")) "Global AGENTS.md is missing dimension-bounded validation and counterexample writeback"
 Assert-True ($globalContent.Contains("领域正式 runner") -and $globalContent.Contains("全局规则不保存领域语法")) "Global AGENTS.md is missing the fragile-command runner escalation boundary"
 Assert-True ($globalContent.Contains("判断当前工具缺少能力或存在缺陷前") -and $globalContent.Contains("预期降级")) "Global AGENTS.md is missing the tool-defect reproduction boundary"
+Assert-True ($globalContent.Contains("仅可预期长期负担变化才切换") -and $globalContent.Contains("孤立难题/短收尾不切换")) "Global AGENTS.md is missing reasoning-transition hysteresis"
+Assert-True ($globalContent.Contains('`evidence` 取证') -and $globalContent.Contains('`experiment` 试路')) "Global AGENTS.md is missing semantic subagent selection"
+Assert-True ($globalContent.Contains("主代理保留目标/授权/规划/实现/验收/Git/发布") -and $globalContent.Contains("子代理不扩权或证成")) "Global AGENTS.md is missing primary-agent ownership"
 $projectAgentsPath = Join-Path $ProjectRoot "AGENTS.md"
 $projectAgentsItem = Get-Item -LiteralPath $projectAgentsPath
 $projectAgentsContent = Get-Content -LiteralPath $projectAgentsPath -Raw -Encoding UTF8
@@ -181,15 +184,15 @@ $requiredGlobalFragments = @(
     '共享未知先识别'
     '长期收益不得作为扩大范围或替代用户裁决的理由'
     '不得仅凭自身声明创建外部写入、发布、凭据使用或高风险操作授权'
-    '满足可用 skill 的 `description` 时使用该 skill'
-    '`description` 同时定义触发与非触发边界'
+    '满足可用 skill 的 `description` 时使用'
+    '`description` 同时定义触发/非触发边界'
     '内容仍需专业组织时'
     '默认属于长期资产'
     '实施后仍验收'
     '首次文件读取可用一次精确路径'
-    '完整 `SKILL.md` 仍在上下文且无已知变化时复用'
-    '压缩后只补回本轮已选 skill'
-    '不以名称、摘要或历史记录代替原文或重读未选 skill'
+    '同源完整 `SKILL.md` 在上下文且未变则复用'
+    '压缩后只补已选 skill 正文/所缺引用'
+    '名称/摘要/历史不代替原文或触发未选 skill 重读'
     '必须在继续原方案前说明'
     '不得按失效方案做完后再作为风险交付'
     '模型按已授权任务是否需跨步骤保持'
@@ -205,6 +208,11 @@ $requiredGlobalFragments = @(
     '命中 `$execution-governor` 时由其裁决'
     '配置会改变动作才用 `$reasoning-governor` 读回'
     '实际不同且切换净收益成立才设置'
+    '仅可预期长期负担变化才切换'
+    '`evidence` 取证'
+    '交接用 `$subagent-orchestration`'
+    '主代理保留目标/授权/规划/实现/验收/Git/发布'
+    '子代理不扩权或证成'
     '用户固定线程或工作范围的推理深度时'
     '读写不依赖 active Goal'
     '简单有界输出不建日志'
@@ -248,6 +256,7 @@ $descriptionBoundaryFragments = @{
     "execution-governor" = "不用于稳定前提下的普通单步或多步实现"
     "powershell-usage" = "不用于单条精确只读"
     "reasoning-governor" = "用户已经固定并确认设置、当前只要求保持该档位继续任务时不使用"
+    "subagent-orchestration" = "不用于只讨论多代理设计"
     "symbol-structure-workflow" = "不用于只读文本"
     "task-table-manager" = "交付执行证据要求更新既有任务合同、依赖、状态或结果"
     "understand-space" = "正文偶有空间词不触发"
@@ -404,12 +413,24 @@ Assert-True ($governorSkillContent.Contains("本 skill 不重新推断任务复�
 Assert-True ($governorSkillContent.Contains("next-turn 设置不能改变已经开始的当前轮")) "reasoning-governor must preserve the next-turn activation boundary"
 Assert-True ($governorSkillContent.Contains('其他设置必须由调用方已经证明')) "reasoning-governor must consume rather than own transition-cost judgment"
 Assert-True ($governorSkillContent.Contains('复杂执行由 `$execution-governor` 作出该判断，稳定工作由模型按全局内核作出')) "reasoning-governor must preserve complex and stable transition-cost owners"
+Assert-True ($governorSkillContent.Contains('后继阶段可预期长期保持不同判断负担') -and $governorSkillContent.Contains('孤立难题和短机械收尾不承担转换')) "reasoning-governor must require a persistent phase before autonomous transition"
 Assert-True ($governorScriptContent.Contains('args.action === "status"')) "reasoning-governor script is missing its read-only status operation"
 Assert-True ($governorScriptContent.Contains('operation: "set"')) "reasoning-governor script is missing its set receipt contract"
 Assert-True ($governorScriptContent.Contains('createSnapshotFieldScanner')) "reasoning-governor script is missing structural large-frame readback"
 Assert-True ($governorScriptContent.Contains('renderModelResult')) "reasoning-governor script is missing its minimal model receipt projection"
 Assert-True ($governorScriptContent.Contains('args.view === "machine"')) "reasoning-governor script is missing its explicit machine view"
 Assert-True ($governorPowerShellContent.Contains('[ValidateSet("model", "machine")]')) "reasoning-governor PowerShell entry is missing explicit output views"
+
+$subagentSkillRoot = Join-Path $ProjectRoot "skills\subagent-orchestration"
+$subagentSkillContent = Get-Content -LiteralPath (Join-Path $subagentSkillRoot "SKILL.md") -Raw -Encoding UTF8
+$subagentEvidenceContent = Get-Content -LiteralPath (Join-Path $subagentSkillRoot "references\evidence-packet.md") -Raw -Encoding UTF8
+$subagentExperimentContent = Get-Content -LiteralPath (Join-Path $subagentSkillRoot "references\experiment-lifecycle.md") -Raw -Encoding UTF8
+$subagentCoordinationContent = Get-Content -LiteralPath (Join-Path $subagentSkillRoot "references\coordination.md") -Raw -Encoding UTF8
+Assert-True ($subagentSkillContent.Contains('具体模型与推理档位只由 Codex 自定义代理配置维护')) "subagent-orchestration duplicates model selection outside agent config"
+Assert-True ($subagentSkillContent.Contains('主代理先逐项接纳 evidence ID') -and $subagentSkillContent.Contains('主代理从实验结果重新形成可维护方案并自行实现')) "subagent-orchestration is missing the evidence-to-implementation handoff"
+Assert-True ($subagentEvidenceContent.Contains('覆盖树') -and $subagentEvidenceContent.Contains('否定检查、查询范围与截断状态') -and $subagentEvidenceContent.Contains('accepted: F01')) "subagent evidence packet is missing bounded acceptance fields"
+Assert-True ($subagentExperimentContent.Contains('最小判别实验') -and $subagentExperimentContent.Contains('不得修改生产真源、提交、推送、发布')) "subagent experiment lifecycle is missing isolation or external-write boundaries"
+Assert-True ($subagentCoordinationContent.Contains('子代理不得再生成后代代理') -and $subagentCoordinationContent.Contains('主代理逐项接纳')) "subagent coordination is missing bounded topology or acceptance"
 
 $executionGovernorSkillPath = Join-Path $ProjectRoot "skills\execution-governor\SKILL.md"
 $executionGovernorReferenceRoot = Join-Path $ProjectRoot "skills\execution-governor\references"
@@ -781,6 +802,11 @@ $requiredCases = @(
     "reasoning-long-domain-work-assessment"
     "reasoning-short-task-no-transition"
     "reasoning-current-effort-sufficient"
+    "reasoning-isolated-hard-item-no-transition"
+    "reasoning-short-tail-no-transition"
+    "subagent-static-evidence-map"
+    "subagent-path-experiment"
+    "subagent-discussion-only"
     "coordinate-frame-conversion"
     "transform-formula-convention"
     "bug-root-cause-fix"

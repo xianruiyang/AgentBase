@@ -1,0 +1,4 @@
+interface:
+  display_name: "Subagent Orchestration"
+  short_description: "编排静态证据与路径实验子代理，并由主代理逐项接纳结果"
+  default_prompt: "使用 $subagent-orchestration 选择 evidence 或 experiment，给出有界交接合同，并在主代理裁决证据后再推进正式实现。"

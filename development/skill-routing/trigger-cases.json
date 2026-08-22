@@ -13,6 +13,7 @@
     "powershell-usage",
     "reasoning-governor",
     "source-query",
+    "subagent-orchestration",
     "symbol-structure-workflow",
     "task-table-manager",
     "understand-space"
@@ -22,6 +23,7 @@
     "delivery-workflow",
     "execution-governor",
     "source-query",
+    "subagent-orchestration",
     "task-table-manager"
   ],
   "allowed_behavior_tags": [
@@ -51,6 +53,7 @@
     "minimal_evidence_closure",
     "user_reasoning_override",
     "reasoning_effort_economy",
+    "bounded_subagent_delegation",
     "adaptive_execution_plan",
     "skill_context_lifecycle"
   ],
@@ -80,7 +83,8 @@
     "model_interaction_surface": "当前请求要求设计、选择或改变模型直接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面最小充分且可局部修改，机器面保持稳定完整，生成物不作为语义修改入口。",
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
-    "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值，线程设置入口只在配置证据会改变动作时查询，并只在剩余收益足以覆盖切换和恢复成本时设置。",
+    "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值，线程设置入口只在配置证据会改变动作时查询，并只为可预期长期阶段且剩余收益足以覆盖切换和恢复成本时设置；孤立难题和短机械收尾沿用当前档位。",
+    "bounded_subagent_delegation": "只有独立有界且能降低系统总成本或墙钟时间的子问题才委派；静态证据与路径实验使用不同语义角色，主代理逐项接纳证据并保留正式实现、完成和外部写责任。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。"
   },
@@ -145,6 +149,11 @@
     "reasoning-long-domain-work-assessment",
     "reasoning-short-task-no-transition",
     "reasoning-current-effort-sufficient",
+    "reasoning-isolated-hard-item-no-transition",
+    "reasoning-short-tail-no-transition",
+    "subagent-static-evidence-map",
+    "subagent-path-experiment",
+    "subagent-discussion-only",
     "architecture-risk-discovered-during-implementation",
     "adaptive-plan-without-user-prompt",
     "simple-task-no-formal-plan",
@@ -163,6 +172,8 @@
     "delivery-task-contract",
     "delivery-feedback-contract",
     "reasoning-long-domain-work-assessment",
+    "subagent-static-evidence-map",
+    "subagent-path-experiment",
     "vertical-validation-closure-selection",
     "source-query-capability-diagnosis",
     "counterexample-checkpoint-before-continue",
@@ -366,6 +377,7 @@
         "task-table-manager"
       ],
       "expected_change_governance_references": [
+        "causal-analysis.md",
         "lifecycle-and-entry.md"
       ],
       "expected_execution_governor_references": [
@@ -1052,7 +1064,9 @@
         "iteration.md"
       ],
       "expected_task_table_manager_references": [
-        "execution.md"
+        "execution.md",
+        "tooling.md",
+        "execution-tooling.md"
       ],
       "expected_behavior_tags": [
         "modify_authorized_scope",
@@ -1196,6 +1210,92 @@
         "reasoning_effort_economy"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "reasoning-isolated-hard-item-no-transition",
+      "kind": "boundary",
+      "request": "用户没有固定推理深度，当前有效读回为 effort:medium。下一项只是一个高难但有界的逻辑问题，能够在已经开始的当前轮独立回答，后面没有持续高难阶段；不要为了这一项切换 next-turn 档位。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "reasoning-governor"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "reasoning_effort_economy"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "reasoning-short-tail-no-transition",
+      "kind": "boundary",
+      "request": "用户没有固定推理深度，当前有效读回为 effort:high；复杂分析已经结束，只剩两个已定位文本字段的机械收尾和语法检查，能够在当前轮闭合。沿用当前档位，不为了短尾巴设置更低的 next-turn 档位。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "reasoning-governor"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "reasoning_effort_economy"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-static-evidence-map",
+      "kind": "positive",
+      "request": "主代理已经确认单个正式组件及其接口 owner，现在需要现状地图来决定一个局部实现。请实际委派静态证据子代理，只读整理入口、当前消费者、调用关系、反例、否定检查与会改变决策的未知；结果必须逐项带稳定 ID 和精确来源，由主代理接纳后才能进入方案，不要让子代理改代码或宣布完成。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-path-experiment",
+      "kind": "positive",
+      "request": "主代理已接纳 F01、F03 和 X01，并形成一个明确的实现路径假设与可推翻 oracle。请实际委派路径实验子代理，在指定临时目录运行一个最小判别实验，返回精确环境、实际结果、路径成立条件、约束和未知；不得修改生产真源、提交、推送或发布，主代理随后自行正式实现。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "experiment-lifecycle.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-discussion-only",
+      "kind": "negative",
+      "request": "只讨论 evidence 与 experiment 两种子代理应怎样分工和控制成本，不实际派发、不读取或修改当前线程配置，也不改项目文件。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "reasoning-governor",
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "explicit-thread-reasoning-status",
