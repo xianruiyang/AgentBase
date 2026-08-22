@@ -1,24 +1,27 @@
 # 验证记录
 
-## 确定性与消费者验证
+## 0.4.2 当前周期候选证据
 
 | 检查 | 结果 | 证明范围 |
 | --- | --- | --- |
-| `cargo ci-build` / `cargo ci-test` / `cargo lint` / `cargo fmt-check` | pass | srcq 0.4.1 全 workspace 构建、测试、严格 lint 与格式 |
-| query gateway | 34/34 pass | rg/fd/scc 共享 renderer、分页/cursor、machine、snapshot、真实 scc 与错误边界 |
-| PowerShell `@next` 往返 | pass | 空 argv、空白、元字符、双引号、反引号、美元与换行保持；新 PowerShell 7 进程成功取得第二页 |
-| fixture scc invocation log | 1 | 首次页面扫描一次；`@next` 只读 snapshot，不重扫原生 scc |
-| source-query 静态合同 | 96 cases；55 strict routing；10 strict references；11/11 skills | skill 消费新 `@next`，引用、触发与非触发边界自洽 |
-| 路由基础设施 | 6 suites；22 syntax files；0 evaluator runs | 确定性 evaluator/planner/ledger 基础设施无回归；当前阶段证据可直接复用 |
-| 部署 `Validate` | pass | Plugin/DirectCompatibility 候选 payload 与当前证据合同可校验；不等于 Publish |
+| scc 首屏—`srcq more`—第二页纵向路径 | pass | PowerShell 7 直接执行短命令；空参数、空白、美元、引号、反引号与换行从不可变记录恢复；fixture 原生调用次数为 1 |
+| query gateway focused/full | 1/1、36/36 pass | rg 预算续页、scc 短句柄、machine cursor、snapshot、输出副作用与错误边界；首次全量只暴露两条旧测试 oracle/capture，修正后受影响项与全量通过 |
+| 句柄生命周期 | pass | 八个并发进程分配八个不同句柄；128 条有界淘汰后编号继续单调；snapshot prune 不误删 continuation namespace |
+| 缺失/损坏句柄 | pass | code 125 明确返回过期/不可用与重跑原查询；payload hash 失败不启动后端，invocation log 保持 1 |
+| `cargo ci-test` | pass | 全 workspace tests 通过；真实 ast-grep 专项按既有环境要求保持 ignored，未外推为其行为通过 |
+| `cargo ci-build` | pass | 0.4.2 全 workspace build 合同 |
+| `cargo lint` | pass | 严格 Clippy；首次有效失败要求锁文件显式 `truncate(false)`，修正后并发单项重验通过 |
+| `cargo fmt-check` | pass | Rust 格式合同 |
+| source-query quick validate | pass | UTF-8 模式下 skill frontmatter、结构与引用有效；初次失败仅为 Python 3.14 在中文 Windows 默认 GBK 读取 UTF-8 文件 |
+| `validate_contract.ps1` | pass；96 cases、55 strict routing、10 strict references、12/12 skills | source-query 短句柄行为、引用和静态合同自洽 |
+| 路由 evidence planner/refresh | 0 evaluate、3 reuse；`already-current` | generation `C27D84237B4B8944905C34E1C452D5F460229C81DB76FDFB9922D8437A07F066` 的现有阶段身份与 oracle 仍有效；没有模型重采样 |
 
-## independent Codex v6
+第一条纵向路径在扩量前单独通过。全量首次失败中的旧长命令断言与未捕获并发 stdout 都没有覆盖产品机制；修正测试 oracle 后先重跑两项，再运行完整 36 项。除此之外没有对未变输入盲目重跑。
 
-- experiment identity: `27ac16beea6ef195bd443057fc229b17af603d4d5c2aa7f54fcc31ca74ad20f5`
-- preflight: 33.149 s；`srcq.exe --version` 为 `srcq 0.4.1`，`srcq query scc doctor` 为 `ok`；网络三项计数全零。
-- subject: 27.522 s；input `64,529`、cached input `40,448`、output `405`、reasoning output `119`；exit 0，postflight failures 为空，网络三项计数全零。
-- 第一条命令原样执行普通 scc files 查询，第一页以 `@more shown=80 omitted=97` 和完整 `@next` 结束。
-- 第二条命令逐字使用 `@next` 的 `srcq query scc exec --after <cursor> -- <原 argv>`，exit 0；第二页首项为 `D:/program/AgentBase/tools/srcq/crates/srcq-core/src/profile/paths.rs`。模型没有读取 help、skill、源码或第三页。
-- capsule SHA-256: `fce108b55bce2871e2bb153e95725cebb5dd04d2530806aa28c07d31a6257926`；4 个原始文件和 2 个环境文件由正式 verifier 验真。
+## 0.4.1 历史证据边界
 
-原始 v6 运行只保存在 `%LOCALAPPDATA%\AgentBase\pagination-eval-20260820-v6`，不进入仓库或发布 payload。结论只覆盖正常同一轮 query model 续页；压缩后恢复、cache/process 自身分页和完整 A/B 收益不在本次目标内。
+独立 Codex v6 曾证明完整 `@next srcq query ... --after <cursor> -- <argv>` 能成功取得第二页并保持一次 scc 扫描；2026-08-22 的真实使用反例推翻了“该模型动作已经足够友善”的完成结论，但不推翻 snapshot、cursor、参数保真和不重扫证据。v6 的网络、Token、capsule 与 postflight 细节仍只属于历史 0.4.1 方案，不作为 0.4.2 短句柄行为证据。
+
+## 待完成外部门禁
+
+正式 0.4.2 source revision、可重复 Windows archive、安装生命周期、私有 GitHub Release 下载、真实安装 Status/doctor，以及 AgentBase Validate/Publish/Status 尚未在本记录截点执行。完成前不得把仓库候选提升为已发布状态。

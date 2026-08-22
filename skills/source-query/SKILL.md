@@ -9,7 +9,7 @@ description: 仅在 srcq 分页或截断阻断当前必要证据，需实际执�
 
 只读取当前缺口对应的引用：
 
-- 分页使必要结果尚未展示：query 的 `@more` 后直接执行 `@next` 提供的完整命令，不自行重组 cursor、控制面或原生 argv，也不读取引用；正文截断实际影响判断时先按已返回定位有界直读。缺少 `@next`、续页异常或明确需要特殊原生、machine/native/artifact 时，rg/fd 读取 [rg-fd.md](references/rg-fd.md)，scc 读取 [scc.md](references/scc.md)。
+- 分页使必要结果尚未展示：query 的 `@more` 后直接执行 `@next` 提供的 `srcq more q<number>` 短命令，不改写句柄、不自行重组 cursor、控制面或原生 argv，也不读取引用；正文截断实际影响判断时先按已返回定位有界直读。缺少 `@next`、续页异常或明确需要特殊原生、machine/native/artifact 时，rg/fd 读取 [rg-fd.md](references/rg-fd.md)，scc 读取 [scc.md](references/scc.md)。
 - 实际需要 scc 的 files、hotspots、lossless、raw、machine、native、artifact、输出副作用边界或结构化续页：读取 [scc.md](references/scc.md)。
 - 文本仍不能确定语法边界、控制流或结构关系，或明确需要 rule/rewrite：读取 [ast.md](references/ast.md)。
 - 实际文本候选仍有定义身份、重载、类型、精确引用、层级或 Provider 诊断歧义：读取 [lsp.md](references/lsp.md)，只发现当前缺失能力。
@@ -21,5 +21,5 @@ description: 仅在 srcq 分页或截断阻断当前必要证据，需实际执�
 ## 运行与证据边界
 
 - PATH 中的 `srcq.exe` 是 fd、rg、scc 与 AST 的唯一运行时；只有命令不可用或安装身份错误时返回安装、升级或重启宿主的恢复动作，不搜索项目构建目录、Skill、插件或 Codex 缓存中的私有副本。
-- 全集、不存在或唯一结论只查询最近项目正式来源确定的权威范围；局部页不得外推，续页沿用同一 snapshot 和精确 cursor。
+- 全集、不存在或唯一结论只查询最近项目正式来源确定的权威范围；局部页不得外推，模型只传递短句柄，srcq 内部沿用同一 snapshot 和精确 cursor。
 - AST 无匹配后先取得会改变下一次查询的源码语法证据，否则回到文本路径；LSP 不重复文本或 AST 已证明的事实。工具选择不创建写入或进程授权。

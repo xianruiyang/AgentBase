@@ -345,6 +345,19 @@ P13 只扩展现有 query model renderer，不增加 `srcq more`、offset/length
 
 TSQG-095—TSQG-098 已闭环。`srcq 0.4.1` 的特殊 argv PowerShell 往返、snapshot fingerprint 与单次 scc 扫描回归通过；全 workspace build/test/lint/fmt、skill 静态合同、零模型 Token 路由基础设施和部署 Validate 通过。v6 identity `27ac16be…20f5` 中，独立 Codex 直接执行 `@next` 并成功取得第二页，preflight/subject 网络计数全零、postflight 无漂移，capsule `fce108b5…7926` 验真通过。GAP-SQG-009 因此关闭；真实 srcq 安装仍按用户要求暂停，本轮没有 Publish 授权也未执行 Publish。
 
+### P14 query model 短句柄续页
+
+2026-08-22 的真实使用反例满足 P13 的模型动作质量重开条件：完整命令虽然可执行，仍要求模型复制 32 位 snapshot cursor、控制面和全部原生 argv。用户确认改用短句柄，并针对本周期授权实现、正式 srcq release/安装与 Codex Publish；P13 历史证据保留，当前交付链仍在同一 [分页动作工作区](../../docs/work/20260820_srcq_model_pagination_action/requirements.md) 修订受保护目标。
+
+| ID | 任务 | 依赖 | 产出 | 验证与闭环 |
+| --- | --- | --- | --- | --- |
+| TSQG-099 | 重裁模型续页 owner、machine 兼容与生命周期 | TSQG-098 | 短句柄需求、不可变 registry、并发/过期边界 | `@next` 只暴露 `srcq more q<number>`；无参数 last-query、offset/length 和 machine cursor 变更均排除 |
+| TSQG-100 | 实现根级 more 与同 owner 原子状态 | TSQG-099 | 0.4.2 候选、进程间 spool lock、128 条有界句柄记录 | scc 纵向路径恢复特殊 argv并保持一次扫描；八进程句柄唯一；损坏/缺失拒绝且不启动后端 |
+| TSQG-101 | 迁移模型交互面、skill 与全部确定性消费者 | TSQG-100 | srcq 文档、source-query 合同、路由静态检查与 workspace 证据 | rg/fd/scc model、machine cursor、snapshot、cache/process、release/安装合同均无回退 |
+| TSQG-102 | 发布、安装、Codex Publish 与 Git 收口 | TSQG-101 | 私有 GitHub Release、真实安装读回、DirectCompatibility 发布和完成审计 | release checklist、下载/升级/doctor、路由 evidence、部署 Status、非强制远端同步全部有直接证据 |
+
+P14 以 TSQG-100 的 scc 首屏—续页—单次扫描作为首个真实消费者；该路径成立后才扩到并发、全 workspace、release 与部署。句柄按十进制单调增长而不固定填充六位；受管保留周期内不复用，过期只返回重跑原查询，不误指其他 snapshot 或隐式重扫。
+
 ## 5. 停止与重开条件
 
 - AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断或 release gate 任一发生非必要变化时，停止并回到设计裁决。

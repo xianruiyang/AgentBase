@@ -1,31 +1,38 @@
 # 模型设计
 
-## DES-001 query model renderer 拥有可执行续页动作
+## DES-001 query model renderer 拥有短句柄续页动作
 
 - 状态: confirmed
-- 关联目标: REQ-001, AC-001, AC-002, CON-001, UDES-001
+- 关联目标: REQ-001, AC-001, AC-002, CON-003, UDES-001
 
-`query_gateway` 继续是 query model 分页、snapshot 和 cursor 的唯一 owner。只有它同时掌握精确 backend、显式 wrapper 状态、原生 argv 与新 cursor，因此由它从同一 `GatewayCommand` 生成：
+`query_gateway` 继续是 query model 分页、snapshot、cursor 和模型续读句柄的唯一 owner。只有它同时掌握精确 backend、已解析 engine/cwd、wrapper 状态、原生 argv 与新 cursor，因此由它从同一 `GatewayCommand` 生成：
 
 ```text
 @more shown=<N> omitted=<N>
-@next srcq query <backend> exec [必要 wrapper 选项] --after <cursor> -- <原生 argv...>
+@next srcq more q<number>
 ```
 
-`@more` 只承担不完整性；`@next` 后的单行命令承担唯一下一动作。machine 继续返回结构化 `next_cursor`，cache/process 的 offset 分页继续由各自 owner 维护。
+`@more` 只承担不完整性；`@next` 后的短命令承担唯一模型动作。machine 继续返回结构化 `next_cursor`，cache/process 的 offset 分页继续由各自 owner 维护。
 
-## DES-002 命令按 PowerShell 7 argv 语义无损渲染
+## DES-002 不可变句柄记录原子绑定完整续读状态
 
 - 状态: confirmed
 - 关联目标: AC-002
 
-固定控制 token 和生成的 cursor 使用安全裸 token。用户或路径值只有完全属于保守安全字符集时才裸写，否则使用 PowerShell 双引号字面量，并转义双引号、反引号、美元符号；控制字符使用 PowerShell 7 的 `` `u{HEX}`` 单行转义。空 argv 显式写为 `""`。不能无损表示为 UTF-8 的 model 参数局部拒绝，不以 lossy path 伪装成可执行恢复。
+句柄记录与 snapshot 同属用户 LocalAppData 下的 query spool，通过同一进程间文件锁分配。每条记录不可变，保存完整 cursor、backend、已解析 engine/cwd、view、limit、正文预算和原生 argv；每页新建句柄，不维护可变“最后查询”或当前 offset。句柄从 `q1` 开始按十进制单调增长，最多保留 128 条，受管保留周期内不复用。
 
-命令只展开改变正确性的状态：显式 engine/cwd、非默认 view/limit/max-text/model-budget、cursor 与全部原生 argv。默认值不重复；cursor 自带 snapshot 与实际 view，续页不增加第二状态源。
+记录使用完整 payload hash 检测损坏；加载后仍由既有 snapshot fingerprint 复核 backend、engine/version、cwd 与 argv。句柄或 snapshot 过期、损坏或不匹配时返回 wrapper code 125 和重跑原查询的恢复动作，不调用原生后端。完整 cursor 仍是程序化续页身份，短记录只是同一 owner 为模型维护的有界索引，不建立可由模型编辑的第二真源。
 
-## DES-003 真实模型事件是友善度 oracle
+## DES-003 machine cursor 与旧消费者保持兼容
 
 - 状态: confirmed
-- 关联目标: AC-003, UDES-001
+- 关联目标: AC-002, CON-003
 
-确定性测试先证明文本合同、特殊 argv 往返、snapshot 身份和原生调用次数。随后用 P12 已修复的 candidate-only evaluator，在同类 scc files 场景运行一个新鲜 subject；审查其第一页、实际第二条命令、第二页首项、网络计数、postflight 身份和 scc 扫描次数。若失败，只有新的事件证据指向可修改机制时才形成下一候选，不在相同实现和环境上盲目重跑。
+`srcq query` 的 machine `query_snapshot`、`next_cursor` 与显式 `--snapshot/--after` 不改 schema 或含义；rg/fd/scc 的投影和 cache/process 分页也不通过短句柄反向改写。模型执行 `srcq more` 后重新进入既有 query gateway，并由内部 cursor 固定首屏选择的实际 view。
+
+## DES-004 真实 CLI 事件与并发/失败边界共同组成 oracle
+
+- 状态: confirmed
+- 关联目标: AC-001, AC-002, AC-003, UDES-001
+
+第一条纵向路径必须证明 scc files 首屏只显示短命令、PowerShell 7 直接执行后取得第二页、特殊 argv 完整恢复且 fixture 原生调用次数保持 1。成立后再验证 rg 共享 renderer、并发首屏分配互不重复、句柄损坏/缺失不启动后端、machine cursor 和完整 workspace 非回退；相同实现与环境失败不得盲目重跑。

@@ -5,13 +5,14 @@ mod scc;
 use std::{
     collections::{BTreeMap, BTreeSet},
     ffi::OsString,
-    fs,
+    fs::{self, OpenOptions},
     io::{self, Cursor, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     time::SystemTime,
 };
 
+use fs2::FileExt;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use srcq_core::{
@@ -25,6 +26,8 @@ use srcq_core::invocation::OutputFormat;
 const MAX_STDOUT_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_STDERR_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_SPOOL_ENTRIES: usize = 32;
+const MAX_CONTINUATION_ENTRIES: usize = 128;
+const CONTINUATION_SCHEMA: &str = "sgy.query.continuation/v1";
 pub(super) const DIRECT_COMPLETE_MAX_UNITS: usize = 512;
 const DIRECT_SINGLE_PATH_MAX_TEXT_CHARS: usize = 1024;
 const SCC_SHORT_VALUE_OPTIONS: &[char] = &['x', 'n', 'i', 'M', 'f', 'o', 's'];
@@ -140,6 +143,16 @@ struct Projection {
 pub fn execute(command: &GatewayCommand) -> i32 {
     match execute_inner(command) {
         Ok(code) => code,
+        Err(error) => {
+            eprintln!("srcq: {error}");
+            error.code
+        }
+    }
+}
+
+pub fn execute_continuation(handle: &str) -> i32 {
+    match load_continuation(handle) {
+        Ok(command) => execute(&command),
         Err(error) => {
             eprintln!("srcq: {error}");
             error.code
@@ -552,10 +565,8 @@ fn execute_query(command: &GatewayCommand, engine: &Path, cwd: &Path) -> Result<
                     projection.total.saturating_sub(end)
                 ),
             );
-            push_model_line(
-                &mut model,
-                &format!("@next {}", model_continuation_command(command, cursor)?),
-            );
+            let handle = persist_continuation(command, cursor, engine, cwd)?;
+            push_model_line(&mut model, &format!("@next srcq more {handle}"));
         }
         let cut = model_text_cut_count(command.backend, &projection.view, &root);
         if cut > 0 {
@@ -1405,6 +1416,39 @@ fn spool_root() -> Result<PathBuf, GatewayError> {
     Ok(root)
 }
 
+fn open_spool_lock(root: &Path) -> Result<fs::File, GatewayError> {
+    let path = root.join(".spool.lock");
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&path)
+        .map_err(|error| GatewayError::io("cannot open query spool lock", error))?;
+    let metadata = fs::symlink_metadata(&path)
+        .map_err(|error| GatewayError::io("cannot inspect query spool lock", error))?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(GatewayError::input("query spool lock is not a safe file"));
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err(GatewayError::input("query spool lock is a reparse point"));
+        }
+    }
+    Ok(file)
+}
+
+fn continuation_root(root: &Path) -> Result<PathBuf, GatewayError> {
+    let directory = root.join("continuations");
+    fs::create_dir_all(&directory)
+        .map_err(|error| GatewayError::io("cannot create continuation spool", error))?;
+    ensure_safe_directory(&directory)?;
+    Ok(directory)
+}
+
 fn snapshot_id(
     query_fingerprint: &str,
     engine_version: &str,
@@ -1477,6 +1521,9 @@ fn persist_snapshot(snapshot: &Snapshot) -> Result<(), GatewayError> {
         ));
     }
     let root = spool_root()?;
+    let lock = open_spool_lock(&root)?;
+    FileExt::lock_exclusive(&lock)
+        .map_err(|error| GatewayError::io("cannot lock query spool", error))?;
     let id = &snapshot.id;
     let directory = root.join(id);
     if !directory.exists() {
@@ -1516,7 +1563,7 @@ fn prune_spool(root: &Path) -> Result<(), GatewayError> {
         .filter_map(Result::ok)
         .filter(|entry| {
             entry.file_type().is_ok_and(|kind| kind.is_dir())
-                && !entry.file_name().to_string_lossy().starts_with('.')
+                && valid_snapshot_id(&entry.file_name().to_string_lossy())
         })
         .collect::<Vec<_>>();
     entries.sort_by_key(|entry| {
@@ -1535,12 +1582,16 @@ fn prune_spool(root: &Path) -> Result<(), GatewayError> {
 }
 
 fn load_snapshot(id: &str) -> Result<Snapshot, GatewayError> {
-    if id.len() != 32 || !id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if !valid_snapshot_id(id) {
         return Err(GatewayError::input(
             "snapshot id must be 32 hexadecimal characters",
         ));
     }
-    let directory = spool_root()?.join(id);
+    let root = spool_root()?;
+    let lock = open_spool_lock(&root)?;
+    FileExt::lock_shared(&lock)
+        .map_err(|error| GatewayError::io("cannot lock query spool", error))?;
+    let directory = root.join(id);
     ensure_safe_directory(&directory)?;
     let metadata: Value = serde_json::from_slice(&read_safe_snapshot_file(
         &directory,
@@ -1601,6 +1652,233 @@ fn load_snapshot(id: &str) -> Result<Snapshot, GatewayError> {
         stderr,
         fd_types,
     })
+}
+
+fn valid_snapshot_id(id: &str) -> bool {
+    id.len() == 32 && id.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn persist_continuation(
+    command: &GatewayCommand,
+    cursor: &str,
+    engine: &Path,
+    cwd: &Path,
+) -> Result<String, GatewayError> {
+    let snapshot = cursor_snapshot(cursor)?;
+    let root = spool_root()?;
+    let lock = open_spool_lock(&root)?;
+    FileExt::lock_exclusive(&lock)
+        .map_err(|error| GatewayError::io("cannot lock query spool", error))?;
+    let snapshot_directory = root.join(&snapshot);
+    if !snapshot_directory.exists() {
+        return Err(expired_continuation("new"));
+    }
+    ensure_safe_directory(&snapshot_directory)?;
+    let continuations = continuation_root(&root)?;
+    let next_number = next_continuation_number(&continuations)?;
+    let handle = format!("q{next_number}");
+    let payload = json!({
+        "handle": handle,
+        "cursor": cursor,
+        "backend": backend_name(command.backend),
+        "engine": model_path(engine, "engine")?,
+        "cwd": model_path(cwd, "cwd")?,
+        "view": command.view,
+        "limit": command.limit,
+        "max_text_chars": command.max_text_chars,
+        "model_token_budget": command.model_token_budget,
+        "native_argv": continuation_args_json(&command.native_argv)?,
+    });
+    let payload_bytes = serde_json::to_vec(&payload).map_err(|error| {
+        GatewayError::input(format!("cannot serialize continuation payload: {error}"))
+    })?;
+    let record = json!({
+        "schema": CONTINUATION_SCHEMA,
+        "handle": handle,
+        "payload_sha256": sha256_hex(&payload_bytes),
+        "payload": payload,
+    });
+    let bytes = serde_json::to_vec(&record).map_err(|error| {
+        GatewayError::input(format!("cannot serialize continuation record: {error}"))
+    })?;
+    let nonce = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let staging = continuations.join(format!(".{handle}.{}.{nonce}", std::process::id()));
+    let mut staging_file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&staging)
+        .map_err(|error| GatewayError::io("cannot create continuation staging", error))?;
+    staging_file
+        .write_all(&bytes)
+        .and_then(|()| staging_file.sync_all())
+        .map_err(|error| GatewayError::io("cannot write continuation record", error))?;
+    drop(staging_file);
+    fs::rename(&staging, continuations.join(format!("{handle}.json")))
+        .map_err(|error| GatewayError::io("cannot commit continuation record", error))?;
+    prune_continuations(&continuations)?;
+    Ok(handle)
+}
+
+fn next_continuation_number(root: &Path) -> Result<u64, GatewayError> {
+    fs::read_dir(root)
+        .map_err(|error| GatewayError::io("cannot enumerate continuations", error))?
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .and_then(|name| name.strip_suffix(".json"))
+                .and_then(parse_continuation_number)
+        })
+        .max()
+        .unwrap_or(0)
+        .checked_add(1)
+        .ok_or_else(|| GatewayError::input("continuation handle space is exhausted"))
+}
+
+fn load_continuation(handle: &str) -> Result<GatewayCommand, GatewayError> {
+    parse_continuation_number(handle)
+        .ok_or_else(|| GatewayError::input("continuation handle must use the form q<number>"))?;
+    let root = spool_root()?;
+    let continuations = continuation_root(&root)?;
+    let lock = open_spool_lock(&root)?;
+    FileExt::lock_shared(&lock)
+        .map_err(|error| GatewayError::io("cannot lock query spool", error))?;
+    let file_name = format!("{handle}.json");
+    let path = continuations.join(&file_name);
+    if !path.exists() {
+        return Err(expired_continuation(handle));
+    }
+    let bytes = read_safe_snapshot_file(&continuations, &file_name, 1024 * 1024)?;
+    let record: Value = serde_json::from_slice(&bytes).map_err(|_| expired_continuation(handle))?;
+    if record.get("schema").and_then(Value::as_str) != Some(CONTINUATION_SCHEMA)
+        || record.get("handle").and_then(Value::as_str) != Some(handle)
+    {
+        return Err(expired_continuation(handle));
+    }
+    let payload = record
+        .get("payload")
+        .ok_or_else(|| expired_continuation(handle))?;
+    let payload_bytes = serde_json::to_vec(payload).map_err(|_| expired_continuation(handle))?;
+    if record.get("payload_sha256").and_then(Value::as_str) != Some(&sha256_hex(&payload_bytes))
+        || payload.get("handle").and_then(Value::as_str) != Some(handle)
+    {
+        return Err(expired_continuation(handle));
+    }
+    let string = |name: &str| {
+        payload
+            .get(name)
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned)
+            .ok_or_else(|| expired_continuation(handle))
+    };
+    let number = |name: &str| {
+        payload
+            .get(name)
+            .and_then(Value::as_u64)
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or_else(|| expired_continuation(handle))
+    };
+    let backend = match string("backend")?.as_str() {
+        "rg" => GatewayBackend::Rg,
+        "fd" => GatewayBackend::Fd,
+        "scc" => GatewayBackend::Scc,
+        _ => return Err(expired_continuation(handle)),
+    };
+    let cursor = string("cursor")?;
+    let snapshot = cursor_snapshot(&cursor)?;
+    let snapshot_directory = root.join(snapshot);
+    if !snapshot_directory.exists() {
+        return Err(expired_continuation(handle));
+    }
+    ensure_safe_directory(&snapshot_directory)?;
+    let native_argv = payload
+        .get("native_argv")
+        .and_then(Value::as_array)
+        .ok_or_else(|| expired_continuation(handle))?
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .map(OsString::from)
+                .ok_or_else(|| expired_continuation(handle))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(GatewayCommand {
+        backend,
+        operation: GatewayOperation::Exec,
+        engine: Some(PathBuf::from(string("engine")?)),
+        cwd: Some(PathBuf::from(string("cwd")?)),
+        view: string("view")?,
+        limit: number("limit")?,
+        max_text_chars: number("max_text_chars")?,
+        model_token_budget: number("model_token_budget")?,
+        auto_complete: false,
+        output: OutputFormat::Model,
+        receipt: "auto".to_owned(),
+        artifact_out: None,
+        snapshot: None,
+        after: Some(cursor),
+        native_argv,
+    })
+}
+
+fn prune_continuations(root: &Path) -> Result<(), GatewayError> {
+    let mut entries = fs::read_dir(root)
+        .map_err(|error| GatewayError::io("cannot enumerate continuations", error))?
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let number = entry
+                .file_name()
+                .to_str()
+                .and_then(|name| name.strip_suffix(".json"))
+                .and_then(parse_continuation_number)?;
+            entry
+                .file_type()
+                .ok()
+                .is_some_and(|kind| kind.is_file())
+                .then_some((number, entry))
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by_key(|(number, _)| *number);
+    let remove_count = entries.len().saturating_sub(MAX_CONTINUATION_ENTRIES);
+    for (_, entry) in entries.into_iter().take(remove_count) {
+        fs::remove_file(entry.path())
+            .map_err(|error| GatewayError::io("cannot prune continuation", error))?;
+    }
+    Ok(())
+}
+
+fn parse_continuation_number(handle: &str) -> Option<u64> {
+    let digits = handle.strip_prefix('q')?;
+    if digits.is_empty()
+        || digits.starts_with('0')
+        || !digits.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    digits.parse().ok()
+}
+
+fn expired_continuation(handle: &str) -> GatewayError {
+    GatewayError::input(format!(
+        "continuation {handle} expired or is unavailable; rerun the original query"
+    ))
+}
+
+fn continuation_args_json(args: &[OsString]) -> Result<Vec<String>, GatewayError> {
+    args.iter()
+        .map(|argument| {
+            argument.to_str().map(ToOwned::to_owned).ok_or_else(|| {
+                GatewayError::input(
+                    "native argv cannot be represented losslessly in a model continuation",
+                )
+            })
+        })
+        .collect()
 }
 
 fn read_safe_snapshot_file(
@@ -3292,86 +3570,12 @@ fn os_args_json(args: &[OsString]) -> Result<Vec<String>, GatewayError> {
         .collect()
 }
 
-fn model_continuation_command(
-    command: &GatewayCommand,
-    cursor: &str,
-) -> Result<String, GatewayError> {
-    let mut tokens = vec![
-        "srcq".to_owned(),
-        "query".to_owned(),
-        backend_name(command.backend).to_owned(),
-        "exec".to_owned(),
-    ];
-    if let Some(engine) = command.engine.as_deref() {
-        tokens.push("--engine".to_owned());
-        tokens.push(powershell_argument(model_path(engine, "engine")?));
-    }
-    if let Some(cwd) = command.cwd.as_deref() {
-        tokens.push("--cwd".to_owned());
-        tokens.push(powershell_argument(model_path(cwd, "cwd")?));
-    }
-    if command.view != "auto" {
-        tokens.push("--view".to_owned());
-        tokens.push(powershell_argument(&command.view));
-    }
-    if command.limit != 80 {
-        tokens.push("--limit".to_owned());
-        tokens.push(command.limit.to_string());
-    }
-    if command.max_text_chars != 240 {
-        tokens.push("--max-text-chars".to_owned());
-        tokens.push(command.max_text_chars.to_string());
-    }
-    if command.model_token_budget != 2048 {
-        tokens.push("--model-token-budget".to_owned());
-        tokens.push(command.model_token_budget.to_string());
-    }
-    tokens.push("--after".to_owned());
-    tokens.push(cursor.to_owned());
-    tokens.push("--".to_owned());
-    for argument in &command.native_argv {
-        let argument = argument.to_str().ok_or_else(|| {
-            GatewayError::input(
-                "native argv cannot be represented losslessly in a model continuation command",
-            )
-        })?;
-        tokens.push(powershell_argument(argument));
-    }
-    Ok(tokens.join(" "))
-}
-
 fn model_path<'a>(path: &'a Path, role: &str) -> Result<&'a str, GatewayError> {
     path.to_str().ok_or_else(|| {
         GatewayError::input(format!(
-            "{role} path cannot be represented losslessly in a model continuation command"
+            "{role} path cannot be represented losslessly in a model continuation"
         ))
     })
-}
-
-fn powershell_argument(value: &str) -> String {
-    let safe = !value.is_empty()
-        && value.chars().all(|character| {
-            character.is_ascii_alphanumeric()
-                || matches!(character, '_' | '-' | '.' | '/' | '\\' | ':' | '=')
-        });
-    if safe {
-        return value.to_owned();
-    }
-
-    let mut rendered = String::from("\"");
-    for character in value.chars() {
-        match character {
-            '`' => rendered.push_str("``"),
-            '$' => rendered.push_str("`$"),
-            '"' => rendered.push_str("`\""),
-            value if value.is_control() => {
-                rendered.push_str(&format!("`u{{{:X}}}", value as u32));
-            }
-            value => rendered.push(value),
-        }
-    }
-    rendered.push('"');
-    rendered
 }
 
 pub(super) fn model_text_cost(text: &str) -> usize {
@@ -3852,18 +4056,53 @@ mod tests {
     }
 
     #[test]
-    fn powershell_continuation_arguments_are_single_line_and_lossless() {
+    fn continuation_handles_are_short_canonical_and_monotonic() {
+        assert_eq!(parse_continuation_number("q1"), Some(1));
+        assert_eq!(parse_continuation_number("q17"), Some(17));
+        assert_eq!(parse_continuation_number("q1000000"), Some(1_000_000));
+        assert_eq!(parse_continuation_number("q0"), None);
+        assert_eq!(parse_continuation_number("q01"), None);
+        assert_eq!(parse_continuation_number("Q1"), None);
+        assert_eq!(parse_continuation_number("q1a"), None);
+    }
+
+    #[test]
+    fn continuation_pruning_keeps_a_bounded_non_reused_sequence() {
+        let directory = tempfile::tempdir().expect("continuation root");
+        for number in 1..=130 {
+            fs::write(directory.path().join(format!("q{number}.json")), b"{}")
+                .expect("continuation fixture");
+        }
+        fs::write(directory.path().join("unmanaged.txt"), b"keep").expect("unmanaged fixture");
+        prune_continuations(directory.path()).expect("bounded prune");
+        assert!(!directory.path().join("q1.json").exists());
+        assert!(!directory.path().join("q2.json").exists());
+        assert!(directory.path().join("q3.json").exists());
+        assert!(directory.path().join("q130.json").exists());
+        assert!(directory.path().join("unmanaged.txt").exists());
         assert_eq!(
-            powershell_argument("plain-path/file.rs"),
-            "plain-path/file.rs"
+            next_continuation_number(directory.path()).expect("next handle"),
+            131
         );
-        assert_eq!(powershell_argument(""), "\"\"");
-        assert_eq!(powershell_argument("with space"), "\"with space\"");
-        assert_eq!(
-            powershell_argument("money$|quote\"tick`apostrophe'"),
-            "\"money`$|quote`\"tick``apostrophe'\""
-        );
-        assert_eq!(powershell_argument("line\nnext"), "\"line`u{A}next\"");
+    }
+
+    #[test]
+    fn snapshot_pruning_ignores_the_continuation_namespace() {
+        let directory = tempfile::tempdir().expect("query spool");
+        let continuations = directory.path().join("continuations");
+        fs::create_dir(&continuations).expect("continuation namespace");
+        for number in 0..=MAX_SPOOL_ENTRIES {
+            fs::create_dir(directory.path().join(format!("{number:032x}")))
+                .expect("snapshot fixture");
+        }
+        prune_spool(directory.path()).expect("snapshot prune");
+        let snapshots = fs::read_dir(directory.path())
+            .expect("spool entries")
+            .filter_map(Result::ok)
+            .filter(|entry| valid_snapshot_id(&entry.file_name().to_string_lossy()))
+            .count();
+        assert_eq!(snapshots, MAX_SPOOL_ENTRIES);
+        assert!(continuations.exists());
     }
 
     #[test]

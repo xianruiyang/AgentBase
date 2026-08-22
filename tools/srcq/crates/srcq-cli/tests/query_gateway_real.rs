@@ -1,4 +1,9 @@
-use std::{env, fs, path::Path, process::Command};
+use std::{
+    collections::BTreeSet,
+    env, fs,
+    path::Path,
+    process::{Command, Stdio},
+};
 
 use serde_json::Value;
 use srcq_core::codec::parse_yaml_documents;
@@ -350,10 +355,9 @@ fn internal_model_budget_pages_complete_evidence_units_with_exact_cursor() {
         .lines()
         .find_map(|line| line.strip_prefix("@next "))
         .expect("continuation command");
-    let cursor = next
-        .split_once("--after ")
-        .and_then(|(_, value)| value.split_whitespace().next())
-        .expect("continuation cursor");
+    let handle = next
+        .strip_prefix("srcq more ")
+        .expect("short continuation handle");
     assert!(first.contains("@more"));
     assert!(!first
         .lines()
@@ -361,22 +365,7 @@ fn internal_model_budget_pages_complete_evidence_units_with_exact_cursor() {
     assert!(!first.lines().any(|line| line.trim().is_empty()));
 
     let second = srcq(directory.path(), local.path())
-        .args([
-            "query",
-            "rg",
-            "exec",
-            "--model-token-budget",
-            "32",
-            "--after",
-            cursor,
-            "--",
-            "--vimgrep",
-            "--sort",
-            "path",
-            "-F",
-            "needle",
-            "budget",
-        ])
+        .args(["more", handle])
         .output()
         .expect("budgeted continuation");
     assert!(
@@ -388,7 +377,7 @@ fn internal_model_budget_pages_complete_evidence_units_with_exact_cursor() {
 }
 
 #[test]
-fn model_next_command_round_trips_powershell_argv_without_rescanning_scc() {
+fn short_model_continuation_restores_exact_argv_without_rescanning_scc() {
     let directory = fixture();
     let local = tempfile::tempdir().expect("local app data");
     let engine = env!("CARGO_BIN_EXE_srcq-native-fixture");
@@ -427,12 +416,33 @@ fn model_next_command_round_trips_powershell_argv_without_rescanning_scc() {
     let next = first
         .lines()
         .find_map(|line| line.strip_prefix("@next "))
-        .expect("PowerShell continuation command");
-    assert!(next.starts_with("srcq query scc exec "));
-    assert!(next.contains("--after q1."));
-    assert!(next.contains("\"folder with space\""));
-    assert!(next.contains("money`$;pipe|quote`\"tick``apostrophe'"));
-    assert!(next.contains("\"line`u{A}next\""));
+        .expect("short continuation command");
+    let handle = next
+        .strip_prefix("srcq more ")
+        .expect("short continuation handle");
+    assert!(handle.starts_with('q'));
+    assert!(
+        handle.len() <= 4,
+        "first handles should stay human-copyable"
+    );
+    let record_path = local
+        .path()
+        .join("srcq/query-spool-v1/continuations")
+        .join(format!("{handle}.json"));
+    let record: Value =
+        serde_json::from_slice(&fs::read(record_path).expect("continuation record"))
+            .expect("continuation JSON");
+    assert_eq!(
+        record["payload"]["native_argv"],
+        serde_json::json!([
+            "--by-file",
+            "--fixture-scc-files=5",
+            "folder with space",
+            "money$;pipe|quote\"tick`apostrophe'",
+            "",
+            "line\nnext"
+        ])
+    );
 
     let srcq_directory = Path::new(env!("CARGO_BIN_EXE_srcq"))
         .parent()
@@ -468,6 +478,129 @@ fn model_next_command_round_trips_powershell_argv_without_rescanning_scc() {
             .count(),
         1,
         "continuation must use the persisted snapshot"
+    );
+}
+
+#[test]
+fn concurrent_model_queries_allocate_distinct_short_handles() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let engine = env!("CARGO_BIN_EXE_srcq-native-fixture");
+    let mut children = Vec::new();
+    for _ in 0..8 {
+        children.push(
+            srcq(directory.path(), local.path())
+                .args([
+                    "query",
+                    "scc",
+                    "exec",
+                    "--view",
+                    "files",
+                    "--limit",
+                    "1",
+                    "--engine",
+                    engine,
+                    "--",
+                    "--by-file",
+                    "--fixture-scc-files=3",
+                ])
+                .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+                .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("concurrent model query"),
+        );
+    }
+    let mut handles = BTreeSet::new();
+    for child in children {
+        let output = child.wait_with_output().expect("concurrent output");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let model = String::from_utf8(output.stdout).expect("UTF-8 model output");
+        let handle = model
+            .lines()
+            .find_map(|line| line.strip_prefix("@next srcq more "))
+            .expect("short handle");
+        assert!(
+            handles.insert(handle.to_owned()),
+            "duplicate handle {handle}"
+        );
+    }
+    assert_eq!(handles.len(), 8);
+}
+
+#[test]
+fn unavailable_or_tampered_handles_fail_without_rescanning() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let engine = env!("CARGO_BIN_EXE_srcq-native-fixture");
+    let log = directory.path().join("continuation-expiry-invocations.log");
+    let missing = srcq(directory.path(), local.path())
+        .args(["more", "q999"])
+        .output()
+        .expect("missing continuation");
+    assert_eq!(missing.status.code(), Some(125));
+    assert!(String::from_utf8_lossy(&missing.stderr).contains("expired or is unavailable"));
+
+    let first = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "scc",
+            "exec",
+            "--view",
+            "files",
+            "--limit",
+            "1",
+            "--engine",
+            engine,
+            "--",
+            "--by-file",
+            "--fixture-scc-files=3",
+        ])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .env("SRCQ_FIXTURE_INVOCATION_LOG", &log)
+        .output()
+        .expect("first model page");
+    assert!(first.status.success());
+    let model = String::from_utf8(first.stdout).expect("UTF-8 model output");
+    let handle = model
+        .lines()
+        .find_map(|line| line.strip_prefix("@next srcq more "))
+        .expect("short handle");
+    let record_path = local
+        .path()
+        .join("srcq/query-spool-v1/continuations")
+        .join(format!("{handle}.json"));
+    let mut record: Value =
+        serde_json::from_slice(&fs::read(&record_path).expect("continuation record"))
+            .expect("continuation JSON");
+    record["payload"]["limit"] = Value::from(999);
+    fs::write(
+        &record_path,
+        serde_json::to_vec(&record).expect("tampered continuation JSON"),
+    )
+    .expect("tamper continuation");
+    let tampered = srcq(directory.path(), local.path())
+        .args(["more", handle])
+        .env("SRCQ_FIXTURE_VERSION", "scc version 99.0.0")
+        .env("SRCQ_FIXTURE_SCC_PROTOCOL", "valid")
+        .env("SRCQ_FIXTURE_INVOCATION_LOG", &log)
+        .output()
+        .expect("tampered continuation");
+    assert_eq!(tampered.status.code(), Some(125));
+    assert!(String::from_utf8_lossy(&tampered.stderr).contains("expired or is unavailable"));
+    assert_eq!(
+        fs::read_to_string(log)
+            .expect("invocation log")
+            .lines()
+            .count(),
+        1,
+        "invalid continuation must not rescan the backend"
     );
 }
 
@@ -650,7 +783,7 @@ fn direct_scc_large_file_sets_obey_the_hard_complete_limit() {
     assert!(model.contains("@more shown="));
     assert!(model.contains("omitted="));
     assert!(model.contains("shown=80"));
-    assert!(model.contains("@next srcq query scc exec --after q1."));
+    assert!(model.contains("@next srcq more q"));
     assert!(!model
         .lines()
         .any(|line| line.starts_with("@more ") && line.contains("after=")));

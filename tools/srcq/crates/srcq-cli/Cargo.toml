@@ -20,6 +20,7 @@ required-features = ["test-helper"]
 
 [dependencies]
 clap.workspace = true
+fs2.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 srcq-core = { path = "../srcq-core" }

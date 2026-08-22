@@ -1,11 +1,11 @@
 # 完成审计
 
-| 目标 | 状态 | 直接证据 |
+| 目标 | 当前状态 | 直接证据与剩余边界 |
 | --- | --- | --- |
-| REQ-001 / AC-001 | verified | 页尾为数量 `@more` + 唯一完整 `@next`；独立 Codex 没有自行重组控制面 |
-| AC-002 | verified | 特殊 argv 在新 PowerShell 7 进程无损往返；snapshot fingerprint 通过且 fixture scc 调用次数保持 1 |
-| AC-003 / UDES-001 | verified | 有效 v6 subject 直接执行提示命令，第二页 exit 0 并正确报告首项；网络与 postflight 均有效 |
-| CON-001 | satisfied | cursor/snapshot 仍是唯一 query 状态；machine、cache/process 不变；没有 offset/length 或 `srcq more` |
-| CON-002 | satisfied | 只构建隔离候选并验证；真实 srcq 安装和 Codex Publish 均未执行 |
+| REQ-001 / AC-001 | verified in candidate | model 页尾为 `@more` + `@next srcq more q<number>`；不再暴露 cursor、控制面或 argv |
+| AC-002 | verified in candidate | 特殊 argv 从记录恢复，snapshot fingerprint 通过，fixture 原生调用次数保持 1；machine cursor 未变 |
+| AC-003 / UDES-001 | verified in candidate | PowerShell 7 从第一页短命令直接取得第二页；并发、缺失和损坏边界均有工具事件 |
+| CON-001 / CON-002 | superseded | 用户已明确替代旧“禁止 more”和“禁止安装/Publish”边界；历史证据保留但不约束当前周期 |
+| CON-003 | verified in candidate | 无参数 last-query 未实现；每页不可变新句柄、受管周期内单调不复用；过期不误指或重扫 |
 
-query model renderer、source-query skill、文档和静态合同已经迁移，旧 query `@more ... after=<cursor>` 不再是当前模型动作入口；machine 的结构化 `next_cursor` 和 cache/process 自身协议继续有效。当前目标没有适用失败、第二状态源、未迁移消费者或开放实施项，SOL-001 完成。正式 0.4.1 archive 与真实安装仍是后续独立生命周期，不影响本次源码和模型友善度目标完成。
+query model renderer、CLI、同 owner spool、source-query skill、组件文档、交付链与静态合同已经迁移，0.4.2 仓库候选的最小充分验证通过。正式 release、真实安装、Codex Publish、部署读回和 Git 最终同步仍未完成，因此 P14 与本周期整体状态保持开放；这些外部门禁完成且没有适用失败后再更新为已完成。

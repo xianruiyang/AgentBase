@@ -1,29 +1,29 @@
 # 当前状态与差距
 
-## OBS-001 query cursor 与 snapshot 已能精确续页
+## OBS-001 0.4.1 cursor 与 snapshot 能精确续页但模型动作冗长
 
 - 状态: confirmed
-- 关联: AC-002, CON-001
+- 关联: AC-001, AC-002, CON-003
 
-`tools/srcq/crates/srcq-cli/src/query_gateway.rs` 在首个未完成 model 页面持久化完整原生捕获，以 `q1.<snapshot>.<view>.<offset>` 生成 cursor。续页会先核对 backend、engine/version、cwd 与原生 argv 的 fingerprint，再从 snapshot 投影下一页；现有组件测试已覆盖 snapshot 身份和 scc 不重扫。
+`srcq 0.4.1` 在首个未完成 model 页面持久化完整原生捕获，以 `q1.<snapshot>.<view>.<offset>` 生成 cursor；续页会核对 backend、engine/version、cwd 与原生 argv fingerprint 并从 snapshot 投影，已有证据证明不重扫。但 model `@next` 同时重复 query 控制面、cursor 和全部原生 argv，模型必须准确复制一整串不透明文本。
 
-## OBS-002 变更前页尾只提供游标片段
-
-- 状态: confirmed
-- 关联: AC-001, AC-003
-
-实施前 query model 页尾为 `@more shown=<N> omitted=<N> after=<cursor>`。正确续页实际需要进入 `srcq query <backend> exec` 控制面并重放原生 argv；直接入口把 backend 后所有 token 原样交给原生工具，所以 `srcq scc --after <cursor>` 会被 scc 拒绝。
-
-## OBS-003 有效独立运行已复现错误动作
+## OBS-002 真实使用推翻了完整长命令已经模型友好的结论
 
 - 状态: confirmed
-- 关联: AC-003
+- 关联: AC-001, AC-003, UDES-001
 
-P12 v5 在 WebSocket、代理端 DNS、ALL_PROXY fanout、full access 与真实 scc preflight 均有效且零 retry/fallback 的边界下，独立 Codex 首先成功取得第一页，随后自行执行 `srcq scc --after <cursor>` 并失败；它没有取得第二页。该命令事件把差距归于模型页尾动作信息，而非评估网络、权限或后端可用性。
+用户在 2026-08-22 直接观察到当前分页要求填写长 cursor，模型复制正确率和使用便利性仍差；随后的项目源码定位查询也实际返回了包含 32 位 snapshot、view、offset、正则、路径和 glob 的完整 `@next`，续页动作本身显著重复当前判断不需要的内容。该反例覆盖 0.4.1 的 model 交互结论，不推翻 machine cursor 或 snapshot 正确性。
+
+## OBS-003 当前候选已形成同 owner 短句柄路径
+
+- 状态: confirmed
+- 关联: AC-001, AC-002, AC-003, CON-003
+
+当前 `0.4.2` 候选增加根级 `srcq more <HANDLE>` 与有界 continuation registry。第一条真实 scc fixture 路径已由 PowerShell 7 直接从 `@next srcq more q1` 取得第二页，特殊 argv 保持且原生 invocation log 为 1；并发八个进程分配到八个不同句柄，缺失或 payload 损坏的句柄以 code 125 失败且调用次数不增加。
 
 ## GAP-001 模型必须重建未显示的控制面语法
 
 - 状态: resolved
 - 关联: REQ-001, AC-001, AC-003, OBS-002, OBS-003
 
-旧 owner 已掌握 backend、wrapper 值、原生 argv 和 cursor，却只输出游标片段，把控制面选择和参数重建责任转嫁给模型。0.4.1 已由同一 owner 输出完整 `@next`；特殊 argv、单次扫描和独立 v6 第二页事件共同证明错误机制不再经过该路径。offset + length 没有进入实现。
+0.4.1 虽然不再要求模型从游标片段重建语法，却把同一复杂度变成需要逐字复制的完整命令，仍由模型承担无必要的 cursor/argv 传递。0.4.2 候选把这些状态收回 query owner，model 只传递短句柄；纵向、并发和拒绝路径已经覆盖原错误机制，machine cursor 与显式 offset 没有改变。

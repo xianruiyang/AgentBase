@@ -42,6 +42,11 @@ pub fn command() -> Command {
         .subcommand(direct_gateway_subcommand("rg", "ripgrep"))
         .subcommand(direct_gateway_subcommand("fd", "fd"))
         .subcommand(direct_gateway_subcommand("scc", "scc"))
+        .subcommand(
+            Command::new("more")
+                .about("Continue a model query from its short handle")
+                .arg(Arg::new("handle").value_name("HANDLE").required(true)),
+        )
         .subcommand(query_subcommand())
         .subcommand(
             Command::new("schema")
@@ -72,7 +77,7 @@ pub fn command() -> Command {
                 ),
         )
         .after_help(
-            "Operational syntax: srcq <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: srcq <schema|capabilities|doctor> ...\nCache syntax: srcq cache <get|query|info|remove|gc> ...\nProcess syntax: srcq process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...\nSource syntax: srcq <rg|fd|scc> <native argv...>\nExplicit query controls: srcq query <rg|fd|scc> <exec|defaults|doctor> [options] -- <native argv...>",
+            "Operational syntax: srcq <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: srcq <schema|capabilities|doctor> ...\nCache syntax: srcq cache <get|query|info|remove|gc> ...\nProcess syntax: srcq process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...\nSource syntax: srcq <rg|fd|scc> <native argv...>\nModel continuation: srcq more <HANDLE>\nExplicit query controls: srcq query <rg|fd|scc> <exec|defaults|doctor> [options] -- <native argv...>",
         )
 }
 
@@ -494,6 +499,7 @@ pub enum CliAction {
     Process(ProcessCommand),
     Inspect(InspectionCommand),
     Gateway(GatewayCommand),
+    More(String),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -818,6 +824,7 @@ pub fn parse_cli_from(
             || value == OsStr::new("rg")
             || value == OsStr::new("fd")
             || value == OsStr::new("scc")
+            || value == OsStr::new("more")
             || value == OsStr::new("query")
     }) {
         if matches!(raw.get(1).and_then(|value| value.to_str()), Some("query"))
@@ -861,6 +868,11 @@ pub fn parse_cli_from(
                 GatewayBackend::Scc,
                 values,
             ))),
+            Some(("more", values)) => values
+                .get_one::<String>("handle")
+                .cloned()
+                .map(CliAction::More)
+                .ok_or(CliParseError::MissingDelimiter),
             Some(("query", values)) => match values.subcommand() {
                 Some(("rg", backend)) => {
                     parse_gateway_command(GatewayBackend::Rg, backend).map(CliAction::Gateway)
@@ -1421,6 +1433,12 @@ mod tests {
             os_args(&["-e", "a b", "-g", "*.rs", "-e", "a b", "", "--", "tail"]),
             command.native_argv
         );
+    }
+
+    #[test]
+    fn parses_short_model_continuation_without_query_syntax() {
+        let action = parse_cli_from(os_args(&["srcq", "more", "q17"])).expect("short continuation");
+        assert_eq!(action, CliAction::More("q17".to_owned()));
     }
 
     #[test]
