@@ -129,6 +129,8 @@ try {
         'default_subagent_model = "gpt-5.6-terra"'
         'default_subagent_reasoning_effort = "low"'
         'keep-host-agent-setting = true'
+        '[windows]'
+        'sandbox = "unelevated"'
         '[mcp_servers.keep]'
         'command = "keep"'
         '[features]'
@@ -378,6 +380,8 @@ try {
         'model_reasoning_effort = "high"'
         'notify = ["keep-host-notify"]'
         'keep-host-agent-setting = true'
+        '[windows]'
+        'sandbox = "unelevated"'
         '[mcp_servers.keep]'
         'command = "keep"'
         'path = "keep-host-feature"'
@@ -435,6 +439,10 @@ try {
         throw "Unrelated custom agent was changed"
     }
     $manifest = Get-Content -LiteralPath (Join-Path $settingsPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $windowsSandboxLifecycle = @($manifest.managed_asset_units | Where-Object { [string]$_.id -eq 'config:windows/sandbox' })
+    if ($windowsSandboxLifecycle.Count -ne 1 -or [string]$windowsSandboxLifecycle[0].state -ne 'transferred') {
+        throw "Portable-settings publish did not preserve the Windows sandbox ownership transfer"
+    }
     $manifestTargets = @($manifest.targets.relative_path | Sort-Object)
     if ($manifestTargets -notcontains "config.toml" -or $manifestTargets -notcontains "hooks.json") {
         throw "Portable settings are missing from the rollback manifest"

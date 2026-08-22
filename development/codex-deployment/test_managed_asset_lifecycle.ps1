@@ -200,6 +200,27 @@ try {
         throw 'Retired config key without provenance was not rejected as unverifiable'
     }
 
+    $transferredConfigDocument = $baseDocument | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    $transferredConfigDocument.config_keys.present = @()
+    $transferredConfigDocument.config_keys.transferred = @([pscustomobject]@{
+        id = 'config:root/managed_key'
+        table = ''
+        key = 'managed_key'
+        since = 'test-transfer'
+        reason = 'ownership transferred to the host'
+    })
+    $transferredConfigPath = Join-Path $testRoot 'transferred-config.json'
+    Write-LifecycleFixture -Path $transferredConfigPath -Document $transferredConfigDocument
+    $transferredConfigContract = Get-ManagedAssetLifecycleContract -Path $transferredConfigPath -CurrentPathUnits @($pathA, $pathB) -CurrentConfigUnits @() -PreviousManifest $baseManifest
+    $transferredConfigReceipt = @(Get-ManagedAssetLifecycleReceiptUnits -Contract $transferredConfigContract -CurrentConfigUnits @() -PreviousManifest $baseManifest -DeliveryMode DirectCompatibility -IncludePortableSettings $true | Where-Object { [string]$_.id -eq 'config:root/managed_key' })
+    $transferredConfigRetirements = @(Get-SelectedRetiredManagedConfigUnits -Contract $transferredConfigContract -DeliveryMode DirectCompatibility -IncludePortableSettings $true)
+    if ($transferredConfigReceipt.Count -ne 1 -or
+        [string]$transferredConfigReceipt[0].state -ne 'transferred' -or
+        [string]$transferredConfigReceipt[0].last_managed_source_fingerprint -ne [string]$managedConfigUnit.source_fingerprint -or
+        $transferredConfigRetirements.Count -ne 0) {
+        throw 'Transferred config ownership did not retain provenance without scheduling host-state removal'
+    }
+
     $portablePath = Join-Path $testRoot 'portable.toml'
     Write-TestText -Path $portablePath -Text ('current_key = "current"' + [Environment]::NewLine)
     $installedWithRetired = 'current_key = "current"' + [Environment]::NewLine + $managedConfigText + 'host_key = "keep"' + [Environment]::NewLine
@@ -225,6 +246,7 @@ try {
         matching_retired_config_removed = $true
         modified_retired_config_protected = $true
         unverifiable_retired_config_protected = $true
+        transferred_config_preserved = $true
         unrelated_config_preserved = $true
     }
     $result.PSObject.TypeNames.Insert(0, 'AgentBase.Deployment.TestResult')

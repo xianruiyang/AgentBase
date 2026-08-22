@@ -41,7 +41,6 @@
       { "id": "config:agents/enabled", "table": "agents", "key": "enabled" },
       { "id": "config:agents/default_subagent_model", "table": "agents", "key": "default_subagent_model" },
       { "id": "config:agents/default_subagent_reasoning_effort", "table": "agents", "key": "default_subagent_reasoning_effort" },
-      { "id": "config:windows/sandbox", "table": "windows", "key": "sandbox" },
       { "id": "config:features/hooks", "table": "features", "key": "hooks" },
       { "id": "config:features/multi_agent", "table": "features", "key": "multi_agent" },
       { "id": "config:features/js_repl", "table": "features", "key": "js_repl" },
@@ -55,7 +54,8 @@
     "retired": [],
     "transferred": [
       { "id": "config:root/model", "table": "", "key": "model", "since": "302c1a0", "reason": "ownership transferred to the target host", "legacy_import": true },
-      { "id": "config:root/model_reasoning_effort", "table": "", "key": "model_reasoning_effort", "since": "302c1a0", "reason": "ownership transferred to the target host", "legacy_import": true }
+      { "id": "config:root/model_reasoning_effort", "table": "", "key": "model_reasoning_effort", "since": "302c1a0", "reason": "ownership transferred to the target host", "legacy_import": true },
+      { "id": "config:windows/sandbox", "table": "windows", "key": "sandbox", "since": "2026-08-22", "reason": "the Windows sandbox backend depends on host setup and user approval; evaluation-only elevated setup remains explicit", "legacy_import": true }
     ]
   }
 }

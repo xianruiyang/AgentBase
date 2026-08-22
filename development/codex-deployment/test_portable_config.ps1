@@ -40,6 +40,8 @@ try {
         'default_subagent_model = "gpt-5.6-terra"'
         'default_subagent_reasoning_effort = "low"'
         'keep-host-agent-setting = true'
+        '[windows]'
+        'sandbox = "unelevated"'
         '[mcp_servers.keep]'
         'command = "keep"'
         '[features]'
@@ -66,6 +68,8 @@ try {
         'default_subagent_model = "gpt-5.6-luna"'
         'default_subagent_reasoning_effort = "max"'
         'keep-host-agent-setting = true'
+        '[windows]'
+        'sandbox = "unelevated"'
         '[mcp_servers.keep]'
         'command = "keep"'
         'path = "host-feature"'
@@ -132,6 +136,7 @@ try {
         mcp_preserved = $true
         project_trust_preserved = $true
         same_table_host_key_preserved = $true
+        windows_sandbox_preserved = $true
         unchanged_merge_is_byte_stable = $true
         host_only_change_ignored_by_contract = $true
         ambiguous_managed_table_rejected = $true
