@@ -24,4 +24,4 @@
 - 本轮没有安装软件；本次 Publish 授权已经消耗。
 - 用户随后明确授予 AgentBase 持续 Git 维护与私有远端同步权限。功能改动形成提交 `384c8ed`，持续授权与接手状态形成独立治理提交；两者按非强制方式同步 `main` 到现有 `origin`。
 
-2026-08-23 的语义角色后继候选已完成上述确定性验证，并保留根 README、Windows SWE sandbox 候选、`vendor/` 与 requirements 的评测合同 dirty 边界。本轮用户已单独授权一次按真实安装模式发布；本节在 Publish 与 Status 读回后补充实际收据。
+2026-08-23 的语义角色后继候选完成上述确定性验证，并保留根 README、Windows SWE sandbox 候选、`vendor/` 与 requirements 的评测合同 dirty 边界。实现提交 `0aba411` 已非强制推送到私有 `origin/main`。用户单独授权后，从该提交的独立干净 worktree 以 `DirectCompatibility + InstallPortableSettings` 正式 Publish：`published:true`、`changed:16`，退役 `agents\luna.toml` 与 `agents\sol.toml`，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-030345-c7ac8ea8`；发布后同范围 Status 返回 `published:true`。

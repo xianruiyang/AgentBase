@@ -51,4 +51,6 @@
 
 ## 部署候选与边界
 
-从暂存候选生成的独立干净 worktree 中，`test_manage_agentbase.ps1` 全部通过，随后正式 `manage_agentbase.ps1 -Action Validate` 返回 `valid=true`，证明长期阶段迟滞、代理角色、路由证据、受管资产与部署合同在同一提交态一致。该动作没有写入真实 Codex；当前已启动任务也不会追溯加载仓库候选。
+从暂存候选生成的独立干净 worktree 中，`test_manage_agentbase.ps1` 全部通过，随后正式 `manage_agentbase.ps1 -Action Validate` 返回 `valid=true`，证明长期阶段迟滞、代理角色、路由证据、受管资产与部署合同在同一提交态一致。
+
+用户明确授权后，从提交 `0aba411` 的独立干净 worktree 以 `DirectCompatibility + InstallPortableSettings` 正式 Publish：`published:true`、`changed:16`，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-030345-c7ac8ea8`；发布后同范围 Status 返回 `published:true`。发布只证明安装文件和部署合同，当前已启动任务不会追溯加载新规则。

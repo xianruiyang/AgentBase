@@ -22,7 +22,7 @@
 
 ## 约束与剩余边界
 
-- `CON-001` 与原 `CON-003` 只描述历史实施轮和历史发布；当前 `CON-005` 的新一次 Publish 授权已取得，执行结果尚待写回。
+- `CON-001` 与原 `CON-003` 只描述历史实施轮和历史发布；当前 `CON-005` 已满足：本次 DirectCompatibility Publish 与发布后 Status 均成功，旧 Luna/Sol 进入真实安装的退役路径。
 - `CON-002` 满足：既有 `docs/plan.md` 与 `docs/handoff.md` 改动被保留并合入当前状态，没有回退无关工作。
 - `CON-004` 满足：项目 `AGENTS.md` 已持久记录日常 Git 维护与私有远端同步授权，同时保留强制推送、历史重写和远端归属变更的单次授权边界；本轮源码已形成职责分离的提交并同步。
-- 当前候选的代码、确定性测试、路由 evidence 与正式 Validate 已闭合；只剩按当前授权执行一次真实 Publish、Status 读回和发布收据写回。
+- 当前代码、确定性测试、路由 evidence、正式 Validate、Git 同步、真实 Publish 与 Status 读回均闭合，没有开放实施项。本次 Publish 授权已经消耗；行为变化需在新任务中验收，不能由当前已启动任务追溯证明。
