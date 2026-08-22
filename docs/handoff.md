@@ -1,10 +1,10 @@
 # AgentBase 当前接手状态
 
-状态截点：2026-08-22，Windows sandbox 宿主所有权事故已完成运行恢复和仓库修复，尚未取得本次 Codex Publish 授权；未运行真实 elevated sandbox/qualification/候选模型（Asia/Shanghai）。
+状态截点：2026-08-22，Windows sandbox 宿主所有权事故已完成运行恢复、仓库修复和正式发布；未运行真实 elevated sandbox/qualification/候选模型（Asia/Shanghai）。
 
 ## 一句话状态
 
-Codex 因全局 portable config 错误拥有 `windows.sandbox = "elevated"` 而出现 Windows 设置未完成；用户切回 `unelevated` 后恢复启动。仓库已把该键从 source 移除并以稳定身份迁移为 `transferred`，配置、生命周期、完整部署消费者与正式 Validate 均通过，真实 Status 已显示 installed 与新 source 一致。旧 manifest 尚未记录移交，所以 formal publication 仍为 false；未经当次明确授权不得 Publish。接手时已有的 Windows SWE 评测候选仍保留在 dirty worktree，外部 elevated sandbox acceptance 与九题 qualification 仍是另一工作边界。
+Codex 因全局 portable config 错误拥有 `windows.sandbox = "elevated"` 而出现 Windows 设置未完成；用户切回 `unelevated` 后恢复启动。仓库已把该键从 source 移除并以稳定身份迁移为 `transferred`，配置、生命周期、完整部署消费者与正式 Validate 均通过；正式 Publish 为 changed 0，发布后宿主仍为 `unelevated`、formal Status gap 0。接手时已有的 Windows SWE 评测候选仍保留在 dirty worktree，外部 elevated sandbox acceptance 与九题 qualification 仍是另一工作边界。
 
 ## 当前源码、安装与发布边界
 
@@ -14,7 +14,7 @@ Codex 因全局 portable config 错误拥有 `windows.sandbox = "elevated"` 而�
 - 用户意图重组的跨项目不变量由 `global/AGENTS.md` 持有，`skills/delivery-workflow/` 只维护交付链中的澄清与投影：用户明确指定且经澄清的技术约束仍进入 `UDES`，仅用于表达期望结果或尚未经证据支持的原因、解法才保持为候选，不得据此静默替换用户目标或扩大授权。
 - taskctl 起止时间的唯一 owner 是 `skills/task-table-manager/scripts/taskctl.py` 的 `task.state` 生命周期：第一次真实开始后保留 `started_at`，进入 `done/retired` 写 `ended_at`，离开终态只清空结束时间；旧状态缺字段时保持未知，不推测历史时间。skill 合同、model/machine 投影、render 和回归测试已经迁移。
 - 本轮通过私有 Release 从 srcq 0.4.1 Upgrade 到 0.4.2；Status 为 ready、完整性 verified、PATH 条目 1，AST/scc doctor 与已安装 `srcq more q2` 续页正常。随后以 `DirectCompatibility + InstallPortableSettings` 正式 Publish，发布后 `managed_payload_formally_published:true`、gap 0；变更 3 个受管资产，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260822-153600-61708e97`。
-- 上述发布没有写 `config.toml`，但此前 portable settings 长期拥有 elevated Windows 后端。当前安装由用户恢复为 `sandbox = "unelevated"`；修复后只读 Status 为 `installed_matches_source:true`，但旧 manifest 产生 `published_manifest_source_is_stale`、`installed_payload_differs_from_manifest` 和 `published_manifest_managed_asset_lifecycle_is_stale`，须另获一次 Publish 授权才能清零。
+- 上述发布没有写 `config.toml`，但此前 portable settings 长期拥有 elevated Windows 后端。修复发布同样没有改写安装文件（changed 0），只把 `config:windows/sandbox` 的 `transferred` 状态写入新 manifest；当前安装保持 `sandbox = "unelevated"`，formal Status 为 published、gap 0，收据目录为 `C:\Users\gzxt\.codex\backups\AgentBase-20260822-173018-7cdc4621`。
 - 每次新的 Codex Publish 仍必须取得用户针对当次操作的明确同意；持续 Git 维护与私有远端非强制推送授权不替代发布授权。
 - 仓库验证资产、语料、runner、测试和收据不进入 Codex payload；正式 `Validate` 已证明 Plugin payload 为 12 skills、2 custom agents、96 routing cases。
 
@@ -46,7 +46,7 @@ Codex 因全局 portable config 错误拥有 `windows.sandbox = "elevated"` 而�
 ## 下个对话的最小恢复步骤
 
 1. 读取根 `README.md` 和本文件，运行 `git status --short`。仍应保留接手时已有的 `development/agent-evaluation/` 修改与 `vendor/`、根 `README.md` 的 sandbox 导航 hunk，以及 `docs/requirements.md` 的评测合同 hunk；不得清理或并入无关提交。当前分支的已提交版本应与既有私有上游同步。
-2. Windows sandbox 修复的仓库实现已验证；开放项只有取得用户针对当次操作的明确同意后，以 `DirectCompatibility + InstallPortableSettings` Publish 并确认 gap 0。Windows SWE dirty 候选属于另一工作边界，评测 elevated setup 不得通过全局配置间接启用。只有处理这些重开项、选择或替代其他子计划，或重新裁决跨组件方向时再读取 `docs/plan.md`。
+2. Windows sandbox 修复已经发布闭合，没有开放实施项；Windows SWE dirty 候选属于另一工作边界，评测 elevated setup 不得通过全局配置间接启用。只有处理该重开项、选择或替代其他子计划，或重新裁决跨组件方向时再读取 `docs/plan.md`。
 3. 若任务依赖真实安装/发布状态，严格按部署说明只读运行 `DirectCompatibility + InstallPortableSettings Status` 和 srcq `Status`；不要用本文件的最后已知值替代读回。
 4. 若用户授权改变宿主 sandbox 配置，先显式运行 `sandbox-check`；通过后再另行取得外部依赖/qualification 授权，按 smoke → core 余项 → rotation 逐题运行 `prepare/oracle`。没有这些授权时只维护仓库和确定性验证。
 5. 规则、skill 或触发合同变化时先运行路由确定性入口并读取 evaluation plan，只执行 `evaluate` 阶段；相同身份与 oracle 有效时复用，不为期待不同结果重采样。
