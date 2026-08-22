@@ -31,3 +31,11 @@
 - 关联: DES-004, DES-005, REQ-003
 
 用 `evidence` 的 Luna/medium 与 `experiment` 的 Sol/low 替代模型名角色；把未分类子代理回退降为 Luna/medium。全局内核只保存角色选择与主代理责任，新的 `subagent-orchestration` 用渐进引用保存 evidence packet、实验生命周期与成本交接；validator 只校验 schema 和安全边界。部署生命周期把旧 Luna/Sol 声明为退役并安装两个新角色，路由分别覆盖真实取证、路径实验和概念讨论非触发。
+
+## SOL-005 以 should 默认请求闭合 Codex 触发语义
+
+- 状态: implemented
+- 解决: GAP-005
+- 关联: DES-004, DES-005, REQ-003, AC-010
+
+把全局委派规则从只表达必要条件的 `must` 许可句改为 `should` 默认请求：用户未指定时，必要取证或试路的独立边界与委派净收益同时成立则使用语义角色，否则主代理直接完成。编排 skill 的 description、正文、成本交接和 UI 提示同步支持用户显式要求与这一默认选择，并把并发限制为多个分别合格、无共享未证前提或可写状态且并发净收益成立的子问题。

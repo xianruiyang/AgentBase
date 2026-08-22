@@ -26,11 +26,11 @@
 - 状态: confirmed
 - 关联目标: REQ-003, UDES-003
 
-`global/AGENTS.md` 唯一维护主代理何时选择 `evidence` 或 `experiment` 以及不可移交的正式责任；`global/agents/evidence.toml`、`experiment.toml` 各自唯一维护实际模型、档位和角色自身约束；`global/config.toml` 只维护未分类子代理的回退。部署 validator 校验可移植 schema 与安全边界，不复制当前模型或档位。
+`global/AGENTS.md` 唯一维护主代理何时默认选择 `evidence` 或 `experiment`、何时直接完成，以及不可移交的正式责任。该规则以 `should` 明确请求可推翻的默认委派，不使用只限制不触发的“只有…才”许可句，也不升级为绝对创建义务。`global/agents/evidence.toml`、`experiment.toml` 各自唯一维护实际模型、档位和角色自身约束；`global/config.toml` 只维护未分类子代理的回退。部署 validator 校验可移植 schema 与安全边界，不复制当前模型或档位。
 
 ## DES-005 编排 skill 持有有界交接协议
 
 - 状态: confirmed
 - 关联目标: REQ-003, AC-009
 
-`subagent-orchestration` 持有委派净收益、最小 capsule、evidence packet、主代理逐项接纳、实验隔离、反例熔断和无后代代理合同。静态证据、实验结果和主代理生产实现形成单向链；子代理输出不成为状态真源或完成裁判。
+`subagent-orchestration` 持有必要输入、独立边界和委派净收益的详细判断，以及最小 capsule、evidence packet、主代理逐项接纳、实验隔离、反例熔断、并发资格和无后代代理合同。全局规则已请求默认委派时本 skill 可以自动选中；它只细化选择和交接，不把净收益改成强制创建。静态证据、实验结果和主代理生产实现形成单向链；子代理输出不成为状态真源或完成裁判。

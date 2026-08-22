@@ -82,7 +82,7 @@ must: 用户固定线程或工作范围的推理深度时按期限保持，未�
 
 must: 用户未固定时，下一段实质工作前独立于领域 skill、计划和 Goal 判档；命中 `$execution-governor` 时由其裁决，否则模型判断；配置会改变动作才用 `$reasoning-governor` 读回，实际不同且切换净收益成立才设置；仅可预期长期负担变化才切换，孤立难题/短收尾不切换；自主档位仅服务当前工作，读写不依赖 active Goal，Goal 只续轮
 
-must: 仅委派独立有界且降低成本/耗时的子任务；`evidence` 取证，`experiment` 试路，交接用 `$subagent-orchestration`；主代理保留目标/授权/规划/实现/验收/Git/发布，子代理不扩权或证成
+should: 用户未指定是否使用子代理时，必要且独立有界的取证或试路若委派净收益成立，使用 `evidence` 或 `experiment`，用 `$subagent-orchestration` 交接；否则主代理直接完成；主代理保留目标/授权/规划/实现/验收/Git/发布
 
 must: 全集、不存在或唯一结论先从最近项目正式来源确认权威源码范围，并只查询该范围；文件发现/文本搜索用 PATH 中的 `srcq fd <fd argv...>` 与 `srcq rg <rg argv...>`，不预加载高级查询 skill 或工具说明；已知或唯一定位后按命中范围直接有界读取所缺正文且不再搜索重读；文本不足才按需通过 srcq 升级 AST，真实符号语义不足才用 LSP，证据充分即停止
 

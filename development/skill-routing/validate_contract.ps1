@@ -92,8 +92,8 @@ Assert-True ($globalContent.Contains("维度与等价依据") -and $globalConten
 Assert-True ($globalContent.Contains("领域正式 runner") -and $globalContent.Contains("全局规则不保存领域语法")) "Global AGENTS.md is missing the fragile-command runner escalation boundary"
 Assert-True ($globalContent.Contains("判断当前工具缺少能力或存在缺陷前") -and $globalContent.Contains("预期降级")) "Global AGENTS.md is missing the tool-defect reproduction boundary"
 Assert-True ($globalContent.Contains("仅可预期长期负担变化才切换") -and $globalContent.Contains("孤立难题/短收尾不切换")) "Global AGENTS.md is missing reasoning-transition hysteresis"
-Assert-True ($globalContent.Contains('`evidence` 取证') -and $globalContent.Contains('`experiment` 试路')) "Global AGENTS.md is missing semantic subagent selection"
-Assert-True ($globalContent.Contains("主代理保留目标/授权/规划/实现/验收/Git/发布") -and $globalContent.Contains("子代理不扩权或证成")) "Global AGENTS.md is missing primary-agent ownership"
+Assert-True ($globalContent.Contains('使用 `evidence` 或 `experiment`') -and $globalContent.Contains('用 `$subagent-orchestration` 交接')) "Global AGENTS.md is missing semantic subagent selection"
+Assert-True ($globalContent.Contains("主代理保留目标/授权/规划/实现/验收/Git/发布")) "Global AGENTS.md is missing primary-agent ownership"
 $projectAgentsPath = Join-Path $ProjectRoot "AGENTS.md"
 $projectAgentsItem = Get-Item -LiteralPath $projectAgentsPath
 $projectAgentsContent = Get-Content -LiteralPath $projectAgentsPath -Raw -Encoding UTF8
@@ -209,10 +209,12 @@ $requiredGlobalFragments = @(
     '配置会改变动作才用 `$reasoning-governor` 读回'
     '实际不同且切换净收益成立才设置'
     '仅可预期长期负担变化才切换'
-    '`evidence` 取证'
-    '交接用 `$subagent-orchestration`'
+    '用户未指定是否使用子代理时'
+    '必要且独立有界的取证或试路若委派净收益成立'
+    '使用 `evidence` 或 `experiment`'
+    '用 `$subagent-orchestration` 交接'
+    '否则主代理直接完成'
     '主代理保留目标/授权/规划/实现/验收/Git/发布'
-    '子代理不扩权或证成'
     '用户固定线程或工作范围的推理深度时'
     '读写不依赖 active Goal'
     '简单有界输出不建日志'
@@ -428,9 +430,11 @@ $subagentExperimentContent = Get-Content -LiteralPath (Join-Path $subagentSkillR
 $subagentCoordinationContent = Get-Content -LiteralPath (Join-Path $subagentSkillRoot "references\coordination.md") -Raw -Encoding UTF8
 Assert-True ($subagentSkillContent.Contains('具体模型与推理档位只由 Codex 自定义代理配置维护')) "subagent-orchestration duplicates model selection outside agent config"
 Assert-True ($subagentSkillContent.Contains('主代理先逐项接纳 evidence ID') -and $subagentSkillContent.Contains('主代理从实验结果重新形成可维护方案并自行实现')) "subagent-orchestration is missing the evidence-to-implementation handoff"
+Assert-True ($subagentSkillContent.Contains('用户未指定时') -and $subagentSkillContent.Contains('默认使用对应角色') -and $subagentSkillContent.Contains('不是绝对创建义务')) "subagent-orchestration is missing the defeasible default delegation contract"
 Assert-True ($subagentEvidenceContent.Contains('覆盖树') -and $subagentEvidenceContent.Contains('否定检查、查询范围与截断状态') -and $subagentEvidenceContent.Contains('accepted: F01')) "subagent evidence packet is missing bounded acceptance fields"
 Assert-True ($subagentExperimentContent.Contains('最小判别实验') -and $subagentExperimentContent.Contains('不得修改生产真源、提交、推送、发布')) "subagent experiment lifecycle is missing isolation or external-write boundaries"
-Assert-True ($subagentCoordinationContent.Contains('子代理不得再生成后代代理') -and $subagentCoordinationContent.Contains('主代理逐项接纳')) "subagent coordination is missing bounded topology or acceptance"
+Assert-True ($subagentCoordinationContent.Contains('用户明确不使用子代理时不进入委派') -and $subagentCoordinationContent.Contains('用户未指定时') -and $subagentCoordinationContent.Contains('默认委派')) "subagent coordination is missing explicit user control or default delegation"
+Assert-True ($subagentCoordinationContent.Contains('并发净收益成立时才优先并行') -and $subagentCoordinationContent.Contains('子代理不得再生成后代代理') -and $subagentCoordinationContent.Contains('主代理逐项接纳')) "subagent coordination is missing bounded topology, acceptance, or parallelism"
 
 $executionGovernorSkillPath = Join-Path $ProjectRoot "skills\execution-governor\SKILL.md"
 $executionGovernorReferenceRoot = Join-Path $ProjectRoot "skills\execution-governor\references"
@@ -807,6 +811,10 @@ $requiredCases = @(
     "subagent-static-evidence-map"
     "subagent-path-experiment"
     "subagent-discussion-only"
+    "subagent-implicit-evidence-benefit"
+    "subagent-implicit-experiment-benefit"
+    "subagent-user-forbids"
+    "subagent-short-local-no-benefit"
     "coordinate-frame-conversion"
     "transform-formula-convention"
     "bug-root-cause-fix"

@@ -84,7 +84,7 @@
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
     "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值，线程设置入口只在配置证据会改变动作时查询，并只为可预期长期阶段且剩余收益足以覆盖切换和恢复成本时设置；孤立难题和短机械收尾沿用当前档位。",
-    "bounded_subagent_delegation": "只有独立有界且能降低系统总成本或墙钟时间的子问题才委派；静态证据与路径实验使用不同语义角色，主代理逐项接纳证据并保留正式实现、完成和外部写责任。",
+    "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定时，必要且独立有界的取证或试路在委派净收益成立时默认委派，否则主代理直接完成；主代理逐项接纳证据并保留正式实现、完成和外部写责任。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。"
   },
@@ -154,6 +154,10 @@
     "subagent-static-evidence-map",
     "subagent-path-experiment",
     "subagent-discussion-only",
+    "subagent-implicit-evidence-benefit",
+    "subagent-implicit-experiment-benefit",
+    "subagent-user-forbids",
+    "subagent-short-local-no-benefit",
     "architecture-risk-discovered-during-implementation",
     "adaptive-plan-without-user-prompt",
     "simple-task-no-formal-plan",
@@ -174,6 +178,8 @@
     "reasoning-long-domain-work-assessment",
     "subagent-static-evidence-map",
     "subagent-path-experiment",
+    "subagent-implicit-evidence-benefit",
+    "subagent-implicit-experiment-benefit",
     "vertical-validation-closure-selection",
     "source-query-capability-diagnosis",
     "counterexample-checkpoint-before-continue",
@@ -1278,6 +1284,82 @@
         "bounded_subagent_delegation"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-implicit-evidence-benefit",
+      "kind": "positive",
+      "request": "一个已限定目录的局部实现下一步必须依据 18 个已知消费者中哪些仍调用旧入口、哪些是否定命中来决定迁移范围。这份证据可全程只读，输入、输出和停止边界已明确，缺少它会改变下一动作，由主代理重复扫描的成本明显更高。先取得带稳定 ID、精确来源、反例和否定检查的证据地图，再由主代理决策并实现。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-implicit-experiment-benefit",
+      "kind": "positive",
+      "request": "主代理已接纳 F01、F03 和 X01，两条候选实现路径都符合静态证据，但下一步取决于一个可推翻的运行约束。现有隔离临时目录、唯一变量和明确 oracle，一次最小实验即可区分路径，不修改生产真源或外部状态，且委派成本低于主代理重建实验环境。先取得路径成立条件和真实约束，随后由主代理正式实现。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "experiment-lifecycle.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-user-forbids",
+      "kind": "negative",
+      "request": "只读整理已限定目录中的调用者和否定命中；虽然范围可独立拆分，但本次我明确不要使用或创建子代理，由主代理直接完成并报告。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "subagent-short-local-no-benefit",
+      "kind": "negative",
+      "request": "用户没有指定是否使用子代理。只需读取一个已知文件中已定位的唯一函数五行定义并报告默认值，主代理可以当前一步直接闭合，交接与复核成本高于任务本身。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "subagent-discussion-only",

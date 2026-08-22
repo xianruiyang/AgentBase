@@ -25,3 +25,10 @@
 - 用户随后明确授予 AgentBase 持续 Git 维护与私有远端同步权限。功能改动形成提交 `384c8ed`，持续授权与接手状态形成独立治理提交；两者按非强制方式同步 `main` 到现有 `origin`。
 
 2026-08-23 的语义角色后继候选完成上述确定性验证，并保留根 README、Windows SWE sandbox 候选、`vendor/` 与 requirements 的评测合同 dirty 边界。实现提交 `0aba411` 已非强制推送到私有 `origin/main`。用户单独授权后，从该提交的独立干净 worktree 以 `DirectCompatibility + InstallPortableSettings` 正式 Publish：`published:true`、`changed:16`，退役 `agents\luna.toml` 与 `agents\sol.toml`，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-030345-c7ac8ea8`；发布后同范围 Status 返回 `published:true`。
+
+## 2026-08-23 should 默认委派修订
+
+- 用户要求不运行独立测试并手动发布；本次没有运行功能测试、完整回归、Windows SWE 或正式部署 Validate/Publish。
+- 在用户叫停前，路由刷新的 Routing 与 Policy 阶段已经返回通过；References 阶段随后被终止，并以 `execution_failed` 收据闭合。三阶段没有合并为新 `current.json`，因此它们不构成当前正式路由证据。
+- 按用户明确要求，手动将 `global/AGENTS.md`、`subagent-orchestration/SKILL.md`、`agents/openai.yaml` 和 `references/coordination.md` 四个变更文件应用到当前 Codex 根目录；未做发布后 Status 或哈希读回。手动回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-manual-20260823-050357`。
+- 安装只证明文件复制成功；当前已启动任务不会追溯加载新规则，`should` 触发、非触发和并发选择均未做新任务行为验收。
