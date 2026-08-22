@@ -4319,7 +4319,11 @@ def render_task_table_locked(
                 "| --- | --- | --- | --- | --- | --- | --- | --- | ---: |",
             ]
         )
-        for task_id in sorted(tasks):
+        task_ids_for_display = sorted(
+            tasks,
+            key=lambda task_id: (states[task_id]["status"] == "retired", task_id),
+        )
+        for task_id in task_ids_for_display:
             task = tasks[task_id]
             state = states[task_id]
             dependencies = ", ".join(

@@ -1654,6 +1654,7 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(by_id["T003"]["consumes"], ["界面接入结果"])
 
     def test_retired_state_is_preserved_but_not_recommended(self) -> None:
+        self.add_task(self.task("T003", "保留退役记录", ["SOL-001"]))
         retired = self.run_task(
             "note",
             "--id",
@@ -1670,6 +1671,24 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(status["status_counts"]["retired"], 1)
         next_tasks = self.run_task("next", "--include-blocked")
         self.assertNotIn("T001", {item["id"] for item in next_tasks["items"]})
+
+        self.run_task(
+            "note",
+            "--id",
+            "T003",
+            "--owner",
+            "agent-a",
+            "--status",
+            "retired",
+            "--message",
+            "不再执行",
+        )
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        active_position = rendered.index("| T002 | todo |")
+        first_retired_position = rendered.index("| T001 | retired |")
+        second_retired_position = rendered.index("| T003 | retired |")
+        self.assertLess(active_position, first_retired_position)
+        self.assertLess(first_retired_position, second_retired_position)
 
     def test_non_standard_status_is_preserved_as_a_diagnostic(self) -> None:
         noted = self.run_task(
