@@ -54,3 +54,27 @@
 References 最终 candidate bundle 为 `BBDC80FA6E84CF1EE599A72715778B582FDA18E2A304552CB873B340C33CD1B4`。最后一次刷新只运行 References 一次，并复用已通过的 Routing 与 Policy；没有对相同失败输入重采样。
 
 这些证据直接覆盖规则结构、skill 发现、粗粒度行为标签和条件引用选择，不证明新 skill 的控制循环会在真实项目中按预期执行。只包含本次暂存内容与原 HEAD 的独立临时 Git tree 通过 skill 校验、同一合同与路由基础设施，并由 `manage_agentbase.ps1 -Action Validate` 运行 45 项基线 Windows SWE 确定性测试后返回 `valid:true`；临时 worktree 随后删除。当前组合工作树的同一 Validate 也通过并运行 66 tests；该数量包含接手时已有且继续保留的评测 dirty 候选，只证明组合兼容。模型 evaluator 保持禁用；真实 Codex 继续使用已安装版本，本轮没有 Publish 授权，也没有新任务运行时验收。
+
+## 2026-08-23 UE 实践反例与第二版验证
+
+用户提供的两天大型 UE 工作流证明第一版仍有适用失败：现有规则已经禁止阶段文档保存原始日志并要求消费者证据回流，但任务状态没有及时记录 schema 进展和 normals verifier 反例；carrier/mode/revision/persistence 维度启动过晚，重复 UE 命令仍由模型人工拼装。用户明确裁决“利用本项目的模型犯错，本质上也是本项目犯错”，因此新增 AC-066，并把规则存在与真实行为证据继续分开。
+
+确定性验证：
+
+- `skills/task-table-manager/tests/test_taskctl.py`：98 tests passed；新增用例覆盖执行检查点 CAS 写入/清空、显式关联 DCR 的同源 context/source snapshot，以及 `validation_dimensions` 与结果 `validation_coverage` 的生命周期分离。旧状态缺少新字段仍按空值读取。
+- `quick_validate.py`：`delivery-workflow`、`execution-governor`、`task-table-manager`、`source-query` 四项全部通过。
+- `validate_contract.ps1`：101 cases、60 strict routing、15 strict references、12/12 skills 正向与非触发覆盖；全局与项目指令合计 28,540 bytes，仍低于 28,672-byte 合同上限。
+- `test_routing_infrastructure.ps1`：6 suites、22 个 PowerShell syntax files、0 模型调用。专项 recovery 测试同时证明同代恢复、`oracle_revalidation`、篡改来源拒绝、跨代 carry-forward、原子 merge 和 staging 清理。
+- `manage_agentbase.ps1 -Action Validate`：从 Git 暂存索引构造的独立临时 worktree 在 evaluator 禁用下运行 46 项基线 Windows SWE 基础设施测试并返回 `valid:true`；当前组合工作树另运行 67 项并通过，后者包含接手时保留的 dirty 评测候选，只证明组合兼容，不把它纳入本版本范围。临时 worktree 已删除。
+
+最终 detached evidence generation 为 `D0B41EA251A5E264D55ECC7447A24C0E5D987B806FE4F21A504483AD921DDE61`：
+
+| 阶段 | 结果 | Capsule SHA-256 |
+| --- | --- | --- |
+| Routing | 101/101 | `22669F572A4473AB2B1CFCCDF4780F2C22DE50C46EA9413F7C24EB7F26EB4A27` |
+| Policy | 101/101 | `1438470512CD533B11DE3D48AA8FD4820DCA255A13CC613545DBEF658401DF59` |
+| References | 38/38 | `23DAC543CB853ABFA6D3CD9379ABC2CAC3D27AC2B4A851167AA8B8D8E63E60BE` |
+
+模型阶段的失败没有按不变输入重采样：每次 Routing/Policy 失败都先修正可见触发或标签边界并形成新身份；最终 References 输出只因隐藏 oracle 过度要求 CLI 引用而失败。修正 oracle 后，相同 stage 文件、可见输入、capsule 和 evaluator 由新增 `oracle_revalidation` 精确绑定旧失败收据并以 0 input/output tokens 通过；最后刷新为 evaluator run 0、recovered 2、oracle revalidated 1。当前 evaluation plan 为 0 evaluate、3 reuse、0 blocked/pending。
+
+这些证据证明仓库规则、taskctl 结构、评测恢复机制、路由、行为标签和引用选择；不证明真实 Codex 已加载第二版，也不证明 UE 新任务中的写回、维度边界或 runner 选择已经改变。本轮没有 Publish 授权，真实安装保持上次发布版本；行为验收必须留到另行授权发布后的新任务。

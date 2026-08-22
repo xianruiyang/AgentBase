@@ -49,6 +49,7 @@ if (-not [DateTimeOffset]::TryParse([string]$history.ledger_started_at_utc, [ref
 
 $attemptIds = @{}
 $evaluatorIds = @{}
+$attemptsById = @{}
 $attemptsByKey = @{}
 foreach ($attempt in @($history.attempts)) {
     $attemptId = [string]$attempt.attempt_id
@@ -56,13 +57,14 @@ foreach ($attempt in @($history.attempts)) {
         throw "Routing attempt history contains an invalid or duplicate receipt id: $attemptId"
     }
     $attemptIds[$attemptId] = $true
+    $attemptsById[$attemptId] = $attempt
     if ([string]$attempt.cycle_id -ne [string]$history.active_cycle_id) {
         throw "Routing receipt $attemptId is outside the active generation"
     }
     if ([string]$attempt.phase -notin @('Routing', 'Policy', 'References')) {
         throw "Routing receipt has an invalid phase: $($attempt.phase)"
     }
-    if ([string]$attempt.origin -notin @('formal', 'baseline_import', 'evidence_reuse', 'staged_carry_forward')) {
+    if ([string]$attempt.origin -notin @('formal', 'baseline_import', 'evidence_reuse', 'staged_carry_forward', 'oracle_revalidation')) {
         throw "Routing receipt has an invalid origin: $($attempt.origin)"
     }
     if ([string]$attempt.outcome -notin @('started', 'passed', 'failed')) {
@@ -88,10 +90,23 @@ foreach ($attempt in @($history.attempts)) {
             throw "Routing receipt $attemptId has an invalid $identityField"
         }
     }
-    if ($evaluatorIds.ContainsKey([string]$attempt.evaluator_id)) {
+    $priorEvaluatorReceipt = if ($evaluatorIds.ContainsKey([string]$attempt.evaluator_id)) {
+        $evaluatorIds[[string]$attempt.evaluator_id]
+    }
+    else {
+        $null
+    }
+    $isLinkedOracleRevalidation = $null -ne $priorEvaluatorReceipt -and
+        [string]$attempt.origin -eq 'oracle_revalidation' -and
+        [string]$attempt.source_receipt_id -eq [string]$priorEvaluatorReceipt.attempt_id -and
+        [string]$priorEvaluatorReceipt.outcome -eq 'failed' -and
+        [string]$priorEvaluatorReceipt.failure_class -eq 'oracle_violation'
+    if ($null -ne $priorEvaluatorReceipt -and -not $isLinkedOracleRevalidation) {
         throw "Routing attempt history reuses evaluator id: $($attempt.evaluator_id)"
     }
-    $evaluatorIds[[string]$attempt.evaluator_id] = $true
+    if ($null -eq $priorEvaluatorReceipt) {
+        $evaluatorIds[[string]$attempt.evaluator_id] = $attempt
+    }
     foreach ($metricField in @('duration_ms', 'input_tokens', 'cached_input_tokens', 'output_tokens')) {
         if ($null -ne $attempt.$metricField -and [long]$attempt.$metricField -lt 0) {
             throw "Routing receipt $attemptId has a negative $metricField"
@@ -141,6 +156,29 @@ foreach ($attempt in @($history.attempts)) {
                     throw "Carry-forward receipt $attemptId lacks an exact prior-generation stage link"
                 }
             }
+            elseif ([string]$attempt.origin -eq 'oracle_revalidation') {
+                $sourceReceipt = if ($attemptsById.ContainsKey([string]$attempt.source_receipt_id)) {
+                    $attemptsById[[string]$attempt.source_receipt_id]
+                }
+                else {
+                    $null
+                }
+                if ([string]$attempt.result_sha256 -notmatch '^[0-9A-Fa-f]{64}$' -or
+                    -not [string]::IsNullOrWhiteSpace([string]$attempt.source_evidence_sha256) -or
+                    [string]$attempt.source_receipt_id -notmatch '^[0-9a-f]{32}$' -or
+                    [string]$attempt.source_cycle_id -ne [string]$history.active_cycle_id -or
+                    [string]$attempt.previous_attempt_id -ne [string]$attempt.source_receipt_id -or
+                    $null -eq $sourceReceipt -or [string]$sourceReceipt.outcome -ne 'failed' -or
+                    [string]$sourceReceipt.failure_class -ne 'oracle_violation' -or
+                    [string]$sourceReceipt.attempt_key -ne [string]$attempt.attempt_key -or
+                    [string]$sourceReceipt.result_sha256 -ne [string]$attempt.result_sha256 -or
+                    [string]$sourceReceipt.evaluator_id -ne [string]$attempt.evaluator_id -or
+                    [long]$attempt.duration_ms -ne 0 -or [long]$attempt.input_tokens -ne 0 -or
+                    [long]$attempt.cached_input_tokens -ne 0 -or [long]$attempt.output_tokens -ne 0 -or
+                    @($attempt.changed_since_previous) -notcontains 'oracle_contract') {
+                    throw "Oracle-revalidation receipt $attemptId lacks an exact zero-cost failed-result link"
+                }
+            }
             else {
                 if ([string]$attempt.result_sha256 -notmatch '^[0-9A-Fa-f]{64}$' -or
                     -not [string]::IsNullOrWhiteSpace([string]$attempt.source_evidence_sha256) -or
@@ -174,7 +212,13 @@ foreach ($attempt in @($history.attempts)) {
 
 foreach ($entry in $attemptsByKey.GetEnumerator()) {
     $sameInputReceipts = [object[]]$entry.Value
-    $samplingReceipts = @($sameInputReceipts | Where-Object { [string]$_.failure_class -ne 'orchestration_failed' })
+    $oracleRevalidations = @($sameInputReceipts | Where-Object { [string]$_.origin -eq 'oracle_revalidation' })
+    if ($oracleRevalidations.Count -gt 1) {
+        throw "Routing attempt history contains more than one oracle revalidation for $($entry.Key)"
+    }
+    $samplingReceipts = @($sameInputReceipts | Where-Object {
+        [string]$_.failure_class -ne 'orchestration_failed' -and [string]$_.origin -ne 'oracle_revalidation'
+    })
     $orchestrationFailures = @($sameInputReceipts | Where-Object { [string]$_.failure_class -eq 'orchestration_failed' })
     if ($samplingReceipts.Count -gt (Get-AgentBaseRoutingAttemptLimit)) {
         throw "Routing attempt history exceeds the unchanged-input evaluator-attempt limit for $($entry.Key)"

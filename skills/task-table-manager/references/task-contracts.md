@@ -23,7 +23,8 @@
   ],
   "mutation_scope": ["src/export/**"],
   "outputs": ["正式入口", "给 T002 使用的接口行为摘要"],
-  "verification": ["运行入口并读回导出内容"]
+  "verification": ["运行入口并读回导出内容"],
+  "validation_dimensions": ["carrier", "mode", "revision"]
 }
 ```
 
@@ -42,6 +43,7 @@
   "mutation_scope": ["src/export/**"],
   "outputs": ["正式入口", "给 T002 使用的接口行为摘要"],
   "verification": ["运行入口并读回导出内容"],
+  "validation_dimensions": ["carrier", "mode", "revision"],
   "suggested_skills": [],
   "reasoning_hint": "medium",
   "revision": 1
@@ -60,6 +62,7 @@
 - `mutation_scope`：预计修改的项目相对路径或 glob，用于发现并行重叠，不授权扩大范围，也不决定行为属于哪个职责 owner。
 - `outputs`：后继任务或用户会消费的结果；公共产出必须能对应当前消费者或直接用户结果。
 - `verification`：与 outcome 同层级的验证方式；允许在探索任务中写明实际可验证边界。
+- `validation_dimensions`：仅当载体、模式、状态、版本、revision、持久化或其他维度可能改变行为或 oracle 时，列出需要在执行前裁决的维度；不机械生成完整笛卡尔积。
 - `suggested_skills`：任务开始时的路由提示，运行时仍按实际工作判断。
 - `reasoning_hint`：`low/medium/high/xhigh/max/ultra` 的非权威起始建议。
 - `revision`：永久机器记录由工具维护；语义 add 固定从 `1` 开始，update 前读取当前值并以 CAS 参数传回，再由工具递增，避免并发覆盖。模型 authoring 文件不复制该字段。
@@ -94,6 +97,7 @@
   "outputs": ["后继任务可直接消费的事实或接口"],
   "changed_files": ["src/export/service.py"],
   "verification": ["pytest tests/export - passed"],
+  "validation_coverage": ["carrier=StaticMesh", "mode=face"],
   "evidence_for": ["REQ-001", "AC-001"],
   "evidence_refs": [
     {"ref": "tests/export-readback", "kind": "test", "note": "真实调用并读回"}
@@ -114,6 +118,7 @@
   "outputs": ["后继任务可直接消费的事实或接口"],
   "changed_files": ["src/export/service.py"],
   "verification": ["pytest tests/export - passed"],
+  "validation_coverage": ["carrier=StaticMesh", "mode=face"],
   "unresolved": [],
   "invalidated_source_ids": [],
   "evidence_for": ["REQ-001", "AC-001", "UDES-001"],
@@ -126,6 +131,6 @@
 
 结果正文由模型裁决，机器 envelope 和来源引用由 `complete` 注入，永久文件按下一状态 revision 写入；生成的 `TASK_TABLE.md`、状态摘要或 completion-context 只提供读取面，不能通过编辑它们改写结果、证据或完成状态。
 
-结果内容由模型根据有效证据填写。`evidence_for` 声明证据所支持的上游 ID，`evidence_refs` 指向可直接查看的证据。执行前的 `context --capture` 在最终模型投影后把实际可见直接来源及其传递祖先指纹写入 `snapshots/<sha256>.json`；模型只把返回引用作为 `complete --source-snapshot-ref` 参数，永久结果由工具附加 `source_snapshot_ref`。完成时不得重新采样当前版本替代实际输入。显式收据在新写入前必须存在、可读且内容身份与引用一致，否则本次结果与状态都不改变；未提供收据、覆盖不足或逐来源陈旧只形成对应诊断。已经落盘的历史结果后来出现资产缺失、损坏或身份不一致时仍隔离并诊断，不改写历史指针。CLI 不判断验证文案是否真实，也不把结果文件存在视为产品完成。
+结果内容由模型根据有效证据填写。`validation_coverage` 只列实际验证的维度值或已证等价类，不因任务声明了某个维度而扩大覆盖；`evidence_for` 声明证据所支持的上游 ID，`evidence_refs` 指向可直接查看的证据。执行前的 `context --capture` 在最终模型投影后把实际可见直接来源、传递祖先及相关 DCR 指纹写入 `snapshots/<sha256>.json`；模型只把返回引用作为 `complete --source-snapshot-ref` 参数，永久结果由工具附加 `source_snapshot_ref`。完成时不得重新采样当前版本替代实际输入。显式收据在新写入前必须存在、可读且内容身份与引用一致，否则本次结果与状态都不改变；未提供收据、覆盖不足或逐来源陈旧只形成对应诊断。已经落盘的历史结果后来出现资产缺失、损坏或身份不一致时仍隔离并诊断，不改写历史指针。CLI 不判断验证文案是否真实，也不把结果文件存在视为产品完成。
 
 后继任务重新执行或验证旧结果覆盖的行为时，提交自己的新结果：`evidence_for` 明确列出本次直接支持的目标或合同 ID，`source_snapshot_ref` 指向本次模型实际读取且覆盖这些 ID 的语义闭包，`verification` 和 `evidence_refs` 指向本次直接复测。旧内联 `source_snapshot` 结果作为真实历史格式继续只读；已发布上一版的完整 `task.result` 输入仍由新写入口校验并规范化，旧式内联输入外部化且永久结果只写引用。该兼容只服务迁移，不定义新模型输入或第二种永久格式。新结果不会回写、抑制或把旧记录标为恢复有效；依赖、任务状态或候选关联本身不声明重新验证。最终复核由模型按目标选择直接适用的当前证据，不由 CLI 合并两个结果的有效性。

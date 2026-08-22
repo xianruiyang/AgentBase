@@ -87,6 +87,10 @@ Assert-True ($globalItem.Length -le [int]$contract.global_max_bytes) "Global AGE
 Assert-True ($globalContent.Contains("设计或选择模型交互面时，先确认事实 owner、实际消费者、模型当前判断或修改责任和内容生命周期")) "Global AGENTS.md is missing the model-interaction-surface decision order"
 Assert-True ($globalContent.Contains("程序维护真源时模型通过有界投影、查询或受验证语义修改入口使用")) "Global AGENTS.md is missing the program-owned source projection contract"
 Assert-True ($globalContent.Contains("完成相关性投影后按实际 Token 成本、可读性和可定位性选择")) "Global AGENTS.md still treats format names as model-interaction evidence"
+Assert-True ($globalContent.Contains("模型仍产生可预防错误") -and $globalContent.Contains("不以正文存在免责")) "Global AGENTS.md is missing observable model-behavior accountability"
+Assert-True ($globalContent.Contains("维度与等价依据") -and $globalContent.Contains("写回失效范围与下一动作")) "Global AGENTS.md is missing dimension-bounded validation and counterexample writeback"
+Assert-True ($globalContent.Contains("领域正式 runner") -and $globalContent.Contains("全局规则不保存领域语法")) "Global AGENTS.md is missing the fragile-command runner escalation boundary"
+Assert-True ($globalContent.Contains("判断当前工具缺少能力或存在缺陷前") -and $globalContent.Contains("预期降级")) "Global AGENTS.md is missing the tool-defect reproduction boundary"
 $projectAgentsPath = Join-Path $ProjectRoot "AGENTS.md"
 $projectAgentsItem = Get-Item -LiteralPath $projectAgentsPath
 $projectAgentsContent = Get-Content -LiteralPath $projectAgentsPath -Raw -Encoding UTF8
@@ -133,10 +137,11 @@ Assert-True ($routingReadmeContent.Contains("更早尝试未被重建")) "Skill-
 $attemptRecorderContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "development\skill-routing\record_routing_attempt.ps1") -Raw -Encoding UTF8
 $attemptMergeContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "development\skill-routing\merge_routing_evidence.ps1") -Raw -Encoding UTF8
 $attemptHistoryContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "development\skill-routing\routing_attempt_history.ps1") -Raw -Encoding UTF8
-Assert-True ($attemptRecorderContent.Contains("[ValidateSet('Begin', 'Finish', 'Reuse', 'CarryForward')]")) "Routing attempt recorder does not expose evaluation, evidence-reuse, and staged carry-forward lifecycles"
+Assert-True ($attemptRecorderContent.Contains("[ValidateSet('Begin', 'Finish', 'Reuse', 'CarryForward', 'Revalidate')]")) "Routing attempt recorder does not expose evaluation, reuse, carry-forward, and oracle-revalidation lifecycles"
 Assert-True ($attemptRecorderContent.Contains("'execution_failed'")) "Routing attempt recorder does not preserve evaluator execution failures"
 Assert-True ($attemptRecorderContent.Contains("'orchestration_failed'")) "Routing attempt recorder does not distinguish pre-evaluator orchestration failures"
 Assert-True ($attemptRecorderContent.Contains("'staged_carry_forward'")) "Routing attempt recorder does not preserve prior-generation passed staging"
+Assert-True ($attemptRecorderContent.Contains("'oracle_revalidation'")) "Routing attempt recorder does not preserve zero-Token oracle revalidation"
 Assert-True (-not $attemptRecorderContent.Contains('[IO.File]::Delete($lockPath)')) "Routing attempt recorder still deletes its shared lock file and can race a new owner"
 Assert-True ($attemptMergeContent.Contains('$RoutingAttemptId') -and $attemptMergeContent.Contains('$PolicyAttemptId') -and $attemptMergeContent.Contains('$ReferenceAttemptId')) "Routing evidence merge is not bound to three completed attempt IDs"
 Assert-True ($attemptHistoryContent.Contains('max_receipts_per_cycle')) "Routing attempt ledger does not expose its active-cycle bound"
@@ -173,7 +178,7 @@ $requiredGlobalFragments = @(
     '不默认把实现限定为最窄局部补丁'
     '为使目标成立并接入唯一正式入口而必需'
     '仅改善架构而不影响本次结果的调整需另行授权'
-    '后续动作共享该未知时'
+    '共享未知先识别'
     '长期收益不得作为扩大范围或替代用户裁决的理由'
     '不得仅凭自身声明创建外部写入、发布、凭据使用或高风险操作授权'
     '满足可用 skill 的 `description` 时使用该 skill'
@@ -304,6 +309,7 @@ $sourceQueryContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "SKIL
 $sourceQueryAstContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "references\ast.md") -Raw -Encoding UTF8
 $sourceQueryLspContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "references\lsp.md") -Raw -Encoding UTF8
 $sourceQuerySccContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "references\scc.md") -Raw -Encoding UTF8
+$sourceQueryDiagnosticsContent = Get-Content -LiteralPath (Join-Path $sourceQueryRoot "references\diagnostics.md") -Raw -Encoding UTF8
 $symbolSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\symbol-structure-workflow\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($sourceQueryContent.Contains('PATH 中的 `srcq.exe`')) "source-query must use the installed PATH runtime"
 Assert-True ($sourceQueryContent.Contains('不搜索项目构建目录、Skill、插件或 Codex 缓存中的私有副本')) "source-query must not discover private runtime copies"
@@ -317,6 +323,9 @@ Assert-True ($globalContent.Contains('PATH 中的 `srcq scc <scc argv...>`')) "g
 Assert-True ($globalContent.Contains('PATH 中的 `hyperfine <hyperfine argv...>`')) "global rules must expose the independent hyperfine syntax"
 Assert-True ($sourceQueryContent.Contains('普通 rg/fd/scc、hyperfine、规则审查或工具名提及也不触发')) "source-query must exclude ordinary scc and hyperfine use from skill routing"
 Assert-True ($sourceQueryContent.Contains('AST 无匹配后尚缺能改变下一次查询的源码证据时先回到普通文本或有界读取，不触发本 skill')) "source-query must keep post-miss evidence gathering outside advanced-query routing"
+Assert-True ($sourceQueryContent.Contains('(references/diagnostics.md)')) "source-query must route current capability and fallback diagnosis to its reference"
+Assert-True ($sourceQueryDiagnosticsContent.Contains('实际工作目录') -and $sourceQueryDiagnosticsContent.Contains('入口帮助') -and $sourceQueryDiagnosticsContent.Contains('只重放一次')) "source-query diagnostics must bind identity, help, and one reproduction"
+Assert-True ($sourceQueryDiagnosticsContent.Contains('- 输入：') -and $sourceQueryDiagnosticsContent.Contains('- 范围：') -and $sourceQueryDiagnosticsContent.Contains('预期降级') -and $sourceQueryDiagnosticsContent.Contains('产品缺陷')) "source-query diagnostics must classify observed failures"
 Assert-True ($sourceQuerySccContent.Contains('`summary`、`languages`、`files`、`hotspots`、`lossless` 与 `raw`')) "source-query must document every scc projection"
 Assert-True ($sourceQuerySccContent.Contains('默认模型投影有意省略 COCOMO')) "source-query must preserve the scc estimation boundary"
 Assert-True ($sourceQuerySccContent.Contains('同一次捕获的有界回退，不重复执行扫描')) "source-query must not rerun scc after a protocol fallback"
@@ -372,7 +381,8 @@ Assert-True ($routingInfrastructureTestContent.Contains("AGENTBASE_ROUTING_EVALU
 $deploymentManagerContent = Get-Content -LiteralPath (Join-Path $ProjectRoot 'development\codex-deployment\manage_agentbase.ps1') -Raw -Encoding UTF8
 Assert-True ($deploymentManagerContent.Contains('test_routing_infrastructure.ps1')) "Deployment Validate and Publish do not consume the canonical routing infrastructure tests"
 $routingRefreshContent = Get-Content -LiteralPath (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -Raw -Encoding UTF8
-Assert-True ($routingRefreshContent.Contains('Get-AgentBasePendingReceipt')) "Routing evidence refresh cannot recover passed staged results"
+Assert-True ($routingRefreshContent.Contains('Resolve-AgentBasePendingReceipt')) "Routing evidence refresh cannot recover or revalidate staged results"
+Assert-True ($routingRefreshContent.Contains('oracle_revalidated_phase_count')) "Routing evidence refresh does not report zero-Token oracle revalidation"
 Assert-True ($routingRefreshContent.Contains('recovered_phase_count')) "Routing evidence refresh does not report recovered phases separately"
 Assert-True ($routingRefreshContent.Contains('source-attempts.json') -and $routingRefreshContent.Contains('previous_ledger_sha256')) "Routing evidence refresh cannot resume a partially carried generation from its immutable source ledger"
 $gitIgnoreContent = Get-Content -LiteralPath (Join-Path $ProjectRoot '.gitignore') -Raw -Encoding UTF8
@@ -411,8 +421,10 @@ Assert-True ($executionGovernorSkillContent.Contains('不维护新的计划、�
 Assert-True ($executionGovernorSkillContent.Contains('`$delivery-workflow`') -and $executionGovernorSkillContent.Contains('`$task-table-manager`') -and $executionGovernorSkillContent.Contains('`$change-governance`') -and $executionGovernorSkillContent.Contains('`$reasoning-governor`')) "execution-governor is missing its coordination boundaries"
 Assert-True ($executionGovernorDecisionContent.Contains("当前证据前沿") -and $executionGovernorDecisionContent.Contains("首个真实消费者")) "execution-governor is missing its shared-prerequisite consumer contract"
 Assert-True ($executionGovernorDecisionContent.Contains("成立后才能并行或批量扩展")) "execution-governor is missing its horizontal expansion boundary"
+Assert-True ($executionGovernorDecisionContent.Contains("验证维度与结论边界") -and $executionGovernorDecisionContent.Contains("任务合同保存需要裁决的维度") -and $executionGovernorDecisionContent.Contains("结果只声明直接验证覆盖")) "execution-governor is missing dimension-bounded validation"
 Assert-True ($executionGovernorFailureContent.Contains("下游保持未知") -and $executionGovernorFailureContent.Contains("基础设施失败不得转换成产品零分")) "execution-governor is missing its failure-masking boundary"
 Assert-True ($executionGovernorFailureContent.Contains("输入、机制和环境未变时不重跑")) "execution-governor is missing its retry stopping condition"
+Assert-True ($executionGovernorFailureContent.Contains("领域正式 runner") -and $executionGovernorFailureContent.Contains('`$change-governance`')) "execution-governor is missing fragile-command runner escalation"
 
 $taskTableSkillPath = Join-Path $ProjectRoot "skills\task-table-manager\SKILL.md"
 $taskTableSkillContent = Get-Content -LiteralPath $taskTableSkillPath -Raw -Encoding UTF8
@@ -438,7 +450,11 @@ Assert-True ($taskTableSkillContent.Contains('任务表文档是执行投影，�
 Assert-True ($taskTableSkillContent.Contains('最终完成标准只来自 `$delivery-workflow` 当前执行周期经用户确认的需求与用户设计')) "task-table-manager does not delegate final completion to the user-confirmed document scope"
 Assert-True ($taskTableSkillContent.Contains('`taskctl` 只辅助存储、索引、查询、上下文压缩和可重建视图')) "task-table-manager does not keep taskctl assistive"
 Assert-True ($taskTableSkillContent.Contains('把证据交给 `$execution-governor` 裁决')) "task-table-manager must delegate the live evidence frontier"
+Assert-True ($taskTableSkillContent.Contains("前沿、消费者、验证 case、证据、失效来源或下一动作改变时")) "task-table-manager must checkpoint execution evidence before dependent work"
 Assert-True ($taskTableContractContent.Contains('证明任务和首个真实消费者产生的可复核证据是后续横向任务的真实消费输入')) "task-table-manager is missing the persisted prerequisite-consumer dependency"
+Assert-True ($taskTableContractContent.Contains('`validation_dimensions`') -and $taskTableContractContent.Contains('`validation_coverage`')) "task-table-manager is missing validation dimension and coverage contracts"
+Assert-True ($taskTableExecutionToolingContent.Contains('`evidence_frontier`') -and $taskTableExecutionToolingContent.Contains('`active_consumer`') -and $taskTableExecutionToolingContent.Contains('`invalidated_source_ids`')) "taskctl note is missing the execution checkpoint contract"
+Assert-True ($taskTableScriptContent.Contains('select_related_deferred_changes') -and $taskTableScriptContent.Contains('clear_execution_checkpoint')) "taskctl is missing related DCR context or checkpoint clearing"
 Assert-True ($taskTableScriptContent.Contains('command_completion_context')) "taskctl is missing its bounded final-review context"
 Assert-True ($taskTableScriptContent.Contains('task_model_projection')) "taskctl is missing its model projection owner"
 Assert-True ($taskTableScriptContent.Contains('choices=("model", "machine")')) "taskctl is missing explicit model/machine views"
@@ -586,6 +602,7 @@ $expectedSourceQueryFiles = @(
     'SKILL.md',
     'agents\openai.yaml',
     'references\ast.md',
+    'references\diagnostics.md',
     'references\lsp.md',
     'references\rg-fd.md',
     'references\scc.md'
@@ -593,7 +610,7 @@ $expectedSourceQueryFiles = @(
 $actualSourceQueryFiles = @(Get-ChildItem -LiteralPath $sourceQueryRoot -Recurse -File | ForEach-Object {
     $_.FullName.Substring($sourceQueryRoot.Length + 1)
 })
-Assert-True ($actualSourceQueryFiles.Count -eq $expectedSourceQueryFiles.Count) "source-query payload must contain only its six protocol files"
+Assert-True ($actualSourceQueryFiles.Count -eq $expectedSourceQueryFiles.Count) "source-query payload must contain only its declared protocol files"
 foreach ($relativePath in $expectedSourceQueryFiles) {
     Assert-True ($actualSourceQueryFiles -contains $relativePath) "source-query payload is missing $relativePath"
 }
@@ -683,7 +700,7 @@ Assert-True ($changeSkillContent.Contains("临时路径风险评审")) "change-g
 $qqSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($qqSkillContent.Contains('同时使用 `$change-governance`')) "codex-qq-hook troubleshooting does not route unknown causes through change-governance"
 Assert-True ($globalContent.Contains("实际场景、期望改变的可观察结果")) "Global kernel is missing scenario-based intent reconstruction"
-Assert-True ($globalContent.Contains("质量同等充分时再以较低上下文与 Token 成本为优，前两者均不变差时再提升速度")) "Global kernel is missing the quality-token-speed priority"
+Assert-True ($globalContent.Contains("质量同等充分时再以较低上下文与 Token 成本为优，均不变差再提速")) "Global kernel is missing the quality-token-speed priority"
 $deliverySkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\delivery-workflow\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($deliverySkillContent.Contains("区分结果、事实陈述、原因猜测与实现建议")) "delivery-workflow is missing intent reconstruction boundaries"
 Assert-True ((Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\delivery-workflow\references\target-contracts.md") -Raw -Encoding UTF8).Contains('期望结果进入 `REQ`，待核实的现状或原因保持为证据问题')) "delivery-workflow target contract is missing intent-to-artifact projection"

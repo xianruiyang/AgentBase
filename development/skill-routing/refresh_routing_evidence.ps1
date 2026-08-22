@@ -166,7 +166,7 @@ function Invoke-AgentBaseReuseReceipt {
     return & (Join-Path $PSScriptRoot "record_routing_attempt.ps1") @parameters
 }
 
-function Get-AgentBasePendingReceipt {
+function Resolve-AgentBasePendingReceipt {
     param(
         [ValidateSet("Routing", "Policy", "References")]
         [string]$PhaseName,
@@ -218,7 +218,44 @@ function Get-AgentBasePendingReceipt {
         throw "$PhaseName pending result matches more than one passed receipt"
     }
     if ($matching.Count -eq 0) {
-        return $null
+        $failedMatching = @($history.attempts | Where-Object {
+            [string]$_.phase -eq $PhaseName -and
+            [string]$_.outcome -eq 'failed' -and
+            [string]$_.failure_class -eq 'oracle_violation' -and
+            [string]$_.result_sha256 -eq $fileHash -and
+            [string]$_.evaluator_id -eq [string]$results.evaluator.id -and
+            [string]$_.candidate_bundle_sha256 -eq [string]$results.candidate_bundle_sha256 -and
+            [string]$_.evaluation_input_sha256 -eq [string]$results.evaluation_input_sha256 -and
+            [string]$_.evaluation_capsule_sha256 -eq [string]$results.evaluation_capsule_sha256
+        })
+        if ($failedMatching.Count -gt 1) {
+            throw "$PhaseName pending result matches more than one oracle-violation receipt"
+        }
+        if ($failedMatching.Count -eq 0) {
+            return $null
+        }
+        $parameters = @{
+            Action = 'Revalidate'
+            Phase = $PhaseName
+            ResultsPath = $ResultPath
+            ProjectRoot = $ProjectRoot
+            AttemptHistoryPath = $AttemptHistoryPath
+        }
+        if ($PhaseName -eq 'References') {
+            $parameters.RoutingResultsPath = $RoutingPath
+        }
+        $receipt = & (Join-Path $PSScriptRoot 'record_routing_attempt.ps1') @parameters
+        $receipt | Add-Member -NotePropertyName action -NotePropertyValue 'oracle-revalidated' -Force
+        $receipt | Add-Member -NotePropertyName result_path -NotePropertyValue ([IO.Path]::GetFullPath($ResultPath)) -Force
+        $receipt | Add-Member -NotePropertyName evaluator_id -NotePropertyValue ([string]$results.evaluator.id) -Force
+        $receipt | Add-Member -NotePropertyName model -NotePropertyValue ([string]$results.evaluator.model) -Force
+        $receipt | Add-Member -NotePropertyName runtime -NotePropertyValue ([string]$results.evaluator.runtime) -Force
+        $receipt | Add-Member -NotePropertyName duration_ms -NotePropertyValue 0 -Force
+        $receipt | Add-Member -NotePropertyName input_tokens -NotePropertyValue 0 -Force
+        $receipt | Add-Member -NotePropertyName cached_input_tokens -NotePropertyValue 0 -Force
+        $receipt | Add-Member -NotePropertyName output_tokens -NotePropertyValue 0 -Force
+        $receipt | Add-Member -NotePropertyName case_count -NotePropertyValue @($results.cases).Count -Force
+        return $receipt
     }
     $receipt = $matching[0]
     return [pscustomobject][ordered]@{
@@ -359,6 +396,7 @@ $stagePaths = [ordered]@{
 $receipts = @{}
 $runResults = New-Object 'System.Collections.Generic.List[object]'
 $recoveredResults = New-Object 'System.Collections.Generic.List[object]'
+$revalidatedResults = New-Object 'System.Collections.Generic.List[object]'
 $carriedResults = New-Object 'System.Collections.Generic.List[object]'
 $refreshSucceeded = $false
 try {
@@ -403,10 +441,11 @@ try {
     }
 
     foreach ($phase in @("Routing", "Policy")) {
-        $pending = Get-AgentBasePendingReceipt -PhaseName $phase -ResultPath $stagePaths.$phase
+        $pending = Resolve-AgentBasePendingReceipt -PhaseName $phase -ResultPath $stagePaths.$phase
         if ($null -ne $pending) {
             $receipts[$phase] = $pending
-            $recoveredResults.Add($pending)
+            if ([string]$pending.action -eq 'oracle-revalidated') { $revalidatedResults.Add($pending) }
+            else { $recoveredResults.Add($pending) }
         }
         elseif ($null -ne $carrySourceRoot) {
             $carried = Invoke-AgentBaseCarryForwardReceipt -PhaseName $phase -SourcePath (Join-Path $carrySourceRoot ("{0}.json" -f $phase.ToLowerInvariant())) -TargetPath $stagePaths.$phase -SourceHistoryPath $carrySourceHistoryPath
@@ -426,10 +465,11 @@ try {
         }
     }
     if ([string]$initialPlan.phases.References.action -eq "reuse") {
-        $pending = Get-AgentBasePendingReceipt -PhaseName References -ResultPath $stagePaths.References -RoutingPath $stagePaths.Routing
+        $pending = Resolve-AgentBasePendingReceipt -PhaseName References -ResultPath $stagePaths.References -RoutingPath $stagePaths.Routing
         if ($null -ne $pending) {
             $receipts.References = $pending
-            $recoveredResults.Add($pending)
+            if ([string]$pending.action -eq 'oracle-revalidated') { $revalidatedResults.Add($pending) }
+            else { $recoveredResults.Add($pending) }
         }
         else {
             $receipts.References = Invoke-AgentBaseReuseReceipt -PhaseName References -RoutingPath $stagePaths.Routing
@@ -466,10 +506,11 @@ try {
         throw "Reference evaluation is blocked because its visible input is unchanged but the current oracle rejects the prior result"
     }
     if (-not $receipts.ContainsKey("References")) {
-        $pending = Get-AgentBasePendingReceipt -PhaseName References -ResultPath $stagePaths.References -RoutingPath $stagePaths.Routing
+        $pending = Resolve-AgentBasePendingReceipt -PhaseName References -ResultPath $stagePaths.References -RoutingPath $stagePaths.Routing
         if ($null -ne $pending) {
             $receipts.References = $pending
-            $recoveredResults.Add($pending)
+            if ([string]$pending.action -eq 'oracle-revalidated') { $revalidatedResults.Add($pending) }
+            else { $recoveredResults.Add($pending) }
         }
         elseif ($null -ne $carrySourceRoot) {
             $carried = Invoke-AgentBaseCarryForwardReceipt -PhaseName References -SourcePath (Join-Path $carrySourceRoot 'references.json') -TargetPath $stagePaths.References -SourceHistoryPath $carrySourceHistoryPath -RoutingPath $stagePaths.Routing
@@ -504,8 +545,9 @@ try {
         evaluation_generation_sha256 = [string]$merge.evaluation_generation_sha256
         evaluator_run_count = $runResults.Count
         recovered_phase_count = $recoveredResults.Count
+        oracle_revalidated_phase_count = $revalidatedResults.Count
         carried_forward_phase_count = $carriedResults.Count
-        reused_phase_count = 3 - $runResults.Count - $recoveredResults.Count - $carriedResults.Count
+        reused_phase_count = 3 - $runResults.Count - $recoveredResults.Count - $revalidatedResults.Count - $carriedResults.Count
         parallel_first_wave = @($startedFirstWave)
         input_tokens = $totalInput
         cached_input_tokens = $totalCached

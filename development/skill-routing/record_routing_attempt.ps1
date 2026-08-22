@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Begin', 'Finish', 'Reuse', 'CarryForward')]
+    [ValidateSet('Begin', 'Finish', 'Reuse', 'CarryForward', 'Revalidate')]
     [string]$Action,
     [Parameter(Mandatory = $true)]
     [ValidateSet('Routing', 'Policy', 'References')]
@@ -173,6 +173,94 @@ try {
     if ($null -ne $historyBeforeRollover -and [int]$historyBeforeRollover.schema_version -eq (Get-AgentBaseRoutingAttemptHistorySchema) -and
         -not ($historyBeforeRollover.PSObject.Properties.Name -contains 'max_orchestration_failures_per_unchanged_input')) {
         $historyBeforeRollover | Add-Member -NotePropertyName max_orchestration_failures_per_unchanged_input -NotePropertyValue (Get-AgentBaseRoutingOrchestrationFailureLimit)
+    }
+
+    if ($Action -eq 'Revalidate') {
+        if ([string]::IsNullOrWhiteSpace($ResultsPath)) {
+            throw 'Revalidate requires ResultsPath'
+        }
+        if (-not [string]::IsNullOrWhiteSpace($AttemptId) -or
+            -not [string]::IsNullOrWhiteSpace($SourceEvidencePath) -or -not [string]::IsNullOrWhiteSpace($SourceStagePath) -or
+            -not [string]::IsNullOrWhiteSpace($SourceAttemptHistoryPath) -or -not [string]::IsNullOrWhiteSpace($RetryJustification) -or
+            -not [string]::IsNullOrWhiteSpace($ExecutionFailureSummary) -or -not [string]::IsNullOrWhiteSpace($OrchestrationFailureSummary) -or
+            -not [string]::IsNullOrWhiteSpace($EvaluatorId) -or -not [string]::IsNullOrWhiteSpace($EvaluatorModel) -or
+            -not [string]::IsNullOrWhiteSpace($EvaluatorRuntime) -or $BaselineImport -or $null -ne $DurationMilliseconds -or
+            $null -ne $InputTokens -or $null -ne $CachedInputTokens -or $null -ne $OutputTokens) {
+            throw 'Revalidate accepts only its phase, result, routing dependency, project root, and history path'
+        }
+        $history = $historyBeforeRollover
+        if ($null -eq $history -or [int]$history.schema_version -ne (Get-AgentBaseRoutingAttemptHistorySchema) -or
+            [string]$history.active_cycle_id -ne $cycleId) {
+            throw 'Revalidate requires a current-generation attempt ledger'
+        }
+        $stage = Get-Content -LiteralPath $ResultsPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100 -DateKind String
+        Invoke-AgentBasePhaseValidation -Results $stage
+        $resultFileHash = (Get-FileHash -LiteralPath $ResultsPath -Algorithm SHA256).Hash
+        $stageSemanticHash = Get-AgentBaseStageSemanticResultFingerprint -Phase $Phase -Results $stage
+        $attempts = @($history.attempts)
+        if (@($attempts | Where-Object {
+            [string]$_.attempt_key -eq $attemptKey -and [string]$_.outcome -eq 'passed'
+        }).Count -gt 0) {
+            throw "$Phase already has a passed receipt for the same visible input"
+        }
+        $sourceReceipts = @($attempts | Where-Object {
+            [string]$_.phase -eq $Phase -and [string]$_.attempt_key -eq $attemptKey -and
+            [string]$_.outcome -eq 'failed' -and [string]$_.failure_class -eq 'oracle_violation' -and
+            [string]$_.result_sha256 -eq $resultFileHash -and
+            [string]$_.evaluator_id -eq [string]$stage.evaluator.id -and
+            [string]$_.candidate_bundle_sha256 -eq [string]$stage.candidate_bundle_sha256 -and
+            [string]$_.evaluation_input_sha256 -eq [string]$stage.evaluation_input_sha256 -and
+            [string]$_.evaluation_capsule_sha256 -eq [string]$stage.evaluation_capsule_sha256
+        })
+        if ($sourceReceipts.Count -ne 1) {
+            throw "$Phase revalidation requires exactly one matching oracle-violation receipt and the identical result file"
+        }
+        if ($attempts.Count -ge (Get-AgentBaseRoutingAttemptLedgerLimit)) {
+            throw "The active routing generation has reached its bounded receipt limit of $(Get-AgentBaseRoutingAttemptLedgerLimit)"
+        }
+        $sourceReceipt = $sourceReceipts[0]
+        $now = [DateTimeOffset]::UtcNow.ToString('o')
+        $receipt = [pscustomobject][ordered]@{
+            attempt_id = [guid]::NewGuid().ToString('N')
+            cycle_id = $cycleId.ToUpperInvariant()
+            started_at_utc = $now
+            completed_at_utc = $now
+            phase = $Phase
+            origin = 'oracle_revalidation'
+            attempt_key = $attemptKey
+            result_sha256 = $resultFileHash
+            stage_result_sha256 = $stageSemanticHash
+            candidate_bundle_sha256 = [string]$expectedCapsule.candidate_bundle_sha256
+            evaluation_input_sha256 = [string]$expectedCapsule.evaluation_input_sha256
+            evaluation_capsule_sha256 = [string]$expectedCapsule.sha256
+            evaluator_id = [string]$stage.evaluator.id
+            evaluator_model = [string]$stage.evaluator.model
+            evaluator_runtime = [string]$stage.evaluator.runtime
+            evaluated_at_utc = [string]$stage.evaluator.evaluated_at_utc
+            outcome = 'passed'
+            failure_class = $null
+            failure_summary = $null
+            retry_justification = $null
+            previous_attempt_id = [string]$sourceReceipt.attempt_id
+            changed_since_previous = @('oracle_contract')
+            source_evidence_sha256 = $null
+            source_receipt_id = [string]$sourceReceipt.attempt_id
+            source_cycle_id = [string]$history.active_cycle_id
+            duration_ms = 0
+            input_tokens = 0
+            cached_input_tokens = 0
+            output_tokens = 0
+        }
+        $history.attempts = @($attempts) + $receipt
+        Write-AgentBaseRoutingAttemptHistory -Path $AttemptHistoryPath -History $history
+        [pscustomobject]@{
+            attempt_id = [string]$receipt.attempt_id
+            cycle_id = [string]$receipt.cycle_id
+            phase = $Phase
+            origin = 'oracle_revalidation'
+            outcome = 'passed'
+        }
+        return
     }
 
     if ($Action -eq 'CarryForward') {

@@ -4,7 +4,7 @@
 
 ## 上下文与来源收据
 
-`context` 从任务 `source_ids` 沿当前语义引用读取传递祖先。model 视图保留当前任务合同、状态、直接依赖、必要上游正文、异常、恢复信息和 `{ref,count,complete}` 来源收据，不输出完整指纹映射；无 `--capture` 时只提示捕获入口。
+`context` 从任务 `source_ids` 沿当前语义引用读取传递祖先，并加入显式引用该闭包、且未在上游中重复出现的 DCR。model 视图保留当前任务合同、结构化执行检查点、直接依赖、必要上游与相关 DCR 正文、异常、恢复信息和 `{ref,count,complete}` 来源收据，不输出完整指纹映射；无 `--capture` 时只提示捕获入口。
 
 `context --capture` 在最终模型 Token 预算确定实际返回正文后保存完整 ID—指纹映射。预算移除正文时同步移除快照成员并标记不完整；输出截断或来源无法唯一定位时先补齐输入并重新捕获，或明确限定结果边界。machine 视图返回完整映射。
 
@@ -13,13 +13,15 @@
 ```text
 claim       记录领取意图
 start       记录开始实际工作
-note        写入有界进度、状态、阻塞原因或下一动作
+note        写入有界进度、状态、阻塞原因、下一动作或执行检查点
 complete    保存结果记录并标记 done
 reopen      记录完成结论或合同已失效
 release     清除领取意图并回到 todo
 ```
 
 所有状态写命令必须传调用方刚读到的 `--expected-state-revision`。命令记录模型已经作出的判断，不决定该判断是否被允许。`retired` 表示任务不再属于当前执行投影，应在 note 中记录原因和替代任务或上游决策 ID；它不删除历史。
+
+`note` 的执行检查点由 `evidence_frontier`、`active_consumer`、可重复的 `validation_case`、`latest_evidence` 和可重复的 `invalidated_source_ids` 组成，`next_action` 继续单独保存。只有这些语义之一实际改变时才写入；反例推翻上游或改变下一动作时，先以同一 CAS 更新检查点，再继续依赖该结论的工作。`--clear-execution-checkpoint` 清除全部检查点字段，不能和新的检查点值并用；`complete/reopen/release` 在各自状态转换中自动清除瞬时检查点，最终验证范围由结果持有。
 
 `state/<ID>.json` 的 `started_at` 与 `ended_at` 由 CLI 以 UTC RFC3339 秒级时间维护，模型不提供时间参数：显式 `start` 或状态首次进入 `in_progress` 时填充尚为空的 `started_at`；状态进入 `done/retired` 时填充 `ended_at`；离开终态时清空 `ended_at`，但保留同一任务第一次实际开始时间。旧状态缺少字段时按 `null` 读取，不推测历史时间，只在后续真实转换中写入。时间与状态、revision、结果引用在同一锁和 CAS 边界内提交。
 
@@ -31,7 +33,7 @@ release     清除领取意图并回到 todo
 
 ## 完成写入
 
-模型通过 `--result-file` 只提交 `outcome/outputs/changed_files/verification/unresolved/invalidated_source_ids/evidence_for/evidence_refs/metadata` 等语义字段；空列表可省略。`schema/task_id/task_revision/source_snapshot/source_snapshot_ref` 由命令目标、CAS 和收据参数维护，不属于新模型输入。
+模型通过 `--result-file` 只提交 `outcome/outputs/changed_files/verification/validation_coverage/unresolved/invalidated_source_ids/evidence_for/evidence_refs/metadata` 等语义字段；空列表可省略。`validation_coverage` 只声明直接证据实际覆盖的维度值或已证等价类。`schema/task_id/task_revision/source_snapshot/source_snapshot_ref` 由命令目标、CAS 和收据参数维护，不属于新模型输入。
 
 - `evidence_for`：本结果声称支持的 `REQ/AC/UDES/DES/SOL` 等上游 ID。
 - `evidence_refs`：可直接查看的测试、日志、文件、页面或其他证据引用；至少包含 `ref`，可附 `kind` 和 `note`。

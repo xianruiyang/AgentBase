@@ -105,3 +105,63 @@
 - 关联: AC-008, AC-009, AC-050, OBS-008
 
 Reasoning Governor 同时承担“任务需要什么档位”和“如何读写 next-turn 设置”，使模型必须先选中该 skill 才会得到本应决定是否选择它的任务负担判断。复杂执行需要把目标档位与状态价值交给运行期控制，而线程 skill 只保留读回、设置和生命周期机制。
+
+## OBS-009 真实 UE 工作流中规则存在但执行状态仍滞后
+
+- 状态: confirmed
+- 来源: 用户提供的两天大型 UE 工作流总结、后续事实复核与任务状态摘录
+- 证据上限: 直接证明该受支持工作流中的可预防行为失败，不外推所有项目或模型版本
+
+原规则已经要求最小语义闭包、消费者证据即时回流和阶段文档不保存原始日志，但实际执行中 `T50` 状态仍停在“下一步开始 normals”，没有记录已经完成的 schema 投影或刚发现的 verifier 反例；`WORK_STATUS.md` 与 `TASK_TABLE.md` 的可重建视图也处于 drift/partial 或计数不一致。规则正文存在没有使当前证据前沿成为一次读取可得、反例后必须先更新的执行状态。
+
+## OBS-010 同一能力的 oracle 会被验证维度和脆弱调用改变
+
+- 状态: confirmed
+- 来源: 用户提供的 UE normals 真实公开 SDK 消费者结果与 `-ExecCmds` 失败复盘
+- 证据上限: 覆盖 carrier、mode、revision、持久化会改变本次 normals 结论，以及重复外部命令的人工作业风险
+
+DynamicMeshActor/StaticMesh、face/angle/area 模式、revision 状态与持久化边界会改变行为或 oracle；单一 fixture 通过被错误外推。另一方面，重复 UE 启动命令因分隔符、引号和环境人工拼装在产品逻辑前失败。前者需要最小判别组合与覆盖边界，后者需要领域 runner，而不是把 UE 语法写进跨项目规则。
+
+## OBS-011 未重放现态会把工具误用写成产品缺口
+
+- 状态: confirmed
+- 来源: 用户提供的 srcq 0.4.2 实测复核与本轮原命令重放
+- 证据上限: 证明已见批评中续页、fixed strings、预算和输出视图本已存在；剩余现象仍须按具体版本与命令判断
+
+`srcq more q<number>`、`-F`、输出预算和 model/machine 视图已经存在；此前的若干失败分别来自不存在路径、未闭合正则、祖先与子目录重叠范围，或把 wrapper 参数传给原生 `rg`。`structured projection unavailable` 是已见现象，但在绑定版本、帮助、原输入与 fallback 充分性前不能直接称为产品缺陷。
+
+## OBS-012 旧 oracle 修正后仍强制模型重采样
+
+- 状态: confirmed
+- 来源: 本轮 generation `D0B41EA251A5E264D55ECC7447A24C0E5D987B806FE4F21A504483AD921DDE61` 的真实 References 失败、原结果与刷新入口
+- 证据上限: 直接覆盖同一 stage 文件、可见输入、capsule 与 evaluator 身份不变而隐藏 oracle 改正的恢复路径
+
+References 模型输出只因隐藏 oracle 过度要求 CLI 引用而被记为 `oracle_violation`；修正 oracle 后原文件已通过当前验证，但刷新仍要求 `RetryJustification` 并准备重新调用模型。原账本只有 passed-result 恢复和跨代 carry-forward，没有“原输出不变、仅 oracle 已纠正”的零 Token 来源。
+
+## GAP-007 可观察模型行为没有成为规则系统质量边界
+
+- 状态: confirmed
+- 关联: AC-066, OBS-009
+
+项目能够区分具体修复 owner，但没有明确禁止用“模型执行问题”把受支持场景中的可预防错误排除在 AgentBase 质量之外，也没有要求从规则、路由、动作入口、反馈、状态回流和行为验证定位最早缺口。
+
+## GAP-008 证据前沿、验证维度与覆盖范围没有进入现有任务 owner
+
+- 状态: confirmed
+- 关联: AC-036, OBS-009, OBS-010
+
+任务合同不能声明会改变行为或 oracle 的维度，状态不能保存当前前沿、消费者、case、最近证据和失效来源，结果也不能区分实际覆盖组合；`context` 因而不能一次返回当前检查点与关联 DCR。反例后的“先写回再继续”仍依赖模型记忆。
+
+## GAP-009 脆弱命令与工具缺陷判断缺少可执行升级边界
+
+- 状态: confirmed
+- 关联: AC-066, OBS-010, OBS-011
+
+全局规则没有把反复人工拼装的稳定接口升级到领域 runner，也没有要求在声称工具缺陷前绑定当前身份、对应帮助和原输入并分类输入、范围、正常协议、降级、截断与产品故障。
+
+## GAP-010 Oracle 修正没有零 Token 恢复来源
+
+- 状态: confirmed
+- 关联: AC-066, OBS-012
+
+相同模型输出已经满足当前 oracle 时，重新采样既不增加产品信息，又违反“不变输入不为期待不同结果重跑”。账本需要一种精确引用旧失败收据、文件哈希、capsule 和 evaluator 的通过来源，并继续受总收据上限与原子 merge 约束。

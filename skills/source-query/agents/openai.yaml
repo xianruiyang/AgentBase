@@ -1,7 +1,7 @@
 interface:
   display_name: "Source Query"
-  short_description: "按证据成本选择文本、结构、符号和完整性的最低充分查询路径"
-  default_prompt: "使用 $source-query 以最低充分成本定位并验证所需源码。"
+  short_description: "按证据成本选择源码查询路径并诊断当前 srcq 能力与恢复协议"
+  default_prompt: "使用 $source-query 以最低充分成本定位并验证所需源码；当前 srcq 能力、错误、降级或恢复协议待裁时，固定身份与原输入后复现分类。"
 dependencies:
   tools:
     - type: "mcp"

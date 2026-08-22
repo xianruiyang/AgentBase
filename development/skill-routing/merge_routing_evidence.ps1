@@ -85,10 +85,10 @@ foreach ($stage in $stageReceipts) {
     if ($receipt.Count -ne 1) {
         throw "$($stage.phase) result is not bound to the supplied passed receipt id: $($stage.attempt_id)"
     }
-    if ([string]$receipt[0].origin -in @('formal', 'baseline_import', 'staged_carry_forward')) {
+    if ([string]$receipt[0].origin -in @('formal', 'baseline_import', 'staged_carry_forward', 'oracle_revalidation')) {
         $resultHash = (Get-FileHash -LiteralPath $stage.path -Algorithm SHA256).Hash
         if ([string]$receipt[0].result_sha256 -ne $resultHash) {
-            throw "$($stage.phase) formal result file does not match its recorded hash"
+            throw "$($stage.phase) stored result file does not match its recorded hash"
         }
     }
     elseif ([string]$receipt[0].origin -eq 'evidence_reuse') {

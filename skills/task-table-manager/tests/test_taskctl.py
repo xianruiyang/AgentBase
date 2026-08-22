@@ -239,6 +239,7 @@ class TaskctlTests(unittest.TestCase):
         *,
         dependencies: list[dict] | None = None,
         scope: list[str] | None = None,
+        validation_dimensions: list[str] | None = None,
     ) -> dict:
         return {
             "id": task_id,
@@ -249,6 +250,7 @@ class TaskctlTests(unittest.TestCase):
             "mutation_scope": scope or [],
             "outputs": [f"{title}的结果"],
             "verification": [f"验证{title}的实际行为"],
+            "validation_dimensions": validation_dimensions or [],
             "suggested_skills": [],
             "reasoning_hint": "medium",
         }
@@ -328,7 +330,7 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(sorted((self.root / "results").glob("*.json")), results_before)
 
-    def complete_t001(self) -> dict:
+    def complete_t001(self, result_payload: dict | None = None) -> dict:
         context = self.run_task(
             "context", "--id", "T001", "--budget", "12000", "--capture"
         )
@@ -342,7 +344,7 @@ class TaskctlTests(unittest.TestCase):
             "--expected-state-revision",
             str(claimed["state"]["revision"]),
         )
-        result = self.result_payload()
+        result = result_payload or self.result_payload()
         result_file = Path(self.temp.name) / "T001-result.json"
         result_file.write_text(
             json.dumps(result, ensure_ascii=False, indent=2),
@@ -1003,6 +1005,63 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(cleared["state"]["note"], "")
 
+    def test_note_records_and_clears_execution_checkpoint(self) -> None:
+        started = self.run_task("start", "--id", "T001", "--owner", "agent-a")
+        checkpoint = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--evidence-frontier",
+            "不同载体是否共享同一 normals oracle",
+            "--active-consumer",
+            "StaticMesh face 模式公开入口",
+            "--validation-case",
+            "carrier=StaticMesh",
+            "--validation-case",
+            "mode=face",
+            "--latest-evidence",
+            "face 模式反例推翻统一判据",
+            "--invalidated-source-id",
+            "SOL-001",
+            "--next-action",
+            "先修订 oracle，再运行同一消费者",
+            "--expected-state-revision",
+            str(started["state"]["revision"]),
+        )
+        self.assertEqual(
+            checkpoint["state"]["evidence_frontier"],
+            "不同载体是否共享同一 normals oracle",
+        )
+        self.assertEqual(
+            checkpoint["state"]["validation_case"],
+            ["carrier=StaticMesh", "mode=face"],
+        )
+        self.assertEqual(checkpoint["state"]["invalidated_source_ids"], ["SOL-001"])
+
+        context = self.run_task("context", "--id", "T001", "--budget", "12000")
+        self.assertEqual(
+            context["state"]["active_consumer"], "StaticMesh face 模式公开入口"
+        )
+        self.assertEqual(
+            context["state"]["latest_evidence"], "face 模式反例推翻统一判据"
+        )
+
+        cleared = self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--clear-execution-checkpoint",
+            "--expected-state-revision",
+            str(checkpoint["state"]["revision"]),
+        )
+        self.assertEqual(cleared["state"]["evidence_frontier"], "")
+        self.assertEqual(cleared["state"]["validation_case"], [])
+        self.assertEqual(cleared["state"]["invalidated_source_ids"], [])
+
     def test_note_on_completed_task_preserves_readable_result(self) -> None:
         completed = self.complete_t001()
         noted = self.run_task(
@@ -1161,6 +1220,63 @@ class TaskctlTests(unittest.TestCase):
             self.assertTrue(task_id.startswith("T"))
         self.assertNotIn("passed", completion)
         self.assertNotIn("pass", completion)
+
+    def test_context_includes_related_deferred_change_in_source_snapshot(self) -> None:
+        (self.root / "deferred-changes.md").write_text(
+            """# 延后讨论项
+
+## DCR-001 是否扩大导出格式
+
+- 状态: deferred
+- 目标ID: AC-001
+
+当前证据不足以扩大导出格式。
+""",
+            encoding="utf-8",
+        )
+        self.run_ok(WORKCTL, "index", "--work-dir", str(self.root))
+        context = self.run_task(
+            "context", "--id", "T001", "--budget", "12000", "--capture"
+        )
+        self.assertEqual(
+            [item["id"] for item in context["deferred_changes"]], ["DCR-001"]
+        )
+        self.assertIn("DCR-001", context["source_snapshot"])
+        snapshot = self.read_snapshot(context["source_snapshot_ref"])
+        self.assertIn("DCR-001", snapshot["sources"])
+
+    def test_task_dimensions_and_result_coverage_remain_distinct(self) -> None:
+        candidate = self.task(
+            "T001",
+            "实现导出职责",
+            ["SOL-001"],
+            scope=["src/export/**"],
+            validation_dimensions=["carrier", "mode", "revision"],
+        )
+        candidate_file = Path(self.temp.name) / "T001-with-dimensions.json"
+        candidate_file.write_text(
+            json.dumps(candidate, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        updated = self.run_task("update", "--file", str(candidate_file))
+        self.assertEqual(updated["task_revision"], 2)
+
+        result = self.result_payload()
+        result["validation_coverage"] = ["carrier=StaticMesh", "mode=face"]
+        completed = self.complete_t001(result)
+        stored = json.loads(
+            (self.root / completed["result_ref"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            stored["validation_coverage"], ["carrier=StaticMesh", "mode=face"]
+        )
+        shown = self.run_task("show", "--id", "T001")
+        self.assertEqual(
+            shown["task"]["validation_dimensions"], ["carrier", "mode", "revision"]
+        )
+        self.assertEqual(
+            shown["result"]["validation_coverage"],
+            ["carrier=StaticMesh", "mode=face"],
+        )
 
     def test_completion_records_structured_evidence_and_source_snapshot(self) -> None:
         completed = self.complete_t001()

@@ -28,8 +28,8 @@ description: 设计并用低 Token 管理长期任务合同、依赖图、状态
 
 1. 模型根据上游 `SOL/GAP/DES/AC/REQ` 和真实工作范围编写任务合同语义；公共产出与消费者接入拆分时必须声明真实消费依赖，需要模板时可用默认 model `taskctl draft`，其结果保留稳定 ID 和语义字段但不返回 schema/revision。CLI 不自动把文档变成任务。
 2. 需要结构化存储时用 `add` 或 `update`。模型输入只维护稳定 ID 与任务语义，CLI 注入机器 schema/revision，并用调用方已读 revision 保护并发写入；语义问题只诊断，不把工具变成任务裁判。
-3. 用 `next`、`deps`、`dependents` 和 `context` 取得有界候选、依赖与结果证据。稳定上游的单一候选可直接执行；候选共享未证前提、昂贵验证或失效关系时，把证据交给 `$execution-governor` 裁决，不能由 CLI 排序、任务深度或完成数量替代。开始实际执行时用 `context --capture` 固化最终模型可见来源。
-4. 需要跨轮跟踪时用 `claim/start/note/complete/reopen/release`，每次先读取当前 state revision 并传 `--expected-state-revision`；不再执行的任务可标记 `retired`。命令记录模型已作出的判断，不决定该判断是否被允许；成功写入会同步刷新任务表展示，只有回执报告展示陈旧时才需修复原因后显式 `render`。
+3. 用 `next`、`deps`、`dependents` 和 `context` 取得有界候选、依赖与结果证据；`context` 还投影执行检查点和关联 DCR。稳定上游的单一候选可直接执行；候选共享未证前提、昂贵验证或失效关系时，把证据交给 `$execution-governor` 裁决，不能由 CLI 排序、任务深度或完成数量替代。实际执行前用 `context --capture` 固化最终模型可见来源。
+4. 跨轮跟踪用 `claim/start/note/complete/reopen/release`，先读 state revision 并传 `--expected-state-revision`；停用任务标 `retired`。前沿、消费者、验证 case、证据、失效来源或下一动作改变时，先用 `note` 写回再继续；普通进度不复制。命令只记录模型判断，不决定其许可；成功写入会刷新展示，仅回执报告陈旧时修因后显式 `render`。
 5. 模型结果文件只写实际结果、验证、未决问题和证据等语义正文；`complete` 从命令目标、调用方实际执行的 task/state revision 和已捕获来源收据形成完整永久结果。后继验证提交自己的收据和直接证据，不改写或隐藏旧结果诊断。
 6. 上游改变时用 `$delivery-workflow` 的 `impact`、本工具的递归 `impact` 和实际系统依赖逐项判断消费者与结果，按结论更新、重开或退休任务并重新验证；CLI 只返回路径和陈旧诊断，不自动重置状态或宣布结果失效。
 7. 需要最终复核且范围较大时可用 `completion-context` 从当前 Markdown 分页取得目标、约束、全部 DCR 和关联结果。CLI 不筛选完成阻断项、不返回整体通过值；任务或文档改变时从第一页重审。

@@ -21,6 +21,7 @@
     "change-governance",
     "delivery-workflow",
     "execution-governor",
+    "source-query",
     "task-table-manager"
   ],
   "allowed_behavior_tags": [
@@ -42,6 +43,10 @@
     "collaborative_requirement_insight",
     "quality_token_speed_order",
     "vertical_validation_closure",
+    "observable_behavior_accountability",
+    "evidence_checkpoint_before_continue",
+    "dimension_bounded_validation",
+    "tool_defect_reproduction",
     "model_interaction_surface",
     "minimal_evidence_closure",
     "user_reasoning_override",
@@ -52,12 +57,12 @@
   "behavior_tag_definitions": {
     "read_only": "请求只授权分析、解释、审查或查询，不修改文件、进程或外部状态。",
     "modify_authorized_scope": "实施用户已授权的修改，并把对象、影响和风险限制在该授权范围内。",
-    "fact_first": "请求要求先取证、修改或转换依赖尚未读取的当前运行时状态，或已有直接证据正在推翻结论、方案、任务与动作时适用：先以直接适用证据确定事实，再判断。",
+    "fact_first": "请求要求先取证、动作依赖尚未读取的当前状态，或直接证据正在推翻结论、方案、任务与动作时适用：先以直接适用证据确定事实，再判断；它可与 challenge_false_premise 等标签同时适用，不因已指出错误而省略。",
     "challenge_false_premise": "已证明前提错误、不完整或有害时，明确指出并修正，不迎合执行。",
     "no_alternative_execution": "审查、解释或建议请求不得被升级为执行模型自行选择的替代方案。",
     "long_term_total_cost": "在可行方案间按长期净收益与整个系统总成本裁决，而非按最少改动或最快结束。",
     "architecture_integrated": "把请求行为接入正确的长期职责和正式入口；执行中发现原 owner 或架构判断失效时，在继续依赖旧方案前回退裁决，不先完成孤立补丁再把问题作为残留风险交付。",
-    "authority_lifecycle": "本次动作必须裁决、新建、迁移或改变长期行为的权威 owner、正式入口或生命周期；仅用生命周期差异说明两个对象不应合并时不适用。",
+    "authority_lifecycle": "本次动作必须裁决、新建、迁移或改变长期行为的权威 owner、正式入口或生命周期；仅用生命周期差异说明对象不应合并，或在已确认 owner 内新增、更新普通记录时不适用。",
     "impact_closure": "共享或权威契约改变后，完成前必须覆盖受影响消费者与派生结果的更新、退出或重验。",
     "no_scope_expansion": "当前请求已明确唯一范围或说明旧工作结束时，不延续历史范围；可以指出风险，但不实施未获授权且不影响本次结果的附带改造。",
     "protected_user_baseline": "用户确认的需求或用户设计保持受保护；新证据要求改变时先延后并交由用户裁决。",
@@ -67,7 +72,11 @@
     "local_mechanical_gates": "只要请求实际调用 workctl/taskctl 或设计其规则就适用：CLI 只对可机械证明、局部且可恢复的操作危险设门禁，并返回原因与恢复动作。",
     "collaborative_requirement_insight": "不把用户措辞、术语、原因判断或实现建议直接当成目标；从实际场景和期望的可观察结果重组候选意图，区分待验证事实与候选方案，说明依据和不确定性后与用户校准。",
     "quality_token_speed_order": "先选择需求对齐、正确、安全、可维护且有完成证据的方案；质量同等充分时降低 Token，前两者不变差时再提速。",
-    "vertical_validation_closure": "多个后续动作共享尚未验证的前提时，先以经过实际消费者并产生用户结果的最小路径验证共同前提；成立前不扩展依赖它的平级范围，反例出现后停止下游并返回所属层重裁。",
+    "vertical_validation_closure": "多个后续动作共享尚未验证或刚被反例推翻的前提时，先以真实消费者最小路径验证；成立前不扩展平级范围，反例出现后停止下游并返回所属层重裁。它可与 evidence_checkpoint_before_continue 或 impact_closure 同时适用。",
+    "observable_behavior_accountability": "适用规则、skill 或工具已正确提供但模型仍产生可预防错误时，把可观察行为作为系统失败证据，定位规则、路由、动作入口、反馈、状态回流或验证缺口；不以正文存在免责，也不按表象堆规则。",
+    "evidence_checkpoint_before_continue": "反例改变失效范围、当前消费者或下一动作时，先停止依赖工作并把反例、失效来源、当前验证 case 和下一动作写回已有 owner，再重新裁决和继续。",
+    "dimension_bounded_validation": "同一声明可能随载体、模式、状态、版本或持久化边界变化时，先识别维度与等价依据，选择最小判别组合，并把验证结论限制在实际覆盖的组合或已证等价类。",
+    "tool_defect_reproduction": "声称当前工具缺少能力或存在缺陷前，核对实际身份与对应帮助并重放原输入，区分输入错误、范围重叠、正常协议、预期降级、截断和产品故障。",
     "model_interaction_surface": "当前请求要求设计、选择或改变模型直接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面最小充分且可局部修改，机器面保持稳定完整，生成物不作为语义修改入口。",
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
@@ -94,6 +103,7 @@
     "advanced-scc-hotspots",
     "ordinary-hyperfine-benchmark",
     "source-query-rule-review",
+    "source-query-capability-diagnosis",
     "complete-known-name-position-list",
     "known-small-definition-range",
     "known-implementation-reading",
@@ -123,6 +133,10 @@
     "qq-troubleshooting-with-powershell",
     "qq-direct-message-required",
     "vertical-validation-closure-selection",
+    "counterexample-checkpoint-before-continue",
+    "dimension-bounded-validation-plan",
+    "observable-model-error-review",
+    "fragile-command-runner-escalation",
     "no-goal-reasoning-shift",
     "explicit-thread-reasoning-status",
     "fixed-thread-reasoning-scope",
@@ -150,6 +164,11 @@
     "delivery-feedback-contract",
     "reasoning-long-domain-work-assessment",
     "vertical-validation-closure-selection",
+    "source-query-capability-diagnosis",
+    "counterexample-checkpoint-before-continue",
+    "dimension-bounded-validation-plan",
+    "observable-model-error-review",
+    "fragile-command-runner-escalation",
     "task-cli-authoring-references",
     "task-cli-execution-references",
     "task-cli-completion-references"
@@ -235,6 +254,30 @@
       ]
     },
     {
+      "id": "observable-model-error-review",
+      "kind": "behavior",
+      "request": "模型在已正确装载 AgentBase 规则、skill 和正式工具的受支持场景中，仍连续犯了本可由当前工作流避免的错误。请把它作为 AgentBase 的质量失败分析规则、路由、动作入口、反馈回流和行为验证缺口；只分析，不修改，也不要用‘这是模型执行问题’免责。",
+      "expected_skills": [
+        "change-governance"
+      ],
+      "forbidden_skills": [
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "causal-analysis.md",
+        "lifecycle-and-entry.md",
+        "verification-and-gates.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "observable_behavior_accountability"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
       "id": "model-interaction-tool-read",
       "kind": "behavior",
       "request": "一个查询工具同时提供 model 和 machine 两种视图：model 只含本次阻塞判断、直接依据与续查游标，machine 是包含完整身份、空值和审计字段的稳定 JSON。当前只需要判断是否继续下一步，请选择输出面并说明原则，不执行修改。",
@@ -309,6 +352,34 @@
         "architecture_integrated"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "fragile-command-runner-escalation",
+      "kind": "behavior",
+      "request": "当前交付仍在进行，同一套稳定的外部产品命令已因手工分隔符、引号和环境参数反复失败，错误发生在产品逻辑执行前，下一动作取决于此裁决。停止原样重试，只读决定是否应把该脆弱调用固化到领域正式 runner，以及 runner 的 owner、消费者和失败边界；不要把具体命令语法写进全局规则。",
+      "expected_skills": [
+        "execution-governor",
+        "change-governance"
+      ],
+      "forbidden_skills": [
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "lifecycle-and-entry.md"
+      ],
+      "expected_execution_governor_references": [
+        "failure-and-cost.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "fact_first",
+        "architecture_integrated",
+        "authority_lifecycle"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "architecture-risk-discovered-during-implementation",
@@ -649,6 +720,30 @@
       ]
     },
     {
+      "id": "source-query-capability-diagnosis",
+      "kind": "behavior",
+      "request": "当前安装的 srcq 返回 structured projection unavailable。请只读判断这是输入错误、正常降级、截断还是当前版本产品缺陷；先固定工作目录、实际版本和原命令，读取对应层 help，并只重放一次可复现命令。不要修改源码，也不要把已有能力误报成新增需求。",
+      "expected_skills": [
+        "source-query"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_source_query_references": [
+        "diagnostics.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "fact_first",
+        "tool_defect_reproduction"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
       "id": "complete-known-name-position-list",
       "kind": "boundary",
       "request": "已知一个没有同名歧义的方法名称；在限定的正式源码范围内列出定义和直接调用位置。完整文本查询及每个命中的局部上下文足以区分定义与调用，不需要类型、重载解析或语义重命名。",
@@ -722,7 +817,7 @@
     {
       "id": "dependent-authority-source-evidence",
       "kind": "behavior",
-      "request": "列出生产源码中一个已知限定符号的全部出现位置，但仓库同时存在开发源码与分发副本，当前尚未确认哪个目录是正式生产 owner。先裁决正式源码范围，再在该范围做完整查询；不要为了减少回合把依赖步骤合并。只读回答。",
+      "request": "列出生产源码中一个已知限定符号的全部出现位置；仓库正式说明已唯一登记 production source root，但当前尚未读取其值，同时仓库还存在开发源码与分发副本。先从最近正式来源读出权威源码范围，再在该范围做完整查询；不要为了减少回合合并依赖步骤。只读回答。",
       "expected_skills": [],
       "forbidden_skills": [
         "source-query",
@@ -932,6 +1027,72 @@
       "forbidden_behavior_tags": [
         "modify_authorized_scope"
       ]
+    },
+    {
+      "id": "counterexample-checkpoint-before-continue",
+      "kind": "behavior",
+      "request": "长期任务状态仍写着下一步开始 normals，但公开消费者刚发现 verifier 反例，多个后续实现和测试仍依赖该共同前提；根因层和 owner 已确认，且已授权继续修复。先把反例、失效范围、当前证据前沿、真实消费者、验证用例和下一动作回写现有方案与任务状态，再继续依赖它的工作，不新建第二份状态真源。",
+      "expected_skills": [
+        "execution-governor",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "forbidden_skills": [
+        "change-governance"
+      ],
+      "expected_change_governance_references": [],
+      "expected_execution_governor_references": [
+        "decision-frontier.md",
+        "failure-and-cost.md"
+      ],
+      "expected_delivery_workflow_references": [
+        "artifact-contracts.md",
+        "planning-contracts.md",
+        "execution-contracts.md",
+        "iteration.md"
+      ],
+      "expected_task_table_manager_references": [
+        "execution.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "fact_first",
+        "vertical_validation_closure",
+        "evidence_checkpoint_before_continue"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "dimension-bounded-validation-plan",
+      "kind": "behavior",
+      "request": "同一能力的 oracle 会随 carrier、mode、revision 和 persistence 改变。请更新现有方案和任务合同，声明会改变结论的维度及等价依据，先选一个最小充分的真实消费者组合；不得机械展开完整笛卡尔积，也不得把单个 fixture 的通过外推到未覆盖组合。",
+      "expected_skills": [
+        "execution-governor",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "forbidden_skills": [
+        "change-governance"
+      ],
+      "expected_change_governance_references": [],
+      "expected_execution_governor_references": [
+        "decision-frontier.md"
+      ],
+      "expected_delivery_workflow_references": [
+        "artifact-contracts.md",
+        "planning-contracts.md",
+        "execution-contracts.md",
+        "iteration.md"
+      ],
+      "expected_task_table_manager_references": [
+        "task-contracts.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "vertical_validation_closure",
+        "dimension_bounded_validation"
+      ],
+      "forbidden_behavior_tags": []
     },
     {
       "id": "protected-baseline-change-discovered",
@@ -1634,7 +1795,7 @@
     {
       "id": "ui-spatial-layout-with-peer",
       "kind": "positive",
-      "request": "审查响应式界面中弹窗相对视口居中、按钮与卡片右边缘间距以及滚动后是否出框；结论依赖布局坐标、裁剪和屏幕像素关系。",
+      "request": "先读取当前视口尺寸、布局坐标、裁剪和滚动状态，再审查响应式界面中弹窗是否相对视口居中、按钮与卡片右边缘间距以及滚动后是否出框；结论依赖这些当前屏幕像素关系。",
       "available_peer_skills": [
         "peer-ui-design"
       ],
@@ -1679,7 +1840,7 @@
     {
       "id": "ue-transform-with-peer",
       "kind": "positive",
-      "request": "在 Unreal Editor 中把控制器目标转换到组件空间写入，并验证角色最终世界姿态和相机画面中的前后关系。",
+      "request": "先读取 Unreal Editor 当前控制器目标、组件变换和相机状态，再把目标转换到组件空间写入，并验证角色最终世界姿态和相机画面中的前后关系。",
       "available_peer_skills": [
         "peer-ue-authoring"
       ],

@@ -299,7 +299,7 @@ def task_context_model(payload: dict[str, Any]) -> dict[str, Any]:
         "task": sparse_model_value(task),
         "state": sparse_model_value(state),
     }
-    for key in ("diagnostics", "upstream", "source_snapshot"):
+    for key in ("diagnostics", "upstream", "deferred_changes", "source_snapshot"):
         if payload.get(key):
             projected[key] = sparse_model_value(copy.deepcopy(payload[key]))
     dependencies: list[dict[str, Any]] = []
@@ -316,6 +316,7 @@ def task_context_model(payload: dict[str, Any]) -> dict[str, Any]:
                     "outcome",
                     "outputs",
                     "verification",
+                    "validation_coverage",
                     "unresolved",
                     "invalidated_source_ids",
                     "evidence_for",
@@ -381,6 +382,7 @@ def task_completion_model(payload: dict[str, Any]) -> dict[str, Any]:
                 "result_outcome",
                 "outputs",
                 "verification",
+                "validation_coverage",
                 "unresolved",
                 "invalidated_source_ids",
                 "evidence_refs",
@@ -450,6 +452,11 @@ def task_state_write_model(payload: dict[str, Any]) -> dict[str, Any]:
             "note",
             "blocked_reason",
             "next_action",
+            "evidence_frontier",
+            "active_consumer",
+            "validation_case",
+            "latest_evidence",
+            "invalidated_source_ids",
             "result_ref",
             "started_at",
             "ended_at",
@@ -672,7 +679,8 @@ def context_model_receipt_candidate(
     originally_complete = bool(projected.pop("source_snapshot_complete", False))
     visible_ids = {
         row.get("id")
-        for row in projected.get("upstream", [])
+        for section_name in ("upstream", "deferred_changes")
+        for row in projected.get(section_name, [])
         if isinstance(row, dict) and isinstance(row.get("id"), str)
     }
     visible_snapshot = {
@@ -721,7 +729,18 @@ def fit_task_model_with_snapshot(
     if isinstance(state, dict):
         core["state"] = {
             key: state[key]
-            for key in ("status", "owner", "blocked_reason", "next_action", "revision")
+            for key in (
+                "status",
+                "owner",
+                "blocked_reason",
+                "next_action",
+                "evidence_frontier",
+                "active_consumer",
+                "validation_case",
+                "latest_evidence",
+                "invalidated_source_ids",
+                "revision",
+            )
             if state.get(key) not in (None, "", [], {})
         }
     core["more"] = {
@@ -1303,6 +1322,9 @@ def normalize_task_body(
         "mutation_scope": mutation_scope,
         "outputs": string_list(raw.get("outputs"), "task.outputs"),
         "verification": string_list(raw.get("verification"), "task.verification"),
+        "validation_dimensions": string_list(
+            raw.get("validation_dimensions"), "task.validation_dimensions"
+        ),
         "suggested_skills": string_list(
             raw.get("suggested_skills"), "task.suggested_skills"
         ),
@@ -1412,6 +1434,23 @@ def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
         "next_action": semantic_string(
             raw.get("next_action", ""), f"state.next_action[{task_id}]"
         ),
+        "evidence_frontier": semantic_string(
+            raw.get("evidence_frontier", ""),
+            f"state.evidence_frontier[{task_id}]",
+        ),
+        "active_consumer": semantic_string(
+            raw.get("active_consumer", ""), f"state.active_consumer[{task_id}]"
+        ),
+        "validation_case": string_list(
+            raw.get("validation_case"), f"state.validation_case[{task_id}]"
+        ),
+        "latest_evidence": semantic_string(
+            raw.get("latest_evidence", ""), f"state.latest_evidence[{task_id}]"
+        ),
+        "invalidated_source_ids": string_list(
+            raw.get("invalidated_source_ids"),
+            f"state.invalidated_source_ids[{task_id}]",
+        ),
         "result_ref": result_ref,
     }
 
@@ -1439,6 +1478,9 @@ def normalize_result_body(
         "outputs": string_list(raw.get("outputs"), "result.outputs"),
         "changed_files": changed_files,
         "verification": string_list(raw.get("verification"), "result.verification"),
+        "validation_coverage": string_list(
+            raw.get("validation_coverage"), "result.validation_coverage"
+        ),
         "unresolved": string_list(raw.get("unresolved"), "result.unresolved"),
         "invalidated_source_ids": invalidated_ids,
         "evidence_for": string_list(raw.get("evidence_for"), "result.evidence_for"),
@@ -1942,6 +1984,24 @@ def state_diagnostics(task_id: str, state: dict[str, Any]) -> list[dict[str, Any
         )
     if status == "retired" and not state.get("note"):
         diagnostics.append({"kind": "retired_reason_missing", "task_id": task_id})
+    for field in ("evidence_frontier", "active_consumer", "latest_evidence"):
+        value = state.get(field, "")
+        if value:
+            diagnostics.extend(
+                semantic_text_diagnostics(value, f"state.{field}", task_id=task_id)
+            )
+    for field in ("validation_case", "invalidated_source_ids"):
+        values = state.get(field, [])
+        for value_index, value in enumerate(values):
+            diagnostics.extend(
+                semantic_text_diagnostics(
+                    value, f"state.{field}[{value_index}]", task_id=task_id
+                )
+            )
+        if len(values) != len(set(values)):
+            diagnostics.append(
+                {"kind": "duplicate_state_values", "task_id": task_id, "field": field}
+            )
     return diagnostics
 
 
@@ -1964,6 +2024,7 @@ def result_diagnostics(
         "outputs",
         "changed_files",
         "verification",
+        "validation_coverage",
         "unresolved",
         "invalidated_source_ids",
         "evidence_for",
@@ -2206,6 +2267,7 @@ def task_diagnostics(
         "mutation_scope",
         "outputs",
         "verification",
+        "validation_dimensions",
         "suggested_skills",
     ):
         values = task.get(field, [])
@@ -2421,6 +2483,7 @@ def command_draft(args: argparse.Namespace) -> dict[str, Any]:
         "mutation_scope": args.mutation_scope,
         "outputs": args.output,
         "verification": args.verification,
+        "validation_dimensions": args.validation_dimension,
         "suggested_skills": args.suggested_skill,
         "reasoning_hint": args.reasoning_hint,
         "revision": 1,
@@ -2456,6 +2519,11 @@ def command_add(args: argparse.Namespace) -> dict[str, Any]:
                 "note": "",
                 "blocked_reason": "",
                 "next_action": "",
+                "evidence_frontier": "",
+                "active_consumer": "",
+                "validation_case": [],
+                "latest_evidence": "",
+                "invalidated_source_ids": [],
                 "result_ref": None,
             },
             candidate["id"],
@@ -3049,6 +3117,50 @@ def select_upstream_context(
     return rows, source_snapshot, truncated, not truncated and not unresolved
 
 
+def select_related_deferred_changes(
+    index: dict[str, Any] | None,
+    source_ids: list[str],
+    excluded_ids: set[str],
+    maximum: int,
+) -> tuple[list[dict[str, Any]], dict[str, str], bool, bool]:
+    if index is None:
+        return [], {}, False, False
+    source_closure = semantic_source_closure(index, source_ids)
+    candidates = [
+        section
+        for section in index.get("sections", [])
+        if isinstance(section, dict)
+        and isinstance(section.get("id"), str)
+        and section["id"].startswith("DCR-")
+        and section["id"] not in excluded_ids
+        and source_closure.intersection(section.get("references", []))
+    ]
+    selected = candidates[:maximum]
+    rows = [
+        {
+            "id": section.get("id"),
+            "title": section.get("title"),
+            "stage": section.get("stage"),
+            "document": section.get("document"),
+            "line": section.get("line"),
+            "status": section.get("status"),
+            "references": section.get("references", []),
+            "body": section.get("body", ""),
+        }
+        for section in selected
+    ]
+    source_snapshot: dict[str, str] = {}
+    unresolved = False
+    for section in selected:
+        fingerprint = section.get("fingerprint")
+        if isinstance(fingerprint, str):
+            source_snapshot[section["id"]] = fingerprint
+        else:
+            unresolved = True
+    truncated = len(candidates) > len(selected)
+    return rows, source_snapshot, truncated, not truncated and not unresolved
+
+
 def semantic_source_closure(index: dict[str, Any], source_ids: list[str]) -> set[str]:
     by_id: dict[str, dict[str, Any]] = {}
     for section in index.get("sections", []):
@@ -3137,9 +3249,20 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
     upstream, source_snapshot, upstream_truncated, source_snapshot_complete = select_upstream_context(
         index, task["source_ids"], args.max_items
     )
+    deferred_changes, deferred_snapshot, deferred_truncated, deferred_complete = (
+        select_related_deferred_changes(
+            index,
+            task["source_ids"],
+            {row["id"] for row in upstream},
+            args.max_items,
+        )
+    )
+    source_snapshot.update(deferred_snapshot)
+    source_snapshot_complete = source_snapshot_complete and deferred_complete
     truncation = {
         "diagnostics": len(all_diagnostics) > args.max_items,
         "upstream": upstream_truncated,
+        "deferred_changes": deferred_truncated,
         "dependents": len(all_dependents) > args.max_items,
     }
     payload = {
@@ -3151,6 +3274,7 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
         "diagnostics": all_diagnostics[: args.max_items],
         "protected_baseline": index.get("protected_baseline") if index else None,
         "upstream": upstream,
+        "deferred_changes": deferred_changes,
         "source_snapshot": source_snapshot,
         "source_snapshot_complete": source_snapshot_complete,
         "dependencies": dependency_context,
@@ -3349,6 +3473,9 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
             "result_outcome": result.get("outcome") if result else None,
             "outputs": result.get("outputs", []) if result else [],
             "verification": result.get("verification", []) if result else [],
+            "validation_coverage": (
+                result.get("validation_coverage", []) if result else []
+            ),
             "unresolved": result.get("unresolved", []) if result else [],
             "invalidated_source_ids": (
                 result.get("invalidated_source_ids", []) if result else []
@@ -3875,11 +4002,32 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def command_note(args: argparse.Namespace) -> dict[str, Any]:
+    checkpoint_values = (
+        args.evidence_frontier,
+        args.active_consumer,
+        args.validation_case,
+        args.latest_evidence,
+        args.invalidated_source_id,
+    )
     if all(
         value is None
-        for value in (args.message, args.status, args.blocked_reason, args.next_action)
+        for value in (
+            args.message,
+            args.status,
+            args.blocked_reason,
+            args.next_action,
+            *checkpoint_values,
+        )
+    ) and not args.clear_execution_checkpoint:
+        raise TaskctlError(
+            "note requires progress, status, a next action, or an execution checkpoint"
+        )
+    if args.clear_execution_checkpoint and any(
+        value is not None for value in checkpoint_values
     ):
-        raise TaskctlError("note requires a message, status, blocked reason, or next action")
+        raise TaskctlError(
+            "--clear-execution-checkpoint cannot be combined with checkpoint values"
+        )
     root = resolve_root(args.task_dir)
     with workspace_lock(root):
         table = load_table(root)
@@ -3924,6 +4072,33 @@ def command_note(args: argparse.Namespace) -> dict[str, Any]:
                 )
         if args.next_action is not None:
             state["next_action"] = semantic_string(args.next_action, "note.next_action")
+        if args.clear_execution_checkpoint:
+            state["evidence_frontier"] = ""
+            state["active_consumer"] = ""
+            state["validation_case"] = []
+            state["latest_evidence"] = ""
+            state["invalidated_source_ids"] = []
+        else:
+            if args.evidence_frontier is not None:
+                state["evidence_frontier"] = semantic_string(
+                    args.evidence_frontier, "note.evidence_frontier"
+                )
+            if args.active_consumer is not None:
+                state["active_consumer"] = semantic_string(
+                    args.active_consumer, "note.active_consumer"
+                )
+            if args.validation_case is not None:
+                state["validation_case"] = string_list(
+                    args.validation_case, "note.validation_case"
+                )
+            if args.latest_evidence is not None:
+                state["latest_evidence"] = semantic_string(
+                    args.latest_evidence, "note.latest_evidence"
+                )
+            if args.invalidated_source_id is not None:
+                state["invalidated_source_ids"] = string_list(
+                    args.invalidated_source_id, "note.invalidated_source_ids"
+                )
         state = write_state(root, table, state, previous_state)
         diagnostics.extend(state_diagnostics(args.id, state))
         table_view, table_view_diagnostic = refresh_task_table_after_mutation(
@@ -4055,6 +4230,11 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
         next_state["result_ref"] = relative_ref
         next_state["blocked_reason"] = ""
         next_state["next_action"] = ""
+        next_state["evidence_frontier"] = ""
+        next_state["active_consumer"] = ""
+        next_state["validation_case"] = []
+        next_state["latest_evidence"] = ""
+        next_state["invalidated_source_ids"] = []
         next_state = apply_state_timestamps(state, next_state, end_event=True)
         next_state = validate_state(next_state, args.id)
         recovered_partial_write = result_path.exists()
@@ -4141,6 +4321,11 @@ def command_reopen(args: argparse.Namespace) -> dict[str, Any]:
         state["note"] = f"reopened: {reason}"
         state["blocked_reason"] = ""
         state["next_action"] = ""
+        state["evidence_frontier"] = ""
+        state["active_consumer"] = ""
+        state["validation_case"] = []
+        state["latest_evidence"] = ""
+        state["invalidated_source_ids"] = []
         state["result_ref"] = None
         state = write_state(root, table, state, previous_state)
         diagnostics.extend(state_diagnostics(args.id, state))
@@ -4195,6 +4380,11 @@ def command_release(args: argparse.Namespace) -> dict[str, Any]:
         state["owner"] = None
         state["blocked_reason"] = ""
         state["next_action"] = ""
+        state["evidence_frontier"] = ""
+        state["active_consumer"] = ""
+        state["validation_case"] = []
+        state["latest_evidence"] = ""
+        state["invalidated_source_ids"] = []
         state["result_ref"] = None
         state = write_state(root, table, state, previous_state)
         diagnostics.extend(state_diagnostics(args.id, state))
@@ -4507,6 +4697,12 @@ def build_parser() -> argparse.ArgumentParser:
     draft_parser.add_argument("--mutation-scope", action="append", default=[], help="允许修改的路径或职责范围；可重复")
     draft_parser.add_argument("--output", action="append", default=[], help="必须交付的产物；可重复")
     draft_parser.add_argument("--verification", action="append", default=[], help="直接验收方式；可重复")
+    draft_parser.add_argument(
+        "--validation-dimension",
+        action="append",
+        default=[],
+        help="可能改变行为或 oracle 的验证维度；可重复",
+    )
     draft_parser.add_argument("--suggested-skill", action="append", default=[], help="执行时建议选择的 skill；可重复且不构成许可")
     draft_parser.add_argument("--reasoning-hint", help="执行阶段的非约束推理深度提示")
     draft_parser.set_defaults(handler=command_draft)
@@ -4623,6 +4819,26 @@ def build_parser() -> argparse.ArgumentParser:
     note_parser.add_argument("--status", help="新的执行状态；非标准值只形成诊断")
     note_parser.add_argument("--blocked-reason", help="阻塞原因；仅 blocked 状态应保留")
     note_parser.add_argument("--next-action", help="恢复执行所需的下一动作")
+    note_parser.add_argument("--evidence-frontier", help="当前最早会支配后续动作的未证判断")
+    note_parser.add_argument("--active-consumer", help="当前用于闭合前沿的真实消费者")
+    note_parser.add_argument(
+        "--validation-case",
+        action="append",
+        default=None,
+        help="当前消费者实际选择的维度值或等价类；可重复并整体替换",
+    )
+    note_parser.add_argument("--latest-evidence", help="最近有效结果或关键反例的有界摘要")
+    note_parser.add_argument(
+        "--invalidated-source-id",
+        action="append",
+        default=None,
+        help="被当前反例推翻的上游 ID；可重复并整体替换",
+    )
+    note_parser.add_argument(
+        "--clear-execution-checkpoint",
+        action="store_true",
+        help="清除当前前沿、消费者、验证 case、最近证据和失效 ID",
+    )
     add_state_revision(note_parser)
     note_parser.set_defaults(handler=command_note)
 

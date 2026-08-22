@@ -119,16 +119,41 @@ try {
         & $recorder @finishParameters | Out-Null
     }
 
+    $preRefreshHistory = Get-Content -LiteralPath $historyPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 50 -DateKind String
+    $referenceFailure = @($preRefreshHistory.attempts | Where-Object { [string]$_.phase -eq 'References' })
+    if ($referenceFailure.Count -ne 1) { throw 'Reference revalidation fixture did not find one source receipt' }
+    $referenceFailure[0].outcome = 'failed'
+    $referenceFailure[0].stage_result_sha256 = $null
+    $referenceFailure[0].failure_class = 'oracle_violation'
+    $referenceFailure[0].failure_summary = 'Synthetic prior-oracle rejection of an otherwise unchanged result.'
+    Write-TestJson -Path $historyPath -Value $preRefreshHistory
+
     $refresh = & (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -ProjectRoot $projectRoot -CurrentEvidencePath $currentPath -AttemptHistoryPath $historyPath
     if ([string]$refresh.action -ne "refreshed" -or [int]$refresh.evaluator_run_count -ne 0 -or
-        [int]$refresh.recovered_phase_count -ne 3 -or [int]$refresh.reused_phase_count -ne 0) {
-        throw "Refresh did not recover all three passed staged results without evaluator runs"
+        [int]$refresh.recovered_phase_count -ne 2 -or [int]$refresh.oracle_revalidated_phase_count -ne 1 -or
+        [int]$refresh.reused_phase_count -ne 0) {
+        throw "Refresh did not recover two passed stages and revalidate one exact oracle-rejected result without evaluator runs"
     }
     if (-not (Test-Path -LiteralPath $currentPath -PathType Leaf) -or (Test-Path -LiteralPath $pendingRoot)) {
         throw "Recovered refresh did not atomically publish current evidence and retire its pending generation"
     }
     & (Join-Path $PSScriptRoot "validate_routing_results.ps1") -ProjectRoot $projectRoot -ResultsPath $currentPath | Out-Null
     & (Join-Path $PSScriptRoot "validate_routing_attempt_history.ps1") -ProjectRoot $projectRoot -AttemptHistoryPath $historyPath -CurrentEvidencePath $currentPath | Out-Null
+    $tamperedHistoryPath = Join-Path $testRoot 'tampered-revalidation-attempts.json'
+    $tamperedHistory = Get-Content -LiteralPath $historyPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 50 -DateKind String
+    $tamperedRevalidation = @($tamperedHistory.attempts | Where-Object { [string]$_.origin -eq 'oracle_revalidation' })
+    if ($tamperedRevalidation.Count -ne 1) { throw 'Oracle revalidation fixture did not create one provenance receipt' }
+    $tamperedRevalidation[0].source_receipt_id = '0' * 32
+    Write-TestJson -Path $tamperedHistoryPath -Value $tamperedHistory
+    $tamperedRejected = $false
+    try {
+        & (Join-Path $PSScriptRoot 'validate_routing_attempt_history.ps1') -ProjectRoot $projectRoot -AttemptHistoryPath $tamperedHistoryPath | Out-Null
+    }
+    catch {
+        $tamperedRejected = $_.Exception.Message.Contains('zero-cost failed-result link') -or
+            $_.Exception.Message.Contains('reuses evaluator id')
+    }
+    if (-not $tamperedRejected) { throw 'Oracle revalidation accepted a tampered source receipt link' }
 
     $carryEvidenceDirectory = Join-Path $testRoot "carry-evidence"
     $carryCurrentPath = Join-Path $carryEvidenceDirectory "current.json"
@@ -196,7 +221,7 @@ try {
     }
     & (Join-Path $PSScriptRoot "validate_routing_attempt_history.ps1") -ProjectRoot $projectRoot -AttemptHistoryPath $resumeHistoryPath -CurrentEvidencePath $resumeCurrentPath | Out-Null
 
-    Write-Output "Routing refresh recovery tests passed: same-generation results resume, cross-generation carry survives interruption without model calls, merges are atomic, and staging retires after commit."
+    Write-Output "Routing refresh recovery tests passed: same-generation results resume, exact oracle-rejected output revalidates at zero Token, cross-generation carry survives interruption, merges are atomic, and staging retires after commit."
 }
 finally {
     $env:AGENTBASE_ROUTING_EVALUATOR_DISABLED = $previousEvaluatorGuard
