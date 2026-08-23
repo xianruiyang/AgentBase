@@ -1,4 +1,4 @@
 interface:
   display_name: "Subagent Orchestration"
-  short_description: "按显式要求或净收益编排静态证据与路径实验子代理，并由主代理接纳结果"
+  short_description: "按显式要求或净收益编排静态证据与可逆操作实验，并由主代理接纳结果"
   default_prompt: "使用 $subagent-orchestration 判断请求是否应委派 evidence 或 experiment，约束交接，并由主代理接纳结果。"

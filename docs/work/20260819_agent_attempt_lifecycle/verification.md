@@ -32,3 +32,12 @@
 - 在用户叫停前，路由刷新的 Routing 与 Policy 阶段已经返回通过；References 阶段随后被终止，并以 `execution_failed` 收据闭合。三阶段没有合并为新 `current.json`，因此它们不构成当前正式路由证据。
 - 按用户明确要求，手动将 `global/AGENTS.md`、`subagent-orchestration/SKILL.md`、`agents/openai.yaml` 和 `references/coordination.md` 四个变更文件应用到当前 Codex 根目录；未做发布后 Status 或哈希读回。手动回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-manual-20260823-050357`。
 - 安装只证明文件复制成功；当前已启动任务不会追溯加载新规则，`should` 触发、非触发和并发选择均未做新任务行为验收。
+
+## 2026-08-23 可逆操作 Experiment 触发修订
+
+- `experiment` 的触发已从“静态证据无法区分路径”扩展为“独立有界的可逆实际操作能够低成本取得改变正式实现裁决的证据”；已有初步方向、未穷尽静态取证或整体仍以正式实现为主都不再构成排除条件。一次便宜定向循环、无法安全隔离或实验不改变裁决仍由主代理直接完成。
+- `subagent-orchestration`、`source-query`、`delivery-workflow`、`task-table-manager` 与 `change-governance` 的 skill quick validation 均通过；全局与项目规则合计 28658 bytes，继续满足为 Codex 默认项目指令上限预留至少 4 KiB 的门禁。
+- 路由合同为 119 cases、78 strict routing、24 strict references，13/13 skills 均有正向与非触发覆盖；零模型基础设施为 6 suites、22 个 PowerShell 文件、0 模型调用。
+- 正式 Routing 刷新依次暴露并修正四个既有 description 边界：受保护待议上游需要重投影任务表、局部架构风险不自动升级完整 delivery、临时路径只读生命周期评审属于 governance、仅据已知事实纠正错误前提不属于 governance。每次都改变 evaluator 可见输入后再评估，没有对同一输入原样重采样；上一代已通过 Policy 由 `staged_carry_forward` 收据迁移，未重复调用模型。
+- 最终 generation `94F0F1833032D2C480AB2E126544842C2907ACBFCC8296F53E350DD877BF4D17` 的 Routing、Policy、References 全部通过当前 oracle，后继计划为 0 evaluate、3 reuse、0 blocked/pending。最后一次刷新只运行 Routing 与 References，Policy carry-forward；`manage_agentbase.ps1 -Action Validate` 的 evaluator-disabled Windows SWE 基础设施 67/67 通过并返回 `valid:true`。
+- 本次没有运行 Windows SWE 九题、candidate、qualification、外部 Verifier 或 elevated sandbox 初始化；上述证据只覆盖规则/skill 路由、确定性基础设施和部署候选合同，真实子代理选择仍需新任务消费发布后的指令链。

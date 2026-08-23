@@ -92,7 +92,7 @@
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
     "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值，线程设置入口只在配置证据会改变动作时查询，并只为可预期长期阶段且剩余收益足以覆盖切换和恢复成本时设置；孤立难题和短机械收尾沿用当前档位。",
-    "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定时，必要且独立有界的取证、路径实验或连续遮蔽问题试路在委派净收益成立时默认委派，否则主代理直接完成；子代理只交付稀疏决策证据，可回滚实验补丁须由主代理逐项裁决和修订后才进入正式实现，主代理保留完成和外部写责任。",
+    "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定时，必要且独立有界的静态取证，或可逆实际操作能低成本取得改变实现裁决的直接证据，在委派净收益成立时默认委派，否则主代理直接完成；experiment 不以任务陌生、静态证据穷尽或尚无初步路径为前提，子代理只交付稀疏决策证据，可回滚实验补丁须由主代理逐项裁决和修订后才进入正式实现，主代理保留完成和外部写责任。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。"
   },
@@ -168,11 +168,13 @@
     "subagent-static-evidence-map",
     "subagent-path-experiment",
     "subagent-serial-masked-implementation-experiment",
+    "subagent-known-direction-operation-experiment",
     "subagent-discussion-only",
     "subagent-implicit-evidence-benefit",
     "subagent-implicit-experiment-benefit",
     "subagent-user-forbids",
     "subagent-short-local-no-benefit",
+    "subagent-cheap-direct-operation-no-benefit",
     "architecture-risk-discovered-during-implementation",
     "adaptive-plan-without-user-prompt",
     "simple-task-no-formal-plan",
@@ -194,6 +196,7 @@
     "subagent-static-evidence-map",
     "subagent-path-experiment",
     "subagent-serial-masked-implementation-experiment",
+    "subagent-known-direction-operation-experiment",
     "subagent-implicit-evidence-benefit",
     "subagent-implicit-experiment-benefit",
     "vertical-validation-closure-selection",
@@ -1464,6 +1467,26 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "subagent-known-direction-operation-experiment",
+      "kind": "positive",
+      "request": "owner、契约和初步实现方向都已经明确，这不是陌生问题；但一个只有实际运行才能确认的库行为会决定正式实现细节，并可能暴露后继错误。当前有独立临时 worktree、精确输入、可推翻 oracle、恢复依据和一次探针预算，委派的交接成本低于主代理在生产改动中连续试错。用户没有指定是否使用子代理，请先用可逆操作实验取得路径成立条件、错误或真实约束，再由主代理裁决并正式实现。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "experiment-lifecycle.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
       "id": "subagent-implicit-evidence-benefit",
       "kind": "positive",
       "request": "一个已限定目录的局部实现下一步必须依据 18 个已知消费者中哪些仍调用旧入口、哪些是否定命中来决定迁移范围。这份证据可全程只读，输入、输出和停止边界已明确，缺少它会改变下一动作，由主代理重复扫描的成本明显更高。先取得带稳定 ID、精确来源、反例和否定检查的证据地图，再由主代理决策并实现。",
@@ -1538,6 +1561,23 @@
       "forbidden_behavior_tags": [
         "modify_authorized_scope"
       ]
+    },
+    {
+      "id": "subagent-cheap-direct-operation-no-benefit",
+      "kind": "negative",
+      "request": "用户没有指定是否使用子代理。唯一 owner、契约和改法已经确认，只需在一个已知文件中改一处常量并运行一个秒级定向测试即可闭环；没有操作后才可见的未知，主代理当前一步的修改与验证成本低于任何派发、交接和复核。直接完成，不创建实验子代理。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "local_task_fast_path",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
     },
     {
       "id": "subagent-discussion-only",
