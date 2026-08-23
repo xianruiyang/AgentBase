@@ -8,7 +8,7 @@
 | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | 跨项目执行内核，只约束目标、证据、授权、路由、修改、验证、记录和交付 |
 | [`config.toml`](config.toml) | 经过筛选的机器无关 Codex 设置；部署时只合并受管键 |
-| [`hooks.template.json`](hooks.template.json) | 事件记录与按工作区开启的 QQ 完成提醒模板；部署时只解析 `{{CODEX_ROOT}}` |
+| [`hooks.template.json`](hooks.template.json) | 推理档位状态投影、事件记录与按工作区开启的 QQ 完成提醒模板；部署时只解析 `{{CODEX_ROOT}}` |
 | [`agents/`](agents/) | `evidence` 与 `experiment` 两个语义稳定的自定义子代理角色；各文件唯一维护实际模型、档位和角色指令 |
 
 ## 全局内核边界
@@ -23,6 +23,6 @@
 
 部署只合并实际变化的受管键，并保留目标主机中的认证、项目 trust、MCP、插件/marketplace、Windows sandbox 后端、hook 信任哈希、宿主生成字段、历史、日志、缓存和秘密。`windows.sandbox` 的初始化依赖机器状态和用户批准，已从 AgentBase 受管键移交宿主；最终评测需要的 elevated 后端只由评测的显式 `sandbox-setup` 入口管理。可移植设置不包含机器绝对路径，也不伪装成可以复制的 MCP 或插件安装状态。
 
-`hooks.template.json` 只描述 hook 命令。新机器仍须通过 `/hooks` 审查并信任实际命令；信任哈希不会迁移。`agents/` 只管理 `evidence` 与 `experiment` 两个自定义角色，不覆盖 Codex 内置代理或目标主机的其他个人代理。旧 `luna`、`sol` 与更早的 `terra` 由部署生命周期作为退役受管资产处理，不保留同责候选。
+`hooks.template.json` 只描述 hook 入口与有界运行参数。`SessionStart` 通过 `reasoning-governor` 的权威线程读回，在新上下文和压缩后投影一行当前 next-turn 档位，并只用可丢弃的有限缓存抑制相同 `resume`；缓存不持有或设置推理状态。新机器仍须通过 `/hooks` 审查并信任实际命令；信任哈希不会迁移。`agents/` 只管理 `evidence` 与 `experiment` 两个自定义角色，不覆盖 Codex 内置代理或目标主机的其他个人代理。旧 `luna`、`sol` 与更早的 `terra` 由部署生命周期作为退役受管资产处理，不保留同责候选。
 
 修改这些文件后，按[部署说明](../development/codex-deployment/README.md#validate)运行部署合同验证。正式安装仍需要用户对当次 `Publish` 的明确同意。

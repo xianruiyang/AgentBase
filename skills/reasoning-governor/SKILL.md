@@ -11,8 +11,22 @@ description: 读取或切换当前 Codex 线程的 next-turn 推理深度。用�
 
 - 以脚本从 Codex conversation state 读回的 `currentConfiguredEffort` 作为当前线程 next-turn 配置证据。当前有效上下文中同一线程、此后无设置或已知配置变化的最近验证读回可以继续使用；否则不从全局 `config.toml`、任务行、模型记忆或历史 receipt 推断。
 - 设置只影响下一轮，不能改变或读取已经开始的当前轮；`activeTurnEffortReadable=false` 是明确边界。
-- 不使用 `Stop` hook，不发送消息，不创建 turn，也不为切换深度创建或结束 Goal；不把临时基线、用户覆盖或自动恢复义务保存到任务表、Goal、hook、文件或脚本状态。
+- 显式状态与设置入口不使用 `Stop` hook，不发送消息，不创建 turn，也不为切换深度创建或结束 Goal。`SessionStart` hook 只把同一权威读回投影为额外 developer context，不选择或设置档位。
+- 不把临时基线、用户覆盖或自动恢复义务保存到任务表、Goal、hook、文件或脚本状态。Hook 的有限本地缓存只记录按线程哈希的最近已投影 `(model, effort)`，用于抑制相同 `resume`；它可丢弃、不可反向推断档位，也不影响 `startup`、`clear` 或 `compact` 的必发读回。
 - 用户明确指定等级与适用范围时先按其选择执行；未声明结束条件则持续到用户明确改变或解除。额度原因无需验证，模型不得以自主判断或 Goal 状态覆盖；等级不可用或任务在该约束下无法可靠完成时如实说明。
+
+## SessionStart 状态投影
+
+可移植 Hook 在 `startup`、`resume`、`clear` 和 `compact` 调用同目录脚本。每次先读真实线程状态；新上下文和压缩后始终注入，相同线程的未变化 `resume` 静默。缺少缓存表示未见过，不使用真实等级 `none` 充当初值；读回失败不覆盖最近成功记录、不猜默认值、不重试。
+
+成功与失败只向模型输出一行，不显示用户警告：
+
+```text
+reasoning_effort=medium; observed, not target/user-lock.
+reasoning_effort=?; do not infer.
+```
+
+第一行只证明当前 next-turn 配置，不是目标档位或用户固定要求；第二行只证明当前无法读回。Hook 缓存删除或损坏最多造成一次重复投影，不影响真实配置。
 
 ## 调用与生命周期
 
@@ -33,6 +47,8 @@ description: 读取或切换当前 Codex 线程的 next-turn 推理深度。用�
 & '<SkillDir>\scripts\reasoning-governor.ps1' -Effort max -ThreadId $env:CODEX_THREAD_ID
 & '<SkillDir>\scripts\reasoning-governor.ps1' -Status -View machine -ThreadId $env:CODEX_THREAD_ID
 ```
+
+`-Hook` 只供已安装的 `SessionStart` 生命周期入口使用，直接消费 Codex 传入的 stdin JSON；模型不手工调用它。
 
 Node 入口同时支持机器调用和旧设置形式：
 

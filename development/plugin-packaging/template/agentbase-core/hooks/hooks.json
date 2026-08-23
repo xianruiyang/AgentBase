@@ -1,6 +1,20 @@
 {
-  "description": "AgentBase plugin event logging and opt-in QQ completion hooks.",
+  "description": "AgentBase plugin reasoning-state context, event logging, and opt-in QQ completion hooks.",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"${PLUGIN_ROOT}\\skills\\reasoning-governor\\scripts\\reasoning-governor.ps1\" -Hook",
+            "commandWindows": "pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"${PLUGIN_ROOT}\\skills\\reasoning-governor\\scripts\\reasoning-governor.ps1\" -Hook",
+            "timeout": 8,
+            "additionalContextLimit": 32
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [

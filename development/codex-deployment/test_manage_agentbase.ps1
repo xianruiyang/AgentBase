@@ -424,6 +424,14 @@ try {
     if (-not $firstCommand.Contains($codexRoot)) {
         throw "Installed hooks do not reference the selected Codex root"
     }
+    $reasoningHookGroup = $installedHooks.hooks.SessionStart[0]
+    $reasoningHookCommand = [string]$reasoningHookGroup.hooks[0].commandWindows
+    if ([string]$reasoningHookGroup.matcher -ne "startup|resume|clear|compact" -or
+        -not $reasoningHookCommand.Contains($codexRoot) -or
+        -not $reasoningHookCommand.EndsWith(" -Hook") -or
+        [int]$reasoningHookGroup.hooks[0].additionalContextLimit -ne 32) {
+        throw "Installed SessionStart hook does not preserve the reasoning-state context contract"
+    }
     $sourceAgentFiles = @(Get-ChildItem -LiteralPath (Join-Path $ProjectRoot "global\agents") -File -Filter "*.toml")
     foreach ($sourceAgentFile in $sourceAgentFiles) {
         $installedAgentPath = Join-Path (Join-Path $codexRoot "agents") $sourceAgentFile.Name

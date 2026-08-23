@@ -595,11 +595,11 @@ function Test-HooksTemplateSource {
         throw "Portable hooks template contains a machine path or a sensitive setting"
     }
     $placeholderCount = [regex]::Matches($raw, '\{\{CODEX_ROOT\}\}').Count
-    if ($placeholderCount -ne 12) {
-        throw "Portable hooks template must contain exactly 12 Codex-root placeholders; found $placeholderCount"
+    if ($placeholderCount -ne 14) {
+        throw "Portable hooks template must contain exactly 14 Codex-root placeholders; found $placeholderCount"
     }
 
-    $expectedEvents = @("PostToolUse", "PreToolUse", "Stop", "UserPromptSubmit")
+    $expectedEvents = @("PostToolUse", "PreToolUse", "SessionStart", "Stop", "UserPromptSubmit")
     $actualEvents = @($document.hooks.PSObject.Properties.Name | Sort-Object)
     if (($actualEvents -join '|') -ne ($expectedEvents -join '|')) {
         throw "Portable hooks template contains an unexpected event set: $($actualEvents -join ', ')"
@@ -609,10 +609,18 @@ function Test-HooksTemplateSource {
         Stop = 2
         PreToolUse = 1
         PostToolUse = 1
+        SessionStart = 1
     }
     $eventLoggerCommand = 'pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{{CODEX_ROOT}}\skills\codex-event-logger\scripts\codex_event_logger.ps1"'
     $qqCommand = 'pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{{CODEX_ROOT}}\skills\codex-qq-hook\scripts\codex_stop_qq_notify.ps1" -CodexRoot "{{CODEX_ROOT}}"'
-    $allowedCommands = @($eventLoggerCommand, $qqCommand)
+    $reasoningHookCommand = 'pwsh.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{{CODEX_ROOT}}\skills\reasoning-governor\scripts\reasoning-governor.ps1" -Hook'
+    $expectedCommands = @{
+        UserPromptSubmit = @($eventLoggerCommand)
+        Stop = @($eventLoggerCommand, $qqCommand)
+        PreToolUse = @($eventLoggerCommand)
+        PostToolUse = @($eventLoggerCommand)
+        SessionStart = @($reasoningHookCommand)
+    }
     foreach ($eventName in $expectedEvents) {
         $groups = @($document.hooks.$eventName)
         if ($groups.Count -ne 1) {
@@ -622,12 +630,18 @@ function Test-HooksTemplateSource {
         if ($handlers.Count -ne $expectedHandlerCounts[$eventName]) {
             throw "Portable hooks template contains an unexpected handler count for $eventName"
         }
+        if ($eventName -eq "SessionStart" -and [string]$groups[0].matcher -ne "startup|resume|clear|compact") {
+            throw "Portable SessionStart hook must cover startup, resume, clear, and compact"
+        }
         foreach ($handler in $handlers) {
             if ([string]$handler.type -ne "command") {
                 throw "Portable hooks template supports command handlers only"
             }
-            if ($allowedCommands -notcontains [string]$handler.command -or [string]$handler.commandWindows -ne [string]$handler.command) {
+            if ($expectedCommands[$eventName] -notcontains [string]$handler.command -or [string]$handler.commandWindows -ne [string]$handler.command) {
                 throw "Portable hooks template contains an unreviewed command for $eventName"
+            }
+            if ($eventName -eq "SessionStart" -and ([int]$handler.timeout -ne 8 -or [int]$handler.additionalContextLimit -ne 32)) {
+                throw "Portable SessionStart hook must keep its bounded timeout and context limit"
             }
         }
     }

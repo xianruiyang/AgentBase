@@ -5,6 +5,8 @@ param(
 
     [switch] $Status,
 
+    [switch] $Hook,
+
     [string] $ThreadId = $env:CODEX_THREAD_ID,
 
     [string] $HostId,
@@ -18,7 +20,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$nodeScript = Join-Path $scriptDir "reasoning-governor.mjs"
+$nodeScript = Join-Path $scriptDir $(if ($Hook) { "reasoning-session-hook.mjs" } else { "reasoning-governor.mjs" })
 
 if (-not (Test-Path -LiteralPath $nodeScript)) {
     throw "Missing node helper: $nodeScript"
@@ -51,32 +53,39 @@ if (-not $nodeExe) {
     throw "Could not find node.exe."
 }
 
+if ($Hook -and ($Status -or -not [string]::IsNullOrWhiteSpace($Effort))) {
+    throw "Use -Hook by itself."
+}
 if ($Status -and -not [string]::IsNullOrWhiteSpace($Effort)) {
     throw "Use either -Status or -Effort, not both."
 }
-if (-not $Status -and [string]::IsNullOrWhiteSpace($Effort)) {
+if (-not $Hook -and -not $Status -and [string]::IsNullOrWhiteSpace($Effort)) {
     throw "Effort is required unless -Status is used."
 }
 
 $argsList = @($nodeScript)
-if ($Status) {
+if ($Hook) {
+    # The hook helper reads Codex's SessionStart JSON directly from stdin.
+} elseif ($Status) {
     $argsList += "status"
 } else {
     $argsList += @("set", "--effort", $Effort)
 }
 
-if ($ThreadId) {
-    $argsList += @("--thread-id", $ThreadId)
-}
+if (-not $Hook) {
+    if ($ThreadId) {
+        $argsList += @("--thread-id", $ThreadId)
+    }
 
-if ($HostId) {
-    $argsList += @("--host-id", $HostId)
-}
+    if ($HostId) {
+        $argsList += @("--host-id", $HostId)
+    }
 
-$argsList += @("--view", $View.ToLowerInvariant())
+    $argsList += @("--view", $View.ToLowerInvariant())
 
-if ($DebugLog) {
-    $argsList += "--debug"
+    if ($DebugLog) {
+        $argsList += "--debug"
+    }
 }
 
 & $nodeExe @argsList

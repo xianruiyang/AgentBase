@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   createSnapshotFieldScanner,
@@ -13,6 +15,12 @@ import {
   renderModelResult,
   updateReasoningEffort,
 } from "../scripts/reasoning-governor.mjs";
+import {
+  UNKNOWN_CONTEXT,
+  boundCache,
+  decideSessionStartContext,
+  runSessionStartHook,
+} from "../scripts/reasoning-session-hook.mjs";
 
 function encodeFrame(message) {
   const json = JSON.stringify(message);
@@ -355,4 +363,177 @@ test("renders only minimal model evidence while canonical receipts stay complete
     }),
     '{ok:false op:status reason:readback_unavailable detail:"timed out"}',
   );
+});
+
+test("session-start context is sparse and does not treat none as unseen", () => {
+  const decision = decideSessionStartContext({
+    source: "startup",
+    model: "gpt-test",
+    effort: "none",
+    previous: null,
+  });
+  assert.equal(decision.emit, true);
+  assert.equal(decision.context, "reasoning_effort=none; observed, not target/user-lock.");
+  assert.equal(decision.reason, "observed");
+  assert.equal(decision.record.effort, "none");
+  assert.equal(decision.record.model, "gpt-test");
+  assert.equal(typeof decision.record.updatedAtMs, "number");
+});
+
+test("session-start cache keeps only the newest bounded observations", () => {
+  const sessions = {};
+  for (let index = 0; index < 300; index += 1) {
+    sessions[`session-${index}`] = { updatedAtMs: index, effort: "low", model: "gpt-test" };
+  }
+  const bounded = boundCache({ version: 1, sessions });
+  assert.equal(Object.keys(bounded.sessions).length, 256);
+  assert.equal("session-299" in bounded.sessions, true);
+  assert.equal("session-0" in bounded.sessions, false);
+});
+
+test("session-start context only suppresses an unchanged resume", () => {
+  const previous = { effort: "medium", model: "gpt-test", updatedAtMs: 1 };
+  assert.deepEqual(
+    decideSessionStartContext({
+      source: "resume",
+      model: "gpt-test",
+      effort: "medium",
+      previous,
+    }),
+    { emit: false, context: null, record: null, reason: "unchanged_resume" },
+  );
+  assert.equal(
+    decideSessionStartContext({
+      source: "compact",
+      model: "gpt-test",
+      effort: "medium",
+      previous,
+    }).emit,
+    true,
+  );
+  assert.equal(
+    decideSessionStartContext({
+      source: "resume",
+      model: "gpt-new",
+      effort: "medium",
+      previous,
+    }).emit,
+    true,
+  );
+  assert.deepEqual(
+    decideSessionStartContext({
+      source: "resume",
+      model: "gpt-test",
+      effort: null,
+      previous,
+    }),
+    { emit: true, context: UNKNOWN_CONTEXT, record: null, reason: "readback_unavailable" },
+  );
+});
+
+test("session-start hook reads canonical effort and persists bounded resume dedup state", async () => {
+  const cacheRoot = await fs.mkdtemp(path.join(os.tmpdir(), "reasoning-session-hook-"));
+  const cachePath = path.join(cacheRoot, "cache.json");
+  let currentEffort = "high";
+  try {
+    await withFakeIpc(
+      (message, socket) => {
+        if (respondToInitialize(message, socket)) {
+          return;
+        }
+        if (
+          message.type === "broadcast" &&
+          message.method === "thread-stream-following-changed" &&
+          message.params?.following === true
+        ) {
+          sendSnapshot(socket, message.params.conversationId, currentEffort);
+        }
+      },
+      async (pipePath) => {
+        const baseInput = {
+          hook_event_name: "SessionStart",
+          session_id: "thread-hook",
+          model: "gpt-test",
+        };
+        const startup = await runSessionStartHook({
+          input: { ...baseInput, source: "startup" },
+          pipePath,
+          timeoutMs: 2_000,
+          cachePath,
+        });
+        assert.equal(startup.context, "reasoning_effort=high; observed, not target/user-lock.");
+
+        const resume = await runSessionStartHook({
+          input: { ...baseInput, source: "resume" },
+          pipePath,
+          timeoutMs: 2_000,
+          cachePath,
+        });
+        assert.deepEqual(resume, {
+          emit: false,
+          context: null,
+          record: null,
+          reason: "unchanged_resume",
+        });
+
+        currentEffort = null;
+        const unavailable = await runSessionStartHook({
+          input: { ...baseInput, source: "resume" },
+          pipePath,
+          timeoutMs: 2_000,
+          cachePath,
+        });
+        assert.equal(unavailable.context, UNKNOWN_CONTEXT);
+
+        currentEffort = "high";
+        const recoveredResume = await runSessionStartHook({
+          input: { ...baseInput, source: "resume" },
+          pipePath,
+          timeoutMs: 2_000,
+          cachePath,
+        });
+        assert.equal(recoveredResume.emit, false);
+
+        const compact = await runSessionStartHook({
+          input: { ...baseInput, source: "compact" },
+          pipePath,
+          timeoutMs: 2_000,
+          cachePath,
+        });
+        assert.equal(compact.emit, true);
+        assert.equal(compact.context, "reasoning_effort=high; observed, not target/user-lock.");
+        assert.equal((await fs.readFile(cachePath, "utf8")).includes("thread-hook"), false);
+      },
+    );
+  } finally {
+    await fs.rm(cacheRoot, { recursive: true, force: true });
+  }
+});
+
+test("PowerShell hook entry forwards stdin and stays silent for non-SessionStart events", () => {
+  const testDir = path.dirname(fileURLToPath(import.meta.url));
+  const wrapper = path.resolve(testDir, "..", "scripts", "reasoning-governor.ps1");
+  const common = [
+    "-NoLogo",
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    wrapper,
+    "-Hook",
+  ];
+  const ignored = spawnSync("pwsh.exe", common, {
+    input: JSON.stringify({ hook_event_name: "Stop", session_id: "thread-ignored" }),
+    encoding: "utf8",
+  });
+  assert.equal(ignored.status, 0, ignored.stderr);
+  assert.equal(ignored.stdout, "");
+
+  const unknown = spawnSync("pwsh.exe", common, {
+    input: JSON.stringify({ hook_event_name: "SessionStart", source: "startup" }),
+    encoding: "utf8",
+  });
+  assert.equal(unknown.status, 0, unknown.stderr);
+  assert.equal(unknown.stdout.trim(), UNKNOWN_CONTEXT);
 });

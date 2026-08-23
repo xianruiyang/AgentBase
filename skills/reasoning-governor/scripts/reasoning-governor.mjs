@@ -972,6 +972,7 @@ if (isMain) {
 
 export {
   createSnapshotFieldScanner,
+  defaultIpcPath,
   parseArgs,
   readReasoningEffort,
   renderModelResult,

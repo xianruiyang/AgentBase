@@ -402,9 +402,11 @@ Assert-True ($gitIgnoreContent.Contains('development/skill-routing/evidence/*.lo
 
 $governorSkillPath = Join-Path $ProjectRoot "skills\reasoning-governor\SKILL.md"
 $governorScriptPath = Join-Path $ProjectRoot "skills\reasoning-governor\scripts\reasoning-governor.mjs"
+$governorHookScriptPath = Join-Path $ProjectRoot "skills\reasoning-governor\scripts\reasoning-session-hook.mjs"
 $governorPowerShellPath = Join-Path $ProjectRoot "skills\reasoning-governor\scripts\reasoning-governor.ps1"
 $governorSkillContent = Get-Content -LiteralPath $governorSkillPath -Raw -Encoding UTF8
 $governorScriptContent = Get-Content -LiteralPath $governorScriptPath -Raw -Encoding UTF8
+$governorHookScriptContent = Get-Content -LiteralPath $governorHookScriptPath -Raw -Encoding UTF8
 $governorPowerShellContent = Get-Content -LiteralPath $governorPowerShellPath -Raw -Encoding UTF8
 Assert-True ($governorSkillContent.Contains('不使用 `Stop` hook')) "reasoning-governor must keep Stop hooks outside its continuation contract"
 Assert-True ($governorSkillContent.Contains("不把临时基线、用户覆盖或自动恢复义务保存")) "reasoning-governor must not create a second reasoning state source"
@@ -421,7 +423,10 @@ Assert-True ($governorScriptContent.Contains('operation: "set"')) "reasoning-gov
 Assert-True ($governorScriptContent.Contains('createSnapshotFieldScanner')) "reasoning-governor script is missing structural large-frame readback"
 Assert-True ($governorScriptContent.Contains('renderModelResult')) "reasoning-governor script is missing its minimal model receipt projection"
 Assert-True ($governorScriptContent.Contains('args.view === "machine"')) "reasoning-governor script is missing its explicit machine view"
+Assert-True ($governorHookScriptContent.Contains('reasoning_effort=${effort}; observed, not target/user-lock.') -and $governorHookScriptContent.Contains('reasoning_effort=?; do not infer.')) "reasoning-governor SessionStart hook is missing its compact success or unknown projection"
+Assert-True ($governorHookScriptContent.Contains('source === "resume"') -and $governorHookScriptContent.Contains('CACHE_ENTRY_LIMIT = 256')) "reasoning-governor SessionStart hook is missing bounded same-thread resume deduplication"
 Assert-True ($governorPowerShellContent.Contains('[ValidateSet("model", "machine")]')) "reasoning-governor PowerShell entry is missing explicit output views"
+Assert-True ($governorPowerShellContent.Contains('[switch] $Hook') -and $governorPowerShellContent.Contains('reasoning-session-hook.mjs')) "reasoning-governor PowerShell entry is missing the SessionStart hook route"
 
 $subagentSkillRoot = Join-Path $ProjectRoot "skills\subagent-orchestration"
 $subagentSkillContent = Get-Content -LiteralPath (Join-Path $subagentSkillRoot "SKILL.md") -Raw -Encoding UTF8
@@ -721,9 +726,20 @@ Assert-True ($pluginBuilderContent.Contains("official_plugin_validation")) "Plug
 Assert-True (-not ($pluginBuilderContent -match 'Copy-Item\s+-LiteralPath\s+\$sourceSkill[^\r\n]+-Recurse')) "Plugin builder recursively copies unfiltered skill sources"
 $pluginHooksPath = Join-Path $ProjectRoot "development\plugin-packaging\template\agentbase-core\hooks\hooks.json"
 $pluginHooksContent = Get-Content -LiteralPath $pluginHooksPath -Raw -Encoding UTF8
-$null = $pluginHooksContent | ConvertFrom-Json
+$pluginHooks = $pluginHooksContent | ConvertFrom-Json
 Assert-True ($pluginHooksContent.Contains('${PLUGIN_ROOT}\\skills\\codex-event-logger')) "Plugin hooks do not locate event logger through PLUGIN_ROOT"
 Assert-True ($pluginHooksContent.Contains('${PLUGIN_ROOT}\\skills\\codex-qq-hook')) "Plugin hooks do not locate QQ hook through PLUGIN_ROOT"
+$portableHooksPath = Join-Path $ProjectRoot "global\hooks.template.json"
+$portableHooksContent = Get-Content -LiteralPath $portableHooksPath -Raw -Encoding UTF8
+$portableHooks = $portableHooksContent | ConvertFrom-Json
+$portableHookEvents = @($portableHooks.hooks.PSObject.Properties.Name | Sort-Object)
+$pluginHookEvents = @($pluginHooks.hooks.PSObject.Properties.Name | Sort-Object)
+Assert-True (($portableHookEvents -join '|') -eq ($pluginHookEvents -join '|')) "Direct and plugin hook templates expose different lifecycle events"
+$portableReasoningHook = $portableHooks.hooks.SessionStart[0]
+$pluginReasoningHook = $pluginHooks.hooks.SessionStart[0]
+Assert-True ([string]$portableReasoningHook.matcher -eq 'startup|resume|clear|compact' -and [string]$pluginReasoningHook.matcher -eq [string]$portableReasoningHook.matcher) "Direct and plugin reasoning hooks do not share the SessionStart lifecycle"
+Assert-True ([int]$portableReasoningHook.hooks[0].additionalContextLimit -eq 32 -and [int]$pluginReasoningHook.hooks[0].additionalContextLimit -eq 32) "Reasoning SessionStart hooks do not preserve the compact context cap"
+Assert-True ($portableHooksContent.Contains('{{CODEX_ROOT}}\\skills\\reasoning-governor') -and $pluginHooksContent.Contains('${PLUGIN_ROOT}\\skills\\reasoning-governor')) "Reasoning SessionStart hooks do not resolve the skill through their delivery root"
 $marketplacePath = Join-Path $ProjectRoot ".agents\plugins\marketplace.json"
 $marketplace = Get-Content -LiteralPath $marketplacePath -Raw -Encoding UTF8 | ConvertFrom-Json
 Assert-True ([string]$marketplace.name -eq "agentbase-local") "Repo marketplace has the wrong identity"
