@@ -120,4 +120,6 @@ Routing candidate bundle 为 `4EA7F33A284EF18DC593140F96F6BDFB2466DEBE3597C7A295
 | Policy | 117/117 | `84B63772E9F72C0765843E73D4982D84EAA0301A1AB73CD49747DA9B76F7ABEC` |
 | References | 46/46 | `09AF88AD69ED94E5FDEFB91EB4C759F5F697E928152A23CD5D7C7D63FA4D7120` |
 
-最终刷新只运行 References 一次，Routing 与 Policy 通过不可变上一代收据各 carry-forward 一次；刷新后计划为 0 evaluate、3 reuse、0 blocked/pending。形成候选期间的 Policy 反例使小而廉价闭集明确退出 coverage-basis 治理，并删除不改变动作的冗余严格标签；References 反例则区分依赖合同与 authoring 工具、组合决策与失败成本引用。每次重新评估前都改变了相应模型可见定义或引用入口；没有对未变输入原样重采样。当前证据只证明仓库合同、路由、粗粒度策略和条件引用，不证明真实 Codex 已加载第四版或实际项目行为已经改变；本段记录时尚未执行本版本 Publish。
+最终刷新只运行 References 一次，Routing 与 Policy 通过不可变上一代收据各 carry-forward 一次；刷新后计划为 0 evaluate、3 reuse、0 blocked/pending。形成候选期间的 Policy 反例使小而廉价闭集明确退出 coverage-basis 治理，并删除不改变动作的冗余严格标签；References 反例则区分依赖合同与 authoring 工具、组合决策与失败成本引用。每次重新评估前都改变了相应模型可见定义或引用入口；没有对未变输入原样重采样。
+
+实现提交 `ce5de0f` 的独立临时 worktree 运行 46 项基线基础设施检查并返回 `valid:true`，排除了接手时已有 dirty 评测候选；当前组合工作树的 67 项检查也通过，只补充证明两者兼容。用户针对本次操作明确授权后，`DirectCompatibility + InstallPortableSettings` Publish 再次运行 67 项检查并通过，更新 7 个受管对象，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-190448-db62872f`；同范围只读 Status 返回 `published:true`。这些证据证明仓库候选与真实安装一致，不证明当前已启动任务追溯加载第四版，也不替代新任务中对实际纵向执行和组合覆盖行为的观察。
