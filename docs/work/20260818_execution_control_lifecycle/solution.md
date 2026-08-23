@@ -161,3 +161,37 @@
 - 满足: AC-068
 
 `evidence` 和 `experiment` 的代理配置直接要求结论先行、只返回能改变主代理裁决或限定范围的非空原子项、精确定位与恢复入口；`subagent-orchestration` 统一禁止复述 capsule、过程和原始日志。`experiment` 新增连续遮蔽问题触发：在临时 worktree、临时副本或主代理明确指定且有恢复依据的精确范围，可以迭代修改代码、配置或测试并运行最小探针，直到路径、关键反例、后继约束或停止边界已足以裁决。该场景同时由 `execution-governor` 裁决遮蔽与验证成本，由 `subagent-orchestration` 承担委派交接；补丁仅为待审实验资产，主代理必须复核职责、契约和 dirty 边界，选择重写、修订接入或拒绝并承担正式验证。路由合同以普通候选路径、连续遮蔽实现链和相近非触发场景覆盖该边界，不复制当前模型名或档位。
+
+## SOL-021 在既定设计内深度优先完成首个正式可用结果
+
+- 状态: confirmed
+- 解决: GAP-018
+- 满足: AC-036, AC-066
+
+`execution-governor` 把纵向路径定义为已确认设计、owner、契约和依赖内的执行顺序：先选择一个用户可观察的正式可用结果，深度优先完成其跨层所需的生产实现、真实消费者与有效 oracle。首个结果不重新设计系统，也不形成平级任务必须继承的新架构；设计仍由原 owner 持有，真实反例才触发上游重裁。收缩的是同时展开的结果数量和证据成本，不是正式实现；一次性 mock、绕行或硬编码不能冒充闭环，也不要求为未知未来预建抽象。
+
+首个切片成立前，只有该结果直接需要的实现、fixture、示例和测试属于纵向工作，其余平级组件与组合均是横向扩量。Delivery 与 Task 合同继续只保存原设计中的真实依赖；共享未证前提确实产生消费关系时才形成 hard dependency，单纯深度优先选择只进入既有当前消费者与下一动作检查点。
+
+## SOL-022 用 coverage basis 形成可组合覆盖证明
+
+- 状态: confirmed
+- 解决: GAP-019
+- 满足: AC-075, AC-066
+
+`decision-frontier.md` 在组合扩量前要求一份当前动作内的紧凑 coverage basis：claim、真正改变机制/oracle/生命周期/边界的 dimensions、可复核 equivalence、真实 interactions、每个代表 case 的新增判别信息，以及 promotion 与剩余未知。覆盖由组件契约、接口接缝、真实消费者、交互代表和缺陷回归按各自证据边界组合；同名接口或代码路径不能单独证明等价，pairwise 不外推高阶交互，参数化不改变证据或成本，只有明确逐组合认证、小而廉价的闭集或无充分等价证据的高后果交互才穷举。
+
+## SOL-023 用现有验证字段持久化组合裁决
+
+- 状态: confirmed
+- 解决: GAP-019
+- 满足: AC-075
+
+组合选择需要跨轮或多人消费时，Delivery Workflow 与 Task Table Manager 只在现有 `verification` 中紧凑保存 coverage basis，在 `validation_dimensions` 中列真正可能改变机制或 oracle 的维度，在 result `validation_coverage` 中列直接覆盖或具有可复核依据的等价类。现有 state 的 `active_consumer`、`validation_case`、`validated_coverage`、`uncovered_dimensions` 与 `next_action` 继续承担执行前沿；不新增 schema 字段、矩阵文件、CLI 语义裁判或固定 case 上限。
+
+## SOL-024 用组合爆炸、反向高阶与小闭集场景验证触发边界
+
+- 状态: confirmed
+- 解决: GAP-018, GAP-019
+- 满足: AC-036, AC-066, AC-075
+
+`execution-governor` description 在测试代码开始生成前即可发现多类型组合扩量；路由合同新增真实组合停滞场景，要求同时选择纵向闭环、维度边界和必要引用。另以共享高阶状态证明不能机械降为 pairwise，并以低成本 2×2 明确闭集证明普通穷举仍走局部快速路径。行为标签只检查策略边界，不以关键词、固定测试数或模型输出格式代替真实执行行为。

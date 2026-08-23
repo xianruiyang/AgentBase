@@ -1,4 +1,4 @@
 interface:
   display_name: "Execution Governor"
-  short_description: "控制证据前沿、验证维度、纵向消费者、反例熔断与扩量成本"
-  default_prompt: "使用 $execution-governor 确定当前证据前沿与最小判别维度，先闭合真实消费者路径；反例出现时熔断下游、写回失效范围，再决定继续、扩量或重裁。"
+  short_description: "控制正式纵向切片、组合覆盖、证据前沿、反例熔断与扩量成本"
+  default_prompt: "使用 $execution-governor 确定当前证据前沿与组合覆盖依据，在已确认设计内先深度优先闭合一个正式可用结果切片；把平级实现、fixture 和测试编写视为扩量，且不让首个结果演化或替代设计，反例出现时熔断下游并写回后再裁决。"

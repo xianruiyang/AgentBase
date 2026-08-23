@@ -100,3 +100,24 @@ References 最终 candidate bundle 为 `BBDC80FA6E84CF1EE599A72715778B582FDA18E2
 Routing candidate bundle 为 `4EA7F33A284EF18DC593140F96F6BDFB2466DEBE3597C7A295299386D0190949`，References candidate bundle 为 `3D2831DAA360F7B288C38FB041ABF1FD052AD07658E163C93E6523C0D5FFF0ED`。验证中每次模型失败都先区分规则/引用边界、oracle 与恢复基础设施，再改变对应输入或 oracle；没有对未变输入原样重采样。最后一份 References 输出只包含一个合理的可选引用差异，移除不成立的严格排他后由同一文件、capsule、evaluator 和失败收据以 0 Token 复核；最终刷新为 evaluator run 0、recovered 2、oracle revalidated 1。
 
 用户随后针对本次操作明确授权发布。`DirectCompatibility + InstallPortableSettings` Publish 再次运行 67 项基础设施测试并通过，写入 20 个受管资产，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-150728-c301230b`；同范围只读 Status 返回 `published:true`。这些证据证明仓库候选和真实安装一致，不证明当前已启动任务追溯加载新规则；子代理选择、局部快速路径、状态写回和 preflight 的真实模型行为仍须在新任务中观察。
+
+## 2026-08-23 第四版发布前验证
+
+真实多组件工作再次暴露：已有“不机械展开笛卡尔积”规则主要约束验证选择，模型仍会在首个可用结果成立前逐组合编写实现、fixture、示例和测试。用户进一步校准，纵向开发不是从首条路线演化设计，而是在上游设计、owner、契约与依赖均已完成后，深度优先制作其中一个正式可用结果并以真实消费者验证；缩小的是同时展开的结果数量与证据成本，不是生产实现。第四版据此新增 AC-075，并在原执行 owner 内形成可组合 coverage basis，没有新增设计 owner、任务字段、矩阵文件、CLI 门禁或固定 case 上限。
+
+发布前集中验证结果：
+
+- `quick_validate.py`：`execution-governor`、`delivery-workflow` 与 `task-table-manager` 全部通过；三个主 skill 都保持 8,192-byte 上限内。
+- `validate_contract.ps1`：117 cases、76 strict routing、23 strict references、13/13 skills 具有正向与非触发覆盖。新增场景覆盖 60-tuple 测试编写停滞、高阶三元交互和低成本 2×2 闭集快速路径。
+- `test_routing_infrastructure.ps1`：6 suites、22 个 PowerShell syntax files、0 模型调用、20.962 秒。
+- `manage_agentbase.ps1 -Action Validate`：67 项 Windows SWE 基础设施测试通过并返回 `valid:true`；evaluator、外部 clone、qualification、候选模型和 elevated sandbox 均未启动。
+
+最终 detached evidence generation 为 `E9A8578617B9FDCED63E0B6B4BDD72220B9717F999BE6DFE4C0293B95FAD25D3`：
+
+| 阶段 | 结果 | Capsule SHA-256 |
+| --- | --- | --- |
+| Routing | 117/117 | `E6232C0BD4909DC9FAE6F876ED2C2F23A20E0D40934FAB95925B751B8B1257AD` |
+| Policy | 117/117 | `84B63772E9F72C0765843E73D4982D84EAA0301A1AB73CD49747DA9B76F7ABEC` |
+| References | 46/46 | `09AF88AD69ED94E5FDEFB91EB4C759F5F697E928152A23CD5D7C7D63FA4D7120` |
+
+最终刷新只运行 References 一次，Routing 与 Policy 通过不可变上一代收据各 carry-forward 一次；刷新后计划为 0 evaluate、3 reuse、0 blocked/pending。形成候选期间的 Policy 反例使小而廉价闭集明确退出 coverage-basis 治理，并删除不改变动作的冗余严格标签；References 反例则区分依赖合同与 authoring 工具、组合决策与失败成本引用。每次重新评估前都改变了相应模型可见定义或引用入口；没有对未变输入原样重采样。当前证据只证明仓库合同、路由、粗粒度策略和条件引用，不证明真实 Codex 已加载第四版或实际项目行为已经改变；本段记录时尚未执行本版本 Publish。

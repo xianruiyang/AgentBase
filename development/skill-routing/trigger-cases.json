@@ -80,13 +80,13 @@
     "collaborative_requirement_insight": "不把用户措辞、术语、原因判断或实现建议直接当成目标；从实际场景和期望的可观察结果重组候选意图，区分待验证事实与候选方案，说明依据和不确定性后与用户校准。",
     "quality_token_speed_order": "先选择需求对齐、正确、安全、可维护且有完成证据的方案；质量同等充分时降低 Token，前两者不变差时再提速。",
     "local_task_fast_path": "当前有界动作的 owner、契约和验收明确，没有支配多个动作的共享未知且不改变长期职责时，直接读取、修改、局部验证并停止，不进入完整需求、架构或治理审计。",
-    "vertical_validation_closure": "多个后续动作共享尚未验证或刚被反例推翻的前提时，先以真实消费者最小路径验证；成立前不扩展平级范围，反例出现后停止下游并返回所属层重裁。它可与 evidence_checkpoint_before_continue 或 impact_closure 同时适用。",
+    "vertical_validation_closure": "多个后续动作共享尚未验证或刚被反例推翻的前提时，先熔断依赖它的平级扩量；该边界在扩量前 preflight 与反例写回时同样适用。上游设计与职责已确认后，在既定设计内深度优先完成一个正式可用结果切片和真实消费者；收缩的是同时展开的结果数量与证据成本，不是正式实现。成立前只实现或编写该结果直接需要的 fixture、示例与测试；首个结果不重新设计系统，反例则返回所属层重裁。它可与 evidence_checkpoint_before_continue 或 impact_closure 同时适用。",
     "observable_behavior_accountability": "适用规则、skill 或工具已正确提供但模型仍产生可预防错误时，把可观察行为作为系统失败证据，定位规则、路由、动作入口、反馈、状态回流或验证缺口；不以正文存在免责，也不按表象堆规则。",
     "rule_execution_failure_localization": "受支持场景出现可预防错误时，按直接 trace 区分规则/能力缺失、skill/引用/入口未触发、规则已读但动作未遵守、动作合规但状态未写回；只修正已证明的最早失效 owner，未到达层保持未知。",
     "expensive_action_preflight": "昂贵动作第一次完整运行前按适用项一次确认待证判断与反证、输入/schema/fixture、路径权限依赖、runner 生命周期、oracle 产品到达性和重复运行变化依据，并返回 ready 或直接阻塞、遮蔽范围与恢复动作；领域 runner 持有具体实现。",
     "stable_candidate_validation": "同一候选内容、目标或验收仍在形成且用户未要求提前验证时，不启动完整回归、独立模型评测或部署校验；候选稳定并准备发布后再按最终影响范围集中验证，开发期只保留能立即改变实现的低成本局部检查。",
     "evidence_checkpoint_before_continue": "反例改变失效范围、当前消费者或下一动作时，先停止依赖工作并把反例、失效来源、当前验证 case 和下一动作写回已有 owner，再重新裁决和继续。",
-    "dimension_bounded_validation": "同一声明可能随载体、模式、状态、版本或持久化边界变化时，先识别维度与等价依据，选择最小判别组合，并把验证结论限制在实际覆盖的组合或已证等价类。",
+    "dimension_bounded_validation": "本标签不适用于 owner、契约、oracle 均明确、无共享未知且可低成本穷举的小闭集；此类直接走局部快速路径，不建立 coverage basis。其他声明随多种组件、载体、模式、状态、版本或持久化边界变化，且存在实质组合扩量或共享未知时，在批量实现或测试编写前形成 claim、有效 dimensions、equivalence、interactions、代表 cases 与 promotion 组成的 coverage basis；每个 case 必须新增判别信息，pairwise 不外推高阶交互，穷举只用于明确逐组合认证或无充分等价证据的高后果交互，结论限制在实际覆盖或有可复核依据的等价类。",
     "tool_defect_reproduction": "声称当前工具缺少能力或存在缺陷前，核对实际身份与对应帮助并重放原输入，区分输入错误、范围重叠、正常协议、预期降级、截断和产品故障。",
     "model_interaction_surface": "当前请求要求设计、选择或改变模型直接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面最小充分且可局部修改，机器面保持稳定完整，生成物不作为语义修改入口。",
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
@@ -147,6 +147,9 @@
     "vertical-validation-closure-selection",
     "counterexample-checkpoint-before-continue",
     "dimension-bounded-validation-plan",
+    "combinatorial-test-authoring-before-closure",
+    "higher-order-interaction-coverage",
+    "small-closed-exhaustive-local",
     "observable-model-error-review",
     "rule-execution-layer-localization",
     "expensive-action-preflight-plan",
@@ -197,6 +200,8 @@
     "source-query-capability-diagnosis",
     "counterexample-checkpoint-before-continue",
     "dimension-bounded-validation-plan",
+    "combinatorial-test-authoring-before-closure",
+    "higher-order-interaction-coverage",
     "rule-execution-layer-localization",
     "expensive-action-preflight-plan",
     "fragile-command-runner-escalation",
@@ -560,8 +565,7 @@
         "modify_authorized_scope",
         "fact_first",
         "impact_closure",
-        "protected_user_baseline",
-        "final_user_scope_only"
+        "protected_user_baseline"
       ],
       "forbidden_behavior_tags": []
     },
@@ -1198,6 +1202,74 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "combinatorial-test-authoring-before-closure",
+      "kind": "behavior",
+      "request": "一个事务的设计、owner、公开契约和依赖已经确认，由 5 种载体、4 种模式和 3 种持久化策略组成；目前还没有任何一个最终可用结果跑通，我已经开始按 60 个 tuple 逐个建立 fixture 和测试，进度停滞。请继续当前实现并决定下一步的实现与测试顺序；不要重新设计系统，最终覆盖要求仍保留。",
+      "expected_skills": [
+        "execution-governor"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_execution_governor_references": [
+        "decision-frontier.md",
+        "failure-and-cost.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "vertical_validation_closure",
+        "dimension_bounded_validation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "higher-order-interaction-coverage",
+      "kind": "behavior",
+      "request": "现有设计中的 carrier、mode 和 persistence 分别都已通过组件契约，但三者在同一个事务缓存与提交 oracle 中共同交互，历史反例只在特定三元组合出现。请只裁决永久测试应如何覆盖这个交互及结论边界，不修改文件、不运行测试，也不要机械套用 pairwise 或展开所有无关维度。",
+      "expected_skills": [
+        "execution-governor"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_execution_governor_references": [
+        "decision-frontier.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "dimension_bounded_validation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "small-closed-exhaustive-local",
+      "kind": "boundary",
+      "request": "现有纯函数的 owner、契约和 oracle 都已明确，需求明确要求覆盖两个布尔输入的完整 2×2 真值表，四个 case 都低于 1ms 且没有共享未知。请直接补齐参数化测试并运行这四个 case。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "execution-governor",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "local_task_fast_path"
+      ],
+      "forbidden_behavior_tags": [
+        "dimension_bounded_validation"
+      ]
+    },
+    {
       "id": "protected-baseline-change-discovered",
       "kind": "behavior",
       "request": "执行现有任务表中的长期交付计划时发现，若改变一条已由我确认的设计会更容易实现。不要改它；继续完成任务表中其他不依赖该改变的内容，最后再把必要性和影响交给我讨论。",
@@ -1262,7 +1334,6 @@
         "verification-and-gates.md"
       ],
       "expected_behavior_tags": [
-        "fact_first",
         "reasoning_effort_economy"
       ],
       "forbidden_behavior_tags": []
@@ -1280,7 +1351,7 @@
       ],
       "expected_change_governance_references": [],
       "expected_behavior_tags": [
-        "modify_authorized_scope",
+        "local_task_fast_path",
         "reasoning_effort_economy"
       ],
       "forbidden_behavior_tags": []
