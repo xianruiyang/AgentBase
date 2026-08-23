@@ -255,12 +255,12 @@ $descriptionBoundaryFragments = @{
     "codex-qq-hook" = "未发送原因尚未确认的链路排查必须同时选择 change-governance"
     "cpp-engineering-rules" = "仅正文提及 C++ 不触发"
     "delivery-workflow" = "不用于规格完整的单轮实现"
-    "execution-governor" = "不用于稳定前提下的普通单步或多步实现"
+    "execution-governor" = "不用于稳定前提下的普通实现"
     "powershell-usage" = "不用于单条精确只读"
     "reasoning-governor" = "用户已经固定并确认设置、当前只要求保持该档位继续任务时不使用"
     "subagent-orchestration" = "不用于只讨论多代理设计"
     "symbol-structure-workflow" = "不用于只读文本"
-    "task-table-manager" = "交付执行证据要求更新既有任务合同、依赖、状态或结果"
+    "task-table-manager" = "受保护上游变化要求重投影既有任务表的合同、可继续范围、依赖、状态或结果"
     "understand-space" = "正文偶有空间词不触发"
 }
 
@@ -428,13 +428,20 @@ $subagentSkillContent = Get-Content -LiteralPath (Join-Path $subagentSkillRoot "
 $subagentEvidenceContent = Get-Content -LiteralPath (Join-Path $subagentSkillRoot "references\evidence-packet.md") -Raw -Encoding UTF8
 $subagentExperimentContent = Get-Content -LiteralPath (Join-Path $subagentSkillRoot "references\experiment-lifecycle.md") -Raw -Encoding UTF8
 $subagentCoordinationContent = Get-Content -LiteralPath (Join-Path $subagentSkillRoot "references\coordination.md") -Raw -Encoding UTF8
+$evidenceAgentContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "global\agents\evidence.toml") -Raw -Encoding UTF8
+$experimentAgentContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "global\agents\experiment.toml") -Raw -Encoding UTF8
 Assert-True ($subagentSkillContent.Contains('具体模型与推理档位只由 Codex 自定义代理配置维护')) "subagent-orchestration duplicates model selection outside agent config"
-Assert-True ($subagentSkillContent.Contains('主代理先逐项接纳 evidence ID') -and $subagentSkillContent.Contains('主代理从实验结果重新形成可维护方案并自行实现')) "subagent-orchestration is missing the evidence-to-implementation handoff"
+Assert-True ($subagentSkillContent.Contains('主代理先逐项接纳 evidence ID') -and $subagentSkillContent.Contains('选择重写、修订后接入或拒绝')) "subagent-orchestration is missing the evidence-to-production adjudication handoff"
 Assert-True ($subagentSkillContent.Contains('用户未指定时') -and $subagentSkillContent.Contains('默认使用对应角色') -and $subagentSkillContent.Contains('不是绝对创建义务')) "subagent-orchestration is missing the defeasible default delegation contract"
-Assert-True ($subagentEvidenceContent.Contains('覆盖树') -and $subagentEvidenceContent.Contains('否定检查、查询范围与截断状态') -and $subagentEvidenceContent.Contains('accepted: F01')) "subagent evidence packet is missing bounded acceptance fields"
-Assert-True ($subagentExperimentContent.Contains('最小判别实验') -and $subagentExperimentContent.Contains('不得修改生产真源、提交、推送、发布')) "subagent experiment lifecycle is missing isolation or external-write boundaries"
+Assert-True ($subagentEvidenceContent.Contains('只输出非空节点') -and $subagentEvidenceContent.Contains('否定检查') -and $subagentEvidenceContent.Contains('accepted: F01')) "subagent evidence packet is missing sparse bounded acceptance fields"
+Assert-True ($subagentExperimentContent.Contains('串行试错') -and $subagentExperimentContent.Contains('可回滚范围') -and $subagentExperimentContent.Contains('选择重写、修订后接入或拒绝')) "subagent experiment lifecycle is missing masked-failure exploration or production adjudication"
+Assert-True ($subagentExperimentContent.Contains('不得提交、推送、发布') -and $subagentExperimentContent.Contains('不得覆盖或回退无关 dirty 内容')) "subagent experiment lifecycle is missing isolation or external-write boundaries"
 Assert-True ($subagentCoordinationContent.Contains('用户明确不使用子代理时不进入委派') -and $subagentCoordinationContent.Contains('用户未指定时') -and $subagentCoordinationContent.Contains('默认委派')) "subagent coordination is missing explicit user control or default delegation"
 Assert-True ($subagentCoordinationContent.Contains('并发净收益成立时才优先并行') -and $subagentCoordinationContent.Contains('子代理不得再生成后代代理') -and $subagentCoordinationContent.Contains('主代理逐项接纳')) "subagent coordination is missing bounded topology, acceptance, or parallelism"
+Assert-True ($subagentCoordinationContent.Contains('返回也使用最小决策包') -and $subagentCoordinationContent.Contains('不复述请求、过程、工具噪声、原始日志')) "subagent coordination is missing its compact handoff contract"
+Assert-True ($evidenceAgentContent.Contains('只输出非空且能改变决策或限定结论的字段') -and $evidenceAgentContent.Contains('不复述派发内容、过程或完整历史')) "evidence agent config is missing its compact evidence handoff"
+Assert-True ($experimentAgentContent.Contains('指定隔离面实际修改代码、配置或测试') -and $experimentAgentContent.Contains('逐点修改后做昂贵验证将形成串行试错')) "experiment agent config is missing reversible code exploration for masked failures"
+Assert-True ($experimentAgentContent.Contains('实验补丁是待审证据') -and $experimentAgentContent.Contains('选择重写、修订后接入或拒绝')) "experiment agent config is missing primary-agent production adjudication"
 
 $executionGovernorSkillPath = Join-Path $ProjectRoot "skills\execution-governor\SKILL.md"
 $executionGovernorReferenceRoot = Join-Path $ProjectRoot "skills\execution-governor\references"
@@ -450,6 +457,9 @@ Assert-True ($executionGovernorDecisionContent.Contains("验证维度与结论�
 Assert-True ($executionGovernorFailureContent.Contains("下游保持未知") -and $executionGovernorFailureContent.Contains("基础设施失败不得转换成产品零分")) "execution-governor is missing its failure-masking boundary"
 Assert-True ($executionGovernorFailureContent.Contains("输入、机制和环境未变时不重跑")) "execution-governor is missing its retry stopping condition"
 Assert-True ($executionGovernorFailureContent.Contains("领域正式 runner") -and $executionGovernorFailureContent.Contains('`$change-governance`')) "execution-governor is missing fragile-command runner escalation"
+Assert-True ($executionGovernorFailureContent.Contains("昂贵动作 preflight") -and $executionGovernorFailureContent.Contains('`ready`') -and $executionGovernorFailureContent.Contains('`blocked`') -and $executionGovernorFailureContent.Contains("oracle 的对象、环境和失败语义是否到达待证产品机制")) "execution-governor is missing the expensive-action preflight contract"
+Assert-True ($executionGovernorSkillContent.Contains("人工调用脆弱且需先熔断重试再裁决领域 runner")) "execution-governor does not expose fragile-runner failure control at routing time"
+Assert-True ($executionGovernorSkillContent.Contains("用户已明确延后完整验证且当前只继续该实现")) "execution-governor is missing the stable-candidate deferral non-trigger"
 
 $taskTableSkillPath = Join-Path $ProjectRoot "skills\task-table-manager\SKILL.md"
 $taskTableSkillContent = Get-Content -LiteralPath $taskTableSkillPath -Raw -Encoding UTF8
@@ -472,14 +482,18 @@ Assert-True ($taskTableSkillContent.Contains('`$reasoning-governor`')) "task-tab
 $taskTableScriptPath = Join-Path $ProjectRoot "skills\task-table-manager\scripts\taskctl.py"
 $taskTableScriptContent = Get-Content -LiteralPath $taskTableScriptPath -Raw -Encoding UTF8
 Assert-True ($taskTableSkillContent.Contains('任务表文档是执行投影，不是计划正确性的裁判')) "task-table-manager does not declare its assistive responsibility"
+Assert-True ($taskTableSkillContent.Contains('受保护上游变化要求重投影既有任务表的合同、可继续范围、依赖、状态或结果')) "task-table-manager is missing protected-upstream task reprojection routing"
 Assert-True ($taskTableSkillContent.Contains('最终完成标准只来自 `$delivery-workflow` 当前执行周期经用户确认的需求与用户设计')) "task-table-manager does not delegate final completion to the user-confirmed document scope"
 Assert-True ($taskTableSkillContent.Contains('`taskctl` 只辅助存储、索引、查询、上下文压缩和可重建视图')) "task-table-manager does not keep taskctl assistive"
 Assert-True ($taskTableSkillContent.Contains('把证据交给 `$execution-governor` 裁决')) "task-table-manager must delegate the live evidence frontier"
-Assert-True ($taskTableSkillContent.Contains("前沿、消费者、验证 case、证据、失效来源或下一动作改变时")) "task-table-manager must checkpoint execution evidence before dependent work"
+Assert-True ($taskTableSkillContent.Contains("前沿、消费者、验证 case") -and $taskTableSkillContent.Contains("已证覆盖、未覆盖维度") -and $taskTableSkillContent.Contains("失效来源或下一动作改变时")) "task-table-manager must checkpoint execution evidence before dependent work"
 Assert-True ($taskTableContractContent.Contains('证明任务和首个真实消费者产生的可复核证据是后续横向任务的真实消费输入')) "task-table-manager is missing the persisted prerequisite-consumer dependency"
 Assert-True ($taskTableContractContent.Contains('`validation_dimensions`') -and $taskTableContractContent.Contains('`validation_coverage`')) "task-table-manager is missing validation dimension and coverage contracts"
 Assert-True ($taskTableExecutionToolingContent.Contains('`evidence_frontier`') -and $taskTableExecutionToolingContent.Contains('`active_consumer`') -and $taskTableExecutionToolingContent.Contains('`invalidated_source_ids`')) "taskctl note is missing the execution checkpoint contract"
+Assert-True ($taskTableExecutionToolingContent.Contains('`validated_coverage`') -and $taskTableExecutionToolingContent.Contains('`uncovered_dimensions`')) "taskctl note is missing interim validation coverage boundaries"
 Assert-True ($taskTableScriptContent.Contains('select_related_deferred_changes') -and $taskTableScriptContent.Contains('clear_execution_checkpoint')) "taskctl is missing related DCR context or checkpoint clearing"
+Assert-True ($taskTableScriptContent.Contains('active_execution_frontiers') -and $taskTableQueryToolingContent.Contains('`active_frontiers`')) "taskctl is missing its current execution-frontier projection"
+Assert-True ($taskTableScriptContent.Contains('result_history_state_write_drift') -and $taskTableQueryToolingContent.Contains('`result_history_state_write_drift`') -and $taskTableQueryToolingContent.Contains('`state_writeback_drift_count`')) "taskctl is missing recoverable result/state writeback drift diagnostics"
 Assert-True ($taskTableScriptContent.Contains('command_completion_context')) "taskctl is missing its bounded final-review context"
 Assert-True ($taskTableScriptContent.Contains('task_model_projection')) "taskctl is missing its model projection owner"
 Assert-True ($taskTableScriptContent.Contains('choices=("model", "machine")')) "taskctl is missing explicit model/machine views"
@@ -488,7 +502,9 @@ Assert-True ($taskTableScriptContent.Contains('compact_model')) "taskctl is miss
 Assert-True ($taskTableToolingContent.Contains('`--view model` 是默认值') -and $taskTableToolingContent.Contains('`--view machine` 面向程序')) "taskctl tooling does not define consumer output surfaces"
 Assert-True ($taskTableToolingContent.Contains('紧凑 HJSON 风格文本')) "taskctl tooling does not define the measured model representation"
 Assert-True ($taskTableSkillContent.Contains('再只增加当前命令族的一项')) "task-table-manager does not progressively select one CLI command family"
-Assert-True ($taskTableSkillContent.Contains('只读查询或只判断下一项工作且不领取、恢复、执行时不读取它')) "task-table-manager does not exclude execution.md from read-only next-work selection"
+Assert-True ($taskTableSkillContent.Contains('纯只读查询或下一项判断不读')) "task-table-manager does not exclude execution.md from read-only next-work selection"
+Assert-True ($taskTableSkillContent.Contains('只设计任务语义或尚未决定调用 CLI 时不预读工具引用')) "task-table-manager preloads CLI references before the command path is selected"
+Assert-True ($taskTableSkillContent.Contains('明确回写任务状态、证据前沿或 `next_action` 即选择状态命令')) "task-table-manager does not map execution-checkpoint writeback to the status-command reference family"
 Assert-True ($taskTableToolingContent.Contains('不要为发现命令而预读其他族')) "taskctl common tooling does not prohibit command-family preloading"
 Assert-True ($taskTableSkillContent.Contains('authoring-tooling.md') -and $taskTableSkillContent.Contains('query-tooling.md') -and $taskTableSkillContent.Contains('execution-tooling.md') -and $taskTableSkillContent.Contains('completion-tooling.md')) "task-table-manager main entry does not route every CLI command family"
 Assert-True ($taskTableSkillContent.Contains('任务合同、状态和结果是程序消费且由模型作出语义决定的结构化真源')) "task-table-manager does not declare its model-maintained structured source"
@@ -542,6 +558,8 @@ $deliveryTargetContractContent = Get-Content -LiteralPath $deliveryTargetContrac
 $deliveryPlanningContractContent = Get-Content -LiteralPath $deliveryPlanningContractPath -Raw -Encoding UTF8
 $deliveryExecutionContractContent = Get-Content -LiteralPath $deliveryExecutionContractPath -Raw -Encoding UTF8
 $deliveryIterationContent = Get-Content -LiteralPath $deliveryIterationPath -Raw -Encoding UTF8
+Assert-True ($deliverySkillContent.Contains('既有长期任务表须随上游变化重投影时同时使用 task-table-manager')) "delivery-workflow does not expose protected-upstream task reprojection as a combined route"
+Assert-True ($deliverySkillContent.Contains('将已确认方案投影为任务设计')) "delivery-workflow does not expose solution-to-task semantic projection at routing time"
 Assert-True ($deliverySkillContent.Contains('requirements.md') -and $deliverySkillContent.Contains('user-design.md')) "delivery-workflow does not separate protected user sources"
 Assert-True ($deliverySkillContent.Contains('模型设计、分析、方案、任务状态、快照、索引、结构检查和各阶段审核都只是中间结果')) "delivery-workflow does not limit intermediate reviews"
 Assert-True ($deliverySkillContent.Contains('Markdown 阶段文档是语义真源')) "delivery-workflow does not keep documents authoritative"
@@ -720,12 +738,18 @@ $responsibilityDesignPath = Join-Path $ProjectRoot "development\responsibility-l
 Assert-True (Test-Path -LiteralPath $responsibilityDesignPath -PathType Leaf) "Responsibility lifecycle design analysis is missing"
 Assert-True ($projectAgentsContent.Length -gt 0 -and $readmeContent.Contains("development/responsibility-lifecycle.md")) "README does not index the responsibility lifecycle design analysis"
 $changeSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\change-governance\SKILL.md") -Raw -Encoding UTF8
+$changeCausalContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\change-governance\references\causal-analysis.md") -Raw -Encoding UTF8
 Assert-True ($changeSkillContent.Contains("多个入口或第二状态源的方案裁决")) "change-governance does not expose its multi-entry decision trigger"
 Assert-True ($changeSkillContent.Contains("临时路径风险评审")) "change-governance does not expose its temporary-path review trigger"
+Assert-True ($changeSkillContent.Contains("缺失领域正式 runner 的 owner/入口")) "change-governance does not expose missing domain-runner ownership"
+Assert-True ($changeSkillContent.Contains('只定位现有规则、路由、动作或写回中的修复层仍归 causal') -and $changeSkillContent.Contains('仅把已有反例作为原因证据且不设计验证或门禁时仍归 causal')) "change-governance does not keep causal localization separate from lifecycle and verification references"
+Assert-True ($changeCausalContent.Contains('`definition_missing`') -and $changeCausalContent.Contains('`route_or_reference_missing`') -and $changeCausalContent.Contains('`action_noncompliant`') -and $changeCausalContent.Contains('`state_writeback_missing`')) "change-governance is missing four-layer rule-execution failure localization"
 $qqSkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\codex-qq-hook\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($qqSkillContent.Contains('同时使用 `$change-governance`')) "codex-qq-hook troubleshooting does not route unknown causes through change-governance"
 Assert-True ($globalContent.Contains("实际场景、期望改变的可观察结果")) "Global kernel is missing scenario-based intent reconstruction"
 Assert-True ($globalContent.Contains("质量同等充分时再以较低上下文与 Token 成本为优，均不变差再提速")) "Global kernel is missing the quality-token-speed priority"
+Assert-True ($globalContent.Contains("owner、契约、验收明确，无共享未知且不改职责时，直接读改验收并停止")) "Global kernel is missing the bounded local-task fast path"
+Assert-True ($globalContent.Contains("用户补充时不做完整/昂贵验证或独立评测")) "validation timing is not bound to a stable release candidate"
 $deliverySkillContent = Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\delivery-workflow\SKILL.md") -Raw -Encoding UTF8
 Assert-True ($deliverySkillContent.Contains("区分结果、事实陈述、原因猜测与实现建议")) "delivery-workflow is missing intent reconstruction boundaries"
 Assert-True ((Get-Content -LiteralPath (Join-Path $ProjectRoot "skills\delivery-workflow\references\target-contracts.md") -Raw -Encoding UTF8).Contains('期望结果进入 `REQ`，待核实的现状或原因保持为证据问题')) "delivery-workflow target contract is missing intent-to-artifact projection"
@@ -761,6 +785,9 @@ $requiredCases = @(
     "mechanical-document-edit"
     "collaborative-requirement-insight"
     "quality-token-speed-priority"
+    "rule-execution-layer-localization"
+    "expensive-action-preflight-plan"
+    "stable-candidate-validation-boundary"
     "architecture-discovery-before-implementation"
     "architecture-risk-discovered-during-implementation"
     "implicit-architecture-integration"
@@ -810,6 +837,7 @@ $requiredCases = @(
     "reasoning-short-tail-no-transition"
     "subagent-static-evidence-map"
     "subagent-path-experiment"
+    "subagent-serial-masked-implementation-experiment"
     "subagent-discussion-only"
     "subagent-implicit-evidence-benefit"
     "subagent-implicit-experiment-benefit"

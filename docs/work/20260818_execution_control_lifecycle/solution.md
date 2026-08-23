@@ -80,7 +80,7 @@
 - 解决: GAP-008
 - 满足: AC-036, AC-066
 
-任务合同可选保存 `validation_dimensions`，state 可选保存 `evidence_frontier`、`active_consumer`、`validation_case`、`latest_evidence` 与 `invalidated_source_ids`，结果以 `validation_coverage` 只声明直接覆盖的值或已证等价类。`taskctl note` 以既有 state CAS 原子更新或清空检查点；`context` 从同一任务、来源索引和交付文档投影检查点、上游与显式关联 DCR，不建立 resume 文件或第二状态源。反例改变范围或下一动作时先写回，再继续依赖工作。
+任务合同可选保存 `validation_dimensions`，state 可选保存 `evidence_frontier`、`active_consumer`、`validation_case`、当前 `validated_coverage`、`uncovered_dimensions`、`latest_evidence` 与 `invalidated_source_ids`，结果以 `validation_coverage` 只声明最终直接覆盖的值或已证等价类。`taskctl note` 以既有 state CAS 原子更新或清空检查点；`context` 从同一任务、来源索引和交付文档投影检查点、上游与显式关联 DCR，不建立 resume 文件或第二状态源。反例改变范围、覆盖边界或下一动作时先写回，再继续依赖工作。
 
 ## SOL-011 用最小判别维度约束验证结论
 
@@ -104,4 +104,60 @@
 - 解决: GAP-010
 - 满足: AC-066
 
-路由账本新增 `oracle_revalidation` 来源：只接受当前 oracle 已通过、可见输入/capsule/evaluator 与一份 `oracle_violation` 失败收据精确相同、文件哈希未变的 stage；追加的 passed 收据引用原失败收据和同代 cycle，Token/耗时为零，不计入真实 evaluator 采样次数，但仍占有界总收据并参与历史、merge 和 current evidence 校验。刷新入口优先恢复或再校验 staging，不能用该机制接受身份、结构或执行失败，也不能覆盖已有 passed receipt。
+路由账本新增 `oracle_revalidation` 来源：只接受当前 oracle 已通过、可见输入/capsule/evaluator 与一份 `oracle_violation` 失败收据精确相同、文件哈希未变的 stage；追加的 passed 收据引用同代失败收据，或通过不可变账本哈希链引用上一代失败收据，Token/耗时为零，不计入真实 evaluator 采样次数，但仍占有界总收据并参与历史、merge 和 current evidence 校验。刷新入口优先恢复或再校验 staging，不能用该机制接受身份、结构或执行失败，也不能覆盖已有 passed receipt。
+
+## SOL-014 在 taskctl 既有查询与生成视图中稀疏派生当前执行前沿
+
+- 状态: confirmed
+- 解决: GAP-011
+- 满足: AC-069
+
+`status` 与 `TASK_TABLE.md` 从活跃 task/state、当前关联 DCR 和结构诊断即时派生 `active_frontiers`，只展开具有非空检查点、关联 DCR 或写回漂移的任务。每项保留任务结果、修改范围、来源 ID、验证维度/case、已证覆盖、未覆盖维度、最近证据、下一动作、task/state 路径与 revision；生成视图记录 UTC 刷新时间。model 预算依次移除 DCR 正文、按完整任务单元缩减；单项仍过大时保留身份、真源、任务结果、前沿、消费者、最近证据和下一动作的有界投影，列出缩短或省略字段并给出 `context`/machine 恢复入口。机器视图保持同源结构；TASK_TABLE、status 与 context 都不是修改入口。
+
+## SOL-015 把 `state+1` 未引用结果诊断为可恢复写回漂移
+
+- 状态: confirmed
+- 解决: GAP-012
+- 满足: AC-069
+
+结果历史在完成结构与任务身份校验后，只对 `result revision == state revision + 1` 且 state 未引用该路径的记录返回 `result_history_state_write_drift`。诊断包含 task/path/state/result/current task revision 与恢复动作，不设置 current result、不写 state、不裁决完成；结果仍适用且 task 合同未变时，相同内容重试继续使用既有 partial-write recovery；结果已失效或合同已变时，先用 CAS state note 越过旧尝试，再完成当前合同。占用路径的不同内容由 `TASK-OVERWRITE` 阻断，较早历史与已引用当前结果不误报。
+
+## SOL-016 由 execution-governor 定义通用 preflight，领域 runner 持有实现
+
+- 状态: confirmed
+- 解决: GAP-013
+- 满足: AC-070
+
+`failure-and-cost.md` 把昂贵动作适用的输入/schema、fixture/catalog、路径/权限/依赖、runner/lifecycle、oracle 到达性、重复运行变化依据和 ready/blocked 输出定义为一次最小充分 preflight。字段按当前动作适用性选择；具体命令、检查和生命周期仍由领域正式 runner 唯一维护。缺少 runner 且人工拼装已反复失败时沿既有职责升级，不建立跨领域脚本或授权门禁。
+
+## SOL-017 由 change-governance 按四层 trace 定位规则系统失效
+
+- 状态: confirmed
+- 解决: GAP-014
+- 满足: AC-071
+
+`causal-analysis.md` 将支持场景失败分为 `definition_missing`、`route_or_reference_missing`、`action_noncompliant` 和 `state_writeback_missing`，分别消费规范对照、Routing/References/入口 trace、实际可见输入与动作反例、state revision 与结果收据。只修正直接证据覆盖的最早 owner；后续未到达层保持未知，结构漂移不外推为语义完成。路由合同以行为标签和正/非触发用例验证发现边界，真实行为仍留给后续独立场景。
+
+## SOL-018 把完整验证集中到稳定候选的发布前阶段
+
+- 状态: confirmed
+- 解决: GAP-015
+- 满足: AC-072
+
+全局内核要求候选稳定后验证，用户仍在补充时不启动完整、昂贵或独立模型验证；AgentBase 已有组件回归、路由评测和部署 Validate 继续作为正式入口，在用户表示准备发布后的 Publish 前阶段按最终影响范围集中调用。用户明确要求提前验证时可以执行；开发中只有能立即改变当前实现且成本低的局部检查可以提前运行，且不得由单项扩成横向门禁。候选仍在变化时已启动的昂贵验证停止扩展，不使用其不完整输出作结论。
+
+## SOL-019 用一条全局条件替换仅覆盖机械修改的快速路径
+
+- 状态: confirmed
+- 解决: GAP-016
+- 满足: AC-073
+
+全局内核不再只按“对象和变换完整”识别机械任务，而按当前有界动作判断：owner、契约和验收明确、无共享未知且不改变职责时，直接读改验收并停止，不进入完整治理流程。routing 复用现有 `mechanical-document-edit` 与 `specified-local-implementation`，增加同一个 `local_task_fast_path` 行为标签，不另建 skill、状态或流程；契约、共享前提、职责或入口实际失效时继续由现有 delivery、execution 或 change owner 接管。
+
+## SOL-020 用稀疏决策包和可回滚实验补丁闭合子代理交接
+
+- 状态: confirmed
+- 解决: GAP-017
+- 满足: AC-068
+
+`evidence` 和 `experiment` 的代理配置直接要求结论先行、只返回能改变主代理裁决或限定范围的非空原子项、精确定位与恢复入口；`subagent-orchestration` 统一禁止复述 capsule、过程和原始日志。`experiment` 新增连续遮蔽问题触发：在临时 worktree、临时副本或主代理明确指定且有恢复依据的精确范围，可以迭代修改代码、配置或测试并运行最小探针，直到路径、关键反例、后继约束或停止边界已足以裁决。该场景同时由 `execution-governor` 裁决遮蔽与验证成本，由 `subagent-orchestration` 承担委派交接；补丁仅为待审实验资产，主代理必须复核职责、契约和 dirty 边界，选择重写、修订接入或拒绝并承担正式验证。路由合同以普通候选路径、连续遮蔽实现链和相近非触发场景覆盖该边界，不复制当前模型名或档位。

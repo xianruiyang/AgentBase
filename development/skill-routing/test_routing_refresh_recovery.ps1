@@ -184,6 +184,59 @@ try {
     }
     & (Join-Path $PSScriptRoot "validate_routing_attempt_history.ps1") -ProjectRoot $projectRoot -AttemptHistoryPath $carryHistoryPath -CurrentEvidencePath $carryCurrentPath | Out-Null
 
+    $crossEvidenceDirectory = Join-Path $testRoot "cross-generation-revalidation-evidence"
+    $crossCurrentPath = Join-Path $crossEvidenceDirectory "current.json"
+    $crossHistoryPath = Join-Path $crossEvidenceDirectory "attempts.json"
+    $crossPriorGeneration = ('E' * 64)
+    $crossPriorRoot = Join-Path (Join-Path $crossEvidenceDirectory "pending") $crossPriorGeneration
+    [IO.Directory]::CreateDirectory($crossPriorRoot) | Out-Null
+    Write-TestJson -Path (Join-Path $crossPriorRoot "routing.json") -Value $routing
+    Write-TestJson -Path (Join-Path $crossPriorRoot "policy.json") -Value $policy
+    Write-TestJson -Path (Join-Path $crossPriorRoot "references.json") -Value $references
+    $crossHistory = Get-Content -LiteralPath $historyPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 50 -DateKind String
+    $crossHistory.active_cycle_id = $crossPriorGeneration
+    $crossHistory.previous_cycle_id = $null
+    $crossHistory.previous_ledger_sha256 = $null
+    $crossHistory.previous_attempt_count = 0
+    $crossHistory.attempts = @($crossHistory.attempts | Where-Object { [string]$_.outcome -eq 'passed' })
+    foreach ($crossAttempt in @($crossHistory.attempts)) {
+        $crossAttempt.cycle_id = $crossPriorGeneration
+        if ([string]$crossAttempt.origin -eq 'oracle_revalidation') {
+            $crossAttempt.origin = 'formal'
+            $crossAttempt.previous_attempt_id = $null
+            $crossAttempt.changed_since_previous = @('initial_receipt')
+            $crossAttempt.source_receipt_id = $null
+            $crossAttempt.source_cycle_id = $null
+        }
+    }
+    $crossPolicyFailure = @($crossHistory.attempts | Where-Object { [string]$_.phase -eq 'Policy' })
+    if ($crossPolicyFailure.Count -ne 1) { throw 'Cross-generation revalidation fixture did not find one policy receipt' }
+    $crossPolicySourceReceiptId = [string]$crossPolicyFailure[0].attempt_id
+    $crossPolicyFailure[0].outcome = 'failed'
+    $crossPolicyFailure[0].stage_result_sha256 = $null
+    $crossPolicyFailure[0].failure_class = 'oracle_violation'
+    $crossPolicyFailure[0].failure_summary = 'Synthetic prior-generation oracle rejection of an otherwise unchanged result.'
+    Write-TestJson -Path $crossHistoryPath -Value $crossHistory
+    & (Join-Path $PSScriptRoot "validate_routing_attempt_history.ps1") -ProjectRoot $projectRoot -AttemptHistoryPath $crossHistoryPath | Out-Null
+
+    $crossRefresh = & (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -ProjectRoot $projectRoot -CurrentEvidencePath $crossCurrentPath -AttemptHistoryPath $crossHistoryPath
+    if ([string]$crossRefresh.action -ne "refreshed" -or [int]$crossRefresh.evaluator_run_count -ne 0 -or
+        [int]$crossRefresh.oracle_revalidated_phase_count -ne 1 -or [int]$crossRefresh.carried_forward_phase_count -ne 2 -or
+        [int]$crossRefresh.reused_phase_count -ne 0) {
+        throw "Refresh did not revalidate one exact prior-generation oracle rejection and carry two passed stages without evaluator runs"
+    }
+    $crossFinalHistory = Get-Content -LiteralPath $crossHistoryPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 50 -DateKind String
+    $crossRevalidation = @($crossFinalHistory.attempts | Where-Object {
+        [string]$_.phase -eq 'Policy' -and [string]$_.origin -eq 'oracle_revalidation'
+    })
+    if ($crossRevalidation.Count -ne 1 -or
+        [string]$crossRevalidation[0].source_receipt_id -ne $crossPolicySourceReceiptId -or
+        [string]$crossRevalidation[0].source_cycle_id -ne $crossPriorGeneration -or
+        -not [string]::IsNullOrWhiteSpace([string]$crossRevalidation[0].previous_attempt_id)) {
+        throw 'Cross-generation oracle revalidation did not retain its exact prior failure provenance'
+    }
+    & (Join-Path $PSScriptRoot "validate_routing_attempt_history.ps1") -ProjectRoot $projectRoot -AttemptHistoryPath $crossHistoryPath -CurrentEvidencePath $crossCurrentPath | Out-Null
+
     $resumeEvidenceDirectory = Join-Path $testRoot "resume-carry-evidence"
     $resumeCurrentPath = Join-Path $resumeEvidenceDirectory "current.json"
     $resumeHistoryPath = Join-Path $resumeEvidenceDirectory "attempts.json"
@@ -221,7 +274,7 @@ try {
     }
     & (Join-Path $PSScriptRoot "validate_routing_attempt_history.ps1") -ProjectRoot $projectRoot -AttemptHistoryPath $resumeHistoryPath -CurrentEvidencePath $resumeCurrentPath | Out-Null
 
-    Write-Output "Routing refresh recovery tests passed: same-generation results resume, exact oracle-rejected output revalidates at zero Token, cross-generation carry survives interruption, merges are atomic, and staging retires after commit."
+    Write-Output "Routing refresh recovery tests passed: same-generation results resume, exact oracle-rejected output revalidates at zero Token within or across generations, cross-generation carry survives interruption, merges are atomic, and staging retires after commit."
 }
 finally {
     $env:AGENTBASE_ROUTING_EVALUATOR_DISABLED = $previousEvaluatorGuard

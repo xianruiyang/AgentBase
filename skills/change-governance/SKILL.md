@@ -1,6 +1,6 @@
 ---
 name: change-governance
-description: 为复杂变更裁决根因与因果机制、争议测试 oracle、职责或权威入口、共享职责、跨消费者影响、迁移兼容、跨两套以上 CLI 或消费者的共享门禁和跨契约完成审计。用于故障根因修复、多入口或第二状态源、架构或跨模块重构、新增或迁移公共职责、消费者接入与旧路径退出、临时路径风险、project-metadata.md/file-metadata.md 维护及普通判断不足的完整审计；不用于尚未进入根因、职责、入口、迁移或完成审计而仅校准需求与风险边界的分析，也不用于上游契约稳定且仅按已确认需求与证据做常规最终交付复核、已有唯一 owner 与明确依赖的普通实现、不改变长期职责或入口的只读确认、局部验证、机械修改、普通文档或问答、仅因任务结束的完成声明；普通执行中的证据前沿、单项先于批量和失败遮蔽由 execution-governor 承担。
+description: 为复杂变更裁决根因与因果机制、争议测试 oracle、职责或权威入口、共享职责、跨消费者影响、迁移兼容、跨两套以上 CLI 或消费者的共享门禁和跨契约完成审计。用于故障根因修复、多入口或第二状态源、架构或跨模块重构、新增或迁移公共职责、缺失领域正式 runner 的 owner/入口、消费者接入与旧路径退出、临时路径风险、project-metadata.md/file-metadata.md 维护及普通判断不足的完整审计；不用于尚未进入根因、职责、入口、迁移或完成审计而仅校准需求与风险边界的分析，也不用于上游契约稳定且仅按已确认需求与证据做常规最终交付复核、已有唯一 owner 与明确依赖的普通实现、不改变长期职责或入口的只读确认、局部验证、机械修改、普通文档或问答、仅因任务结束的完成声明；普通执行中的证据前沿、单项先于批量和失败遮蔽由 execution-governor 承担。
 ---
 
 # Change Governance
@@ -11,10 +11,10 @@ description: 为复杂变更裁决根因与因果机制、争议测试 oracle、
 
 ## 选择参考
 
-- bug 或故障链路的根因、系统机制、反复失效、差距或上游判断会改变动作时，完整读取 [causal-analysis.md](references/causal-analysis.md)。
-- 多个入口或第二状态源的方案裁决、职责或权威入口变化、共享职责形成、跨消费者影响传播、迁移兼容、原型转正、临时路径风险评审或绕行退出条件时，完整读取 [lifecycle-and-entry.md](references/lifecycle-and-entry.md)。
+- bug 或故障链路的根因、系统机制、反复失效、差距或上游判断会改变动作时，完整读取 [causal-analysis.md](references/causal-analysis.md)；当前失败分类与重试熔断已由 `$execution-governor` 覆盖、这里只裁决长期入口时不重复读取。
+- 多个入口或第二状态源的方案裁决、长期职责或权威入口变化、共享职责形成、跨消费者影响传播、迁移兼容、原型转正、临时路径风险评审或绕行退出条件时，完整读取 [lifecycle-and-entry.md](references/lifecycle-and-entry.md)；只定位现有规则、路由、动作或写回中的修复层仍归 causal，不因要求指出修复 owner 读取本项。
 - 维护 `project-metadata.md`、`file-metadata.md` 或重构同类长期状态记录时，完整读取 [records-and-metadata.md](references/records-and-metadata.md)。
-- 需要证明反复失效、循环依赖或其他已修复机制确实改变，裁决测试 oracle，设计共享阻断门禁，或执行跨契约完成审计时，完整读取 [verification-and-gates.md](references/verification-and-gates.md)。
+- 需要证明反复失效、循环依赖或其他已修复机制确实改变，裁决测试 oracle，设计共享阻断门禁，或执行跨契约完成审计时，完整读取 [verification-and-gates.md](references/verification-and-gates.md)；仅把已有反例作为原因证据且不设计验证或门禁时仍归 causal。
 - 同一任务跨越多个边界时读取所有对应文件；不要加载无关参考。
 
 ## 工作流

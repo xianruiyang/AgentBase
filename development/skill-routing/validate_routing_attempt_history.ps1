@@ -157,25 +157,33 @@ foreach ($attempt in @($history.attempts)) {
                 }
             }
             elseif ([string]$attempt.origin -eq 'oracle_revalidation') {
-                $sourceReceipt = if ($attemptsById.ContainsKey([string]$attempt.source_receipt_id)) {
+                $sameGenerationSource = [string]$attempt.source_cycle_id -eq [string]$history.active_cycle_id
+                $priorGenerationSource = -not [string]::IsNullOrWhiteSpace([string]$history.previous_cycle_id) -and
+                    [string]$attempt.source_cycle_id -eq [string]$history.previous_cycle_id
+                $sourceReceipt = if ($sameGenerationSource -and $attemptsById.ContainsKey([string]$attempt.source_receipt_id)) {
                     $attemptsById[[string]$attempt.source_receipt_id]
                 }
                 else {
                     $null
                 }
-                if ([string]$attempt.result_sha256 -notmatch '^[0-9A-Fa-f]{64}$' -or
+                $commonLinkInvalid = [string]$attempt.result_sha256 -notmatch '^[0-9A-Fa-f]{64}$' -or
                     -not [string]::IsNullOrWhiteSpace([string]$attempt.source_evidence_sha256) -or
                     [string]$attempt.source_receipt_id -notmatch '^[0-9a-f]{32}$' -or
-                    [string]$attempt.source_cycle_id -ne [string]$history.active_cycle_id -or
+                    [long]$attempt.duration_ms -ne 0 -or [long]$attempt.input_tokens -ne 0 -or
+                    [long]$attempt.cached_input_tokens -ne 0 -or [long]$attempt.output_tokens -ne 0 -or
+                    @($attempt.changed_since_previous) -notcontains 'oracle_contract'
+                $sameGenerationLinkInvalid = $sameGenerationSource -and (
                     [string]$attempt.previous_attempt_id -ne [string]$attempt.source_receipt_id -or
                     $null -eq $sourceReceipt -or [string]$sourceReceipt.outcome -ne 'failed' -or
                     [string]$sourceReceipt.failure_class -ne 'oracle_violation' -or
                     [string]$sourceReceipt.attempt_key -ne [string]$attempt.attempt_key -or
                     [string]$sourceReceipt.result_sha256 -ne [string]$attempt.result_sha256 -or
-                    [string]$sourceReceipt.evaluator_id -ne [string]$attempt.evaluator_id -or
-                    [long]$attempt.duration_ms -ne 0 -or [long]$attempt.input_tokens -ne 0 -or
-                    [long]$attempt.cached_input_tokens -ne 0 -or [long]$attempt.output_tokens -ne 0 -or
-                    @($attempt.changed_since_previous) -notcontains 'oracle_contract') {
+                    [string]$sourceReceipt.evaluator_id -ne [string]$attempt.evaluator_id)
+                $priorGenerationLinkInvalid = $priorGenerationSource -and (
+                    -not [string]::IsNullOrWhiteSpace([string]$attempt.previous_attempt_id) -or
+                    [string]$history.previous_ledger_sha256 -notmatch '^[0-9A-Fa-f]{64}$')
+                if ($commonLinkInvalid -or (-not $sameGenerationSource -and -not $priorGenerationSource) -or
+                    $sameGenerationLinkInvalid -or $priorGenerationLinkInvalid) {
                     throw "Oracle-revalidation receipt $attemptId lacks an exact zero-cost failed-result link"
                 }
             }

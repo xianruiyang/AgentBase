@@ -44,6 +44,17 @@ STATE_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 STATUSES = ("todo", "claimed", "in_progress", "review", "blocked", "done", "retired")
 ACTIVE_STATUSES = {"claimed", "in_progress", "review", "blocked"}
 TERMINAL_STATUSES = {"done", "retired"}
+EXECUTION_CHECKPOINT_TEXT_FIELDS = (
+    "evidence_frontier",
+    "active_consumer",
+    "latest_evidence",
+)
+EXECUTION_CHECKPOINT_LIST_FIELDS = (
+    "validation_case",
+    "validated_coverage",
+    "uncovered_dimensions",
+    "invalidated_source_ids",
+)
 DEPENDENCY_TYPES = ("hard", "ordering", "informational")
 REASONING_HINTS = ("low", "medium", "high", "xhigh", "max", "ultra")
 WORKFLOW_STAGES = (
@@ -277,6 +288,21 @@ def task_status_model(payload: dict[str, Any]) -> dict[str, Any]:
     if kind_counts:
         results["issues"] = kind_counts
     projected: dict[str, Any] = {"tasks": tasks}
+    if payload.get("generated_at"):
+        projected["generated_at"] = payload["generated_at"]
+    if payload.get("active_frontiers"):
+        projected["active_frontiers"] = copy.deepcopy(payload["active_frontiers"])
+        active_frontier_count = payload.get("active_frontier_count", 0)
+        if active_frontier_count > len(payload["active_frontiers"]):
+            projected["active_frontiers_more"] = {
+                "total": active_frontier_count,
+                "returned": len(payload["active_frontiers"]),
+                "recovery": "rerun status with a larger --limit or query one task with context",
+            }
+    if payload.get("state_writeback_drift_count"):
+        projected["state_writeback_drift_count"] = payload[
+            "state_writeback_drift_count"
+        ]
     if upstream:
         projected["upstream"] = upstream
     if results:
@@ -455,6 +481,8 @@ def task_state_write_model(payload: dict[str, Any]) -> dict[str, Any]:
             "evidence_frontier",
             "active_consumer",
             "validation_case",
+            "validated_coverage",
+            "uncovered_dimensions",
             "latest_evidence",
             "invalidated_source_ids",
             "result_ref",
@@ -619,6 +647,129 @@ def task_model_projection(payload: dict[str, Any]) -> dict[str, Any]:
     return sparse_model_value(copy.deepcopy(payload), root=True)
 
 
+def bounded_frontier_text(
+    value: Any,
+    maximum: int,
+    field: str,
+    omitted_fields: list[str],
+) -> Any:
+    if not isinstance(value, str) or len(value) <= maximum:
+        return value
+    omitted_fields.append(field)
+    return value[: maximum - 1] + "…"
+
+
+def bounded_frontier_list(
+    value: Any,
+    maximum_items: int,
+    maximum_item_chars: int,
+    field: str,
+    omitted_fields: list[str],
+) -> Any:
+    if not isinstance(value, list):
+        return value
+    projected = []
+    for item in value[:maximum_items]:
+        projected.append(
+            bounded_frontier_text(
+                item,
+                maximum_item_chars,
+                field,
+                omitted_fields,
+            )
+        )
+    if len(value) > maximum_items:
+        omitted_fields.append(field)
+    return projected
+
+
+def compact_active_frontier(
+    frontier: dict[str, Any], *, minimal: bool = False
+) -> dict[str, Any]:
+    projected: dict[str, Any] = {
+        key: copy.deepcopy(frontier[key])
+        for key in ("id", "status", "source")
+        if frontier.get(key) not in (None, "", [], {})
+    }
+    omitted_fields: list[str] = []
+    text_limits = (
+        {
+            "title": 64,
+            "outcome": 96,
+            "evidence_frontier": 120,
+            "active_consumer": 80,
+            "latest_evidence": 120,
+            "next_action": 120,
+        }
+        if minimal
+        else {
+            "title": 120,
+            "outcome": 160,
+            "evidence_frontier": 240,
+            "active_consumer": 160,
+            "latest_evidence": 240,
+            "next_action": 240,
+        }
+    )
+    for field, maximum in text_limits.items():
+        value = frontier.get(field)
+        if value not in (None, ""):
+            projected[field] = bounded_frontier_text(
+                value, maximum, field, omitted_fields
+            )
+    if not minimal:
+        for field, maximum_items, maximum_item_chars in (
+            ("source_ids", 8, 80),
+            ("mutation_scope", 4, 120),
+            ("validation_dimensions", 4, 120),
+            ("validation_case", 4, 120),
+            ("validated_coverage", 4, 120),
+            ("uncovered_dimensions", 4, 120),
+            ("invalidated_source_ids", 8, 80),
+        ):
+            value = frontier.get(field)
+            if value:
+                projected[field] = bounded_frontier_list(
+                    value,
+                    maximum_items,
+                    maximum_item_chars,
+                    field,
+                    omitted_fields,
+                )
+    drifts = frontier.get("state_writeback_drifts")
+    if isinstance(drifts, list) and drifts:
+        drift = drifts[0]
+        if isinstance(drift, dict):
+            projected["state_writeback_drift"] = {
+                key: bounded_frontier_text(
+                    drift[key],
+                    160,
+                    f"state_writeback_drifts.{key}",
+                    omitted_fields,
+                )
+                for key in (
+                    "kind",
+                    "path",
+                    "result_task_revision",
+                    "current_task_revision",
+                    "recovery",
+                )
+                if drift.get(key) not in (None, "")
+            }
+        if len(drifts) > 1:
+            omitted_fields.append("state_writeback_drifts")
+    retained_fields = set(projected)
+    for field, value in frontier.items():
+        if field not in retained_fields and value not in (None, "", [], {}):
+            omitted_fields.append(field)
+    if omitted_fields:
+        projected["more"] = {
+            "omitted_or_shortened": sorted(set(omitted_fields)),
+            "recovery": "query this task with context or use --view machine",
+        }
+    return projected
+
+
 def task_model_variants(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
     projected = task_model_projection(payload)
     yield projected
@@ -667,6 +818,44 @@ def task_model_variants(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
                 "snapshot_id": payload.get("snapshot_id"),
             }
             yield copy.deepcopy(candidate)
+    elif command in {"status", "render"}:
+        candidate = copy.deepcopy(projected)
+        frontiers = candidate.get("active_frontiers")
+        if isinstance(frontiers, list) and frontiers:
+            for frontier in frontiers:
+                body_omitted = False
+                for deferred_change in frontier.get("deferred_changes", []):
+                    if isinstance(deferred_change, dict):
+                        body_omitted = (
+                            deferred_change.pop("body", None) is not None
+                            or body_omitted
+                        )
+                if body_omitted:
+                    frontier["deferred_change_bodies"] = {
+                        "omitted": True,
+                        "recovery": "query this task with context",
+                    }
+            yield copy.deepcopy(candidate)
+            while len(frontiers) > 1:
+                frontiers.pop()
+                candidate["active_frontiers_more"] = {
+                    "total": payload.get("active_frontier_count", len(frontiers)),
+                    "returned": len(frontiers),
+                    "recovery": "rerun status with a larger model budget or query one task with context",
+                }
+                yield copy.deepcopy(candidate)
+            compact = copy.deepcopy(candidate)
+            compact["active_frontiers"] = [
+                compact_active_frontier(frontier)
+                for frontier in compact.get("active_frontiers", [])
+            ]
+            yield compact
+            minimal = copy.deepcopy(candidate)
+            minimal["active_frontiers"] = [
+                compact_active_frontier(frontier, minimal=True)
+                for frontier in minimal.get("active_frontiers", [])
+            ]
+            yield minimal
 
 
 def context_model_receipt_candidate(
@@ -737,6 +926,8 @@ def fit_task_model_with_snapshot(
                 "evidence_frontier",
                 "active_consumer",
                 "validation_case",
+                "validated_coverage",
+                "uncovered_dimensions",
                 "latest_evidence",
                 "invalidated_source_ids",
                 "revision",
@@ -1444,6 +1635,14 @@ def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
         "validation_case": string_list(
             raw.get("validation_case"), f"state.validation_case[{task_id}]"
         ),
+        "validated_coverage": string_list(
+            raw.get("validated_coverage"),
+            f"state.validated_coverage[{task_id}]",
+        ),
+        "uncovered_dimensions": string_list(
+            raw.get("uncovered_dimensions"),
+            f"state.uncovered_dimensions[{task_id}]",
+        ),
         "latest_evidence": semantic_string(
             raw.get("latest_evidence", ""), f"state.latest_evidence[{task_id}]"
         ),
@@ -1453,6 +1652,13 @@ def validate_state(raw: Any, task_id: str) -> dict[str, Any]:
         ),
         "result_ref": result_ref,
     }
+
+
+def clear_execution_checkpoint(state: dict[str, Any]) -> None:
+    for field in EXECUTION_CHECKPOINT_TEXT_FIELDS:
+        state[field] = ""
+    for field in EXECUTION_CHECKPOINT_LIST_FIELDS:
+        state[field] = []
 
 
 def normalize_result_body(
@@ -1681,6 +1887,7 @@ def result_history_diagnostics(
         )
     diagnostics: list[dict[str, Any]] = []
     invalid_count = 0
+    returned_invalid_count = 0
     for path in paths:
         try:
             path = path.resolve()
@@ -1703,9 +1910,41 @@ def result_history_diagnostics(
             )
             if historical["task_id"] != task["id"]:
                 raise TaskctlError(f"task result history identity mismatch: {path}")
+            relative_ref = path.relative_to(root).as_posix()
+            if (
+                storage_revision == maximum_revision
+                and state.get("result_ref") != relative_ref
+            ):
+                same_task_revision = historical["task_revision"] == task["revision"]
+                diagnostics.append(
+                    {
+                        "kind": "result_history_state_write_drift",
+                        "task_id": task["id"],
+                        "path": relative_ref,
+                        "state_revision": state["revision"],
+                        "result_revision": storage_revision,
+                        "result_task_revision": historical["task_revision"],
+                        "current_task_revision": task["revision"],
+                        "message": (
+                            "a structurally valid, identity-matching next-revision "
+                            "result exists but the current task state does not reference it"
+                        ),
+                        "recovery": (
+                            "inspect the existing result, then retry complete with the same "
+                            "expected state revision and a reconciled identical result; a "
+                            "superseded attempt must first be recorded with a CAS state note, "
+                            "and a conflicting overwrite remains TASK-OVERWRITE"
+                            if same_task_revision
+                            else "inspect the result from the earlier task revision, then use "
+                            "a CAS state note to record that the stale attempt was superseded "
+                            "before completing against the current task contract; do not "
+                            "overwrite the occupied result path"
+                        ),
+                    }
+                )
         except (OSError, TaskctlError) as exc:
             invalid_count += 1
-            if len(diagnostics) < DEFAULT_LIMIT:
+            if returned_invalid_count < DEFAULT_LIMIT:
                 diagnostics.append(
                     {
                         "kind": "result_history_record_unreadable",
@@ -1714,13 +1953,14 @@ def result_history_diagnostics(
                         "message": str(exc),
                     }
                 )
-    if invalid_count > len(diagnostics):
+                returned_invalid_count += 1
+    if invalid_count > returned_invalid_count:
         diagnostics.append(
             {
                 "kind": "result_history_diagnostics_truncated",
                 "task_id": task["id"],
                 "invalid_count": invalid_count,
-                "returned_count": len(diagnostics),
+                "returned_count": returned_invalid_count,
             }
         )
     return diagnostics
@@ -1984,13 +2224,13 @@ def state_diagnostics(task_id: str, state: dict[str, Any]) -> list[dict[str, Any
         )
     if status == "retired" and not state.get("note"):
         diagnostics.append({"kind": "retired_reason_missing", "task_id": task_id})
-    for field in ("evidence_frontier", "active_consumer", "latest_evidence"):
+    for field in EXECUTION_CHECKPOINT_TEXT_FIELDS:
         value = state.get(field, "")
         if value:
             diagnostics.extend(
                 semantic_text_diagnostics(value, f"state.{field}", task_id=task_id)
             )
-    for field in ("validation_case", "invalidated_source_ids"):
+    for field in EXECUTION_CHECKPOINT_LIST_FIELDS:
         values = state.get(field, [])
         for value_index, value in enumerate(values):
             diagnostics.extend(
@@ -2198,11 +2438,17 @@ def summarize_loaded_task_storage(
     invalidated_source_ids: set[str] = set()
     diagnostics: list[dict[str, Any]] = []
     diagnostics_by_task: dict[str, list[dict[str, Any]]] = {}
+    state_writeback_drifts: list[dict[str, Any]] = []
     for task_id, task in tasks.items():
         state = states[task_id]
         diagnostics.extend(state_diagnostics(task_id, state))
         result, result_read_diagnostics = safe_current_result(root, table, task, state)
         diagnostics.extend(result_read_diagnostics)
+        state_writeback_drifts.extend(
+            item
+            for item in result_read_diagnostics
+            if item.get("kind") == "result_history_state_write_drift"
+        )
         if result is None:
             continue
         result_count += 1
@@ -2221,6 +2467,8 @@ def summarize_loaded_task_storage(
         "invalidated_source_ids": sorted(invalidated_source_ids),
         "diagnostics": diagnostics[:DEFAULT_LIMIT],
         "diagnostic_count": len(diagnostics),
+        "state_writeback_drifts": state_writeback_drifts,
+        "state_writeback_drift_count": len(state_writeback_drifts),
         **summarize_result_diagnostics(diagnostics_by_task),
     }
 
@@ -2231,6 +2479,7 @@ def task_storage_summary(root: Path) -> dict[str, Any]:
     tasks, states, storage_diagnostics = load_query_storage(root, table)
     index, index_diagnostics = maybe_load_index(root, table)
     summary = summarize_loaded_task_storage(root, table, tasks, states, index)
+    summary.pop("state_writeback_drifts", None)
     all_diagnostics = [
         *storage_diagnostics,
         *index_diagnostics,
@@ -2522,6 +2771,8 @@ def command_add(args: argparse.Namespace) -> dict[str, Any]:
                 "evidence_frontier": "",
                 "active_consumer": "",
                 "validation_case": [],
+                "validated_coverage": [],
+                "uncovered_dimensions": [],
                 "latest_evidence": "",
                 "invalidated_source_ids": [],
                 "result_ref": None,
@@ -3179,6 +3430,75 @@ def semantic_source_closure(index: dict[str, Any], source_ids: list[str]) -> set
     return selected
 
 
+def active_execution_frontiers(
+    root: Path,
+    table: dict[str, Any],
+    tasks: dict[str, dict[str, Any]],
+    states: dict[str, dict[str, Any]],
+    index: dict[str, Any] | None,
+    state_writeback_drifts: list[dict[str, Any]],
+    maximum: int,
+) -> tuple[list[dict[str, Any]], int]:
+    task_dir, state_dir, _ = table_paths(root, table)
+    drifts_by_task: dict[str, list[dict[str, Any]]] = {}
+    for diagnostic in state_writeback_drifts:
+        task_id = diagnostic.get("task_id")
+        if isinstance(task_id, str):
+            drifts_by_task.setdefault(task_id, []).append(diagnostic)
+    rows: list[dict[str, Any]] = []
+    for task_id in sorted(tasks):
+        task = tasks[task_id]
+        state = states[task_id]
+        if state["status"] not in ACTIVE_STATUSES:
+            continue
+        deferred_changes, _, deferred_truncated, _ = select_related_deferred_changes(
+            index, task["source_ids"], set(), 5
+        )
+        checkpoint_present = any(
+            state.get(field) for field in EXECUTION_CHECKPOINT_TEXT_FIELDS
+        ) or any(state.get(field) for field in EXECUTION_CHECKPOINT_LIST_FIELDS)
+        task_drifts = drifts_by_task.get(task_id, [])
+        if not checkpoint_present and not deferred_changes and not task_drifts:
+            continue
+        row: dict[str, Any] = {
+            "id": task_id,
+            "title": task["title"],
+            "outcome": task["outcome"],
+            "status": state["status"],
+            "owner": state["owner"],
+            "source_ids": task["source_ids"],
+            "mutation_scope": task["mutation_scope"],
+            "validation_dimensions": task["validation_dimensions"],
+            "source": {
+                "task": (
+                    (task_dir / f"{task_id}.json").relative_to(root).as_posix()
+                ),
+                "task_revision": task["revision"],
+                "state": (
+                    (state_dir / f"{task_id}.json").relative_to(root).as_posix()
+                ),
+                "state_revision": state["revision"],
+            },
+        }
+        for field in (
+            *EXECUTION_CHECKPOINT_TEXT_FIELDS,
+            *EXECUTION_CHECKPOINT_LIST_FIELDS,
+        ):
+            value = state.get(field)
+            if value not in (None, "", []):
+                row[field] = copy.deepcopy(value)
+        if state.get("next_action"):
+            row["next_action"] = state["next_action"]
+        if deferred_changes:
+            row["deferred_changes"] = deferred_changes
+        if deferred_truncated:
+            row["deferred_changes_truncated"] = True
+        if task_drifts:
+            row["state_writeback_drifts"] = copy.deepcopy(task_drifts)
+        rows.append(row)
+    return rows[:maximum], len(rows)
+
+
 def command_context(args: argparse.Namespace) -> dict[str, Any]:
     root = resolve_root(args.task_dir)
     table = load_table(root)
@@ -3192,6 +3512,9 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
         )
     index, index_diagnostics = maybe_load_index(root, table)
     task = tasks[args.id]
+    _, current_result_diagnostics = safe_current_result(
+        root, table, task, states[args.id]
+    )
     dependency_context = []
     for dependency in task["dependencies"]:
         dependency_id = dependency["id"]
@@ -3244,6 +3567,7 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
     all_diagnostics = [
         *storage_diagnostics,
         *index_diagnostics,
+        *current_result_diagnostics,
         *task_diagnostics(task, tasks, states, index),
     ]
     upstream, source_snapshot, upstream_truncated, source_snapshot_complete = select_upstream_context(
@@ -3711,9 +4035,19 @@ def command_status(args: argparse.Namespace) -> dict[str, Any]:
         ):
             dependency_blocked_count += 1
     semantic_summary = index.get("summary", {}) if index else {}
+    active_frontiers, active_frontier_count = active_execution_frontiers(
+        root,
+        table,
+        tasks,
+        states,
+        index,
+        storage["state_writeback_drifts"],
+        args.limit,
+    )
     return {
         "ok": True,
         "command": "status",
+        "generated_at": utc_now_timestamp(),
         "task_count": storage["task_count"],
         "status_counts": storage["counts"],
         "needs_review_count": storage["counts"]["review"],
@@ -3742,6 +4076,9 @@ def command_status(args: argparse.Namespace) -> dict[str, Any]:
                 "result_diagnostic_kind_counts"
             ],
         },
+        "active_frontier_count": active_frontier_count,
+        "active_frontiers": active_frontiers,
+        "state_writeback_drift_count": storage["state_writeback_drift_count"],
         "diagnostic_count": diagnostic_count,
         "index_diagnostics": index_diagnostics[: args.limit],
         "storage_diagnostics": [
@@ -4006,6 +4343,8 @@ def command_note(args: argparse.Namespace) -> dict[str, Any]:
         args.evidence_frontier,
         args.active_consumer,
         args.validation_case,
+        args.validated_coverage,
+        args.uncovered_dimension,
         args.latest_evidence,
         args.invalidated_source_id,
     )
@@ -4073,11 +4412,7 @@ def command_note(args: argparse.Namespace) -> dict[str, Any]:
         if args.next_action is not None:
             state["next_action"] = semantic_string(args.next_action, "note.next_action")
         if args.clear_execution_checkpoint:
-            state["evidence_frontier"] = ""
-            state["active_consumer"] = ""
-            state["validation_case"] = []
-            state["latest_evidence"] = ""
-            state["invalidated_source_ids"] = []
+            clear_execution_checkpoint(state)
         else:
             if args.evidence_frontier is not None:
                 state["evidence_frontier"] = semantic_string(
@@ -4090,6 +4425,14 @@ def command_note(args: argparse.Namespace) -> dict[str, Any]:
             if args.validation_case is not None:
                 state["validation_case"] = string_list(
                     args.validation_case, "note.validation_case"
+                )
+            if args.validated_coverage is not None:
+                state["validated_coverage"] = string_list(
+                    args.validated_coverage, "note.validated_coverage"
+                )
+            if args.uncovered_dimension is not None:
+                state["uncovered_dimensions"] = string_list(
+                    args.uncovered_dimension, "note.uncovered_dimensions"
                 )
             if args.latest_evidence is not None:
                 state["latest_evidence"] = semantic_string(
@@ -4230,11 +4573,7 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
         next_state["result_ref"] = relative_ref
         next_state["blocked_reason"] = ""
         next_state["next_action"] = ""
-        next_state["evidence_frontier"] = ""
-        next_state["active_consumer"] = ""
-        next_state["validation_case"] = []
-        next_state["latest_evidence"] = ""
-        next_state["invalidated_source_ids"] = []
+        clear_execution_checkpoint(next_state)
         next_state = apply_state_timestamps(state, next_state, end_event=True)
         next_state = validate_state(next_state, args.id)
         recovered_partial_write = result_path.exists()
@@ -4321,11 +4660,7 @@ def command_reopen(args: argparse.Namespace) -> dict[str, Any]:
         state["note"] = f"reopened: {reason}"
         state["blocked_reason"] = ""
         state["next_action"] = ""
-        state["evidence_frontier"] = ""
-        state["active_consumer"] = ""
-        state["validation_case"] = []
-        state["latest_evidence"] = ""
-        state["invalidated_source_ids"] = []
+        clear_execution_checkpoint(state)
         state["result_ref"] = None
         state = write_state(root, table, state, previous_state)
         diagnostics.extend(state_diagnostics(args.id, state))
@@ -4380,11 +4715,7 @@ def command_release(args: argparse.Namespace) -> dict[str, Any]:
         state["owner"] = None
         state["blocked_reason"] = ""
         state["next_action"] = ""
-        state["evidence_frontier"] = ""
-        state["active_consumer"] = ""
-        state["validation_case"] = []
-        state["latest_evidence"] = ""
-        state["invalidated_source_ids"] = []
+        clear_execution_checkpoint(state)
         state["result_ref"] = None
         state = write_state(root, table, state, previous_state)
         diagnostics.extend(state_diagnostics(args.id, state))
@@ -4440,12 +4771,23 @@ def render_task_table_locked(
     index_diagnostics: list[dict[str, Any]],
 ) -> dict[str, Any]:
     storage = summarize_loaded_task_storage(root, table, tasks, states, index)
+    generated_at = utc_now_timestamp()
+    active_frontiers, active_frontier_count = active_execution_frontiers(
+        root,
+        table,
+        tasks,
+        states,
+        index,
+        storage["state_writeback_drifts"],
+        DEFAULT_LIMIT,
+    )
     output_path = resolve_inside(root, str(table.get("table_view", "TASK_TABLE.md")))
     counts = storage["counts"]
     lines = [
         f"# {table.get('title') or table.get('id') or 'Tasks'}",
         "",
         "> 本文件由 taskctl 生成，只是任务合同与状态的可重建视图，不表示允许执行或产品完成。",
+        f"> 视图刷新时间：{generated_at}；真源仍为 tasks/、state/ 与 results/。",
         "",
         "## 状态统计",
         "",
@@ -4456,9 +4798,89 @@ def render_task_table_locked(
         lines.extend(f"| {status} | {count} |" for status, count in nonzero_statuses)
     else:
         lines.append("- 无任务")
+    if active_frontiers:
+        lines.extend(["", "## 当前执行前沿", ""])
+        for frontier in active_frontiers:
+            lines.extend(
+                [
+                    f"### {markdown_cell(frontier['id'])} · {markdown_cell(frontier['status'])}",
+                    "",
+                    f"- 标题：{markdown_cell(frontier['title'], 240)}",
+                    f"- 当前任务结果：{markdown_cell(frontier['outcome'], 320)}",
+                    "- 真源："
+                    + markdown_cell(
+                        f"{frontier['source']['task']}@r{frontier['source']['task_revision']}; "
+                        f"{frontier['source']['state']}@r{frontier['source']['state_revision']}",
+                        240,
+                    ),
+                    "- 修改范围："
+                    + markdown_cell(
+                        ", ".join(frontier.get("mutation_scope", [])) or "—", 320
+                    ),
+                ]
+            )
+            for field, label in (
+                ("source_ids", "目标来源"),
+                ("evidence_frontier", "证据前沿"),
+                ("active_consumer", "当前消费者"),
+                ("validation_dimensions", "可能改变结论的维度"),
+                ("validation_case", "当前验证 case"),
+                ("validated_coverage", "已验证覆盖"),
+                ("uncovered_dimensions", "仍未覆盖"),
+                ("latest_evidence", "最近有效证据/反例"),
+                ("invalidated_source_ids", "已失效来源"),
+                ("next_action", "下一项有界动作"),
+            ):
+                value = frontier.get(field)
+                if value in (None, "", []):
+                    continue
+                if isinstance(value, list):
+                    value = ", ".join(str(item) for item in value)
+                lines.append(f"- {label}：{markdown_cell(value, 320)}")
+            for deferred_change in frontier.get("deferred_changes", []):
+                location = ":".join(
+                    str(value)
+                    for value in (
+                        deferred_change.get("document"),
+                        deferred_change.get("line"),
+                    )
+                    if value not in (None, "")
+                )
+                lines.append(
+                    "- 关联 DCR："
+                    + markdown_cell(
+                        f"{deferred_change.get('id')} [{deferred_change.get('status')}] "
+                        f"{deferred_change.get('title')} — {deferred_change.get('body', '')}"
+                        + (f" ({location})" if location else ""),
+                        360,
+                    )
+                )
+            if frontier.get("deferred_changes_truncated"):
+                lines.append("- 关联 DCR：已截断；用 context 读取本任务完整关联项")
+            for drift in frontier.get("state_writeback_drifts", []):
+                lines.append(
+                    "- 状态漂移："
+                    + markdown_cell(
+                        f"{drift.get('path')} 未被 state r{drift.get('state_revision')} 引用；"
+                        f"result task r{drift.get('result_task_revision')} / "
+                        f"current task r{drift.get('current_task_revision')}；"
+                        f"{drift.get('recovery')}",
+                        360,
+                    )
+                )
+            lines.append("")
+        if active_frontier_count > len(active_frontiers):
+            lines.append(
+                f"- 仅展示前 {len(active_frontiers)} 项，共 {active_frontier_count} 项；"
+                "使用 status --limit 或 context 渐进读取。"
+            )
     lines.extend(["", "## 复核与结果", ""])
     if counts["review"]:
         lines.append(f"- 需复核任务：{counts['review']}")
+    if storage["state_writeback_drift_count"]:
+        lines.append(
+            f"- 结果/state 结构写回漂移：{storage['state_writeback_drift_count']}"
+        )
     if storage["result_count"]:
         lines.extend(
             [
@@ -4498,7 +4920,13 @@ def render_task_table_locked(
     if all_storage_diagnostics:
         lines.extend(["", "## 存储诊断", ""])
         lines.extend(
-            f"- {markdown_cell(item.get('kind'))}: {markdown_cell(item.get('message', ''))}"
+            f"- {markdown_cell(item.get('kind'))}: "
+            + markdown_cell(item.get("message", ""), 320)
+            + (
+                f"；恢复：{markdown_cell(item.get('recovery'), 320)}"
+                if item.get("recovery")
+                else ""
+            )
             for item in all_storage_diagnostics[:DEFAULT_LIMIT]
         )
     lines.extend(["", "## 任务", ""])
@@ -4543,10 +4971,14 @@ def render_task_table_locked(
     return {
         "ok": True,
         "command": "render",
+        "generated_at": generated_at,
         "output": str(output_path),
         "task_count": len(tasks),
         "status_counts": counts,
         "needs_review_count": counts["review"],
+        "active_frontier_count": active_frontier_count,
+        "active_frontiers": active_frontiers,
+        "state_writeback_drift_count": storage["state_writeback_drift_count"],
         "results": {
             "referenced_result_count": storage["result_count"],
             "result_with_verification_count": storage[
@@ -4827,6 +5259,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="当前消费者实际选择的维度值或等价类；可重复并整体替换",
     )
+    note_parser.add_argument(
+        "--validated-coverage",
+        action="append",
+        default=None,
+        help="当前检查点已有直接证据覆盖的维度值或等价类；可重复并整体替换",
+    )
+    note_parser.add_argument(
+        "--uncovered-dimension",
+        action="append",
+        default=None,
+        help="当前已知仍未覆盖的维度、值或 case；可重复并整体替换",
+    )
     note_parser.add_argument("--latest-evidence", help="最近有效结果或关键反例的有界摘要")
     note_parser.add_argument(
         "--invalidated-source-id",
@@ -4837,7 +5281,7 @@ def build_parser() -> argparse.ArgumentParser:
     note_parser.add_argument(
         "--clear-execution-checkpoint",
         action="store_true",
-        help="清除当前前沿、消费者、验证 case、最近证据和失效 ID",
+        help="清除当前前沿、消费者、验证 case、覆盖边界、最近证据和失效 ID",
     )
     add_state_revision(note_parser)
     note_parser.set_defaults(handler=command_note)

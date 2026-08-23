@@ -78,3 +78,25 @@ References 最终 candidate bundle 为 `BBDC80FA6E84CF1EE599A72715778B582FDA18E2
 模型阶段的失败没有按不变输入重采样：每次 Routing/Policy 失败都先修正可见触发或标签边界并形成新身份；最终 References 输出只因隐藏 oracle 过度要求 CLI 引用而失败。修正 oracle 后，相同 stage 文件、可见输入、capsule 和 evaluator 由新增 `oracle_revalidation` 精确绑定旧失败收据并以 0 input/output tokens 通过；最后刷新为 evaluator run 0、recovered 2、oracle revalidated 1。当前 evaluation plan 为 0 evaluate、3 reuse、0 blocked/pending。
 
 这些证据证明仓库规则、taskctl 结构、评测恢复机制、路由、行为标签和引用选择；不证明真实 Codex 已加载第二版，也不证明 UE 新任务中的写回、维度边界或 runner 选择已经改变。本轮没有 Publish 授权，真实安装保持上次发布版本；行为验收必须留到另行授权发布后的新任务。
+
+## 2026-08-23 第三版验证与发布
+
+用户表示准备发布后，才对稳定候选集中执行完整验证。确定性证据如下：
+
+- `skills/task-table-manager/tests/test_taskctl.py`：102 tests、137.195 秒，全部通过；覆盖同源 `active_frontiers`、执行检查点、结果覆盖边界和 `result_history_state_write_drift` 的 advisory/恢复语义。
+- `quick_validate.py`：本次涉及的 `delivery-workflow`、`execution-governor`、`task-table-manager`、`change-governance` 与 `subagent-orchestration` 均通过；显式 `-X utf8` 修正宿主默认 GBK 后没有内容错误。
+- `validate_contract.ps1`：114 cases、73 strict routing、21 strict references、13/13 skills 具有正向与非触发覆盖。
+- `test_routing_infrastructure.ps1`：6 suites、22 个 PowerShell syntax files、0 模型调用、18.731 秒；专项恢复测试证明同代恢复、跨代 passed carry、同代或跨代 `oracle_revalidation`、篡改来源拒绝、原子 merge 与 staging 清理。
+- `manage_agentbase.ps1 -Action Validate`：67 项 Windows SWE 基础设施测试通过，返回 `valid:true`；evaluator 保持禁用，没有启动 elevated sandbox、外部 clone、qualification 或候选模型。
+
+最终 detached evidence generation 为 `089AC7A5EA9521DE82F919AB6083BF31871B207979FD3010434CA78F209B56B8`：
+
+| 阶段 | 结果 | Capsule SHA-256 |
+| --- | --- | --- |
+| Routing | 114/114 | `6B9BEA76509CD3A08BF15B1FD6545E540D3567892468856985A2FA9D815C8CE8` |
+| Policy | 114/114 | `9DE255414D3C63D36B37B2A953B000C3C300E6A8004B62FB1ADC09381AEF0277` |
+| References | 45/45 | `823BD7AA748B9AC04CF9B67057F9DE685BC29BCEAAFC0A28F1FD32C9412B07E3` |
+
+Routing candidate bundle 为 `4EA7F33A284EF18DC593140F96F6BDFB2466DEBE3597C7A295299386D0190949`，References candidate bundle 为 `3D2831DAA360F7B288C38FB041ABF1FD052AD07658E163C93E6523C0D5FFF0ED`。验证中每次模型失败都先区分规则/引用边界、oracle 与恢复基础设施，再改变对应输入或 oracle；没有对未变输入原样重采样。最后一份 References 输出只包含一个合理的可选引用差异，移除不成立的严格排他后由同一文件、capsule、evaluator 和失败收据以 0 Token 复核；最终刷新为 evaluator run 0、recovered 2、oracle revalidated 1。
+
+用户随后针对本次操作明确授权发布。`DirectCompatibility + InstallPortableSettings` Publish 再次运行 67 项基础设施测试并通过，写入 20 个受管资产，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-150728-c301230b`；同范围只读 Status 返回 `published:true`。这些证据证明仓库候选和真实安装一致，不证明当前已启动任务追溯加载新规则；子代理选择、局部快速路径、状态写回和 preflight 的真实模型行为仍须在新任务中观察。

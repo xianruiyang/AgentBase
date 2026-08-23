@@ -33,7 +33,7 @@
 - 状态: confirmed
 - 关联目标: REQ-003, AC-008
 
-`refresh_routing_evidence.ps1` 把阶段结果原子写入 `evidence/pending/<generation>/`，该目录由 `.gitignore` 排除，不是项目真源。恢复时重新运行当前阶段 validator，并同时匹配 passed receipt、文件 SHA-256、语义结果 SHA-256、capsule 身份与 evaluator；任何一项不一致都不得恢复。generation 改变时先把旧账本原样固化到新 staging，并只在旧 stage、旧 passed receipt、旧账本哈希链和当前 oracle 一致时登记零 Token `staged_carry_forward`；若搬运中途再次中断，新账本沿不可变快照继续剩余阶段。`current.json` 合并成功后才清理已消费的全部 generation staging；原始 JSONL 和临时 Codex home 仍立即删除。
+`refresh_routing_evidence.ps1` 把阶段结果原子写入 `evidence/pending/<generation>/`，该目录由 `.gitignore` 排除，不是项目真源。恢复时重新运行当前阶段 validator，并同时匹配 receipt、文件 SHA-256、语义结果 SHA-256、capsule 身份与 evaluator；任何一项不一致都不得恢复。generation 改变时先把旧账本原样固化到新 staging：旧 passed receipt 在当前 oracle 下仍有效时登记零 Token `staged_carry_forward`；旧 `oracle_violation` 的精确结果在当前 oracle 下已有效时，登记引用上一代失败收据的零 Token `oracle_revalidation`。若搬运中途再次中断，新账本沿不可变快照继续剩余阶段。`current.json` 合并成功后才清理已消费的全部 generation staging；原始 JSONL 和临时 Codex home 仍立即删除。
 
 ## DES-006 确定性测试入口与模型 evaluator 分层
 

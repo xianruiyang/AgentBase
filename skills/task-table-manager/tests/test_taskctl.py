@@ -831,6 +831,45 @@ class TaskctlTests(unittest.TestCase):
             module.model_text_cost(constrained.stdout.rstrip()), 256
         )
 
+    def test_status_model_budget_preserves_a_recoverable_execution_frontier(
+        self,
+    ) -> None:
+        long_frontier = "证据前沿" * 500
+        self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--evidence-frontier",
+            long_frontier,
+            "--active-consumer",
+            "公开消费者" * 300,
+            "--latest-evidence",
+            "关键反例" * 500,
+            "--next-action",
+            "读取并修正唯一 owner" * 300,
+        )
+
+        model = self.run_default_cli(
+            TASKCTL,
+            "status",
+            "--task-dir",
+            str(self.root),
+            "--model-token-budget",
+            "1024",
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertIn("active_frontiers:", model.stdout)
+        self.assertIn("id:T001", model.stdout)
+        self.assertIn("evidence_frontier:", model.stdout)
+        self.assertIn("latest_evidence:", model.stdout)
+        self.assertIn("next_action:", model.stdout)
+        self.assertIn("omitted_or_shortened:", model.stdout)
+        self.assertIn("query this task with context", model.stdout)
+        module = load_taskctl_module()
+        self.assertLessEqual(module.model_text_cost(model.stdout.rstrip()), 1024)
+
     def test_captured_snapshot_matches_final_budgeted_model_upstream(self) -> None:
         captured = None
         for budget in (1536, 1280, 1024, 768, 512):
@@ -1021,6 +1060,12 @@ class TaskctlTests(unittest.TestCase):
             "carrier=StaticMesh",
             "--validation-case",
             "mode=face",
+            "--validated-coverage",
+            "carrier=StaticMesh",
+            "--validated-coverage",
+            "mode=face",
+            "--uncovered-dimension",
+            "mode=angle_threshold",
             "--latest-evidence",
             "face 模式反例推翻统一判据",
             "--invalidated-source-id",
@@ -1038,7 +1083,37 @@ class TaskctlTests(unittest.TestCase):
             checkpoint["state"]["validation_case"],
             ["carrier=StaticMesh", "mode=face"],
         )
+        self.assertEqual(
+            checkpoint["state"]["validated_coverage"],
+            ["carrier=StaticMesh", "mode=face"],
+        )
+        self.assertEqual(
+            checkpoint["state"]["uncovered_dimensions"],
+            ["mode=angle_threshold"],
+        )
         self.assertEqual(checkpoint["state"]["invalidated_source_ids"], ["SOL-001"])
+
+        status = self.run_task("status")
+        frontier = next(
+            item for item in status["active_frontiers"] if item["id"] == "T001"
+        )
+        self.assertEqual(
+            frontier["validated_coverage"], ["carrier=StaticMesh", "mode=face"]
+        )
+        self.assertEqual(frontier["uncovered_dimensions"], ["mode=angle_threshold"])
+        self.assertEqual(
+            frontier["source"]["state_revision"], checkpoint["state"]["revision"]
+        )
+        self.assertEqual(frontier["mutation_scope"], ["src/export/**"])
+
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn("## 当前执行前沿", rendered)
+        self.assertIn("- 已验证覆盖：carrier=StaticMesh, mode=face", rendered)
+        self.assertIn("- 仍未覆盖：mode=angle_threshold", rendered)
+        self.assertRegex(
+            rendered,
+            r"视图刷新时间：\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z",
+        )
 
         context = self.run_task("context", "--id", "T001", "--budget", "12000")
         self.assertEqual(
@@ -1060,7 +1135,87 @@ class TaskctlTests(unittest.TestCase):
         )
         self.assertEqual(cleared["state"]["evidence_frontier"], "")
         self.assertEqual(cleared["state"]["validation_case"], [])
+        self.assertEqual(cleared["state"]["validated_coverage"], [])
+        self.assertEqual(cleared["state"]["uncovered_dimensions"], [])
         self.assertEqual(cleared["state"]["invalidated_source_ids"], [])
+        status = self.run_task("status")
+        self.assertNotIn("T001", {item["id"] for item in status["active_frontiers"]})
+
+    def test_execution_frontier_projection_escapes_markdown_and_filters_terminal_states(
+        self,
+    ) -> None:
+        self.run_task(
+            "note",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--status",
+            "todo",
+            "--evidence-frontier",
+            "不应展示的 todo 前沿",
+        )
+        self.run_task(
+            "note",
+            "--id",
+            "T002",
+            "--owner",
+            "agent-b",
+            "--evidence-frontier",
+            "公开入口 | 第一行\n第二行",
+            "--next-action",
+            "读取同一消费者",
+        )
+        self.add_task(self.task("T003", "阻塞任务", ["SOL-001"]))
+        self.run_task(
+            "note",
+            "--id",
+            "T003",
+            "--owner",
+            "agent-c",
+            "--status",
+            "blocked",
+            "--blocked-reason",
+            "等待 fixture",
+            "--evidence-frontier",
+            "fixture 身份",
+        )
+        self.add_task(self.task("T004", "评审任务", ["SOL-001"]))
+        self.run_task(
+            "note",
+            "--id",
+            "T004",
+            "--owner",
+            "agent-d",
+            "--status",
+            "review",
+            "--evidence-frontier",
+            "oracle 是否有效",
+        )
+        self.add_task(self.task("T005", "退役任务", ["SOL-001"]))
+        self.run_task(
+            "note",
+            "--id",
+            "T005",
+            "--owner",
+            "agent-e",
+            "--status",
+            "retired",
+            "--message",
+            "不再执行",
+            "--evidence-frontier",
+            "不应展示的 retired 前沿",
+        )
+
+        status = self.run_task("status")
+        self.assertEqual(
+            {item["id"] for item in status["active_frontiers"]},
+            {"T002", "T003", "T004"},
+        )
+        rendered = (self.root / "TASK_TABLE.md").read_text(encoding="utf-8")
+        self.assertIn("公开入口 \\| 第一行 第二行", rendered)
+        self.assertNotIn("不应展示的 todo 前沿", rendered)
+        self.assertNotIn("不应展示的 retired 前沿", rendered)
 
     def test_note_on_completed_task_preserves_readable_result(self) -> None:
         completed = self.complete_t001()
@@ -1235,6 +1390,18 @@ class TaskctlTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.run_ok(WORKCTL, "index", "--work-dir", str(self.root))
+        self.run_task("start", "--id", "T001", "--owner", "agent-a")
+        status = self.run_task("status")
+        frontier = next(
+            item for item in status["active_frontiers"] if item["id"] == "T001"
+        )
+        self.assertEqual(
+            [item["id"] for item in frontier["deferred_changes"]], ["DCR-001"]
+        )
+        self.assertIn(
+            "当前证据不足以扩大导出格式",
+            frontier["deferred_changes"][0]["body"],
+        )
         context = self.run_task(
             "context", "--id", "T001", "--budget", "12000", "--capture"
         )
@@ -2887,6 +3054,129 @@ class TaskctlTests(unittest.TestCase):
             "owner_mismatch",
             {item["kind"] for item in json.loads(wrong_owner.stdout)["diagnostics"]},
         )
+
+    def test_valid_orphan_result_reports_recoverable_state_writeback_drift(
+        self,
+    ) -> None:
+        started = self.run_task("start", "--id", "T001", "--owner", "agent-a")
+        next_revision = started["state"]["revision"] + 1
+        orphan = self.root / "results" / f"T001.r{next_revision}.json"
+        orphan.write_text(
+            json.dumps(self.legacy_result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        older = self.root / "results" / "T001.r1.json"
+        older.write_text(
+            json.dumps(self.legacy_result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        shown = self.run_task("show", "--id", "T001")
+        self.assertIsNone(shown["result"])
+        drift = next(
+            item
+            for item in shown["diagnostics"]
+            if item["kind"] == "result_history_state_write_drift"
+        )
+        self.assertEqual(drift["path"], f"results/T001.r{next_revision}.json")
+        self.assertEqual(drift["state_revision"], started["state"]["revision"])
+        self.assertEqual(drift["result_revision"], next_revision)
+        self.assertEqual(drift["result_task_revision"], 1)
+        self.assertEqual(drift["current_task_revision"], 1)
+        self.assertIn("reconciled identical result", drift["recovery"])
+
+        context = self.run_task("context", "--id", "T001", "--budget", "12000")
+        self.assertIn(
+            "result_history_state_write_drift",
+            {item["kind"] for item in context["diagnostics"]},
+        )
+        status = self.run_task("status")
+        self.assertEqual(status["state_writeback_drift_count"], 1)
+        self.assertIn(
+            "result_history_state_write_drift",
+            {item["kind"] for item in status["storage_diagnostics"]},
+        )
+        frontier = next(
+            item for item in status["active_frontiers"] if item["id"] == "T001"
+        )
+        self.assertEqual(
+            frontier["state_writeback_drifts"][0]["result_revision"], next_revision
+        )
+        rendered = self.run_task("render")
+        table = Path(rendered["output"]).read_text(encoding="utf-8")
+        self.assertIn("- 结果/state 结构写回漂移：1", table)
+        self.assertIn("- 状态漂移：results/T001.r", table)
+        self.assertIn("inspect the existing result", table)
+
+        too_far = self.root / "results" / f"T001.r{next_revision + 1}.json"
+        too_far.write_text(
+            json.dumps(self.legacy_result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        status = self.run_task("status")
+        kinds = {item["kind"] for item in status["storage_diagnostics"]}
+        self.assertIn("result_history_state_write_drift", kinds)
+        self.assertIn("result_history_record_unreadable", kinds)
+        too_far.unlink()
+
+        result_file = Path(self.temp.name) / "recover-drift-result.json"
+        result_file.write_text(
+            json.dumps(self.result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        completed = self.run_task(
+            "complete",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--expected-state-revision",
+            str(started["state"]["revision"]),
+        )
+        self.assertTrue(completed["recovered_partial_write"])
+        shown = self.run_task("show", "--id", "T001")
+        self.assertEqual(shown["result"]["outcome"], "导出职责已经实现")
+        self.assertNotIn(
+            "result_history_state_write_drift",
+            {item["kind"] for item in shown["diagnostics"]},
+        )
+        self.assertEqual(self.run_task("status")["state_writeback_drift_count"], 0)
+
+    def test_orphan_from_earlier_task_revision_requires_state_supersession(
+        self,
+    ) -> None:
+        started = self.run_task("start", "--id", "T001", "--owner", "agent-a")
+        next_revision = started["state"]["revision"] + 1
+        orphan = self.root / "results" / f"T001.r{next_revision}.json"
+        orphan.write_text(
+            json.dumps(self.legacy_result_payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        revised_task = self.task(
+            "T001",
+            "实现修订后的导出职责",
+            ["SOL-001"],
+            scope=["src/export/**"],
+        )
+        revised_file = Path(self.temp.name) / "T001-revised-after-orphan.json"
+        revised_file.write_text(
+            json.dumps(revised_task, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        self.run_task("update", "--file", str(revised_file), "--owner", "agent-a")
+
+        shown = self.run_task("show", "--id", "T001")
+        drift = next(
+            item
+            for item in shown["diagnostics"]
+            if item["kind"] == "result_history_state_write_drift"
+        )
+        self.assertEqual(drift["result_task_revision"], 1)
+        self.assertEqual(drift["current_task_revision"], 2)
+        self.assertIn("CAS state note", drift["recovery"])
+        self.assertNotIn("retry complete", drift["recovery"])
 
     def test_complete_recovers_matching_orphan_result(self) -> None:
         claimed = self.run_task("claim", "--id", "T001", "--owner", "agent-a")

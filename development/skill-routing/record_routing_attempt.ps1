@@ -288,7 +288,7 @@ try {
         Invoke-AgentBasePhaseValidation -Results $sourceStage
         $sourceSemanticHash = Get-AgentBaseStageSemanticResultFingerprint -Phase $Phase -Results $sourceStage
         $sourceFileHash = (Get-FileHash -LiteralPath $SourceStagePath -Algorithm SHA256).Hash
-        $sourceReceipts = @($sourceHistory.attempts | Where-Object {
+        $passedSourceReceipts = @($sourceHistory.attempts | Where-Object {
             [string]$_.phase -eq $Phase -and
             [string]$_.outcome -eq 'passed' -and
             [string]$_.stage_result_sha256 -eq $sourceSemanticHash -and
@@ -298,9 +298,30 @@ try {
             [string]$_.evaluation_capsule_sha256 -eq [string]$sourceStage.evaluation_capsule_sha256 -and
             (([string]$_.origin -eq 'evidence_reuse') -or [string]$_.result_sha256 -eq $sourceFileHash)
         })
-        if ($sourceReceipts.Count -ne 1) {
-            throw "$Phase carry-forward source does not match exactly one passed prior receipt"
+        if ($passedSourceReceipts.Count -gt 1) {
+            throw "$Phase carry-forward source matches more than one passed prior receipt"
         }
+        $failedSourceReceipts = if ($passedSourceReceipts.Count -eq 0) {
+            @($sourceHistory.attempts | Where-Object {
+                [string]$_.phase -eq $Phase -and
+                [string]$_.attempt_key -eq $attemptKey -and
+                [string]$_.outcome -eq 'failed' -and
+                [string]$_.failure_class -eq 'oracle_violation' -and
+                [string]$_.result_sha256 -eq $sourceFileHash -and
+                [string]$_.evaluator_id -eq [string]$sourceStage.evaluator.id -and
+                [string]$_.candidate_bundle_sha256 -eq [string]$sourceStage.candidate_bundle_sha256 -and
+                [string]$_.evaluation_input_sha256 -eq [string]$sourceStage.evaluation_input_sha256 -and
+                [string]$_.evaluation_capsule_sha256 -eq [string]$sourceStage.evaluation_capsule_sha256
+            })
+        }
+        else {
+            @()
+        }
+        if ($passedSourceReceipts.Count -eq 0 -and $failedSourceReceipts.Count -ne 1) {
+            throw "$Phase carry-forward source requires exactly one passed prior receipt or one exact oracle-violation receipt"
+        }
+        $sourceReceipt = if ($passedSourceReceipts.Count -eq 1) { $passedSourceReceipts[0] } else { $failedSourceReceipts[0] }
+        $receiptOrigin = if ($passedSourceReceipts.Count -eq 1) { 'staged_carry_forward' } else { 'oracle_revalidation' }
         $history = New-AgentBaseCurrentHistory -ExistingHistory $historyBeforeRollover
         $sourceLedgerHash = (Get-FileHash -LiteralPath $SourceAttemptHistoryPath -Algorithm SHA256).Hash
         if ([string]$history.active_cycle_id -ne $cycleId -or [string]$history.previous_ledger_sha256 -ne $sourceLedgerHash) {
@@ -322,7 +343,7 @@ try {
             candidate_bundle_sha256 = [string]$expectedCapsule.candidate_bundle_sha256
             evaluation_input_sha256 = [string]$expectedCapsule.evaluation_input_sha256
             evaluation_capsule_sha256 = [string]$expectedCapsule.sha256
-            origin = 'staged_carry_forward'
+            origin = $receiptOrigin
             evaluator_model = [string]$sourceStage.evaluator.model
             evaluator_runtime = [string]$sourceStage.evaluator.runtime
         }
@@ -332,7 +353,7 @@ try {
             started_at_utc = $now
             completed_at_utc = $now
             phase = $Phase
-            origin = 'staged_carry_forward'
+            origin = $receiptOrigin
             attempt_key = $attemptKey
             result_sha256 = $sourceFileHash
             stage_result_sha256 = $sourceSemanticHash
@@ -347,10 +368,10 @@ try {
             failure_class = $null
             failure_summary = $null
             retry_justification = $null
-            previous_attempt_id = if ($null -eq $previous) { $null } else { [string]$previous.attempt_id }
-            changed_since_previous = @(Get-AgentBaseRoutingAttemptChanges -Previous $previous -Current $draft)
+            previous_attempt_id = if ($receiptOrigin -eq 'oracle_revalidation' -or $null -eq $previous) { $null } else { [string]$previous.attempt_id }
+            changed_since_previous = if ($receiptOrigin -eq 'oracle_revalidation') { @('oracle_contract') } else { @(Get-AgentBaseRoutingAttemptChanges -Previous $previous -Current $draft) }
             source_evidence_sha256 = $null
-            source_receipt_id = [string]$sourceReceipts[0].attempt_id
+            source_receipt_id = [string]$sourceReceipt.attempt_id
             source_cycle_id = [string]$sourceHistory.active_cycle_id
             duration_ms = 0
             input_tokens = 0
@@ -363,7 +384,7 @@ try {
             attempt_id = [string]$receipt.attempt_id
             cycle_id = [string]$receipt.cycle_id
             phase = $Phase
-            origin = 'staged_carry_forward'
+            origin = $receiptOrigin
             outcome = 'passed'
         }
         return

@@ -21,11 +21,13 @@ release     清除领取意图并回到 todo
 
 所有状态写命令必须传调用方刚读到的 `--expected-state-revision`。命令记录模型已经作出的判断，不决定该判断是否被允许。`retired` 表示任务不再属于当前执行投影，应在 note 中记录原因和替代任务或上游决策 ID；它不删除历史。
 
-`note` 的执行检查点由 `evidence_frontier`、`active_consumer`、可重复的 `validation_case`、`latest_evidence` 和可重复的 `invalidated_source_ids` 组成，`next_action` 继续单独保存。只有这些语义之一实际改变时才写入；反例推翻上游或改变下一动作时，先以同一 CAS 更新检查点，再继续依赖该结论的工作。`--clear-execution-checkpoint` 清除全部检查点字段，不能和新的检查点值并用；`complete/reopen/release` 在各自状态转换中自动清除瞬时检查点，最终验证范围由结果持有。
+`note` 的执行检查点由 `evidence_frontier`、`active_consumer`、可重复的 `validation_case`、当前已取得直接证据的 `validated_coverage`、已知仍未覆盖的 `uncovered_dimensions`、`latest_evidence` 和可重复的 `invalidated_source_ids` 组成，`next_action` 继续单独保存。只有这些语义之一实际改变时才写入；反例推翻上游、覆盖边界或下一动作改变时，先以同一 CAS 更新检查点，再继续依赖该结论的工作。`--clear-execution-checkpoint` 清除全部检查点字段，不能和新的检查点值并用；`complete/reopen/release` 在各自状态转换中自动清除瞬时检查点，最终验证范围由结果持有。
 
 `state/<ID>.json` 的 `started_at` 与 `ended_at` 由 CLI 以 UTC RFC3339 秒级时间维护，模型不提供时间参数：显式 `start` 或状态首次进入 `in_progress` 时填充尚为空的 `started_at`；状态进入 `done/retired` 时填充 `ended_at`；离开终态时清空 `ended_at`，但保留同一任务第一次实际开始时间。旧状态缺少字段时按 `null` 读取，不推测历史时间，只在后续真实转换中写入。时间与状态、revision、结果引用在同一锁和 CAS 边界内提交。
 
 全部状态写命令在状态或结果真源提交后、释放同一工作区锁前自动刷新 `TASK_TABLE.md`。刷新是派生步骤：成功状态在 machine 回执的 `table_view` 中可见；失败时已提交真源保持有效，回执用 `table_view.status: stale` 和 `task_table_refresh_failed` 明确要求修复生成路径或文件系统后运行同一绝对 `--task-dir` 的 `render`，不得原样重试状态写命令。
+
+`complete` 先写不可覆盖的 `results/<ID>.r<next-state-revision>.json`，再写引用它的 state。若两者之间中断，查询把结构与任务身份匹配的下一 revision 结果报告为 `result_history_state_write_drift`，但不修改 state。恢复者检查既有结果和 result/current task revision：结果仍适用且合同未变时，以原预期 state revision 和调和后相同的结果重试，相同内容走已有 partial-write recovery；结果已失效或合同已变时，不向占用路径重试，先用 CAS `note` 记录旧尝试已被越过，再以新的 state revision 完成当前合同。冲突覆盖继续由 `TASK-OVERWRITE` 阻断。
 
 内置状态、依赖类型、来源 ID 格式、reasoning hint、项目相对 mutation scope 和去重列表是推荐合同。可解析的非标准语义值保留原值并返回诊断，不用 argparse 枚举把文档语义改写成工具许可。
 

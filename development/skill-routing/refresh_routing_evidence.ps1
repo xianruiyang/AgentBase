@@ -317,7 +317,8 @@ function Invoke-AgentBaseCarryForwardReceipt {
     }
     if ($PhaseName -eq "References") { $parameters.RoutingResultsPath = $RoutingPath }
     $receipt = & (Join-Path $PSScriptRoot "record_routing_attempt.ps1") @parameters
-    $receipt | Add-Member -NotePropertyName action -NotePropertyValue "carried-forward" -Force
+    $action = if ([string]$receipt.origin -eq 'oracle_revalidation') { 'oracle-revalidated' } else { 'carried-forward' }
+    $receipt | Add-Member -NotePropertyName action -NotePropertyValue $action -Force
     $receipt | Add-Member -NotePropertyName result_path -NotePropertyValue ([IO.Path]::GetFullPath($TargetPath)) -Force
     return $receipt
 }
@@ -451,7 +452,8 @@ try {
             $carried = Invoke-AgentBaseCarryForwardReceipt -PhaseName $phase -SourcePath (Join-Path $carrySourceRoot ("{0}.json" -f $phase.ToLowerInvariant())) -TargetPath $stagePaths.$phase -SourceHistoryPath $carrySourceHistoryPath
             if ($null -ne $carried) {
                 $receipts[$phase] = $carried
-                $carriedResults.Add($carried)
+                if ([string]$carried.action -eq 'oracle-revalidated') { $revalidatedResults.Add($carried) }
+                else { $carriedResults.Add($carried) }
             }
         }
         if (-not $receipts.ContainsKey($phase) -and [string]$initialPlan.phases.$phase.action -eq "reuse") {
@@ -516,7 +518,8 @@ try {
             $carried = Invoke-AgentBaseCarryForwardReceipt -PhaseName References -SourcePath (Join-Path $carrySourceRoot 'references.json') -TargetPath $stagePaths.References -SourceHistoryPath $carrySourceHistoryPath -RoutingPath $stagePaths.Routing
             if ($null -ne $carried) {
                 $receipts.References = $carried
-                $carriedResults.Add($carried)
+                if ([string]$carried.action -eq 'oracle-revalidated') { $revalidatedResults.Add($carried) }
+                else { $carriedResults.Add($carried) }
             }
         }
         if (-not $receipts.ContainsKey("References")) {

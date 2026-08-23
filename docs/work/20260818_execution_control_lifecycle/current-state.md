@@ -165,3 +165,108 @@ References 模型输出只因隐藏 oracle 过度要求 CLI 引用而被记为 `
 - 关联: AC-066, OBS-012
 
 相同模型输出已经满足当前 oracle 时，重新采样既不增加产品信息，又违反“不变输入不为期待不同结果重跑”。账本需要一种精确引用旧失败收据、文件哈希、capsule 和 evaluator 的通过来源，并继续受总收据上限与原子 merge 约束。
+
+## OBS-013 第二版任务真源已有前沿字段，但生成视图没有投影
+
+- 状态: confirmed
+- 来源: `skills/task-table-manager/scripts/taskctl.py` 的 state schema、`command_context`、`command_status` 与 `render_task_table_locked` 修改前实现；真实 UAI T50 state/TASK_TABLE 对照
+- 证据上限: 证明现有字段和关联 DCR 能在 task owner 内派生，且 status/TASK_TABLE 未展示；不证明模型每次都只读取生成视图
+
+第二版 state 已持有 `evidence_frontier`、`active_consumer`、`validation_case`、`latest_evidence`、`invalidated_source_ids` 和 `next_action`，任务合同持有范围与验证维度，`context` 能读取关联 DCR；但 `status` 只给计数与诊断，`TASK_TABLE.md` 只给稳定任务行。真实 T50 state 与 TASK_TABLE 同时刷新却看不出前沿变化，说明问题不是必然的文件刷新失败，而是已有 owner 缺少稀疏读取投影。
+
+## OBS-014 `complete` 两阶段写入允许结构有效的下一 revision 结果静默存在
+
+- 状态: confirmed
+- 来源: `taskctl.py` 修改前 `command_complete`、`result_history_diagnostics` 与 partial-write recovery
+- 证据上限: 只覆盖 result 已落盘、state 尚未提交的结构边界，不证明结果正文或验证语义有效
+
+`complete` 先写 `results/<ID>.r<state+1>.json` 再原子写 state；相同内容重试本来能够恢复。但读取诊断允许 `state+1` 的结构有效结果且不报告其尚未被 state 引用，导致最需要恢复的中间态没有可见信号。自动推进 state 会越过模型完成判断，硬阻断读取又会破坏已有恢复路径。
+
+## OBS-015 昂贵动作已有停止原则但缺少最小充分 preflight 合同
+
+- 状态: confirmed
+- 来源: 第二版 `execution-governor/references/failure-and-cost.md` 与用户提供的 UE 实践复盘
+- 证据上限: 证明通用原则没有明确覆盖输入/schema、fixture/catalog、路径/权限、runner/lifecycle 和产品 oracle；领域具体检查仍由各项目 owner 决定
+
+第二版要求昂贵运行写清当前判断、可推翻观察、最低成本入口和失败分类，但没有把会在产品机制前串行暴露的适用前置条件组织成一次 runner preflight，也没有规定 ready/blocked 的遮蔽与恢复输出。继续只靠模型临时拼装会重复 UE 实践中的低信息收益失败；把 UE 语法写进全局规则又会违反领域 owner 边界。
+
+## OBS-016 可观察行为责任已经建立，但失效层仍未结构化区分
+
+- 状态: confirmed
+- 来源: AC-066、`global/AGENTS.md` 与 `change-governance/references/causal-analysis.md` 修改前正文
+- 证据上限: 证明候选要求定位规则、路由、入口、反馈、状态和验证缺口，但没有给出可逐项验收的层级与证据边界
+
+同一次错误可能来自规则缺失、skill/引用未触发、规则已读但动作不遵守，或动作正确而状态未回流。现有枚举没有要求按实际 trace 区分最早失效层，因此模型仍可能在规则已存在时继续堆规则，或把 task state 滞后误归为路由失败。
+
+## GAP-011 当前证据前沿缺少一次有界的同源派生读取面
+
+- 状态: confirmed
+- 关联: AC-069, OBS-013
+
+现有任务真源足以提供大部分前沿事实，但广域 status/TASK_TABLE 无法一次回答当前范围、消费者、覆盖边界、DCR、反例、下一动作和来源 revision；新增人工活动文档会形成第二状态源。
+
+## GAP-012 结果与 state 的结构写回漂移缺少 advisory 恢复诊断
+
+- 状态: confirmed
+- 关联: AC-069, OBS-014
+
+合法的 partial-write 中间态既不能自动晋升，也不应被当作损坏记录；需要从同一结果历史 owner 精确识别 `state+1` 未引用结果并保留已有相同内容恢复与冲突阻断语义。
+
+## GAP-013 昂贵动作的前置证据没有形成领域 runner 可消费的通用合同
+
+- 状态: confirmed
+- 关联: AC-070, OBS-015
+
+现有停止原则不足以保证一次检查会在完整运行前暴露输入、fixture、权限、runner 生命周期和 oracle 到达性；同时 AgentBase 不应成为领域命令或检查实现 owner。
+
+## GAP-014 规则系统失败没有按定义、路由、动作和写回四层定位
+
+- 状态: confirmed
+- 关联: AC-071, OBS-016
+
+AC-066 的责任边界已经成立，但缺少直接证据到修复 owner 的稳定映射，导致规则存在、路由 evidence、实际动作和 state/result receipt 仍可能互相冒充。
+
+## OBS-017 当前实现尚未收敛时启动了长回归
+
+- 状态: confirmed
+- 来源: 本轮 taskctl 第一批代码修改后即启动完整单组件回归，用户随后明确纠正验证时点
+- 证据上限: 证明候选内容仍会继续变化时该次完整回归不能作为最终发布证据；不否定低成本局部检查对当前实现的判别价值
+
+验证开始时任务读取面、规则合同、路由用例和文档仍未完成，后续输入必然变化；即使该回归最终结束，也需要在稳定候选上重新覆盖最终影响范围。提前运行因而消耗墙钟时间且不能减少发布前验证，违反信息收益原则。
+
+## GAP-015 正式验证没有绑定候选稳定与发布前边界
+
+- 状态: confirmed
+- 关联: AC-072, OBS-017
+
+现有“修改后验证”容易被解释为每个局部补丁后立即跑完整回归，没有区分能即时改变实现的低成本检查与只应在稳定发布候选上执行的完整回归、独立模型评测和部署 Validate。
+
+## OBS-018 局部任务的非触发边界已分散存在但没有统一快速路径
+
+- 状态: confirmed
+- 来源: 修改前 `global/AGENTS.md` 的机械任务条款，delivery/change/execution skill 的非触发边界，以及 routing 的 `mechanical-document-edit`、`specified-local-implementation` 用例
+- 证据上限: 证明已知 owner 的简单修改可以不选治理 skill，但不证明模型会按当前动作而非项目总体规模稳定选择该路径
+
+现有合同分别排除了机械任务、稳定上游普通实现和无共享前提的执行控制，却没有用同一组可观察条件说明何时直接读改验收并停止。大型项目背景仍可能让模型对一个已知 owner 的局部动作重新加载完整交付链或治理审计；继续新增专项排除用例不会形成统一停止边界。
+
+## GAP-016 局部任务缺少按当前动作判定的统一执行与停止条件
+
+- 状态: confirmed
+- 关联: AC-073, OBS-018
+
+需要把 owner、契约、验收、共享未知和长期职责变化合成一条全局快速路径，并让既有局部边界用例验证该行为；一旦这些条件失效仍返回对应深层 owner，而不是把快速路径绝对化。
+
+## OBS-019 子代理合同把实验生命周期边界与只读边界混在一起
+
+- 状态: confirmed
+- 来源: 修改前 `global/agents/evidence.toml`、`global/agents/experiment.toml` 与 `skills/subagent-orchestration`；用户对真实连续实现试错和交接 Token 的补充
+- 证据上限: 证明当前文本容易把“实验代码不是生产实现”理解为“实验不能改代码”，且交付模板包含可重复字段；不证明每次子代理实际输出都冗长或只读
+
+`evidence` 与 `experiment` 已有稳定身份、隔离范围和主代理接纳责任，但两个交付模板仍接近完整报告；`experiment` 同时写“只写隔离范围”“不得修改生产真源”“补丁不直接合入”，没有明确可在可回滚隔离面真实改代码，也没有覆盖前一失败连续遮蔽后续问题、主代理因而反复小改并启动昂贵验证的试路场景。
+
+## GAP-017 子代理缺少稀疏决策交付与连续遮蔽问题的可回滚实验语义
+
+- 状态: confirmed
+- 关联: AC-068, OBS-019
+
+需要把所有子代理交接收敛为只含非空、可逐项接纳且能改变主代理裁决的最小证据包；同时允许 `experiment` 在有恢复依据且不污染无关 dirty 内容的隔离面迭代修改实验代码，以有界探针提前发现可行路径和有证据支持的后继约束。实验补丁仍须由主代理按正式 owner 与契约重写、修订接入或拒绝，不能自动转正。
