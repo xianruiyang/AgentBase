@@ -13,6 +13,14 @@
 
 首次完整 `cargo ci-test` 的 YAML 反例直接覆盖产品 emitter，修正实现与输入后本次完整 suite 通过；没有对未变输入原样重跑。私有 Release、可重复 archive、真实 Upgrade/doctor 和已安装回卷读回在实现提交后取得，不由候选测试提前替代。
 
+## 0.4.3 发布、安装与部署证据
+
+- source revision 为 `f4e35707fcb69e69ed9583bf108a96727f8d5087`；以该提交时间固定 `SOURCE_DATE_EPOCH` 的两次 clean Windows archive SHA-256 均为 `9d0b9569a4c19e6e1c20cc5e9625d882a5e9acfeabde93e6ee89533fdcc9e52c`，manifest 固定 `x86_64-pc-windows-msvc`、Rust 1.85.0 与同一 revision。
+- `cargo audit 0.22.2 --no-fetch` 使用本机当前 1225 条 RustSec advisory 扫描 127 个依赖，无漏洞；Release 安装合同覆盖资产集合、认证下载边界、状态读回、缺失 checksum 拒绝和 0.4.3 版本。
+- 私有 [GitHub Release srcq-v0.4.3](https://github.com/xianruiyang/AgentBase/releases/tag/srcq-v0.4.3) 指向该 revision，包含 archive、checksum、manifest、SPDX SBOM、第三方许可证和两份安装脚本；通过 Release 下载的 wrapper 真实 Upgrade 后，machine Status 为 `ready:true`、完整性 verified、PATH 条目 1，`srcq 0.4.3`、`srcq doctor` 与 `srcq query scc doctor` 均通过。
+- 已安装二进制从 `srcq query rg exec --limit 1` 返回 `@next srcq more q921`，直接执行后取得下一页并返回 `q922`；六位上限回卷由同一发布源码的 focused/full tests 直接覆盖，不用伪造真实用户 spool 冒充安装读回。
+- 同轮 `DirectCompatibility + InstallPortableSettings` Publish 通过 67/67 evaluator-disabled 基础设施检查，返回 `published:true`、`changed:10`；发布后 Status 为 `published:true`，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-211434-11afc187`。
+
 ## 0.4.2 当前周期候选证据
 
 | 检查 | 结果 | 证明范围 |

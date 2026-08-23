@@ -41,3 +41,4 @@
 - 正式 Routing 刷新依次暴露并修正四个既有 description 边界：受保护待议上游需要重投影任务表、局部架构风险不自动升级完整 delivery、临时路径只读生命周期评审属于 governance、仅据已知事实纠正错误前提不属于 governance。每次都改变 evaluator 可见输入后再评估，没有对同一输入原样重采样；上一代已通过 Policy 由 `staged_carry_forward` 收据迁移，未重复调用模型。
 - 最终 generation `94F0F1833032D2C480AB2E126544842C2907ACBFCC8296F53E350DD877BF4D17` 的 Routing、Policy、References 全部通过当前 oracle，后继计划为 0 evaluate、3 reuse、0 blocked/pending。最后一次刷新只运行 Routing 与 References，Policy carry-forward；`manage_agentbase.ps1 -Action Validate` 的 evaluator-disabled Windows SWE 基础设施 67/67 通过并返回 `valid:true`。
 - 本次没有运行 Windows SWE 九题、candidate、qualification、外部 Verifier 或 elevated sandbox 初始化；上述证据只覆盖规则/skill 路由、确定性基础设施和部署候选合同，真实子代理选择仍需新任务消费发布后的指令链。
+- 用户针对本次操作明确授权后，`DirectCompatibility + InstallPortableSettings` Publish 再次通过 67/67 evaluator-disabled 基础设施检查，返回 `published:true`、`changed:10`，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-211434-11afc187`；同范围发布后 Status 返回 `published:true`。

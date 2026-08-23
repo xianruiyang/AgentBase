@@ -2,7 +2,7 @@
 
 ## SOL-001 将 query 续页投影为短句柄模型动作
 
-- 状态: verified
+- 状态: released
 - 解决: GAP-001
 - 满足: REQ-001, AC-001, AC-002, AC-003, CON-003, DES-001, DES-002, DES-003, DES-004, UDES-001
 

@@ -372,7 +372,7 @@ TSQG-099—TSQG-102 已闭环。`srcq 0.4.2` 以 revision `ef65946f…9c04` 生�
 
 P15 不改变 `srcq more q<number>`、machine cursor、snapshot schema、记录 payload 或 cache/process 分页。现存记录的文件集合仍是分配与淘汰唯一状态；新编号持锁环形查找空闲值，写入后以该值为原点按环形年龄删除最旧记录。七位以上句柄只作为 0.4.2 升级兼容输入保留，在后续写入中优先自然淘汰。
 
-TSQG-103—TSQG-104 已由 0.4.3 候选与完整组件门禁覆盖；全量性质测试同时发现并闭合 YAML emitter 的独立真实反例。TSQG-105 已完成路由与部署 Validate，仍待从实现提交生成可重复 Release、真实 Upgrade/doctor、已安装续页读回和本次已授权 Codex Publish 后关闭。
+TSQG-103—TSQG-105 已闭环。0.4.3 候选与完整组件门禁覆盖六位环形句柄；全量性质测试同时发现并闭合 YAML emitter 的独立真实反例。revision `f4e3570…5087` 的两次 clean archive SHA-256 相同，私有 `srcq-v0.4.3` Release、真实 Upgrade/doctor、已安装 `q921 → q922` 续页、路由 evidence、DirectCompatibility Publish 与发布后 Status 均通过，P15 不再保留开放仓库实施项。
 
 ## 5. 停止与重开条件
 
