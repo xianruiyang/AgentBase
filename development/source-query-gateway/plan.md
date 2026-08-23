@@ -360,6 +360,20 @@ P14 以 TSQG-100 的 scc 首屏—续页—单次扫描作为首个真实消费�
 
 TSQG-099—TSQG-102 已闭环。`srcq 0.4.2` 以 revision `ef65946f…9c04` 生成两份 SHA-256 相同的 clean Windows archive，并经私有 GitHub Release 安装到真实 PATH；Status、AST/scc doctor 与已安装短句柄续页通过。source-query 路由合同、36 项 query gateway、workspace build/test/lint/fmt 和 release gates 通过；正式部署还暴露并修正了 Windows SWE 预检仍解析旧 `--after` 长命令的真实消费者缺口，聚焦测试后 Validate/Publish 各 67 项通过。DirectCompatibility + InstallPortableSettings 发布后 gap 为 0，P14 不再保留开放仓库实施项。
 
+### P15 query model 六位循环句柄
+
+2026-08-23 的实际 spool 复核满足 P14 的短句柄误用重开条件：记录和 snapshot 已分别有界为 128 条与 32 份，旧记录会淘汰，但可见编号仍跨任务单调增长。用户明确句柄不是持久引用，要求新编号最多六位并在上限后循环，不为淘汰记录永久保存历史身份。
+
+| ID | 任务 | 依赖 | 产出 | 验证与闭环 |
+| --- | --- | --- | --- | --- |
+| TSQG-103 | 修订临时句柄生命周期与兼容边界 | TSQG-102 | REQ-002、AC-004/005、CON-004 与同 owner 环形设计 | `q1`—`q999999` 不补零；活动记录不覆盖；旧七位记录只读过渡；不增加永久 counter、tombstone 或第二状态源 |
+| TSQG-104 | 实现六位环形分配和环形年龄淘汰 | TSQG-103 | 0.4.3 候选、回卷/窗口/旧记录单元测试 | `q999999` 后生成 `q1`；新 `q1` 保留、最旧高位记录淘汰、下一编号为 `q2`；既有并发、快照、argv 和 machine 合同不退化 |
+| TSQG-105 | 完成组件验证、release、安装和 Codex 发布 | TSQG-104 | 私有 0.4.3 Release、真实 Upgrade/doctor、source-query 临时游标指引、DirectCompatibility 发布和完成审计 | release checklist、路由/部署合同、已安装真实续页、Status 与非强制远端同步均有直接证据 |
+
+P15 不改变 `srcq more q<number>`、machine cursor、snapshot schema、记录 payload 或 cache/process 分页。现存记录的文件集合仍是分配与淘汰唯一状态；新编号持锁环形查找空闲值，写入后以该值为原点按环形年龄删除最旧记录。七位以上句柄只作为 0.4.2 升级兼容输入保留，在后续写入中优先自然淘汰。
+
+TSQG-103—TSQG-104 已由 0.4.3 候选与完整组件门禁覆盖；全量性质测试同时发现并闭合 YAML emitter 的独立真实反例。TSQG-105 已完成路由与部署 Validate，仍待从实现提交生成可重复 Release、真实 Upgrade/doctor、已安装续页读回和本次已授权 Codex Publish 后关闭。
+
 ## 5. 停止与重开条件
 
 - AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断或 release gate 任一发生非必要变化时，停止并回到设计裁决。

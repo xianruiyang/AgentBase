@@ -102,6 +102,38 @@ proptest! {
 }
 
 #[test]
+fn token_safe_budget_emits_valid_yaml_when_truncation_ends_on_private_use_text() {
+    let text = " ¡   ¡  ¡\n\u{e000}  ";
+    let settings = BudgetSettings::new(1, 11, 543).expect("budget settings");
+    let mut aggregator =
+        ContextAggregator::new(Profile::TokenSafe, settings).expect("context aggregator");
+    let native = json!({
+        "file": "src/0000.ts",
+        "range": {
+            "start": {"line": 0, "column": 0},
+            "end": {"line": 0, "column": text.chars().count()},
+        },
+        "text": text,
+        "metaVariables": {"single": {"A": {"text": text}}},
+    });
+    aggregator
+        .push_token_safe(project_token_safe(0, &native))
+        .expect("projected record");
+    let context = aggregator.finish().expect("fitted context");
+    let mut yaml = Vec::new();
+    context
+        .document
+        .write_yaml(&mut yaml)
+        .expect("write context YAML");
+    parse_yaml_documents(&yaml).unwrap_or_else(|error| {
+        panic!(
+            "YAML is invalid: {error}\n{}",
+            String::from_utf8_lossy(&yaml)
+        )
+    });
+}
+
+#[test]
 fn cache_paths_reject_parent_segments_workspace_roots_and_invalid_ids() {
     let workspace = tempfile::tempdir().expect("workspace");
     let unsafe_root = workspace.path().join("cache");

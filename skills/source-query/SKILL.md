@@ -9,7 +9,7 @@ description: 仅在 srcq 分页或截断阻断当前必要证据，需诊断 src
 
 只读取当前缺口对应的引用：
 
-- 分页使必要结果尚未展示：query 的 `@more` 后直接执行 `@next` 提供的 `srcq more q<number>` 短命令，不改写句柄、不自行重组 cursor、控制面或原生 argv，也不读取引用；正文截断实际影响判断时先按已返回定位有界直读。缺少 `@next`、续页异常或明确需要特殊原生、machine/native/artifact 时，rg/fd 读取 [rg-fd.md](references/rg-fd.md)，scc 读取 [scc.md](references/scc.md)。
+- 分页使必要结果尚未展示：query 的 `@more` 后直接执行 `@next` 提供的 `srcq more q<number>` 短命令，不改写句柄、不自行重组 cursor、控制面或原生 argv，也不读取引用；该句柄只是当前 spool 中的临时游标，不把旧句柄记录为持久引用。正文截断实际影响判断时先按已返回定位有界直读。缺少 `@next`、续页异常或明确需要特殊原生、machine/native/artifact 时，rg/fd 读取 [rg-fd.md](references/rg-fd.md)，scc 读取 [scc.md](references/scc.md)。
 - 用户要求判断 srcq 是否缺少能力、错误返回或投影降级是否为产品缺陷，或当前失败会改变查询方案：读取 [diagnostics.md](references/diagnostics.md)，先核对实际版本、对应帮助和原命令，再区分输入、范围、正常协议、降级与产品机制。
 - 实际需要 scc 的 files、hotspots、lossless、raw、machine、native、artifact、输出副作用边界或结构化续页：读取 [scc.md](references/scc.md)。
 - 文本仍不能确定语法边界、控制流或结构关系，或明确需要 rule/rewrite：读取 [ast.md](references/ast.md)。

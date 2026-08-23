@@ -49,7 +49,7 @@
 @unprojectable <N>
 ```
 
-query 的 `@more` 只表示仍有未展示证据，紧随其后的 `@next` 值是 PowerShell 7 可直接执行的唯一下一动作。短句柄由 query spool 在进程间锁下单调分配，并在同一 owner 内绑定 cursor、snapshot、backend、解析后的 engine/cwd、实际 view、分页参数和全部原生 argv；续页读取持久化快照而不重新运行原生查询。模型不读取句柄记录，也不重组控制面。记录或 snapshot 被有界淘汰、损坏或不匹配时明确报过期并要求重跑原查询，不把旧句柄改指向另一查询。cache/process 继续用其独立的 `@more cache/after` 协议，不与 query 句柄混用。不能续读的结果或行省略使用 `@cut`。`@unprojectable` 表示 cache 中存在无法形成位置投影的记录。同一结果同时发生分页和正文截断时可分别出现信号。真正未知不得省略成默认；无法可靠表达时返回错误并建议 machine/artifact，而不是输出看似完整的正文。
+query 的 `@more` 只表示仍有未展示证据，紧随其后的 `@next` 值是 PowerShell 7 可直接执行的唯一下一动作。短句柄由 query spool 在进程间锁下从不补零的 `q1` 至 `q999999` 环形分配，并在同一 owner 内绑定 cursor、snapshot、backend、解析后的 engine/cwd、实际 view、分页参数和全部原生 argv；分配永不覆盖当前最多 128 条现存记录，续页读取持久化快照而不重新运行原生查询。句柄只是记录仍存在期间的临时游标，记录淘汰后允许复用其编号；模型不读取句柄记录、不把旧句柄当成持久身份，也不重组控制面。现存记录或 snapshot 损坏、不匹配或已经淘汰时明确报过期并要求重跑原查询。cache/process 继续用其独立的 `@more cache/after` 协议，不与 query 句柄混用。不能续读的结果或行省略使用 `@cut`。`@unprojectable` 表示 cache 中存在无法形成位置投影的记录。同一结果同时发生分页和正文截断时可分别出现信号。真正未知不得省略成默认；无法可靠表达时返回错误并建议 machine/artifact，而不是输出看似完整的正文。
 
 ## 选择与验证
 

@@ -289,6 +289,10 @@ fn can_use_literal(value: &str) -> bool {
     value.contains('\n')
         && value.chars().any(|character| character != '\n')
         && !value.ends_with("\n\n")
+        && value
+            .split('\n')
+            .find(|line| !line.is_empty())
+            .is_some_and(|line| !line.starts_with(' ') && !line.starts_with('\t'))
         && value.chars().all(|character| {
             matches!(character, '\n' | '\t' | ' '..='~')
                 || (character >= '\u{00a0}'
@@ -494,6 +498,18 @@ mod tests {
             assert_eq!(actual, vec![expected]);
             assert_eq!(yaml.last(), Some(&b'\n'));
         }
+    }
+
+    #[test]
+    fn emitter_quotes_multiline_text_whose_first_content_line_is_indented() {
+        let expected = json!(" leading\nnext");
+        let mut yaml = Vec::new();
+        write_yaml_document(&expected, &mut yaml, false).expect("emit quoted YAML");
+        assert!(yaml.starts_with(b"\""));
+        assert_eq!(
+            parse_yaml_documents(&yaml).expect("parse quoted YAML"),
+            vec![expected]
+        );
     }
 
     #[test]

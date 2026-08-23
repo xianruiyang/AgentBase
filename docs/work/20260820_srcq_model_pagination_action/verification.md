@@ -1,5 +1,18 @@
 # 验证记录
 
+## 0.4.3 六位环形句柄候选证据
+
+| 检查 | 结果 | 证明范围 |
+| --- | --- | --- |
+| continuation focused tests | pass | canonical `q1`—`q999999`、旧七位句柄可读、`q999999 → q1 → q2` 回卷、活动记录不覆盖、环形年龄窗口和旧记录优先淘汰 |
+| `cargo ci-test` | pass | 全 workspace；57 项 CLI 单元测试、36 项真实 query gateway 及 cache/codec/property/stress 等合同通过；依赖真实 ast-grep/PTY 的既有专项保持 ignored |
+| YAML 定向与性质回归 | pass | 首个多行内容行带额外缩进且后续含 private-use 字符时改用安全 quoted scalar；原 `token_safe_budget_is_deterministic_bounded_and_unicode_safe` 与新增定向回归均通过 |
+| `cargo ci-build` / `cargo lint` / `cargo fmt-check` | pass | 0.4.3 workspace build、严格 Clippy 与 Rust 格式合同 |
+| `scripts/test-install-srcq-views.ps1` | pass | Release 安装脚本 model/machine 视图合同 |
+| source-query quick validation | pass | 临时句柄生命周期与 `srcq more` 渐进恢复说明结构、引用有效 |
+
+首次完整 `cargo ci-test` 的 YAML 反例直接覆盖产品 emitter，修正实现与输入后本次完整 suite 通过；没有对未变输入原样重跑。私有 Release、可重复 archive、真实 Upgrade/doctor 和已安装回卷读回在实现提交后取得，不由候选测试提前替代。
+
 ## 0.4.2 当前周期候选证据
 
 | 检查 | 结果 | 证明范围 |

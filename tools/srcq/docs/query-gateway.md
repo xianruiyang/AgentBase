@@ -32,7 +32,7 @@ srcq query <rg|fd|scc> doctor [--engine PATH] [--cwd PATH]
 
 ## 完整性与快照
 
-结构化执行对 stdout 设置 256 MiB、stderr 设置 16 MiB 的硬捕获上限；超过上限会终止整个原生进程组并返回 wrapper 错误。成功捕获先保留在当前进程内；只有需要续页、machine full 或显式 full receipt 时才计算快照身份并持久化，最多保存 32 份。model 正常完整结果只写证据；query 分页追加 `@more shown=<N> omitted=<N>` 与 `@next srcq more q<number>`。短句柄记录最多保存 128 份，按十进制单调递增且在受管 spool 保留周期内不复用；模型只传递句柄。正文或不可续读的结果/行省略追加 `@cut text|results|lines=<N>`。machine auto 保留 `sgy.query.result/v2`，full 保留 `sgy.query.result/v1`。rg 无匹配继续返回原生 exit 1 和空 stdout，原生错误不能伪装成完整空结果。raw、artifact 与 passthrough 保持原生或清单合同。
+结构化执行对 stdout 设置 256 MiB、stderr 设置 16 MiB 的硬捕获上限；超过上限会终止整个原生进程组并返回 wrapper 错误。成功捕获先保留在当前进程内；只有需要续页、machine full 或显式 full receipt 时才计算快照身份并持久化，最多保存 32 份。model 正常完整结果只写证据；query 分页追加 `@more shown=<N> omitted=<N>` 与 `@next srcq more q<number>`。短句柄记录最多保存 128 份；新编号从不补零的 `q1` 至 `q999999` 环形分配，只复用已经不在现存 registry 中的编号。模型只传递当前输出的临时句柄；句柄记录淘汰后不再承诺旧命令可用，也不为其保存永久 tombstone 或无限计数。正文或不可续读的结果/行省略追加 `@cut text|results|lines=<N>`。machine auto 保留 `sgy.query.result/v2`，full 保留 `sgy.query.result/v1`。rg 无匹配继续返回原生 exit 1 和空 stdout，原生错误不能伪装成完整空结果。raw、artifact 与 passthrough 保持原生或清单合同。
 
 model 首个可续页结果在 `@next` 后返回短命令；machine 继续返回 `query_snapshot` 与 `next_cursor`。model 直接执行 `@next` 后的命令，例如：
 
@@ -40,7 +40,7 @@ model 首个可续页结果在 `@next` 后返回短命令；machine 继续返回
 srcq more q17
 ```
 
-同一 query owner 的不可变句柄记录保存完整 cursor、backend、已解析 engine/cwd、分页参数和原生 argv；每个后继页分配新句柄，因此并发读取不会共享可变的“最后一页”状态。句柄目录和 snapshot 目录共用进程间 spool lock，分配原子；记录损坏、过期或引用的 snapshot 已淘汰时以 wrapper code 125 明确拒绝，并要求重跑原查询，不重扫或猜测恢复。`auto` 的首个实际 view 仍写入 cursor，后续页固定复用，避免页形状变化导致表示切换。snapshot 身份绑定 backend、引擎路径与版本、cwd、原生 argv、退出、stdout、stderr 和 backend 所需的稳定补充状态；fd 另绑定类型快照，目录、文件、reparse point、大小与哈希均读回校验。machine 消费者仍可显式使用长 cursor；其未知、损坏、跨查询或跨 view 续点继续局部拒绝。
+同一 query owner 的不可变句柄记录保存完整 cursor、backend、已解析 engine/cwd、分页参数和原生 argv；每个后继页分配新句柄，因此并发读取不会共享可变的“最后一页”状态。句柄目录和 snapshot 目录共用进程间 spool lock，分配原子且不会覆盖现存记录；写入后以最新编号为原点按环形年龄淘汰最旧记录，保证回卷后的新 `q1` 不会因数值较小而被误删。0.4.2 可能生成的七位以上记录在仍存在时保持可读，新记录写入后优先自然淘汰。记录损坏、过期或引用的 snapshot 已淘汰时以 wrapper code 125 明确拒绝，并要求重跑原查询，不重扫或猜测恢复。`auto` 的首个实际 view 仍写入 cursor，后续页固定复用，避免页形状变化导致表示切换。snapshot 身份绑定 backend、引擎路径与版本、cwd、原生 argv、退出、stdout、stderr 和 backend 所需的稳定补充状态；fd 另绑定类型快照，目录、文件、reparse point、大小与哈希均读回校验。machine 消费者仍可显式使用长 cursor；其未知、损坏、跨查询或跨 view 续点继续局部拒绝。
 
 ## 失败与安全
 

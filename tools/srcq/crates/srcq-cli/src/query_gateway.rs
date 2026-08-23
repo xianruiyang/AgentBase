@@ -27,6 +27,7 @@ const MAX_STDOUT_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_STDERR_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_SPOOL_ENTRIES: usize = 32;
 const MAX_CONTINUATION_ENTRIES: usize = 128;
+const MAX_CONTINUATION_NUMBER: u64 = 999_999;
 const CONTINUATION_SCHEMA: &str = "sgy.query.continuation/v1";
 pub(super) const DIRECT_COMPLETE_MAX_UNITS: usize = 512;
 const DIRECT_SINGLE_PATH_MAX_TEXT_CHARS: usize = 1024;
@@ -1718,12 +1719,12 @@ fn persist_continuation(
     drop(staging_file);
     fs::rename(&staging, continuations.join(format!("{handle}.json")))
         .map_err(|error| GatewayError::io("cannot commit continuation record", error))?;
-    prune_continuations(&continuations)?;
+    prune_continuations(&continuations, next_number)?;
     Ok(handle)
 }
 
 fn next_continuation_number(root: &Path) -> Result<u64, GatewayError> {
-    fs::read_dir(root)
+    let used = fs::read_dir(root)
         .map_err(|error| GatewayError::io("cannot enumerate continuations", error))?
         .filter_map(Result::ok)
         .filter_map(|entry| {
@@ -1733,9 +1734,17 @@ fn next_continuation_number(root: &Path) -> Result<u64, GatewayError> {
                 .and_then(|name| name.strip_suffix(".json"))
                 .and_then(parse_continuation_number)
         })
-        .max()
-        .unwrap_or(0)
-        .checked_add(1)
+        .filter(|number| *number <= MAX_CONTINUATION_NUMBER)
+        .collect::<BTreeSet<_>>();
+    let highest = used.iter().next_back().copied().unwrap_or(0);
+    let first = if highest == MAX_CONTINUATION_NUMBER {
+        1
+    } else {
+        highest + 1
+    };
+    (first..=MAX_CONTINUATION_NUMBER)
+        .chain(1..first)
+        .find(|number| !used.contains(number))
         .ok_or_else(|| GatewayError::input("continuation handle space is exhausted"))
 }
 
@@ -1826,7 +1835,7 @@ fn load_continuation(handle: &str) -> Result<GatewayCommand, GatewayError> {
     })
 }
 
-fn prune_continuations(root: &Path) -> Result<(), GatewayError> {
+fn prune_continuations(root: &Path, newest: u64) -> Result<(), GatewayError> {
     let mut entries = fs::read_dir(root)
         .map_err(|error| GatewayError::io("cannot enumerate continuations", error))?
         .filter_map(Result::ok)
@@ -1843,7 +1852,14 @@ fn prune_continuations(root: &Path) -> Result<(), GatewayError> {
                 .then_some((number, entry))
         })
         .collect::<Vec<_>>();
-    entries.sort_by_key(|(number, _)| *number);
+    entries.sort_by_key(|(number, _)| {
+        if *number > MAX_CONTINUATION_NUMBER {
+            (0, *number)
+        } else {
+            let age = (newest + MAX_CONTINUATION_NUMBER - *number) % MAX_CONTINUATION_NUMBER;
+            (1, MAX_CONTINUATION_NUMBER - age)
+        }
+    });
     let remove_count = entries.len().saturating_sub(MAX_CONTINUATION_ENTRIES);
     for (_, entry) in entries.into_iter().take(remove_count) {
         fs::remove_file(entry.path())
@@ -4056,9 +4072,10 @@ mod tests {
     }
 
     #[test]
-    fn continuation_handles_are_short_canonical_and_monotonic() {
+    fn continuation_handles_are_short_canonical_and_legacy_readable() {
         assert_eq!(parse_continuation_number("q1"), Some(1));
         assert_eq!(parse_continuation_number("q17"), Some(17));
+        assert_eq!(parse_continuation_number("q999999"), Some(999_999));
         assert_eq!(parse_continuation_number("q1000000"), Some(1_000_000));
         assert_eq!(parse_continuation_number("q0"), None);
         assert_eq!(parse_continuation_number("q01"), None);
@@ -4067,14 +4084,14 @@ mod tests {
     }
 
     #[test]
-    fn continuation_pruning_keeps_a_bounded_non_reused_sequence() {
+    fn continuation_pruning_keeps_the_newest_bounded_window() {
         let directory = tempfile::tempdir().expect("continuation root");
         for number in 1..=130 {
             fs::write(directory.path().join(format!("q{number}.json")), b"{}")
                 .expect("continuation fixture");
         }
         fs::write(directory.path().join("unmanaged.txt"), b"keep").expect("unmanaged fixture");
-        prune_continuations(directory.path()).expect("bounded prune");
+        prune_continuations(directory.path(), 130).expect("bounded prune");
         assert!(!directory.path().join("q1.json").exists());
         assert!(!directory.path().join("q2.json").exists());
         assert!(directory.path().join("q3.json").exists());
@@ -4084,6 +4101,53 @@ mod tests {
             next_continuation_number(directory.path()).expect("next handle"),
             131
         );
+    }
+
+    #[test]
+    fn continuation_numbers_wrap_without_overwriting_the_active_window() {
+        let directory = tempfile::tempdir().expect("continuation root");
+        let first_active = MAX_CONTINUATION_NUMBER - MAX_CONTINUATION_ENTRIES as u64 + 1;
+        for number in first_active..=MAX_CONTINUATION_NUMBER {
+            fs::write(directory.path().join(format!("q{number}.json")), b"{}")
+                .expect("continuation fixture");
+        }
+        assert_eq!(
+            next_continuation_number(directory.path()).expect("wrapped handle"),
+            1
+        );
+
+        fs::write(directory.path().join("q1.json"), b"{}").expect("wrapped fixture");
+        prune_continuations(directory.path(), 1).expect("wrapped prune");
+        assert!(!directory
+            .path()
+            .join(format!("q{first_active}.json"))
+            .exists());
+        assert!(directory.path().join("q1.json").exists());
+        assert_eq!(
+            next_continuation_number(directory.path()).expect("next wrapped handle"),
+            2
+        );
+        assert_eq!(
+            fs::read_dir(directory.path())
+                .expect("continuation entries")
+                .filter_map(Result::ok)
+                .count(),
+            MAX_CONTINUATION_ENTRIES
+        );
+    }
+
+    #[test]
+    fn continuation_pruning_ages_out_legacy_seven_digit_records_first() {
+        let directory = tempfile::tempdir().expect("continuation root");
+        for number in 1_000_000..1_000_128 {
+            fs::write(directory.path().join(format!("q{number}.json")), b"{}")
+                .expect("legacy continuation fixture");
+        }
+        fs::write(directory.path().join("q1.json"), b"{}").expect("bounded fixture");
+        prune_continuations(directory.path(), 1).expect("legacy prune");
+        assert!(!directory.path().join("q1000000.json").exists());
+        assert!(directory.path().join("q1000001.json").exists());
+        assert!(directory.path().join("q1.json").exists());
     }
 
     #[test]
