@@ -12,6 +12,7 @@
 - 每个阶段只取得一次模型结果；Routing 直接通过，Policy 在删除与案例核心无必然关系的隐藏附加标签后重验原结果，References 在修正规则后使用新输入通过，没有对相同可见输入重采样。
 - 失败反例形成两项长期修正：维度案例明确“方案 Markdown + taskctl update”的唯一动作与引用集合；Delivery 按实际修改类型选择引用，只有同次修改方案语义和任务/结果合同才双读 planning/execution，单向消费已确认方案只读 execution。
 - `authority-change-impact-closure` 不再把普通契约影响闭环强制等同于需求或用户设计基线冲突；受保护基线仍由专门正向案例覆盖。
+- 首次干净部署 Validate 证明评测运行时已动态投影 `operator`，但 `candidate_capability_contract` 的确定性测试仍固定期望两个角色；已把该唯一固定集合消费者更新为三角色，评测运行时和最终九题合同不变。
 
 ## 发布前待验收
 

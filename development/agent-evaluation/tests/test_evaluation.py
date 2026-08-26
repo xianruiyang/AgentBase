@@ -815,6 +815,7 @@ class SandboxConfigTests(unittest.TestCase):
             {
                 "evidence": {"model": "gpt-5.6-luna", "reasoning_effort": "medium"},
                 "experiment": {"model": "gpt-5.6-sol", "reasoning_effort": "low"},
+                "operator": {"model": "gpt-5.6-luna", "reasoning_effort": "max"},
             },
         )
         self.assertEqual(
