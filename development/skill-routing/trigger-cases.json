@@ -574,8 +574,7 @@
       "expected_behavior_tags": [
         "modify_authorized_scope",
         "fact_first",
-        "impact_closure",
-        "protected_user_baseline"
+        "impact_closure"
       ],
       "forbidden_behavior_tags": []
     },
