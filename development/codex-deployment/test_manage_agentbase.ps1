@@ -370,7 +370,7 @@ try {
     if (-not [bool]$settingsPublish.portable_settings_installed) {
         throw "Portable-settings publish did not report settings installation"
     }
-    if ([int]$settingsPublish.portable_agent_count -ne 2) {
+    if ([int]$settingsPublish.portable_agent_count -ne 3) {
         throw "Portable-settings publish reported an unexpected custom-agent count"
     }
     if ([int]$settingsPublish.retired_managed_path_removed_count -ne $retiredPortablePaths.Count) {
@@ -457,7 +457,7 @@ try {
     if ($manifestTargets -notcontains "config.toml" -or $manifestTargets -notcontains "hooks.json") {
         throw "Portable settings are missing from the rollback manifest"
     }
-    foreach ($agentName in @("evidence", "experiment")) {
+    foreach ($agentName in @("evidence", "experiment", "operator")) {
         if ($manifestTargets -notcontains "agents\$agentName.toml") {
             throw "Portable custom agent is missing from the rollback manifest: $agentName"
         }
@@ -493,7 +493,7 @@ try {
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\luna.toml") -Algorithm SHA256).Hash -ne $originalLunaHash) {
         throw "Rollback did not restore the original luna agent"
     }
-    foreach ($agentName in @("evidence", "experiment")) {
+    foreach ($agentName in @("evidence", "experiment", "operator")) {
         if (Test-Path -LiteralPath (Join-Path $codexRoot "agents\$agentName.toml")) {
             throw "Rollback did not remove the newly installed custom agent: $agentName"
         }

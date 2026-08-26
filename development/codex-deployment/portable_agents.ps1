@@ -7,7 +7,7 @@ function Get-ValidatedPortableAgentSources {
         throw "Portable Codex agents directory is missing: $Path"
     }
 
-    $expectedAgentNames = @("evidence", "experiment")
+    $expectedAgentNames = @("evidence", "experiment", "operator")
     $entries = @(Get-ChildItem -LiteralPath $Path -Force | Sort-Object Name)
     $expectedFileNames = @($expectedAgentNames | ForEach-Object { "{0}.toml" -f $_ })
     $actualFileNames = @($entries.Name)

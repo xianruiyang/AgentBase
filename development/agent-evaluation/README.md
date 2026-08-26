@@ -21,7 +21,7 @@
 independent Codex candidate
 ├─ projected assets
 │  ├─ global/AGENTS.md + portable config/transport overlay
-│  ├─ evidence=Luna/medium + experiment=Sol/low project custom agents
+│  ├─ evidence=Luna/medium + experiment=Sol/low + operator=Luna/max project custom agents
 │  ├─ Sol/medium + Luna/max evaluator profiles (independent runtime selection)
 │  ├─ target repository AGENTS/instructions from the fixed base tree
 │  └─ complete `.agents/skills` trees (SKILL/references/scripts/assets), hash-pinned and read-only

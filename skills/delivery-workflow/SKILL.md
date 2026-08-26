@@ -20,7 +20,7 @@ description: 组织需求、目标设计、现状、方案、执行反馈与最�
 ## 工作区与工具
 
 - 默认把长期交付链放在 `docs/work/<YYYYMMDD>_<NAME>/`；项目已有正式位置时沿用项目约定。
-- 建立、修改或最终复核阶段产物时先读取公共 [artifact-contracts.md](references/artifact-contracts.md)，并只增加当前动作所属的一项：[target-contracts.md](references/target-contracts.md) 用于创建、修改或重新裁决需求、用户设计、目标保护与 DCR，[planning-contracts.md](references/planning-contracts.md) 用于模型设计、现状与方案，[execution-contracts.md](references/execution-contracts.md) 用于任务/结果合同、状态或证据回流及最终完成。当前动作只是遵守“不改变已确认目标”且没有目标漂移、DCR 或最终复核时，不因此额外读取目标合同。
+- 阶段产物先读公共 [artifact-contracts.md](references/artifact-contracts.md)，再按实际修改类型读：[target-contracts.md](references/target-contracts.md) 管需求、用户设计、目标保护与 DCR，[planning-contracts.md](references/planning-contracts.md) 管设计、现状与方案，[execution-contracts.md](references/execution-contracts.md) 管任务、结果、状态、证据回流与完成。仅同次修改方案语义与任务/结果合同才双读 planning/execution；消费已确认方案投影任务只读 execution。只遵守已确认目标且无漂移、DCR 或最终复核时不因此额外读取目标合同。
 - 判断阶段推进、回退、新证据影响、执行上下文、证据回流或最终复核时读取 [iteration.md](references/iteration.md)；最终复核同时读取公共产物、目标与执行合同。实际使用 `workctl` 时读取 [tooling.md](references/tooling.md)。完整链在进入相应动作时逐步加载，不预读尚未需要的细则。
 - 工具入口是 `<SkillDir>/scripts/workctl.py`。只在它能降低编辑或查询成本时使用，并显式传绝对 `--work-dir`；默认 `--view model` 返回当前阶段动作的稀疏证据，protect/render 等写入回执只保留当前状态、来源、输出位置与实际问题，影响列表只在截断时额外返回总数。程序、测试或完整结构检查显式使用 `--view machine`。两种视图来自同一次文档索引事实计算；不得因 CLI 缺失或诊断而改变文档已确定的目标或实施授权。
 - `requirements.md` 保存与用户商议确认的需求，`user-design.md` 保存用户明确给出的设计，`design.md` 只保存模型形成的设计。需要跨轮保留确认来源时，可用 `workctl protect` 记录内容指纹与条目清单。

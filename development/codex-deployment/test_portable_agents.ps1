@@ -61,8 +61,8 @@ try {
     New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
 
     $baselineRoot = New-AgentFixture -Name "baseline"
-    if (@(Get-ValidatedPortableAgentSources -Path $baselineRoot).Count -ne 2) {
-        throw "Portable agent contract did not accept the current two semantic roles"
+    if (@(Get-ValidatedPortableAgentSources -Path $baselineRoot).Count -ne 3) {
+        throw "Portable agent contract did not accept the current three semantic roles"
     }
 
     $independentTextRoot = New-AgentFixture -Name "independent-text"
@@ -75,7 +75,7 @@ try {
         '只处理给出权威范围的事实问题；范围不足时返回未知，不修改项目。'
         '"""'
     ) -join [Environment]::NewLine) + [Environment]::NewLine)
-    if (@(Get-ValidatedPortableAgentSources -Path $independentTextRoot).Count -ne 2) {
+    if (@(Get-ValidatedPortableAgentSources -Path $independentTextRoot).Count -ne 3) {
         throw "Portable agent contract still depends on the current evidence prose"
     }
 
@@ -83,7 +83,7 @@ try {
     $futureModel = (Get-Content -LiteralPath (Join-Path $futureModelRoot "evidence.toml") -Raw -Encoding UTF8).Replace('model = "gpt-5.6-luna"', 'model = "gpt-6.0-fast"')
     $futureModel = $futureModel.Replace('model_reasoning_effort = "medium"', 'model_reasoning_effort = "high"')
     Write-FixtureText -Path (Join-Path $futureModelRoot "evidence.toml") -Text $futureModel
-    if (@(Get-ValidatedPortableAgentSources -Path $futureModelRoot).Count -ne 2) {
+    if (@(Get-ValidatedPortableAgentSources -Path $futureModelRoot).Count -ne 3) {
         throw "Portable agent contract incorrectly couples a semantic role to the current model or effort"
     }
 

@@ -92,7 +92,7 @@
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
     "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值，线程设置入口只在配置证据会改变动作时查询，并只为可预期长期阶段且剩余收益足以覆盖切换和恢复成本时设置；孤立难题和短机械收尾沿用当前档位。",
-    "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定时，必要且独立有界的静态取证，或可逆实际操作能低成本取得改变实现裁决的直接证据，在委派净收益成立时默认委派，否则主代理直接完成；experiment 不以任务陌生、静态证据穷尽或尚无初步路径为前提，子代理只交付稀疏决策证据，可回滚实验补丁须由主代理逐项裁决和修订后才进入正式实现，主代理保留完成和外部写责任。",
+    "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定且委派净收益成立时，事实未知而只读可得用 evidence，必须操作才能裁决路径、错误或约束未知用 experiment，目标、规则、范围与 oracle 已确认且只剩难脚本化执行用 operator，否则主代理直接完成。等待不是角色依据：观察既有执行属 evidence，启动并分析冻结输入的已知执行属 operator，修改后反复运行以发现路径属 experiment。子代理只返回稀疏结果，主代理保留目标、设计、正式验收、完成、Git、发布和外部写责任。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。"
   },
@@ -169,6 +169,10 @@
     "subagent-path-experiment",
     "subagent-serial-masked-implementation-experiment",
     "subagent-known-direction-operation-experiment",
+    "subagent-existing-execution-monitor",
+    "subagent-bounded-operator-execution",
+    "subagent-known-build-operator",
+    "subagent-scriptable-batch-no-benefit",
     "subagent-discussion-only",
     "subagent-implicit-evidence-benefit",
     "subagent-implicit-experiment-benefit",
@@ -197,6 +201,9 @@
     "subagent-path-experiment",
     "subagent-serial-masked-implementation-experiment",
     "subagent-known-direction-operation-experiment",
+    "subagent-existing-execution-monitor",
+    "subagent-bounded-operator-execution",
+    "subagent-known-build-operator",
     "subagent-implicit-evidence-benefit",
     "subagent-implicit-experiment-benefit",
     "vertical-validation-closure-selection",
@@ -1175,7 +1182,7 @@
     {
       "id": "dimension-bounded-validation-plan",
       "kind": "behavior",
-      "request": "同一能力的 oracle 会随 carrier、mode、revision 和 persistence 改变。请更新现有方案和任务合同，声明会改变结论的维度及等价依据，先选一个最小充分的真实消费者组合；不得机械展开完整笛卡尔积，也不得把单个 fixture 的通过外推到未覆盖组合。",
+      "request": "同一能力的 oracle 会随 carrier、mode、revision 和 persistence 改变，这些维度与等价依据已经作为方案输入确认；本题不判断阶段推进或新证据影响。请直接更新现有方案 Markdown，并使用既有 taskctl update 把同一覆盖合同投影到任务，先选一个最小充分的真实消费者组合；不得机械展开完整笛卡尔积，也不得把单个 fixture 的通过外推到未覆盖组合。",
       "expected_skills": [
         "execution-governor",
         "delivery-workflow",
@@ -1191,15 +1198,15 @@
       "expected_delivery_workflow_references": [
         "artifact-contracts.md",
         "planning-contracts.md",
-        "execution-contracts.md",
-        "iteration.md"
+        "execution-contracts.md"
       ],
       "expected_task_table_manager_references": [
-        "task-contracts.md"
+        "task-contracts.md",
+        "tooling.md",
+        "authoring-tooling.md"
       ],
       "expected_behavior_tags": [
         "modify_authorized_scope",
-        "vertical_validation_closure",
         "dimension_bounded_validation"
       ],
       "forbidden_behavior_tags": []
@@ -1527,6 +1534,90 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "subagent-existing-execution-monitor",
+      "kind": "positive",
+      "request": "正式 runner 已经启动一个长任务，主代理还有互不重叠的工作。请实际委派子代理，只读观察给定进程和日志直到明确成功、失败或超时；不得启动、修改、重试、终止或恢复该任务，状态没有变化时不要重复汇报，最终只返回终态、直接证据、日志定位和仍会改变决策的未知。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "execution-governor"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "subagent-bounded-operator-execution",
+      "kind": "positive",
+      "request": "目标、正式规则、精确对象集、允许动作、dirty 边界和单项 oracle 都已确认，只剩 12 个规则相同但难以可靠脚本化的一次性修改。请实际委派有界执行子代理，先完成并验收一个代表项，仅在其余对象与该项等价时继续；第一处非等价、失败或未知立即停止并返回主代理，不自行改设计、重跑或宣布整体完成。主代理随后复核实际差异与验收结果。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "change-governance"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "operator-execution.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-known-build-operator",
+      "kind": "positive",
+      "request": "候选已经稳定，正式构建命令、冻结输入、环境、日志位置、成功 oracle、时限和恢复动作都已由主代理确认。构建耗时较长，主代理还有独立工作；请先完成昂贵动作 preflight，再实际委派有界执行子代理启动、等待并分析这一次构建。输入未变时不得盲目重跑；失败只返回第一处直接错误和遮蔽范围，不修改代码寻找修复路径。",
+      "expected_skills": [
+        "execution-governor",
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_execution_governor_references": [
+        "failure-and-cost.md"
+      ],
+      "expected_subagent_orchestration_references": [
+        "operator-execution.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "expensive_action_preflight",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-scriptable-batch-no-benefit",
+      "kind": "negative",
+      "request": "目标、输入、转换规则和验收都已确认，500 个同构文件可以由现有确定性脚本一次处理并生成机器可检验结果。用户没有要求子代理；直接由主代理调用脚本并验收，不要把可可靠脚本化的机械批处理委派给 operator。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
       "id": "subagent-user-forbids",
       "kind": "negative",
       "request": "只读整理已限定目录中的调用者和否定命中；虽然范围可独立拆分，但本次我明确不要使用或创建子代理，由主代理直接完成并报告。",
@@ -1582,7 +1673,7 @@
     {
       "id": "subagent-discussion-only",
       "kind": "negative",
-      "request": "只讨论 evidence 与 experiment 两种子代理应怎样分工和控制成本，不实际派发、不读取或修改当前线程配置，也不改项目文件。",
+      "request": "只讨论 evidence、experiment 与 operator 三种子代理应怎样分工和控制成本，不实际派发、不读取或修改当前线程配置，也不改项目文件。",
       "expected_skills": [],
       "forbidden_skills": [
         "reasoning-governor",
