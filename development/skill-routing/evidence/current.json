@@ -833,8 +833,8 @@
       "selected_peer_skills": []
     }
   ],
-  "receipt_id": "8ba6fe66ee4e467fb823fe2e648e6152",
-  "evaluation_generation_sha256": "C0241F1D3C319C415F969B3C29D67B34FAE589CFDAFFB5FFDC894C17F1F32F76",
+  "receipt_id": "236281310e3e4e9081eb4e5b05794ade",
+  "evaluation_generation_sha256": "CB5994671757C6FE82015E7EA8FC30C62DFA7BE9A0D31634A4B48089C5331F3E",
   "policy_evaluation": {
     "schema_version": 4,
     "evaluation_kind": "behavior-policy",
@@ -1865,22 +1865,22 @@
         ]
       }
     ],
-    "receipt_id": "b3bb0ae4e4d8408fb764409efc81715d"
+    "receipt_id": "6900801e815a44129bd340dc64754ea5"
   },
   "reference_evaluation": {
     "schema_version": 4,
     "evaluation_kind": "routing-reference-policy",
     "fingerprint_schema": "phase-visible-lf-v2",
     "evaluator": {
-      "id": "agentbase-references-26dd1c2479934257bc2898648097bab3",
+      "id": "agentbase-references-78d014fbcefe468bb5a110a7167ca513",
       "model": "gpt-5.6-sol",
-      "runtime": "codex-cli 0.148.0/windows/read-only/ephemeral/cases-only-v4/catalog-F358067AEC8D24FC/shell-38fed52b24194b4f",
-      "evaluated_at_utc": "2026-08-26T04:00:45.6811521+00:00",
+      "runtime": "codex-cli 0.148.0/windows/read-only/ephemeral/cases-only-v4/catalog-59454531671D1A0C/shell-38fed52b24194b4f",
+      "evaluated_at_utc": "2026-08-27T04:37:20.6741309+00:00",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false,
       "auth_mode": "read-only-hardlink",
-      "model_catalog_sha256": "F358067AEC8D24FC422C988E9B0D68E3CEB6BEE84155EA54B3ADDF1467D22C59",
+      "model_catalog_sha256": "59454531671D1A0CD1D33D25271EB7C34C95FCFACF3719D21693FB1D0552BD17",
       "disabled_features": [
         "apps",
         "browser_use",
@@ -1907,8 +1907,8 @@
         "workspace_dependencies"
       ]
     },
-    "evaluation_capsule_sha256": "2A1673E0932B31A01AA3B7E8B7CF505828FD0A699F7E70E29AF8E231A6952446",
-    "candidate_bundle_sha256": "910EB8110A4E1319F1220F77A0DB975089D9E457D08DF9CA1D13262FAA419997",
+    "evaluation_capsule_sha256": "9735EEAC9DFD00FD1661116DBA21104619767255DB230B5C97B31917603A22BB",
+    "candidate_bundle_sha256": "BCB7D0CBF4EF13104FD22167CE19BFD4BEE0C4E001867002D3337857BBBCB15B",
     "evaluation_input_sha256": "5B41334DC4B0BF53994B036B0C57D8033D9D3D882181A2C5DBF8E79B95241A4A",
     "routing_reference_selection_sha256": "E83FF499744572D5C385302D9598209D782A857DE89790F8D4E802B2837D7DA7",
     "cases": [
@@ -2027,8 +2027,13 @@
           {
             "skill": "task-table-manager",
             "references": [
+              "authoring-tooling.md",
+              "completion-tooling.md",
+              "execution-tooling.md",
               "execution.md",
-              "task-contracts.md"
+              "query-tooling.md",
+              "task-contracts.md",
+              "tooling.md"
             ]
           }
         ]
@@ -2131,6 +2136,7 @@
               "authoring-tooling.md",
               "execution-tooling.md",
               "execution.md",
+              "query-tooling.md",
               "task-contracts.md",
               "tooling.md"
             ]
@@ -2279,7 +2285,8 @@
           {
             "skill": "task-table-manager",
             "references": [
-              "execution.md"
+              "execution.md",
+              "task-contracts.md"
             ]
           }
         ]
@@ -2446,7 +2453,6 @@
           {
             "skill": "change-governance",
             "references": [
-              "lifecycle-and-entry.md",
               "records-and-metadata.md"
             ]
           }
@@ -2491,6 +2497,7 @@
           {
             "skill": "change-governance",
             "references": [
+              "lifecycle-and-entry.md",
               "verification-and-gates.md"
             ]
           },
@@ -2499,14 +2506,22 @@
             "references": [
               "artifact-contracts.md",
               "execution-contracts.md",
+              "iteration.md",
               "planning-contracts.md",
-              "target-contracts.md"
+              "target-contracts.md",
+              "tooling.md"
             ]
           },
           {
             "skill": "task-table-manager",
             "references": [
-              "task-contracts.md"
+              "authoring-tooling.md",
+              "completion-tooling.md",
+              "execution-tooling.md",
+              "execution.md",
+              "query-tooling.md",
+              "task-contracts.md",
+              "tooling.md"
             ]
           }
         ]
@@ -2646,6 +2661,6 @@
         ]
       }
     ],
-    "receipt_id": "ed2483fee27141aebcd25f5a050f9eb9"
+    "receipt_id": "3f0d6082f0454424bf8528e50f0bab75"
   }
 }
