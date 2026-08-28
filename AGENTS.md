@@ -28,7 +28,7 @@ must: 新增、退役或移交由正式 Codex 部署入口管理的路径或配�
 
 must: 可移植 Codex 设置、hooks 模板和自定义子代理不得包含认证、凭据、项目绝对路径、信任哈希、历史、缓存或宿主自动生成状态；机器相关 MCP 和插件安装只记录正式安装入口与前置条件，不伪装成可直接复制的配置
 
-must: 修改全局规则或 skill 的触发语义时，同步维护 `development/skill-routing/validate_contract.ps1` 和适用的 `trigger-cases.json`；不得为保留旧字符串检查而在正式规则中制造重复表述
+must: 修改全局规则或 skill 触发语义时同步 `trigger-cases.json`；`validate_contract.ps1` 只查结构、引用、身份和集合关系，不复制正文语义或阻断改写
 
 must: 新增或修改模型直接读取、生成或维护的工具返回、文件、文档、日志、快照、索引或生成视图时，在正式 owner 中声明权威事实、实际消费者、读取或修改责任、生命周期、派生关系和恢复方式；模型读取面按当前动作投影最小充分证据，模型修改面保持职责局部且可验证，机器面保持稳定完整，现有消费者必须显式迁移，不得以统一格式、事后截断、直接编辑生成物或双向同步副本代替裁决
 
@@ -50,7 +50,7 @@ must: 全局规则或 skill 变更至少运行：
 & (Join-Path (Get-Location).Path 'development\skill-routing\validate_contract.ps1') -ProjectRoot (Get-Location).Path
 ```
 
-must: 路由基础设施变化后运行同目录 `test_routing_infrastructure.ps1`（并行、零模型调用）；规则、skill 或触发合同变化后，`Validate`/`Publish` 前按同目录 `get_routing_evaluation_plan.ps1` 刷新 evidence：只执行 `evaluate`，`reuse` 须经 oracle 与来源链证明，`pending-routing` 待 Routing 后重算；同输入 oracle 失败不得重采样，身份或来源异常须阻断；`Validate`/`Publish` 自动运行确定性测试
+must: 路由基础设施变化后运行 `test_routing_infrastructure.ps1`；规则、skill 或触发合同变化后，`Validate`/`Publish` 前按 `get_routing_evaluation_plan.ps1` 刷新 evidence：只执行 `evaluate`，`reuse` 经 oracle 与来源链证明，`pending-routing` 待 Routing 后重算；同输入 oracle 失败不重采样，身份或来源异常须阻断。部署只验证 payload、evidence 与可恢复写入；组件回归仅在受影响且稳定后运行一次
 
 must: 最终评测合同变更后运行 `development/agent-evaluation/test_agent_evaluation_infrastructure.ps1`；门禁禁用 evaluator，外部 clone 仅由显式 `prepare`/单题 `oracle`，依赖与 Verifier 仅由单题 `oracle`/`run`，qualification 仅由 `oracle`、模型仅由 `run` 触发
 

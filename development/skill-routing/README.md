@@ -5,7 +5,7 @@
 ## 正式产物
 
 - [`trigger-cases.json`](trigger-cases.json)：所需 skill、触发用例、严格路由用例、策略标签和条件引用选择的隐藏 oracle。
-- [`validate_contract.ps1`](validate_contract.ps1)：规则、skill、项目入口、相对引用和触发集合的静态合同。
+- [`validate_contract.ps1`](validate_contract.ps1)：规则与 skill 的结构、引用、身份、集合关系和触发集合静态合同；不复制或裁决规则正文语义。
 - [`routing_evaluation_common.ps1`](routing_evaluation_common.ps1) 与 [`routing_fingerprint.ps1`](routing_fingerprint.ps1)：三阶段 capsule、真实模型可见身份、cases-only 输出 schema、当前 oracle 和整体 generation 的唯一 owner。
 - [`get_routing_evaluation_plan.ps1`](get_routing_evaluation_plan.ps1)：只读增量计划；默认返回低 Token model 视图，`-View machine` 返回同一 canonical 计划的完整 JSON。
 - [`build_routing_evaluation.ps1`](build_routing_evaluation.ps1)：只构建指定阶段 capsule，供审计或外部受控运行使用。
@@ -26,7 +26,7 @@
 & '.\development\skill-routing\validate_contract.ps1' -ProjectRoot (Get-Location).Path
 ```
 
-静态通过只证明文件结构、必要语义、项目入口和测试 oracle 自洽，不证明模型行为已经改变。
+静态通过只证明文件结构、引用、身份、集合关系和测试 oracle 自洽，不证明规则语义正确或模型行为已经改变。规则语义只由唯一正文和行为评估维护；静态脚本不得以精确文案、开发组件内部实现或等价改写差异形成第二契约。
 
 修改评估基础设施时运行统一确定性入口；默认 model 视图只返回一行摘要，`-View Machine` 返回同一结果的结构化投影。入口对子进程设置只允许阻止 evaluator 的测试边界，invoker 在该边界内会先于 Begin 和外部进程拒绝执行，因此回归走错分支也不会消耗模型 Token。它不刷新 `current.json`：
 

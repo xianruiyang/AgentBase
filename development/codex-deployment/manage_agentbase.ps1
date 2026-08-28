@@ -683,52 +683,6 @@ function Get-ValidatedSource {
 
     & (Join-Path $Root "development\skill-routing\validate_contract.ps1") -ProjectRoot $Root | Out-Null
     $routingEvidence = Get-ValidatedRoutingEvidence -Root $Root
-    $hostBootstrapPath = Join-Path $Root "development\codex-deployment\bootstrap_windows.ps1"
-    if (-not (Test-Path -LiteralPath $hostBootstrapPath -PathType Leaf)) {
-        throw "Windows host bootstrap is missing: $hostBootstrapPath"
-    }
-    $hostBootstrapContent = Get-Content -LiteralPath $hostBootstrapPath -Raw -Encoding UTF8
-    $requiredBootstrapFragments = @(
-        'ValidateSet("Check", "Install")'
-        'ValidateSet("Model", "Machine")'
-        'Format-HostPrerequisiteModelResult'
-        'Microsoft.PowerShell'
-        'sharkdp.fd'
-        'BenBoyter.scc'
-        'sharkdp.hyperfine'
-        'Python.Python.3.13'
-        'OpenJS.NodeJS.LTS'
-        '@ast-grep/cli@0.44.1'
-        '@openai/codex@0.148.0'
-        'Test-UserNpmPathPrecedence'
-        'isolation_options_supported'
-        '--ignore-user-config'
-        '$version.Major -ge 7'
-        '--max-results'
-        '[version]"22.9.0"'
-        '[version]"3.11.0"'
-        'winget.exe'
-        'npm.cmd'
-    )
-    foreach ($requiredBootstrapFragment in $requiredBootstrapFragments) {
-        if (-not $hostBootstrapContent.Contains($requiredBootstrapFragment)) {
-            throw "Windows host bootstrap is missing required contract fragment: $requiredBootstrapFragment"
-        }
-    }
-    $projectAgentsContent = Get-Content -LiteralPath (Join-Path $Root "AGENTS.md") -Raw -Encoding UTF8
-    $deploymentReadmeContent = Get-Content -LiteralPath (Join-Path $Root "development\codex-deployment\README.md") -Raw -Encoding UTF8
-    if (-not $projectAgentsContent.Contains('bootstrap_windows.ps1') -or -not $projectAgentsContent.Contains('-Action Install') -or
-        -not $projectAgentsContent.Contains('用户级 Codex CLI')) {
-        throw "Project AGENTS.md does not route Windows reproduction through the host bootstrap"
-    }
-    if (-not $deploymentReadmeContent.Contains('bootstrap_windows.ps1') -or -not $deploymentReadmeContent.Contains('-Action Check') -or
-        -not $deploymentReadmeContent.Contains('-View Machine')) {
-        throw "Deployment README does not document the Windows host bootstrap lifecycle"
-    }
-    if (-not $deploymentReadmeContent.Contains('install-srcq.ps1') -or -not $deploymentReadmeContent.Contains('ready=true') -or
-        -not $deploymentReadmeContent.Contains('srcq doctor') -or -not $deploymentReadmeContent.Contains('srcq query scc doctor')) {
-        throw "Deployment README does not retain the independent srcq runtime preflight"
-    }
     $portableConfigPath = Join-Path $Root "global\config.toml"
     $hooksTemplatePath = Join-Path $Root "global\hooks.template.json"
     $portableAgentsPath = Join-Path $Root "global\agents"
@@ -863,20 +817,9 @@ function Get-ValidatedSource {
     })
     $lifecycleReceiptUnits = @(Get-ManagedAssetLifecycleReceiptUnits -Contract $lifecycle -CurrentConfigUnits $currentConfigUnits -PreviousManifest $PreviousManifest -DeliveryMode $DeliveryMode -IncludePortableSettings $IncludePortableSettings)
 
-    $mcpPackagePath = Join-Path $Root "mcp\vscode-lsp-mcp\package.json"
-    if (-not (Test-Path -LiteralPath $mcpPackagePath -PathType Leaf)) {
-        throw "vscode-lsp-mcp package.json is missing: $mcpPackagePath"
-    }
-    $mcpPackage = Get-Content -LiteralPath $mcpPackagePath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([string]::IsNullOrWhiteSpace([string]$mcpPackage.scripts.'release:build') -or [string]::IsNullOrWhiteSpace([string]$mcpPackage.scripts.'release:verify')) {
-        throw "vscode-lsp-mcp must retain release:build and release:verify as its authoritative release entry points"
-    }
-
     return [pscustomobject]@{
         contract = $contract
         targets = $targets.ToArray()
-        mcp_name = [string]$mcpPackage.name
-        mcp_version = [string]$mcpPackage.version
         portable_settings_sha256 = $portableSettingsFingerprint
         portable_config_path = $portableConfigPath
         hooks_template_path = $hooksTemplatePath
@@ -887,7 +830,6 @@ function Get-ValidatedSource {
         retired_path_targets = @($retiredPathTargets)
         retired_config_units = @($retiredConfigUnits)
         retired_config_diagnostics = @($retiredConfigDiagnostics)
-        host_bootstrap_path = $hostBootstrapPath
         routing_evidence = $routingEvidence
         skill_delivery_mode = $DeliveryMode
         skills_managed = $DeliveryMode -eq "DirectCompatibility"
@@ -1011,11 +953,6 @@ function Get-SrcqRuntimePreflight {
 }
 
 if ($Action -eq "Validate") {
-    & (Join-Path $ProjectRoot "development\skill-routing\test_routing_infrastructure.ps1") -ProjectRoot $ProjectRoot | Out-Null
-    & (Join-Path $ProjectRoot "development\agent-evaluation\test_agent_evaluation_infrastructure.ps1") -ProjectRoot $ProjectRoot | Out-Null
-}
-
-if ($Action -eq "Validate") {
     $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $null -IncludePortableSettings $false -DeliveryMode $SkillDeliveryMode
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
     $result = [pscustomobject]@{
@@ -1024,8 +961,6 @@ if ($Action -eq "Validate") {
         source_bundle_sha256 = $sourceFingerprint
         global_bytes = (Get-Item -LiteralPath (Join-Path $ProjectRoot "global\AGENTS.md")).Length
         skill_count = @($source.contract.required_skills).Count
-        mcp = "$($source.mcp_name)@$($source.mcp_version)"
-        mcp_release_owner = Join-Path $ProjectRoot "mcp\vscode-lsp-mcp"
         portable_settings_sha256 = $source.portable_settings_sha256
         portable_config = $source.portable_config_path
         hooks_template = $source.hooks_template_path
@@ -1037,7 +972,6 @@ if ($Action -eq "Validate") {
         managed_asset_present_count = @($source.managed_asset_lifecycle.units | Where-Object { [string]$_.state -eq 'present' }).Count
         managed_asset_retired_count = @($source.managed_asset_lifecycle.units | Where-Object { [string]$_.state -eq 'retired' }).Count
         managed_asset_transferred_count = @($source.managed_asset_lifecycle.units | Where-Object { [string]$_.state -eq 'transferred' }).Count
-        host_bootstrap = $source.host_bootstrap_path
         routing_evidence = $source.routing_evidence.path
         routing_evidence_sha256 = $source.routing_evidence.sha256
         routing_case_count = $source.routing_evidence.case_count
@@ -1047,11 +981,6 @@ if ($Action -eq "Validate") {
 }
 
 $CodexRoot = Resolve-CodexRoot -RequestedRoot $CodexRoot -Create ($Action -eq "Publish")
-
-if ($Action -eq "Publish" -and -not (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot)) {
-    & (Join-Path $ProjectRoot "development\skill-routing\test_routing_infrastructure.ps1") -ProjectRoot $ProjectRoot | Out-Null
-    & (Join-Path $ProjectRoot "development\agent-evaluation\test_agent_evaluation_infrastructure.ps1") -ProjectRoot $ProjectRoot | Out-Null
-}
 
 if ($Action -eq "Status") {
     $publishRecord = Get-LatestPublishedManifest -InstallRoot $CodexRoot -DeliveryMode $SkillDeliveryMode -PortableSettingsInstalled ([bool]$InstallPortableSettings)

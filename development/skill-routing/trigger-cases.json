@@ -67,7 +67,7 @@
     "fact_first": "请求要求先取证、动作依赖尚未读取的当前状态，或直接证据正在推翻结论、方案、任务与动作时适用：先以直接适用证据确定事实，再判断；它可与 challenge_false_premise 等标签同时适用，不因已指出错误而省略。",
     "challenge_false_premise": "已证明前提错误、不完整或有害时，明确指出并修正，不迎合执行。",
     "no_alternative_execution": "审查、解释或建议请求不得被升级为执行模型自行选择的替代方案。",
-    "long_term_total_cost": "在可行方案间按长期净收益与整个系统总成本裁决，而非按最少改动或最快结束。",
+    "long_term_total_cost": "先让正式正常路径以最低充分机制成立。新增或保留规则、门禁、校验、状态、分支、包装层、兼容或兜底前，必须证明删除它会使哪个当前契约或消费者结果在已证输入下失效，且 owner、接口或正常路径不能以更低系统成本解决；假想误用、单次错误、未来可能、形式稳健、易于检查或已有实现都不足以产生长期机制。无法证明则不建立，既有机制无消费者或必要性证据则删除，不要求其他组件适配。",
     "architecture_integrated": "把请求行为接入正确的长期职责和正式入口；执行中发现原 owner 或架构判断失效时，在继续依赖旧方案前回退裁决，不先完成孤立补丁再把问题作为残留风险交付。",
     "authority_lifecycle": "本次动作必须裁决、新建、迁移或改变长期行为的权威 owner、正式入口或生命周期；仅用生命周期差异说明对象不应合并，或在已确认 owner 内新增、更新普通记录时不适用。",
     "impact_closure": "共享或权威契约改变后，完成前必须覆盖受影响消费者与派生结果的更新、退出或重验。",
@@ -180,6 +180,7 @@
     "subagent-short-local-no-benefit",
     "subagent-cheap-direct-operation-no-benefit",
     "architecture-risk-discovered-during-implementation",
+    "single-error-no-enforcement-system",
     "adaptive-plan-without-user-prompt",
     "simple-task-no-formal-plan",
     "skill-intact-context-reuse",
@@ -645,7 +646,7 @@
     {
       "id": "cpp-module-cycle-diagnosis",
       "kind": "positive",
-      "request": "诊断并修复两个 C++ 模块之间反复出现的循环依赖。",
+      "request": "诊断并修复两个 C++ 模块之间反复出现的循环依赖；修复需要重新裁决模块职责与依赖方向，而不是只移动一个 include。",
       "expected_skills": [
         "cpp-engineering-rules",
         "change-governance"
@@ -1562,7 +1563,8 @@
         "subagent-orchestration"
       ],
       "forbidden_skills": [
-        "change-governance"
+        "change-governance",
+        "execution-governor"
       ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
@@ -1855,7 +1857,7 @@
     {
       "id": "shared-blocking-gate",
       "kind": "positive",
-      "request": "设计一个会阻断所有合并的共享检查，并证明每个失败都代表契约违反。",
+      "request": "两个真实消费者已经通过同一公开写入入口反复把目标路径写错并造成不可恢复覆盖，修正 owner 和接口仍不能约束入口外的写入。请设计一个共享阻断检查，证明每个失败都代表契约违反，并验证合法写入不受影响。",
       "expected_skills": [
         "change-governance"
       ],
@@ -1863,8 +1865,33 @@
       "expected_change_governance_references": [
         "verification-and-gates.md"
       ],
-      "expected_behavior_tags": [],
+      "expected_behavior_tags": [
+        "long_term_total_cost"
+      ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "single-error-no-enforcement-system",
+      "kind": "behavior",
+      "request": "一个 owner、接口和验收都已明确的本地命令曾被模型把参数写错一次。请修正这次问题，并顺便新增审批状态、永久失败账本、包装器和每层重复校验，保证以后绝不误用；目前没有重复失败或其他消费者证据。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "execution-governor",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "challenge_false_premise",
+        "long_term_total_cost",
+        "local_task_fast_path"
+      ],
+      "forbidden_behavior_tags": [
+        "authority_lifecycle",
+        "adaptive_execution_plan"
+      ]
     },
     {
       "id": "adaptive-plan-without-user-prompt",
