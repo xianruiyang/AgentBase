@@ -29,7 +29,7 @@ interface ToolMetadata {
 const TOOL_METADATA: readonly ToolMetadata[] = [
   {
     name: 'list_workspaces',
-    description: 'List usable VS Code workspaces and logical root aliases.',
+    description: 'Resolve an unknown workspace and root aliases.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -37,7 +37,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'health_check',
-    description: 'Check the server, VS Code bridge, and optional document activation.',
+    description: 'Diagnose bridge or document activation after uncertainty or failure.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -45,7 +45,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'get_capabilities',
-    description: 'Check which semantic operations are usable for a workspace or document.',
+    description: 'Probe only capabilities that change the next action.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -53,7 +53,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'workspace_symbols',
-    description: 'Search workspace symbols by name and return bounded navigation candidates.',
+    description: 'After scoped text/AST cannot locate a symbol, return bounded semantic candidates.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -61,7 +61,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'document_symbols',
-    description: 'Return a bounded document outline with exact path/name filters and optional full ranges.',
+    description: 'After source/AST cannot supply structure, return a bounded document outline.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -69,7 +69,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'symbol_info',
-    description: 'Query selected semantic information at one source position.',
+    description: 'At a known position, request only semantics unresolved by source/AST.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -77,7 +77,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'get_references',
-    description: 'Find complete semantic references using fast C/C++ identity search or an explicit full Provider scan.',
+    description: 'At a known symbol, return complete semantic references when text matches are insufficient.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -85,7 +85,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'verify_symbol_candidates',
-    description: 'Verify a bounded set of source positions against one target symbol identity.',
+    description: 'Verify bounded text/AST candidates against one target identity.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -93,7 +93,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'get_call_hierarchy',
-    description: 'Return bounded incoming or outgoing call hierarchy entries.',
+    description: 'Return bounded call relations only when source/AST is insufficient.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -101,7 +101,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'get_type_hierarchy',
-    description: 'Return bounded supertype or subtype hierarchy entries.',
+    description: 'Return bounded type relations only when source/AST is insufficient.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -109,7 +109,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'get_diagnostics',
-    description: 'Return diagnostics for selected files, modified files, or a workspace.',
+    description: 'Read diagnostics from the smallest needed scope.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -117,7 +117,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'rename_preview',
-    description: 'Preview a complete semantic rename within an explicit path scope and safety budget.',
+    description: 'Preview a complete semantic rename within an explicit path scope.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -133,7 +133,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'code_actions',
-    description: 'List code actions that can be safely previewed as complete text changes.',
+    description: 'For one known range, list bounded code actions only when provider assistance is needed.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -141,7 +141,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'code_action_preview',
-    description: 'Turn one cached code action into a reviewable text change preview.',
+    description: 'Resolve one code action into an edit preview without applying it.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -157,7 +157,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'format_preview',
-    description: 'Preview complete document or range formatting changes.',
+    description: 'Preview formatting for one known document or range without applying it.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -174,7 +174,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   {
     name: 'execute_command',
     description:
-      'Execute one standard user command, trusted-workspace task, or authorized custom command.',
+      'Execute one selected standard command, trusted task, or authorized custom command; never arbitrary shell.',
     readOnly: false,
     destructive: true,
     idempotent: false,

@@ -4,7 +4,7 @@
 
 本文是 `vscode-lsp-mcp` 第一版公开工具接口的规范源。接口只为 LLM 的定位、理解、修改和验证流程服务，不复刻传统 LSP 数据结构，也不暴露 Bridge、Provider 或预览缓存的内部实现字段。
 
-- Schema 版本：`1.1.0-draft.2`
+- Schema 版本：`1.1.0-draft.3`
 - MCP 规范基线：`2025-11-25`
 - JSON Schema 方言：Draft 2020-12
 - MCP `inputSchema` 和调用参数：严格 JSON
@@ -529,24 +529,25 @@ CommandFailedDetails:
 
 | 工具 | 精确 description | 成功数据类型 | annotations |
 |---|---|---|---|
-| `list_workspaces` | List usable VS Code workspaces and logical root aliases. | `Collection<Workspace>` | `R=true,D=false,I=true,O=false` |
-| `health_check` | Check the server, VS Code bridge, and optional document activation. | `Collection<HealthResult>` | `R=true,D=false,I=true,O=false` |
-| `get_capabilities` | Check which semantic operations are usable for a workspace or document. | `Collection<Capability>` | `R=true,D=false,I=true,O=false` |
-| `workspace_symbols` | Search workspace symbols by name and return bounded navigation candidates. | `Collection<SymbolHit>` | `R=true,D=false,I=true,O=false` |
-| `document_symbols` | Return a bounded document outline with exact path/name filters and optional full ranges. | `Collection<DocumentSymbol>` | `R=true,D=false,I=true,O=false` |
-| `symbol_info` | Query selected semantic information at one source position. | `Collection<SymbolInfoResult>` | `R=true,D=false,I=true,O=false` |
-| `get_references` | Find complete semantic references using fast C/C++ identity search or an explicit full Provider scan. | `Collection<ReferenceHit>` | `R=true,D=false,I=true,O=false` |
-| `get_call_hierarchy` | Return bounded incoming or outgoing call hierarchy entries. | `Collection<CallHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
-| `get_type_hierarchy` | Return bounded supertype or subtype hierarchy entries. | `Collection<TypeHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
-| `get_diagnostics` | Return diagnostics for selected files, modified files, or a workspace. | `Collection<Diagnostic>` | `R=true,D=false,I=true,O=false` |
-| `rename_preview` | Preview a complete semantic rename within an explicit path scope and safety budget. | `Preview` | `R=true,D=false,I=true,O=false` |
+| `list_workspaces` | Resolve an unknown workspace and root aliases. | `Collection<Workspace>` | `R=true,D=false,I=true,O=false` |
+| `health_check` | Diagnose bridge or document activation after uncertainty or failure. | `Collection<HealthResult>` | `R=true,D=false,I=true,O=false` |
+| `get_capabilities` | Probe only capabilities that change the next action. | `Collection<Capability>` | `R=true,D=false,I=true,O=false` |
+| `workspace_symbols` | After scoped text/AST cannot locate a symbol, return bounded semantic candidates. | `Collection<SymbolHit>` | `R=true,D=false,I=true,O=false` |
+| `document_symbols` | After source/AST cannot supply structure, return a bounded document outline. | `Collection<DocumentSymbol>` | `R=true,D=false,I=true,O=false` |
+| `symbol_info` | At a known position, request only semantics unresolved by source/AST. | `Collection<SymbolInfoResult>` | `R=true,D=false,I=true,O=false` |
+| `get_references` | At a known symbol, return complete semantic references when text matches are insufficient. | `Collection<ReferenceHit>` | `R=true,D=false,I=true,O=false` |
+| `verify_symbol_candidates` | Verify bounded text/AST candidates against one target identity. | `Collection<SymbolCandidateVerification>` | `R=true,D=false,I=true,O=false` |
+| `get_call_hierarchy` | Return bounded call relations only when source/AST is insufficient. | `Collection<CallHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
+| `get_type_hierarchy` | Return bounded type relations only when source/AST is insufficient. | `Collection<TypeHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
+| `get_diagnostics` | Read diagnostics from the smallest needed scope. | `Collection<Diagnostic>` | `R=true,D=false,I=true,O=false` |
+| `rename_preview` | Preview a complete semantic rename within an explicit path scope. | `Preview` | `R=true,D=false,I=true,O=false` |
 | `rename_apply` | Apply one unexpired rename preview after change validation. | `ApplyResult` | `R=false,D=true,I=false,O=false` |
-| `code_actions` | List code actions that can be safely previewed as complete text changes. | `CodeActionSet` | `R=true,D=false,I=true,O=false` |
-| `code_action_preview` | Turn one cached code action into a reviewable text change preview. | `Preview` | `R=true,D=false,I=true,O=false` |
+| `code_actions` | For one known range, list bounded code actions only when provider assistance is needed. | `CodeActionSet` | `R=true,D=false,I=true,O=false` |
+| `code_action_preview` | Resolve one code action into an edit preview without applying it. | `Preview` | `R=true,D=false,I=true,O=false` |
 | `code_action_apply` | Apply one unexpired code-action preview after change validation. | `ApplyResult` | `R=false,D=true,I=false,O=false` |
-| `format_preview` | Preview complete document or range formatting changes. | `Preview` | `R=true,D=false,I=true,O=false` |
+| `format_preview` | Preview formatting for one known document or range without applying it. | `Preview` | `R=true,D=false,I=true,O=false` |
 | `format_apply` | Apply one unexpired formatting preview after change validation. | `ApplyResult` | `R=false,D=true,I=false,O=false` |
-| `execute_command` | Execute one standard user command, trusted-workspace task, or authorized custom command. | `CommandResult` | `R=false,D=true,I=false,O=false` |
+| `execute_command` | Execute one selected standard command, trusted task, or authorized custom command; never arbitrary shell. | `CommandResult` | `R=false,D=true,I=false,O=false` |
 
 缩写依次表示 `readOnlyHint`、`destructiveHint`、`idempotentHint`、`openWorldHint`。安全策略由服务端强制执行，不依赖 annotation。
 

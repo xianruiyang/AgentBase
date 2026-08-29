@@ -1,28 +1,28 @@
 # MCP tool reference
 
-The server exposes exactly 19 tools. MCP `tools/list` is authoritative for input JSON Schema and mutation annotations; clients should discover schemas instead of copying them from this overview.
+The server exposes exactly 19 tools. MCP `tools/list` is authoritative for descriptions, input JSON Schema, and mutation annotations; clients should discover schemas instead of copying them from this overview. Tool descriptions encode the minimum routing decision: use bounded source or AST evidence first, invoke only the missing semantic operation, and stop once the result is sufficient. Health and capability probes are diagnostic, not mandatory preflight.
 
 | Tool | Class | Purpose |
 |---|---|---|
-| `list_workspaces` | read | List usable VS Code windows/workspaces and their public IDs and root aliases. |
-| `health_check` | read | Check server, bridge, workspace, and optional document activation health. |
-| `get_capabilities` | read | Report effective language-provider, command, and task capabilities. |
-| `workspace_symbols` | read | Search symbols across a selected workspace and report the current Provider observation. |
-| `document_symbols` | read | Return one logical file's symbol tree with optional exact filters, full ranges, and Provider observation. |
-| `symbol_info` | read | Query hover, declaration, definition, type definition, implementation, and signature information at a position, with optional path filters for location results. |
-| `get_references` | read | Find a complete reference set with fast C/C++ workspace/scoped identity search or an explicit full Provider scan. |
-| `verify_symbol_candidates` | read | Compare up to 100 text-discovered positions with one target symbol identity without a global reference scan. |
-| `get_call_hierarchy` | read | Traverse incoming, outgoing, or both call-hierarchy directions. |
-| `get_type_hierarchy` | read | Traverse supertypes, subtypes, or both type-hierarchy directions. |
-| `get_diagnostics` | read | Read diagnostics already published by active language providers; supplying `files` implies file scope. |
-| `rename_preview` | preview | Prepare a rename inside required include globs, with an optional per-call 1,000–300,000 ms provider timeout, and return a bounded immutable preview. |
-| `rename_apply` | mutation | Apply one unexpired rename preview by `previewId`. |
-| `code_actions` | read | List bounded code-action candidates for a range. |
-| `code_action_preview` | preview | Resolve one action and return its edit preview without applying it. |
-| `code_action_apply` | mutation | Apply one unexpired code-action preview by `previewId`. |
-| `format_preview` | preview | Preview document or range formatting edits. |
-| `format_apply` | mutation | Apply one unexpired formatting preview by `previewId`. |
-| `execute_command` | mutation | Execute a standard user command, trusted-workspace task, or explicitly authorized custom command. |
+| `list_workspaces` | read | Resolve an unknown workspace and root aliases. |
+| `health_check` | read | Diagnose bridge or document activation after uncertainty or failure. |
+| `get_capabilities` | read | Probe only capabilities that change the next action. |
+| `workspace_symbols` | read | After scoped text/AST cannot locate a symbol, return bounded semantic candidates. |
+| `document_symbols` | read | After source/AST cannot supply structure, return a bounded document outline. |
+| `symbol_info` | read | At a known position, request only semantics unresolved by source/AST. |
+| `get_references` | read | At a known symbol, return complete semantic references when text matches are insufficient. |
+| `verify_symbol_candidates` | read | Verify bounded text/AST candidates against one target identity. |
+| `get_call_hierarchy` | read | Return bounded call relations only when source/AST is insufficient. |
+| `get_type_hierarchy` | read | Return bounded type relations only when source/AST is insufficient. |
+| `get_diagnostics` | read | Read diagnostics from the smallest needed scope. |
+| `rename_preview` | preview | Preview a complete semantic rename within an explicit path scope. |
+| `rename_apply` | mutation | Apply one unexpired rename preview after change validation. |
+| `code_actions` | read | For one known range, list bounded code actions only when provider assistance is needed. |
+| `code_action_preview` | preview | Resolve one code action into an edit preview without applying it. |
+| `code_action_apply` | mutation | Apply one unexpired code-action preview after change validation. |
+| `format_preview` | preview | Preview formatting for one known document or range without applying it. |
+| `format_apply` | mutation | Apply one unexpired formatting preview after change validation. |
+| `execute_command` | mutation | Execute one selected standard command, trusted task, or authorized custom command; never arbitrary shell. |
 
 Only `rename_apply`, `code_action_apply`, `format_apply`, and `execute_command` are marked destructive. Preview and read tools are read-only/idempotent; the four mutation tools are not treated as idempotent.
 
