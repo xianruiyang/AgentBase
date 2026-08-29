@@ -49,3 +49,4 @@
 - 路由评估中的有效反例促成三项收敛：方案验证维度投影任务成为 `delivery-workflow` 的直接触发；任务、状态和证据回流的引用路由统一到公共/执行合同；`operator` 用例只在对象等价依据已确认时排除执行治理。一个不会改变动作且已有原子用例覆盖的重复 Policy 标签从混合反例中退出强制 oracle。
 - 正式 evidence generation `261F82CBD070C0B8ECD3904C9A44E679DBDAD84F832588945ABA94EE65186091` 为 0 evaluate、3 reuse、0 blocked/pending；最终刷新仅运行 References，恢复已通过 Routing，并按当前 oracle 零 Token 重验 Policy。合同检查为 125 cases、84 strict routing、28 strict references，13/13 skills 具备正向与非触发覆盖。
 - 干净候选的 `manage_agentbase.ps1 -Action Validate` 返回 `valid:true`。本轮没有运行 Windows SWE 九题、candidate、qualification 或 elevated sandbox；固定角色的真实创建参数与后代代理行为仍须新任务消费发布后的指令链验证。
+- 用户针对本次操作明确授权后，从提交 `7a277cb` 的独立干净 worktree 以 `DirectCompatibility + InstallPortableSettings` 正式 Publish，更新 8 个受管路径，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260830-040053-a40de1f7`；同范围发布后 Status 返回 `published:true`、0 个正式发布缺口，源码、安装、manifest、路由 evidence 与生命周期均一致。

@@ -30,3 +30,4 @@
 - `CON-004` 满足：项目 `AGENTS.md` 已持久记录日常 Git 维护与私有远端同步授权，同时保留强制推送、历史重写和远端归属变更的单次授权边界；本轮源码已形成职责分离的提交并同步。
 - 2026-08-23 的 `should` 修订已完成源码和手动安装，但用户明确叫停检查并要求手动发布：Routing/Policy 已通过、References 以 `execution_failed` 结束，新三阶段 evidence 没有合并，正式 Validate/Publish 和发布后 Status 未运行。因此当前只能声明“已实现并手动应用”，不声明正式发布合同或模型行为已验证。后续只有在用户重新要求正式发布或行为验收时才恢复对应证据链，不自动重试。
 - 后继可逆操作 Experiment 版本已形成新的正式三阶段 evidence，通过部署 Validate，并以 `DirectCompatibility + InstallPortableSettings` 正式 Publish；发布后 Status 为 `published:true`。它取代上一条手动应用作为当前源码与安装证据，但发布只证明受管文件安装，真实选择行为仍须新任务消费新指令链。
+- 2026-08-30 固定角色隔离版本已从干净提交正式发布，发布后无安装、manifest、路由 evidence 或生命周期差距；它取代此前允许正整数 fork 的调用合同。当前运行不会追溯加载新规则，`fork_turns="none"` 和无后代代理的真实动作验收仍须新任务完成。
