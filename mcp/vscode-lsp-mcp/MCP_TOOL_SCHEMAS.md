@@ -4,7 +4,7 @@
 
 本文是 `vscode-lsp-mcp` 第一版公开工具接口的规范源。接口只为 LLM 的定位、理解、修改和验证流程服务，不复刻传统 LSP 数据结构，也不暴露 Bridge、Provider 或预览缓存的内部实现字段。
 
-- Schema 版本：`1.0.0-draft.4`
+- Schema 版本：`1.1.0-draft.1`
 - MCP 规范基线：`2025-11-25`
 - JSON Schema 方言：Draft 2020-12
 - MCP `inputSchema` 和调用参数：严格 JSON
@@ -61,7 +61,7 @@
 - 起点超过可用数量时成功返回空 `results`。
 - WorkspaceEdit、TextEdit 和 apply 报告属于一个操作，不按候选窗口切片。
 
-第一版精确使用结果窗口的工具为：`list_workspaces`、`health_check`、`get_capabilities`、`workspace_symbols`、`document_symbols`、`symbol_info`、`get_references`、`get_call_hierarchy`、`get_type_hierarchy`、`get_diagnostics` 和 `code_actions`。未注册的 MCP completion 能力不在本组件第一版范围内。
+第一版精确使用结果窗口的工具为：`list_workspaces`、`health_check`、`get_capabilities`、`workspace_symbols`、`document_symbols`、`symbol_info`、`get_references`、`get_call_hierarchy`、`get_type_hierarchy`、`get_diagnostics` 和 `code_actions`。`verify_symbol_candidates` 的输出与显式候选输入一一对应，不再二次分页。未注册的 MCP completion 能力不在本组件第一版范围内。
 
 集合只额外返回可用候选数量：
 
@@ -82,9 +82,9 @@ available: 46
 
 计数口径冻结为：
 
-- 18 个公开工具。
-- `tools/list` 公开 18 份独立 `inputSchema`。
-- 服务端内部维护 18 份输出 Schema；输入与内部输出共 36 份 Schema，均可单独通过 Draft 2020-12 校验。
+- 19 个公开工具。
+- `tools/list` 公开 19 份独立 `inputSchema`。
+- 服务端内部维护 19 份输出 Schema；输入与内部输出共 38 份 Schema，均可单独通过 Draft 2020-12 校验。
 - 公共 `$defs` 是生成源，不是额外公开工具 Schema，也不计入上述数量。
 
 ### 2.5 默认值和跨字段校验
@@ -265,6 +265,12 @@ ReferenceHit:
   column: integer >= 1
   snippet?: string
 
+SymbolCandidateVerification:
+  file: string
+  line: integer >= 1
+  column: integer >= 1
+  status: verified | mismatched | unresolved | positionOutOfRange
+
 HierarchySymbol:
   name: string
   kind: SymbolKind
@@ -324,7 +330,7 @@ SymbolKind:
 
 - Workspace symbol 不伪造完整限定名。
 - Document symbol 的 `path` 由文档符号树确定性生成，例如 `[ClassName, methodName]`；名称是最后一项，深度是数组长度减一，不重复输出。
-- 引用结果不返回 `isDeclaration`，因为 Reference Provider 不标记单项语义。
+- 引用结果不返回 `isDeclaration`，因为 Reference Provider 不标记单项语义。候选核验只裁决调用方提交的位置，不声称调用方的文本候选集合完整。
 - Symbol info 使用判别联合，不为 Hover 返回空 location，也不为 Definition 返回空 markdown。
 - 多个签名候选把当前 active signature 排在第一项；只有参数存在独立文档时才输出 `parameters`。
 - Symbol info 忽略请求中 `include` 的排列差异，按 `hover`、`declaration`、`definition`、`typeDefinition`、`implementation`、`signatureHelp` 的固定能力顺序分组。组内先规范化和去重：Hover 按标准化 text，Location 按 file/line/column/snippet，Signature 先 active signature、再按 label/documentation。分组拼接后再应用统一结果窗口。
@@ -544,7 +550,7 @@ CommandFailedDetails:
 
 缩写依次表示 `readOnlyHint`、`destructiveHint`、`idempotentHint`、`openWorldHint`。安全策略由服务端强制执行，不依赖 annotation。
 
-所有 18 个工具都显式注册 `execution.taskSupport: "forbidden"`：本组件不使用 MCP task-augmented execution。`execute_command` 内部等待 VS Code command/task 完成，不等同于 MCP `tasks/*` 协议。Preview 和候选工具产生的临时服务端缓存不视为对用户工作区环境的修改，因此保持 `readOnlyHint: true`。
+所有 19 个工具都显式注册 `execution.taskSupport: "forbidden"`：本组件不使用 MCP task-augmented execution。`execute_command` 内部等待 VS Code command/task 完成，不等同于 MCP `tasks/*` 协议。Preview 和候选工具产生的临时服务端缓存不视为对用户工作区环境的修改，因此保持 `readOnlyHint: true`。
 
 ### 6.2 `list_workspaces`
 
@@ -626,7 +632,6 @@ CommandFailedDetails:
     "includeGlobs": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "type": "string", "minLength": 1 } },
     "excludeGlobs": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "type": "string", "minLength": 1 } },
     "contextLines": { "type": "integer", "minimum": 0, "maximum": 5, "default": 0 },
-    "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 90000 },
     "resultStart": { "type": "integer", "minimum": 1, "default": 1 },
     "resultEnd": { "type": "integer", "minimum": 1 }
   },
@@ -707,6 +712,7 @@ CommandFailedDetails:
     "includeGlobs": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "type": "string", "minLength": 1 } },
     "excludeGlobs": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "type": "string", "minLength": 1 } },
     "contextLines": { "type": "integer", "minimum": 0, "maximum": 5, "default": 0 },
+    "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 300000 },
     "resultStart": { "type": "integer", "minimum": 1, "default": 1 },
     "resultEnd": { "type": "integer", "minimum": 1 }
   },
@@ -715,9 +721,45 @@ CommandFailedDetails:
 }
 ```
 
-输出：`Collection<ReferenceHit>`。通常调用 VS Code 公开 Reference Provider 命令，采用其固定包含声明的语义；不对单个结果伪造声明标记。`timeoutMs` 只覆盖本次引用查询，省略时使用扩展的 60,000 毫秒默认值；允许 1,000 至 90,000 毫秒。显式提供 `timeoutMs` 时会把完整预算留给公开 Reference Provider，不先消耗 scoped fallback 预算。C/C++ 在未显式提供 `timeoutMs`、且 `includeGlobs` 带固定目录前缀时，优先执行有界的 scoped identity fallback：直接读取未打开文件的 UTF-8 内容，但始终优先使用已打开文档的内存文本，只发现范围内的精确标识符 token，并逐个通过 definition/declaration 锚点验证符号身份。只有文件数、文本量、候选数、时间和每个候选的语义验证全部完成时才返回，并附带 `references_scoped_identity_fallback` warning；任一预算或验证不足时不得返回部分结果，而是回退到公开 Reference Provider。公开 C/C++ references 在超时或取消后会触发一次有界的中断脉冲，并最多等待三秒确认原 Provider promise 已结束；只有真实结束才释放单飞槽，其他 Provider 不支持中断时仍保持保护。
+输出：`Collection<ReferenceHit>`。通常调用 VS Code 公开 Reference Provider 命令，采用其固定包含声明的语义；不对单个结果伪造声明标记。`timeoutMs` 只覆盖本次引用查询，省略时使用扩展的 60,000 毫秒默认值；允许 1,000 至 300,000 毫秒。显式提供 `timeoutMs` 时会把完整预算留给公开 Reference Provider，不先消耗 scoped fallback 预算。C/C++ 在未显式提供 `timeoutMs`、且 `includeGlobs` 带固定目录前缀时，优先执行有界的 scoped identity fallback：只发现范围内的精确标识符 token，并逐个通过 definition/declaration 锚点验证符号身份。只有文件数、文本量、候选数、时间和每个候选的语义验证全部完成时才返回，并附带 `references_scoped_identity_fallback` warning；任一预算或候选身份无法证明时快速返回可恢复错误，不再隐式启动一次昂贵的全工作区 Provider。调用方随后应改用 `verify_symbol_candidates`，或显式提供 `timeoutMs` 请求完整 Provider 枚举。公开 C/C++ references 在超时或取消后会触发一次有界的中断脉冲，并最多等待三秒确认原 Provider promise 已结束；只有真实结束才释放单飞槽，其他 Provider 不支持中断时仍保持保护。
 
-### 6.9 `get_call_hierarchy`
+### 6.9 `verify_symbol_candidates`
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "workspaceId": { "type": "string", "minLength": 1 },
+    "file": { "type": "string", "minLength": 1 },
+    "line": { "type": "integer", "minimum": 1 },
+    "column": { "type": "integer", "minimum": 1 },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": { "type": "string", "minLength": 1 },
+          "line": { "type": "integer", "minimum": 1 },
+          "column": { "type": "integer", "minimum": 1 }
+        },
+        "required": ["file", "line", "column"],
+        "additionalProperties": false
+      }
+    },
+    "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 300000 }
+  },
+  "required": ["workspaceId", "file", "line", "column", "candidates"],
+  "additionalProperties": false
+}
+```
+
+输出：`Collection<SymbolCandidateVerification>`，顺序和数量与显式候选输入一致。工具只解析一次目标身份，再逐项核验调用方已通过文本或 AST 收窄的位置；它不会枚举文件，也不证明未提交的位置不存在。`verified` 表示候选解析到同一目标，`mismatched` 表示解析到其他目标，`unresolved` 表示 Provider 未给出可比较身份，`positionOutOfRange` 表示候选位置无效。Provider 整体不可用、失败或超时仍作为工具错误返回，不把未检查项伪装成结果。
+
+### 6.10 `get_call_hierarchy`
 
 ```json
 {
@@ -740,7 +782,7 @@ CommandFailedDetails:
 
 输出：`Collection<CallHierarchyEntry>`。按根节点、breadth-first、direction 和位置稳定排列。`parent` 仅在 `depth > 0` 时输出。
 
-### 6.10 `get_type_hierarchy`
+### 6.11 `get_type_hierarchy`
 
 ```json
 {
@@ -763,7 +805,7 @@ CommandFailedDetails:
 
 输出：`Collection<TypeHierarchyEntry>`。排序和 parent 规则与调用层级相同。
 
-### 6.11 `get_diagnostics`
+### 6.12 `get_diagnostics`
 
 ```json
 {
@@ -792,7 +834,7 @@ CommandFailedDetails:
 
 输出：`Collection<Diagnostic>`。只返回 VS Code 已发布的诊断；不遍历文件模拟全量语言分析。提供 `files` 且省略 `scope` 时自动使用 `files`；显式使用 `scope: "files"` 时必须提供 `files`，其他 scope 不得同时提供 `files`。跨字段错误由运行时校验返回具体原因，避免依赖客户端对条件 JSON Schema 的支持。
 
-### 6.12 `rename_preview`
+### 6.13 `rename_preview`
 
 ```json
 {
@@ -804,7 +846,7 @@ CommandFailedDetails:
     "line": { "type": "integer", "minimum": 1 },
     "column": { "type": "integer", "minimum": 1 },
     "newName": { "type": "string", "minLength": 1, "maxLength": 1000 },
-    "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 90000 },
+    "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 300000 },
     "includeGlobs": {
       "type": "array",
       "minItems": 1,
@@ -823,13 +865,13 @@ CommandFailedDetails:
 }
 ```
 
-输出：`Preview`。`includeGlobs` 必填，`excludeGlobs` 可选；源文件必须落在声明范围内。`timeoutMs` 可选，范围为 1,000–90,000 ms；省略时使用窗口配置的 Provider 超时（默认 60 秒），已知冷启动 C++ rename 超过默认值时可对单次预览使用 90,000 ms，无需修改持久设置或重载窗口。该范围是完整编辑的安全边界，不是结果裁剪器：Provider 只要返回一个范围外目标，整份结果返回 `RENAME_SCOPE_VIOLATION`，不生成 `previewId`、不缓存任何子集，也不得通过放宽范围绕过对每个目标的审查。
+输出：`Preview`。`includeGlobs` 必填，`excludeGlobs` 可选；源文件必须落在声明范围内。`timeoutMs` 可选，范围为 1,000–300,000 ms；省略时使用窗口配置的 Provider 超时（默认 60 秒）。该范围是完整编辑的安全边界，不是结果裁剪器：Provider 只要返回一个范围外目标，整份结果返回 `RENAME_SCOPE_VIOLATION`，不生成 `previewId`、不缓存任何子集，也不得通过放宽范围绕过对每个目标的审查。
 
 Provider edit 规范化后先检查完整路径范围；发现越界文件时直接返回有界的 `RENAME_SCOPE_VIOLATION`，不进入较慢的身份查询，也不缓存预览。范围校验通过后，扩展仍要验证每个 edit：被替换文本必须等于 prepare rename 的目标文本，且该 edit 位置的 definition/declaration 锚点必须非歧义地属于目标锚点集合。对于 definition/declaration 无法解析、但语言 Provider 有意参与重命名的语义字符串位置（例如 Python `__all__`），还必须由目标的一次有界 Reference Provider 结果按文件、行、列精确证明；这不是对普通 unresolved edit 的放行。任一同名异符号、混合锚点、无法解析或无法被引用集合证明、Provider 失败或 30 秒/100 edits 校验预算不足都返回 `RENAME_IDENTITY_UNVERIFIED`，只给出有界原因和计数，不缓存预览。身份 Provider 超时使用 `providerTimedOut` 原因，不再误报为普通 rename Provider 超时。引用证明最多接收 200 个位置。零有效编辑返回 `RENAME_NO_EDITS`，不得以 `ok: true, changes: []` 表示成功。
 
 完整预览最多包含 50 个变更文件、100 个编辑、50,000 个 `oldText + newText` UTF-16 code unit，最终 YAML 工具响应最多 65,536 个 UTF-8 字节。任一预算超限返回仅含计数的 `PREVIEW_TOO_LARGE`；`serializedBytes` 是按真实 YAML 编码器和等长占位 `previewId` 计算的最终响应字节数，不是内部 JSON 大小。不得把截断结果标为可 apply。完整版本和哈希快照保存在内部缓存，不传给 LLM。Provider edit 不能由公共 API 完整枚举为 text-only 时返回 `EDIT_CONFLICT/unsupportedEdit`，不得应用原始 WorkspaceEdit。
 
-### 6.13 `rename_apply`
+### 6.14 `rename_apply`
 
 ```json
 {
@@ -845,7 +887,7 @@ Provider edit 规范化后先检查完整路径范围；发现越界文件时直
 
 输出：`ApplyResult`。调用 apply 本身就是确认，不额外要求 `confirm: true`。`previewId` 已绑定工作区，工具只能应用缓存中的完整预览，不能重复提交 workspace 或 rename 参数。
 
-### 6.14 `code_actions`
+### 6.15 `code_actions`
 
 ```json
 {
@@ -866,7 +908,7 @@ Provider edit 规范化后先检查完整路径范围；发现越界文件时直
 
 输出：`CodeActionSet`。服务端只返回已经解析并缓存为完整 text-only edit 的 Action，不向 LLM 暴露 `itemResolveCount` 等 Provider 调优参数。
 
-### 6.15 `code_action_preview`
+### 6.16 `code_action_preview`
 
 ```json
 {
@@ -883,7 +925,7 @@ Provider edit 规范化后先检查完整路径范围；发现越界文件时直
 
 输出：`Preview`。只使用 actionSet 中缓存的已解析 text edit，不重新调用 Provider 取得另一批编辑。若候选缓存完整性或最终安全归一化失败，返回 `ACTION_NOT_PREVIEWABLE` 并要求重新获取候选；文档快照变化返回 `DOCUMENT_CHANGED`。
 
-### 6.16 `code_action_apply`
+### 6.17 `code_action_apply`
 
 ```json
 {
@@ -899,7 +941,7 @@ Provider edit 规范化后先检查完整路径范围；发现越界文件时直
 
 输出：`ApplyResult`。预览校验和一次性消费规则与 `rename_apply` 相同。
 
-### 6.17 `format_preview`
+### 6.18 `format_preview`
 
 ```json
 {
@@ -926,7 +968,7 @@ Provider edit 规范化后先检查完整路径范围；发现越界文件时直
 
 输出：`Preview`。省略 `range` 时格式化文档；提供 `range` 时格式化范围。省略 options 时使用目标文档的有效配置。
 
-### 6.18 `format_apply`
+### 6.19 `format_apply`
 
 ```json
 {
@@ -942,7 +984,7 @@ Provider edit 规范化后先检查完整路径范围；发现越界文件时直
 
 输出：`ApplyResult`。预览校验和一次性消费规则与 `rename_apply` 相同。
 
-### 6.19 `execute_command`
+### 6.20 `execute_command`
 
 ```json
 {
@@ -1014,9 +1056,9 @@ Provider edit 规范化后先检查完整路径范围；发现越界文件时直
 
 ## 8. 实现验收
 
-- `tools/list` 返回 18 个工具，名称、description、annotations 和 inputSchema 与本文一致，并且不包含 outputSchema。
+- `tools/list` 返回 19 个工具，名称、description、annotations 和 inputSchema 与本文一致，并且不包含 outputSchema。
 - 所有输入拒绝未知字段；所有输出拒绝未在对应判别联合中的字段。
-- 18 份 inputSchema 和 18 份内部输出 Schema分别通过 Draft 2020-12 校验；公共 `$defs` 生成源也必须通过自身校验并成功内联。
+- 19 份 inputSchema 和 19 份内部输出 Schema分别通过 Draft 2020-12 校验；公共 `$defs` 生成源也必须通过自身校验并成功内联。
 - 每份内部输出 Schema 根显式为 `type: object`，成功和失败 DTO 在 YAML 序列化前通过对应联合 envelope 校验。
 - 每个 `tools/call` 响应只包含一份 YAML TextContent，不包含 structuredContent。
 - 默认窗口为 20，最大窗口为 100；覆盖单边窗口、空窗口、逆序和越界测试。

@@ -228,6 +228,8 @@ const applyToolDefaults = (toolName: ToolName, input: Record<string, unknown>): 
       input.contextLines ??= 0;
       validateGlobFields(toolName, input);
       break;
+    case 'verify_symbol_candidates':
+      break;
     case 'get_call_hierarchy':
       input.direction ??= 'both';
       input.maxDepth ??= 1;

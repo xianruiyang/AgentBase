@@ -87,7 +87,7 @@ test('rename bridge owns a closed exact-generation request', () => {
     column: 2,
     newName: 'next',
     includeGlobs: ['src/**'],
-    timeoutMs: 90_001,
+    timeoutMs: 300_001,
   }), TypeError);
 });
 

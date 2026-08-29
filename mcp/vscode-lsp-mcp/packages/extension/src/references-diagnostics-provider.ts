@@ -2,6 +2,7 @@ import type { Position as VscodePosition, TextDocument } from 'vscode';
 import {
   DIAGNOSTICS_BRIDGE_METHOD,
   REFERENCES_BRIDGE_METHOD,
+  VERIFY_SYMBOL_CANDIDATES_BRIDGE_METHOD,
   WorkspaceBoundaryError,
   buildCandidateCollection,
   contextSnippetForLine,
@@ -16,17 +17,24 @@ import {
   type JsonValue,
   type Range,
   type ReferenceHit,
+  type SymbolCandidatePosition,
+  type SymbolCandidateVerification,
   type WorkspacePathAccess,
   type WorkspacePathContext,
 } from '@simplechat/vscode-lsp-mcp-protocol';
 import {
+  PROVIDER_DEFAULT_TIMEOUT_MS,
+  PROVIDER_MAX_TIMEOUT_MS,
   ProviderRuntime,
   classifyArrayProviderResult,
   type ProviderCommandAdapter,
   type ProviderInvocationResult,
   type VscodeProviderHost,
 } from './provider-runtime.js';
-import { SymbolIdentityResolver } from './symbol-identity-resolver.js';
+import {
+  SymbolIdentityResolver,
+  type SymbolIdentityFailureStatus,
+} from './symbol-identity-resolver.js';
 
 interface ReferenceBridgeParams {
   readonly file: string;
@@ -46,6 +54,14 @@ interface DiagnosticsBridgeParams {
   readonly includeRelatedInformation: boolean;
 }
 
+interface VerifySymbolCandidatesBridgeParams {
+  readonly file: string;
+  readonly line: number;
+  readonly column: number;
+  readonly candidates: readonly SymbolCandidatePosition[];
+  readonly timeoutMs?: number;
+}
+
 interface ProviderPoint {
   readonly line: number;
   readonly character: number;
@@ -62,11 +78,25 @@ interface MappedReference {
   readonly hit: ReferenceHit;
 }
 
-interface ScopedReferenceResult {
-  readonly status: 'completed' | 'notApplicable' | 'cancelled';
-  readonly candidates?: readonly MappedReference[];
-  readonly warnings?: readonly string[];
-}
+type ScopedReferenceIncompleteReason =
+  | 'targetUnresolved'
+  | 'scopeBudgetExceeded'
+  | 'candidateUnresolved'
+  | 'providerUnavailable'
+  | 'providerTimedOut'
+  | 'providerFailed';
+
+type ScopedReferenceResult =
+  | { readonly status: 'notApplicable' | 'cancelled' }
+  | {
+      readonly status: 'incomplete';
+      readonly reason: ScopedReferenceIncompleteReason;
+    }
+  | {
+      readonly status: 'completed';
+      readonly candidates: readonly MappedReference[];
+      readonly warnings: readonly string[];
+    };
 
 interface DiagnosticEntry {
   readonly rawUri: unknown;
@@ -153,7 +183,7 @@ const parseReferenceParams = (value: unknown): ReferenceBridgeParams | undefined
   }
   if (record.timeoutMs !== undefined && (
     !Number.isSafeInteger(record.timeoutMs) || (record.timeoutMs as number) < 1_000 ||
-    (record.timeoutMs as number) > 90_000
+    (record.timeoutMs as number) > PROVIDER_MAX_TIMEOUT_MS
   )) {
     return undefined;
   }
@@ -185,6 +215,49 @@ const parseReferenceParams = (value: unknown): ReferenceBridgeParams | undefined
       : {}),
     ...(record.timeoutMs === undefined ? {} : { timeoutMs: record.timeoutMs as number }),
   };
+};
+
+const parseSymbolCandidatePosition = (value: unknown): SymbolCandidatePosition | undefined => {
+  const record = asRecord(value);
+  if (record === undefined || !exactFields(record, ['file', 'line', 'column']) ||
+      typeof record.file !== 'string' || record.file.length === 0 ||
+      !Number.isSafeInteger(record.line) || (record.line as number) < 1 ||
+      !Number.isSafeInteger(record.column) || (record.column as number) < 1) {
+    return undefined;
+  }
+  return Object.freeze({
+    file: record.file,
+    line: record.line as number,
+    column: record.column as number,
+  });
+};
+
+const parseVerifySymbolCandidatesParams = (
+  value: unknown,
+): VerifySymbolCandidatesBridgeParams | undefined => {
+  const record = asRecord(value);
+  if (record === undefined ||
+      !exactFields(record, ['file', 'line', 'column', 'candidates', 'timeoutMs']) ||
+      typeof record.file !== 'string' || record.file.length === 0 ||
+      !Number.isSafeInteger(record.line) || (record.line as number) < 1 ||
+      !Number.isSafeInteger(record.column) || (record.column as number) < 1 ||
+      !Array.isArray(record.candidates) || record.candidates.length < 1 ||
+      record.candidates.length > 100 ||
+      (record.timeoutMs !== undefined && (
+        !Number.isSafeInteger(record.timeoutMs) || (record.timeoutMs as number) < 1_000 ||
+        (record.timeoutMs as number) > PROVIDER_MAX_TIMEOUT_MS
+      ))) {
+    return undefined;
+  }
+  const candidates = record.candidates.map(parseSymbolCandidatePosition);
+  if (candidates.some((candidate) => candidate === undefined)) return undefined;
+  return Object.freeze({
+    file: record.file,
+    line: record.line as number,
+    column: record.column as number,
+    candidates: Object.freeze(candidates as SymbolCandidatePosition[]),
+    ...(record.timeoutMs === undefined ? {} : { timeoutMs: record.timeoutMs as number }),
+  });
 };
 
 const parseDiagnosticsParams = (value: unknown): DiagnosticsBridgeParams | undefined => {
@@ -288,6 +361,16 @@ const invocationStatus = <T>(result: ProviderInvocationResult<T>): ReferenceStat
   result.status === 'failed' && result.reason === 'providerArgumentsInvalid'
     ? 'positionOutOfRange'
     : result.status;
+
+const scopedIdentityFailureReason = (
+  status: SymbolIdentityFailureStatus,
+): ScopedReferenceIncompleteReason => {
+  if (status === 'timedOut') return 'providerTimedOut';
+  if (status === 'budgetExceeded') return 'scopeBudgetExceeded';
+  if (status === 'unresolved' || status === 'positionOutOfRange') return 'targetUnresolved';
+  if (status === 'unavailable' || status === 'notReady') return 'providerUnavailable';
+  return 'providerFailed';
+};
 
 const providerRange = (value: unknown): Range | undefined => {
   const record = asRecord(value);
@@ -534,6 +617,7 @@ const mapDiagnostic = async (
 
 export class ReferencesDiagnosticsProviderBridge {
   readonly #host: ReferencesDiagnosticsProviderHost;
+  readonly #defaultTimeoutMs: number;
   readonly #identity: SymbolIdentityResolver;
   readonly #pathAccess: WorkspacePathAccess;
   readonly #runtime: ProviderRuntime;
@@ -545,6 +629,7 @@ export class ReferencesDiagnosticsProviderBridge {
     defaultTimeoutMs?: number,
   ) {
     this.#host = host;
+    this.#defaultTimeoutMs = defaultTimeoutMs ?? PROVIDER_DEFAULT_TIMEOUT_MS;
     this.#pathAccess = pathAccess;
     this.#scopedReferenceCallTimeoutMs = Math.min(
       SCOPED_REFERENCE_CALL_TIMEOUT_MS,
@@ -588,7 +673,9 @@ export class ReferencesDiagnosticsProviderBridge {
       return remaining < 1 ? undefined : Math.min(this.#scopedReferenceCallTimeoutMs, remaining);
     };
     const targetTimeout = callTimeout();
-    if (targetTimeout === undefined) return Object.freeze({ status: 'notApplicable' });
+    if (targetTimeout === undefined) {
+      return Object.freeze({ status: 'incomplete', reason: 'providerTimedOut' });
+    }
     const target = await this.#identity.resolveTarget(
       context,
       { file: input.file, line: input.line, column: input.column },
@@ -596,7 +683,12 @@ export class ReferencesDiagnosticsProviderBridge {
       targetTimeout,
     );
     if (target.status === 'cancelled') return Object.freeze({ status: 'cancelled' });
-    if (target.status !== 'resolved') return Object.freeze({ status: 'notApplicable' });
+    if (target.status !== 'resolved') {
+      return Object.freeze({
+        status: 'incomplete',
+        reason: scopedIdentityFailureReason(target.status),
+      });
+    }
     const targetAnchors = new Set(target.anchors);
 
     const files = new Map<string, { readonly file: string; readonly rawUri: unknown }>();
@@ -610,14 +702,16 @@ export class ReferencesDiagnosticsProviderBridge {
           SCOPED_REFERENCE_MAX_FILES + 1,
         );
       } catch {
-        return Object.freeze({ status: 'notApplicable' });
+        return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
       }
       if (found.length > SCOPED_REFERENCE_MAX_FILES) {
-        return Object.freeze({ status: 'notApplicable' });
+        return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
       }
       for (const rawUri of found) {
         const uri = uriRecord(rawUri);
-        if (uri === undefined) return Object.freeze({ status: 'notApplicable' });
+        if (uri === undefined) {
+          return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
+        }
         let file: string;
         try {
           file = (await logicalPathFromProviderLocation(context, {
@@ -625,13 +719,13 @@ export class ReferencesDiagnosticsProviderBridge {
             lexicalAbsolutePath: uri.fsPath,
           }, this.#pathAccess)).logicalPath;
         } catch {
-          return Object.freeze({ status: 'notApplicable' });
+          return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
         }
         if (!cppSourceFile.test(file) || !matchesLogicalGlobs(file, input)) continue;
         const key = context.platform === 'win32' ? file.toLowerCase() : file;
         files.set(key, Object.freeze({ file, rawUri }));
         if (files.size > SCOPED_REFERENCE_MAX_FILES) {
-          return Object.freeze({ status: 'notApplicable' });
+          return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
         }
       }
     }
@@ -644,14 +738,16 @@ export class ReferencesDiagnosticsProviderBridge {
       try {
         text = await this.#host.readProviderText(entry.rawUri);
       } catch {
-        return Object.freeze({ status: 'notApplicable' });
+        return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
       }
       textCharacters += text.length;
       if (textCharacters > SCOPED_REFERENCE_MAX_TEXT_CHARACTERS) {
-        return Object.freeze({ status: 'notApplicable' });
+        return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
       }
       const uri = uriRecord(entry.rawUri);
-      if (uri === undefined) return Object.freeze({ status: 'notApplicable' });
+      if (uri === undefined) {
+        return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
+      }
       for (const offset of identifierOccurrences(text, identifier)) {
         const position = pointAtTextOffset(text, offset);
         occurrences.push(Object.freeze({
@@ -667,7 +763,7 @@ export class ReferencesDiagnosticsProviderBridge {
           }),
         }));
         if (occurrences.length > SCOPED_REFERENCE_MAX_OCCURRENCES) {
-          return Object.freeze({ status: 'notApplicable' });
+          return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
         }
       }
     }
@@ -675,7 +771,9 @@ export class ReferencesDiagnosticsProviderBridge {
     const verified: MappedReference[] = [];
     for (const occurrence of occurrences) {
       const timeoutMs = callTimeout();
-      if (timeoutMs === undefined) return Object.freeze({ status: 'notApplicable' });
+      if (timeoutMs === undefined) {
+        return Object.freeze({ status: 'incomplete', reason: 'providerTimedOut' });
+      }
       const result = await this.#identity.verifyCandidate(
         context,
         {
@@ -688,8 +786,16 @@ export class ReferencesDiagnosticsProviderBridge {
         timeoutMs,
       );
       if (result.status === 'cancelled') return Object.freeze({ status: 'cancelled' });
-      if (result.status === 'mismatched' || result.status === 'unresolved') continue;
-      if (result.status !== 'verified') return Object.freeze({ status: 'notApplicable' });
+      if (result.status === 'mismatched') continue;
+      if (result.status === 'unresolved' || result.status === 'positionOutOfRange') {
+        return Object.freeze({ status: 'incomplete', reason: 'candidateUnresolved' });
+      }
+      if (result.status !== 'verified') {
+        return Object.freeze({
+          status: 'incomplete',
+          reason: scopedIdentityFailureReason(result.status),
+        });
+      }
       verified.push(occurrence);
     }
     return Object.freeze({
@@ -713,10 +819,13 @@ export class ReferencesDiagnosticsProviderBridge {
       ? await this.#scopedCppReferences(context, input, signal)
       : Object.freeze({ status: 'notApplicable' as const });
     if (scoped.status === 'cancelled') return { status: 'cancelled' };
+    if (scoped.status === 'incomplete') {
+      return { status: 'scopedIncomplete', reason: scoped.reason };
+    }
     let mappedCandidates: readonly MappedReference[];
     if (scoped.status === 'completed') {
-      mappedCandidates = scoped.candidates ?? [];
-      for (const warning of scoped.warnings ?? []) warnings.add(warning);
+      mappedCandidates = scoped.candidates;
+      for (const warning of scoped.warnings) warnings.add(warning);
     } else {
       const invocation = await this.#runtime.invoke(
         context,
@@ -805,6 +914,57 @@ export class ReferencesDiagnosticsProviderBridge {
     } as unknown as JsonValue;
   }
 
+  async #verifySymbolCandidates(
+    context: WorkspacePathContext,
+    input: VerifySymbolCandidatesBridgeParams,
+    signal: AbortSignal,
+  ): Promise<JsonValue> {
+    const deadlineAt = Date.now() + (input.timeoutMs ?? this.#defaultTimeoutMs);
+    const remaining = (): number => Math.max(0, Math.ceil(deadlineAt - Date.now()));
+    const targetTimeout = remaining();
+    if (targetTimeout === 0) return { status: 'timedOut' };
+    const target = await this.#identity.resolveTarget(
+      context,
+      { file: input.file, line: input.line, column: input.column },
+      signal,
+      targetTimeout,
+    );
+    if (target.status !== 'resolved') {
+      if (target.status === 'budgetExceeded' || target.status === 'unresolved') {
+        return { status: 'failed' };
+      }
+      return { status: target.status };
+    }
+
+    const anchors = new Set(target.anchors);
+    const candidates: SymbolCandidateVerification[] = [];
+    for (const candidate of input.candidates) {
+      if (signal.aborted) return { status: 'cancelled' };
+      const timeoutMs = remaining();
+      if (timeoutMs === 0) return { status: 'timedOut' };
+      const verification = await this.#identity.verifyCandidate(
+        context,
+        candidate,
+        anchors,
+        signal,
+        timeoutMs,
+      );
+      if (verification.status === 'verified' ||
+          verification.status === 'mismatched' ||
+          verification.status === 'unresolved' ||
+          verification.status === 'positionOutOfRange') {
+        candidates.push(Object.freeze({ ...candidate, status: verification.status }));
+        continue;
+      }
+      if (verification.status === 'budgetExceeded') return { status: 'failed' };
+      return { status: verification.status };
+    }
+    return {
+      status: 'completed',
+      candidates: Object.freeze(candidates),
+    } as unknown as JsonValue;
+  }
+
   async #diagnosticEntries(
     context: WorkspacePathContext,
     input: DiagnosticsBridgeParams,
@@ -882,6 +1042,12 @@ export class ReferencesDiagnosticsProviderBridge {
     if (request.method === DIAGNOSTICS_BRIDGE_METHOD) {
       const params = parseDiagnosticsParams(request.params);
       return params === undefined ? { status: 'failed' } : this.#diagnostics(context, params);
+    }
+    if (request.method === VERIFY_SYMBOL_CANDIDATES_BRIDGE_METHOD) {
+      const params = parseVerifySymbolCandidatesParams(request.params);
+      return params === undefined
+        ? { status: 'failed' }
+        : this.#verifySymbolCandidates(context, params, signal);
     }
     return undefined;
   };

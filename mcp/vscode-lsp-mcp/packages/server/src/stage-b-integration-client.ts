@@ -304,6 +304,22 @@ const main = async (): Promise<void> => {
       candidate.file === 'src/dirty.ts' && candidate.line === 3);
     assert.equal(dirtyReferenceFound, true);
 
+    const verifiedCandidates = await call('verify_symbol_candidates', {
+      workspaceId,
+      file: 'src/widget.ts',
+      line: 1,
+      column: 14,
+      candidates: [
+        { file: 'src/consumer.ts', line: 2, column: 29 },
+        { file: 'src/dirty.ts', line: 3, column: 32 },
+      ],
+      timeoutMs: 30_000,
+    });
+    assert.equal(verifiedCandidates.response.ok, true);
+    if (!verifiedCandidates.response.ok) throw new Error('Candidate verification failed.');
+    assert.equal(verifiedCandidates.response.data.results.every((candidate) =>
+      candidate.status === 'verified'), true);
+
     const workspaceSymbols = await call('workspace_symbols', {
       workspaceId,
       query: 'WindowSymbol',
@@ -340,6 +356,7 @@ const main = async (): Promise<void> => {
       dirtyDefinition.raw,
       references.raw,
       dirtyReferences.raw,
+      verifiedCandidates.raw,
       workspaceSymbols.raw,
       diagnostics.raw,
     ];

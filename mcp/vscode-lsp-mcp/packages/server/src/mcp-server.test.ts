@@ -75,6 +75,13 @@ const service: FoundationToolService = {
       available: 1,
     },
   }),
+  verifySymbolCandidates: (): Promise<ToolResponseMap['verify_symbol_candidates']> => Promise.resolve({
+    ok: true,
+    data: {
+      results: [{ file: 'src/widget.ts', line: 2, column: 7, status: 'verified' }],
+      available: 1,
+    },
+  }),
   getTypeHierarchy: (): Promise<ToolResponseMap['get_type_hierarchy']> => Promise.resolve({
     ok: true,
     data: {
@@ -177,6 +184,19 @@ test('official MCP SDK completes initialize, listTools, and foundation callTool'
     });
     assert.equal(references.isError, undefined);
     responseFromYaml('get_references', references);
+
+    const verifiedCandidates = await client.callTool({
+      name: 'verify_symbol_candidates',
+      arguments: {
+        workspaceId: 'ws_AAAAAAAAAAAAAAAAAAAAAA',
+        file: 'src/widget.ts',
+        line: 1,
+        column: 1,
+        candidates: [{ file: 'src/widget.ts', line: 2, column: 7 }],
+      },
+    });
+    assert.equal(verifiedCandidates.isError, undefined);
+    responseFromYaml('verify_symbol_candidates', verifiedCandidates);
 
     const diagnostics = await client.callTool({
       name: 'get_diagnostics',

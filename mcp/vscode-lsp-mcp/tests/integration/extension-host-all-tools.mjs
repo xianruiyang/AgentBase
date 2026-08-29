@@ -392,6 +392,19 @@ try {
   assert.equal(referencesResult.response.data.results[0]?.line, 41);
   assert.equal(referencesResult.response.data.results.at(-1)?.line, 60);
 
+  const verifiedCandidates = await call('verify_symbol_candidates', {
+    ...semanticArguments(alphaWorkspace.workspaceId),
+    candidates: [{
+      file: 'src/semantic.p64',
+      line: 1,
+      column: 1,
+    }],
+    timeoutMs: 30_000,
+  }, true);
+  assert.deepEqual(verifiedCandidates.response.data.results.map(({ status }) => status), [
+    'verified',
+  ]);
+
   const callHierarchy = await call('get_call_hierarchy', {
     ...semanticArguments(alphaWorkspace.workspaceId),
     direction: 'both',

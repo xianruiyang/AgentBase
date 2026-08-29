@@ -1,6 +1,6 @@
 {
   "name": "@simplechat/vscode-lsp-mcp-server",
-  "version": "0.1.21",
+  "version": "0.2.0",
   "private": true,
   "description": "Stdio MCP server package for the VS Code LSP MCP companion.",
   "author": "SimpleChat contributors",
@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
-    "@simplechat/vscode-lsp-mcp-protocol": "0.1.21",
-    "@simplechat/vscode-lsp-mcp-win32-security": "0.1.21"
+    "@simplechat/vscode-lsp-mcp-protocol": "0.2.0",
+    "@simplechat/vscode-lsp-mcp-win32-security": "0.2.0"
   }
 }

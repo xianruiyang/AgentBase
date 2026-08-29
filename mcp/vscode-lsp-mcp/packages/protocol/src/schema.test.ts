@@ -35,6 +35,13 @@ const validInputs: ToolInputMap = {
     line: 1,
     column: 1,
   },
+  verify_symbol_candidates: {
+    workspaceId: 'workspace-1',
+    file: 'src/widget.ts',
+    line: 1,
+    column: 1,
+    candidates: [{ file: 'src/widget.ts', line: 2, column: 7 }],
+  },
   get_call_hierarchy: {
     workspaceId: 'workspace-1',
     file: 'src/widget.ts',
@@ -82,6 +89,7 @@ const validSuccessData: ToolOutputDataMap = {
   document_symbols: emptyCollection,
   symbol_info: emptyCollection,
   get_references: emptyCollection,
+  verify_symbol_candidates: emptyCollection,
   get_call_hierarchy: emptyCollection,
   get_type_hierarchy: emptyCollection,
   get_diagnostics: emptyCollection,
@@ -104,8 +112,8 @@ const invalidArgumentEnvelope = {
   },
 } as const;
 
-test('registry is the exact frozen 18-tool contract', () => {
-  assert.equal(TOOL_DEFINITIONS.length, 18);
+test('registry is the exact frozen 19-tool contract', () => {
+  assert.equal(TOOL_DEFINITIONS.length, 19);
   assert.deepEqual(TOOL_DEFINITIONS.map((definition) => definition.name), TOOL_NAMES);
   assert.ok(TOOL_DEFINITIONS.every((definition) => definition.execution.taskSupport === 'forbidden'));
   assert.ok(Object.isFrozen(TOOL_DEFINITIONS));
@@ -121,10 +129,10 @@ test('registry is the exact frozen 18-tool contract', () => {
   ]);
 });
 
-test('all 36 schemas compile independently as Draft 2020-12 objects', () => {
+test('all 38 schemas compile independently as Draft 2020-12 objects', () => {
   const compiled = compileAllToolSchemasIndependently();
-  assert.equal(compiled.length, 36);
-  assert.equal(new Set(compiled.map((item) => `${item.toolName}:${item.direction}`)).size, 36);
+  assert.equal(compiled.length, 38);
+  assert.equal(new Set(compiled.map((item) => `${item.toolName}:${item.direction}`)).size, 38);
 
   for (const definition of TOOL_DEFINITIONS) {
     assert.equal(definition.inputSchema.$schema, JSON_SCHEMA_DIALECT);
@@ -231,7 +239,7 @@ test('normalization applies explicit defaults without mutating caller input', ()
       file: 'src/widget.ts',
       line: 1,
       column: 1,
-      timeoutMs: 90_001,
+      timeoutMs: 300_001,
     }),
     ProtocolValidationError,
   );
@@ -260,7 +268,7 @@ test('normalization applies explicit defaults without mutating caller input', ()
       column: 1,
       newName: 'nextWidget',
       includeGlobs: ['src/**'],
-      timeoutMs: 90_001,
+      timeoutMs: 300_001,
     }),
     ProtocolValidationError,
   );

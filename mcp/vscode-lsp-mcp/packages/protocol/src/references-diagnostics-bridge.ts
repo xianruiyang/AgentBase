@@ -4,9 +4,11 @@ import type {
   DiagnosticSeverity,
   Range,
   ReferenceHit,
+  SymbolCandidateVerification,
 } from './dto.js';
 
 export const REFERENCES_BRIDGE_METHOD = 'references.get' as const;
+export const VERIFY_SYMBOL_CANDIDATES_BRIDGE_METHOD = 'references.verifyCandidates' as const;
 export const DIAGNOSTICS_BRIDGE_METHOD = 'diagnostics.get' as const;
 
 type ProviderTerminalStatus =
@@ -23,6 +25,23 @@ export type ReferencesBridgeResponse =
       readonly candidates: readonly ReferenceHit[];
       readonly available?: number;
       readonly warnings?: readonly string[];
+  }
+  | { readonly status: ProviderTerminalStatus }
+  | {
+      readonly status: 'scopedIncomplete';
+      readonly reason:
+        | 'targetUnresolved'
+        | 'scopeBudgetExceeded'
+        | 'candidateUnresolved'
+        | 'providerUnavailable'
+        | 'providerTimedOut'
+        | 'providerFailed';
+    };
+
+export type VerifySymbolCandidatesBridgeResponse =
+  | {
+      readonly status: 'completed';
+      readonly candidates: readonly SymbolCandidateVerification[];
     }
   | { readonly status: ProviderTerminalStatus };
 
@@ -138,6 +157,32 @@ const parseReference = (value: unknown, index: number): ReferenceHit => {
   });
 };
 
+const candidateVerificationStatuses = new Set<SymbolCandidateVerification['status']>([
+  'verified',
+  'mismatched',
+  'unresolved',
+  'positionOutOfRange',
+]);
+
+const parseSymbolCandidateVerification = (
+  value: unknown,
+  index: number,
+): SymbolCandidateVerification => {
+  const label = `symbol candidate verification ${index}`;
+  const record = asRecord(value, label);
+  exactFields(record, ['file', 'line', 'column', 'status'], label);
+  if (typeof record.status !== 'string' ||
+      !candidateVerificationStatuses.has(record.status as SymbolCandidateVerification['status'])) {
+    throw new TypeError(`${label}.status is invalid.`);
+  }
+  return Object.freeze({
+    file: logicalPath(requiredString(record, 'file', label), `${label}.file`),
+    line: positiveInteger(record, 'line', label),
+    column: positiveInteger(record, 'column', label),
+    status: record.status as SymbolCandidateVerification['status'],
+  });
+};
+
 const diagnosticSeverities = new Set<DiagnosticSeverity>([
   'error',
   'warning',
@@ -232,6 +277,17 @@ const terminalStatuses = new Set<ProviderTerminalStatus>([
   'positionOutOfRange',
 ]);
 
+const scopedIncompleteReasons = new Set<Extract<ReferencesBridgeResponse, {
+  readonly status: 'scopedIncomplete';
+}>['reason']>([
+  'targetUnresolved',
+  'scopeBudgetExceeded',
+  'candidateUnresolved',
+  'providerUnavailable',
+  'providerTimedOut',
+  'providerFailed',
+]);
+
 const parseResponse = <T>(
   value: unknown,
   label: string,
@@ -272,8 +328,35 @@ const parseResponse = <T>(
   return Object.freeze({ status: record.status as ProviderTerminalStatus });
 };
 
-export const parseReferencesBridgeResponse = (value: unknown): ReferencesBridgeResponse =>
-  parseResponse(value, 'references bridge response', parseReference, true, true);
+export const parseReferencesBridgeResponse = (value: unknown): ReferencesBridgeResponse => {
+  const record = asRecord(value, 'references bridge response');
+  if (record.status === 'scopedIncomplete') {
+    exactFields(record, ['status', 'reason'], 'references bridge response');
+    if (typeof record.reason !== 'string' ||
+        !scopedIncompleteReasons.has(record.reason as Extract<ReferencesBridgeResponse, {
+          readonly status: 'scopedIncomplete';
+        }>['reason'])) {
+      throw new TypeError('references bridge response.reason is invalid.');
+    }
+    return Object.freeze({
+      status: 'scopedIncomplete' as const,
+      reason: record.reason as Extract<ReferencesBridgeResponse, {
+        readonly status: 'scopedIncomplete';
+      }>['reason'],
+    });
+  }
+  return parseResponse(value, 'references bridge response', parseReference, true, true);
+};
+
+export const parseVerifySymbolCandidatesBridgeResponse = (
+  value: unknown,
+): VerifySymbolCandidatesBridgeResponse =>
+  parseResponse(
+    value,
+    'symbol candidates bridge response',
+    parseSymbolCandidateVerification,
+    true,
+  ) as VerifySymbolCandidatesBridgeResponse;
 
 export const parseDiagnosticsBridgeResponse = (value: unknown): DiagnosticsBridgeResponse =>
   parseResponse(value, 'diagnostics bridge response', parseDiagnostic, false) as DiagnosticsBridgeResponse;

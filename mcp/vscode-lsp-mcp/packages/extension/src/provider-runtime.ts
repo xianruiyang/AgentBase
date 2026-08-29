@@ -39,7 +39,7 @@ export const isPublicProviderCommand = (value: string): value is PublicProviderC
   providerCommandSet.has(value);
 
 export const PROVIDER_DEFAULT_TIMEOUT_MS = 60_000;
-export const PROVIDER_MAX_TIMEOUT_MS = 90_000;
+export const PROVIDER_MAX_TIMEOUT_MS = 300_000;
 export const PROVIDER_DEFAULT_POLL_DELAYS_MS = Object.freeze([0, 100, 250, 500] as const);
 
 export type ProviderInvocationPhase =

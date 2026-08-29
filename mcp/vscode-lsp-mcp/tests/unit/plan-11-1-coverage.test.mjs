@@ -154,13 +154,13 @@ test('PLAN 11.1 has a non-empty executable evidence mapping for all 17 unit boun
   }
 });
 
-test('the frozen registry compiles exactly 18 input and 18 output schemas', () => {
+test('the frozen registry compiles exactly 19 input and 19 output schemas', () => {
   const { TOOL_DEFINITIONS, TOOL_NAMES, compileAllToolSchemasIndependently } = protocol;
-  assert.equal(TOOL_NAMES.length, 18);
-  assert.equal(TOOL_DEFINITIONS.length, 18);
+  assert.equal(TOOL_NAMES.length, 19);
+  assert.equal(TOOL_DEFINITIONS.length, 19);
   assert.deepEqual(TOOL_DEFINITIONS.map(({ name }) => name), [...TOOL_NAMES]);
   const compiled = compileAllToolSchemasIndependently();
-  assert.equal(compiled.length, 36);
-  assert.equal(compiled.filter(({ direction }) => direction === 'input').length, 18);
-  assert.equal(compiled.filter(({ direction }) => direction === 'output').length, 18);
+  assert.equal(compiled.length, 38);
+  assert.equal(compiled.filter(({ direction }) => direction === 'input').length, 19);
+  assert.equal(compiled.filter(({ direction }) => direction === 'output').length, 19);
 });

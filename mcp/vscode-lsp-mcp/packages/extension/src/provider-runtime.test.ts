@@ -20,7 +20,7 @@ import {
 
 test('provider timeout defaults to 60 seconds and remains configurable within the safe bridge bound', () => {
   assert.equal(PROVIDER_DEFAULT_TIMEOUT_MS, 60_000);
-  assert.equal(PROVIDER_MAX_TIMEOUT_MS, 90_000);
+  assert.equal(PROVIDER_MAX_TIMEOUT_MS, 300_000);
   assert.ok(PROVIDER_DEFAULT_TIMEOUT_MS < PROVIDER_MAX_TIMEOUT_MS);
 });
 

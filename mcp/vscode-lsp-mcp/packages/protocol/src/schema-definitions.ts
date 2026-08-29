@@ -323,6 +323,15 @@ export const PUBLIC_SCHEMA_DEFS: Record<string, JsonSchema> = {
     },
     ['file', 'line', 'column'],
   ),
+  SymbolCandidateVerification: objectSchema(
+    {
+      file: nonEmptyString(),
+      line: positionInteger(),
+      column: positionInteger(),
+      status: { enum: ['verified', 'mismatched', 'unresolved', 'positionOutOfRange'] },
+    },
+    ['file', 'line', 'column', 'status'],
+  ),
   HierarchySymbol: hierarchySymbolSchema,
   CallHierarchyEntry: objectSchema(
     {
@@ -698,6 +707,7 @@ export const PUBLIC_SCHEMA_DEFS: Record<string, JsonSchema> = {
   DocumentSymbolCollection: collectionSchema('DocumentSymbol'),
   SymbolInfoResultCollection: collectionSchema('SymbolInfoResult'),
   ReferenceHitCollection: collectionSchema('ReferenceHit'),
+  SymbolCandidateVerificationCollection: collectionSchema('SymbolCandidateVerification'),
   CallHierarchyEntryCollection: collectionSchema('CallHierarchyEntry'),
   TypeHierarchyEntryCollection: collectionSchema('TypeHierarchyEntry'),
   DiagnosticCollection: collectionSchema('Diagnostic'),

@@ -19,6 +19,7 @@ import {
   parseHierarchyReleaseBridgeResponse,
   parseDocumentSymbolBridgeResponse,
   parseReferencesBridgeResponse,
+  parseVerifySymbolCandidatesBridgeResponse,
   parseSymbolInfoBridgeResponse,
   parseWorkspaceSymbolBridgeResponse,
   registrationComparison,
@@ -27,6 +28,7 @@ import {
   SYMBOL_BRIDGE_METHODS,
   DIAGNOSTICS_BRIDGE_METHOD,
   REFERENCES_BRIDGE_METHOD,
+  VERIFY_SYMBOL_CANDIDATES_BRIDGE_METHOD,
   SYMBOL_INFO_BRIDGE_METHOD,
   type Diagnostic,
   type Capability,
@@ -41,6 +43,7 @@ import {
   type ProviderObservation,
   type RegistrationRecord,
   type ReferenceHit,
+  type SymbolCandidateVerification,
   type RuntimePlatform,
   type RuntimePrimitives,
   type ToolResponseMap,
@@ -85,6 +88,7 @@ type SemanticToolName =
   | 'document_symbols'
   | 'symbol_info'
   | 'get_references'
+  | 'verify_symbol_candidates'
   | 'get_diagnostics';
 type SemanticToolFailure = Extract<ToolResponseMap[SemanticToolName], { readonly ok: false }>;
 
@@ -164,7 +168,7 @@ const compareCapabilities = (left: Capability, right: Capability): number =>
   (capabilityOrder.get(left.name) ?? Number.MAX_SAFE_INTEGER) -
   (capabilityOrder.get(right.name) ?? Number.MAX_SAFE_INTEGER);
 
-const SEMANTIC_BRIDGE_TIMEOUT_MS = 95_000;
+const SEMANTIC_BRIDGE_TIMEOUT_MS = 305_000;
 const HIERARCHY_TOTAL_TIMEOUT_MS = 90_000;
 const HIERARCHY_MAX_ENTRIES = 5_000;
 
@@ -1086,6 +1090,14 @@ export class WorkspaceRouter {
         retryable: true,
       });
     }
+    if (response.status === 'scopedIncomplete') {
+      return semanticFailure({
+        code: 'PROVIDER_UNAVAILABLE',
+        message: 'The bounded C/C++ reference scope could not be proven complete.',
+        retryable: false,
+        action: 'Use verify_symbol_candidates with text-discovered positions, or set timeoutMs to run the full Reference Provider explicitly.',
+      });
+    }
     if (response.status !== 'completed') return providerStatusFailure(response.status);
     if (response.available !== undefined) {
       return Object.freeze({
@@ -1115,6 +1127,54 @@ export class WorkspaceRouter {
       ...(response.warnings === undefined ? {} : { warnings: response.warnings }),
     });
     return Object.freeze({ ok: true, data: collection });
+  }
+
+  async verifySymbolCandidates(
+    inputValue: unknown,
+    signal?: AbortSignal,
+  ): Promise<ToolResponseMap['verify_symbol_candidates']> {
+    const input = normalizeToolInput('verify_symbol_candidates', inputValue);
+    let raw: unknown;
+    try {
+      raw = await this.#callSemanticBridge(
+        input.workspaceId,
+        VERIFY_SYMBOL_CANDIDATES_BRIDGE_METHOD,
+        {
+          file: input.file,
+          line: input.line,
+          column: input.column,
+          candidates: input.candidates.map((candidate) => ({
+            file: candidate.file,
+            line: candidate.line,
+            column: candidate.column,
+          })),
+          ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+        },
+        Date.now() + (input.timeoutMs === undefined
+          ? SEMANTIC_BRIDGE_TIMEOUT_MS
+          : input.timeoutMs + 5_000),
+        signal,
+      );
+    } catch (error) {
+      return routeFailure(error);
+    }
+
+    let response;
+    try {
+      response = parseVerifySymbolCandidatesBridgeResponse(raw);
+    } catch {
+      return semanticFailure({
+        code: 'INTERNAL_ERROR',
+        message: 'The symbol candidate bridge returned an invalid response.',
+        retryable: true,
+      });
+    }
+    if (response.status !== 'completed') return providerStatusFailure(response.status);
+    const results = Object.freeze([...response.candidates]) as readonly SymbolCandidateVerification[];
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({ results, available: results.length }),
+    });
   }
 
   async getDiagnostics(

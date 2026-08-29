@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   parseDiagnosticsBridgeResponse,
   parseReferencesBridgeResponse,
+  parseVerifySymbolCandidatesBridgeResponse,
 } from './references-diagnostics-bridge.js';
 
 test('references bridge parser accepts logical 1-based hits and strict terminal states', () => {
@@ -20,6 +21,13 @@ test('references bridge parser accepts logical 1-based hits and strict terminal 
   assert.deepEqual(parseReferencesBridgeResponse({ status: 'positionOutOfRange' }), {
     status: 'positionOutOfRange',
   });
+  assert.deepEqual(parseReferencesBridgeResponse({
+    status: 'scopedIncomplete',
+    reason: 'candidateUnresolved',
+  }), {
+    status: 'scopedIncomplete',
+    reason: 'candidateUnresolved',
+  });
   assert.throws(() => parseReferencesBridgeResponse({
     status: 'completed',
     candidates: [{ file: '../secret.ts', line: 1, column: 1 }],
@@ -28,6 +36,26 @@ test('references bridge parser accepts logical 1-based hits and strict terminal 
     status: 'completed',
     candidates: [{ file: 'src/widget.ts', line: 1, column: 1 }],
     available: 0,
+  }));
+});
+
+test('symbol candidate bridge parser preserves bounded per-position outcomes', () => {
+  assert.deepEqual(parseVerifySymbolCandidatesBridgeResponse({
+    status: 'completed',
+    candidates: [
+      { file: 'src/widget.ts', line: 2, column: 7, status: 'verified' },
+      { file: 'src/other.ts', line: 4, column: 3, status: 'mismatched' },
+    ],
+  }), {
+    status: 'completed',
+    candidates: [
+      { file: 'src/widget.ts', line: 2, column: 7, status: 'verified' },
+      { file: 'src/other.ts', line: 4, column: 3, status: 'mismatched' },
+    ],
+  });
+  assert.throws(() => parseVerifySymbolCandidatesBridgeResponse({
+    status: 'completed',
+    candidates: [{ file: 'src/widget.ts', line: 2, column: 7, status: 'skipped' }],
   }));
 });
 

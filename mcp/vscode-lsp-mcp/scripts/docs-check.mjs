@@ -82,7 +82,7 @@ const protocolTools = [...toolArray[1].matchAll(/'([a-z_]+)'/gu)].map((match) =>
 const documentedTools = [...documents.get('docs/tools.md').matchAll(
   /^\| `([a-z_]+)` \| (?:read|preview|mutation) \|/gmu,
 )].map((match) => match[1]);
-assert.equal(protocolTools.length, 18, 'The protocol must expose exactly 18 tools.');
+assert.equal(protocolTools.length, 19, 'The protocol must expose exactly 19 tools.');
 assert.deepEqual(documentedTools, protocolTools, 'The tool table differs from protocol TOOL_NAMES.');
 assert.match(documents.get('docs/security.md'), /^## Explicit limitations$/mu);
 

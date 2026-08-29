@@ -137,6 +137,11 @@ const invocationStatus = (
 const recoverableEmptyStatus = (status: SymbolIdentityFailureStatus): boolean =>
   status === 'unresolved' || status === 'unavailable' || status === 'notReady';
 
+const remainingTimeout = (deadlineAt: number | undefined): number | undefined => {
+  if (deadlineAt === undefined) return undefined;
+  return Math.max(0, Math.ceil(deadlineAt - Date.now()));
+};
+
 export class SymbolIdentityResolver {
   readonly #host: SymbolIdentityHost;
   readonly #maximumAnchors: number;
@@ -236,12 +241,15 @@ export class SymbolIdentityResolver {
     signal: AbortSignal,
     timeoutMs?: number,
   ): Promise<SymbolIdentityResolution> {
+    const deadlineAt = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
+    const definitionTimeout = remainingTimeout(deadlineAt);
+    if (definitionTimeout === 0) return Object.freeze({ status: 'timedOut' });
     const definition = await this.#resolveCommand(
       context,
       'vscode.executeDefinitionProvider',
       position,
       signal,
-      timeoutMs,
+      definitionTimeout,
     );
     // A resolved definition is already a stable semantic identity. Asking the
     // declaration provider as well can double (or, for cpptools, multiply) the
@@ -249,12 +257,14 @@ export class SymbolIdentityResolver {
     // verified against their definition first too.
     if (definition.status === 'resolved') return definition;
     if (!recoverableEmptyStatus(definition.status)) return definition;
+    const declarationTimeout = remainingTimeout(deadlineAt);
+    if (declarationTimeout === 0) return Object.freeze({ status: 'timedOut' });
     const declaration = await this.#resolveCommand(
       context,
       'vscode.executeDeclarationProvider',
       position,
       signal,
-      timeoutMs,
+      declarationTimeout,
     );
     if (declaration.status !== 'resolved') {
       if (!recoverableEmptyStatus(declaration.status)) return declaration;
@@ -274,12 +284,15 @@ export class SymbolIdentityResolver {
     signal: AbortSignal,
     timeoutMs?: number,
   ): Promise<SymbolIdentityVerification> {
+    const deadlineAt = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
+    const definitionTimeout = remainingTimeout(deadlineAt);
+    if (definitionTimeout === 0) return Object.freeze({ status: 'timedOut' });
     const definition = await this.#resolveCommand(
       context,
       'vscode.executeDefinitionProvider',
       position,
       signal,
-      timeoutMs,
+      definitionTimeout,
       true,
     );
     if (definition.status === 'resolved') {
@@ -289,12 +302,15 @@ export class SymbolIdentityResolver {
     }
     if (!recoverableEmptyStatus(definition.status)) return definition;
 
+    const declarationTimeout = remainingTimeout(deadlineAt);
+    if (declarationTimeout === 0) return Object.freeze({ status: 'timedOut' });
+
     const declaration = await this.#resolveCommand(
       context,
       'vscode.executeDeclarationProvider',
       position,
       signal,
-      timeoutMs,
+      declarationTimeout,
       true,
     );
     if (declaration.status === 'resolved') {

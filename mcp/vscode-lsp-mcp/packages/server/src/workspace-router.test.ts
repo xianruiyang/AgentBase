@@ -737,7 +737,7 @@ test('a timed-out semantic request does not close the healthy shared session', a
     assert.equal(callCount, 2);
     assert.deepEqual(
       session.callOptions.map((options) => options?.maximumTimeoutMs),
-      [95_000, 95_000],
+      [305_000, 305_000],
     );
     await router.close();
     assert.equal(session.closed, true);
@@ -1212,6 +1212,15 @@ test('reference and diagnostic routes filter, dedupe, sort, and window safe DTOs
             ],
           };
         }
+        if (method === 'references.verifyCandidates') {
+          return {
+            status: 'completed',
+            candidates: [
+              { file: 'src/a.ts', line: 2, column: 7, status: 'verified' },
+              { file: 'src/z.ts', line: 3, column: 2, status: 'mismatched' },
+            ],
+          };
+        }
         if (method === 'diagnostics.get') {
           return {
             status: 'completed',
@@ -1280,6 +1289,39 @@ test('reference and diagnostic routes filter, dedupe, sort, and window safe DTOs
       },
     });
 
+    const verified = await router.verifySymbolCandidates({
+      workspaceId: record.workspaceId,
+      file: 'src/widget.ts',
+      line: 2,
+      column: 7,
+      candidates: [
+        { file: 'src/a.ts', line: 2, column: 7 },
+        { file: 'src/z.ts', line: 3, column: 2 },
+      ],
+      timeoutMs: 30_000,
+    });
+    assert.equal(verified.ok, true);
+    if (verified.ok) {
+      assert.equal(verified.data.available, 2);
+      assert.deepEqual(verified.data.results.map((candidate) => candidate.status), [
+        'verified',
+        'mismatched',
+      ]);
+    }
+    assert.deepEqual(calls[1], {
+      method: 'references.verifyCandidates',
+      params: {
+        file: 'src/widget.ts',
+        line: 2,
+        column: 7,
+        candidates: [
+          { file: 'src/a.ts', line: 2, column: 7 },
+          { file: 'src/z.ts', line: 3, column: 2 },
+        ],
+        timeoutMs: 30_000,
+      },
+    });
+
     const diagnostics = await router.getDiagnostics({
       workspaceId: record.workspaceId,
       severities: ['warning'],
@@ -1298,7 +1340,7 @@ test('reference and diagnostic routes filter, dedupe, sort, and window safe DTOs
         source: 'typescript',
       }]);
     }
-    assert.deepEqual(calls[1], {
+    assert.deepEqual(calls[2], {
       method: 'diagnostics.get',
       params: { scope: 'modifiedFiles', includeRelatedInformation: false },
     });

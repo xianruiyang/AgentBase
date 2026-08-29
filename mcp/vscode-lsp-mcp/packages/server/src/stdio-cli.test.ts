@@ -13,7 +13,7 @@ import {
 import { getServerVersion } from './cli.js';
 
 test('server version is read from the package manifest used by the executable', () => {
-  assert.equal(getServerVersion(), '0.1.21');
+  assert.equal(getServerVersion(), '0.2.0');
 });
 
 test('real stdio CLI reserves stdout for MCP initialize, listTools, and callTool', {

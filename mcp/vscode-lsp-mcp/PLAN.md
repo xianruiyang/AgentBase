@@ -149,6 +149,8 @@ vscode-lsp-mcp/
 
 调用前通过 `openTextDocument` 激活目标语言扩展，但默认不显示编辑器 UI。
 
+大型工作区不把“缩小返回结果”和“缩小 Provider 工作量”混为一谈。普通精确引用路径由源码文本或 AST 先产生有界候选位置，Companion 只批量核验这些位置是否解析到同一目标身份；它不重复实现文本搜索，也不把候选核验外推为 Provider 全集。只有必须取得 Provider 自己枚举的完整引用集时才调用公开 Reference Provider，并允许显式分配最长 300 秒。C/C++ scoped proof 不能证明完整时必须快速返回恢复动作，不得在同一次默认调用中隐藏第二次全局扫描。
+
 ## 7. MCP 工具设计
 
 工具数量保持克制，优先让单个工具通过枚举参数覆盖同类只读操作。
@@ -173,6 +175,7 @@ vscode-lsp-mcp/
 | `document_symbols` | 获取文件结构和符号层级 |
 | `symbol_info` | 按位置获取 hover、声明、定义、类型、实现和签名 |
 | `get_references` | 获取真实引用，支持结果区间和可选上下文 |
+| `verify_symbol_candidates` | 批量核验文本/AST 已定位的位置是否属于同一目标符号 |
 | `get_call_hierarchy` | 获取 incoming、outgoing 或两者 |
 | `get_type_hierarchy` | 获取 supertypes、subtypes 或两者 |
 | `get_diagnostics` | 查询指定文件、修改文件或工作区诊断 |
@@ -396,7 +399,7 @@ WorkspaceEdit 和 TextEdit 中共同组成一次操作的编辑列表不是候�
 | WorkspaceEdit 公共 API 不能枚举资源操作 | 第一版仅重建并 apply `entries()` 的 text edits；size/entries 不一致时拒绝，永不 apply Provider 原始对象 |
 | 多工作区路径冲突 | 使用随机 instance/workspace ID，不依赖路径哈希 |
 | Windows 管道或路径大小写问题 | 双端规范化并通过 health 发现真实工作区 |
-| 大型引用结果消耗大量 token | 强制结果窗口和默认无源码上下文 |
+| 大型引用扫描耗时且结果消耗大量 token | 默认走文本/AST 候选加批量身份核验；完整 Provider 枚举须显式选择长预算，结果仍强制窗口和默认无源码上下文 |
 | Preview 后文件变化 | 文档版本与内容哈希双重校验 |
 | 指令触发 UI 交互 | 白名单、task 静态检查和默认拒绝策略 |
 | VS Code/扩展 API 变化 | 只依赖公开 API，增加版本兼容测试 |

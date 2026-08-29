@@ -3,7 +3,7 @@
   "displayName": "VS Code LSP MCP Companion",
   "description": "Expose active VS Code language providers through an independent MCP companion.",
   "publisher": "simplechat",
-  "version": "0.1.21",
+  "version": "0.2.0",
   "private": true,
   "author": "SimpleChat contributors",
   "license": "Apache-2.0",
@@ -24,7 +24,7 @@
           "description": "Maximum time in milliseconds for one VS Code language-provider operation. Reload the window after changing this setting.",
           "default": 60000,
           "minimum": 1000,
-          "maximum": 90000
+          "maximum": 300000
         },
         "vscodeLspMcp.commandPolicy": {
           "type": "object",
@@ -141,7 +141,7 @@
     "test": "node --test dist/*.test.js"
   },
   "dependencies": {
-    "@simplechat/vscode-lsp-mcp-protocol": "0.1.21",
-    "@simplechat/vscode-lsp-mcp-win32-security": "0.1.21"
+    "@simplechat/vscode-lsp-mcp-protocol": "0.2.0",
+    "@simplechat/vscode-lsp-mcp-win32-security": "0.2.0"
   }
 }

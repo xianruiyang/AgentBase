@@ -14,6 +14,7 @@ export const OUTPUT_SUCCESS_DEFINITION_NAMES: Readonly<Record<ToolName, string>>
   document_symbols: 'DocumentSymbolCollection',
   symbol_info: 'SymbolInfoResultCollection',
   get_references: 'ReferenceHitCollection',
+  verify_symbol_candidates: 'SymbolCandidateVerificationCollection',
   get_call_hierarchy: 'CallHierarchyEntryCollection',
   get_type_hierarchy: 'TypeHierarchyEntryCollection',
   get_diagnostics: 'DiagnosticCollection',
@@ -62,4 +63,3 @@ export const OUTPUT_SCHEMAS: Readonly<Record<ToolName, JsonSchema>> = Object.fro
     createOutputSchema(successDefinition),
   ]),
 ) as Record<ToolName, JsonSchema>;
-

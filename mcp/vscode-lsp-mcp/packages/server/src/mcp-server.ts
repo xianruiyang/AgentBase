@@ -23,6 +23,10 @@ export interface FoundationToolService {
   getCallHierarchy(input: unknown, signal?: AbortSignal): Promise<ToolResponseMap['get_call_hierarchy']>;
   getDiagnostics(input: unknown, signal?: AbortSignal): Promise<ToolResponseMap['get_diagnostics']>;
   getReferences(input: unknown, signal?: AbortSignal): Promise<ToolResponseMap['get_references']>;
+  verifySymbolCandidates(
+    input: unknown,
+    signal?: AbortSignal,
+  ): Promise<ToolResponseMap['verify_symbol_candidates']>;
   getTypeHierarchy(input: unknown, signal?: AbortSignal): Promise<ToolResponseMap['get_type_hierarchy']>;
   healthCheck(input: unknown): Promise<ToolResponseMap['health_check']>;
   listWorkspaces(input: unknown): Promise<ToolResponseMap['list_workspaces']>;
@@ -100,6 +104,9 @@ const callTool = async (
     }
     if (name === 'get_references') {
       return encodeDynamic(name, await service.getReferences(normalizedInput, signal));
+    }
+    if (name === 'verify_symbol_candidates') {
+      return encodeDynamic(name, await service.verifySymbolCandidates(normalizedInput, signal));
     }
     if (name === 'get_call_hierarchy') {
       return encodeDynamic(name, await service.getCallHierarchy(normalizedInput, signal));

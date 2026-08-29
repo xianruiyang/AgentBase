@@ -2,7 +2,7 @@
 
 ## Language-provider timeout
 
-The window-scoped `vscodeLspMcp.providerTimeoutMs` setting bounds each VS Code language-provider invocation. It defaults to 60,000 milliseconds and accepts integers from 1,000 through 90,000. Configure it in user or workspace settings, for example `{ "vscodeLspMcp.providerTimeoutMs": 90000 }`, then reload the VS Code window. `get_references` and `rename_preview` also accept a per-call `timeoutMs` in the same range; use that when only one known-slow query needs a larger budget and no reload or persistent setting change is desirable. A result that repeatedly arrives at this exact boundary usually means the underlying language Provider remained pending for the whole interval.
+The window-scoped `vscodeLspMcp.providerTimeoutMs` setting bounds each VS Code language-provider invocation. It defaults to 60,000 milliseconds and accepts integers from 1,000 through 300,000. Configure it in user or workspace settings, for example `{ "vscodeLspMcp.providerTimeoutMs": 180000 }`, then reload the VS Code window. `get_references`, `verify_symbol_candidates`, and `rename_preview` also accept a per-call `timeoutMs` in the same range; use that when only one known-slow query needs a larger budget and no reload or persistent setting change is desirable. A result that repeatedly arrives at this exact boundary usually means the underlying language Provider remained pending for the whole interval.
 
 VS Code does not expose a cancellation token on the public execute-provider commands. After a timed-out or caller-cancelled C/C++ references or rename invocation, the companion therefore sends a bounded call-hierarchy preparation pulse at a whitespace position. cpptools treats that new reference-family request as cancellation of its current references/rename operation. The companion then waits up to three seconds for the original Provider promise to settle and releases the single-flight slot only after that real settlement. If the active C/C++ Provider does not support this interruption behavior, the slot remains protected until its original promise ends; it is never force-cleared in a way that could stack duplicate background scans.
 
@@ -87,9 +87,11 @@ Restart the Codex UI after changing MCP configuration, then use `/mcp` to inspec
 command = "node"
 args = ["<resolved-managed-install-root>/bin/vscode-lsp-mcp.cjs"]
 startup_timeout_sec = 10
-tool_timeout_sec = 120
+tool_timeout_sec = 330
 enabled = true
 ```
+
+The 330-second client ceiling permits the documented 300-second provider budget plus bridge cleanup. It does not make ordinary calls wait longer: the extension still uses its 60-second default unless a per-call timeout or the window setting deliberately raises it.
 
 Replace the placeholder with the actual resolved path; TOML does not expand PowerShell environment-variable syntax. Current Codex MCP configuration syntax is documented in the [official Codex MCP guide](https://learn.chatgpt.com/docs/extend/mcp.md).
 

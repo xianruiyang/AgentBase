@@ -12,6 +12,11 @@ import {
 
 const nonEmptyString = (): JsonSchema => ({ type: 'string', minLength: 1 });
 const positionInteger = (): JsonSchema => ({ type: 'integer', minimum: 1 });
+const providerTimeoutProperty = (): JsonSchema => ({
+  type: 'integer',
+  minimum: 1_000,
+  maximum: 300_000,
+});
 
 const resultWindowProperties = (): Record<string, JsonSchema> => ({
   resultStart: { type: 'integer', minimum: 1, default: 1 },
@@ -170,10 +175,33 @@ export const INPUT_SCHEMAS: Readonly<Record<ToolName, JsonSchema>> = {
       ...pointProperties(),
       ...globProperties(),
       contextLines: contextLinesProperty(),
-      timeoutMs: { type: 'integer', minimum: 1_000, maximum: 90_000 },
+      timeoutMs: providerTimeoutProperty(),
       ...resultWindowProperties(),
     },
     ['workspaceId', 'file', 'line', 'column'],
+  ),
+  verify_symbol_candidates: inputSchema(
+    {
+      ...pointProperties(),
+      candidates: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 100,
+        uniqueItems: true,
+        items: {
+          type: 'object',
+          properties: {
+            file: nonEmptyString(),
+            line: positionInteger(),
+            column: positionInteger(),
+          },
+          required: ['file', 'line', 'column'],
+          additionalProperties: false,
+        },
+      },
+      timeoutMs: providerTimeoutProperty(),
+    },
+    ['workspaceId', 'file', 'line', 'column', 'candidates'],
   ),
   get_call_hierarchy: inputSchema(
     {
@@ -228,7 +256,7 @@ export const INPUT_SCHEMAS: Readonly<Record<ToolName, JsonSchema>> = {
       ...pointProperties(),
       newName: { type: 'string', minLength: 1, maxLength: 1_000 },
       ...globProperties(),
-      timeoutMs: { type: 'integer', minimum: 1_000, maximum: 90_000 },
+      timeoutMs: providerTimeoutProperty(),
     },
     ['workspaceId', 'file', 'line', 'column', 'newName', 'includeGlobs'],
   ),

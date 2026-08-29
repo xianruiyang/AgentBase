@@ -6,6 +6,7 @@ export const TOOL_NAMES = [
   'document_symbols',
   'symbol_info',
   'get_references',
+  'verify_symbol_candidates',
   'get_call_hierarchy',
   'get_type_hierarchy',
   'get_diagnostics',
@@ -191,6 +192,21 @@ export interface GetReferencesInput extends ResultWindowInput, GlobFilterInput {
   readonly timeoutMs?: number;
 }
 
+export interface SymbolCandidatePosition {
+  readonly file: string;
+  readonly line: number;
+  readonly column: number;
+}
+
+export interface VerifySymbolCandidatesInput {
+  readonly workspaceId: string;
+  readonly file: string;
+  readonly line: number;
+  readonly column: number;
+  readonly candidates: readonly SymbolCandidatePosition[];
+  readonly timeoutMs?: number;
+}
+
 export interface GetCallHierarchyInput extends ResultWindowInput {
   readonly workspaceId: string;
   readonly file: string;
@@ -287,6 +303,7 @@ export interface ToolInputMap {
   readonly document_symbols: DocumentSymbolsInput;
   readonly symbol_info: SymbolInfoInput;
   readonly get_references: GetReferencesInput;
+  readonly verify_symbol_candidates: VerifySymbolCandidatesInput;
   readonly get_call_hierarchy: GetCallHierarchyInput;
   readonly get_type_hierarchy: GetTypeHierarchyInput;
   readonly get_diagnostics: GetDiagnosticsInput;
@@ -383,6 +400,10 @@ export interface ReferenceHit {
   readonly line: number;
   readonly column: number;
   readonly snippet?: string;
+}
+
+export interface SymbolCandidateVerification extends SymbolCandidatePosition {
+  readonly status: 'verified' | 'mismatched' | 'unresolved' | 'positionOutOfRange';
 }
 
 export interface HierarchySymbol {
@@ -694,6 +715,7 @@ export interface ToolOutputDataMap {
   readonly document_symbols: Collection<DocumentSymbol>;
   readonly symbol_info: Collection<SymbolInfoResult>;
   readonly get_references: Collection<ReferenceHit>;
+  readonly verify_symbol_candidates: Collection<SymbolCandidateVerification>;
   readonly get_call_hierarchy: Collection<CallHierarchyEntry>;
   readonly get_type_hierarchy: Collection<TypeHierarchyEntry>;
   readonly get_diagnostics: Collection<Diagnostic>;

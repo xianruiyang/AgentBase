@@ -84,6 +84,14 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
     openWorld: false,
   },
   {
+    name: 'verify_symbol_candidates',
+    description: 'Verify a bounded set of source positions against one target symbol identity.',
+    readOnly: true,
+    destructive: false,
+    idempotent: true,
+    openWorld: false,
+  },
+  {
     name: 'get_call_hierarchy',
     description: 'Return bounded incoming or outgoing call hierarchy entries.',
     readOnly: true,

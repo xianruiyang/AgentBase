@@ -6,10 +6,12 @@ import {
   DIAGNOSTICS_BRIDGE_METHOD,
   IPC_PROTOCOL_VERSION,
   REFERENCES_BRIDGE_METHOD,
+  VERIFY_SYMBOL_CANDIDATES_BRIDGE_METHOD,
   createWorkspacePathContext,
   hostPathPlatform,
   parseDiagnosticsBridgeResponse,
   parseReferencesBridgeResponse,
+  parseVerifySymbolCandidatesBridgeResponse,
   systemRuntimePrimitives,
   type IpcRequest,
   type JsonObject,
@@ -201,7 +203,9 @@ test('scoped C++ references use exact-token discovery and definition identity in
   host.results.set('vscode.executeDefinitionProvider', (rawUri: unknown, rawPosition: unknown) => {
     const fsPath = (rawUri as { readonly fsPath: string }).fsPath;
     const position = rawPosition as { readonly line: number };
-    if (fsPath === useFile && position.line === 2) return [];
+    if (fsPath === useFile && position.line === 2) {
+      return [{ uri: uri(otherSymbolFile), range: range(0, 0, 0, 10) }];
+    }
     return fsPath === otherSymbolFile
       ? [{ uri: uri(otherSymbolFile), range: range(0, 0, 0, 10) }]
       : [{ uri: uri(headerFile), range: range(0, 0, 0, 10) }];
@@ -236,6 +240,74 @@ test('scoped C++ references use exact-token discovery and definition identity in
   }
   assert.equal(host.calls.some((call) => call.command === 'vscode.executeReferenceProvider'), false);
   assert.equal(host.providerDocumentOpenCount, 0);
+});
+
+test('incomplete scoped C++ proof fails fast without starting the global provider', async () => {
+  const headerFile = path.join(workspaceRoot, 'Source', 'settings.h');
+  const useFile = path.join(workspaceRoot, 'Source', 'settings.cpp');
+  const host = new FakeReadHost();
+  host.documents.set(headerFile, richDocument(headerFile, 'GetMutable\n'));
+  host.documents.set(useFile, richDocument(useFile, 'GetMutable();\n'));
+  host.findResults = [uri(useFile), uri(headerFile)];
+  host.results.set('vscode.executeDefinitionProvider', (rawUri: unknown) =>
+    (rawUri as { readonly fsPath: string }).fsPath === headerFile
+      ? [{ uri: uri(headerFile), range: range(0, 0, 0, 10) }]
+      : []);
+  host.results.set('vscode.executeDeclarationProvider', []);
+  host.results.set('vscode.executeReferenceProvider', new Error('Global references must not run.'));
+  const bridge = new ReferencesDiagnosticsProviderBridge(host, pathAccess);
+  const raw = await bridge.handle(await context(), request(REFERENCES_BRIDGE_METHOD, {
+    file: 'Source/settings.h',
+    line: 1,
+    column: 1,
+    contextLines: 0,
+    includeGlobs: ['Source/**'],
+    resultStart: 1,
+    resultEnd: 100,
+  }), new AbortController().signal);
+
+  assert.deepEqual(parseReferencesBridgeResponse(raw), {
+    status: 'scopedIncomplete',
+    reason: 'candidateUnresolved',
+  });
+  assert.equal(host.calls.some((call) => call.command === 'vscode.executeReferenceProvider'), false);
+});
+
+test('candidate verification checks only supplied positions against one target identity', async () => {
+  const headerFile = path.join(workspaceRoot, 'Source', 'settings.h');
+  const useFile = path.join(workspaceRoot, 'Source', 'settings.cpp');
+  const otherFile = path.join(workspaceRoot, 'Source', 'other.cpp');
+  const host = new FakeReadHost();
+  host.documents.set(headerFile, richDocument(headerFile, 'GetMutable\n'));
+  host.documents.set(useFile, richDocument(useFile, 'GetMutable();\n'));
+  host.documents.set(otherFile, richDocument(otherFile, 'GetMutable();\n'));
+  host.results.set('vscode.executeDefinitionProvider', (rawUri: unknown) => {
+    const fsPath = (rawUri as { readonly fsPath: string }).fsPath;
+    return [{
+      uri: uri(fsPath === otherFile ? otherFile : headerFile),
+      range: range(0, 0, 0, 10),
+    }];
+  });
+  const bridge = new ReferencesDiagnosticsProviderBridge(host, pathAccess);
+  const raw = await bridge.handle(await context(), request(VERIFY_SYMBOL_CANDIDATES_BRIDGE_METHOD, {
+    file: 'Source/settings.h',
+    line: 1,
+    column: 1,
+    candidates: [
+      { file: 'Source/settings.cpp', line: 1, column: 1 },
+      { file: 'Source/other.cpp', line: 1, column: 1 },
+    ],
+    timeoutMs: 10_000,
+  }), new AbortController().signal);
+
+  assert.deepEqual(parseVerifySymbolCandidatesBridgeResponse(raw), {
+    status: 'completed',
+    candidates: [
+      { file: 'Source/settings.cpp', line: 1, column: 1, status: 'verified' },
+      { file: 'Source/other.cpp', line: 1, column: 1, status: 'mismatched' },
+    ],
+  });
+  assert.equal(host.calls.some((call) => call.command === 'vscode.executeReferenceProvider'), false);
 });
 
 test('explicit references timeout reserves the full budget for the semantic provider', async () => {

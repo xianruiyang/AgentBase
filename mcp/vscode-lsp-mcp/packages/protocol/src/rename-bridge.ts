@@ -136,8 +136,8 @@ export const parseRenamePreviewBridgeRequest = (value: unknown): RenamePreviewBr
   const timeoutMs = record.timeoutMs === undefined
     ? undefined
     : safeInteger(record.timeoutMs, 1_000, 'timeoutMs');
-  if (timeoutMs !== undefined && timeoutMs > 90_000) {
-    throw new TypeError('timeoutMs must not exceed 90000.');
+  if (timeoutMs !== undefined && timeoutMs > 300_000) {
+    throw new TypeError('timeoutMs must not exceed 300000.');
   }
   return Object.freeze({
     workspace: parseWorkspace(record.workspace),
