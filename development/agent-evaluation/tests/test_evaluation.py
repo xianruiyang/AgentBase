@@ -3951,6 +3951,19 @@ class VerifierLifecycleTests(unittest.TestCase):
 
 
 class DeterministicEntryTests(unittest.TestCase):
+    def test_json_subprocess_projection_uses_shared_capture(self) -> None:
+        result = agent_eval._run_json_command(
+            [
+                sys.executable,
+                "-c",
+                'import json; print(json.dumps({"status": "passed"}))',
+            ],
+            cwd=PROJECT_ROOT,
+            timeout=30,
+            label="projection probe",
+        )
+        self.assertEqual(result, {"status": "passed"})
+
     def test_attempt_stage_progress_uses_stderr_and_only_reports_transitions(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -93,6 +93,7 @@ from evaluation_core import (  # noqa: E402
     require_profile,
     require_task,
     require_within,
+    run_capture,
     sha256_bytes,
     sha256_file,
     sandbox_runtime_home,
