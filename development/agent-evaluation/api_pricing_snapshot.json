@@ -1,0 +1,41 @@
+{
+  "schema": "agentbase.windows-swe-api-pricing/v1",
+  "basis": "official-openai-standard-api-text-token-pricing",
+  "currency": "USD",
+  "observed_at": "2026-08-24",
+  "actual_billing_observed": false,
+  "cost_unit": "usd_nanos",
+  "long_context": {
+    "input_threshold_tokens_exclusive": 272000,
+    "input_multiplier": {
+      "numerator": 2,
+      "denominator": 1
+    },
+    "output_multiplier": {
+      "numerator": 3,
+      "denominator": 2
+    }
+  },
+  "cache_write_multiplier": {
+    "numerator": 5,
+    "denominator": 4
+  },
+  "aliases": {
+    "gpt-5.6": "gpt-5.6-sol"
+  },
+  "models": {
+    "gpt-5.6-luna": {
+      "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+      "input_usd_nanos_per_token": 200,
+      "cached_input_usd_nanos_per_token": 20,
+      "output_usd_nanos_per_token": 1200
+    },
+    "gpt-5.6-sol": {
+      "source": "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+      "input_usd_nanos_per_token": 4000,
+      "cached_input_usd_nanos_per_token": 400,
+      "output_usd_nanos_per_token": 20000,
+      "price_note": "Promotional pricing shown by the source page and stated there as available at least through 2026-11-21."
+    }
+  }
+}

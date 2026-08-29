@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 import time
@@ -18,8 +19,13 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 
-CORPUS_SCHEMA = "agentbase.windows-swe-corpus/v2"
+CORPUS_SCHEMA = "agentbase.windows-swe-corpus/v4"
 CORPUS_ID = "agentbase-windows-swe-v1"
+QUALIFICATION_SCHEMA = "agentbase.windows-swe-qualification/v3"
+WINDOWS_ADAPTER_ROOT = Path("development/agent-evaluation/windows-adapters")
+PYTEST_DEBUG_TEMPROOT_ENV_KEY = "PYTEST_DEBUG_TEMPROOT"
+PYTEST_ADDOPTS_ENV_KEY = "PYTEST_ADDOPTS"
+PYTEST_RETENTION_ADDOPTS = "--override-ini=tmp_path_retention_policy=none"
 REQUIRED_ASSETS = (
     "instruction.md",
     "task.toml",
@@ -43,6 +49,40 @@ PLACEHOLDER_PATTERN = re.compile(r"\{([a-z_]+)\}")
 TASK_ID_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]+\Z")
 MAX_PATCH_BYTES = 8 * 1024 * 1024
 MAX_PATCH_FILES = 100
+MANAGED_TREE_RETRY_DELAYS_SECONDS = (
+    0.05,
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6,
+    3.2,
+    5.0,
+    5.0,
+    5.0,
+    5.0,
+)
+RECOVERABLE_ATTEMPT_STAGES = frozenset(
+    {"candidate-finished", "patch-captured", "verifier-running"}
+)
+GIT_WINDOWS_PREFIX = (
+    "git.exe",
+    "-c",
+    "core.longpaths=true",
+    "-c",
+    "core.autocrlf=false",
+    "-c",
+    "core.eol=lf",
+)
+GIT_WINDOWS_ASSET_PREFIX = (
+    "git.exe",
+    "-c",
+    "core.longpaths=true",
+    "-c",
+    "core.autocrlf=true",
+    "-c",
+    "core.eol=crlf",
+)
 
 
 class EvaluationError(RuntimeError):
@@ -51,6 +91,18 @@ class EvaluationError(RuntimeError):
 
 class PreconditionError(EvaluationError):
     """A caller must establish required evidence before an evaluation can run."""
+
+
+class ControlledRuntimeDriftError(PreconditionError):
+    """A generated runtime asset changed without invalidating the sandbox backend."""
+
+
+class SandboxRuntimeInvalidError(PreconditionError):
+    """Codex rejected a runtime that passed the framework's readiness checks."""
+
+
+class SandboxSetupApprovalError(PreconditionError):
+    """The explicit Windows sandbox setup did not receive administrator approval."""
 
 
 def utc_now() -> str:
@@ -146,6 +198,18 @@ def default_work_root() -> Path:
     return _local_app_data() / "AgentBase" / "agent-evaluation-workspaces"
 
 
+def sandbox_runtime_root(state_root: Path) -> Path:
+    return state_root.resolve() / "sandbox-runtime"
+
+
+def sandbox_runtime_home(state_root: Path) -> Path:
+    return sandbox_runtime_root(state_root) / "codex-home"
+
+
+def sandbox_runtime_state_path(state_root: Path) -> Path:
+    return sandbox_runtime_root(state_root) / "runtime.json"
+
+
 def ensure_disjoint_roots(state_root: Path, work_root: Path) -> None:
     state = state_root.resolve()
     work = work_root.resolve()
@@ -190,6 +254,158 @@ def require_within(root: Path, candidate: Path) -> Path:
     if resolved_candidate == resolved_root or resolved_root not in resolved_candidate.parents:
         raise EvaluationError(f"path escapes managed root {resolved_root}: {resolved_candidate}")
     return resolved_candidate
+
+
+def prepare_sandbox_writable_root(
+    root: Path,
+    candidate: Path,
+    *,
+    create_runtime_subdirs: bool = True,
+) -> Path:
+    """Create one managed sandbox write root that remains removable by its host owner."""
+
+    resolved = require_within(root, candidate)
+    if resolved.exists():
+        attributes = getattr(resolved.lstat(), "st_file_attributes", 0)
+        if (
+            not resolved.is_dir()
+            or resolved.is_symlink()
+            or bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+        ):
+            raise EvaluationError(f"sandbox writable root is not a regular directory: {resolved}")
+    else:
+        resolved.mkdir(parents=True)
+    system_root = os.environ.get("SystemRoot", "").strip()
+    username = os.environ.get("USERNAME", "").strip()
+    domain = os.environ.get("USERDOMAIN", "").strip()
+    if not system_root or not username:
+        raise EvaluationError("cannot resolve the Windows owner for a sandbox writable root")
+    icacls = Path(system_root).resolve() / "System32" / "icacls.exe"
+    if not icacls.is_file():
+        raise EvaluationError("Windows icacls.exe is unavailable")
+    principal = f"{domain}\\{username}" if domain else username
+    completed = subprocess.run(
+        [
+            str(icacls),
+            str(resolved),
+            "/grant:r",
+            f"{principal}:(OI)(CI)F",
+            "/Q",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=60,
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = bounded_text(completed.stdout.decode("utf-8", errors="replace"), 500)
+        raise EvaluationError(f"cannot preserve host cleanup access on {resolved}: {detail}")
+    if create_runtime_subdirs:
+        for name in ("appdata", "home", "localappdata"):
+            (resolved / name).mkdir(exist_ok=True)
+        pytest_users = {
+            value.strip()
+            for key in ("LOGNAME", "USER", "LNAME", "USERNAME")
+            if (value := os.environ.get(key, "")).strip()
+        }
+        pytest_users.add("unknown")
+        for value in sorted(pytest_users):
+            if (
+                value in {".", ".."}
+                or Path(value).name != value
+                or any(character in value for character in '\\/:*?"<>|')
+            ):
+                continue
+            (resolved / f"pytest-of-{value}").mkdir(exist_ok=True)
+    return resolved
+
+
+def sandbox_temp_environment(runtime_temp: Path) -> dict[str, str]:
+    resolved = runtime_temp.resolve()
+    return {
+        "TEMP": str(resolved),
+        "TMP": str(resolved),
+        "TMPDIR": str(resolved),
+        "APPDATA": str(resolved / "appdata"),
+        "HOME": str(resolved / "home"),
+        "LOCALAPPDATA": str(resolved / "localappdata"),
+        "USERPROFILE": str(resolved / "home"),
+        PYTEST_DEBUG_TEMPROOT_ENV_KEY: str(resolved),
+        PYTEST_ADDOPTS_ENV_KEY: PYTEST_RETENTION_ADDOPTS,
+        "NO_COLOR": "1",
+        "PYTHONUTF8": "1",
+    }
+
+
+def dependency_runtime_projection(
+    task: Mapping[str, Any], values: Mapping[str, str]
+) -> dict[str, str | None]:
+    """Resolve the task runtime directory that must lead child PATH lookup."""
+
+    toolchain = task.get("toolchain")
+    if not isinstance(toolchain, Mapping):
+        raise EvaluationError("task toolchain is invalid")
+    kind = toolchain.get("kind")
+    if kind == "python":
+        key = "python"
+    elif kind == "node":
+        key = str(toolchain.get("package_manager", ""))
+        if key not in {"npm", "pnpm"}:
+            raise EvaluationError("node task package manager is invalid")
+    else:
+        raise EvaluationError("task toolchain kind is invalid")
+    executable_value = values.get(key)
+    if not isinstance(executable_value, str) or not executable_value:
+        raise EvaluationError(f"task dependency runtime is missing: {key}")
+    executable = Path(executable_value).resolve()
+    if not executable.is_file():
+        raise EvaluationError(f"task dependency runtime is not a file: {key}")
+    bin_directory = executable.parent.resolve()
+    virtual_environment: Path | None = None
+    if kind == "python":
+        workspace_value = values.get("workspace")
+        if not isinstance(workspace_value, str) or not workspace_value:
+            raise EvaluationError("python task workspace is missing")
+        expected = Path(workspace_value).resolve() / ".agentbase-venv"
+        virtual_environment = bin_directory.parent.resolve()
+        if virtual_environment != expected.resolve():
+            raise EvaluationError("python task runtime is outside the managed virtual environment")
+    return {
+        "kind": str(kind),
+        "executable": str(executable),
+        "bin_directory": str(bin_directory),
+        "virtual_environment": (
+            str(virtual_environment) if virtual_environment is not None else None
+        ),
+    }
+
+
+def remove_managed_tree(root: Path, candidate: Path) -> None:
+    """Remove one verified managed subtree after bounded Windows handle release."""
+
+    resolved = require_within(root, candidate)
+    if not resolved.exists():
+        return
+
+    def clear_readonly_and_retry(
+        function: Any,
+        path: str,
+        error: tuple[type[BaseException], BaseException, Any],
+    ) -> None:
+        exception = error[1]
+        if not isinstance(exception, PermissionError):
+            raise exception
+        os.chmod(path, stat.S_IREAD | stat.S_IWRITE)
+        function(path)
+
+    for delay in (*MANAGED_TREE_RETRY_DELAYS_SECONDS, None):
+        try:
+            shutil.rmtree(resolved, onerror=clear_readonly_and_retry)
+            return
+        except PermissionError:
+            if delay is None:
+                raise
+            time.sleep(delay)
 
 
 def _safe_relative_path(value: str, *, field: str) -> bool:
@@ -405,7 +621,7 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
                 "setup_cleanup",
                 "checks",
             },
-            optional=None,
+            optional={"windows_adapter", "windows_oracle"},
             errors=errors,
         )
         task_id = str(task.get("id", ""))
@@ -466,6 +682,61 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
                     errors.append(f"{where}.assets[{asset}] is not SHA-256")
             if assets.get("tests/grader.py") != grader_hash:
                 errors.append(f"{where} grader hash differs from adapter owner")
+        windows_adapter = task.get("windows_adapter")
+        if windows_adapter is not None:
+            adapter_where = f"{where}.windows_adapter"
+            if not isinstance(windows_adapter, dict):
+                errors.append(f"{adapter_where} must be an object")
+            else:
+                _validate_object_keys(
+                    windows_adapter,
+                    where=adapter_where,
+                    required={"path", "sha256", "patch_paths"},
+                    optional=None,
+                    errors=errors,
+                )
+                adapter_path = windows_adapter.get("path")
+                if (
+                    not isinstance(adapter_path, str)
+                    or not _safe_relative_path(adapter_path, field=adapter_where)
+                    or not adapter_path.replace("\\", "/").startswith("windows-adapters/")
+                    or not adapter_path.lower().endswith(".patch")
+                ):
+                    errors.append(
+                        f"{adapter_where}.path must be a relative windows-adapters/*.patch path"
+                    )
+                if not HASH_PATTERN.fullmatch(str(windows_adapter.get("sha256", ""))):
+                    errors.append(f"{adapter_where}.sha256 is not SHA-256")
+                patch_paths = windows_adapter.get("patch_paths")
+                if (
+                    not isinstance(patch_paths, list)
+                    or not patch_paths
+                    or any(
+                        not isinstance(item, str)
+                        or not _safe_relative_path(item, field=f"{adapter_where}.patch_paths")
+                        for item in patch_paths
+                    )
+                    or len(patch_paths) != len(set(patch_paths))
+                ):
+                    errors.append(f"{adapter_where}.patch_paths is invalid")
+        windows_oracle = task.get("windows_oracle")
+        if windows_oracle is not None:
+            oracle_where = f"{where}.windows_oracle"
+            if not isinstance(windows_oracle, dict):
+                errors.append(f"{oracle_where} must be an object")
+            else:
+                _validate_object_keys(
+                    windows_oracle,
+                    where=oracle_where,
+                    required={"p2p_baseline_policy"},
+                    optional=None,
+                    errors=errors,
+                )
+                if windows_oracle.get("p2p_baseline_policy") not in {
+                    "exclude-stable-skips",
+                    "exclude-stable-nonpassing",
+                }:
+                    errors.append(f"{oracle_where}.p2p_baseline_policy is invalid")
         toolchain = task.get("toolchain")
         if not isinstance(toolchain, dict) or toolchain.get("kind") not in {
             "python",
@@ -583,7 +854,13 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
                     report,
                     where=f"{check_where}.report",
                     required={"kind", "path"},
-                    optional={"raw_path", "name", "tool", "fold_whitespace"},
+                    optional={
+                        "raw_path",
+                        "name",
+                        "tool",
+                        "fold_whitespace",
+                        "node_identity_normalization",
+                    },
                     errors=errors,
                 )
                 report_path = str(report.get("path", ""))
@@ -619,6 +896,11 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
                     report["fold_whitespace"], bool
                 ):
                     errors.append(f"{check_where}.report.fold_whitespace must be boolean")
+                normalization = report.get("node_identity_normalization")
+                if normalization not in {None, "nfc-utf16-surrogate-replacement"}:
+                    errors.append(
+                        f"{check_where}.report.node_identity_normalization is invalid"
+                    )
             if len(set(check_ids)) != len(check_ids):
                 errors.append(f"{where}.check ids must be unique")
             if len(set(report_paths)) != len(report_paths):
@@ -756,6 +1038,16 @@ def run_capture(
     return result
 
 
+def git_command(*arguments: str | Path) -> list[str]:
+    """Build a host-independent Git command for Windows-managed repositories."""
+    return [*GIT_WINDOWS_PREFIX, *(str(argument) for argument in arguments)]
+
+
+def git_asset_command(*arguments: str | Path) -> list[str]:
+    """Build the fixed Windows projection used by pinned DeepSWE task assets."""
+    return [*GIT_WINDOWS_ASSET_PREFIX, *(str(argument) for argument in arguments)]
+
+
 def git_output(
     repo: Path,
     *arguments: str,
@@ -763,10 +1055,25 @@ def git_output(
     env: Mapping[str, str] | None = None,
 ) -> str:
     return run_capture(
-        ["git.exe", "-C", str(repo), *arguments], timeout=timeout, env=env
+        git_command("-C", repo, *arguments),
+        timeout=timeout,
+        env=env,
     ).stdout.decode(
         "utf-8", errors="strict"
     ).strip()
+
+
+def git_asset_output(
+    repo: Path,
+    *arguments: str,
+    timeout: int = 600,
+    env: Mapping[str, str] | None = None,
+) -> str:
+    return run_capture(
+        git_asset_command("-C", repo, *arguments),
+        timeout=timeout,
+        env=env,
+    ).stdout.decode("utf-8", errors="strict").strip()
 
 
 def git_head(repo: Path) -> str:
@@ -778,10 +1085,9 @@ def git_head(repo: Path) -> str:
 
 def _file_set_identity(project_root: Path, pathspecs: Sequence[str]) -> dict[str, Any]:
     result = run_capture(
-        [
-            "git.exe",
+        git_command(
             "-C",
-            str(project_root),
+            project_root,
             "ls-files",
             "-z",
             "--cached",
@@ -789,7 +1095,7 @@ def _file_set_identity(project_root: Path, pathspecs: Sequence[str]) -> dict[str
             "--exclude-standard",
             "--",
             *pathspecs,
-        ]
+        )
     )
     relative_paths = sorted(
         item.decode("utf-8", errors="strict").replace("\\", "/")
@@ -830,10 +1136,14 @@ def framework_identity(project_root: Path) -> dict[str, Any]:
         [
             "development/agent-evaluation/agent_eval.py",
             "development/agent-evaluation/agentbase_codex.py",
+            "development/agent-evaluation/api_pricing_snapshot.json",
             "development/agent-evaluation/candidate_preflight.ps1",
             "development/agent-evaluation/codex-eval-overlay.toml",
             "development/agent-evaluation/evaluation_core.py",
             "development/agent-evaluation/invoke_candidate.ps1",
+            "development/agent-evaluation/sandbox_runtime_cleanup.ps1",
+            "development/agent-evaluation/vendor",
+            "development/agent-evaluation/windows-adapters",
             "development/agent-evaluation/windows_verifier.py",
             "development/common/codex_runtime.py",
             "development/common/codex_cli_runtime.ps1",
@@ -854,6 +1164,79 @@ def task_asset_root(state_root: Path, corpus: Mapping[str, Any], task_id: str) -
     return deep_swe / str(corpus["source"]["task_root"]) / task_id
 
 
+def windows_adapter_asset(
+    project_root: Path,
+    task: Mapping[str, Any],
+) -> tuple[Path, dict[str, Any]] | None:
+    """Resolve, parse, and hash-check one project-owned Windows fixture adapter."""
+
+    value = task.get("windows_adapter")
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise EvaluationError("task Windows adapter descriptor is invalid")
+    relative = str(value.get("path", "")).replace("\\", "/")
+    evaluation_root = project_root.resolve() / "development" / "agent-evaluation"
+    adapter_root = project_root.resolve() / WINDOWS_ADAPTER_ROOT
+    path = require_within(adapter_root, evaluation_root / Path(relative))
+    if not path.is_file() or path.is_symlink():
+        raise EvaluationError(f"Windows adapter is missing or not a regular file: {relative}")
+    actual = sha256_file(path)
+    expected = str(value.get("sha256", ""))
+    if actual != expected:
+        raise EvaluationError(f"Windows adapter hash mismatch: {relative}")
+    try:
+        parsed = run_capture(
+            git_command("-C", project_root.resolve(), "apply", "--numstat", "-z", path),
+            timeout=30,
+        ).stdout
+    except EvaluationError as exc:
+        raise EvaluationError(f"Windows adapter is not a valid Git patch: {relative}: {exc}") from exc
+    parsed_paths: list[str] = []
+    for record in parsed.split(b"\0"):
+        if not record:
+            continue
+        parts = record.split(b"\t", 2)
+        if len(parts) != 3 or any(
+            value != b"-" and not value.isdigit() for value in parts[:2]
+        ):
+            raise EvaluationError(f"Windows adapter numstat is invalid: {relative}")
+        try:
+            patch_path = parts[2].decode("utf-8", errors="strict").replace("\\", "/")
+        except UnicodeDecodeError as exc:
+            raise EvaluationError(f"Windows adapter path is not UTF-8: {relative}") from exc
+        if not _safe_relative_path(patch_path, field=f"Windows adapter {relative}"):
+            raise EvaluationError(f"Windows adapter contains an unsafe path: {patch_path}")
+        parsed_paths.append(patch_path)
+    declared_paths = [str(item).replace("\\", "/") for item in value.get("patch_paths", [])]
+    if len(parsed_paths) != len(set(parsed_paths)):
+        raise EvaluationError(f"Windows adapter repeats a patch path: {relative}")
+    if sorted(parsed_paths) != sorted(declared_paths):
+        raise EvaluationError(
+            f"Windows adapter patch paths differ from its descriptor: {relative}: "
+            f"declared={sorted(declared_paths)}, parsed={sorted(parsed_paths)}"
+        )
+    descriptor = {
+        "path": relative,
+        "sha256": actual,
+        "bytes": path.stat().st_size,
+        "patch_paths": declared_paths,
+    }
+    return path, descriptor
+
+
+def verify_windows_adapter_assets(
+    project_root: Path,
+    corpus: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    verified: dict[str, dict[str, Any]] = {}
+    for task in corpus["tasks"]:
+        resolved = windows_adapter_asset(project_root, task)
+        if resolved is not None:
+            verified[str(task["id"])] = resolved[1]
+    return verified
+
+
 def upstream_source_root(state_root: Path, corpus: Mapping[str, Any], task_id: str) -> Path:
     _, upstreams = source_paths(state_root, corpus)
     task = require_task(corpus, task_id)
@@ -861,9 +1244,7 @@ def upstream_source_root(state_root: Path, corpus: Mapping[str, Any], task_id: s
 
 
 def _remove_staging(path: Path, staging_root: Path) -> None:
-    resolved = require_within(staging_root, path)
-    if resolved.exists():
-        shutil.rmtree(resolved)
+    remove_managed_tree(staging_root, path)
 
 
 def _clone_exact_commit(
@@ -877,7 +1258,7 @@ def _clone_exact_commit(
     staging_root.mkdir(parents=True, exist_ok=True)
     temporary = staging_root / uuid.uuid4().hex
     try:
-        run_capture(["git.exe", "init", str(temporary)], env=process_environment)
+        run_capture(git_command("init", temporary), env=process_environment)
         git_output(temporary, "remote", "add", "origin", repository, env=process_environment)
         git_output(
             temporary,
@@ -928,8 +1309,8 @@ def _prepare_deep_swe(
     temporary = staging_root / uuid.uuid4().hex
     commit = str(corpus["source"]["commit"])
     try:
-        run_capture(["git.exe", "init", str(temporary)], env=process_environment)
-        git_output(
+        run_capture(git_asset_command("init", temporary), env=process_environment)
+        git_asset_output(
             temporary,
             "remote",
             "add",
@@ -937,10 +1318,22 @@ def _prepare_deep_swe(
             str(corpus["source"]["repository"]),
             env=process_environment,
         )
-        git_output(temporary, "sparse-checkout", "init", "--cone", env=process_environment)
+        git_asset_output(
+            temporary,
+            "sparse-checkout",
+            "init",
+            "--cone",
+            env=process_environment,
+        )
         task_paths = [f"tasks/{task['id']}" for task in corpus["tasks"]]
-        git_output(temporary, "sparse-checkout", "set", *task_paths, env=process_environment)
-        git_output(
+        git_asset_output(
+            temporary,
+            "sparse-checkout",
+            "set",
+            *task_paths,
+            env=process_environment,
+        )
+        git_asset_output(
             temporary,
             "fetch",
             "--depth=1",
@@ -949,8 +1342,14 @@ def _prepare_deep_swe(
             timeout=1800,
             env=process_environment,
         )
-        git_output(temporary, "checkout", "--detach", "FETCH_HEAD", env=process_environment)
-        git_output(temporary, "remote", "remove", "origin")
+        git_asset_output(
+            temporary,
+            "checkout",
+            "--detach",
+            "FETCH_HEAD",
+            env=process_environment,
+        )
+        git_asset_output(temporary, "remote", "remove", "origin")
         fetch_head = temporary / ".git" / "FETCH_HEAD"
         if fetch_head.exists():
             fetch_head.unlink()
@@ -1064,7 +1463,13 @@ def create_workspace(
         raise EvaluationError(f"workspace already exists: {destination}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     run_capture(
-        ["git.exe", "clone", "--local", "--no-hardlinks", str(source), str(destination)],
+        git_command(
+            "clone",
+            "--local",
+            "--no-hardlinks",
+            source,
+            destination,
+        ),
         timeout=1200,
     )
     task = require_task(corpus, task_id)
@@ -1140,19 +1545,18 @@ def capture_candidate_patch(workspace: Path, task: Mapping[str, Any], output: Pa
     paths = _changed_paths(workspace)
     _validate_patch_paths(paths, task)
     if paths:
-        run_capture(["git.exe", "-C", str(workspace), "add", "-A", "--", *paths])
+        run_capture(git_command("-C", workspace, "add", "-A", "--", *paths))
     patch = run_capture(
-        [
-            "git.exe",
+        git_command(
             "-C",
-            str(workspace),
+            workspace,
             "diff",
             "--cached",
             "--binary",
             "--full-index",
             "--no-ext-diff",
             "HEAD",
-        ]
+        )
     ).stdout
     if len(patch) > MAX_PATCH_BYTES:
         raise EvaluationError(f"candidate patch exceeds {MAX_PATCH_BYTES} bytes")
@@ -1178,24 +1582,31 @@ def capture_candidate_patch(workspace: Path, task: Mapping[str, Any], output: Pa
     }
 
 
-def normalize_upstream_patch(value: bytes) -> tuple[bytes, int]:
-    """Repair only blank context lines omitted by permissive upstream patch writers."""
+def normalize_upstream_patch(value: bytes) -> tuple[bytes, int, int]:
+    """Project pinned Windows patch bytes to canonical Git input without changing hunks."""
 
     lines = value.splitlines(keepends=True)
     normalized: list[bytes] = []
     old_remaining = 0
     new_remaining = 0
     inserted_prefixes = 0
+    normalized_crlf_endings = 0
     header_pattern = re.compile(
         rb"^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@"
     )
     for line_number, line in enumerate(lines, start=1):
         if line.endswith(b"\r\n"):
-            content, ending = line[:-2], b"\r\n"
+            content, ending = line[:-2], b"\n"
+            normalized_crlf_endings += 1
         elif line.endswith(b"\n"):
             content, ending = line[:-1], b"\n"
+        elif line.endswith(b"\r"):
+            raise EvaluationError(
+                f"upstream patch uses an unsupported bare CR ending at line {line_number}"
+            )
         else:
             content, ending = line, b""
+        line = content + ending
         header = header_pattern.match(content)
         if header:
             if old_remaining or new_remaining:
@@ -1230,7 +1641,7 @@ def normalize_upstream_patch(value: bytes) -> tuple[bytes, int]:
         normalized.append(line)
     if old_remaining or new_remaining:
         raise EvaluationError("upstream patch ends before its declared hunk size")
-    return b"".join(normalized), inserted_prefixes
+    return b"".join(normalized), inserted_prefixes, normalized_crlf_endings
 
 
 def apply_git_patch(
@@ -1250,18 +1661,22 @@ def apply_git_patch(
                 "applied_sha256": sha256_bytes(source),
                 "bytes": 0,
                 "blank_context_prefixes_inserted": 0,
+                "crlf_line_endings_normalized": 0,
             }
         raise EvaluationError(f"patch is empty: {patch}")
-    applied, inserted = normalize_upstream_patch(source) if normalize_upstream else (source, 0)
-    argv = [
-        "git.exe",
+    applied, inserted, normalized_crlf = (
+        normalize_upstream_patch(source)
+        if normalize_upstream
+        else (source, 0, 0)
+    )
+    argv = git_command(
         "-C",
-        str(workspace),
+        workspace,
         "apply",
         "--index",
         "--binary",
         "--whitespace=nowarn",
-    ]
+    )
     if normalize_upstream:
         run_capture([*argv, "-"], input_bytes=applied)
     else:
@@ -1271,6 +1686,67 @@ def apply_git_patch(
         "applied_sha256": sha256_bytes(applied),
         "bytes": len(applied),
         "blank_context_prefixes_inserted": inserted,
+        "crlf_line_endings_normalized": normalized_crlf,
+    }
+
+
+def apply_windows_adapter_baseline(
+    project_root: Path,
+    workspace: Path,
+    task: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Apply one pinned test-fixture adapter and commit it as the workspace baseline."""
+
+    resolved = windows_adapter_asset(project_root, task)
+    if resolved is None:
+        return None
+    adapter_path, asset = resolved
+    if git_output(workspace, "status", "--porcelain", "--untracked-files=all"):
+        raise EvaluationError("Windows adapter requires a clean prepared workspace")
+    base_commit = git_head(workspace)
+    patch = apply_git_patch(workspace, adapter_path)
+    paths = sorted(
+        path.replace("\\", "/")
+        for path in git_output(workspace, "diff", "--cached", "--name-only", "HEAD").splitlines()
+        if path
+    )
+    expected_paths = sorted(str(path).replace("\\", "/") for path in asset["patch_paths"])
+    if paths != expected_paths:
+        raise EvaluationError(
+            f"Windows adapter patch paths differ from its contract: {paths} != {expected_paths}"
+        )
+    _validate_index_modes(workspace, paths)
+    commit_environment = dict(os.environ)
+    commit_environment.update(
+        {
+            "GIT_AUTHOR_DATE": "2000-01-01T00:00:00+00:00",
+            "GIT_COMMITTER_DATE": "2000-01-01T00:00:00+00:00",
+        }
+    )
+    run_capture(
+        git_command(
+            "-C",
+            workspace,
+            "-c",
+            "user.name=AgentBase Windows SWE",
+            "-c",
+            "user.email=agentbase@example.invalid",
+            "commit",
+            "--no-gpg-sign",
+            "--quiet",
+            "-m",
+            "Apply pinned AgentBase Windows test adapter",
+        ),
+        env=commit_environment,
+    )
+    if git_output(workspace, "status", "--porcelain", "--untracked-files=all"):
+        raise EvaluationError("Windows adapter baseline is not clean after commit")
+    return {
+        **asset,
+        **patch,
+        "base_commit": base_commit,
+        "baseline_commit": git_head(workspace),
+        "paths": paths,
     }
 
 
@@ -1281,6 +1757,8 @@ def qualification_base_identity(
     corpus: Mapping[str, Any],
     task_id: str,
 ) -> dict[str, Any]:
+    task = require_task(corpus, task_id)
+    adapter = windows_adapter_asset(project_root, task)
     payload = {
         "schema": "agentbase.windows-swe-qualification-base/v1",
         "corpus_sha256": sha256_file(corpus_path.resolve()),
@@ -1288,6 +1766,7 @@ def qualification_base_identity(
         "prepared_task_identity": prepared_task_identity(state_root, corpus, task_id),
         "task_id": task_id,
         "adapter": dict(corpus["adapter"]),
+        "windows_adapter": adapter[1] if adapter is not None else None,
     }
     return {**payload, "identity_sha256": sha256_bytes(canonical_bytes(payload))}
 
@@ -1387,9 +1866,9 @@ def find_qualification_receipts(
         return []
     receipts: list[dict[str, Any]] = []
     for path in sorted(root.glob("*.json"), reverse=True):
-        receipt = validate_receipt(
-            read_json(path), schema="agentbase.windows-swe-qualification/v1"
-        )
+        receipt = validate_receipt(read_json(path))
+        if receipt.get("schema") != QUALIFICATION_SCHEMA:
+            continue
         if receipt.get("base_identity_sha256") == base_identity_sha256:
             receipts.append(receipt)
     return receipts
@@ -1462,13 +1941,11 @@ def enforce_retry_policy(
                 attempt = read_json(path)
             except EvaluationError:
                 continue
-            if (
-                attempt.get("candidate_identity_sha256") == candidate_identity_sha256
-                and attempt.get("status") == "infrastructure-failed"
-            ):
-                if attempt.get("stage") in {"candidate-finished", "patch-captured"}:
+            if attempt.get("candidate_identity_sha256") == candidate_identity_sha256:
+                if attempt.get("stage") in RECOVERABLE_ATTEMPT_STAGES:
                     recoverable_attempts.append(str(attempt.get("attempt_id", path.parent.name)))
-                failures += 1
+                if attempt.get("status") == "infrastructure-failed":
+                    failures += 1
     if recoverable_attempts:
         attempt_ids = ", ".join(sorted(recoverable_attempts))
         raise PreconditionError(

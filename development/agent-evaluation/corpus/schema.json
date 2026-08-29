@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://agentbase.local/schemas/windows-swe-corpus-v2.json",
+  "$id": "https://agentbase.local/schemas/windows-swe-corpus-v4.json",
   "title": "AgentBase Windows SWE corpus",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "id", "source", "adapter", "codex", "profiles", "suites", "tasks", "assessment"],
   "properties": {
     "$schema": { "type": "string", "minLength": 1 },
-    "schema": { "const": "agentbase.windows-swe-corpus/v2" },
+    "schema": { "const": "agentbase.windows-swe-corpus/v4" },
     "id": { "const": "agentbase-windows-swe-v1" },
     "source": { "$ref": "#/$defs/source" },
     "adapter": { "$ref": "#/$defs/adapter" },
@@ -138,10 +138,37 @@
           "items": { "$ref": "#/$defs/command" }
         },
         "setup_cleanup": { "$ref": "#/$defs/setupCleanup" },
+        "windows_adapter": { "$ref": "#/$defs/windowsAdapter" },
+        "windows_oracle": { "$ref": "#/$defs/windowsOracle" },
         "checks": {
           "type": "array",
           "minItems": 2,
           "items": { "$ref": "#/$defs/check" }
+        }
+      }
+    },
+    "windowsOracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p2p_baseline_policy"],
+      "properties": {
+        "p2p_baseline_policy": {
+          "enum": ["exclude-stable-skips", "exclude-stable-nonpassing"]
+        }
+      }
+    },
+    "windowsAdapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "patch_paths"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^windows-adapters/.+\\.patch$" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "patch_paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
         }
       }
     },
@@ -219,7 +246,8 @@
         "raw_path": { "type": "string", "minLength": 1 },
         "name": { "type": "string", "minLength": 1 },
         "tool": { "type": "string", "minLength": 1 },
-        "fold_whitespace": { "type": "boolean" }
+        "fold_whitespace": { "type": "boolean" },
+        "node_identity_normalization": { "enum": ["nfc-utf16-surrogate-replacement"] }
       },
       "allOf": [
         {

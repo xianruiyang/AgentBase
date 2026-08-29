@@ -185,12 +185,17 @@ function Get-AgentBaseCodexJsonlSummary {
     )
 
     $eventCount = 0
+    $threadStartedCount = 0
     $turnCompletedCount = 0
+    $threadId = $null
     $toolEvents = New-Object 'System.Collections.Generic.List[string]'
     $usage = [ordered]@{
+        total_tokens = $null
         input_tokens = $null
         cached_input_tokens = $null
+        cache_write_input_tokens = $null
         output_tokens = $null
+        reasoning_output_tokens = $null
     }
     foreach ($line in @($Text -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
         try {
@@ -200,6 +205,17 @@ function Get-AgentBaseCodexJsonlSummary {
             throw 'Codex emitted non-JSON data on its JSONL channel'
         }
         $eventCount++
+        if ([string]$event.type -eq 'thread.started') {
+            $threadStartedCount++
+            $candidateThreadId = [string]$event.thread_id
+            if ([string]::IsNullOrWhiteSpace($candidateThreadId)) {
+                throw 'Codex JSONL thread.started omitted thread_id'
+            }
+            if ($null -ne $threadId -and $threadId -cne $candidateThreadId) {
+                throw 'Codex JSONL contains multiple thread identities'
+            }
+            $threadId = $candidateThreadId
+        }
         $itemType = [string]$event.item.type
         if ($itemType -in @(
             'command_execution',
@@ -212,9 +228,18 @@ function Get-AgentBaseCodexJsonlSummary {
         )) {
             $toolEvents.Add($itemType)
         }
-        if ([string]$event.type -eq 'turn.completed' -and $null -ne $event.usage) {
+        if ([string]$event.type -eq 'turn.completed') {
             $turnCompletedCount++
-            foreach ($field in @('input_tokens', 'cached_input_tokens', 'output_tokens')) {
+            if ($null -eq $event.usage) {
+                continue
+            }
+            foreach ($field in @(
+                'input_tokens',
+                'cached_input_tokens',
+                'cache_write_input_tokens',
+                'output_tokens',
+                'reasoning_output_tokens'
+            )) {
                 if ($null -eq $event.usage.$field) {
                     continue
                 }
@@ -224,12 +249,17 @@ function Get-AgentBaseCodexJsonlSummary {
                 }
                 $usage[$field] = $tokenValue
             }
+            if ($null -ne $usage.input_tokens -and $null -ne $usage.output_tokens) {
+                $usage.total_tokens = [long]$usage.input_tokens + [long]$usage.output_tokens
+            }
         }
     }
     $usageComplete = @($usage.Values | Where-Object { $null -eq $_ }).Count -eq 0
     return [pscustomobject][ordered]@{
-        schema = 'agentbase.codex-jsonl-summary/v1'
+        schema = 'agentbase.codex-jsonl-summary/v2'
         event_count = $eventCount
+        thread_started_count = $threadStartedCount
+        thread_id = $threadId
         turn_completed_count = $turnCompletedCount
         usage_complete = $usageComplete
         usage = [pscustomobject]$usage

@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "schema": "agentbase.windows-swe-corpus/v2",
+  "schema": "agentbase.windows-swe-corpus/v4",
   "id": "agentbase-windows-swe-v1",
   "source": {
     "name": "DeepSWE",
@@ -11,7 +11,7 @@
   },
   "adapter": {
     "name": "agentbase-windows-swe",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "platform": "windows",
     "workspace_contract": "candidate-patch-verifier",
     "qualification_repetitions": 2,
@@ -192,6 +192,11 @@
         "tests/config.json": "0deef4291e8a34334d91b2bc0da9fa8b1dd5497798e64362d1064733383943ad",
         "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
       },
+      "windows_adapter": {
+        "path": "windows-adapters/httpx-ephemeral-loopback.patch",
+        "sha256": "b715c3030764df95d69526f7cb866a3cfc47339bfc253c3d71e356c6f9b6dba4",
+        "patch_paths": ["tests/conftest.py", "tests/test_utils.py"]
+      },
       "toolchain": { "kind": "python", "minimum_version": "3.11" },
       "setup": [
         {
@@ -295,6 +300,18 @@
         "tests/config.json": "de6c9b037cee2ec40765f669877adbf6448cc10567d3453fb19e8ab21968fd5f",
         "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
       },
+      "windows_adapter": {
+        "path": "windows-adapters/bandit-portable-public-tests.patch",
+        "sha256": "51a3990274440a1299e0f1f912c418f3697ed09c6c6610ee224c9a3eb4f38634",
+        "patch_paths": [
+          "tests/functional/test_functional.py",
+          "tests/functional/test_runtime.py",
+          "tests/unit/core/test_config.py",
+          "tests/unit/core/test_manager.py",
+          "tests/unit/core/test_util.py",
+          "tests/unit/formatters/test_sarif.py"
+        ]
+      },
       "toolchain": { "kind": "python", "minimum_version": "3.11" },
       "setup": [
         {
@@ -303,16 +320,18 @@
         },
         {
           "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "--no-build-isolation", "-e", "."],
+          "env": { "PBR_VERSION": "0.0.0" },
           "timeout_seconds": 600
         }
       ],
       "setup_cleanup": { "restore_tracked": [], "remove_untracked": [] },
+      "windows_oracle": { "p2p_baseline_policy": "exclude-stable-skips" },
       "checks": [
         {
           "id": "base",
           "bucket": "base",
           "before": [
-            { "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "--no-build-isolation", "-e", "."], "timeout_seconds": 600 }
+            { "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "--no-build-isolation", "-e", "."], "env": { "PBR_VERSION": "0.0.0" }, "timeout_seconds": 600 }
           ],
           "argv": ["{python}", "-m", "pytest", "tests/", "--ignore=tests/functional/test_taint_new.py", "-v", "-p", "no:cacheprovider", "--junitxml={report}"],
           "timeout_seconds": 1200,
@@ -322,7 +341,7 @@
           "id": "new",
           "bucket": "new",
           "before": [
-            { "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "--no-build-isolation", "-e", "."], "timeout_seconds": 600 }
+            { "argv": ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "--no-build-isolation", "-e", "."], "env": { "PBR_VERSION": "0.0.0" }, "timeout_seconds": 600 }
           ],
           "argv": ["{python}", "-m", "pytest", "tests/functional/test_taint_new.py", "-v", "-p", "no:cacheprovider", "--junitxml={report}"],
           "timeout_seconds": 1200,
@@ -361,6 +380,7 @@
         }
       ],
       "setup_cleanup": { "restore_tracked": [], "remove_untracked": [] },
+      "windows_oracle": { "p2p_baseline_policy": "exclude-stable-skips" },
       "checks": [
         {
           "id": "base",
@@ -406,26 +426,26 @@
       "toolchain": { "kind": "node", "minimum_version": "20", "package_manager": "npm" },
       "setup": [
         {
-          "argv": ["{npm}", "install", "--ignore-scripts"],
+          "argv": ["{npm}", "install", "--include=dev", "--ignore-scripts"],
           "env": { "NODE_ENV": "development" },
           "timeout_seconds": 1200
         }
       ],
-      "setup_cleanup": { "restore_tracked": [], "remove_untracked": [] },
+      "setup_cleanup": { "restore_tracked": [], "remove_untracked": ["package-lock.json"] },
       "checks": [
         {
           "id": "base",
           "bucket": "base",
-          "argv": ["{workspace}/node_modules/.bin/vitest.cmd", "run", "--exclude=test/parser/declarations/using.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "argv": ["{workspace}/node_modules/.bin/vitest.cmd", "run", "--configLoader=runner", "--exclude=test/parser/declarations/using.ts", "--reporter=junit", "--outputFile={raw_report}"],
           "timeout_seconds": 1200,
-          "report": { "kind": "junit-to-ctrf", "raw_path": "base.xml", "path": "base-ctrf.json", "tool": "vitest", "fold_whitespace": true }
+          "report": { "kind": "junit-to-ctrf", "raw_path": "base.xml", "path": "base-ctrf.json", "tool": "vitest", "fold_whitespace": true, "node_identity_normalization": "nfc-utf16-surrogate-replacement" }
         },
         {
           "id": "new",
           "bucket": "new",
-          "argv": ["{workspace}/node_modules/.bin/vitest.cmd", "run", "test/parser/declarations/using.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "argv": ["{workspace}/node_modules/.bin/vitest.cmd", "run", "--configLoader=runner", "test/parser/declarations/using.ts", "--reporter=junit", "--outputFile={raw_report}"],
           "timeout_seconds": 1200,
-          "report": { "kind": "junit-to-ctrf", "raw_path": "new.xml", "path": "new-ctrf.json", "tool": "vitest", "fold_whitespace": true }
+          "report": { "kind": "junit-to-ctrf", "raw_path": "new.xml", "path": "new-ctrf.json", "tool": "vitest", "fold_whitespace": true, "node_identity_normalization": "nfc-utf16-surrogate-replacement" }
         }
       ]
     },
@@ -452,15 +472,21 @@
         "tests/config.json": "7ddcaa5b740c7227d469d36672fc73001fb4e4960bb1323a48df8253c920c1b6",
         "tests/grader.py": "6110820e2eb065da9507bd3114639d4aeb55cb1341d22229d0aa38e5d27bd054"
       },
+      "windows_adapter": {
+        "path": "windows-adapters/clack-synthetic-keypress.patch",
+        "sha256": "0cc6bb56cde2861fc13b1e7d9e9f5de1eb13f3ac8d427bc3c88b4c339d0c6fd5",
+        "patch_paths": ["packages/core/src/prompts/prompt.ts", "packages/core/test/mock-readable.ts", "packages/prompts/test/test-utils.ts"]
+      },
       "toolchain": { "kind": "node", "minimum_version": "20", "package_manager": "pnpm" },
       "setup": [
         {
-          "argv": ["{pnpm}", "install", "--no-frozen-lockfile"],
+          "argv": ["{pnpm}", "install", "--no-frozen-lockfile", "--config.node-linker=hoisted"],
           "env": { "NODE_ENV": "development", "NPM_CONFIG_PRODUCTION": "false" },
           "timeout_seconds": 1800
         }
       ],
       "setup_cleanup": { "restore_tracked": ["pnpm-lock.yaml"], "remove_untracked": [] },
+      "windows_oracle": { "p2p_baseline_policy": "exclude-stable-nonpassing" },
       "checks": [
         {
           "id": "build-gate",
@@ -472,28 +498,32 @@
         {
           "id": "base-prompts",
           "bucket": "base",
-          "argv": ["{pnpm}", "test", "--filter=@clack/prompts", "--", "--exclude=**/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "argv": ["{pnpm}", "test", "--filter=@clack/prompts", "--", "--configLoader=runner", "--no-file-parallelism", "--exclude=**/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "env": { "TERM_PROGRAM": "vscode" },
           "timeout_seconds": 1200,
           "report": { "kind": "junit-to-ctrf", "raw_path": "base1.xml", "path": "base1-ctrf.json", "tool": "vitest" }
         },
         {
           "id": "base-core",
           "bucket": "base",
-          "argv": ["{pnpm}", "test", "--filter=@clack/core", "--", "--exclude=**/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "argv": ["{pnpm}", "test", "--filter=@clack/core", "--", "--configLoader=runner", "--no-file-parallelism", "--exclude=**/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "env": { "TERM_PROGRAM": "vscode" },
           "timeout_seconds": 1200,
           "report": { "kind": "junit-to-ctrf", "raw_path": "base2.xml", "path": "base2-ctrf.json", "tool": "vitest" }
         },
         {
           "id": "new-core",
           "bucket": "new",
-          "argv": ["{pnpm}", "test", "--filter=@clack/core", "--", "test/prompts/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "argv": ["{pnpm}", "test", "--filter=@clack/core", "--", "--configLoader=runner", "--no-file-parallelism", "test/prompts/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "env": { "TERM_PROGRAM": "vscode" },
           "timeout_seconds": 1200,
           "report": { "kind": "junit-to-ctrf", "raw_path": "new1.xml", "path": "new1-ctrf.json", "tool": "vitest" }
         },
         {
           "id": "new-prompts",
           "bucket": "new",
-          "argv": ["{pnpm}", "test", "--filter=@clack/prompts", "--", "test/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "argv": ["{pnpm}", "test", "--filter=@clack/prompts", "--", "--configLoader=runner", "--no-file-parallelism", "test/async-autocomplete.test.ts", "--reporter=junit", "--outputFile={raw_report}"],
+          "env": { "TERM_PROGRAM": "vscode" },
           "timeout_seconds": 1200,
           "report": { "kind": "junit-to-ctrf", "raw_path": "new2.xml", "path": "new2-ctrf.json", "tool": "vitest" }
         }

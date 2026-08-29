@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Resolve', 'Preflight', 'Run')]
+    [ValidateSet('Resolve', 'Setup', 'Preflight', 'Run')]
     [string]$Action,
     [Parameter(Mandatory = $true)]
     [string]$ProjectRoot,
@@ -10,6 +10,9 @@ param(
     [string]$Workspace,
     [string]$StateRoot,
     [string]$CodexHome,
+    [string]$RuntimeTemp,
+    [string]$SandboxRuntimeStatePath,
+    [string]$ExpectedSandboxRuntimeIdentitySha256,
     [string]$InstalledCodexRoot,
     [string]$PromptPath,
     [string]$CanaryPath,
@@ -20,6 +23,7 @@ param(
     [string]$ToolProbeManifestPath,
     [string]$ExpectedToolProbeManifestSha256,
     [string]$PreflightOutputPath,
+    [string]$TaskRuntimeBinPath,
     [string]$Model,
     [string]$ReasoningEffort,
     [string]$PermissionProfile,
@@ -267,6 +271,7 @@ function Read-AgentBaseToolProbeManifest {
         throw 'Tool probe manifest is empty'
     }
     $expectedTools = [ordered]@{}
+    $toolPaths = [ordered]@{}
     foreach ($probe in $rawProbes) {
         if (-not (Test-AgentBaseExactPropertySet -Value $probe -Expected @('id', 'path', 'sha256', 'argv'))) {
             throw 'Tool probe manifest entry fields are invalid'
@@ -303,11 +308,16 @@ function Read-AgentBaseToolProbeManifest {
             }
         }
         $expectedTools[$probeId] = $probeSha256
+        $toolPaths[$probeId] = $resolvedProbePath
+    }
+    if (-not $toolPaths.Contains('pwsh')) {
+        throw 'Tool probe manifest omits the PowerShell bootstrap executable'
     }
     return [pscustomobject][ordered]@{
         path = $resolvedPath
         sha256 = $actualSha256
         expected_tools = $expectedTools
+        tool_paths = $toolPaths
     }
 }
 
@@ -338,7 +348,8 @@ function Set-AgentBaseEvaluationEnvironment {
         [Parameter(Mandatory = $true)]
         [string]$CodexHomePath,
         [Parameter(Mandatory = $true)]
-        [string]$RuntimeTemp
+        [string]$RuntimeTemp,
+        [string]$TaskRuntimeBinPath
     )
 
     foreach ($name in @($StartInfo.Environment.Keys | Where-Object { [string]$_ -like 'CODEX_*' })) {
@@ -359,16 +370,36 @@ function Set-AgentBaseEvaluationEnvironment {
         [void]$StartInfo.Environment.Remove($name)
     }
     $StartInfo.Environment['CODEX_HOME'] = [IO.Path]::GetFullPath($CodexHomePath)
+    $StartInfo.Environment['CODEX_NETWORK_ALLOW_LOCAL_BINDING'] = '1'
     $StartInfo.Environment['TEMP'] = [IO.Path]::GetFullPath($RuntimeTemp)
     $StartInfo.Environment['TMP'] = [IO.Path]::GetFullPath($RuntimeTemp)
     $StartInfo.Environment['TMPDIR'] = [IO.Path]::GetFullPath($RuntimeTemp)
     $StartInfo.Environment['APPDATA'] = [IO.Path]::GetFullPath(
         (Join-Path $RuntimeTemp 'appdata')
     )
+    $StartInfo.Environment['HOME'] = [IO.Path]::GetFullPath(
+        (Join-Path $RuntimeTemp 'home')
+    )
     $StartInfo.Environment['LOCALAPPDATA'] = [IO.Path]::GetFullPath(
         (Join-Path $RuntimeTemp 'localappdata')
     )
+    $StartInfo.Environment['USERPROFILE'] = [IO.Path]::GetFullPath(
+        (Join-Path $RuntimeTemp 'home')
+    )
+    $StartInfo.Environment['PYTEST_DEBUG_TEMPROOT'] = [IO.Path]::GetFullPath($RuntimeTemp)
+    $StartInfo.Environment['PYTEST_ADDOPTS'] = '--override-ini=tmp_path_retention_policy=none'
     $StartInfo.Environment['NO_COLOR'] = '1'
+    if (-not [string]::IsNullOrWhiteSpace($TaskRuntimeBinPath)) {
+        $runtimeBin = [IO.Path]::GetFullPath($TaskRuntimeBinPath)
+        $inheritedPath = [string]$StartInfo.Environment['PATH']
+        $StartInfo.Environment['PATH'] = if ([string]::IsNullOrWhiteSpace($inheritedPath)) {
+            $runtimeBin
+        }
+        else {
+            $runtimeBin + [IO.Path]::PathSeparator + $inheritedPath
+        }
+    }
+    [void]$StartInfo.Environment.Remove('VIRTUAL_ENV')
 }
 
 function Invoke-AgentBaseBoundedProcess {
@@ -383,6 +414,7 @@ function Invoke-AgentBaseBoundedProcess {
         [string]$CodexHomePath,
         [Parameter(Mandatory = $true)]
         [string]$RuntimeTemp,
+        [string]$TaskRuntimeBinPath,
         [string]$StandardInput,
         [Parameter(Mandatory = $true)]
         [int]$Timeout
@@ -402,7 +434,11 @@ function Invoke-AgentBaseBoundedProcess {
     $startInfo.StandardInputEncoding = [Text.Encoding]::UTF8
     $startInfo.StandardOutputEncoding = [Text.Encoding]::UTF8
     $startInfo.StandardErrorEncoding = [Text.Encoding]::UTF8
-    Set-AgentBaseEvaluationEnvironment -StartInfo $startInfo -CodexHomePath $CodexHomePath -RuntimeTemp $RuntimeTemp
+    Set-AgentBaseEvaluationEnvironment `
+        -StartInfo $startInfo `
+        -CodexHomePath $CodexHomePath `
+        -RuntimeTemp $RuntimeTemp `
+        -TaskRuntimeBinPath $TaskRuntimeBinPath
 
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
@@ -436,10 +472,373 @@ function Invoke-AgentBaseBoundedProcess {
     }
 }
 
+function Read-AgentBaseAppServerResponse {
+    param(
+        [Parameter(Mandatory = $true)]
+        [Diagnostics.Process]$Process,
+        [Parameter(Mandatory = $true)]
+        [long]$RequestId,
+        [Parameter(Mandatory = $true)]
+        [DateTimeOffset]$Deadline
+    )
+
+    $observedMessages = 0
+    while ($observedMessages -lt 256) {
+        $remainingMilliseconds = [int][Math]::Ceiling(
+            ($Deadline - [DateTimeOffset]::UtcNow).TotalMilliseconds
+        )
+        if ($remainingMilliseconds -le 0) {
+            throw "Codex app-server request $RequestId timed out"
+        }
+        $readTask = $Process.StandardOutput.ReadLineAsync()
+        if (-not $readTask.Wait($remainingMilliseconds)) {
+            throw "Codex app-server request $RequestId timed out"
+        }
+        $line = $readTask.GetAwaiter().GetResult()
+        if ($null -eq $line) {
+            throw "Codex app-server closed before response $RequestId"
+        }
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+        if ($line.Length -gt 2097152) {
+            throw 'Codex app-server emitted an oversized protocol message'
+        }
+        try {
+            $message = $line | ConvertFrom-Json -Depth 30 -DateKind String
+        }
+        catch {
+            throw 'Codex app-server emitted an invalid JSONL protocol message'
+        }
+        $observedMessages++
+        if (
+            $message.PSObject.Properties.Name -contains 'id' -and
+            $null -ne $message.id -and
+            [long]$message.id -eq $RequestId
+        ) {
+            return $message
+        }
+    }
+    throw "Codex app-server exceeded the response message bound for request $RequestId"
+}
+
+function Invoke-AgentBaseAppServerCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$CodexIdentity,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Command,
+        [Parameter(Mandatory = $true)]
+        [string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)]
+        [string]$CodexHomePath,
+        [Parameter(Mandatory = $true)]
+        [string]$RuntimeTemp,
+        [string]$TaskRuntimeBinPath,
+        [Parameter(Mandatory = $true)]
+        [string]$PermissionProfile,
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 1800)]
+        [int]$Timeout
+    )
+
+    if ($Command.Count -eq 0) {
+        throw 'Codex app-server command must not be empty'
+    }
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = [string]$CodexIdentity.path
+    $startInfo.ArgumentList.Add('app-server')
+    $startInfo.ArgumentList.Add('--stdio')
+    $startInfo.ArgumentList.Add('--strict-config')
+    # command/exec persists trust when its writable cwd has no effective trust.
+    # Supply the exact dynamic project key in memory so preflight cannot mutate
+    # the controlled runtime config.
+    $projectTrustKey = ConvertTo-AgentBaseCodexTomlString (
+        ([IO.Path]::GetFullPath($WorkingDirectory)).ToLowerInvariant()
+    )
+    $startInfo.ArgumentList.Add('-c')
+    $startInfo.ArgumentList.Add(
+        "projects={$projectTrustKey={trust_level=`"trusted`"}}"
+    )
+    $startInfo.WorkingDirectory = [IO.Path]::GetFullPath($WorkingDirectory)
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.StandardInputEncoding = [Text.UTF8Encoding]::new($false)
+    $startInfo.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
+    $startInfo.StandardErrorEncoding = [Text.UTF8Encoding]::new($false)
+    Set-AgentBaseEvaluationEnvironment `
+        -StartInfo $startInfo `
+        -CodexHomePath $CodexHomePath `
+        -RuntimeTemp $RuntimeTemp `
+        -TaskRuntimeBinPath $TaskRuntimeBinPath
+    # command/exec is a local no-model runner. Do not inherit the desktop
+    # app-server's persisted remote-control websocket setting.
+    $startInfo.Environment['CODEX_INTERNAL_APP_SERVER_REMOTE_CONTROL_DISABLED'] = '1'
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    $started = [DateTimeOffset]::UtcNow
+    $stderrTask = $null
+    try {
+        if (-not $process.Start()) {
+            throw 'Codex app-server did not start'
+        }
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $initialize = [ordered]@{
+            method = 'initialize'
+            id = 1
+            params = [ordered]@{
+                clientInfo = [ordered]@{
+                    name = 'agentbase_evaluation'
+                    title = 'AgentBase Evaluation'
+                    version = '1.0.0'
+                }
+                capabilities = [ordered]@{
+                    experimentalApi = $true
+                }
+            }
+        }
+        $process.StandardInput.WriteLine(
+            ($initialize | ConvertTo-Json -Depth 10 -Compress)
+        )
+        $process.StandardInput.Flush()
+        $deadline = [DateTimeOffset]::UtcNow.AddSeconds($Timeout)
+        $initializeResponse = Read-AgentBaseAppServerResponse `
+            -Process $process `
+            -RequestId 1 `
+            -Deadline $deadline
+        if ($initializeResponse.PSObject.Properties.Name -contains 'error') {
+            $initializeError = $initializeResponse.error | ConvertTo-Json -Depth 10 -Compress
+            throw "Codex app-server initialize failed: $initializeError"
+        }
+        if ($initializeResponse.PSObject.Properties.Name -notcontains 'result') {
+            throw 'Codex app-server initialize response omitted result'
+        }
+
+        $initialized = [ordered]@{ method = 'initialized' }
+        $execute = [ordered]@{
+            method = 'command/exec'
+            id = 2
+            params = [ordered]@{
+                command = @($Command)
+                cwd = [IO.Path]::GetFullPath($WorkingDirectory)
+                permissionProfile = $PermissionProfile
+                timeoutMs = $Timeout * 1000
+            }
+        }
+        $process.StandardInput.WriteLine(
+            ($initialized | ConvertTo-Json -Depth 4 -Compress)
+        )
+        $process.StandardInput.WriteLine(
+            ($execute | ConvertTo-Json -Depth 10 -Compress)
+        )
+        $process.StandardInput.Flush()
+        $executeResponse = Read-AgentBaseAppServerResponse `
+            -Process $process `
+            -RequestId 2 `
+            -Deadline $deadline
+        if ($executeResponse.PSObject.Properties.Name -contains 'error') {
+            $executeError = $executeResponse.error | ConvertTo-Json -Depth 10 -Compress
+            throw "Codex app-server command/exec failed: $executeError"
+        }
+        if ($executeResponse.PSObject.Properties.Name -notcontains 'result') {
+            throw 'Codex app-server command/exec response omitted result'
+        }
+        $commandResult = $executeResponse.result
+        foreach ($field in @('exitCode', 'stdout', 'stderr')) {
+            if ($commandResult.PSObject.Properties.Name -notcontains $field) {
+                throw "Codex app-server command/exec result omitted $field"
+            }
+        }
+
+        $process.StandardInput.Close()
+        if (-not $process.WaitForExit(5000)) {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
+        $serverDiagnostic = $stderrTask.GetAwaiter().GetResult()
+        if ($serverDiagnostic.Length -gt 2097152) {
+            throw 'Codex app-server exceeded the bounded diagnostic output contract'
+        }
+        $combinedDiagnostic = @(
+            [string]$commandResult.stderr
+            [string]$serverDiagnostic
+        ) -join [Environment]::NewLine
+        return [pscustomobject][ordered]@{
+            exit_code = [int]$commandResult.exitCode
+            stdout = [string]$commandResult.stdout
+            stderr = $combinedDiagnostic.Trim()
+            duration_seconds = [Math]::Round(
+                ([DateTimeOffset]::UtcNow - $started).TotalSeconds,
+                3
+            )
+        }
+    }
+    catch {
+        $failure = $_.Exception.Message
+        try { $process.StandardInput.Close() } catch {}
+        if (-not $process.HasExited) {
+            try { $process.Kill($true) } catch {}
+            try { $process.WaitForExit() } catch {}
+        }
+        $serverDiagnostic = if ($null -eq $stderrTask) {
+            ''
+        }
+        else {
+            try { [string]$stderrTask.GetAwaiter().GetResult() } catch { '' }
+        }
+        $serverDiagnostic = [regex]::Replace($serverDiagnostic.Trim(), '\s+', ' ')
+        if ($serverDiagnostic.Length -gt 1000) {
+            $serverDiagnostic = $serverDiagnostic.Substring(0, 497) + ' ... ' + $serverDiagnostic.Substring($serverDiagnostic.Length - 498)
+        }
+        if ([string]::IsNullOrWhiteSpace($serverDiagnostic)) {
+            throw $failure
+        }
+        throw "$failure; app-server diagnostic=$serverDiagnostic"
+    }
+    finally {
+        try { $process.StandardInput.Close() } catch {}
+        if (-not $process.HasExited) {
+            try { $process.Kill($true) } catch {}
+            try { $process.WaitForExit() } catch {}
+        }
+        $process.Dispose()
+    }
+}
+
+function Invoke-AgentBaseSandboxSetup {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$CodexIdentity,
+        [Parameter(Mandatory = $true)]
+        [string]$ResolvedWorkspace,
+        [Parameter(Mandatory = $true)]
+        [string]$ResolvedHome,
+        [Parameter(Mandatory = $true)]
+        [string]$RuntimeTemp,
+        [Parameter(Mandatory = $true)]
+        [string]$PermissionProfile
+    )
+
+    # This is the only evaluator action allowed to initialize the host-level
+    # elevated backend. Normal candidate and verifier actions only reuse it.
+    $setupShell = (Resolve-Path -LiteralPath (
+        Join-Path $env:SystemRoot 'System32\cmd.exe'
+    ) -ErrorAction Stop).Path
+    $arguments = @(
+        'sandbox',
+        '-P', $PermissionProfile,
+        '-C', $ResolvedWorkspace,
+        '--',
+        $setupShell, '/d', '/c', 'exit 0'
+    )
+    $process = Invoke-AgentBaseBoundedProcess `
+        -Executable $CodexIdentity.path `
+        -Arguments $arguments `
+        -WorkingDirectory $ResolvedWorkspace `
+        -CodexHomePath $ResolvedHome `
+        -RuntimeTemp $RuntimeTemp `
+        -Timeout 300
+    $diagnostic = [regex]::Replace(
+        (([string]$process.stderr + ' ' + [string]$process.stdout).Trim()),
+        '\s+',
+        ' '
+    )
+    if ($diagnostic.Length -gt 600) {
+        $diagnostic = $diagnostic.Substring(0, 297) + ' ... ' + $diagnostic.Substring($diagnostic.Length - 298)
+    }
+    if ($process.exit_code -ne 0) {
+        throw "candidate sandbox setup failed; exit=$($process.exit_code); diagnostic=$diagnostic"
+    }
+    return [pscustomobject][ordered]@{
+        schema = 'agentbase.windows-swe-sandbox-setup/v1'
+        passed = $true
+        setup_invoked = $true
+        model_invoked = $false
+        exit_code = $process.exit_code
+        duration_seconds = $process.duration_seconds
+        diagnostic = if ([string]::IsNullOrWhiteSpace($diagnostic)) { $null } else { $diagnostic }
+    }
+}
+
+function Get-AgentBaseSandboxRuntimeUse {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ResolvedHome,
+        [Parameter(Mandatory = $true)]
+        [string]$RuntimeStatePath,
+        [Parameter(Mandatory = $true)]
+        [string]$ExpectedIdentitySha256
+    )
+
+    if ($ExpectedIdentitySha256 -cnotmatch '^[0-9a-f]{64}$') {
+        throw 'Expected sandbox runtime identity is invalid'
+    }
+    $resolvedStatePath = (Resolve-Path -LiteralPath $RuntimeStatePath).Path
+    $runtimeState = [IO.File]::ReadAllText(
+        $resolvedStatePath,
+        [Text.Encoding]::UTF8
+    ) | ConvertFrom-Json -Depth 20 -DateKind String
+    if (
+        [string]$runtimeState.schema -cne 'agentbase.windows-swe-sandbox-runtime/v1' -or
+        [string]$runtimeState.status -cne 'ready' -or
+        [string]$runtimeState.identity_sha256 -cne $ExpectedIdentitySha256
+    ) {
+        throw 'Sandbox runtime state is not ready for reuse; run sandbox-setup explicitly'
+    }
+    foreach ($relative in @(
+        '.sandbox\setup_marker.json',
+        'cap_sid'
+    )) {
+        if (-not (Test-Path -LiteralPath (Join-Path $ResolvedHome $relative) -PathType Leaf)) {
+            throw "Sandbox runtime backend is incomplete ($relative); run sandbox-setup explicitly"
+        }
+    }
+    $runnerRoot = Join-Path $ResolvedHome '.sandbox-bin'
+    if (-not (Test-Path -LiteralPath $runnerRoot -PathType Container)) {
+        throw 'Sandbox runtime runner directory is absent; run sandbox-setup explicitly'
+    }
+    $runnerRootItem = Get-Item -LiteralPath $runnerRoot -Force -ErrorAction Stop
+    if (($runnerRootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw 'Sandbox runtime runner directory is a reparse point; run sandbox-setup explicitly'
+    }
+    $runnerFiles = @(
+        Get-ChildItem -LiteralPath $runnerRoot -Force -File -ErrorAction Stop |
+            Where-Object {
+                $_.Name -cmatch '^(?:codex|codex-command-runner-[A-Za-z0-9][A-Za-z0-9._-]*)\.exe$' -and
+                ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and
+                $_.Length -gt 0 -and
+                $_.Length -le 536870912
+            }
+    )
+    if ($runnerFiles.Count -lt 1 -or $runnerFiles.Count -gt 16) {
+        throw 'Sandbox runtime command runner set is invalid; run sandbox-setup explicitly'
+    }
+    $secretsRoot = Join-Path $ResolvedHome '.sandbox-secrets'
+    if (-not (Test-Path -LiteralPath $secretsRoot -PathType Container)) {
+        throw 'Sandbox runtime protected state is absent; run sandbox-setup explicitly'
+    }
+    $secretRootItem = Get-Item -LiteralPath $secretsRoot -Force -ErrorAction Stop
+    if (($secretRootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw 'Sandbox runtime protected state is a reparse point; run sandbox-setup explicitly'
+    }
+    return [pscustomobject][ordered]@{
+        schema = 'agentbase.windows-swe-sandbox-runtime-use/v1'
+        ready = $true
+        setup_invoked = $false
+        identity_sha256 = $ExpectedIdentitySha256
+    }
+}
+
 function Invoke-AgentBaseCandidatePreflight {
     param(
         [Parameter(Mandatory = $true)]
         [object]$CodexIdentity,
+        [Parameter(Mandatory = $true)]
+        [object]$SandboxRuntime,
         [Parameter(Mandatory = $true)]
         [string]$ResolvedWorkspace,
         [Parameter(Mandatory = $true)]
@@ -467,6 +866,8 @@ function Invoke-AgentBaseCandidatePreflight {
         [Parameter(Mandatory = $true)]
         [object]$ExpectedToolProbes,
         [Parameter(Mandatory = $true)]
+        [string]$ResolvedPreflightShell,
+        [Parameter(Mandatory = $true)]
         [string]$ResolvedOutput,
         [Parameter(Mandatory = $true)]
         [string]$Profile,
@@ -475,18 +876,32 @@ function Invoke-AgentBaseCandidatePreflight {
         [Parameter(Mandatory = $true)]
         [string]$RuntimeAppData,
         [Parameter(Mandatory = $true)]
+        [string]$RuntimeHome,
+        [Parameter(Mandatory = $true)]
         [string]$RuntimeLocalAppData,
+        [string]$TaskRuntimeBinPath,
         [string]$FailureResultPath,
         [switch]$AllowFailedReceipt
     )
 
+    if (-not [IO.Path]::IsPathFullyQualified($ResolvedPreflightShell)) {
+        throw 'Candidate preflight shell path must be absolute'
+    }
+    $preflightShell = (Resolve-Path -LiteralPath $ResolvedPreflightShell).Path
+    if (-not (Test-Path -LiteralPath $preflightShell -PathType Leaf)) {
+        throw 'Candidate preflight shell path must be a file'
+    }
+    $expectedPreflightShellSha256 = [string]$ExpectedToolProbes['pwsh']
+    $observedPreflightShellSha256 = (
+        Get-FileHash -LiteralPath $preflightShell -Algorithm SHA256 -ErrorAction Stop
+    ).Hash.ToLowerInvariant()
+    if ($observedPreflightShellSha256 -cne $expectedPreflightShellSha256) {
+        throw 'Candidate preflight shell changed before sandbox launch'
+    }
+
     $preflightScript = Join-Path $ResolvedWorkspace '.agentbase\preflight.ps1'
-    $preflightArguments = @(
-        'sandbox',
-        '-P', $Profile,
-        '-C', $ResolvedWorkspace,
-        '--',
-        'pwsh.exe', '-NoProfile', '-NonInteractive', '-File', $preflightScript,
+    $preflightCommand = @(
+        $preflightShell, '-NoProfile', '-NonInteractive', '-File', $preflightScript,
         '-CanaryPath', $ResolvedCanary,
         '-DeniedAuthPath', $ResolvedDeniedAuth,
         '-InstalledAuthPath', $ResolvedInstalledAuth,
@@ -496,17 +911,23 @@ function Invoke-AgentBaseCandidatePreflight {
         '-ExpectedSkillProbeManifestSha256', $ExpectedSkillProbeManifestSha256,
         '-ToolProbeManifestPath', $ResolvedToolProbeManifest,
         '-ExpectedToolProbeManifestSha256', $ExpectedToolProbeManifestSha256,
-        '-WriteProbePath', ($ResolvedOutput + '.write-probe'),
+        '-WriteProbePath', (Join-Path $ResolvedWorkspace '.agentbase-workspace-write-probe'),
         '-RuntimeTempPath', $RuntimeTemp,
         '-RuntimeAppDataPath', $RuntimeAppData,
+        '-RuntimeHomePath', $RuntimeHome,
         '-RuntimeLocalAppDataPath', $RuntimeLocalAppData
     )
-    $preflightProcess = Invoke-AgentBaseBoundedProcess `
-        -Executable $CodexIdentity.path `
-        -Arguments $preflightArguments `
+    if (-not [string]::IsNullOrWhiteSpace($TaskRuntimeBinPath)) {
+        $preflightCommand += @('-TaskRuntimeBinPath', $TaskRuntimeBinPath)
+    }
+    $preflightProcess = Invoke-AgentBaseAppServerCommand `
+        -CodexIdentity $CodexIdentity `
+        -Command $preflightCommand `
         -WorkingDirectory $ResolvedWorkspace `
         -CodexHomePath $ResolvedHome `
         -RuntimeTemp $RuntimeTemp `
+        -TaskRuntimeBinPath $TaskRuntimeBinPath `
+        -PermissionProfile $Profile `
         -Timeout 300
     $preflightDiagnostic = [regex]::Replace(
         ([string]$preflightProcess.stderr).Trim(),
@@ -614,7 +1035,9 @@ function Invoke-AgentBaseCandidatePreflight {
         'skill_projection_write_error_type', 'skill_files_expected',
         'skill_files_verified', 'workspace_write_probe_passed',
         'workspace_write_probe_error_type', 'runtime_temp_attempt_scoped',
-        'runtime_appdata_attempt_scoped', 'runtime_localappdata_attempt_scoped',
+        'runtime_appdata_attempt_scoped', 'runtime_home_attempt_scoped',
+        'runtime_localappdata_attempt_scoped',
+        'pytest_temp_policy_ready', 'task_runtime_path_ready',
         'runtime_state_error_type', 'tool_probe_manifest_readable',
         'tool_probe_manifest_sha256', 'tool_probe_manifest_error_type',
         'tool_probes', 'srcq_doctor_exit_code', 'srcq_scc_doctor_exit_code',
@@ -622,7 +1045,7 @@ function Invoke-AgentBaseCandidatePreflight {
     )
     $receiptShapeValid = (
         $receiptPropertiesValid -and
-        [string]$preflight.schema -eq 'agentbase.windows-swe-preflight/v9' -and
+        [string]$preflight.schema -eq 'agentbase.windows-swe-preflight/v12' -and
         $preflight.passed -is [bool] -and
         $preflight.canary_readable -is [bool] -and
         $preflight.auth_readable -is [bool] -and
@@ -639,7 +1062,10 @@ function Invoke-AgentBaseCandidatePreflight {
         $preflight.workspace_write_probe_passed -is [bool] -and
         $preflight.runtime_temp_attempt_scoped -is [bool] -and
         $preflight.runtime_appdata_attempt_scoped -is [bool] -and
+        $preflight.runtime_home_attempt_scoped -is [bool] -and
         $preflight.runtime_localappdata_attempt_scoped -is [bool] -and
+        $preflight.pytest_temp_policy_ready -is [bool] -and
+        $preflight.task_runtime_path_ready -is [bool] -and
         $preflight.tool_probe_manifest_readable -is [bool] -and
         (
             $null -eq $preflight.tool_probe_manifest_sha256 -or
@@ -691,7 +1117,9 @@ function Invoke-AgentBaseCandidatePreflight {
         [bool]$preflight.workspace_write_probe_passed -and
         [bool]$preflight.runtime_temp_attempt_scoped -and
         [bool]$preflight.runtime_appdata_attempt_scoped -and
+        [bool]$preflight.runtime_home_attempt_scoped -and
         [bool]$preflight.runtime_localappdata_attempt_scoped -and
+        [bool]$preflight.task_runtime_path_ready -and
         $allToolProbesPassed -and
         [int]$preflight.srcq_doctor_exit_code -eq 0 -and
         [int]$preflight.srcq_scc_doctor_exit_code -eq 0 -and
@@ -708,7 +1136,7 @@ function Invoke-AgentBaseCandidatePreflight {
     if (-not $preflightPassed -and -not $AllowFailedReceipt) {
         if (-not [string]::IsNullOrWhiteSpace($FailureResultPath)) {
             Write-AgentBaseJson -Path $FailureResultPath -Value ([ordered]@{
-                schema = 'agentbase.windows-swe-codex-run/v3'
+                schema = 'agentbase.windows-swe-codex-run/v7'
                 status = 'blocked-precondition'
                 model_invoked = $false
                 exit_code = $null
@@ -716,7 +1144,19 @@ function Invoke-AgentBaseCandidatePreflight {
                 diagnostic = $preflightDiagnostic
                 codex = $CodexIdentity
                 permission_profile = $Profile
+                sandbox_runtime = $SandboxRuntime
                 preflight = $preflight
+                usage_scope = 'not-invoked'
+                usage_complete = $true
+                usage = [ordered]@{
+                    total_tokens = 0
+                    input_tokens = 0
+                    cached_input_tokens = 0
+                    cache_write_input_tokens = 0
+                    output_tokens = 0
+                    reasoning_output_tokens = 0
+                }
+                agent_usage = @()
             })
         }
         throw "candidate preflight failed; exit=$($preflightProcess.exit_code); diagnostic=$preflightDiagnostic"
@@ -734,11 +1174,63 @@ if ($Action -eq 'Resolve') {
     Write-AgentBaseJson -Path $resolvedResult -Value $identity
     exit 0
 }
+if ($env:AGENTBASE_AGENT_EVALUATOR_DISABLED -eq '1') {
+    throw "$Action action is disabled by the deterministic test gate"
+}
+
+if ($Action -eq 'Setup') {
+    foreach ($required in @{
+        Workspace = $Workspace
+        StateRoot = $StateRoot
+        CodexHome = $CodexHome
+        RuntimeTemp = $RuntimeTemp
+        PermissionProfile = $PermissionProfile
+    }.GetEnumerator()) {
+        if ([string]::IsNullOrWhiteSpace([string]$required.Value)) {
+            throw "Setup action requires -$($required.Key)"
+        }
+    }
+    $setupWorkspace = (Resolve-Path -LiteralPath $Workspace).Path
+    $setupState = (Resolve-Path -LiteralPath $StateRoot).Path
+    $setupHome = (Resolve-Path -LiteralPath $CodexHome).Path
+    $setupTemp = [IO.Path]::GetFullPath($RuntimeTemp)
+    foreach ($boundary in @{
+        'Codex home' = $setupHome
+        'Runtime tmpdir' = $setupTemp
+        'Result path' = $resolvedResult
+    }.GetEnumerator()) {
+        $relative = [IO.Path]::GetRelativePath($setupState, [string]$boundary.Value)
+        if (
+            [IO.Path]::IsPathRooted($relative) -or
+            $relative -eq '..' -or
+            $relative.StartsWith('..' + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal)
+        ) {
+            throw "$($boundary.Key) must be inside the evaluation state root"
+        }
+    }
+    Assert-AgentBaseDisjointPaths -LeftName 'Setup workspace' -LeftPath $setupWorkspace -RightName 'evaluation state root' -RightPath $setupState
+    Assert-AgentBaseDisjointPaths -LeftName 'Setup workspace' -LeftPath $setupWorkspace -RightName 'project root' -RightPath $resolvedProject
+    Assert-AgentBaseDisjointPaths -LeftName 'Runtime tmpdir' -LeftPath $setupTemp -RightName 'setup workspace' -RightPath $setupWorkspace
+    [IO.Directory]::CreateDirectory($setupTemp) | Out-Null
+    [IO.Directory]::CreateDirectory((Join-Path $setupTemp 'appdata')) | Out-Null
+    [IO.Directory]::CreateDirectory((Join-Path $setupTemp 'localappdata')) | Out-Null
+    $setupResult = Invoke-AgentBaseSandboxSetup `
+        -CodexIdentity $identity `
+        -ResolvedWorkspace $setupWorkspace `
+        -ResolvedHome $setupHome `
+        -RuntimeTemp $setupTemp `
+        -PermissionProfile $PermissionProfile
+    Write-AgentBaseJson -Path $resolvedResult -Value $setupResult
+    exit 0
+}
 
 foreach ($required in @{
     Workspace = $Workspace
     StateRoot = $StateRoot
     CodexHome = $CodexHome
+    RuntimeTemp = $RuntimeTemp
+    SandboxRuntimeStatePath = $SandboxRuntimeStatePath
+    ExpectedSandboxRuntimeIdentitySha256 = $ExpectedSandboxRuntimeIdentitySha256
     InstalledCodexRoot = $InstalledCodexRoot
     CanaryPath = $CanaryPath
     DeniedAuthPath = $DeniedAuthPath
@@ -757,6 +1249,7 @@ foreach ($required in @{
 if ($Action -eq 'Run') {
     foreach ($required in @{
         PromptPath = $PromptPath
+        TaskRuntimeBinPath = $TaskRuntimeBinPath
         Model = $Model
         ReasoningEffort = $ReasoningEffort
     }.GetEnumerator()) {
@@ -767,6 +1260,12 @@ if ($Action -eq 'Run') {
 }
 
 $resolvedWorkspace = (Resolve-Path -LiteralPath $Workspace).Path
+$resolvedTaskRuntimeBin = if ($Action -eq 'Run') {
+    (Resolve-Path -LiteralPath $TaskRuntimeBinPath).Path
+}
+else {
+    $null
+}
 $resolvedState = (Resolve-Path -LiteralPath $StateRoot).Path
 $resolvedHome = (Resolve-Path -LiteralPath $CodexHome).Path
 $resolvedInstalledCodexRoot = (Resolve-Path -LiteralPath $InstalledCodexRoot).Path
@@ -841,8 +1340,23 @@ $toolProbeManifest = Read-AgentBaseToolProbeManifest `
     -Path $ToolProbeManifestPath `
     -ExpectedSha256 $ExpectedToolProbeManifestSha256 `
     -ResolvedWorkspace $resolvedWorkspace
-$attemptRuntimeRoot = Split-Path -Parent $resolvedHome
-$runtimeTemp = [IO.Path]::GetFullPath((Join-Path $attemptRuntimeRoot 'runtime-temp'))
+if ($Action -eq 'Run') {
+    if (-not (Test-Path -LiteralPath $resolvedTaskRuntimeBin -PathType Container)) {
+        throw 'Task runtime bin path must be a directory'
+    }
+    $runtimeToolMatches = @(
+        $toolProbeManifest.tool_paths.Values | Where-Object {
+            (Split-Path -Parent ([IO.Path]::GetFullPath([string]$_))).Equals(
+                $resolvedTaskRuntimeBin,
+                [StringComparison]::OrdinalIgnoreCase
+            )
+        }
+    )
+    if ($runtimeToolMatches.Count -eq 0) {
+        throw 'Task runtime bin path is not bound to a frozen dependency tool'
+    }
+}
+$runtimeTemp = [IO.Path]::GetFullPath($RuntimeTemp)
 $runtimeRelative = [IO.Path]::GetRelativePath($resolvedState, $runtimeTemp)
 if (
     [IO.Path]::IsPathRooted($runtimeRelative) -or
@@ -856,13 +1370,29 @@ Assert-AgentBaseDisjointPaths -LeftName 'Runtime tmpdir' -LeftPath $runtimeTemp 
 Assert-AgentBaseDisjointPaths -LeftName 'Runtime tmpdir' -LeftPath $runtimeTemp -RightName 'installed Codex root' -RightPath $resolvedInstalledCodexRoot
 [IO.Directory]::CreateDirectory($runtimeTemp) | Out-Null
 $runtimeAppData = Join-Path $runtimeTemp 'appdata'
+$runtimeHome = Join-Path $runtimeTemp 'home'
 $runtimeLocalAppData = Join-Path $runtimeTemp 'localappdata'
 [IO.Directory]::CreateDirectory($runtimeAppData) | Out-Null
+[IO.Directory]::CreateDirectory($runtimeHome) | Out-Null
 [IO.Directory]::CreateDirectory($runtimeLocalAppData) | Out-Null
+$resolvedSandboxRuntimeState = (Resolve-Path -LiteralPath $SandboxRuntimeStatePath).Path
+$sandboxStateRelative = [IO.Path]::GetRelativePath($resolvedState, $resolvedSandboxRuntimeState)
+if (
+    [IO.Path]::IsPathRooted($sandboxStateRelative) -or
+    $sandboxStateRelative -eq '..' -or
+    $sandboxStateRelative.StartsWith('..' + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal)
+) {
+    throw 'Sandbox runtime state must be inside the denied state root'
+}
+$sandboxRuntime = Get-AgentBaseSandboxRuntimeUse `
+    -ResolvedHome $resolvedHome `
+    -RuntimeStatePath $resolvedSandboxRuntimeState `
+    -ExpectedIdentitySha256 $ExpectedSandboxRuntimeIdentitySha256
 
 if ($Action -eq 'Preflight') {
     $preflightResult = Invoke-AgentBaseCandidatePreflight `
         -CodexIdentity $identity `
+        -SandboxRuntime $sandboxRuntime `
         -ResolvedWorkspace $resolvedWorkspace `
         -ResolvedHome $resolvedHome `
         -ResolvedCanary $resolvedCanary `
@@ -876,26 +1406,27 @@ if ($Action -eq 'Preflight') {
         -ResolvedToolProbeManifest $toolProbeManifest.path `
         -ExpectedToolProbeManifestSha256 $toolProbeManifest.sha256 `
         -ExpectedToolProbes $toolProbeManifest.expected_tools `
+        -ResolvedPreflightShell $toolProbeManifest.tool_paths['pwsh'] `
         -ResolvedOutput $resolvedPreflight `
         -Profile $PermissionProfile `
         -RuntimeTemp $runtimeTemp `
         -RuntimeAppData $runtimeAppData `
+        -RuntimeHome $runtimeHome `
         -RuntimeLocalAppData $runtimeLocalAppData `
+        -TaskRuntimeBinPath $resolvedTaskRuntimeBin `
         -AllowFailedReceipt
     $preflightEnvelope = [ordered]@{
-        schema = 'agentbase.windows-swe-sandbox-check/v3'
+        schema = 'agentbase.windows-swe-sandbox-check/v5'
         status = if ($preflightResult.passed) { 'passed' } else { 'failed' }
         passed = [bool]$preflightResult.passed
         codex = $identity
         permission_profile = $PermissionProfile
+        sandbox_runtime = $sandboxRuntime
         duration_seconds = $preflightResult.process.duration_seconds
         diagnostic = if ($preflightResult.passed) { $null } else { $preflightResult.diagnostic }
         preflight = $preflightResult.receipt
     }
     Write-AgentBaseJson -Path $resolvedResult -Value $preflightEnvelope
-    if ([IO.Directory]::Exists($runtimeTemp)) {
-        [IO.Directory]::Delete($runtimeTemp, $true)
-    }
     if (-not $preflightResult.passed) {
         exit 3
     }
@@ -926,6 +1457,7 @@ try {
 
     $preflightResult = Invoke-AgentBaseCandidatePreflight `
         -CodexIdentity $identity `
+        -SandboxRuntime $sandboxRuntime `
         -ResolvedWorkspace $resolvedWorkspace `
         -ResolvedHome $resolvedHome `
         -ResolvedCanary $resolvedCanary `
@@ -939,23 +1471,27 @@ try {
         -ResolvedToolProbeManifest $toolProbeManifest.path `
         -ExpectedToolProbeManifestSha256 $toolProbeManifest.sha256 `
         -ExpectedToolProbes $toolProbeManifest.expected_tools `
+        -ResolvedPreflightShell $toolProbeManifest.tool_paths['pwsh'] `
         -ResolvedOutput $resolvedPreflight `
         -Profile $PermissionProfile `
         -RuntimeTemp $runtimeTemp `
         -RuntimeAppData $runtimeAppData `
+        -RuntimeHome $runtimeHome `
         -RuntimeLocalAppData $runtimeLocalAppData `
+        -TaskRuntimeBinPath $resolvedTaskRuntimeBin `
         -FailureResultPath $resolvedResult
     $preflight = $preflightResult.receipt
 
     $catalogTomlPath = [IO.Path]::GetFullPath([string]$catalog.path).Replace('\', '/')
+    $projectTrustKey = ConvertTo-AgentBaseCodexTomlString ($resolvedWorkspace.ToLowerInvariant())
     $arguments = @(
         'exec',
         '--model', $Model,
         '-c', "model_reasoning_effort=`"$ReasoningEffort`"",
         '-c', "model_catalog_json=`"$catalogTomlPath`"",
         '-c', 'analytics.enabled=false',
+        '-c', "projects={$projectTrustKey={trust_level=`"trusted`"}}",
         '--strict-config',
-        '--ephemeral',
         '--skip-git-repo-check',
         '--output-last-message', $lastMessagePath,
         '--json',
@@ -970,6 +1506,7 @@ try {
         -WorkingDirectory $resolvedWorkspace `
         -CodexHomePath $resolvedHome `
         -RuntimeTemp $runtimeTemp `
+        -TaskRuntimeBinPath $resolvedTaskRuntimeBin `
         -StandardInput $prompt `
         -Timeout $TimeoutSeconds
     if (([string]$codexProcess.stdout).Length -gt 16777216 -or ([string]$codexProcess.stderr).Length -gt 2097152) {
@@ -987,7 +1524,7 @@ try {
         $diagnosticText = $diagnosticText.Substring(0, 400) + ' ... ' + $diagnosticText.Substring($diagnosticText.Length - 395)
     }
     $result = [ordered]@{
-        schema = 'agentbase.windows-swe-codex-run/v3'
+        schema = 'agentbase.windows-swe-codex-run/v7'
         status = 'completed'
         model_invoked = $true
         exit_code = $codexProcess.exit_code
@@ -996,11 +1533,18 @@ try {
         codex = $identity
         model_catalog_sha256 = ([string]$catalog.sha256).ToLowerInvariant()
         permission_profile = $PermissionProfile
+        sandbox_runtime = $sandboxRuntime
         preflight = $preflight
         event_count = $jsonlSummary.event_count
+        thread_started_count = $jsonlSummary.thread_started_count
+        root_thread_id = $jsonlSummary.thread_id
         turn_completed_count = $jsonlSummary.turn_completed_count
+        usage_scope = 'root-thread-only'
+        root_usage_complete = $jsonlSummary.usage_complete
+        root_usage = $jsonlSummary.usage
         usage_complete = $jsonlSummary.usage_complete
         usage = $jsonlSummary.usage
+        agent_usage = @()
         tool_event_types = @($jsonlSummary.tool_event_types)
         stdout = [ordered]@{
             path = $stdoutPath
@@ -1013,6 +1557,7 @@ try {
             bytes = (Get-Item -LiteralPath $stderrPath).Length
         }
     }
+    Write-AgentBaseJson -Path $resolvedResult -Value $result
 }
 finally {
     if ($null -ne $authLock) {
@@ -1021,8 +1566,8 @@ finally {
     if (Test-Path -LiteralPath $authLink -PathType Leaf) {
         Remove-Item -LiteralPath $authLink -Force
     }
-    if ([IO.Directory]::Exists($runtimeTemp)) {
-        [IO.Directory]::Delete($runtimeTemp, $true)
+    if (Test-Path -LiteralPath $catalogPath -PathType Leaf) {
+        Remove-Item -LiteralPath $catalogPath -Force
     }
 }
 

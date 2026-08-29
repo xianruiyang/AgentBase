@@ -27,7 +27,10 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$RuntimeAppDataPath,
     [Parameter(Mandatory = $true)]
-    [string]$RuntimeLocalAppDataPath
+    [string]$RuntimeHomePath,
+    [Parameter(Mandatory = $true)]
+    [string]$RuntimeLocalAppDataPath,
+    [string]$TaskRuntimeBinPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -418,11 +421,15 @@ finally {
 
 $runtimeTempAttemptScoped = $false
 $runtimeAppDataAttemptScoped = $false
+$runtimeHomeAttemptScoped = $false
 $runtimeLocalAppDataAttemptScoped = $false
+$pytestTempPolicyReady = $false
+$taskRuntimePathReady = $true
 $runtimeStateError = $null
 try {
     $expectedRuntimeTemp = [IO.Path]::GetFullPath($RuntimeTempPath)
     $expectedRuntimeAppData = [IO.Path]::GetFullPath($RuntimeAppDataPath)
+    $expectedRuntimeHome = [IO.Path]::GetFullPath($RuntimeHomePath)
     $expectedRuntimeLocalAppData = [IO.Path]::GetFullPath($RuntimeLocalAppDataPath)
     $workspaceRoot = [IO.Path]::GetFullPath((Get-Location).Path)
     $tempRelativeToWorkspace = [IO.Path]::GetRelativePath($workspaceRoot, $expectedRuntimeTemp)
@@ -448,6 +455,19 @@ try {
             break
         }
     }
+    $actualPytestTempRoot = [Environment]::GetEnvironmentVariable('PYTEST_DEBUG_TEMPROOT')
+    $actualPytestAddopts = [Environment]::GetEnvironmentVariable('PYTEST_ADDOPTS')
+    $pytestTempPolicyReady = (
+        -not [string]::IsNullOrWhiteSpace($actualPytestTempRoot) -and
+        ([IO.Path]::GetFullPath($actualPytestTempRoot)).Equals(
+            $expectedRuntimeTemp,
+            [StringComparison]::OrdinalIgnoreCase
+        ) -and
+        $actualPytestAddopts -ceq '--override-ini=tmp_path_retention_policy=none'
+    )
+    if (-not $pytestTempPolicyReady) {
+        $runtimeStateError = 'AgentBase.PytestTempPolicyMismatch'
+    }
     $runtimeAppDataAttemptScoped = (
         ([IO.Path]::GetFullPath([Environment]::GetEnvironmentVariable('APPDATA'))).Equals(
             $expectedRuntimeAppData,
@@ -462,14 +482,54 @@ try {
         ) -and
         ([IO.Path]::GetRelativePath($expectedRuntimeTemp, $expectedRuntimeLocalAppData)) -notmatch '^\.\.'
     )
+    $runtimeHomeAttemptScoped = (
+        ([IO.Path]::GetFullPath([Environment]::GetEnvironmentVariable('HOME'))).Equals(
+            $expectedRuntimeHome,
+            [StringComparison]::OrdinalIgnoreCase
+        ) -and
+        ([IO.Path]::GetFullPath([Environment]::GetEnvironmentVariable('USERPROFILE'))).Equals(
+            $expectedRuntimeHome,
+            [StringComparison]::OrdinalIgnoreCase
+        ) -and
+        ([IO.Path]::GetRelativePath($expectedRuntimeTemp, $expectedRuntimeHome)) -notmatch '^\.\.'
+    )
     if (-not $runtimeAppDataAttemptScoped -or -not $runtimeLocalAppDataAttemptScoped) {
         $runtimeStateError = 'AgentBase.RuntimeAppDataPathMismatch'
+    }
+    if (-not $runtimeHomeAttemptScoped) {
+        $runtimeStateError = 'AgentBase.RuntimeHomePathMismatch'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($TaskRuntimeBinPath)) {
+        $expectedTaskRuntimeBin = [IO.Path]::GetFullPath($TaskRuntimeBinPath)
+        $runtimePathEntries = @(
+            ([string][Environment]::GetEnvironmentVariable('PATH')).Split(
+                [IO.Path]::PathSeparator,
+                [StringSplitOptions]::RemoveEmptyEntries
+            )
+        )
+        $taskRuntimePathReady = (
+            [IO.Directory]::Exists($expectedTaskRuntimeBin) -and
+            @(
+                $runtimePathEntries | Where-Object {
+                    ([IO.Path]::GetFullPath([string]$_)).Equals(
+                        $expectedTaskRuntimeBin,
+                        [StringComparison]::OrdinalIgnoreCase
+                    )
+                }
+            ).Count -gt 0
+        )
+        if (-not $taskRuntimePathReady) {
+            $runtimeStateError = 'AgentBase.TaskRuntimePathMismatch'
+        }
     }
 }
 catch {
     $runtimeTempAttemptScoped = $false
     $runtimeAppDataAttemptScoped = $false
+    $runtimeHomeAttemptScoped = $false
     $runtimeLocalAppDataAttemptScoped = $false
+    $pytestTempPolicyReady = $false
+    $taskRuntimePathReady = $false
     $runtimeStateError = $_.Exception.GetType().FullName
 }
 
@@ -796,7 +856,10 @@ $passed = (
     $workspaceWriteProbePassed -and
     $runtimeTempAttemptScoped -and
     $runtimeAppDataAttemptScoped -and
+    $runtimeHomeAttemptScoped -and
     $runtimeLocalAppDataAttemptScoped -and
+    $pytestTempPolicyReady -and
+    $taskRuntimePathReady -and
     $manifestReady -and
     $allToolProbesPassed -and
     $srcqDoctorExit -eq 0 -and
@@ -804,7 +867,7 @@ $passed = (
     @($srcqSmoke.Values | Where-Object { -not [bool]$_.passed }).Count -eq 0
 )
 $value = [ordered]@{
-    schema = 'agentbase.windows-swe-preflight/v9'
+    schema = 'agentbase.windows-swe-preflight/v12'
     passed = $passed
     canary_readable = $canaryReadable
     canary_error_type = $canaryError
@@ -827,7 +890,10 @@ $value = [ordered]@{
     workspace_write_probe_error_type = $workspaceWriteProbeError
     runtime_temp_attempt_scoped = $runtimeTempAttemptScoped
     runtime_appdata_attempt_scoped = $runtimeAppDataAttemptScoped
+    runtime_home_attempt_scoped = $runtimeHomeAttemptScoped
     runtime_localappdata_attempt_scoped = $runtimeLocalAppDataAttemptScoped
+    pytest_temp_policy_ready = $pytestTempPolicyReady
+    task_runtime_path_ready = $taskRuntimePathReady
     runtime_state_error_type = $runtimeStateError
     tool_probe_manifest_readable = $toolProbeManifestReadable
     tool_probe_manifest_sha256 = $toolProbeManifestHash

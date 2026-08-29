@@ -10,23 +10,38 @@ import shutil
 import subprocess
 import sys
 import time
+import unicodedata
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from agentbase_codex import stage_verifier_home
+from agentbase_codex import (
+    evaluation_runtime_home_controlled_identity,
+    is_elevated_sandbox_runtime_rejection,
+    sandbox_backend_snapshot,
+    sandbox_backend_runner_files,
+    sandbox_runtime_use_is_valid,
+    validate_sandbox_runtime_state,
+)
 from evaluation_core import (
+    ControlledRuntimeDriftError,
     EvaluationError,
+    SandboxRuntimeInvalidError,
     apply_git_patch,
+    apply_windows_adapter_baseline,
     bounded_text,
     canonical_bytes,
     create_workspace,
+    dependency_runtime_projection,
     elapsed_seconds,
     git_output,
+    prepare_sandbox_writable_root,
     read_json,
+    remove_managed_tree,
     require_task,
     require_within,
     run_capture,
+    sandbox_temp_environment,
     sha256_bytes,
     sha256_file,
     task_asset_root,
@@ -35,6 +50,21 @@ from evaluation_core import (
     write_immutable_receipt,
     write_json_atomic,
 )
+
+
+PYTHON_PROXY_BOOTSTRAP_WHEEL = (
+    Path(__file__).resolve().parent
+    / "vendor"
+    / "PySocks-1.7.1-py3-none-any.whl"
+)
+PYTHON_PROXY_BOOTSTRAP_SHA256 = (
+    "2725bd0a9925919b9b51739eea5f9e2bae91e83288108a9ad338b2e3a4435ee5"
+)
+SANDBOX_RUNTIME_CLEANUP_SOURCE = (
+    Path(__file__).resolve().parent / "sandbox_runtime_cleanup.ps1"
+)
+VERIFIER_RESULT_SCHEMA = "agentbase.windows-swe-verifier-result/v4"
+MAX_VERIFIER_REPORT_BYTES = 64 * 1024 * 1024
 
 
 def _resolve_application(*names: str) -> Path:
@@ -65,6 +95,75 @@ def _ensure_minimum_version(executable: Path, minimum: str) -> str:
     return text
 
 
+def _pnpm_runtime_paths(workspace: Path) -> tuple[Path, Path]:
+    runtime_root = workspace.resolve() / ".agentbase" / "task-runtime"
+    wrapper = runtime_root / "bin" / "pnpm.cmd"
+    module = runtime_root / "pnpm" / "node_modules" / "pnpm" / "dist" / "pnpm.cjs"
+    return wrapper, module
+
+
+def _prepare_pnpm_runtime(
+    workspace: Path,
+    environment: Mapping[str, str],
+    log_path: Path,
+) -> None:
+    package = read_json(workspace.resolve() / "package.json")
+    package_manager = package.get("packageManager")
+    match = (
+        re.fullmatch(r"pnpm@([0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?)", package_manager)
+        if isinstance(package_manager, str)
+        else None
+    )
+    if not match:
+        raise EvaluationError("pnpm task package.json must pin packageManager to an exact version")
+    version = match.group(1)
+    npm = _resolve_application("npm.cmd", "npm.exe")
+    node = _resolve_application("node.exe", "node")
+    wrapper, module = _pnpm_runtime_paths(workspace)
+    install_root = module.parents[3]
+    install_root.mkdir(parents=True, exist_ok=True)
+    _run_logged(
+        [
+            str(npm),
+            "install",
+            "--prefix",
+            str(install_root),
+            "--no-save",
+            "--ignore-scripts",
+            "--package-lock=false",
+            "--fund=false",
+            "--audit=false",
+            f"pnpm@{version}",
+        ],
+        workspace=workspace,
+        environment=_command_environment(environment, {}),
+        timeout=300,
+        log_path=log_path,
+        check=True,
+    )
+    if not module.is_file():
+        raise EvaluationError("workspace pnpm runtime was not materialized")
+    runtime_text = module.read_text(encoding="utf-8")
+    replacements = {
+        "value: fs.realpathSync(os.tmpdir())": "value: os.tmpdir()",
+        "const cwd = fs_1.default.realpathSync((0, better_path_resolve_1.default)(cliOptions.dir ?? npmConfig.localPrefix));": "const cwd = (0, better_path_resolve_1.default)(cliOptions.dir ?? npmConfig.localPrefix);",
+    }
+    for original, replacement in replacements.items():
+        if runtime_text.count(original) != 1:
+            raise EvaluationError("pinned pnpm runtime compatibility target changed")
+        runtime_text = runtime_text.replace(original, replacement)
+    module.write_text(runtime_text, encoding="utf-8", newline="\n")
+    wrapper.parent.mkdir(parents=True, exist_ok=True)
+    wrapper.write_text(
+        "@echo off\n"
+        "setlocal\n"
+        f'"{node}" "%~dp0..\\pnpm\\node_modules\\pnpm\\dist\\pnpm.cjs" %*\n'
+        "exit /b %ERRORLEVEL%\n",
+        encoding="utf-8",
+        newline="\r\n",
+    )
+
+
 def resolve_task_tools(task: Mapping[str, Any], workspace: Path) -> dict[str, str]:
     toolchain = task["toolchain"]
     if toolchain["kind"] == "python":
@@ -82,17 +181,22 @@ def resolve_task_tools(task: Mapping[str, Any], workspace: Path) -> dict[str, st
     node = _resolve_application("node.exe", "node")
     _ensure_minimum_version(node, str(toolchain["minimum_version"]))
     npm = _resolve_application("npm.cmd", "npm.exe")
-    pnpm = (
-        _resolve_application("pnpm.cmd", "pnpm.exe")
-        if toolchain.get("package_manager") == "pnpm"
-        else Path("pnpm.cmd")
-    )
+    if toolchain.get("package_manager") == "pnpm":
+        pnpm, pnpm_runtime = _pnpm_runtime_paths(workspace)
+        if not pnpm.is_file() or not pnpm_runtime.is_file():
+            raise EvaluationError("workspace pnpm runtime is not prepared")
+    else:
+        pnpm = Path("pnpm.cmd")
+        pnpm_runtime = Path("pnpm.cjs")
     return {
         "python": str(Path(sys.executable).resolve()),
         "workspace": str(workspace.resolve()),
         "node": str(node),
         "npm": str(npm),
-        "pnpm": str(pnpm),
+        "pnpm": str(pnpm.resolve()) if pnpm.is_absolute() else str(pnpm),
+        "pnpm_runtime": (
+            str(pnpm_runtime.resolve()) if pnpm_runtime.is_absolute() else str(pnpm_runtime)
+        ),
     }
 
 
@@ -129,6 +233,74 @@ def _command_environment(
     return environment
 
 
+def _task_runtime_environment(
+    task: Mapping[str, Any],
+    values: Mapping[str, str],
+    inherited_environment: Mapping[str, str],
+) -> dict[str, str]:
+    projection = dependency_runtime_projection(task, values)
+    inherited_path = next(
+        (
+            str(value)
+            for key, value in inherited_environment.items()
+            if str(key).upper() == "PATH"
+        ),
+        "",
+    )
+    runtime_bin = str(projection["bin_directory"])
+    environment = {
+        "PATH": (
+            runtime_bin + os.pathsep + inherited_path if inherited_path else runtime_bin
+        )
+    }
+    virtual_environment = projection.get("virtual_environment")
+    if isinstance(virtual_environment, str) and virtual_environment:
+        environment["VIRTUAL_ENV"] = virtual_environment
+    return environment
+
+
+def _absolute_sandbox_child_argv(argv: Sequence[str]) -> list[str]:
+    if not argv:
+        raise EvaluationError("sandbox child command is empty")
+    executable = Path(str(argv[0]))
+    if not executable.is_absolute():
+        raise EvaluationError(
+            f"sandbox child executable must use an absolute path: {argv[0]}"
+        )
+    if not executable.is_file():
+        raise EvaluationError(f"sandbox child executable is not a file: {executable}")
+    return [str(executable.resolve()), *[str(item) for item in argv[1:]]]
+
+
+def _terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
+    """Terminate the exact Windows process tree owned by one verifier command."""
+
+    if process.poll() is not None:
+        return
+    system_root = os.environ.get("SystemRoot", "").strip()
+    taskkill = Path(system_root).resolve() / "System32" / "taskkill.exe"
+    if not system_root or not taskkill.is_file():
+        process.kill()
+        process.wait(timeout=30)
+        raise EvaluationError("taskkill.exe is unavailable; only the command root was terminated")
+    completed = subprocess.run(
+        [str(taskkill), "/PID", str(process.pid), "/T", "/F"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=30,
+        check=False,
+    )
+    try:
+        process.wait(timeout=30)
+    except subprocess.TimeoutExpired as exc:
+        process.kill()
+        process.wait(timeout=30)
+        raise EvaluationError("timed-out command root did not exit after taskkill") from exc
+    if completed.returncode != 0:
+        detail = bounded_text(completed.stdout.decode("utf-8", errors="replace"), 500)
+        raise EvaluationError(f"taskkill could not confirm descendant termination: {detail}")
+
+
 def _run_logged(
     argv: Sequence[str],
     *,
@@ -140,30 +312,50 @@ def _run_logged(
 ) -> dict[str, Any]:
     started = time.monotonic()
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             [str(item) for item in argv],
             cwd=str(workspace.resolve()),
             env=dict(environment),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            timeout=timeout,
-            check=False,
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise EvaluationError(f"command failed to start or timed out: {argv[0]}: {exc}") from exc
+    except OSError as exc:
+        raise EvaluationError(f"command failed to start: {argv[0]}: {exc}") from exc
+    try:
+        output, _ = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        termination_error: EvaluationError | None = None
+        try:
+            _terminate_process_tree(process)
+        except EvaluationError as termination_exc:
+            termination_error = termination_exc
+        try:
+            output, _ = process.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            output = exc.output or b""
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_bytes(output or b"")
+        if termination_error is not None:
+            raise EvaluationError(
+                f"command timed out after {timeout} seconds and process-tree cleanup failed: "
+                f"{argv[0]}: {termination_error}"
+            ) from exc
+        raise EvaluationError(
+            f"command timed out after {timeout} seconds; process tree was terminated: {argv[0]}"
+        ) from exc
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_path.write_bytes(result.stdout)
+    log_path.write_bytes(output)
     record = {
         "argv": list(argv),
-        "exit_code": result.returncode,
+        "exit_code": process.returncode,
         "duration_seconds": elapsed_seconds(started),
         "log_path": str(log_path.resolve()),
         "log_sha256": sha256_file(log_path),
         "log_bytes": log_path.stat().st_size,
     }
-    if check and result.returncode != 0:
-        detail = bounded_text(result.stdout.decode("utf-8", errors="replace"), 700)
-        raise EvaluationError(f"command failed ({result.returncode}): {argv[0]}: {detail}")
+    if check and process.returncode != 0:
+        detail = bounded_text(output.decode("utf-8", errors="replace"), 700)
+        raise EvaluationError(f"command failed ({process.returncode}): {argv[0]}: {detail}")
     return record
 
 
@@ -171,7 +363,7 @@ def _restore_setup_baseline(task: Mapping[str, Any], workspace: Path) -> None:
     cleanup = task["setup_cleanup"]
     restore = list(cleanup["restore_tracked"])
     if restore:
-        run_capture(["git.exe", "-C", str(workspace), "checkout", "HEAD", "--", *restore])
+        git_output(workspace, "checkout", "HEAD", "--", *restore)
     for relative in cleanup["remove_untracked"]:
         target = require_within(workspace, workspace / Path(relative))
         if target.exists():
@@ -200,12 +392,44 @@ def prepare_dependencies(
             log_path=logs / "venv.log",
             check=True,
         )
+    elif task["toolchain"].get("package_manager") == "pnpm":
+        _prepare_pnpm_runtime(
+            workspace,
+            network_environment,
+            logs / "pnpm-runtime.log",
+        )
     values = resolve_task_tools(task, workspace)
+    task_environment = _task_runtime_environment(task, values, network_environment)
+    if task["toolchain"]["kind"] == "python":
+        if not PYTHON_PROXY_BOOTSTRAP_WHEEL.is_file():
+            raise EvaluationError("Python SOCKS bootstrap wheel is missing")
+        if sha256_file(PYTHON_PROXY_BOOTSTRAP_WHEEL) != PYTHON_PROXY_BOOTSTRAP_SHA256:
+            raise EvaluationError("Python SOCKS bootstrap wheel hash mismatch")
+        _run_logged(
+            [
+                values["python"],
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                "--no-index",
+                str(PYTHON_PROXY_BOOTSTRAP_WHEEL),
+            ],
+            workspace=workspace,
+            environment=_command_environment(
+                {**network_environment, **task_environment}, {}
+            ),
+            timeout=180,
+            log_path=logs / "python-proxy-bootstrap.log",
+            check=True,
+        )
     for index, command in enumerate(task["setup"]):
         _run_logged(
             _expanded_argv(command, values),
             workspace=workspace,
-            environment=_command_environment(network_environment, command),
+            environment=_command_environment(
+                {**network_environment, **task_environment}, command
+            ),
             timeout=int(command["timeout_seconds"]),
             log_path=logs / f"{index:02d}.log",
             check=True,
@@ -220,6 +444,21 @@ def dependency_identity(
     workspace: Path,
     values: Mapping[str, str],
 ) -> dict[str, Any]:
+    workspace_spellings = {
+        str(workspace.resolve()),
+        str(workspace.resolve()).replace("\\", "/"),
+    }
+
+    def normalized_workspace_text(value: str) -> str:
+        for spelling in workspace_spellings:
+            value = re.sub(
+                re.escape(spelling),
+                "<workspace>",
+                value,
+                flags=re.IGNORECASE,
+            )
+        return value
+
     manifests: list[dict[str, Any]] = []
     for relative in (
         "pyproject.toml",
@@ -230,7 +469,6 @@ def dependency_identity(
         "yarn.lock",
         "pnpm-lock.yaml",
         "node_modules/.package-lock.json",
-        "node_modules/.modules.yaml",
     ):
         path = workspace / Path(relative)
         if path.is_file():
@@ -256,12 +494,35 @@ def dependency_identity(
     inventory_text = inventory_result.stdout.decode("utf-8", errors="replace").replace(
         "\r\n", "\n"
     )
-    for spelling in {
-        str(workspace.resolve()),
-        str(workspace.resolve()).replace("\\", "/"),
-    }:
-        inventory_text = re.sub(re.escape(spelling), "<workspace>", inventory_text, flags=re.IGNORECASE)
-    inventory = inventory_text.encode("utf-8")
+    if task["toolchain"]["kind"] == "python":
+        inventory_text = normalized_workspace_text(inventory_text)
+        inventory = inventory_text.encode("utf-8")
+    else:
+        try:
+            inventory_document = json.loads(inventory_text)
+        except json.JSONDecodeError as exc:
+            raise EvaluationError("package dependency inventory is not valid JSON") from exc
+
+        def normalize_inventory_value(value: Any) -> Any:
+            if isinstance(value, str):
+                for spelling in workspace_spellings:
+                    value = re.sub(
+                        re.escape(spelling),
+                        "<workspace>",
+                        value,
+                        flags=re.IGNORECASE,
+                    )
+                return value
+            if isinstance(value, list):
+                return [normalize_inventory_value(item) for item in value]
+            if isinstance(value, dict):
+                return {
+                    key: normalize_inventory_value(item)
+                    for key, item in value.items()
+                }
+            return value
+
+        inventory = canonical_bytes(normalize_inventory_value(inventory_document))
     identity_tool_names = (
         ["python"]
         if task["toolchain"]["kind"] == "python"
@@ -286,6 +547,14 @@ def dependency_identity(
             "bytes": path.stat().st_size,
             "version": version,
         }
+    if task["toolchain"]["kind"] == "node" and task["toolchain"]["package_manager"] == "pnpm":
+        runtime_path = Path(str(values["pnpm_runtime"])).resolve()
+        if not runtime_path.is_file():
+            raise EvaluationError("pnpm runtime module is not a regular file")
+        tool_identities["pnpm-runtime"] = {
+            "sha256": sha256_file(runtime_path),
+            "bytes": runtime_path.stat().st_size,
+        }
     payload = {
         "toolchain": dict(task["toolchain"]),
         "tools": tool_identities,
@@ -295,7 +564,64 @@ def dependency_identity(
     return {**payload, "identity_sha256": sha256_bytes(canonical_bytes(payload))}
 
 
-def _sandbox_environment(base_environment: Mapping[str, str], codex_home: Path) -> dict[str, str]:
+def _assert_sandbox_runtime_reusable(
+    codex_home: Path,
+    sandbox_runtime: Mapping[str, Any],
+    *,
+    full_backend_check: bool,
+) -> None:
+    if not sandbox_runtime_use_is_valid(sandbox_runtime):
+        raise EvaluationError("verifier received an invalid sandbox runtime descriptor")
+    state_path = Path(str(sandbox_runtime.get("state_path", ""))).resolve()
+    try:
+        state = validate_sandbox_runtime_state(read_json(state_path))
+    except EvaluationError as exc:
+        raise SandboxRuntimeInvalidError(
+            "sandbox runtime state changed before verifier launch; run sandbox-setup explicitly"
+        ) from exc
+    if (
+        state.get("status") != "ready"
+        or state.get("identity_sha256") != sandbox_runtime.get("identity_sha256")
+    ):
+        raise SandboxRuntimeInvalidError(
+            "sandbox runtime was invalidated before verifier launch; run sandbox-setup explicitly"
+        )
+    required = (
+        codex_home.resolve() / ".sandbox" / "setup_marker.json",
+        codex_home.resolve() / "cap_sid",
+    )
+    if any(not path.is_file() for path in required) or not (
+        codex_home.resolve() / ".sandbox-secrets"
+    ).is_dir():
+        raise SandboxRuntimeInvalidError(
+            "sandbox backend changed before verifier launch; run sandbox-setup explicitly"
+        )
+    try:
+        sandbox_backend_runner_files(codex_home)
+    except EvaluationError as exc:
+        raise SandboxRuntimeInvalidError(
+            "sandbox command runner changed before verifier launch; run sandbox-setup explicitly"
+        ) from exc
+    if full_backend_check:
+        try:
+            backend = sandbox_backend_snapshot(codex_home)
+        except EvaluationError as exc:
+            raise SandboxRuntimeInvalidError(
+                "sandbox backend changed before verifier launch; run sandbox-setup explicitly"
+            ) from exc
+        if backend.get("identity_sha256") != sandbox_runtime.get(
+            "backend_identity_sha256"
+        ):
+            raise SandboxRuntimeInvalidError(
+                "sandbox backend identity changed; run sandbox-setup explicitly"
+            )
+
+
+def _sandbox_environment(
+    base_environment: Mapping[str, str],
+    codex_home: Path,
+    runtime_temp: Path,
+) -> dict[str, str]:
     environment = dict(base_environment)
     for key in list(environment):
         if key.upper() in {
@@ -310,8 +636,7 @@ def _sandbox_environment(base_environment: Mapping[str, str], codex_home: Path) 
         } or key.upper().startswith("CODEX_"):
             environment.pop(key, None)
     environment["CODEX_HOME"] = str(codex_home.resolve())
-    environment["NO_COLOR"] = "1"
-    environment["PYTHONUTF8"] = "1"
+    environment.update(sandbox_temp_environment(runtime_temp))
     return environment
 
 
@@ -319,6 +644,7 @@ def _run_sandboxed_check(
     *,
     codex_executable: Path,
     codex_home: Path,
+    sandbox_runtime: Mapping[str, Any],
     permission_profile: str,
     argv: Sequence[str],
     workspace: Path,
@@ -327,7 +653,24 @@ def _run_sandboxed_check(
     timeout: int,
     log_path: Path,
 ) -> dict[str, Any]:
-    environment = _sandbox_environment(base_environment, codex_home)
+    child_argv = _absolute_sandbox_child_argv(argv)
+    _assert_sandbox_runtime_reusable(
+        codex_home,
+        sandbox_runtime,
+        full_backend_check=False,
+    )
+    prepare_sandbox_writable_root(
+        workspace.parent,
+        workspace,
+        create_runtime_subdirs=False,
+    )
+    runtime_temp = workspace.resolve() / ".agentbase-verifier" / "runtime-temp"
+    prepare_sandbox_writable_root(workspace, runtime_temp)
+    environment = _sandbox_environment(
+        base_environment,
+        codex_home,
+        runtime_temp,
+    )
     environment.update(command_environment)
     sandbox_argv = [
         str(codex_executable.resolve()),
@@ -337,9 +680,9 @@ def _run_sandboxed_check(
         "-C",
         str(workspace.resolve()),
         "--",
-        *[str(item) for item in argv],
+        *child_argv,
     ]
-    return _run_logged(
+    record = _run_logged(
         sandbox_argv,
         workspace=workspace,
         environment=environment,
@@ -347,6 +690,65 @@ def _run_sandboxed_check(
         log_path=log_path,
         check=False,
     )
+    if record["exit_code"] != 0:
+        diagnostic = log_path.read_bytes()[: 1024 * 1024].decode(
+            "utf-8", errors="replace"
+        )
+        if is_elevated_sandbox_runtime_rejection(diagnostic):
+            raise SandboxRuntimeInvalidError(
+                "Codex rejected the prepared sandbox runtime; run sandbox-setup explicitly"
+            )
+    return record
+
+
+def _stage_sandbox_runtime_cleanup(workspace: Path) -> Path:
+    if not SANDBOX_RUNTIME_CLEANUP_SOURCE.is_file():
+        raise EvaluationError("sandbox runtime cleanup script is missing")
+    destination = workspace.resolve() / ".agentbase-verifier" / "runtime-cleanup.ps1"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(SANDBOX_RUNTIME_CLEANUP_SOURCE, destination)
+    return destination
+
+
+def _cleanup_sandbox_runtime_temp(
+    *,
+    cleanup_script: Path,
+    codex_executable: Path,
+    pwsh_executable: Path,
+    codex_home: Path,
+    sandbox_runtime: Mapping[str, Any],
+    permission_profile: str,
+    workspace: Path,
+    base_environment: Mapping[str, str],
+    artifact_root: Path,
+) -> None:
+    runtime_temp = workspace.resolve() / ".agentbase-verifier" / "runtime-temp"
+    if not runtime_temp.exists():
+        return
+    record = _run_sandboxed_check(
+        codex_executable=codex_executable,
+        codex_home=codex_home,
+        sandbox_runtime=sandbox_runtime,
+        permission_profile=permission_profile,
+        argv=[
+            str(pwsh_executable.resolve()),
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(cleanup_script.resolve()),
+            "-WorkspaceRoot",
+            str(workspace.resolve()),
+            "-RuntimeTempPath",
+            str(runtime_temp),
+        ],
+        workspace=workspace,
+        base_environment=base_environment,
+        command_environment={},
+        timeout=120,
+        log_path=artifact_root.resolve() / "runtime-cleanup.log",
+    )
+    if record["exit_code"] != 0:
+        raise EvaluationError("sandbox runtime cleanup failed")
 
 
 def _ctrf_document(tests: Sequence[Mapping[str, Any]], tool: str) -> dict[str, Any]:
@@ -410,12 +812,31 @@ def _junit_status(testcase: ET.Element) -> tuple[str, str]:
     return status, message
 
 
+def _normalize_junit_node_identity(value: str, mode: str | None) -> str:
+    if mode is None:
+        return value
+    if mode != "nfc-utf16-surrogate-replacement":
+        raise EvaluationError(f"unsupported JUnit node identity normalization: {mode}")
+    normalized = unicodedata.normalize("NFC", value)
+    parts: list[str] = []
+    for character in normalized:
+        codepoint = ord(character)
+        if codepoint > 0xFFFF:
+            parts.append("\ufffd\ufffd")
+        elif 0xD800 <= codepoint <= 0xDFFF:
+            parts.append("\ufffd")
+        else:
+            parts.append(character)
+    return "".join(parts)
+
+
 def convert_junit_to_ctrf(
     raw_path: Path,
     output_path: Path,
     *,
     tool: str,
     fold_whitespace: bool = False,
+    node_identity_normalization: str | None = None,
 ) -> None:
     try:
         root = ET.parse(raw_path).getroot()
@@ -432,6 +853,10 @@ def convert_junit_to_ctrf(
         full_name = f"{classname}: {name}" if classname else name
         if fold_whitespace:
             full_name = re.sub(r"\r\n|[\t\n\r]", " ", full_name).strip()
+        full_name = _normalize_junit_node_identity(
+            full_name,
+            node_identity_normalization,
+        )
         status, message = _junit_status(testcase)
         row: dict[str, Any] = {"name": full_name, "status": status}
         if message:
@@ -448,11 +873,34 @@ def write_gate_ctrf(path: Path, *, name: str, tool: str, exit_code: int) -> None
     )
 
 
-def _materialize_report(report: Mapping[str, Any], reports_root: Path, exit_code: int) -> None:
+def _copy_sandbox_report(source: Path, destination: Path, sandbox_root: Path) -> None:
+    resolved = require_within(sandbox_root, source)
+    if resolved.is_symlink() or not resolved.is_file():
+        raise EvaluationError(f"sandboxed check did not produce a regular report: {source.name}")
+    size = resolved.stat().st_size
+    if size > MAX_VERIFIER_REPORT_BYTES:
+        raise EvaluationError(
+            f"sandboxed check report exceeds {MAX_VERIFIER_REPORT_BYTES} bytes: {source.name}"
+        )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(resolved, destination)
+
+
+def _materialize_report(
+    report: Mapping[str, Any],
+    sandbox_reports_root: Path,
+    reports_root: Path,
+    exit_code: int,
+) -> None:
     kind = report["kind"]
-    output = reports_root / str(report["path"])
-    raw = reports_root / str(report.get("raw_path", report["path"]))
+    output_relative = str(report["path"])
+    output = reports_root / output_relative
+    sandbox_output = sandbox_reports_root / output_relative
+    raw_relative = str(report.get("raw_path", report["path"]))
+    raw = reports_root / raw_relative
+    sandbox_raw = sandbox_reports_root / raw_relative
     if kind == "junit":
+        _copy_sandbox_report(sandbox_output, output, sandbox_reports_root)
         return
     if kind == "gate-ctrf":
         write_gate_ctrf(
@@ -461,7 +909,9 @@ def _materialize_report(report: Mapping[str, Any], reports_root: Path, exit_code
             tool=str(report.get("tool", "gate")),
             exit_code=exit_code,
         )
-    elif kind == "jest-json-to-ctrf":
+        return
+    _copy_sandbox_report(sandbox_raw, raw, sandbox_reports_root)
+    if kind == "jest-json-to-ctrf":
         convert_jest_json(raw, output, str(report.get("tool", "jest")))
     elif kind == "junit-to-ctrf":
         convert_junit_to_ctrf(
@@ -469,6 +919,7 @@ def _materialize_report(report: Mapping[str, Any], reports_root: Path, exit_code
             output,
             tool=str(report.get("tool", "junit")),
             fold_whitespace=bool(report.get("fold_whitespace", False)),
+            node_identity_normalization=report.get("node_identity_normalization"),
         )
     else:
         raise EvaluationError(f"unsupported report adapter: {kind}")
@@ -482,18 +933,25 @@ def run_checks(
     values: Mapping[str, str],
     codex_executable: Path,
     codex_home: Path,
+    sandbox_runtime: Mapping[str, Any],
     permission_profile: str,
     base_environment: Mapping[str, str],
 ) -> list[dict[str, Any]]:
     reports_root = artifact_root.resolve() / "reports"
+    sandbox_reports_root = workspace.resolve() / ".agentbase-verifier" / "reports"
     logs_root = artifact_root.resolve() / "check-logs"
     reports_root.mkdir(parents=True, exist_ok=True)
+    sandbox_reports_root.mkdir(parents=True, exist_ok=False)
     records: list[dict[str, Any]] = []
     gate_failed = False
+    task_environment = _task_runtime_environment(task, values, base_environment)
     for index, check in enumerate(task["checks"]):
         report = check["report"]
         report_path = reports_root / str(report["path"])
-        raw_path = reports_root / str(report.get("raw_path", report["path"]))
+        sandbox_report_path = sandbox_reports_root / str(report["path"])
+        sandbox_raw_path = sandbox_reports_root / str(
+            report.get("raw_path", report["path"])
+        )
         if gate_failed:
             records.append({"id": check["id"], "status": "skipped-after-gate"})
             continue
@@ -501,31 +959,43 @@ def run_checks(
             before_record = _run_sandboxed_check(
                 codex_executable=codex_executable,
                 codex_home=codex_home,
+                sandbox_runtime=sandbox_runtime,
                 permission_profile=permission_profile,
                 argv=_expanded_argv(before, values),
                 workspace=workspace,
                 base_environment=base_environment,
-                command_environment=_command_environment({}, before),
+                command_environment=_command_environment(task_environment, before),
                 timeout=int(before["timeout_seconds"]),
                 log_path=logs_root / f"{index:02d}-{before_index:02d}-before.log",
             )
             if before_record["exit_code"] != 0:
                 raise EvaluationError(f"verifier preparation failed before {check['id']}")
-        argv = _expanded_argv(check, values, report=report_path, raw_report=raw_path)
+        argv = _expanded_argv(
+            check,
+            values,
+            report=sandbox_report_path,
+            raw_report=sandbox_raw_path,
+        )
         record = _run_sandboxed_check(
             codex_executable=codex_executable,
             codex_home=codex_home,
+            sandbox_runtime=sandbox_runtime,
             permission_profile=permission_profile,
             argv=argv,
             workspace=workspace,
             base_environment=base_environment,
-            command_environment=_command_environment({}, check),
+            command_environment=_command_environment(task_environment, check),
             timeout=int(check["timeout_seconds"]),
             log_path=logs_root / f"{index:02d}-{check['id']}.log",
         )
         record["id"] = check["id"]
         record["bucket"] = check["bucket"]
-        _materialize_report(report, reports_root, int(record["exit_code"]))
+        _materialize_report(
+            report,
+            sandbox_reports_root,
+            reports_root,
+            int(record["exit_code"]),
+        )
         record["report_path"] = str(report_path)
         records.append(record)
         if check["bucket"] == "gate" and record["exit_code"] != 0:
@@ -533,17 +1003,125 @@ def run_checks(
     return records
 
 
+def baseline_p2p_exclusions(
+    *,
+    task_assets: Path,
+    task: Mapping[str, Any],
+    artifact_root: Path,
+) -> list[str]:
+    """Project declared Windows JUnit base outcomes onto pinned P2P nodes."""
+
+    policy = task.get("windows_oracle", {}).get("p2p_baseline_policy")
+    if policy is None:
+        return []
+    if policy == "exclude-stable-skips":
+        excluded_statuses = {"skipped"}
+    elif policy == "exclude-stable-nonpassing":
+        excluded_statuses = {"failed", "skipped"}
+    else:
+        raise EvaluationError(f"unsupported Windows P2P baseline policy: {policy}")
+
+    config = read_json(task_assets / "tests" / "config.json")
+    p2p_values = config.get("p2p_node_ids")
+    if not isinstance(p2p_values, list) or any(
+        not isinstance(item, str) or not item for item in p2p_values
+    ):
+        raise EvaluationError("pinned DeepSWE config has invalid p2p_node_ids")
+    p2p_node_ids = set(p2p_values)
+    exact_outcomes: set[str] = set()
+    collection_prefixes: set[str] = set()
+    reports_root = artifact_root.resolve() / "reports"
+    for check in task["checks"]:
+        if check["bucket"] != "base":
+            continue
+        report = check["report"]
+        kind = report["kind"]
+        if kind == "gate-ctrf":
+            continue
+        if kind not in {"junit", "junit-to-ctrf"}:
+            raise EvaluationError(
+                f"{policy} requires JUnit base reports"
+            )
+        raw_relative = str(report.get("raw_path", report["path"]))
+        raw_path = require_within(reports_root, reports_root / raw_relative)
+        if not raw_path.is_file():
+            raise EvaluationError(
+                f"baseline outcome projection is missing JUnit report: {raw_relative}"
+            )
+        try:
+            root = ET.parse(raw_path).getroot()
+        except ET.ParseError as exc:
+            raise EvaluationError(
+                f"baseline outcome projection cannot parse JUnit report: {raw_relative}"
+            ) from exc
+        for case in root.iter():
+            if case.tag.rsplit("}", 1)[-1] != "testcase":
+                continue
+            status, _ = _junit_status(case)
+            if status not in excluded_statuses:
+                continue
+            name = str(case.attrib.get("name", "")).strip()
+            classname = str(case.attrib.get("classname", "")).strip()
+            if not name:
+                raise EvaluationError("nonpassing JUnit testcase has no name")
+            fold_whitespace = bool(report.get("fold_whitespace", False))
+            normalization = report.get("node_identity_normalization")
+            if classname:
+                candidates = {f"{classname}.{name}", f"{classname}: {name}"}
+                for candidate in candidates:
+                    if fold_whitespace:
+                        candidate = re.sub(r"\r\n|[\t\n\r]", " ", candidate).strip()
+                    exact_outcomes.add(
+                        _normalize_junit_node_identity(candidate, normalization)
+                    )
+            else:
+                if fold_whitespace:
+                    name = re.sub(r"\r\n|[\t\n\r]", " ", name).strip()
+                collection_prefixes.add(
+                    _normalize_junit_node_identity(name, normalization)
+                )
+
+    matched = p2p_node_ids & exact_outcomes
+    for prefix in collection_prefixes:
+        matched.update(
+            node_id
+            for node_id in p2p_node_ids
+            if node_id == prefix or node_id.startswith(f"{prefix}.")
+        )
+    return sorted(matched)
+
+
 def grade_reports(
     *,
     task_assets: Path,
     task: Mapping[str, Any],
     artifact_root: Path,
+    p2p_exclusions: Sequence[str] = (),
 ) -> dict[str, Any]:
     grader = task_assets / "tests" / "grader.py"
     config_source = task_assets / "tests" / "config.json"
     if sha256_file(grader) != task["assets"]["tests/grader.py"]:
         raise EvaluationError("pinned DeepSWE grader identity changed")
     config = copy.deepcopy(read_json(config_source))
+    original_p2p = config.get("p2p_node_ids")
+    if not isinstance(original_p2p, list) or any(
+        not isinstance(item, str) or not item for item in original_p2p
+    ):
+        raise EvaluationError("pinned DeepSWE config has invalid p2p_node_ids")
+    exclusions = list(p2p_exclusions)
+    if any(not isinstance(item, str) or not item for item in exclusions):
+        raise EvaluationError("P2P exclusions must be sorted unique node ids")
+    exclusion_set = set(exclusions)
+    if exclusions != sorted(exclusion_set):
+        raise EvaluationError("P2P exclusions must be sorted unique node ids")
+    unknown_exclusions = sorted(exclusion_set - set(original_p2p))
+    if unknown_exclusions:
+        raise EvaluationError(
+            f"P2P exclusions are absent from the pinned config: {unknown_exclusions[:3]}"
+        )
+    config["p2p_node_ids"] = [
+        item for item in original_p2p if item not in exclusion_set
+    ]
     reports_root = artifact_root.resolve() / "reports"
     reports = [str((reports_root / check["report"]["path"]).resolve()) for check in task["checks"]]
     config["grade"]["reports"] = reports
@@ -586,6 +1164,8 @@ def grade_reports(
         "ctrf_sha256": sha256_file(ctrf_path),
         "grader_log_sha256": record["log_sha256"],
         "grader_sha256": sha256_file(grader),
+        "p2p_exclusions": exclusions,
+        "original_p2p_total": len(original_p2p),
     }
 
 
@@ -602,7 +1182,11 @@ def verify_patch(
     artifact_root: Path,
     network_environment: Mapping[str, str],
     codex_executable: Path,
+    pwsh_executable: Path,
+    codex_home: Path,
+    sandbox_runtime: Mapping[str, Any],
     retain_workspace: bool = False,
+    p2p_exclusions: Sequence[str] = (),
 ) -> dict[str, Any]:
     if patch_kind not in {"noop", "reference", "candidate"}:
         raise EvaluationError(f"unsupported verifier patch kind: {patch_kind}")
@@ -617,6 +1201,7 @@ def verify_patch(
     )
     started = time.monotonic()
     result: dict[str, Any]
+    cleanup_script: Path | None = None
     try:
         dependency, values = prepare_dependencies(
             task,
@@ -625,6 +1210,18 @@ def verify_patch(
             network_environment,
         )
         applied_patches: list[dict[str, Any]] = []
+        windows_adapter = apply_windows_adapter_baseline(
+            project_root,
+            workspace,
+            task,
+        )
+        if windows_adapter is not None:
+            applied_patches.append(
+                {
+                    "kind": "windows-adapter",
+                    **windows_adapter,
+                }
+            )
         if patch_kind == "reference":
             reference_descriptor = apply_git_patch(
                 workspace,
@@ -663,28 +1260,79 @@ def verify_patch(
                 ),
             }
         )
-        verifier_home = stage_verifier_home(artifact_root, corpus)
+        home_identity = evaluation_runtime_home_controlled_identity(codex_home)
+        if home_identity.get("identity_sha256") != sandbox_runtime.get(
+            "controlled_identity_sha256"
+        ):
+            raise ControlledRuntimeDriftError(
+                "evaluation runtime controlled assets changed before verifier launch"
+            )
+        _assert_sandbox_runtime_reusable(
+            codex_home,
+            sandbox_runtime,
+            full_backend_check=True,
+        )
+        cleanup_script = _stage_sandbox_runtime_cleanup(workspace)
         checks = run_checks(
             task=task,
             workspace=workspace,
             artifact_root=artifact_root,
             values=values,
             codex_executable=codex_executable,
-            codex_home=verifier_home,
+            codex_home=codex_home,
+            sandbox_runtime=sandbox_runtime,
             permission_profile=str(corpus["codex"]["verifier_permission_profile"]),
             base_environment=network_environment,
         )
-        grade = grade_reports(task_assets=task_assets, task=task, artifact_root=artifact_root)
+        failed_gate = next(
+            (
+                check
+                for check in checks
+                if check.get("bucket") == "gate" and check.get("exit_code") != 0
+            ),
+            None,
+        )
+        if failed_gate is not None and patch_kind in {"noop", "reference"}:
+            raise EvaluationError(
+                f"Windows {patch_kind} oracle gate failed: {failed_gate['id']}"
+            )
+        observed_baseline_p2p_exclusions = (
+            []
+            if failed_gate is not None
+            else baseline_p2p_exclusions(
+                task_assets=task_assets,
+                task=task,
+                artifact_root=artifact_root,
+            )
+        )
+        grade = grade_reports(
+            task_assets=task_assets,
+            task=task,
+            artifact_root=artifact_root,
+            p2p_exclusions=p2p_exclusions,
+        )
         result = {
-            "schema": "agentbase.windows-swe-verifier-result/v1",
+            "schema": VERIFIER_RESULT_SCHEMA,
             "task_id": task_id,
             "patch_kind": patch_kind,
             "created_at": utc_now(),
             "duration_seconds": elapsed_seconds(started),
             "workspace": str(workspace.resolve()),
+            "sandbox_runtime": {
+                "schema": str(sandbox_runtime["schema"]),
+                "identity_sha256": str(sandbox_runtime["identity_sha256"]),
+                "controlled_identity_sha256": str(
+                    sandbox_runtime["controlled_identity_sha256"]
+                ),
+                "backend_identity_sha256": str(
+                    sandbox_runtime["backend_identity_sha256"]
+                ),
+                "shared_host_runtime": True,
+            },
             "dependency_identity": dependency,
             "applied_patches": applied_patches,
             "checks": checks,
+            "observed_baseline_p2p_exclusions": observed_baseline_p2p_exclusions,
             "grade": grade,
         }
         return write_immutable_receipt(
@@ -692,6 +1340,38 @@ def verify_patch(
             result,
         )
     finally:
+        active_exception = sys.exc_info()[0] is not None
+        verifier_runtime_temp = (
+            workspace.resolve() / ".agentbase-verifier" / "runtime-temp"
+        )
+        sandbox_cleanup_succeeded = not verifier_runtime_temp.exists()
+        if cleanup_script is not None and verifier_runtime_temp.exists():
+            try:
+                _cleanup_sandbox_runtime_temp(
+                    cleanup_script=cleanup_script,
+                    codex_executable=codex_executable,
+                    pwsh_executable=pwsh_executable,
+                    codex_home=codex_home,
+                    sandbox_runtime=sandbox_runtime,
+                    permission_profile=str(corpus["codex"]["verifier_permission_profile"]),
+                    workspace=workspace,
+                    base_environment=network_environment,
+                    artifact_root=artifact_root,
+                )
+                sandbox_cleanup_succeeded = True
+            except Exception:
+                if not active_exception:
+                    raise
+        if sandbox_cleanup_succeeded and verifier_runtime_temp.exists():
+            try:
+                remove_managed_tree(workspace, verifier_runtime_temp)
+            except Exception:
+                if not active_exception:
+                    raise
         if not retain_workspace and workspace.exists():
-            resolved = require_within(work_root.resolve(), workspace)
-            shutil.rmtree(resolved)
+            try:
+                resolved = require_within(work_root.resolve(), workspace)
+                remove_managed_tree(work_root, resolved)
+            except Exception:
+                if not active_exception:
+                    raise
