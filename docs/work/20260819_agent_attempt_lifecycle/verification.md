@@ -42,3 +42,10 @@
 - 最终 generation `94F0F1833032D2C480AB2E126544842C2907ACBFCC8296F53E350DD877BF4D17` 的 Routing、Policy、References 全部通过当前 oracle，后继计划为 0 evaluate、3 reuse、0 blocked/pending。最后一次刷新只运行 Routing 与 References，Policy carry-forward；`manage_agentbase.ps1 -Action Validate` 的 evaluator-disabled Windows SWE 基础设施 67/67 通过并返回 `valid:true`。
 - 本次没有运行 Windows SWE 九题、candidate、qualification、外部 Verifier 或 elevated sandbox 初始化；上述证据只覆盖规则/skill 路由、确定性基础设施和部署候选合同，真实子代理选择仍需新任务消费发布后的指令链。
 - 用户针对本次操作明确授权后，`DirectCompatibility + InstallPortableSettings` Publish 再次通过 67/67 evaluator-disabled 基础设施检查，返回 `published:true`、`changed:10`，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-211434-11afc187`；同范围发布后 Status 返回 `published:true`。
+
+## 2026-08-30 固定角色上下文与拓扑隔离
+
+- `evidence`、`experiment`、`operator` 的共同创建合同已收敛为显式且只用 `fork_turns="none"`；上下文只经有界 capsule 传入，三种角色均明确禁止子代理、新任务和分叉入口。`subagent-orchestration` 与后继受影响的 `delivery-workflow` 均通过 skill quick validation，三份 portable agent 配置测试通过。
+- 路由评估中的有效反例促成三项收敛：方案验证维度投影任务成为 `delivery-workflow` 的直接触发；任务、状态和证据回流的引用路由统一到公共/执行合同；`operator` 用例只在对象等价依据已确认时排除执行治理。一个不会改变动作且已有原子用例覆盖的重复 Policy 标签从混合反例中退出强制 oracle。
+- 正式 evidence generation `261F82CBD070C0B8ECD3904C9A44E679DBDAD84F832588945ABA94EE65186091` 为 0 evaluate、3 reuse、0 blocked/pending；最终刷新仅运行 References，恢复已通过 Routing，并按当前 oracle 零 Token 重验 Policy。合同检查为 125 cases、84 strict routing、28 strict references，13/13 skills 具备正向与非触发覆盖。
+- 干净候选的 `manage_agentbase.ps1 -Action Validate` 返回 `valid:true`。本轮没有运行 Windows SWE 九题、candidate、qualification 或 elevated sandbox；固定角色的真实创建参数与后代代理行为仍须新任务消费发布后的指令链验证。

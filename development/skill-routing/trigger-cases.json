@@ -92,7 +92,7 @@
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
     "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值，线程设置入口只在配置证据会改变动作时查询，并只为可预期长期阶段且剩余收益足以覆盖切换和恢复成本时设置；孤立难题和短机械收尾沿用当前档位。",
-    "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定且委派净收益成立时，事实未知而只读可得用 evidence，必须操作才能裁决路径、错误或约束未知用 experiment，目标、规则、范围与 oracle 已确认且只剩难脚本化执行用 operator，否则主代理直接完成。等待不是角色依据：观察既有执行属 evidence，启动并分析冻结输入的已知执行属 operator，修改后反复运行以发现路径属 experiment。子代理只返回稀疏结果，主代理保留目标、设计、正式验收、完成、Git、发布和外部写责任。",
+    "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定且委派净收益成立时，事实未知而只读可得用 evidence，必须操作才能裁决路径、错误或约束未知用 experiment，目标、规则、范围与 oracle 已确认且只剩难脚本化执行用 operator，否则主代理直接完成。等待不是角色依据：观察既有执行属 evidence，启动并分析冻结输入的已知执行属 operator，修改后反复运行以发现路径属 experiment。创建这三种固定角色时必须显式且只用 fork_turns=none，上下文只经有界 capsule 传入，不省略、不用 all 或正整数，也不用通用角色绕过固定配置；子代理不得再创建子代理、新任务或分叉任务。子代理只返回稀疏结果，主代理保留目标、设计、正式验收、完成、Git、发布和外部写责任。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。"
   },
@@ -166,6 +166,7 @@
     "reasoning-isolated-hard-item-no-transition",
     "reasoning-short-tail-no-transition",
     "subagent-static-evidence-map",
+    "subagent-fixed-profile-context-isolation",
     "subagent-path-experiment",
     "subagent-serial-masked-implementation-experiment",
     "subagent-known-direction-operation-experiment",
@@ -199,6 +200,7 @@
     "delivery-feedback-contract",
     "reasoning-long-domain-work-assessment",
     "subagent-static-evidence-map",
+    "subagent-fixed-profile-context-isolation",
     "subagent-path-experiment",
     "subagent-serial-masked-implementation-experiment",
     "subagent-known-direction-operation-experiment",
@@ -1430,6 +1432,24 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "subagent-fixed-profile-context-isolation",
+      "kind": "behavior",
+      "request": "当前主代理有很长的未压缩历史，但这次只需委派 evidence 读取一个已限定源码范围。创建固定角色时显式使用 fork_turns=none，把当前问题、范围、停止条件和输出预算写入最小 capsule；不要省略参数，不要使用 all 或正整数，不要改用 explorer、worker 或 default 继承主代理配置。子代理若发现任务需要拆分，应停止并返回主代理，不得继续创建子代理、新任务或分叉任务。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
       "id": "subagent-path-experiment",
       "kind": "positive",
       "request": "主代理已接纳 F01、F03 和 X01，并形成一个明确的实现路径假设与可推翻 oracle。请实际委派路径实验子代理，在指定临时 worktree 内修改实验代码并运行一个最小判别实验，只返回改变裁决的结果、路径成立条件、补丁位置、关键约束和未知；不得提交、推送、发布或把实验补丁自动当成生产实现，主代理随后逐项裁决并修订后正式接入。",
@@ -1558,7 +1578,7 @@
     {
       "id": "subagent-bounded-operator-execution",
       "kind": "positive",
-      "request": "目标、正式规则、精确对象集、允许动作、dirty 边界和单项 oracle 都已确认，只剩 12 个规则相同但难以可靠脚本化的一次性修改。请实际委派有界执行子代理，先完成并验收一个代表项，仅在其余对象与该项等价时继续；第一处非等价、失败或未知立即停止并返回主代理，不自行改设计、重跑或宣布整体完成。主代理随后复核实际差异与验收结果。",
+      "request": "目标、正式规则、精确对象集、对象等价依据、允许动作、dirty 边界、停止条件和单项 oracle 都已确认，只剩 12 个已证等价但难以可靠脚本化的一次性修改。请实际委派有界执行子代理，先完成并验收一个代表项，再按既有等价依据继续；第一处反例、失败或未知立即停止并返回主代理，不自行改设计、重跑或宣布整体完成。主代理随后复核实际差异与验收结果。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -1885,8 +1905,7 @@
       "expected_behavior_tags": [
         "modify_authorized_scope",
         "challenge_false_premise",
-        "long_term_total_cost",
-        "local_task_fast_path"
+        "long_term_total_cost"
       ],
       "forbidden_behavior_tags": [
         "authority_lifecycle",

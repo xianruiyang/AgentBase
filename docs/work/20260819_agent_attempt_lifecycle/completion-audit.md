@@ -4,20 +4,21 @@
 
 - `REQ-001` / `UDES-001`、`AC-001`、`AC-002`：作为 2026-08-19 的历史两级角色合同已完成，现已被 REQ-003/UDES-003 的语义角色合同替代；旧 Luna/Sol 文件进入 retired 生命周期。
 - `AC-003`：已由生命周期清单、部署 Validate、通用 path/kind/scope 回归及 Rollback 验证覆盖；无关个人代理保留测试仍通过。
-- `REQ-003` / `UDES-003`：已满足。稳定调用身份为 `evidence` 与 `experiment`，具体模型和档位只在代理 TOML 中维护，主代理保留正式交付责任。
+- `REQ-003` / `UDES-003`：已满足。稳定调用身份为 `evidence`、`experiment` 与 `operator`，具体模型和档位只在代理 TOML 中维护，主代理保留正式交付责任。
 - `AC-006`：`evidence` 使用 Luna/medium，只读证据包合同和逐项接纳协议由代理配置与编排 skill 共同覆盖。
 - `AC-007`：`experiment` 使用 Sol/low，在有恢复依据的隔离或精确可回滚边界运行最小操作实验；输入可直接使用主代理已确认的当前事实与快照，已有 evidence 包时才要求先逐项接纳。
 - `AC-008`：portable validator 只固定语义文件集合、schema、安全模型标识和受支持档位；未来模型/档位变体回归证明角色不再与模型后缀耦合。
 - `AC-009`：全局内核保留委派选择与主代理目标/交付责任，编排 skill 规定 capsule、反例熔断、无后代代理、可选 evidence→experiment 交接和实验补丁生产裁决。
 - `AC-010`：全局 `should` 对有净收益且独立有界的静态取证或可逆实验发出可推翻的默认委派请求；一次便宜定向循环、无独立边界或不改变裁决时由主代理直接完成。
 - `AC-011`：已满足候选合同。`experiment` 按可逆操作的信息增益选择，不要求任务陌生、静态证据穷尽、多个候选或没有初步路径；正向路由覆盖已知 owner/契约/方向下的运行探针，负向路由覆盖主代理一次便宜修改与测试即可闭环。
+- `AC-012`：候选合同已满足。三种固定角色只能显式使用 `fork_turns="none"`，上下文只经 capsule 传入，且角色配置与编排 skill 均禁止创建后代代理、新任务或分叉任务；静态合同、路由 evidence 与 portable agent 测试已覆盖，真实运行行为留待新任务验证。
 - `REQ-002` / `UDES-002`：已满足。正式 attempt 必须先 Begin 后 Finish；执行失败与结果失败均可审计，merge 只消费已通过 attempt ID。
 - `AC-004`：已由 started 阻断、第二次需理由和第三次拒绝的回归场景覆盖。
 - `AC-005`：已由 6 收据活跃周期上限、周期轮换前 unfinished 检查、上一账本哈希链和 Git 恢复合同覆盖。
 
 ## 影响闭合
 
-- Agent owner、编排 skill、全局路由、portable validator、部署 README、manifest/rollback 测试和 managed lifecycle 已同步为语义两角色合同。
+- Agent owner、编排 skill、全局路由、portable validator、部署 README、manifest/rollback 测试和 managed lifecycle 已同步为语义三角色合同。
 - Windows SWE 的项目代理投影与 evaluator profile 已分离：前者消费当前 `global/agents`，后者继续由九题 corpus 固定 Sol/medium 与 Luna/max；评测不再要求两份集合相等。
 - attempt owner、merge、正式 validator、baseline initializer、当前账本、组件 README、静态合同和回归测试已同步为 schema 2 两阶段合同；不存在仍调用旧 merge 重试参数的当前消费者。
 - 旧 `docs/work/20260818_agent_instruction_surface/` 只保留其完成时的三角色历史证据，不作为当前真源改写。

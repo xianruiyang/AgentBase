@@ -81,3 +81,18 @@
 - 关联: OBS-005, DES-006, AC-007, AC-009, AC-010, AC-011
 
 现有触发语义没有以实际操作的信息增益为准，也没有区分“整个任务需要正式实现”与“其中一个操作性问题可独立实验”。因此模型会错过已有方向下确认路径、暴露错误和收敛连续问题的低成本委派机会。
+
+## OBS-006 固定角色在完整历史 fork 下继承主代理配置
+
+- 状态: confirmed
+- 证据: UeAgentInterface14 根会话的 `spawn_agent` 调用与对应子线程 `turn_context`；AgentBase 修复提交 `8085259`
+- 关联: GAP-007, DES-007, AC-012
+
+UAI14 在规则修复后仍实际用 `fork_turns="all"` 创建过 `evidence` 与 `experiment`，对应子线程均继承主代理的 Sol/high；使用 `fork_turns="none"` 的最近同类创建则分别保持 Luna/medium 与 Sol/low，`operator` 保持 Luna/max。还出现过一个由子代理创建的二级 `experiment`。这直接证明平台调用参数与代理拓扑会改变固定角色的实际运行身份，规则正文存在不足以保证动作合规。
+
+## GAP-007 固定配置和无后代代理没有成为唯一调用路径
+
+- 状态: confirmed
+- 关联: OBS-006, DES-007, AC-008, AC-009, AC-012
+
+编排合同虽已禁止 `fork_turns="all"`，但仍允许正整数继承，且角色配置只用抽象“不得继续委派”表达拓扑边界。旧任务因此仍能绕过固定 profile、改用通用角色或创建后代代理；缺少的是无例外的 `none` 参数、capsule-only 上下文和子代理对具体委派入口的停止合同。
