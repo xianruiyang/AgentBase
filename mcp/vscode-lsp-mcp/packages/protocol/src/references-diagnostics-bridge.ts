@@ -32,6 +32,8 @@ export type ReferencesBridgeResponse =
       readonly reason:
         | 'targetUnresolved'
         | 'scopeBudgetExceeded'
+        | 'scopeInvalid'
+        | 'scopeUnsupported'
         | 'candidateUnresolved'
         | 'providerUnavailable'
         | 'providerTimedOut'
@@ -282,6 +284,8 @@ const scopedIncompleteReasons = new Set<Extract<ReferencesBridgeResponse, {
 }>['reason']>([
   'targetUnresolved',
   'scopeBudgetExceeded',
+  'scopeInvalid',
+  'scopeUnsupported',
   'candidateUnresolved',
   'providerUnavailable',
   'providerTimedOut',

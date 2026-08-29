@@ -99,6 +99,11 @@ class FakeReadHost implements ReferencesDiagnosticsProviderHost {
   readonly baseDocument = document(baseFile, 'export class Widget {}', false);
   readonly globalDiagnostics: Array<readonly [unknown, readonly unknown[]]> = [];
   readonly documents = new Map<string, TextDocument>();
+  readonly findCalls: Array<{
+    readonly rootAbsolutePath: string;
+    readonly includePattern: string;
+    readonly maximumResults: number;
+  }> = [];
   findResults: readonly unknown[] = [];
   providerDocumentOpenCount = 0;
 
@@ -121,7 +126,12 @@ class FakeReadHost implements ReferencesDiagnosticsProviderHost {
       : result);
   }
 
-  findFiles(): PromiseLike<readonly unknown[]> {
+  findFiles(
+    rootAbsolutePath: string,
+    includePattern: string,
+    maximumResults: number,
+  ): PromiseLike<readonly unknown[]> {
+    this.findCalls.push({ rootAbsolutePath, includePattern, maximumResults });
     return Promise.resolve(this.findResults);
   }
 
@@ -197,7 +207,10 @@ test('scoped C++ references use exact-token discovery and definition identity in
   const otherSymbolFile = path.join(workspaceRoot, 'Source', 'other.cpp');
   const host = new FakeReadHost();
   host.documents.set(headerFile, richDocument(headerFile, 'GetMutable\n'));
-  host.documents.set(useFile, richDocument(useFile, 'GetMutable();\nGetMutable();\n// GetMutable\n'));
+  host.documents.set(useFile, richDocument(
+    useFile,
+    'GetMutable();\nGetMutable();\n// GetMutable\nconst char* text = "GetMutable";\nauto raw = R"(GetMutable)";\n',
+  ));
   host.documents.set(otherSymbolFile, richDocument(otherSymbolFile, 'GetMutable();\n'));
   host.findResults = [uri(otherSymbolFile), uri(useFile), uri(headerFile)];
   host.results.set('vscode.executeDefinitionProvider', (rawUri: unknown, rawPosition: unknown) => {
@@ -236,7 +249,7 @@ test('scoped C++ references use exact-token discovery and definition identity in
       ['Source/settings.cpp', 2, 1],
       ['Source/settings.h', 1, 1],
     ]);
-    assert.deepEqual(result.warnings, ['references_scoped_identity_fallback']);
+    assert.deepEqual(result.warnings, ['references_scoped_identity_search']);
   }
   assert.equal(host.calls.some((call) => call.command === 'vscode.executeReferenceProvider'), false);
   assert.equal(host.providerDocumentOpenCount, 0);
@@ -310,7 +323,7 @@ test('candidate verification checks only supplied positions against one target i
   assert.equal(host.calls.some((call) => call.command === 'vscode.executeReferenceProvider'), false);
 });
 
-test('explicit references timeout reserves the full budget for the semantic provider', async () => {
+test('explicit provider mode reserves the requested budget for full semantic enumeration', async () => {
   const headerFile = path.join(workspaceRoot, 'Source', 'settings.h');
   const host = new FakeReadHost();
   host.documents.set(headerFile, richDocument(headerFile, 'GetMutable\n'));
@@ -326,6 +339,7 @@ test('explicit references timeout reserves the full budget for the semantic prov
     column: 1,
     contextLines: 0,
     includeGlobs: ['Source/**'],
+    searchMode: 'provider',
     timeoutMs: 90_000,
     resultStart: 1,
     resultEnd: 100,
@@ -335,6 +349,75 @@ test('explicit references timeout reserves the full budget for the semantic prov
   assert.equal(result.status, 'completed');
   assert.equal(host.calls.some((call) => call.command === 'vscode.executeDefinitionProvider'), false);
   assert.equal(host.calls.filter((call) => call.command === 'vscode.executeReferenceProvider').length, 1);
+});
+
+test('default C++ references search the full workspace candidate set without a global provider scan', async () => {
+  const headerFile = path.join(workspaceRoot, 'Source', 'settings.h');
+  const useFile = path.join(workspaceRoot, 'Source', 'settings.cpp');
+  const host = new FakeReadHost();
+  host.documents.set(headerFile, richDocument(headerFile, 'GetMutable\n'));
+  host.documents.set(useFile, richDocument(useFile, 'GetMutable();\n'));
+  host.findResults = [uri(useFile), uri(headerFile)];
+  host.results.set('vscode.executeDefinitionProvider', [{
+    uri: uri(headerFile),
+    range: range(0, 0, 0, 10),
+  }]);
+  host.results.set('vscode.executeReferenceProvider', new Error('Global references must not run.'));
+  const bridge = new ReferencesDiagnosticsProviderBridge(host, pathAccess);
+  const raw = await bridge.handle(await context(), request(REFERENCES_BRIDGE_METHOD, {
+    file: 'Source/settings.h',
+    line: 1,
+    column: 1,
+    contextLines: 0,
+    resultStart: 1,
+    resultEnd: 100,
+  }), new AbortController().signal);
+  const result = parseReferencesBridgeResponse(raw);
+
+  assert.equal(result.status, 'completed');
+  if (result.status === 'completed') {
+    assert.equal(result.available, 2);
+    assert.deepEqual(result.warnings, ['references_fast_workspace_identity_search']);
+  }
+  assert.deepEqual(host.findCalls.map((call) => call.includePattern), [
+    '**/*.{c,cc,cpp,cxx,m,mm,h,hh,hpp,hxx,inl,inc,ipp,tpp,txx,ixx,cppm}',
+  ]);
+  assert.equal(host.calls.some((call) => call.command === 'vscode.executeReferenceProvider'), false);
+});
+
+test('scopePaths expand logical files or directories without requiring glob syntax', async () => {
+  const headerFile = path.join(workspaceRoot, 'Source', 'Feature', 'settings.h');
+  const host = new FakeReadHost();
+  host.documents.set(headerFile, richDocument(headerFile, 'GetMutable\n'));
+  host.findResults = [uri(headerFile)];
+  host.results.set('vscode.executeDefinitionProvider', [{
+    uri: uri(headerFile),
+    range: range(0, 0, 0, 10),
+  }]);
+  const bridge = new ReferencesDiagnosticsProviderBridge(host, pathAccess);
+  const raw = await bridge.handle(await context(), request(REFERENCES_BRIDGE_METHOD, {
+    file: 'Source/Feature/settings.h',
+    line: 1,
+    column: 1,
+    contextLines: 0,
+    searchMode: 'scoped',
+    scopePaths: ['Source/Feature'],
+    resultStart: 1,
+    resultEnd: 100,
+  }), new AbortController().signal);
+  const result = parseReferencesBridgeResponse(raw);
+
+  assert.equal(result.status, 'completed');
+  if (result.status === 'completed') {
+    assert.deepEqual(result.candidates.map((candidate) => candidate.file), [
+      'Source/Feature/settings.h',
+    ]);
+    assert.deepEqual(result.warnings, ['references_scoped_identity_search']);
+  }
+  assert.deepEqual(host.findCalls.map((call) => call.includePattern), [
+    'Source/Feature',
+    'Source/Feature/**',
+  ]);
 });
 
 test('diagnostics bridge maps files scope, tags, code, and safe related information', async () => {

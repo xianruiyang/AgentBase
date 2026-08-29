@@ -4,7 +4,7 @@
 
 本文是 `vscode-lsp-mcp` 第一版公开工具接口的规范源。接口只为 LLM 的定位、理解、修改和验证流程服务，不复刻传统 LSP 数据结构，也不暴露 Bridge、Provider 或预览缓存的内部实现字段。
 
-- Schema 版本：`1.1.0-draft.1`
+- Schema 版本：`1.1.0-draft.2`
 - MCP 规范基线：`2025-11-25`
 - JSON Schema 方言：Draft 2020-12
 - MCP `inputSchema` 和调用参数：严格 JSON
@@ -69,7 +69,7 @@
 available: 46
 ```
 
-- `available` 是 Provider 本次实际返回并完成去重后的数量，不声称是语言服务器未截断的全局绝对总数。
+- `available` 是本次完整查询实际取得并完成去重后的数量；Provider 模式不把语言服务器未返回的对象外推为存在或不存在。
 - LLM 已知自己请求的起点，并可由 `results.length` 计算本次终点；下一页起点为 `resultStart + results.length`，因此不重复返回窗口起止字段。
 
 ### 2.4 Schema 生成
@@ -535,7 +535,7 @@ CommandFailedDetails:
 | `workspace_symbols` | Search workspace symbols by name and return bounded navigation candidates. | `Collection<SymbolHit>` | `R=true,D=false,I=true,O=false` |
 | `document_symbols` | Return a bounded document outline with exact path/name filters and optional full ranges. | `Collection<DocumentSymbol>` | `R=true,D=false,I=true,O=false` |
 | `symbol_info` | Query selected semantic information at one source position. | `Collection<SymbolInfoResult>` | `R=true,D=false,I=true,O=false` |
-| `get_references` | Find semantic references at one source position. | `Collection<ReferenceHit>` | `R=true,D=false,I=true,O=false` |
+| `get_references` | Find complete semantic references using fast C/C++ identity search or an explicit full Provider scan. | `Collection<ReferenceHit>` | `R=true,D=false,I=true,O=false` |
 | `get_call_hierarchy` | Return bounded incoming or outgoing call hierarchy entries. | `Collection<CallHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
 | `get_type_hierarchy` | Return bounded supertype or subtype hierarchy entries. | `Collection<TypeHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
 | `get_diagnostics` | Return diagnostics for selected files, modified files, or a workspace. | `Collection<Diagnostic>` | `R=true,D=false,I=true,O=false` |
@@ -712,6 +712,8 @@ CommandFailedDetails:
     "includeGlobs": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "type": "string", "minLength": 1 } },
     "excludeGlobs": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "type": "string", "minLength": 1 } },
     "contextLines": { "type": "integer", "minimum": 0, "maximum": 5, "default": 0 },
+    "searchMode": { "enum": ["auto", "scoped", "provider"], "default": "auto" },
+    "scopePaths": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
     "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 300000 },
     "resultStart": { "type": "integer", "minimum": 1, "default": 1 },
     "resultEnd": { "type": "integer", "minimum": 1 }
@@ -721,7 +723,9 @@ CommandFailedDetails:
 }
 ```
 
-输出：`Collection<ReferenceHit>`。通常调用 VS Code 公开 Reference Provider 命令，采用其固定包含声明的语义；不对单个结果伪造声明标记。`timeoutMs` 只覆盖本次引用查询，省略时使用扩展的 60,000 毫秒默认值；允许 1,000 至 300,000 毫秒。显式提供 `timeoutMs` 时会把完整预算留给公开 Reference Provider，不先消耗 scoped fallback 预算。C/C++ 在未显式提供 `timeoutMs`、且 `includeGlobs` 带固定目录前缀时，优先执行有界的 scoped identity fallback：只发现范围内的精确标识符 token，并逐个通过 definition/declaration 锚点验证符号身份。只有文件数、文本量、候选数、时间和每个候选的语义验证全部完成时才返回，并附带 `references_scoped_identity_fallback` warning；任一预算或候选身份无法证明时快速返回可恢复错误，不再隐式启动一次昂贵的全工作区 Provider。调用方随后应改用 `verify_symbol_candidates`，或显式提供 `timeoutMs` 请求完整 Provider 枚举。公开 C/C++ references 在超时或取消后会触发一次有界的中断脉冲，并最多等待三秒确认原 Provider promise 已结束；只有真实结束才释放单飞槽，其他 Provider 不支持中断时仍保持保护。
+输出：`Collection<ReferenceHit>`。`searchMode` 默认 `auto`：C/C++ 先在工作区的标准源码扩展名内快速发现精确标识符 token、排除注释与字面量，再逐个通过 definition/declaration 锚点核验身份；其他语言直接使用公开 Reference Provider。`scopePaths` 是无需 glob 的逻辑文件/目录列表，适合把大型项目收窄到 `Source/Module` 或 `Plugins/Name/Source`；它与 `includeGlobs` 二选一，`excludeGlobs` 可继续排除子范围。`scoped` 强制使用 C/C++ 快速路径，`provider` 明确选择公开 Provider 全量枚举且不能携带 `scopePaths`。Provider 后置过滤不能降低其枚举成本。
+
+快速路径只有文件、文本、候选、总时间和每个候选的语义验证全部完成时才成功；无显式 `timeoutMs` 时总预算至多 30 秒，目标身份单次最多 15 秒，后续候选单次最多 2 秒。全工作区成功附带 `references_fast_workspace_identity_search`，显式范围成功附带 `references_scoped_identity_search`。任一预算或身份无法证明时快速返回原因与恢复动作，不隐式启动第二次全局 Provider；先用 `scopePaths` 收窄，确需 Provider 全枚举时再设 `searchMode: "provider"` 与最长 300,000 毫秒预算。公开 C/C++ Provider 在超时或取消后会触发一次有界中断脉冲，并最多等待三秒确认原 promise 已结束；只有真实结束才释放单飞槽。
 
 ### 6.9 `verify_symbol_candidates`
 

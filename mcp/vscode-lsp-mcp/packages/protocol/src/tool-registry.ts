@@ -77,7 +77,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'get_references',
-    description: 'Find semantic references at one source position.',
+    description: 'Find complete semantic references using fast C/C++ identity search or an explicit full Provider scan.',
     readOnly: true,
     destructive: false,
     idempotent: true,

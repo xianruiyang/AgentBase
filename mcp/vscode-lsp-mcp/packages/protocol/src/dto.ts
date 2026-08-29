@@ -183,12 +183,18 @@ export interface SymbolInfoInput extends ResultWindowInput, GlobFilterInput {
   readonly contextLines?: number;
 }
 
+export const REFERENCE_SEARCH_MODES = ['auto', 'scoped', 'provider'] as const;
+
+export type ReferenceSearchMode = (typeof REFERENCE_SEARCH_MODES)[number];
+
 export interface GetReferencesInput extends ResultWindowInput, GlobFilterInput {
   readonly workspaceId: string;
   readonly file: string;
   readonly line: number;
   readonly column: number;
   readonly contextLines?: number;
+  readonly searchMode?: ReferenceSearchMode;
+  readonly scopePaths?: readonly string[];
   readonly timeoutMs?: number;
 }
 

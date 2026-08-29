@@ -7,6 +7,7 @@ The component does not replace the existing `vscode-mcp` or AST MCP integrations
 ## Delivery status
 
 - Source candidate: `0.2.0`; it is not installed or released by this change.
+- Large C/C++ reference queries default to bounded workspace identity search, support path-based scopes, and reserve the slow full Provider for explicit use.
 - Current verified release target: Windows x64.
 - Runtime requirements: Node.js `>=22.9.0 <27` and VS Code `^1.125.0`.
 - Language behavior depends on the language extensions installed and activated in the selected VS Code window.

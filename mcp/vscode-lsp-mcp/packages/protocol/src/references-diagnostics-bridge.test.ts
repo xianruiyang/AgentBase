@@ -28,6 +28,13 @@ test('references bridge parser accepts logical 1-based hits and strict terminal 
     status: 'scopedIncomplete',
     reason: 'candidateUnresolved',
   });
+  assert.deepEqual(parseReferencesBridgeResponse({
+    status: 'scopedIncomplete',
+    reason: 'scopeInvalid',
+  }), {
+    status: 'scopedIncomplete',
+    reason: 'scopeInvalid',
+  });
   assert.throws(() => parseReferencesBridgeResponse({
     status: 'completed',
     candidates: [{ file: '../secret.ts', line: 1, column: 1 }],

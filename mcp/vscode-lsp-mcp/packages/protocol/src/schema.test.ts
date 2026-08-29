@@ -229,6 +229,7 @@ test('normalization applies explicit defaults without mutating caller input', ()
     line: 1,
     column: 1,
     contextLines: 0,
+    searchMode: 'auto',
     timeoutMs: 90_000,
     resultStart: 1,
     resultEnd: 20,
@@ -240,6 +241,45 @@ test('normalization applies explicit defaults without mutating caller input', ()
       line: 1,
       column: 1,
       timeoutMs: 300_001,
+    }),
+    ProtocolValidationError,
+  );
+  assert.deepEqual(normalizeToolInput('get_references', {
+    workspaceId: 'workspace-1',
+    file: 'src/widget.ts',
+    line: 1,
+    column: 1,
+    searchMode: 'scoped',
+    scopePaths: ['src', 'include/widget.h'],
+  }), {
+    workspaceId: 'workspace-1',
+    file: 'src/widget.ts',
+    line: 1,
+    column: 1,
+    contextLines: 0,
+    searchMode: 'scoped',
+    scopePaths: ['src', 'include/widget.h'],
+    resultStart: 1,
+    resultEnd: 20,
+  });
+  assert.throws(
+    () => normalizeToolInput('get_references', {
+      workspaceId: 'workspace-1',
+      file: 'src/widget.ts',
+      line: 1,
+      column: 1,
+      searchMode: 'provider',
+      scopePaths: ['src'],
+    }),
+    ProtocolValidationError,
+  );
+  assert.throws(
+    () => normalizeToolInput('get_references', {
+      workspaceId: 'workspace-1',
+      file: 'src/widget.ts',
+      line: 1,
+      column: 1,
+      scopePaths: ['src/**'],
     }),
     ProtocolValidationError,
   );

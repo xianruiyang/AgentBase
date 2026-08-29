@@ -1,5 +1,6 @@
 import {
   CAPABILITY_NAMES,
+  REFERENCE_SEARCH_MODES,
   SYMBOL_INFO_INCLUDES,
   type ToolName,
 } from './dto.js';
@@ -175,6 +176,14 @@ export const INPUT_SCHEMAS: Readonly<Record<ToolName, JsonSchema>> = {
       ...pointProperties(),
       ...globProperties(),
       contextLines: contextLinesProperty(),
+      searchMode: { enum: [...REFERENCE_SEARCH_MODES], default: 'auto' },
+      scopePaths: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 32,
+        uniqueItems: true,
+        items: nonEmptyString(),
+      },
       timeoutMs: providerTimeoutProperty(),
       ...resultWindowProperties(),
     },

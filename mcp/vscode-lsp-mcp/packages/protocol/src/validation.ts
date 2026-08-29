@@ -193,6 +193,45 @@ const validateGlobFields = (toolName: ToolName, input: Record<string, unknown>):
   }
 };
 
+const logicalScopePath = (value: string): boolean =>
+  value.length > 0 &&
+  !value.startsWith('/') &&
+  !value.endsWith('/') &&
+  !value.includes('\\') &&
+  !value.includes('//') &&
+  !/[\u0000-\u001f\u007f*?{}\[\]]/u.test(value) &&
+  !/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value) &&
+  value.split('/').every((segment) =>
+    segment !== '' && segment !== '.' && segment !== '..' && !segment.includes(':'));
+
+const validateReferenceScope = (
+  toolName: ToolName,
+  input: Record<string, unknown>,
+): void => {
+  const scopePaths = input.scopePaths as string[] | undefined;
+  if (scopePaths?.some((value) => !logicalScopePath(value))) {
+    failCrossField(
+      toolName,
+      'INVALID_ARGUMENT',
+      'scopePaths must contain normalized logical files or directories without glob syntax',
+    );
+  }
+  if (scopePaths !== undefined && input.includeGlobs !== undefined) {
+    failCrossField(
+      toolName,
+      'INVALID_ARGUMENT',
+      'scopePaths and includeGlobs are alternative scope forms and cannot be combined',
+    );
+  }
+  if (input.searchMode === 'provider' && scopePaths !== undefined) {
+    failCrossField(
+      toolName,
+      'INVALID_ARGUMENT',
+      'scopePaths requires searchMode auto or scoped because Provider enumeration cannot be narrowed',
+    );
+  }
+};
+
 const applyToolDefaults = (toolName: ToolName, input: Record<string, unknown>): void => {
   if (WINDOWED_TOOLS.has(toolName)) {
     applyWindowDefaults(toolName, input);
@@ -226,7 +265,9 @@ const applyToolDefaults = (toolName: ToolName, input: Record<string, unknown>): 
       break;
     case 'get_references':
       input.contextLines ??= 0;
+      input.searchMode ??= 'auto';
       validateGlobFields(toolName, input);
+      validateReferenceScope(toolName, input);
       break;
     case 'verify_symbol_candidates':
       break;

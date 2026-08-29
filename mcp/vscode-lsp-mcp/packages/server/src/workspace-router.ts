@@ -1070,8 +1070,10 @@ export class WorkspaceRouter {
         line: input.line,
         column: input.column,
         contextLines: input.contextLines ?? 0,
+        searchMode: input.searchMode ?? 'auto',
         ...(input.includeGlobs === undefined ? {} : { includeGlobs: input.includeGlobs }),
         ...(input.excludeGlobs === undefined ? {} : { excludeGlobs: input.excludeGlobs }),
+        ...(input.scopePaths === undefined ? {} : { scopePaths: input.scopePaths }),
         ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
         resultStart,
         resultEnd,
@@ -1091,11 +1093,27 @@ export class WorkspaceRouter {
       });
     }
     if (response.status === 'scopedIncomplete') {
+      const targetSlash = input.file.lastIndexOf('/');
+      const suggestedScope = targetSlash < 0 ? input.file : input.file.slice(0, targetSlash);
+      if (response.reason === 'scopeInvalid') {
+        return semanticFailure({
+          code: 'INVALID_ARGUMENT',
+          message: 'A reference scope path does not identify a valid logical workspace file or directory.',
+          retryable: false,
+          action: 'Use list_workspaces logical root aliases and normalized scopePaths without globs or absolute paths.',
+        });
+      }
       return semanticFailure({
         code: 'PROVIDER_UNAVAILABLE',
-        message: 'The bounded C/C++ reference scope could not be proven complete.',
+        message: `The fast C/C++ reference search could not prove a complete result (${response.reason}).`,
         retryable: false,
-        action: 'Use verify_symbol_candidates with text-discovered positions, or set timeoutMs to run the full Reference Provider explicitly.',
+        action: response.reason === 'scopeBudgetExceeded'
+          ? `Retry with scopePaths such as ${JSON.stringify([suggestedScope])}, add only directly relevant source directories, or choose searchMode provider with an explicit long timeout.`
+          : response.reason === 'scopeUnsupported'
+            ? 'Use searchMode provider for this language; fast scoped identity search currently supports C and C++.'
+            : response.reason === 'targetUnresolved'
+              ? 'Confirm the exact symbol position with symbol_info, then retry; use searchMode provider only when the Provider can resolve references but not definition identity.'
+              : `Retry with scopePaths such as ${JSON.stringify([suggestedScope])}, raise timeoutMs for the same scoped search, or choose searchMode provider for full Provider enumeration.`,
       });
     }
     if (response.status !== 'completed') return providerStatusFailure(response.status);

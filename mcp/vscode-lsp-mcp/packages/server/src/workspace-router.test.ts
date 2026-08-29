@@ -1282,6 +1282,7 @@ test('reference and diagnostic routes filter, dedupe, sort, and window safe DTOs
         line: 2,
         column: 7,
         contextLines: 0,
+        searchMode: 'auto',
         excludeGlobs: ['**/*.test.ts'],
         timeoutMs: 90_000,
         resultStart: 2,
