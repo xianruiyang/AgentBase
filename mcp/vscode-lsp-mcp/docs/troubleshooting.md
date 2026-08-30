@@ -12,6 +12,8 @@ See [doctor.md](doctor.md) for report states, codes, privacy rules, document-pro
 
 Restart VS Code after installing the VSIX, open a folder or multi-root workspace, and wait for `onStartupFinished`. `NO_REGISTRATIONS` means no trustworthy Extension Host record exists; `NO_WORKSPACE` means the extension activated but the window has no workspace folder.
 
+If doctor reports `REGISTRATION_VERSION_MISMATCH`, the running window and Server are from different releases. Updating files on disk is not enough for an already-open Extension Host: install both artifacts from one release and reload or restart the window. Source-server testing must likewise use the companion built from the same checkout; incompatible registrations are ignored rather than called.
+
 ## A language tool is unavailable or empty
 
 Confirm the relevant language extension is installed and active, open the target document once, then call `get_capabilities`. Run doctor with `--workspace-id` and a logical `--file` to probe document-scoped providers. Diagnostics are event-driven: `DIAGNOSTICS_NOT_PUBLISHED` can be a degraded state even when definitions or rename work.

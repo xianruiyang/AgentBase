@@ -35,7 +35,7 @@ Set `P6_004_REPORT_PATH` to persist the JSON evidence. The runner removes both w
 
 Run `npm run test:manual:multilanguage` for the P6-005 Windows audit. The runner links only the currently installed C/C++/clangd/C# extension directories into an isolated Extension Host, restores a temporary .NET project, and records both direct VS Code Provider readiness and companion results for definition, references, diagnostics, and rename preview/apply.
 
-The audit never installs or updates extensions. Missing extensions or Provider capabilities remain explicit report states rather than fabricated success. Set `P6_005_REPORT_PATH` to persist the JSON evidence; `P6_005_EXTENSIONS_DIR` and `P6_005_CPP_COMPILER_PATH` may select an existing extension directory or compiler without modifying them.
+The audit never installs or updates extensions. Missing extensions or Provider capabilities remain explicit report states rather than fabricated success. Set `P6_005_REPORT_PATH` to persist the JSON evidence; `P6_005_EXTENSIONS_DIR` and `P6_005_CPP_COMPILER_PATH` may select an existing extension directory or compiler without modifying them. The archived VS Code test binary temporarily uses a test-only update mutex and restores its exact product manifest after exit, so an unrelated desktop updater cannot block this isolated host.
 
 ## Existing MCP coexistence gate
 

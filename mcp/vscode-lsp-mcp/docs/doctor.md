@@ -38,6 +38,8 @@ Important diagnostic codes include:
 
 `NO_REGISTRATIONS` means no trustworthy Extension Host record exists. `NO_WORKSPACE` is different: the extension activated and explicitly published that no workspace folder is open. An empty Provider result is not treated as proof that a Provider is unavailable; doctor reports the evidence state returned by the extension.
 
+`REGISTRATION_VERSION_MISMATCH` means a running VS Code window is still publishing an incompatible companion protocol. Install the Server and companion from the same release, then reload or restart that window. The Server ignores these records without quarantining them, so an older active window cannot be mistaken for a usable Provider or create repeated quarantine entries.
+
 The installed manifest records the Node engine, VS Code compatibility range, server/protocol build version, and bundled MCP SDK version. Doctor checks those records together with the live extension version, registered VS Code version, server `--version`, and IPC protocol version.
 
 ## Read-only and privacy boundary

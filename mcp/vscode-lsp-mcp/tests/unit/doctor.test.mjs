@@ -186,7 +186,7 @@ test('doctor leaves malformed registrations in place and never quarantines durin
       writeFile(invalidPath, '{"authToken":"do-not-log"}', { mode: 0o600 }),
       writeFile(
         path.join(runtimeRoot, 'registrations', 'version-mismatch.json'),
-        '{"registryVersion":2,"protocolVersion":"9.9"}',
+        '{"registryVersion":1,"protocolVersion":"1.0"}',
         { mode: 0o600 },
       ),
     ]);

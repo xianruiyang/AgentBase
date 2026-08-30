@@ -15,7 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { runTests } from '@vscode/test-electron';
+import { downloadAndUnzipVSCode, runTests } from '@vscode/test-electron';
 import {
   assertToolOutput,
   decodeYamlText,
@@ -97,6 +97,24 @@ const selectedExtensionPrefixes = [
 ];
 const cppCompilerPath = process.env.P6_005_CPP_COMPILER_PATH ?? findCppCompiler();
 
+const findProductManifest = async (vscodeExecutablePath) => {
+  const executableRoot = path.dirname(vscodeExecutablePath);
+  const candidates = [
+    path.join(executableRoot, 'resources', 'app', 'product.json'),
+    ...(await readdir(executableRoot, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(executableRoot, entry.name, 'resources', 'app', 'product.json')),
+  ];
+  for (const candidate of candidates) {
+    try {
+      return { path: candidate, bytes: await readFile(candidate) };
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  throw new Error('The isolated VS Code product manifest was not found.');
+};
+
 const positionOfLast = (text, symbol) => {
   const offset = text.lastIndexOf(symbol);
   assert.ok(offset >= 0, `Fixture symbol ${symbol} is missing.`);
@@ -136,6 +154,7 @@ let hostPromise;
 let client;
 let auditPhase = 'fixture-setup';
 let readyEvidence;
+let productManifest;
 try {
   await Promise.all([
     cp(fixtureTemplate, temporaryRoot, { recursive: true }),
@@ -167,8 +186,15 @@ try {
   };
 
   auditPhase = 'extension-host-readiness';
+  const vscodeExecutablePath = await downloadAndUnzipVSCode(
+    process.env.VSCODE_TEST_VERSION ?? '1.128.0',
+  );
+  productManifest = await findProductManifest(vscodeExecutablePath);
+  const testProduct = JSON.parse(productManifest.bytes.toString('utf8'));
+  testProduct.win32MutexName = `vscode-lsp-mcp-test-${process.pid}`;
+  await writeFile(productManifest.path, `${JSON.stringify(testProduct, null, '\t')}\n`, 'utf8');
   hostPromise = runTests({
-    version: process.env.VSCODE_TEST_VERSION ?? '1.128.0',
+    vscodeExecutablePath,
     extensionDevelopmentPath: path.join(componentRoot, 'packages', 'extension'),
     extensionTestsPath: path.join(
       componentRoot,
@@ -391,5 +417,8 @@ try {
     await hostPromise.catch(() => undefined);
   }
   await client?.close().catch(() => undefined);
+  if (productManifest !== undefined) {
+    await writeFile(productManifest.path, productManifest.bytes).catch(() => undefined);
+  }
   await rm(temporaryRoot, { recursive: true, force: true });
 }

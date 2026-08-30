@@ -79,7 +79,8 @@ export class RegistryError extends Error {
     | 'invalidRecord'
     | 'ioFailure'
     | 'recordTooLarge'
-    | 'unsafeRecord';
+    | 'unsafeRecord'
+    | 'versionMismatch';
 
   constructor(reason: RegistryError['reason'], message: string) {
     super(message);
@@ -144,7 +145,7 @@ const validateRecordNonce = (value: string): string => {
 
 const commonFields = (object: JsonObject): RegistrationCommon => {
   if (object.registryVersion !== REGISTRY_VERSION || object.protocolVersion !== IPC_PROTOCOL_VERSION) {
-    throw new RegistryError('invalidRecord', 'Registration version is unsupported.');
+    throw new RegistryError('versionMismatch', 'Registration version is unsupported.');
   }
   const instanceId = requiredString(object, 'instanceId', 36);
   const workspaceId = requiredString(object, 'workspaceId', 25);
@@ -495,7 +496,10 @@ export class RegistrationStore {
           throw new RegistryError('invalidRecord', 'Registration filename and identity differ.');
         }
         records.push(record);
-      } catch {
+      } catch (error) {
+        if (error instanceof RegistryError && error.reason === 'versionMismatch') {
+          continue;
+        }
         await this.#quarantine(filePath);
       }
     }

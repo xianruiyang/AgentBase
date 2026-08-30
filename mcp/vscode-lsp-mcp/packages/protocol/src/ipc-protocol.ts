@@ -4,7 +4,7 @@ import type { JsonObject, JsonValue } from './dto.js';
 import type { RuntimePrimitives } from './runtime.js';
 import { isInstanceId, isWorkspaceId, type InstanceId, type WorkspaceId } from './workspace-identity.js';
 
-export const IPC_PROTOCOL_VERSION = '1.0' as const;
+export const IPC_PROTOCOL_VERSION = '2.0' as const;
 export const IPC_MAX_PAYLOAD_BYTES = 16_777_216;
 // A busy Extension Host can be temporarily delayed by workspace indexing. Keep
 // discovery bounded while allowing enough time for the local handshake and the

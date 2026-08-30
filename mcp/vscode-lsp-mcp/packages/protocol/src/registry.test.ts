@@ -62,6 +62,10 @@ test('registration schema preserves routing data and excludes secrets from unava
   const source = primitives();
   const usable = record(source);
   assert.deepEqual(parseRegistrationRecord(JSON.stringify(usable)), usable);
+  assert.throws(() => parseRegistrationRecord(JSON.stringify({
+    ...usable,
+    protocolVersion: '1.0',
+  })), /version is unsupported/u);
   const unavailable = {
     ...usable,
     kind: 'unavailable',
@@ -133,9 +137,16 @@ test('registry publish is atomic, comparison-delete is nonce guarded, and invali
     assert.equal(await store.comparisonAndDelete(registrationComparison(item)), true);
     assert.equal(await store.read(item.instanceId), undefined);
 
+    const legacy = record(source);
+    const legacyName = `${legacy.instanceId}.json`;
+    await writeFile(path.join(layout.registrations, legacyName), JSON.stringify({
+      ...legacy,
+      protocolVersion: '1.0',
+    }), 'utf8');
     const invalidName = '00000000-0000-4000-8000-000000000000.json';
     await writeFile(path.join(layout.registrations, invalidName), '{"kind":"usable","kind":"unavailable"}', 'utf8');
     assert.deepEqual(await store.scan(), []);
+    assert.equal((await readdir(layout.registrations)).includes(legacyName), true);
     const quarantined = await readdir(layout.quarantine);
     assert.equal(quarantined.length, 1);
     assert.match(await readFile(path.join(layout.quarantine, quarantined[0] as string), 'utf8'), /"kind"/u);
