@@ -181,9 +181,9 @@ rg、fd 与 ast-grep 默认继续作为外部执行后端：srcq 负责 argv、�
 ## DES-SQG-016 源码关系由分层证据而非伪语义统一
 
 - 状态: proposed
-- 满足: REQ-SQG-002, AC-SQG-010, AC-SQG-011, AC-SQG-012, AC-SQG-013, UDES-SQG-016, UDES-SQG-017
+- 满足: REQ-SQG-002, AC-SQG-010, AC-SQG-011, AC-SQG-012, AC-SQG-013, AC-SQG-014, UDES-SQG-016, UDES-SQG-017, UDES-SQG-018
 
-`tools/srcq` 作为唯一公开 owner 组合现有外部 rg 与 ast-grep：rg 完整生成授权范围内的词面候选；AST run/outline 和语言适配器归一化声明、定义、作用域、引用角色、调用与外层 owner；同一查询 owner 负责批处理、缓存复用、图遍历、完整性、分页和 model/machine 投影。VS Code Companion 与实际 Language Provider 继续拥有精确符号身份、类型和动态语义，srcq 不复制 Provider 业务。
+`tools/srcq` 作为唯一公开 owner 组合现有外部 rg 与 ast-grep：源码宇宙解析器先形成有来源和完整性边界的根集合，rg 在其中完整生成词面候选；AST run/outline 和语言适配器归一化声明、定义、作用域、引用角色、调用与外层 owner；同一查询 owner 负责批处理、缓存复用、图遍历、完整性、分页和 model/machine 投影。VS Code Companion 与实际 Language Provider 继续拥有精确符号身份、类型和动态语义，srcq 不复制 Provider 业务。
 
 关系证据至少区分 `syntax-direct`、`qualified-candidate`、`lexical-candidate`、`ambiguous` 与 `semantic-unknown`。扫描范围完整性、AST 分类确定性和符号身份确定性分别持有；任一项未知都不得借另一个维度的完成状态隐式提升。快速路径足够支撑当前模型判断时停止，只有歧义会改变动作或结论时才按需升级 LSP 或领域工具。
 
@@ -202,6 +202,17 @@ rg、fd 与 ast-grep 默认继续作为外部执行后端：srcq 负责 argv、�
 - 满足: AC-SQG-011, AC-SQG-013
 
 调用树以稳定的文件、范围、语言、符号种类和签名候选组成节点，以调用位置、方向和证据等级组成边。遍历按层批量生成 frontier 候选并复用同文件 AST，只递归展开身份唯一的边；歧义、虚分派、宏、模板、函数值、动态绑定和跨语言生成关系作为带原因的叶子保留。循环检测、节点/边预算和现有续页 owner 控制工作量与模型上下文，不能把预算耗尽、未适配或未展开表示为没有关系。
+
+## DES-SQG-019 SourceUniverse 持有跨工作区源码范围
+
+- 状态: proposed
+- 满足: AC-SQG-001, AC-SQG-007, AC-SQG-014, UDES-SQG-018
+
+关系查询内部建立可重建的 `SourceUniverse`，但不建立新的人工配置真源。它以查询目标的位置和语言为锚点，合并调用方显式根、现有编辑器多根配置、编译数据库、编译器响应文件、项目/模块清单与语言依赖元数据；每个根保留 canonical path、稳定别名、来源、相对路径解析基准、模块/依赖/版本身份、源码/生成/系统分类、适用语言与 freshness。机器面保存完整绝对路径和诊断，model 面正常只用 `project:`、`ue:`、`dep:` 等本次稳定别名表示命中；只有范围不完整会改变判断时才投影缺失来源和最短恢复动作。
+
+C/C++ 适配器至少能从 `compile_commands.json` 读取 source、directory 和 command/arguments，按 MSVC 规则有界递归展开 `@response-file` 并检测缺失、循环和陈旧输入，再将相对 include/source 路径按真实基准规范化；UE 只作为该通用机制的消费者，不在 srcq 中硬编码引擎路径或 UBT 语法。其他语言由各自适配器消费已经存在的项目与依赖元数据，例如 TypeScript/JavaScript project/package、Python project/environment/import、Rust workspace/package、Go module/workspace、Java 或 C# build/project 描述；没有可靠 resolver 的语言仍允许显式根查询，但 capability 必须标为 `explicit-only` 或 `unresolved`，不能猜测完整依赖图。
+
+`SourceUniverse` 分别计算 root-resolution、candidate-scan、AST-classification 和 symbol-identity 完整性。生成目录、系统 SDK、依赖缓存和二进制包不因出现在 include/import 路径中自动成为递归扫描根；只有直接目标、项目/依赖元数据或显式范围证明其中存在相关源码时纳入。解析缓存只按输入内容指纹和时效加速，可删除重建且不裁决范围；任何缺失、陈旧或被排除的适用根都会使不存在/全集结论降级为 `scope-incomplete`。
 
 ## 4. 版本与迁移边界
 
@@ -238,9 +249,11 @@ rg、fd 与 ast-grep 默认继续作为外部执行后端：srcq 负责 argv、�
 | 测试资产增加 Codex 运行时体积或 Token | 测试 owner 固定在 development，共享 payload 过滤并清理旧受管理副本 |
 | PATH 中的 srcq 缺失、被同名程序遮蔽或版本漂移 | 安装状态、`srcq --version`、`srcq doctor` 与发布身份读回；不回退到 skill 私有副本，PATH 变化后重启消费者进程 |
 | 为绕过适配困难过早分叉上游源码 | 以可重复阻塞、根因和外部方案排除为技术门槛，再取得用户针对该次升级的明确同意；此前不拉取源码，获准后固定版本、补丁、供应链、更新和退出责任 |
+| 当前目录或单一 workspace 漏掉外部源码 | `SourceUniverse` 消费已有多根、编译/响应文件和语言依赖元数据；范围未闭合时禁止不存在与全集声明 |
+| 自动发现把 UE、SDK 或依赖缓存变成无界扫描 | 根按来源与源码属性分类，只扫描与当前目标有关的已解析源码；不默认扫描整盘、启动构建或下载依赖 |
 
 ## 6. 设计完成判定
 
-实现闭环要求 rg/fd 全部公开模式有持久分类，各视图按自身语义单元给出正确总量、分页与完整性，fd 紧凑树可逆；AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、machine schema、诊断和发布合同逐项未退化。所有模型可见输出族必须完成字段准入审查，model/machine/native 三面不混用，普通成功不重复机器 envelope，异常回执仍足以分页、判断截断和恢复；自动完整闭环不得放宽多来源或未知大结果，显式控制面不得被自动策略改写。候选选择按实际 model 字符串，定向 round-trip、语义等价和真实 Codex 运行均通过。命名、安装生命周期、消费者退出和 LSP 渐进暴露的既有闭环继续有效。默认外部适配若遇到阻塞，只有 DES-SQG-013 的升级证据、生命周期和退出条件全部落实后才可把改造版上游纳入完成范围。
+实现闭环要求 rg/fd 全部公开模式有持久分类，各视图按自身语义单元给出正确总量、分页与完整性，fd 紧凑树可逆；AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、machine schema、诊断和发布合同逐项未退化。P16 还须证明 `SourceUniverse` 能跨当前目录恢复代表消费者的外部源码，并分别报告根解析、候选扫描、AST 分类和身份完整性；缺失或未解析的适用根不得产生不存在或全集结论。所有模型可见输出族必须完成字段准入审查，model/machine/native 三面不混用，普通成功不重复机器 envelope，异常回执仍足以分页、判断截断和恢复；自动完整闭环不得放宽多来源或未知大结果，显式控制面不得被自动策略改写。候选选择按实际 model 字符串，定向 round-trip、语义等价和真实 Codex 运行均通过。命名、安装生命周期、消费者退出和 LSP 渐进暴露的既有闭环继续有效。默认外部适配若遇到阻塞，只有 DES-SQG-013 的升级证据、生命周期和退出条件全部落实后才可把改造版上游纳入完成范围。
 
 P10 最终 identity `0cfb8919…59d5` 已由 12/12 required、12/12 行限、完整 usage、detached audit 和 capsule 验真证明质量；总 Token `1,066,470`，比 P9 同质量候选低 `7.31%`。耗时较 P9 高 `32.38%`，因此设计完成结论只成立于质量和 Token 两个更高优先级，不声称速度改善。当前没有可重复共享机制支持继续增加规则、接口或默认预算，达到当前 corpus、模型、项目快照和 Provider 条件下的收益边缘。项目真源已完成；Codex 安装态仍保持上次发布版本，任何后续发布须取得当次明确授权。
