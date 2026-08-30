@@ -15,7 +15,7 @@ srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction outgoing --dept
 srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction incoming --depth 2
 ```
 
-位置上的 `A::B` 静态限定名会直接保留为查询目标；`object.method` 的类型不能仅凭源码字面量确定，仍保持候选边界。
+位置上的 `A::B` 静态限定名会直接保留为查询目标。C++ 成员调用会保留接收者；当当前函数内恰有一个在调用前声明的显式参数或局部变量类型时，输出 `Type::method [typed-member-candidate receiver=object:Type]` 并允许继续解析该候选。`auto`、成员链、不同类型的同名绑定及其他不能从当前源码直接证明的接收者仍保持 `semantic-unknown`，不会用猜测消除歧义。
 
 只有名称时仍可查询，但名称只建立候选身份：
 
@@ -24,7 +24,7 @@ srcq symbol definition 'Namespace::Type::Method'
 srcq symbol references Method
 ```
 
-`definition` 的 `--body auto` 在唯一小定义可落入当前模型预算时直接返回完整正文；大定义返回可直接执行的 `@body` 命令；多个定义只列紧凑候选。`references` 排除已识别的声明/定义位置，并按语言能力标记 `call`、`write` 或普通 `reference`。`calls` 只递归展开唯一候选；重载、成员分派、虚调用、函数值和其他动态关系保留为带原因的叶子。`--depth` 取 1–8，`--max-nodes` 与 `--model-token-budget` 分别限制遍历和模型输出，达到预算不表示不存在更多关系。
+`definition` 的 `--body auto` 在唯一小定义可落入当前模型预算时直接返回完整正文；大定义返回可直接执行的 `@body` 命令；多个定义只列紧凑候选。`references` 排除已识别的声明/定义位置，并按语言能力标记 `call`、`write` 或普通 `reference`。`calls` 只把函数、方法和其他可调用目标作为树节点；类、结构体和变量通过 `definition`/`references` 查询，显式接收者类型和变量名作为调用节点上下文返回，不伪装成调用边。调用树只递归展开唯一的直接或显式类型成员候选；重载、未解析成员分派、虚调用、函数值和其他动态关系保留为带原因的叶子。`--depth` 取 1–8，`--max-nodes` 与 `--model-token-budget` 分别限制遍历和模型输出，达到预算不表示不存在更多关系。
 
 ## 范围
 
@@ -62,5 +62,7 @@ model 位置使用 1-based 行列，省略正常机器 envelope；范围未完�
 - `srcq.symbol.references/v1`
 - `srcq.symbol.calls/v1`
 - `srcq.symbol.capabilities/v1`
+
+调用节点的 `receiver` 与 `receiver_type` 是可空字段：前者保存源码中的成员接收者，后者只在显式词法类型唯一时出现。它们不证明别名展开、模板实例化或运行时分派。
 
 定义候选存在时退出 0，无定义候选退出 1；输入、引擎、转换与 I/O 故障使用 srcq 的 120–127 错误域。关系命令不写源码，也不把自动发现结果持久化为第二范围真源。

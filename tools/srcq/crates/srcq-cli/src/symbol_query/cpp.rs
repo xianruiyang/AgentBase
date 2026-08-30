@@ -121,6 +121,31 @@ pub(crate) struct DirectCallCandidate {
     pub(crate) range: SourceRange,
     pub(crate) callee: String,
     pub(crate) dispatch: &'static str,
+    pub(crate) receiver: Option<String>,
+    pub(crate) receiver_type: Option<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct CallScan {
+    pub(crate) calls: Vec<DirectCallCandidate>,
+    bindings: Vec<TypeBindingCandidate>,
+}
+
+impl CallScan {
+    pub(crate) fn calls_only(calls: Vec<DirectCallCandidate>) -> Self {
+        Self {
+            calls,
+            bindings: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct TypeBindingCandidate {
+    file: PathBuf,
+    range: SourceRange,
+    name: String,
+    type_name: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -366,16 +391,13 @@ pub(crate) fn parse_occurrence_stream(
 }
 
 pub(crate) fn call_rules() -> &'static str {
-    "id: srcq.cpp.call\nlanguage: Cpp\nrule:\n  kind: call_expression\nseverity: info\nmessage: direct call candidate"
+    "id: srcq.cpp.call\nlanguage: Cpp\nrule:\n  kind: call_expression\nseverity: info\nmessage: direct call candidate\n---\nid: srcq.cpp.binding.declaration\nlanguage: Cpp\nrule:\n  kind: declaration\nseverity: info\nmessage: explicit type binding candidate\n---\nid: srcq.cpp.binding.parameter\nlanguage: Cpp\nrule:\n  kind: parameter_declaration\nseverity: info\nmessage: explicit parameter type candidate"
 }
 
-pub(crate) fn parse_call_stream(
-    bytes: &[u8],
-    cwd: &Path,
-) -> Result<Vec<DirectCallCandidate>, String> {
+pub(crate) fn parse_call_stream(bytes: &[u8], cwd: &Path) -> Result<CallScan, String> {
     let text =
         std::str::from_utf8(bytes).map_err(|_| "ast-grep call output was not UTF-8".to_owned())?;
-    let mut calls = Vec::new();
+    let mut scan = CallScan::default();
     for (index, line) in text.lines().enumerate() {
         if line.trim().is_empty() {
             continue;
@@ -387,25 +409,90 @@ pub(crate) fn parse_call_stream(
             )
         })?;
         let record = parse_record(&value, cwd)?;
-        let (callee, dispatch) = call_name(&record.text);
-        calls.push(DirectCallCandidate {
-            file: fs::canonicalize(&record.file).unwrap_or(record.file),
-            range: record.range,
-            callee,
-            dispatch,
-        });
+        let file = fs::canonicalize(&record.file).unwrap_or(record.file);
+        if record.rule_id == "srcq.cpp.call" {
+            let (callee, dispatch, receiver) = call_name(&record.text);
+            scan.calls.push(DirectCallCandidate {
+                file,
+                range: record.range,
+                callee,
+                dispatch,
+                receiver,
+                receiver_type: None,
+            });
+        } else if matches!(
+            record.rule_id.as_str(),
+            "srcq.cpp.binding.declaration" | "srcq.cpp.binding.parameter"
+        ) {
+            if let Some((type_name, name)) = simple_type_binding(&record.text) {
+                scan.bindings.push(TypeBindingCandidate {
+                    file,
+                    range: record.range,
+                    name,
+                    type_name,
+                });
+            }
+        }
     }
-    calls.sort_by(|left, right| {
+    scan.calls.sort_by(|left, right| {
         normalized_key(&left.file)
             .cmp(&normalized_key(&right.file))
             .then_with(|| left.range.start.line.cmp(&right.range.start.line))
             .then_with(|| left.range.start.column.cmp(&right.range.start.column))
     });
-    calls.dedup_by(|left, right| {
+    scan.calls.dedup_by(|left, right| {
         normalized_key(&left.file) == normalized_key(&right.file)
             && left.range.start == right.range.start
     });
-    Ok(calls)
+    scan.bindings.sort_by(|left, right| {
+        normalized_key(&left.file)
+            .cmp(&normalized_key(&right.file))
+            .then_with(|| left.range.start.line.cmp(&right.range.start.line))
+            .then_with(|| left.range.start.column.cmp(&right.range.start.column))
+            .then_with(|| left.name.cmp(&right.name))
+    });
+    scan.bindings.dedup();
+    Ok(scan)
+}
+
+pub(crate) fn annotate_explicit_member_types(
+    calls: &mut [DirectCallCandidate],
+    scan: &CallScan,
+    definition: &DefinitionCandidate,
+) {
+    for call in calls {
+        if call.dispatch != "member-candidate" {
+            continue;
+        }
+        let Some(receiver) = call
+            .receiver
+            .as_deref()
+            .filter(|value| is_simple_identifier(value))
+        else {
+            continue;
+        };
+        let types = scan
+            .bindings
+            .iter()
+            .filter(|binding| {
+                normalized_key(&binding.file) == normalized_key(&call.file)
+                    && contains(definition.range, binding.range)
+                    && position_le(binding.range.start, call.range.start)
+                    && binding.name == receiver
+            })
+            .map(|binding| binding.type_name.clone())
+            .collect::<BTreeSet<_>>();
+        if types.len() != 1 {
+            continue;
+        }
+        let type_name = types
+            .into_iter()
+            .next()
+            .expect("one explicit receiver type");
+        call.callee = format!("{type_name}::{}", call.callee);
+        call.dispatch = "typed-member-candidate";
+        call.receiver_type = Some(type_name);
+    }
 }
 
 pub(crate) fn containing_function_rules(target: &str) -> String {
@@ -456,7 +543,7 @@ pub(crate) fn parse_function_owner_stream(
     Ok(owners)
 }
 
-fn call_name(text: &str) -> (String, &'static str) {
+fn call_name(text: &str) -> (String, &'static str, Option<String>) {
     let mut angle_depth = 0_usize;
     let mut open = None;
     for (offset, character) in text.char_indices() {
@@ -471,17 +558,26 @@ fn call_name(text: &str) -> (String, &'static str) {
         }
     }
     let Some(open) = open else {
-        return ("<indirect>".to_owned(), "unknown");
+        return ("<indirect>".to_owned(), "unknown", None);
     };
     let mut callee = text[..open].trim();
     if let Some(template) = callee.find('<') {
         callee = callee[..template].trim_end();
     }
-    if let Some((_, method)) = callee.rsplit_once("->") {
-        return (method.trim().to_owned(), "member-candidate");
+    if callee.contains("->") {
+        let (receiver, method) = callee.rsplit_once("->").expect("member split");
+        return (
+            method.trim().to_owned(),
+            "member-candidate",
+            Some(receiver.trim().to_owned()),
+        );
     }
-    if let Some((_, method)) = callee.rsplit_once('.') {
-        return (method.trim().to_owned(), "member-candidate");
+    if let Some((receiver, method)) = callee.rsplit_once('.') {
+        return (
+            method.trim().to_owned(),
+            "member-candidate",
+            Some(receiver.trim().to_owned()),
+        );
     }
     if callee.is_empty()
         || callee
@@ -489,9 +585,90 @@ fn call_name(text: &str) -> (String, &'static str) {
             .any(|character| matches!(character, '(' | ')' | '[' | ']'))
         || !callee.chars().any(is_identifier_character)
     {
-        return ("<indirect>".to_owned(), "unknown");
+        return ("<indirect>".to_owned(), "unknown", None);
     }
-    (callee.to_owned(), "direct-candidate")
+    (callee.to_owned(), "direct-candidate", None)
+}
+
+fn simple_type_binding(text: &str) -> Option<(String, String)> {
+    let mut angle_depth = 0_usize;
+    let mut end = text.trim_end_matches(';').len();
+    for (offset, character) in text.char_indices() {
+        match character {
+            '<' => angle_depth += 1,
+            '>' => angle_depth = angle_depth.saturating_sub(1),
+            '=' | '{' if angle_depth == 0 => {
+                end = offset;
+                break;
+            }
+            ',' | '(' | ')' | '[' | ']' if angle_depth == 0 => return None,
+            _ => {}
+        }
+    }
+    let head = text[..end].trim();
+    let mut identifiers = Vec::new();
+    let mut start = None;
+    for (offset, character) in head.char_indices() {
+        if is_identifier_character(character) {
+            start.get_or_insert(offset);
+        } else if let Some(identifier_start) = start.take() {
+            identifiers.push((identifier_start, offset));
+        }
+    }
+    if let Some(identifier_start) = start {
+        identifiers.push((identifier_start, head.len()));
+    }
+    let (name_start, name_end) = identifiers.pop()?;
+    let name = head[name_start..name_end].to_owned();
+    let type_name = explicit_base_type(&head[..name_start])?;
+    Some((type_name, name))
+}
+
+fn explicit_base_type(prefix: &str) -> Option<String> {
+    let mut without_templates = String::new();
+    let mut angle_depth = 0_usize;
+    for character in prefix.chars() {
+        match character {
+            '<' => angle_depth += 1,
+            '>' => angle_depth = angle_depth.saturating_sub(1),
+            '*' | '&' if angle_depth == 0 => without_templates.push(' '),
+            _ if angle_depth == 0 => without_templates.push(character),
+            _ => {}
+        }
+    }
+    let candidate = without_templates
+        .split_whitespace()
+        .filter(|token| {
+            !matches!(
+                *token,
+                "const"
+                    | "volatile"
+                    | "static"
+                    | "constexpr"
+                    | "mutable"
+                    | "register"
+                    | "struct"
+                    | "class"
+                    | "enum"
+            )
+        })
+        .next_back()?;
+    if matches!(candidate, "auto" | "decltype" | "typename")
+        || !candidate
+            .chars()
+            .all(|character| is_identifier_character(character) || character == ':')
+    {
+        return None;
+    }
+    Some(candidate.to_owned())
+}
+
+fn is_simple_identifier(value: &str) -> bool {
+    value
+        .chars()
+        .next()
+        .is_some_and(|character| !character.is_ascii_digit() && is_identifier_character(character))
+        && value.chars().all(is_identifier_character)
 }
 
 fn parse_record(value: &Value, cwd: &Path) -> Result<AstRecord, String> {
@@ -1032,7 +1209,9 @@ fn offset_position(start: SourcePosition, text: &str, offset: usize) -> SourcePo
 
 #[cfg(test)]
 mod tests {
-    use super::{function_name, keyword_name, namespace_name, DefinitionRole};
+    use super::{
+        call_name, function_name, keyword_name, namespace_name, simple_type_binding, DefinitionRole,
+    };
 
     #[test]
     fn function_name_rejects_substrings_body_calls_and_return_types() {
@@ -1066,5 +1245,27 @@ mod tests {
             Some(("UE::UAI".to_owned(), 17))
         );
         assert_eq!(namespace_name("namespace { int Value; }"), None);
+    }
+
+    #[test]
+    fn member_calls_and_explicit_bindings_preserve_only_direct_source_facts() {
+        assert_eq!(
+            call_name("WorkspaceRoot.TrimStartAndEndInline()"),
+            (
+                "TrimStartAndEndInline".to_owned(),
+                "member-candidate",
+                Some("WorkspaceRoot".to_owned())
+            )
+        );
+        assert_eq!(
+            simple_type_binding("const FString& WorkspaceRootInput"),
+            Some(("FString".to_owned(), "WorkspaceRootInput".to_owned()))
+        );
+        assert_eq!(
+            simple_type_binding("TSharedPtr<FJsonObject> ObjectToSave = Object.IsValid();"),
+            Some(("TSharedPtr".to_owned(), "ObjectToSave".to_owned()))
+        );
+        assert_eq!(simple_type_binding("auto Value = MakeValue();"), None);
+        assert_eq!(simple_type_binding("int Function(int Value);"), None);
     }
 }

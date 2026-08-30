@@ -379,6 +379,61 @@ fn cpp_nested_namespace_call_trees_match_the_exact_bounded_source_oracle() {
 }
 
 #[test]
+fn cpp_explicit_receiver_types_add_owner_and_variable_context_without_claiming_lsp_precision() {
+    let root = fixture_source();
+    let root = root.to_str().expect("UTF-8 fixture path");
+
+    let calls = run(&[
+        "symbol",
+        "calls",
+        "UseFixtureWorker",
+        "--only-root",
+        root,
+        "--depth",
+        "2",
+        "--output",
+        "machine",
+    ]);
+    assert!(calls.status.success());
+    let calls: Value = serde_json::from_slice(&calls.stdout).expect("typed call JSON");
+    assert_eq!(calls["scope"]["candidate_scan"], "complete");
+    assert_eq!(calls["nodes"], 2);
+    let children = calls["root"]["children"]
+        .as_array()
+        .expect("typed member children");
+    assert_eq!(children.len(), 1);
+    assert_eq!(children[0]["name"], "FixtureWorker::Tick");
+    assert_eq!(children[0]["dispatch"], "typed-member-candidate");
+    assert_eq!(children[0]["status"], "qualified-candidate");
+    assert_eq!(children[0]["receiver"], "Worker");
+    assert_eq!(children[0]["receiver_type"], "FixtureWorker");
+    assert_eq!(
+        children[0]["definition"]["qualified_name"],
+        "FixtureWorker::Tick"
+    );
+
+    let symbols = [("FixtureWorker", "type"), ("Worker", "variable")];
+    for (symbol, kind) in symbols {
+        let definition = run(&[
+            "symbol",
+            "definition",
+            symbol,
+            "--only-root",
+            root,
+            "--body",
+            "none",
+            "--output",
+            "machine",
+        ]);
+        assert!(definition.status.success(), "definition for {symbol}");
+        let definition: Value =
+            serde_json::from_slice(&definition.stdout).expect("symbol definition JSON");
+        assert_eq!(definition["definition_total"], 1);
+        assert_eq!(definition["definitions"][0]["symbol_kind"], kind);
+    }
+}
+
+#[test]
 fn outline_definition_adapters_cover_representative_language_mechanisms() {
     let root = multilang_source();
     let cases = [

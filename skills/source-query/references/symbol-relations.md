@@ -13,7 +13,7 @@ srcq symbol calls --at '<path>:<line>:<column>' --direction outgoing --depth 2
 srcq symbol calls --at '<path>:<line>:<column>' --direction incoming --depth 2
 ```
 
-`--at` 会保留可从源码直接观察到的 `A::B` 限定名；它不推断 `object.method` 的运行时类型。位置是定义或静态限定调用时，优先直接查询，不先做全仓名称扫描。
+`--at` 会保留可从源码直接观察到的 `A::B` 限定名。C++ `object.method` 在当前函数内存在唯一、显式且先于调用的参数或局部变量类型时，保留 `receiver=object:Type` 并形成 `typed-member-candidate`；这只是词法类型候选，不外推别名、模板实例化或运行时类型。无法直接证明时仍保留 `semantic-unknown`。位置是定义或静态限定调用时，优先直接查询，不先做全仓名称扫描。
 
 没有位置才按名称查询，并把结果保持为候选。正常查询不先调用 help、doctor 或 capabilities；当前语言报 `unadapted`/`not-applicable`，或需要 machine 消费时才读取对应能力或改用 `--output machine`。
 
@@ -23,7 +23,7 @@ srcq symbol calls --at '<path>:<line>:<column>' --direction incoming --depth 2
 - `--add-root` 追加自动范围，`--only-root` 替换范围，`--exclude` 排除根或子树，均可重复。
 - `scan=prioritized` 只证明已扫描部分中的候选；全集或不存在结论需要权威源码范围和适用根全部扫描。显式 `--only-root` 只证明该选定范围。
 - 唯一小定义会直接带正文；大定义执行返回的 `@body`，多候选先按位置或范围消歧，不批量读取全部正文。
-- 调用树只递归唯一候选；`ambiguous`、`semantic-unknown`、虚调用、成员分派、循环或预算叶子不能解释为没有关系。
+- 调用树只包含函数、方法和其他可调用节点；类、结构体、字段和变量用 `definition`/`references` 查询，显式接收者类型和变量名只作为调用节点上下文。树只递归唯一的直接或显式类型成员候选；`ambiguous`、`semantic-unknown`、虚调用、未解析成员分派、循环或预算叶子不能解释为没有关系。
 
 ## 10 秒快速路径
 

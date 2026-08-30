@@ -45,11 +45,8 @@ pub(crate) fn containing_function_rules(
     )
 }
 
-pub(crate) fn parse_call_stream(
-    bytes: &[u8],
-    cwd: &Path,
-) -> Result<Vec<super::cpp::DirectCallCandidate>, String> {
-    Ok(parse_scan_records(bytes, cwd)?
+pub(crate) fn parse_call_stream(bytes: &[u8], cwd: &Path) -> Result<super::cpp::CallScan, String> {
+    let calls = parse_scan_records(bytes, cwd)?
         .into_iter()
         .map(|record| {
             let (callee, dispatch) = direct_callee(&record.text);
@@ -58,9 +55,12 @@ pub(crate) fn parse_call_stream(
                 range: record.range,
                 callee,
                 dispatch,
+                receiver: None,
+                receiver_type: None,
             }
         })
-        .collect())
+        .collect();
+    Ok(super::cpp::CallScan::calls_only(calls))
 }
 
 pub(crate) fn parse_function_owner_stream(

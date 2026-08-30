@@ -78,3 +78,19 @@ int NestedTop()
 {
     return Alpha::Beta::Gamma::NestedMiddle();
 }
+
+struct FixtureWorker
+{
+    int Tick();
+};
+
+int FixtureWorker::Tick()
+{
+    return 1;
+}
+
+int UseFixtureWorker()
+{
+    FixtureWorker Worker;
+    return Worker.Tick();
+}

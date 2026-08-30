@@ -167,6 +167,8 @@ struct CallTreeNode {
     name: String,
     dispatch: &'static str,
     status: String,
+    receiver: Option<String>,
+    receiver_type: Option<String>,
     call_file: Option<PathBuf>,
     call_position: Option<SourcePosition>,
     definition: Option<DefinitionCandidate>,
@@ -324,6 +326,8 @@ fn execute_calls_inner(
         } else {
             definition_identity_evidence(command).to_owned()
         },
+        receiver: None,
+        receiver_type: None,
         call_file: None,
         call_position: None,
         definition: Some(root_definition.clone()),
@@ -350,6 +354,8 @@ fn execute_calls_inner(
                     name: "dynamic callers".to_owned(),
                     dispatch: "semantic-unknown:virtual-dispatch",
                     status: "semantic-unknown:virtual-dispatch".to_owned(),
+                    receiver: None,
+                    receiver_type: None,
                     call_file: None,
                     call_position: None,
                     definition: None,
@@ -398,7 +404,7 @@ fn expand_call_node(
     query: &ResolvedQuery,
     deadline: QueryDeadline,
     resolution_cache: &mut BTreeMap<String, CalleeResolution>,
-    call_cache: &mut BTreeMap<String, Vec<DirectCallCandidate>>,
+    call_cache: &mut BTreeMap<String, cpp::CallScan>,
     active: &mut BTreeSet<String>,
     nodes: &mut usize,
     truncated: &mut bool,
@@ -431,17 +437,20 @@ fn expand_call_node(
         let mut child = CallTreeNode {
             name: call.callee.clone(),
             dispatch: call.dispatch,
-            status: if call.dispatch == "direct-candidate" {
-                "direct-candidate".to_owned()
-            } else {
-                "semantic-unknown".to_owned()
+            status: match call.dispatch {
+                "direct-candidate" | "typed-member-candidate" => call.dispatch.to_owned(),
+                _ => "semantic-unknown".to_owned(),
             },
+            receiver: call.receiver.clone(),
+            receiver_type: call.receiver_type.clone(),
             call_file: Some(call.file.clone()),
             call_position: Some(call.range.start),
             definition: None,
             children: Vec::new(),
         };
-        if depth + 1 < command.depth && call.dispatch == "direct-candidate" {
+        if depth + 1 < command.depth
+            && matches!(call.dispatch, "direct-candidate" | "typed-member-candidate")
+        {
             let resolution = match resolve_callee(
                 &call.callee,
                 command,
@@ -533,6 +542,8 @@ fn expand_incoming_node(
             name: owner.name.clone(),
             dispatch: "incoming-candidate",
             status: "lexical-candidate".to_owned(),
+            receiver: None,
+            receiver_type: None,
             call_file: Some(reference.file),
             call_position: Some(reference.position),
             definition: None,
@@ -1813,7 +1824,7 @@ fn calls_for_definition(
     universe: &SourceUniverse,
     language: language::LanguageCapability,
     deadline: QueryDeadline,
-    cache: &mut BTreeMap<String, Vec<DirectCallCandidate>>,
+    cache: &mut BTreeMap<String, cpp::CallScan>,
 ) -> Result<Vec<DirectCallCandidate>, SymbolFailure> {
     let key = normalized_key(&definition.file);
     if !cache.contains_key(&key) {
@@ -1866,13 +1877,19 @@ fn calls_for_definition(
             },
         );
     }
-    Ok(cache
+    let scan = cache
         .get(&key)
-        .into_iter()
-        .flatten()
+        .ok_or_else(|| SymbolFailure::conversion("call scan cache lost its result"))?;
+    let mut calls = scan
+        .calls
+        .iter()
         .filter(|call| source_range_contains(definition.range, call.range))
         .cloned()
-        .collect())
+        .collect::<Vec<_>>();
+    if language.key == "cpp" {
+        cpp::annotate_explicit_member_types(&mut calls, scan, definition);
+    }
+    Ok(calls)
 }
 
 fn source_range_contains(outer: SourceRange, inner: SourceRange) -> bool {
@@ -2205,9 +2222,14 @@ fn render_call_children(
         } else {
             format!("{};{}", child.status, child.dispatch)
         };
+        let receiver = match (&child.receiver, &child.receiver_type) {
+            (Some(receiver), Some(type_name)) => format!(" receiver={receiver}:{type_name}"),
+            (Some(receiver), None) => format!(" receiver={receiver}:unknown"),
+            _ => String::new(),
+        };
         let line = format!(
-            "{prefix}{connector} {} [{evidence}]{}\n",
-            child.name, location
+            "{prefix}{connector} {} [{evidence}{receiver}]{}\n",
+            child.name, location,
         );
         if crate::query_gateway::model_text_cost(output)
             + crate::query_gateway::model_text_cost(&line)
@@ -2275,6 +2297,8 @@ fn machine_call_node(node: &CallTreeNode, universe: &SourceUniverse) -> Value {
         "name": node.name,
         "dispatch": node.dispatch,
         "status": node.status,
+        "receiver": node.receiver,
+        "receiver_type": node.receiver_type,
         "call": node.call_file.as_deref().zip(node.call_position).map(|(file, position)| json!({
             "path": universe.render_path(file),
             "line": position.line,
