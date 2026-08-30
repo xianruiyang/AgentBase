@@ -2,7 +2,7 @@
 
 ## 1. 文档职责与状态
 
-本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的模型设计，状态为 `implemented_and_verified_pending_publish_authorization`。srcq 运行时、安装生命周期、正式 Skill、消费者退出、原生 LSP 渐进入口、rg/fd 直觉入口、结果后置投影、同预算自动闭环和分层路由已经实现；组件验证、真实隔离 12-run、detached 语义审计和确定性身份验真共同覆盖当前候选。项目真源完成不表示 Codex 安装态已更新，后续发布仍须取得当次明确同意。
+本文件定义满足 [requirements.md](requirements.md) 和 [user-design.md](user-design.md) 的模型设计。P0—P15 已实现并验证；用户于 2026-08-30 新增低延迟、多语言源码关系目标，当前状态为 `reopened_for_p16_design`。既有 srcq 运行时、安装生命周期、正式 Skill、消费者退出、原生 LSP 渐进入口、rg/fd 直觉入口、结果后置投影、同预算自动闭环和分层路由继续作为已验证基线；P16 的 proposed 设计不得反向把未实现能力写成当前状态。后续发布仍须取得当次明确同意。
 
 ## 2. 设计结论
 
@@ -170,6 +170,38 @@ rg、fd 与 ast-grep 默认继续作为外部执行后端：srcq 负责 argv、�
 - 关联: REQ-SQG-001, AC-SQG-007, AC-SQG-009, UDES-SQG-015
 
 公共 `query_gateway` 已同时持有 backend、wrapper 状态、原生 argv、snapshot 与 cursor，因此由它唯一生成 `@more shown=<N> omitted=<N>` 和紧随其后的 `@next <PowerShell command>`。命令重放显式 engine/cwd、影响分页的非默认 wrapper 值、精确 cursor 与全部原生 argv；安全 token 裸写，其他值按 PowerShell 7 单行字面量无损转义。machine `next_cursor`、snapshot 身份、cache/process 分页和 native backend 保持现有 owner；模型或 skill 不维护第二份续页语法。
+
+## DEC-SQG-001 是否建立高层源码关系命令
+
+- 状态: confirmed
+- 关联: REQ-SQG-002, UDES-SQG-016, DES-SQG-014
+
+现有 rg、AST 与 LSP 分步入口无法以一次可维护调用表达反复出现的定义候选、引用候选和调用树闭环；UAI 代表探针已证明同一组合能在保持歧义边界的同时显著降低冷路径耗时。P16 因此允许扩展 `srcq` 现有 owner，建立明确的只读源码关系命令域。该决定不授权自然语言规划入口、不把候选升级为精确语义，也不迁入编辑器修改职责；正式命令名称与参数仍由 P16 的位置身份和输出合同裁决。
+
+## DES-SQG-016 源码关系由分层证据而非伪语义统一
+
+- 状态: proposed
+- 满足: REQ-SQG-002, AC-SQG-010, AC-SQG-011, AC-SQG-012, AC-SQG-013, UDES-SQG-016, UDES-SQG-017
+
+`tools/srcq` 作为唯一公开 owner 组合现有外部 rg 与 ast-grep：rg 完整生成授权范围内的词面候选；AST run/outline 和语言适配器归一化声明、定义、作用域、引用角色、调用与外层 owner；同一查询 owner 负责批处理、缓存复用、图遍历、完整性、分页和 model/machine 投影。VS Code Companion 与实际 Language Provider 继续拥有精确符号身份、类型和动态语义，srcq 不复制 Provider 业务。
+
+关系证据至少区分 `syntax-direct`、`qualified-candidate`、`lexical-candidate`、`ambiguous` 与 `semantic-unknown`。扫描范围完整性、AST 分类确定性和符号身份确定性分别持有；任一项未知都不得借另一个维度的完成状态隐式提升。快速路径足够支撑当前模型判断时停止，只有歧义会改变动作或结论时才按需升级 LSP 或领域工具。
+
+## DES-SQG-017 位置身份、能力注册与语言适配
+
+- 状态: proposed
+- 满足: AC-SQG-010, AC-SQG-012, UDES-SQG-017
+
+源码位置是关系查询的规范符号输入，名称查询只返回候选。内部 `LanguageCapability` 注册表按实际外部引擎能力声明 parse、outline、scope、definition、reference-role、direct-call、import-binding 和 semantic-exact 等独立能力；语言适配器只维护 Tree-sitter grammar 差异，不复制 rg 扫描、图遍历、分页或输出策略。所有 ast-grep 内置语言都由 capability owner 显式登记，关系不适用、仅候选、未适配和解析失败使用不同结果。
+
+定义候选优先适配 ast-grep outline 的结构化 JSON，但该能力自 0.44.0 起仍为 alpha，必须通过功能探测、结构验证和受测版本证据使用，不按版本字符串直接准入。局部变量、参数、遮蔽和调用节点由按独立语法机制组织的适配规则补足；不能可靠外部适配时先收紧能力，不自行内嵌或分叉 ast-grep。
+
+## DES-SQG-018 有界关系图不递归放大歧义
+
+- 状态: proposed
+- 满足: AC-SQG-011, AC-SQG-013
+
+调用树以稳定的文件、范围、语言、符号种类和签名候选组成节点，以调用位置、方向和证据等级组成边。遍历按层批量生成 frontier 候选并复用同文件 AST，只递归展开身份唯一的边；歧义、虚分派、宏、模板、函数值、动态绑定和跨语言生成关系作为带原因的叶子保留。循环检测、节点/边预算和现有续页 owner 控制工作量与模型上下文，不能把预算耗尽、未适配或未展开表示为没有关系。
 
 ## 4. 版本与迁移边界
 
