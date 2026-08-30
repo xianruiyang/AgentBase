@@ -119,7 +119,12 @@ pub(crate) fn resolve(
     anchor_file: Option<&Path>,
 ) -> Result<SourceUniverse, String> {
     let discovery_start = anchor_file.and_then(Path::parent).unwrap_or(cwd);
-    let project_root = find_project_root(discovery_start).unwrap_or_else(|| cwd.to_path_buf());
+    let cwd_project = anchor_file
+        .filter(|anchor| anchor.starts_with(cwd))
+        .and_then(|_| find_project_root(cwd));
+    let project_root = cwd_project
+        .or_else(|| find_project_root(discovery_start))
+        .unwrap_or_else(|| cwd.to_path_buf());
     let project_root = canonical_existing(&project_root, cwd, "project root")?;
     let mut candidates = Vec::new();
     let mut compile_files = Vec::new();
@@ -777,6 +782,7 @@ mod tests {
             output: OutputFormat::Model,
             limit: 40,
             model_token_budget: 2048,
+            time_budget_ms: 7_500,
             depth: 1,
             max_nodes: 40,
             direction: "outgoing".to_owned(),
@@ -937,5 +943,23 @@ mod tests {
         assert_eq!(universe.roots.len(), 1);
         assert!(universe.compile_files.is_empty());
         assert!(universe.compile_directories.is_empty());
+    }
+
+    #[test]
+    fn enclosing_workspace_scope_wins_over_a_nested_repository_for_anchored_queries() {
+        let directory = tempdir().expect("temporary workspace");
+        let workspace = directory.path();
+        write(&workspace.join("Game.uproject"), "{}\n");
+        let nested = workspace.join("Plugins/NestedPlugin");
+        fs::create_dir_all(nested.join(".git")).expect("nested repository marker");
+        let source = nested.join("Source/Nested/Private/File.cpp");
+        write(&source, "int Target() { return 1; }\n");
+
+        let universe = resolve(&command(), workspace, Some(&source)).expect("source universe");
+        assert_eq!(
+            universe.project_root,
+            workspace.canonicalize().expect("canonical workspace")
+        );
+        assert!(universe.roots.iter().any(|root| root.source == "project"));
     }
 }

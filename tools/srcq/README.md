@@ -80,6 +80,8 @@ srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction outgoing --dept
 
 它返回带范围与歧义边界的候选，不冒充编译器或 LSP 精确语义。语言能力、外部源码根和输出合同见[快速源码关系](docs/symbol-relations.md)。
 
+关系查询不等待常驻 Provider：每次调用都启动新的 srcq、rg 与 ast-grep 进程。默认共享 7500 ms 扫描预算，为端到端 10 秒快速路径保留包装开销；达到预算会以退出 124 明确报告结果不完整。优先传入源码位置或限定名，宽范围超时时先用 `--only-root` 收窄模块；只有确实需要更宽证据时才提高 `--time-budget-ms`。
+
 若把 `files`、`--files` 或 AST 原生命令误写到根级，srcq 只返回上述唯一入口的一行修正，不创建别名或猜测执行。分页结果的下一页只需执行页尾短命令，例如 `srcq more q17`；不要重组控制面、cursor 或原生 argv。
 
 只有调用方明确需要 machine、native/artifact、定向投影、诊断或续页时进入独立控制面：

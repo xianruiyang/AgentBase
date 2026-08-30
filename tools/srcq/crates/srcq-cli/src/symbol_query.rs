@@ -8,12 +8,13 @@ use std::ffi::OsString;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 use srcq_core::config::{load_standard_config, resolve_settings};
 use srcq_core::engine::{discover_engine, EngineEnvironment, SystemEngineEnvironment};
 use srcq_core::invocation::{ExplicitOptions, OutputFormat};
-use srcq_core::process::{run, ProcessRequest, StdinMode};
+use srcq_core::process::{run, ProcessError, ProcessOutcome, ProcessRequest, StdinMode};
 
 use crate::{SymbolBodyMode, SymbolCommand, SymbolOperation};
 use cpp::{
@@ -28,10 +29,37 @@ const MAX_ENGINE_STDERR_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_SOURCE_POSITION_BYTES: u64 = 64 * 1024 * 1024;
 const WINDOWS_BATCH_CHARS: usize = 24_000;
 
+#[derive(Clone, Copy, Debug)]
+struct QueryDeadline {
+    started: Instant,
+    deadline: Instant,
+    budget: Duration,
+}
+
+impl QueryDeadline {
+    fn new(milliseconds: u64) -> Self {
+        let started = Instant::now();
+        let budget = Duration::from_millis(milliseconds);
+        Self {
+            started,
+            deadline: started + budget,
+            budget,
+        }
+    }
+
+    fn remaining(self) -> Result<Duration, SymbolFailure> {
+        self.deadline
+            .checked_duration_since(Instant::now())
+            .filter(|remaining| !remaining.is_zero())
+            .ok_or_else(|| SymbolFailure::timeout(self))
+    }
+}
+
 #[derive(Debug)]
 struct SymbolFailure {
     code: i32,
     message: String,
+    time_limited: bool,
 }
 
 impl SymbolFailure {
@@ -39,6 +67,7 @@ impl SymbolFailure {
         Self {
             code,
             message: message.into(),
+            time_limited: false,
         }
     }
 
@@ -56,6 +85,31 @@ impl SymbolFailure {
 
     fn engine(message: impl Into<String>) -> Self {
         Self::new(120, message)
+    }
+
+    fn timeout(deadline: QueryDeadline) -> Self {
+        Self {
+            code: 124,
+            message: format!(
+                "symbol query reached its {} ms time budget after {} ms; the result is incomplete. Retry from --at or narrow with --only-root/--exclude; raise --time-budget-ms only for a deliberate broader scan",
+                deadline.budget.as_millis(),
+                deadline.started.elapsed().as_millis()
+            ),
+            time_limited: true,
+        }
+    }
+}
+
+fn run_budgeted(
+    mut request: ProcessRequest,
+    deadline: QueryDeadline,
+    operation: &'static str,
+) -> Result<ProcessOutcome, SymbolFailure> {
+    request.timeout = Some(deadline.remaining()?);
+    match run(request) {
+        Ok(outcome) => Ok(outcome),
+        Err(ProcessError::Timeout { .. }) => Err(SymbolFailure::timeout(deadline)),
+        Err(error) => Err(SymbolFailure::io(format!("{operation} failed: {error}"))),
     }
 }
 
@@ -127,6 +181,7 @@ struct CallsOutcome {
     root_definition_total: usize,
     nodes: usize,
     truncated: bool,
+    time_limited: bool,
     scan_complete: bool,
 }
 
@@ -152,7 +207,8 @@ pub fn execute(command: &SymbolCommand) -> i32 {
         SymbolOperation::Calls => return execute_calls(command),
         SymbolOperation::Definition => {}
     }
-    match execute_inner(command) {
+    let deadline = QueryDeadline::new(command.time_budget_ms);
+    match execute_inner(command, deadline) {
         Ok(outcome) => {
             let rendered = match command.output {
                 OutputFormat::Model => render_model(command, &outcome),
@@ -175,7 +231,8 @@ pub fn execute(command: &SymbolCommand) -> i32 {
 }
 
 fn execute_references(command: &SymbolCommand) -> i32 {
-    match execute_references_inner(command) {
+    let deadline = QueryDeadline::new(command.time_budget_ms);
+    match execute_references_inner(command, deadline) {
         Ok(outcome) => {
             let rendered = match command.output {
                 OutputFormat::Model => render_references_model(command, &outcome),
@@ -198,13 +255,15 @@ fn execute_references(command: &SymbolCommand) -> i32 {
 }
 
 fn execute_calls(command: &SymbolCommand) -> i32 {
-    match execute_calls_inner(command) {
+    let deadline = QueryDeadline::new(command.time_budget_ms);
+    match execute_calls_inner(command, deadline) {
         Ok(outcome) => {
             let rendered = match command.output {
                 OutputFormat::Model => render_calls_model(command, &outcome),
                 OutputFormat::Machine => render_calls_machine(command, &outcome),
             };
             match rendered.and_then(write_stdout) {
+                Ok(()) if outcome.time_limited => 124,
                 Ok(()) if outcome.root.is_some() => 0,
                 Ok(()) => 1,
                 Err(error) => {
@@ -220,8 +279,11 @@ fn execute_calls(command: &SymbolCommand) -> i32 {
     }
 }
 
-fn execute_calls_inner(command: &SymbolCommand) -> Result<CallsOutcome, SymbolFailure> {
-    let definitions = execute_inner(command)?;
+fn execute_calls_inner(
+    command: &SymbolCommand,
+    deadline: QueryDeadline,
+) -> Result<CallsOutcome, SymbolFailure> {
+    let definitions = execute_inner(command, deadline)?;
     let root_definition_total = definitions.definition_total;
     if root_definition_total != 1 {
         return Ok(CallsOutcome {
@@ -232,6 +294,7 @@ fn execute_calls_inner(command: &SymbolCommand) -> Result<CallsOutcome, SymbolFa
             root_definition_total,
             nodes: 0,
             truncated: false,
+            time_limited: false,
             scan_complete: definitions.scan_complete,
         });
     }
@@ -251,6 +314,7 @@ fn execute_calls_inner(command: &SymbolCommand) -> Result<CallsOutcome, SymbolFa
     active.insert(definition_identity(&root_definition));
     let mut nodes = 1_usize;
     let mut truncated = false;
+    let mut time_limited = false;
     let mut scan_complete = definitions.scan_complete;
     let mut root = CallTreeNode {
         name: root_definition.qualified_name.clone(),
@@ -272,10 +336,12 @@ fn execute_calls_inner(command: &SymbolCommand) -> Result<CallsOutcome, SymbolFa
             0,
             command,
             &query,
+            deadline,
             &mut resolution_cache,
             &mut active,
             &mut nodes,
             &mut truncated,
+            &mut time_limited,
             &mut scan_complete,
         )?;
         if has_dynamic_dispatch && command.depth > 0 {
@@ -301,11 +367,13 @@ fn execute_calls_inner(command: &SymbolCommand) -> Result<CallsOutcome, SymbolFa
             0,
             command,
             &query,
+            deadline,
             &mut resolution_cache,
             &mut call_cache,
             &mut active,
             &mut nodes,
             &mut truncated,
+            &mut time_limited,
         )?;
     }
     Ok(CallsOutcome {
@@ -316,6 +384,7 @@ fn execute_calls_inner(command: &SymbolCommand) -> Result<CallsOutcome, SymbolFa
         root_definition_total,
         nodes,
         truncated,
+        time_limited,
         scan_complete,
     })
 }
@@ -327,22 +396,32 @@ fn expand_call_node(
     depth: usize,
     command: &SymbolCommand,
     query: &ResolvedQuery,
+    deadline: QueryDeadline,
     resolution_cache: &mut BTreeMap<String, CalleeResolution>,
     call_cache: &mut BTreeMap<String, Vec<DirectCallCandidate>>,
     active: &mut BTreeSet<String>,
     nodes: &mut usize,
     truncated: &mut bool,
+    time_limited: &mut bool,
 ) -> Result<(), SymbolFailure> {
     if depth >= command.depth {
         return Ok(());
     }
-    let calls = calls_for_definition(
+    let calls = match calls_for_definition(
         &query.ast_grep,
         definition,
         &query.universe,
         query.language,
+        deadline,
         call_cache,
-    )?;
+    ) {
+        Ok(calls) => calls,
+        Err(error) if error.time_limited => {
+            *time_limited = true;
+            return Ok(());
+        }
+        Err(error) => return Err(error),
+    };
     for call in calls {
         if *nodes >= command.max_nodes {
             *truncated = true;
@@ -363,13 +442,23 @@ fn expand_call_node(
             children: Vec::new(),
         };
         if depth + 1 < command.depth && call.dispatch == "direct-candidate" {
-            let resolution = resolve_callee(
+            let resolution = match resolve_callee(
                 &call.callee,
                 command,
                 &query.universe,
                 &call.file,
+                deadline,
                 resolution_cache,
-            )?;
+            ) {
+                Ok(resolution) => resolution,
+                Err(error) if error.time_limited => {
+                    child.status = "time-budget".to_owned();
+                    node.children.push(child);
+                    *time_limited = true;
+                    return Ok(());
+                }
+                Err(error) => return Err(error),
+            };
             child.status = match resolution.total {
                 0 => "semantic-unknown".to_owned(),
                 1 => definition_identity_evidence(command).to_owned(),
@@ -388,11 +477,13 @@ fn expand_call_node(
                         depth + 1,
                         command,
                         query,
+                        deadline,
                         resolution_cache,
                         call_cache,
                         active,
                         nodes,
                         truncated,
+                        time_limited,
                     )?;
                     active.remove(&identity);
                 }
@@ -410,16 +501,27 @@ fn expand_incoming_node(
     depth: usize,
     command: &SymbolCommand,
     query: &ResolvedQuery,
+    deadline: QueryDeadline,
     resolution_cache: &mut BTreeMap<String, CalleeResolution>,
     active: &mut BTreeSet<String>,
     nodes: &mut usize,
     truncated: &mut bool,
+    time_limited: &mut bool,
     scan_complete: &mut bool,
 ) -> Result<(), SymbolFailure> {
     if depth >= command.depth {
         return Ok(());
     }
-    let (callers, caller_scan_complete) = incoming_callers(definition, command, query)?;
+    let (callers, caller_scan_complete) =
+        match incoming_callers(definition, command, query, deadline) {
+            Ok(result) => result,
+            Err(error) if error.time_limited => {
+                *time_limited = true;
+                *scan_complete = false;
+                return Ok(());
+            }
+            Err(error) => return Err(error),
+        };
     *scan_complete &= caller_scan_complete;
     for (reference, owner) in callers {
         if *nodes >= command.max_nodes {
@@ -437,13 +539,24 @@ fn expand_incoming_node(
             children: Vec::new(),
         };
         if depth + 1 < command.depth {
-            let resolution = resolve_callee(
+            let resolution = match resolve_callee(
                 &owner.name,
                 command,
                 &query.universe,
                 &owner.file,
+                deadline,
                 resolution_cache,
-            )?;
+            ) {
+                Ok(resolution) => resolution,
+                Err(error) if error.time_limited => {
+                    child.status = "time-budget".to_owned();
+                    node.children.push(child);
+                    *time_limited = true;
+                    *scan_complete = false;
+                    return Ok(());
+                }
+                Err(error) => return Err(error),
+            };
             child.status = match resolution.total {
                 0 => "semantic-unknown".to_owned(),
                 1 => definition_identity_evidence(command).to_owned(),
@@ -462,10 +575,12 @@ fn expand_incoming_node(
                         depth + 1,
                         command,
                         query,
+                        deadline,
                         resolution_cache,
                         active,
                         nodes,
                         truncated,
+                        time_limited,
                         scan_complete,
                     )?;
                     active.remove(&identity);
@@ -481,6 +596,7 @@ fn incoming_callers(
     definition: &DefinitionCandidate,
     command: &SymbolCommand,
     query: &ResolvedQuery,
+    deadline: QueryDeadline,
 ) -> Result<(Vec<(ReferenceCandidate, FunctionOwnerCandidate)>, bool), SymbolFailure> {
     let mut reference_command = command.clone();
     reference_command.operation = SymbolOperation::References;
@@ -494,7 +610,7 @@ fn incoming_callers(
     );
     reference_command.at = None;
     reference_command.limit = command.max_nodes;
-    let references = execute_references_inner(&reference_command)?;
+    let references = execute_references_inner(&reference_command, deadline)?;
     let scan_complete = references.scan_complete;
     let call_references = references
         .references
@@ -513,6 +629,7 @@ fn incoming_callers(
         &files,
         &query.universe,
         query.language,
+        deadline,
     )?;
     let mut callers = Vec::new();
     for reference in call_references {
@@ -556,6 +673,7 @@ fn resolve_callee(
     command: &SymbolCommand,
     universe: &SourceUniverse,
     local_file: &Path,
+    deadline: QueryDeadline,
     cache: &mut BTreeMap<String, CalleeResolution>,
 ) -> Result<CalleeResolution, SymbolFailure> {
     let cache_key = format!("{}|{}", callee, normalized_key(local_file));
@@ -569,7 +687,7 @@ fn resolve_callee(
     child_command.body = SymbolBodyMode::None;
     child_command.add_roots.clear();
     child_command.only_roots = bounded_relation_roots(universe, local_file);
-    let outcome = execute_inner(&child_command)?;
+    let outcome = execute_inner(&child_command, deadline)?;
     let resolution = CalleeResolution {
         total: outcome.definition_total,
         definition: (outcome.definition_total == 1).then(|| outcome.definitions[0].clone()),
@@ -634,11 +752,14 @@ fn definition_identity(definition: &DefinitionCandidate) -> String {
     )
 }
 
-fn execute_references_inner(command: &SymbolCommand) -> Result<ReferencesOutcome, SymbolFailure> {
+fn execute_references_inner(
+    command: &SymbolCommand,
+    deadline: QueryDeadline,
+) -> Result<ReferencesOutcome, SymbolFailure> {
     let mut definition_command = command.clone();
     definition_command.operation = SymbolOperation::Definition;
     definition_command.limit = 10_000;
-    let definition_outcome = execute_inner(&definition_command)?;
+    let definition_outcome = execute_inner(&definition_command, deadline)?;
     let query = resolve_query(command)?;
     let mut definitions = definition_outcome.definitions;
     definitions.extend(definition_outcome.declarations);
@@ -664,6 +785,7 @@ fn execute_references_inner(command: &SymbolCommand) -> Result<ReferencesOutcome
         &roots,
         &query.universe,
         query.language,
+        deadline,
     )?;
     definitions.sort_by(|left, right| {
         normalized_key(&left.file)
@@ -692,6 +814,7 @@ fn execute_references_inner(command: &SymbolCommand) -> Result<ReferencesOutcome
         &candidate_files,
         &query.universe,
         query.language,
+        deadline,
     )?;
     let mut documents = BTreeMap::new();
     let mut references = Vec::new();
@@ -780,7 +903,10 @@ fn reference_scan_inputs(
     inputs
 }
 
-fn execute_inner(command: &SymbolCommand) -> Result<QueryOutcome, SymbolFailure> {
+fn execute_inner(
+    command: &SymbolCommand,
+    deadline: QueryDeadline,
+) -> Result<QueryOutcome, SymbolFailure> {
     let query = resolve_query(command)?;
     let ResolvedQuery {
         target,
@@ -796,7 +922,8 @@ fn execute_inner(command: &SymbolCommand) -> Result<QueryOutcome, SymbolFailure>
     let mut scanned_roots = BTreeSet::new();
     let mut candidates = Vec::new();
     for phase in phases {
-        let candidate_files = find_candidate_files(&rg, &target, &phase, &universe, language)?;
+        let candidate_files =
+            find_candidate_files(&rg, &target, &phase, &universe, language, deadline)?;
         candidate_file_keys.extend(candidate_files.iter().map(|path| normalized_key(path)));
         candidates.extend(scan_candidates(
             &ast_grep,
@@ -804,6 +931,7 @@ fn execute_inner(command: &SymbolCommand) -> Result<QueryOutcome, SymbolFailure>
             &candidate_files,
             &universe,
             language,
+            deadline,
         )?);
         for root in &universe.roots {
             if phase
@@ -1159,12 +1287,42 @@ fn identifier_at(
         )));
     }
     Ok((
-        line_text[start..end].to_owned(),
+        qualified_identifier(line_text, start, end),
         SourcePosition {
             line,
             column: line_text[..start].chars().count(),
         },
     ))
+}
+
+fn qualified_identifier(line: &str, start: usize, end: usize) -> String {
+    let mut parts = vec![line[start..end].to_owned()];
+    let mut cursor = start;
+    loop {
+        let prefix = line[..cursor].trim_end();
+        let Some(owner) = prefix.strip_suffix("::") else {
+            break;
+        };
+        let owner = owner.trim_end();
+        let owner_end = owner.len();
+        let mut owner_start = owner_end;
+        while owner_start > 0 {
+            let Some((offset, character)) = owner[..owner_start].char_indices().next_back() else {
+                break;
+            };
+            if !is_identifier_char(character) {
+                break;
+            }
+            owner_start = offset;
+        }
+        if owner_start == owner_end {
+            break;
+        }
+        parts.push(owner[owner_start..owner_end].to_owned());
+        cursor = owner_start;
+    }
+    parts.reverse();
+    parts.join("::")
 }
 
 fn is_identifier_char(character: char) -> bool {
@@ -1232,6 +1390,7 @@ fn find_candidate_files(
     roots: &[PathBuf],
     universe: &SourceUniverse,
     language: language::LanguageCapability,
+    deadline: QueryDeadline,
 ) -> Result<Vec<PathBuf>, SymbolFailure> {
     let mut paths = Vec::new();
     for batch in path_batches(roots, WINDOWS_BATCH_CHARS) {
@@ -1261,9 +1420,7 @@ fn find_candidate_files(
         request.forward_stderr = false;
         request.max_stdout_bytes = Some(MAX_RG_STDOUT_BYTES);
         request.max_stderr_bytes = Some(MAX_ENGINE_STDERR_BYTES);
-        let outcome = run(request).map_err(|error| {
-            SymbolFailure::io(format!("ripgrep candidate scan failed: {error}"))
-        })?;
+        let outcome = run_budgeted(request, deadline, "ripgrep candidate scan")?;
         let code = outcome.exit_code();
         if code == 1 {
             continue;
@@ -1307,12 +1464,13 @@ fn scan_candidates(
     files: &[PathBuf],
     universe: &SourceUniverse,
     language: language::LanguageCapability,
+    deadline: QueryDeadline,
 ) -> Result<Vec<DefinitionCandidate>, SymbolFailure> {
     if language.key != "cpp" {
-        return scan_outline_candidates(ast_grep, target, files, universe, language);
+        return scan_outline_candidates(ast_grep, target, files, universe, language, deadline);
     }
     let direct_rules = cpp::inline_rules(target, false);
-    let direct = run_ast_scan(ast_grep, target, files, universe, &direct_rules)?;
+    let direct = run_ast_scan(ast_grep, target, files, universe, &direct_rules, deadline)?;
     if !direct.is_empty()
         && !direct
             .iter()
@@ -1331,7 +1489,14 @@ fn scan_candidates(
     scope_files.sort_by_key(|path| normalized_key(path));
     scope_files.dedup_by(|left, right| normalized_key(left) == normalized_key(right));
     let scoped_rules = cpp::inline_rules(target, true);
-    let scoped = run_ast_scan(ast_grep, target, &scope_files, universe, &scoped_rules)?;
+    let scoped = run_ast_scan(
+        ast_grep,
+        target,
+        &scope_files,
+        universe,
+        &scoped_rules,
+        deadline,
+    )?;
     if scoped.is_empty() {
         Ok(direct)
     } else {
@@ -1345,6 +1510,7 @@ fn scan_outline_candidates(
     files: &[PathBuf],
     universe: &SourceUniverse,
     language: language::LanguageCapability,
+    deadline: QueryDeadline,
 ) -> Result<Vec<DefinitionCandidate>, SymbolFailure> {
     let mut candidates = Vec::new();
     for batch in path_batches(files, WINDOWS_BATCH_CHARS) {
@@ -1365,8 +1531,7 @@ fn scan_outline_candidates(
         request.forward_stderr = false;
         request.max_stdout_bytes = Some(MAX_AST_STDOUT_BYTES);
         request.max_stderr_bytes = Some(MAX_ENGINE_STDERR_BYTES);
-        let outcome = run(request)
-            .map_err(|error| SymbolFailure::io(format!("ast-grep outline failed: {error}")))?;
+        let outcome = run_budgeted(request, deadline, "ast-grep outline")?;
         let code = outcome.exit_code();
         if !matches!(code, 0 | 1) {
             return Err(engine_exit_failure(
@@ -1393,6 +1558,7 @@ fn run_ast_scan(
     files: &[PathBuf],
     universe: &SourceUniverse,
     inline_rules: &str,
+    deadline: QueryDeadline,
 ) -> Result<Vec<DefinitionCandidate>, SymbolFailure> {
     let mut candidates = Vec::new();
     for batch in path_batches(files, WINDOWS_BATCH_CHARS) {
@@ -1409,9 +1575,7 @@ fn run_ast_scan(
         request.forward_stderr = false;
         request.max_stdout_bytes = Some(MAX_AST_STDOUT_BYTES);
         request.max_stderr_bytes = Some(MAX_ENGINE_STDERR_BYTES);
-        let outcome = run(request).map_err(|error| {
-            SymbolFailure::io(format!("ast-grep candidate scan failed: {error}"))
-        })?;
+        let outcome = run_budgeted(request, deadline, "ast-grep candidate scan")?;
         let code = outcome.exit_code();
         if code != 0 {
             return Err(engine_exit_failure(
@@ -1430,7 +1594,7 @@ fn run_ast_scan(
         );
     }
     candidates.extend(scan_cpp_header_declarations(
-        ast_grep, target, files, universe,
+        ast_grep, target, files, universe, deadline,
     )?);
     Ok(candidates)
 }
@@ -1440,6 +1604,7 @@ fn scan_cpp_header_declarations(
     target: &str,
     files: &[PathBuf],
     universe: &SourceUniverse,
+    deadline: QueryDeadline,
 ) -> Result<Vec<DefinitionCandidate>, SymbolFailure> {
     let mut candidates = Vec::new();
     for file in files.iter().filter(|file| {
@@ -1483,9 +1648,7 @@ fn scan_cpp_header_declarations(
         request.forward_stderr = false;
         request.max_stdout_bytes = Some(MAX_AST_STDOUT_BYTES);
         request.max_stderr_bytes = Some(MAX_ENGINE_STDERR_BYTES);
-        let outcome = run(request).map_err(|error| {
-            SymbolFailure::io(format!("ast-grep C++ header scan failed: {error}"))
-        })?;
+        let outcome = run_budgeted(request, deadline, "ast-grep C++ header scan")?;
         let code = outcome.exit_code();
         if !matches!(code, 0 | 1) {
             return Err(engine_exit_failure(
@@ -1512,6 +1675,7 @@ fn scan_occurrences(
     files: &[PathBuf],
     universe: &SourceUniverse,
     language: language::LanguageCapability,
+    deadline: QueryDeadline,
 ) -> Result<Vec<OccurrenceCandidate>, SymbolFailure> {
     let inline_rules = if language.key == "cpp" {
         cpp::occurrence_rules(target)
@@ -1542,9 +1706,7 @@ fn scan_occurrences(
         request.forward_stderr = false;
         request.max_stdout_bytes = Some(MAX_AST_STDOUT_BYTES);
         request.max_stderr_bytes = Some(MAX_ENGINE_STDERR_BYTES);
-        let outcome = run(request).map_err(|error| {
-            SymbolFailure::io(format!("ast-grep occurrence scan failed: {error}"))
-        })?;
+        let outcome = run_budgeted(request, deadline, "ast-grep occurrence scan")?;
         let code = outcome.exit_code();
         if code != 0 {
             return Err(engine_exit_failure(
@@ -1581,6 +1743,7 @@ fn scan_containing_functions(
     files: &[PathBuf],
     universe: &SourceUniverse,
     language: language::LanguageCapability,
+    deadline: QueryDeadline,
 ) -> Result<Vec<FunctionOwnerCandidate>, SymbolFailure> {
     let inline_rules = if language.key == "cpp" {
         cpp::containing_function_rules(target)
@@ -1611,9 +1774,7 @@ fn scan_containing_functions(
         request.forward_stderr = false;
         request.max_stdout_bytes = Some(MAX_AST_STDOUT_BYTES);
         request.max_stderr_bytes = Some(MAX_ENGINE_STDERR_BYTES);
-        let outcome = run(request).map_err(|error| {
-            SymbolFailure::io(format!("ast-grep containing-function scan failed: {error}"))
-        })?;
+        let outcome = run_budgeted(request, deadline, "ast-grep containing-function scan")?;
         let code = outcome.exit_code();
         if code != 0 {
             return Err(engine_exit_failure(
@@ -1651,6 +1812,7 @@ fn calls_for_definition(
     definition: &DefinitionCandidate,
     universe: &SourceUniverse,
     language: language::LanguageCapability,
+    deadline: QueryDeadline,
     cache: &mut BTreeMap<String, Vec<DirectCallCandidate>>,
 ) -> Result<Vec<DirectCallCandidate>, SymbolFailure> {
     let key = normalized_key(&definition.file);
@@ -1681,8 +1843,7 @@ fn calls_for_definition(
         request.forward_stderr = false;
         request.max_stdout_bytes = Some(MAX_AST_STDOUT_BYTES);
         request.max_stderr_bytes = Some(MAX_ENGINE_STDERR_BYTES);
-        let outcome = run(request)
-            .map_err(|error| SymbolFailure::io(format!("ast-grep call scan failed: {error}")))?;
+        let outcome = run_budgeted(request, deadline, "ast-grep call scan")?;
         let code = outcome.exit_code();
         if code != 0 {
             return Err(engine_exit_failure(
@@ -1989,7 +2150,11 @@ fn render_calls_model(
         &outcome.universe,
         &mut budget_truncated,
     );
-    if outcome.truncated {
+    if outcome.time_limited {
+        output.push_str(
+            "@cut reason=time-budget result=partial recovery=use-depth-1-or-query-a-returned-child-position\n",
+        );
+    } else if outcome.truncated {
         output.push_str("... node budget reached (raise --max-nodes)\n");
     } else if budget_truncated {
         output.push_str("... output budget reached (raise --model-token-budget)\n");
@@ -2091,6 +2256,7 @@ fn render_calls_machine(
         "root_definition_total": outcome.root_definition_total,
         "nodes": outcome.nodes,
         "truncated": outcome.truncated,
+        "time_limited": outcome.time_limited,
         "root": outcome.root.as_ref().map(|root| machine_call_node(root, &outcome.universe)),
         "evidence": evidence,
     });

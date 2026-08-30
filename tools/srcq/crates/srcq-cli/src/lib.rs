@@ -236,6 +236,14 @@ fn symbol_relation_subcommand(
                 .help("Soft estimated-token budget for model output"),
         )
         .arg(
+            Arg::new("time-budget-ms")
+                .long("time-budget-ms")
+                .value_name("MILLISECONDS")
+                .default_value("7500")
+                .value_parser(clap::value_parser!(u64).range(1..=600_000))
+                .help("End-to-end symbol-query scan budget; expiry reports an incomplete result"),
+        )
+        .arg(
             Arg::new("rg-engine")
                 .long("rg-engine")
                 .value_name("PATH")
@@ -714,6 +722,7 @@ pub struct SymbolCommand {
     pub output: OutputFormat,
     pub limit: usize,
     pub model_token_budget: usize,
+    pub time_budget_ms: u64,
     pub depth: usize,
     pub max_nodes: usize,
     pub direction: String,
@@ -1140,6 +1149,7 @@ fn parse_symbol_command(matches: &ArgMatches) -> Result<SymbolCommand, CliParseE
             output: parse_output(values),
             limit: 40,
             model_token_budget: 2048,
+            time_budget_ms: 7_500,
             depth: 1,
             max_nodes: 40,
             direction: "outgoing".to_owned(),
@@ -1187,6 +1197,10 @@ fn parse_symbol_command(matches: &ArgMatches) -> Result<SymbolCommand, CliParseE
             .get_one::<u64>("model-token-budget")
             .and_then(|value| usize::try_from(*value).ok())
             .unwrap_or(2048),
+        time_budget_ms: values
+            .get_one::<u64>("time-budget-ms")
+            .copied()
+            .unwrap_or(7_500),
         depth: values
             .try_get_one::<u64>("depth")
             .ok()
@@ -1728,6 +1742,30 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn parses_default_and_explicit_symbol_time_budgets() {
+        let default = parse_cli_from(os_args(&["srcq", "symbol", "definition", "Target"]))
+            .expect("default symbol query");
+        let CliAction::Symbol(default) = default else {
+            panic!("expected symbol command")
+        };
+        assert_eq!(default.time_budget_ms, 7_500);
+
+        let explicit = parse_cli_from(os_args(&[
+            "srcq",
+            "symbol",
+            "references",
+            "Target",
+            "--time-budget-ms",
+            "9000",
+        ]))
+        .expect("explicit symbol query");
+        let CliAction::Symbol(explicit) = explicit else {
+            panic!("expected symbol command")
+        };
+        assert_eq!(explicit.time_budget_ms, 9_000);
     }
 
     #[test]

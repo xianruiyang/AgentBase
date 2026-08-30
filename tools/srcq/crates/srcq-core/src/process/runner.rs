@@ -39,6 +39,8 @@ pub struct ProcessRequest {
     pub cancellation: CancellationToken,
     pub poll_interval: Duration,
     pub grace_period: Duration,
+    /// Optional wall-clock limit for the native process. Expiry terminates the process group.
+    pub timeout: Option<Duration>,
     /// Optional hard capture bounds. Crossing either bound terminates the native process group.
     pub max_stdout_bytes: Option<u64>,
     pub max_stderr_bytes: Option<u64>,
@@ -56,6 +58,7 @@ impl ProcessRequest {
             cancellation: CancellationToken::new(),
             poll_interval: DEFAULT_POLL_INTERVAL,
             grace_period: DEFAULT_GRACE_PERIOD,
+            timeout: None,
             max_stdout_bytes: None,
             max_stderr_bytes: None,
         }
@@ -164,12 +167,17 @@ pub enum ProcessError {
     },
     #[error("native process {stream} pump thread failed")]
     PumpPanic { stream: &'static str },
+    #[error("native process exceeded its {timeout:?} wall-clock limit")]
+    Timeout { timeout: Duration },
 }
 
 impl ProcessError {
     #[must_use]
     pub const fn wrapper_exit_code(&self) -> i32 {
-        126
+        match self {
+            Self::Timeout { .. } => 124,
+            _ => 126,
+        }
     }
 }
 
@@ -256,6 +264,7 @@ pub fn run(request: ProcessRequest) -> Result<ProcessOutcome, ProcessError> {
         &request.cancellation,
         request.poll_interval,
         request.grace_period,
+        request.timeout,
         &pump_errors_rx,
     );
 
@@ -427,8 +436,10 @@ fn supervise(
     cancellation: &CancellationToken,
     poll_interval: Duration,
     grace_period: Duration,
+    timeout: Option<Duration>,
     pump_errors: &mpsc::Receiver<PumpError>,
 ) -> Result<(ExitStatus, Option<CancellationReport>), ProcessError> {
+    let deadline = timeout.map(|duration| (Instant::now() + duration, duration));
     loop {
         if let Ok((stream, source)) = pump_errors.try_recv() {
             let _ = child.kill();
@@ -457,6 +468,19 @@ fn supervise(
         })? {
             let cancellation = cancellation_from_exit_status(&status);
             return Ok((status, cancellation));
+        }
+        if let Some((deadline, timeout)) = deadline {
+            if Instant::now() >= deadline {
+                child.kill().map_err(|source| ProcessError::Io {
+                    operation: "kill process group after timeout",
+                    source,
+                })?;
+                child.wait().map_err(|source| ProcessError::Io {
+                    operation: "wait after process-group timeout",
+                    source,
+                })?;
+                return Err(ProcessError::Timeout { timeout });
+            }
         }
         thread::sleep(poll_interval);
     }

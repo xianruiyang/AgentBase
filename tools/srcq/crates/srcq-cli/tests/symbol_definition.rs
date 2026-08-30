@@ -111,6 +111,29 @@ fn cpp_definition_position_input_machine_schema_and_missing_result_are_stable() 
         .expect("UTF-8 position output")
         .starts_with("definition-candidate function BuildTool"));
 
+    let qualified_call_at = format!("{}:53:18", source.display());
+    let qualified_call = run(&[
+        "symbol",
+        "definition",
+        "--at",
+        &qualified_call_at,
+        "--only-root",
+        root_text,
+        "--body",
+        "none",
+        "--output",
+        "machine",
+    ]);
+    assert!(qualified_call.status.success());
+    let qualified_call: Value =
+        serde_json::from_slice(&qualified_call.stdout).expect("qualified-call JSON");
+    assert_eq!(qualified_call["query"]["target"], "Other::BuildTool");
+    assert_eq!(qualified_call["definition_total"], 1);
+    assert_eq!(
+        qualified_call["definitions"][0]["qualified_name"],
+        "Other::BuildTool"
+    );
+
     let machine = run(&[
         "symbol",
         "definition",

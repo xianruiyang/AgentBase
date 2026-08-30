@@ -6,7 +6,9 @@ use std::{
     time::Duration,
 };
 
-use srcq_core::process::{run, CancellationKind, CancellationToken, ProcessRequest, StdinMode};
+use srcq_core::process::{
+    run, CancellationKind, CancellationToken, ProcessError, ProcessRequest, StdinMode,
+};
 use tempfile::tempdir;
 
 fn fixture() -> PathBuf {
@@ -115,5 +117,30 @@ fn cancellation_terminates_the_descendant_tree() {
             .len(),
         size_after_exit,
         "descendant continued running after process outcome"
+    );
+}
+
+#[test]
+fn timeout_terminates_the_descendant_tree() {
+    let directory = tempdir().expect("temp directory");
+    let heartbeat = directory.path().join("timeout-heartbeat");
+    let heartbeat_argument = heartbeat.to_string_lossy().into_owned();
+    let mut process = request(directory.path(), &["tree", &heartbeat_argument]);
+    process.poll_interval = Duration::from_millis(5);
+    process.timeout = Some(Duration::from_millis(180));
+
+    let error = run(process).expect_err("timed-out tree fixture must be reaped");
+    assert!(matches!(error, ProcessError::Timeout { .. }));
+
+    let size_after_exit = fs::metadata(&heartbeat)
+        .expect("leaf created timeout heartbeat")
+        .len();
+    thread::sleep(Duration::from_millis(250));
+    assert_eq!(
+        fs::metadata(&heartbeat)
+            .expect("timeout heartbeat remains inspectable")
+            .len(),
+        size_after_exit,
+        "descendant continued running after process timeout"
     );
 }

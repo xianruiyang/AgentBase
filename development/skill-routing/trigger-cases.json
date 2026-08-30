@@ -720,6 +720,28 @@
       ]
     },
     {
+      "id": "fast-symbol-time-budget-recovery",
+      "kind": "positive",
+      "request": "大型 C++ 项目中的宽泛名称关系查询触发默认时间预算并明确返回 incomplete；目标仍是 10 秒内取得可用候选。请先用有界文本定位限定名或位置，或把范围收窄到权威模块后重试；不要把限时解释为不存在，也不要直接无条件延长预算或启动 LSP。只读处理。",
+      "expected_skills": [
+        "source-query"
+      ],
+      "forbidden_skills": [
+        "symbol-structure-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_source_query_references": [
+        "symbol-relations.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
       "id": "ast-no-match-needs-source-evidence",
       "kind": "boundary",
       "request": "一次 AST pattern 查询没有匹配。请决定下一步：当前还没读取实际候选源码，不允许只改写 pattern 连续试探；先取得能改变语言、节点形状、限定名或 strictness 判断的源码证据，否则返回文本路径。只读处理。",
