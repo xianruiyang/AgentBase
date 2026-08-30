@@ -382,13 +382,13 @@ TSQG-103—TSQG-105 已闭环。0.4.3 候选与完整组件门禁覆盖六位环
 | --- | --- | --- | --- | --- |
 | TSQG-106 | 冻结位置身份、关系证据等级和语言 capability 合同 | DEC-SQG-001, DES-SQG-016, DES-SQG-017 | P16 已确认设计、命令候选与 machine/model 语义 | 名称歧义、局部遮蔽、无调用概念、未适配和解析失败均有不同结果；扫描完整不提升为身份完整 |
 | TSQG-107 | 以外部 rg + ast-grep outline/run 完成多语言适配探针 | TSQG-106, DES-SQG-013 | 适配器协议、外部能力/版本降级证据和不应共享的语法机制 | C++、Python、TypeScript、Rust、Go、Java 覆盖六类已证节点差异；其余语言按独立 grammar/capability 机制扩展，不机械复制完整矩阵 |
-| TSQG-112 | 实现跨 workspace 的 SourceUniverse 解析与完整性合同 | TSQG-106, DES-SQG-019 | 显式根、workspace 多根、compile database/response file 与语言依赖 resolver；可重建根缓存和范围诊断 | GptProjectTest 从项目编译项恢复 UE 外部源码根；嵌套/缺失/循环/陈旧响应文件、无源码依赖和重复库版本可区分；不扫描整盘或默认启动构建系统 |
+| TSQG-112 | 实现跨 workspace 的 SourceUniverse、默认范围与显式目录组合 | TSQG-106, DES-SQG-019, DES-SQG-020 | anchor/cwd 默认 resolver，auto/augment/exact/exclude 组合，workspace 多根、compile database/response file 与语言依赖 resolver；可重建根缓存和范围诊断 | 不填目录即可在普通项目和无元数据目录完成查询；显式追加/替换/排除语义稳定；GptProjectTest 从项目编译项恢复 UE 外部源码根；嵌套/缺失/循环/陈旧响应文件、无源码依赖和重复库版本可区分；不扫描整盘或默认启动构建系统 |
 | TSQG-108 | 实现首个位置到定义、引用与深度调用树的正式纵向消费者 | TSQG-107, TSQG-112 | `srcq` 候选命令、稳定图模型和 UAI C++ 真实结果 | 同一 UAI 符号跨项目与 UE 源码根完成定义、引用、outgoing/incoming 和深度展开；虚调用反例返回 unknown；候选与 LSP 可比部分一致且快速路径显著更快 |
 | TSQG-109 | 扩展全部 ast-grep 内置语言的显式 capability 与适用适配 | TSQG-108 | 语言注册表、适配规则和逐语言最小 smoke | 每种内置语言均为 supported、candidate-only、not-applicable 或明确失败；函数/变量/类型等按适用能力验证，不用空集合掩盖缺口 |
 | TSQG-110 | 接入模型投影、续页、source-query 路由与精确语义升级 | TSQG-109 | model/machine 输出、短句柄续页、skill 消费和 LSP 后备边界 | 普通模型不手工串底层命令；歧义才升级；树、引用和候选可渐进恢复且不复制 Provider 决策 |
 | TSQG-111 | 完成组件、语言机制、真实消费者与发布边界验证 | TSQG-110 | P16 验证、版本与完成审计 | 先定向后公共合同验证；候选稳定前不跑完整发布验证；未获当次明确同意不制作正式 Codex Publish |
 
-当前证据只支持 TSQG-106 的设计收敛、TSQG-107 的外部适配探针和 TSQG-112 的真实输入协议设计；尚未证明 SourceUniverse 能完整恢复各语言依赖源码。命令名称、全部语言的关系等级、outline alpha 降级和深层调用图预算仍是 proposed 设计，未完成前不得把 TSQG-108—TSQG-111 当作已经可执行的横向批量。
+当前证据只支持 TSQG-106 的设计收敛、TSQG-107 的外部适配探针和 TSQG-112 的真实输入协议设计；尚未证明目录省略、显式组合或 SourceUniverse 能在正式实现中完整恢复各语言依赖源码。命令名称、全部语言的关系等级、outline alpha 降级和深层调用图预算仍是 proposed 设计，未完成前不得把 TSQG-108—TSQG-111 当作已经可执行的横向批量。
 
 ## 5. 停止与重开条件
 
