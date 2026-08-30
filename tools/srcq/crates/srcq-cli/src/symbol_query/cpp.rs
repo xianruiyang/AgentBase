@@ -50,6 +50,9 @@ pub(crate) fn inline_rules(target: &str, include_scopes: bool) -> String {
         )
         }));
     }
+    rules.push(format!(
+        "id: srcq.cpp.declaration.init\nlanguage: Cpp\nrule:\n  all:\n    - kind: declaration\n    - has:\n        stopBy: end\n        kind: init_declarator\n    - has:\n        stopBy: end\n        regex: '^{regex}$'\nseverity: info\nmessage: direct-initialized variable marker"
+    ));
     rules.join("\n---\n")
 }
 
@@ -214,10 +217,18 @@ pub(crate) fn parse_scan_stream(
     let target_last = target.rsplit("::").next().unwrap_or(target);
     let mut candidates = Vec::new();
     for record in &records {
-        let Some(extracted) = extract_target(record, target_last) else {
+        let direct_initialized = records.iter().any(|candidate| {
+            candidate.rule_id == "srcq.cpp.declaration.init"
+                && normalized_key(&candidate.file) == normalized_key(&record.file)
+                && candidate.range == record.range
+        });
+        let Some(extracted) = extract_target(record, target_last, direct_initialized) else {
             continue;
         };
-        if record.rule_id == "srcq.cpp.namespace" {
+        if matches!(
+            record.rule_id.as_str(),
+            "srcq.cpp.namespace" | "srcq.cpp.declaration.init"
+        ) {
             continue;
         }
         let qualified_name = qualify(record, &extracted.name, &scopes);
@@ -764,7 +775,11 @@ fn build_scopes(records: &[AstRecord]) -> Vec<ScopeNode> {
         .collect()
 }
 
-fn extract_target(record: &AstRecord, target: &str) -> Option<ExtractedName> {
+fn extract_target(
+    record: &AstRecord,
+    target: &str,
+    direct_initialized: bool,
+) -> Option<ExtractedName> {
     match record.rule_id.as_str() {
         "srcq.cpp.function" => function_name(&record.text, target),
         "srcq.cpp.class" => type_name(&record.text, target, "class", "class_specifier"),
@@ -779,7 +794,9 @@ fn extract_target(record: &AstRecord, target: &str) -> Option<ExtractedName> {
             DefinitionRole::Definition,
             "type_definition",
         ),
-        "srcq.cpp.declaration" => declaration_name(&record.text, target, "declaration"),
+        "srcq.cpp.declaration" => {
+            declaration_name(&record.text, target, "declaration", direct_initialized)
+        }
         "srcq.cpp.field" => field_name(&record.text, target),
         "srcq.cpp.parameter" => declarator_name(
             &record.text,
@@ -869,14 +886,20 @@ fn alias_name(text: &str, target: &str) -> Option<ExtractedName> {
     })
 }
 
-fn declaration_name(text: &str, target: &str, ast_kind: &'static str) -> Option<ExtractedName> {
+fn declaration_name(
+    text: &str,
+    target: &str,
+    ast_kind: &'static str,
+    direct_initialized: bool,
+) -> Option<ExtractedName> {
     for offset in exact_occurrences(text, target) {
         if !looks_like_declarator(text, offset, target.len()) {
             continue;
         }
         let after = skip_whitespace(text, offset + target.len());
-        let role = if text.as_bytes().get(after) == Some(&b'(')
-            || text.trim_start().starts_with("extern ")
+        let role = if !direct_initialized
+            && (text.as_bytes().get(after) == Some(&b'(')
+                || text.trim_start().starts_with("extern "))
         {
             DefinitionRole::Declaration
         } else {

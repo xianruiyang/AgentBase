@@ -88,6 +88,27 @@ fn cpp_definition_distinguishes_definitions_calls_declarations_and_lexical_owner
     let declaration = String::from_utf8(declaration.stdout).expect("UTF-8 declaration output");
     assert!(declaration.starts_with("definition-candidate none\n"));
     assert!(declaration.contains("declarations 1\n"));
+
+    let direct_initialized = run(&[
+        "symbol",
+        "definition",
+        "DirectWidget",
+        "--only-root",
+        root,
+        "--body",
+        "none",
+        "--output",
+        "machine",
+    ]);
+    assert!(direct_initialized.status.success());
+    let direct_initialized: Value =
+        serde_json::from_slice(&direct_initialized.stdout).expect("direct-init JSON");
+    assert_eq!(direct_initialized["definition_total"], 1);
+    assert_eq!(direct_initialized["declaration_total"], 0);
+    assert_eq!(
+        direct_initialized["definitions"][0]["symbol_kind"],
+        "variable"
+    );
 }
 
 #[test]

@@ -94,3 +94,5 @@ int UseFixtureWorker()
     FixtureWorker Worker;
     return Worker.Tick();
 }
+
+Widget DirectWidget(Widget{});
