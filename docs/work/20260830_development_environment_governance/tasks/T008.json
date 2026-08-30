@@ -1,0 +1,44 @@
+{
+  "dependencies": [],
+  "id": "T008",
+  "mutation_scope": [
+    "development/codex-deployment/bootstrap_windows.ps1",
+    "development/codex-deployment/README.md",
+    "development/codex-deployment/test_bootstrap_windows.ps1",
+    "docs/work/20260830_development_environment_governance/**"
+  ],
+  "outcome": "AgentBase bootstrap、说明、确定性测试与用户级原生 Codex CLI 一致使用 npm 当前稳定 latest 0.151.0，并保留 routing runner 所需能力",
+  "outputs": [
+    "Codex CLI 0.151.0 精确主机基线",
+    "用户 npm 原生 Codex CLI 0.151.0 安装与能力读回",
+    "供 T007 消费的 latest CLI 身份"
+  ],
+  "reasoning_hint": "high",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-008",
+    "GAP-008",
+    "DES-009",
+    "AC-010",
+    "REQ-005",
+    "UDES-004",
+    "CON-005"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "powershell-usage"
+  ],
+  "title": "升级 Codex CLI 稳定基线到 npm latest",
+  "validation_dimensions": [
+    "dist_tag=latest",
+    "version=0.151.0",
+    "platform=win32-x64",
+    "capability=isolated_exec_jsonl"
+  ],
+  "verification": [
+    "npm latest dist-tag 读回为 0.151.0 且不采用 alpha/beta",
+    "运行 development/codex-deployment/test_bootstrap_windows.ps1",
+    "只升级 @openai/codex@0.151.0 后运行 bootstrap_windows.ps1 -Action Check -View Machine，确认版本、原生路径、PATH 顺序与隔离选项"
+  ]
+}

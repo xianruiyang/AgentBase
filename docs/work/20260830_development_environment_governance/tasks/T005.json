@@ -1,0 +1,43 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "当前入口与退出资产清单"
+      ],
+      "id": "T004",
+      "type": "ordering"
+    }
+  ],
+  "id": "T005",
+  "mutation_scope": [
+    ".github/**",
+    ".pytest_cache/**",
+    "development/**",
+    "%LOCALAPPDATA%/AgentBase/agent-evaluation-*"
+  ],
+  "outcome": "空 CI 目录、测试缓存和退出评测路径的无恢复价值本地状态被清理，仍有当前消费者的 benchmark、hook 与日志边界保留",
+  "outputs": [
+    "已删除残留清单",
+    "保留资产及消费者依据"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-004",
+    "GAP-005",
+    "DES-006",
+    "AC-006",
+    "CON-001"
+  ],
+  "suggested_skills": [],
+  "title": "清理其余已证无消费者的开发环境残留",
+  "validation_dimensions": [
+    "repository-source",
+    "ignored-cache",
+    "host-runtime-state"
+  ],
+  "verification": [
+    "目标路径读回；Git 与正式入口不引用已删除资产；不删除当前 QQ hook 或活动日志"
+  ]
+}

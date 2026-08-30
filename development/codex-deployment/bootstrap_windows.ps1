@@ -359,7 +359,7 @@ function Get-CodexCliState {
         return [pscustomobject]@{
             name = "Codex CLI"
             command = "codex.exe"
-            package_id = "@openai/codex@0.148.0"
+            package_id = "@openai/codex@0.151.0"
             installer = "npm"
             remediation = "install"
             available = $false
@@ -388,11 +388,11 @@ function Get-CodexCliState {
         $supportsIsolation = $supportsIsolation -and $help.Contains($requiredOption)
     }
     $pathReady = Test-UserNpmPathPrecedence -NpmPrefix $npmPrefix
-    $versionReady = $null -ne $versionObject -and $versionObject -eq [version]"0.148.0"
+    $versionReady = $null -ne $versionObject -and $versionObject -eq [version]"0.151.0"
     return [pscustomobject]@{
         name = "Codex CLI"
         command = "codex.exe"
-        package_id = "@openai/codex@0.148.0"
+        package_id = "@openai/codex@0.151.0"
         installer = "npm"
         remediation = if ($versionReady -and $supportsIsolation -and -not $pathReady) { "configure_path" } else { "install" }
         available = $true
@@ -482,10 +482,10 @@ function Install-CodexCli {
     if ($null -eq $npm) {
         throw "npm is required to install the verified Codex CLI runtime"
     }
-    & $npm.Source install --global "@openai/codex@0.148.0" --no-audit --no-fund
+    & $npm.Source install --global "@openai/codex@0.151.0" --no-audit --no-fund
     $npmExit = $LASTEXITCODE
     if ($npmExit -ne 0) {
-        throw "npm install failed for @openai/codex@0.148.0 with exit code $npmExit"
+        throw "npm install failed for @openai/codex@0.151.0 with exit code $npmExit"
     }
 }
 
@@ -613,7 +613,7 @@ if ($Action -eq "Install") {
         Add-PersistedPathEntries
     }
     $codexState = Get-CodexCliState
-    if (-not $codexState.available -or [string]$codexState.version -ne "0.148.0" -or -not [bool]$codexState.isolation_options_supported) {
+    if (-not $codexState.available -or [string]$codexState.version -ne "0.151.0" -or -not [bool]$codexState.isolation_options_supported) {
         Install-CodexCli
         Add-PersistedPathEntries
     }

@@ -1,0 +1,43 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "受信任本地候选与 Verifier 替代路径"
+      ],
+      "id": "T002",
+      "type": "hard"
+    }
+  ],
+  "id": "T003",
+  "mutation_scope": [
+    "development/agent-evaluation/**"
+  ],
+  "outcome": "评测源码、测试和 CLI 不再包含 elevated sandbox、ACL/deny/canary、认证 hardlink、权限清单或专用 sandbox 清理生命周期",
+  "outputs": [
+    "退出的旧安全脚本/schema/命令",
+    "只覆盖当前机械契约的测试集"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-002",
+    "GAP-002",
+    "GAP-003",
+    "DES-004",
+    "DES-005",
+    "AC-002",
+    "AC-005",
+    "UDES-002"
+  ],
+  "suggested_skills": [],
+  "title": "删除 strict safety 资产与生产者自证门禁",
+  "validation_dimensions": [
+    "implementation",
+    "test-oracle",
+    "cli-contract"
+  ],
+  "verification": [
+    "源码与测试引用审计无退出术语；组件测试不生成或读取 sandbox runtime"
+  ]
+}

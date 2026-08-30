@@ -1,0 +1,20 @@
+{
+  "active_consumer": "",
+  "blocked_reason": "",
+  "ended_at": "2026-08-30T16:42:38Z",
+  "evidence_frontier": "",
+  "invalidated_source_ids": [],
+  "latest_evidence": "",
+  "next_action": "",
+  "note": "",
+  "owner": "/root",
+  "result_ref": "results/T008.r4.json",
+  "revision": 4,
+  "schema": "task.state",
+  "started_at": "2026-08-30T16:38:30Z",
+  "status": "done",
+  "task_id": "T008",
+  "uncovered_dimensions": [],
+  "validated_coverage": [],
+  "validation_case": []
+}

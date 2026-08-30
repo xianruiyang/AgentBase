@@ -1,0 +1,77 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "首个本地入口结果"
+      ],
+      "id": "T001",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "候选与 Verifier 替代路径"
+      ],
+      "id": "T002",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "旧安全资产退出结果"
+      ],
+      "id": "T003",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "跨组件文档与生命周期更新"
+      ],
+      "id": "T004",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "本地与仓库残留清理结果"
+      ],
+      "id": "T005",
+      "type": "hard"
+    }
+  ],
+  "id": "T006",
+  "mutation_scope": [
+    "docs/work/20260830_development_environment_governance/**",
+    "docs/plan.md",
+    "docs/handoff.md"
+  ],
+  "outcome": "当前开发环境入口、保留门禁、退出生命周期和文档状态均由直接证据闭合，无适用失败或未知 dirty",
+  "outputs": [
+    "定向验证证据",
+    "完成审计",
+    "可恢复交接状态"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-005",
+    "AC-001",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "REQ-001",
+    "REQ-002",
+    "REQ-003"
+  ],
+  "suggested_skills": [],
+  "title": "执行影响范围验证与跨契约完成审计",
+  "validation_dimensions": [
+    "component-contract",
+    "consumer-impact",
+    "lifecycle-exit",
+    "documentation-status"
+  ],
+  "verification": [
+    "组件正式测试、相关静态合同、部署 Validate、引用/生命周期审计和 Git 状态；不运行九题模型评测或 Publish"
+  ]
+}

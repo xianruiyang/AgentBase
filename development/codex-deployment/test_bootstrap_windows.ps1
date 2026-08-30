@@ -49,7 +49,7 @@ Assert-True (-not [string]::IsNullOrWhiteSpace([string]$machineReadyResult.tools
 $packageIds = @($machineReadyResult.tools | ForEach-Object { [string]$_.package_id })
 Assert-True ($packageIds -contains "BenBoyter.scc") "machine readiness result omitted the scc package identity"
 Assert-True ($packageIds -contains "sharkdp.hyperfine") "machine readiness result omitted the hyperfine package identity"
-Assert-True ($packageIds -contains "@openai/codex@0.148.0") "machine readiness result omitted the isolated Codex CLI package identity"
+Assert-True ($packageIds -contains "@openai/codex@0.151.0") "machine readiness result omitted the isolated Codex CLI package identity"
 $codexState = @($machineReadyResult.tools | Where-Object { [string]$_.name -eq "Codex CLI" })[0]
 Assert-True ([bool]$codexState.isolation_options_supported) "Codex CLI does not expose the isolated exec options required by routing evaluation"
 Assert-True ([bool]$codexState.path_precedes_windowsapps) "Codex CLI user npm prefix does not precede WindowsApps in the persisted user PATH"

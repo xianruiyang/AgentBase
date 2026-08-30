@@ -1,0 +1,56 @@
+{
+  "changed_files": [
+    "development/codex-deployment/bootstrap_windows.ps1",
+    "development/codex-deployment/README.md",
+    "development/codex-deployment/test_bootstrap_windows.ps1",
+    "docs/work/20260830_development_environment_governance/requirements.md",
+    "docs/work/20260830_development_environment_governance/user-design.md",
+    "docs/work/20260830_development_environment_governance/design.md",
+    "docs/work/20260830_development_environment_governance/current-state.md",
+    "docs/work/20260830_development_environment_governance/solution.md"
+  ],
+  "evidence_for": [
+    "REQ-005",
+    "AC-010",
+    "UDES-004",
+    "DES-009",
+    "SOL-008"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "runtime-readback",
+      "note": "读回 ready、原生路径、版本、PATH 顺序和隔离能力",
+      "ref": "development/codex-deployment/bootstrap_windows.ps1 -Action Check -View Machine"
+    },
+    {
+      "kind": "test",
+      "note": "确定性 bootstrap 合同通过",
+      "ref": "development/codex-deployment/test_bootstrap_windows.ps1"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "Codex CLI 稳定基线与用户级安装已从 0.148.0 更新为 npm latest 0.151.0，bootstrap 能力读回和确定性测试均通过",
+  "outputs": [
+    "bootstrap、部署说明和测试共同使用 @openai/codex@0.151.0",
+    "用户 npm 原生 codex.exe 版本为 0.151.0，路径优先于 WindowsApps",
+    "T007 可消费的 latest CLI 身份与 isolated exec JSONL 能力"
+  ],
+  "schema": "task.result",
+  "source_snapshot_ref": "sha256:a083cac02bdb8bcf9945311a308783169790350cac8418ae23988cdb81cfdb4d",
+  "task_id": "T008",
+  "task_revision": 1,
+  "unresolved": [],
+  "validation_coverage": [
+    "dist_tag=latest",
+    "version=0.151.0",
+    "platform=win32-x64",
+    "capability=isolated_exec_jsonl"
+  ],
+  "verification": [
+    "npm view @openai/codex version dist-tags --json: latest=0.151.0，alpha=0.152.0-alpha.4",
+    "npm install --global @openai/codex@0.151.0 --no-audit --no-fund: exit 0",
+    "codex --version: codex-cli 0.151.0；codex exec --help 保留所需隔离与 JSONL 选项",
+    "bootstrap_windows.ps1 -Action Check -View Machine: ready=true，Codex CLI 0.151.0、原生 npm 路径、PATH 优先、isolation_options_supported=true",
+    "test_bootstrap_windows.ps1: tests : pass"
+  ]
+}

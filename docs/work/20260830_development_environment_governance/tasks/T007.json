@@ -1,0 +1,89 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "稳定 latest Codex CLI 0.151.0 身份与隔离能力读回"
+      ],
+      "id": "T008",
+      "type": "hard"
+    }
+  ],
+  "id": "T007",
+  "mutation_scope": [
+    "global/AGENTS.md",
+    "global/config.toml",
+    "global/README.md",
+    "skills/subagent-orchestration/**",
+    "development/skill-routing/trigger-cases.json",
+    "development/codex-deployment/**",
+    "docs/work/20260830_development_environment_governance/**"
+  ],
+  "outcome": "portable Codex mode 与全局执行规则使非 ultra 的 /root 在隐式高收益任务中主动创建子代理，同时 child 默认不递归、只有用户、父代理或适用规则明确要求当前任务嵌套时才继续创建，并允许同时打开 6 个子代理线程",
+  "outputs": [
+    "root-led multi-agent mode、全局创建动作与六子代理容量配置",
+    "主代理角色路由、固定角色交接与 child 默认不嵌套的 skill/触发合同",
+    "portable-settings 合并、生命周期和说明合同",
+    "0.151.0 prompt-input、root 真实代理事件与 child 默认非递归事件结论",
+    "官方 tag/main 的结构化委派决策与 V2 wait 职责结论"
+  ],
+  "reasoning_hint": "xhigh",
+  "revision": 7,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-007",
+    "SOL-008",
+    "SOL-009",
+    "GAP-007",
+    "GAP-011",
+    "GAP-012",
+    "GAP-013",
+    "GAP-015",
+    "GAP-017",
+    "GAP-018",
+    "DES-008",
+    "DES-009",
+    "DES-010",
+    "DES-011",
+    "DES-012",
+    "DES-013",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "REQ-004",
+    "REQ-005",
+    "UDES-004",
+    "UDES-005",
+    "UDES-006",
+    "CON-004",
+    "CON-005"
+  ],
+  "suggested_skills": [
+    "change-governance",
+    "execution-governor",
+    "subagent-orchestration",
+    "skill-creator",
+    "openai-docs",
+    "powershell-usage"
+  ],
+  "title": "闭合 root 主动与 child 默认非递归委派",
+  "validation_dimensions": [
+    "codex_cli=0.151.0",
+    "reasoning_effort=medium_or_xhigh",
+    "prompt_explicitness=implicit",
+    "agent_role=root_vs_child",
+    "mode_owner=features.multi_agent_v2.multi_agent_mode_hint_text",
+    "action_owner=global_AGENTS_and_subagent_orchestration",
+    "spawned_agent_capacity=6",
+    "v2_total_capacity=7",
+    "client_decision_owner=official_tag_and_main",
+    "oracle=root_agent_event_and_no_default_nested_event"
+  ],
+  "verification": [
+    "运行 skill quick_validate、静态路由合同，并在候选稳定后按 routing plan 只刷新受影响 evidence",
+    "运行 deployment Validate 和受影响的 portable-settings 确定性测试，检查受管 mode/容量、生命周期、合并与保留",
+    "从候选 portable config 用 codex-cli 0.151.0 debug prompt-input 读回 root-led mode、候选 AGENTS/skill 和 7 个含 root 总槽位",
+    "使用 medium 与 xhigh 非 ultra 档位运行不含委派提示词的独立任务，从 JSONL 验收 /root 真实创建、child 回传、默认无嵌套和父任务完成；失败按真实行为记录，不重采样",
+    "对照官方 rust-v0.151.0 与 main 复核结构化委派决策、递归策略、spawn spec、AgentRegistry 与 V2 wait 正式职责",
+    "不运行九项最终评测、实际 Codex Publish 或新增 Hook 门禁"
+  ]
+}

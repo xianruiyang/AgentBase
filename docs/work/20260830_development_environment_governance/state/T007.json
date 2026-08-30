@@ -1,0 +1,47 @@
+{
+  "active_consumer": "codex-cli 0.151.0 run10 medium、run11 xhigh 与官方 tag/main 源码合同",
+  "blocked_reason": "run10 medium 与 run11 xhigh 均在候选 mode/AGENTS/skill 已加载、模型明确决定委派后产生 0 次 spawn 和 4 次空 wait；官方 rust-v0.151.0 与 main 没有结构化 delegation-decision 到 tool-call 的正式 owner，现有 wait/live-agent 状态不能安全补足。",
+  "ended_at": null,
+  "evidence_frontier": "缺少结构化 delegation-decision 到 spawn tool-call 的正式绑定 owner",
+  "invalidated_source_ids": [],
+  "latest_evidence": "候选静态与部署合同通过：129-case routing contract、3-stage evidence refresh、manage Validate、portable-settings tests。行为仍失败：run11 xhigh 声明创建 6 个 evidence，但 0 spawn/child return、4 空 wait；官方 main 无结构化绑定 owner。",
+  "next_action": "客户端或模型出现结构化委派决策、spawn obligation 或等价正式机制后重开；先复核 owner、tool loop 与 root/child 权限，再运行一个新的代表 case。",
+  "note": "最低充分候选已表达 root 按需主动、child 默认仅按明确要求嵌套，并保留 6 子代理容量；最终静态、路由和 portable-settings 合同均通过，真实行为 oracle 连续失败。",
+  "owner": "/root",
+  "result_ref": null,
+  "revision": 23,
+  "schema": "task.state",
+  "started_at": "2026-08-30T16:30:08Z",
+  "status": "blocked",
+  "task_id": "T007",
+  "uncovered_dimensions": [
+    "future_structured_delegation_decision_owner",
+    "root_actual_agent_event",
+    "child_real_default_non_nesting_event"
+  ],
+  "validated_coverage": [
+    "run10_prompt_inputs=candidate_mode_AGENTS_skill_loaded",
+    "run10_parent_completion=pass",
+    "run10_root_actual_agent_event=absent",
+    "run10_declared_delegation_without_spawn=confirmed",
+    "run11_parent_completion=pass",
+    "run11_root_actual_agent_event=absent",
+    "run11_declared_delegation_without_spawn=confirmed",
+    "run10_run11_nested_agent_event=absent",
+    "official_tag_main_structured_decision_owner=absent",
+    "v2_wait_no_child_error_patch=invalidated_by_official_contract",
+    "skill_quick_validate=pass",
+    "routing_contract=129_cases_pass",
+    "routing_evidence_generation=D011F57C_refreshed_3_stages",
+    "deployment_validate=pass",
+    "portable_settings_tests=pass"
+  ],
+  "validation_case": [
+    "codex_cli=0.151.0",
+    "reasoning_effort=medium_and_xhigh",
+    "mode=root_led_custom",
+    "action_owner=global_AGENTS_and_subagent_orchestration",
+    "spawned_agent_capacity=6",
+    "oracle=root_spawn_and_no_default_nested_spawn"
+  ]
+}

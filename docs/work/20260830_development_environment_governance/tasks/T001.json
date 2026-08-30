@@ -1,0 +1,35 @@
+{
+  "dependencies": [],
+  "id": "T001",
+  "mutation_scope": [
+    "development/agent-evaluation/**"
+  ],
+  "outcome": "validate、list 和 report 从当前 corpus 与本地状态产生真实结果，不读取或要求 sandbox runtime",
+  "outputs": [
+    "简化后的评测 CLI/runtime 边界",
+    "首个真实本地消费者读回"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-001",
+    "GAP-002",
+    "GAP-004",
+    "DES-002",
+    "DES-003",
+    "AC-002",
+    "AC-004",
+    "AC-007",
+    "REQ-003"
+  ],
+  "suggested_skills": [],
+  "title": "闭合无 sandbox 的评测只读入口",
+  "validation_dimensions": [
+    "command",
+    "local-state-presence"
+  ],
+  "verification": [
+    "运行 validate/list/report，确认不访问 sandbox runtime、不请求管理员批准且返回当前语料与结果状态"
+  ]
+}

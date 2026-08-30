@@ -180,6 +180,8 @@
     "subagent-user-forbids",
     "subagent-short-local-no-benefit",
     "subagent-cheap-direct-operation-no-benefit",
+    "subagent-child-explicit-nesting",
+    "subagent-child-no-default-nesting",
     "architecture-risk-discovered-during-implementation",
     "single-error-no-enforcement-system",
     "adaptive-plan-without-user-prompt",
@@ -1742,6 +1744,41 @@
         "bounded_subagent_delegation"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-child-explicit-nesting",
+      "kind": "positive",
+      "request": "你当前是 `/root/evidence` 子代理。父代理在本次 capsule 中明确要求你把两个互不依赖、范围已限定的目录分别交给两个 evidence 后代并行取证，再由你合并为一个有界证据包返回；不得创建用户任务或分叉线程。请按这次明确的嵌套要求执行。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-child-no-default-nesting",
+      "kind": "negative",
+      "request": "你当前是 `/root/evidence` 子代理，父代理只要求你读取已限定的三个文件并返回证据，没有要求继续拆分或嵌套委派。即使其中还有可并行的小片段，也由你在当前任务内完成并返回父代理，不要再创建子代理、分叉或新任务。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "subagent-discussion-only",

@@ -1,0 +1,47 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "简化后的 CLI/runtime 边界"
+      ],
+      "id": "T001",
+      "type": "hard"
+    }
+  ],
+  "id": "T002",
+  "mutation_scope": [
+    "development/agent-evaluation/agent_eval.py",
+    "development/agent-evaluation/evaluation_core.py",
+    "development/agent-evaluation/windows_verifier.py",
+    "development/agent-evaluation/tests/**"
+  ],
+  "outcome": "prepare、oracle、run 和 recover 使用普通本地候选与独立 Verifier 工作区，并保留 patch、身份、结果和恢复合同",
+  "outputs": [
+    "无 permission profile 的候选入口",
+    "普通本地 Verifier",
+    "可恢复单题状态机"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-001",
+    "GAP-002",
+    "GAP-004",
+    "DES-002",
+    "DES-003",
+    "AC-003",
+    "AC-004",
+    "REQ-003"
+  ],
+  "suggested_skills": [],
+  "title": "迁移候选与 Verifier 到受信任本地运行",
+  "validation_dimensions": [
+    "candidate-stage",
+    "verifier-stage",
+    "recovery-stage"
+  ],
+  "verification": [
+    "确定性测试以冻结的本地子进程替身验证候选、patch、Verifier、失败分类与 recover；不启动真实模型或外部依赖"
+  ]
+}

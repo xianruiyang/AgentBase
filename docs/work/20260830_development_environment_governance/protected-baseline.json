@@ -1,0 +1,209 @@
+{
+  "confirmation_ref": "2026-08-31:root-proactive-child-explicit-nested-delegation",
+  "confirmed_by": "user",
+  "cycle_id": "cycle-005",
+  "documents": {
+    "requirements": {
+      "fingerprint": "sha256:62d03cb80e9894068a85bdd11904a427fcec73a128fd8de646fc92deca698dd3",
+      "ids": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006",
+        "AC-007",
+        "AC-008",
+        "AC-009",
+        "AC-010",
+        "CON-001",
+        "CON-002",
+        "CON-003",
+        "CON-004",
+        "CON-005",
+        "REQ-001",
+        "REQ-002",
+        "REQ-003",
+        "REQ-004",
+        "REQ-005"
+      ],
+      "path": "requirements.md"
+    },
+    "user_design": {
+      "fingerprint": "sha256:24ee3fc57a082d05e87b9ef629d4c82a11751e679f859ee32229d1256d01dca6",
+      "ids": [
+        "UDES-001",
+        "UDES-002",
+        "UDES-003",
+        "UDES-004",
+        "UDES-005",
+        "UDES-006"
+      ],
+      "path": "user-design.md"
+    }
+  },
+  "history": [
+    {
+      "confirmation_ref": "user-turn-2026-08-30-development-environment-governance",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-001",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:fad7d950f8b51694a0b273f265cf42baa6fb681b8177bee4e91a6b1e17c1b50b",
+          "ids": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007",
+            "CON-001",
+            "CON-002",
+            "CON-003",
+            "REQ-001",
+            "REQ-002",
+            "REQ-003"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:45c811283257cd0080fc9857aefad880b3cb85ce405de652c4b2a768d134323c",
+          "ids": [
+            "UDES-001",
+            "UDES-002"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "当前对话：用户要求通过 AGENTS.md 对冲宿主保守默认，并由独立 CLI 单任务验证；同时明确否决 PreToolUse/Stop Hook",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-002",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:94c65558b28c2791654ecdd9600af584d454afdc517c759f7a346c8e03e23b3c",
+          "ids": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007",
+            "AC-008",
+            "AC-009",
+            "CON-001",
+            "CON-002",
+            "CON-003",
+            "CON-004",
+            "REQ-001",
+            "REQ-002",
+            "REQ-003",
+            "REQ-004"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:3a3aad7ea92d843f2af2acf667bb47ca484b8277fb2af0c5b7f2c661ab0be95d",
+          "ids": [
+            "UDES-001",
+            "UDES-002",
+            "UDES-003"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "当前对话：用户补充要求独立行为测试先升级到 npm 当前稳定 latest Codex CLI",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-003",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:bea8f9d183a10a65da131a51eab5627ba446e233b4c05b74ba62e5bdde26b3eb",
+          "ids": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007",
+            "AC-008",
+            "AC-009",
+            "AC-010",
+            "CON-001",
+            "CON-002",
+            "CON-003",
+            "CON-004",
+            "CON-005",
+            "REQ-001",
+            "REQ-002",
+            "REQ-003",
+            "REQ-004",
+            "REQ-005"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:181105ffb05f624fa78be5076109420297ed344119a1b8df490c13b0e0af7430",
+          "ids": [
+            "UDES-001",
+            "UDES-002",
+            "UDES-003",
+            "UDES-004"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "2026-08-31:multi_agent_mode_hint_text-and-configurable-capacity",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-004",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:89b3988fa8a60ca349c4cc49a88c7fe1142eef322e491e5a1a90bc49e6a134c7",
+          "ids": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007",
+            "AC-008",
+            "AC-009",
+            "AC-010",
+            "CON-001",
+            "CON-002",
+            "CON-003",
+            "CON-004",
+            "CON-005",
+            "REQ-001",
+            "REQ-002",
+            "REQ-003",
+            "REQ-004",
+            "REQ-005"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:863a103432fabc708edd0fafd39d7ae7c82d86d3162584a6c4c70c648faa2342",
+          "ids": [
+            "UDES-001",
+            "UDES-002",
+            "UDES-003",
+            "UDES-004",
+            "UDES-005"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    }
+  ],
+  "schema": "delivery.protected-baseline",
+  "workflow_id": "development-environment-governance"
+}

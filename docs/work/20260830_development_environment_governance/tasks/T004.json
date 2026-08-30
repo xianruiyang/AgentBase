@@ -1,0 +1,51 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "最终退出的安全资产和新入口集合"
+      ],
+      "id": "T003",
+      "type": "hard"
+    }
+  ],
+  "id": "T004",
+  "mutation_scope": [
+    "README.md",
+    "AGENTS.md",
+    "docs/requirements.md",
+    "docs/plan.md",
+    "docs/handoff.md",
+    "docs/work/20260820_agentbase_final_evaluation_set/**",
+    "development/codex-deployment/README.md",
+    "development/agent-evaluation/README.md"
+  ],
+  "outcome": "根 requirements、总计划、项目规则、README、部署说明和最终评测交付链只描述当前本地开发与评测入口",
+  "outputs": [
+    "当前 owner/入口/状态说明",
+    "旧安全合同的 superseded/退出裁决"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-003",
+    "GAP-001",
+    "GAP-004",
+    "DES-001",
+    "DES-005",
+    "AC-001",
+    "AC-006",
+    "REQ-001"
+  ],
+  "suggested_skills": [],
+  "title": "更新跨组件当前状态与生命周期消费者",
+  "validation_dimensions": [
+    "owner",
+    "entrypoint",
+    "lifecycle",
+    "status"
+  ],
+  "verification": [
+    "引用审计只命中历史失败证据；当前文档与真实 CLI、srcq/MCP/AgentBase Status 一致"
+  ]
+}
