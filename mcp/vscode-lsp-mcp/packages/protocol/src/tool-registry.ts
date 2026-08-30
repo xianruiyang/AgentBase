@@ -61,7 +61,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'document_symbols',
-    description: 'After source/AST cannot supply structure, return a bounded document outline.',
+    description: 'Only when source/AST cannot supply the required outline, return bounded Provider document symbols; do not use it for an ordinary C/C++ function list.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -93,7 +93,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'get_call_hierarchy',
-    description: 'Return bounded call relations only when source/AST is insufficient.',
+    description: 'Return bounded overload-aware call relations only when source/AST is insufficient; cold C/C++ requires a current compile_commands entry.',
     readOnly: true,
     destructive: false,
     idempotent: true,

@@ -19,7 +19,7 @@ import {
 } from './hierarchy-provider.js';
 
 const workspaceRoot = 'D:\\workspace\\app';
-const sourceFile = `${workspaceRoot}\\src\\hierarchy.ts`;
+const sourceFile = `${workspaceRoot}\\src\\hierarchy.cpp`;
 const sourceText = [
   'export function leafCall(): number {',
   '  return 1;',
@@ -95,6 +95,7 @@ class FakeHierarchyHost implements HierarchyProviderHost {
     uri: { scheme: 'file', fsPath: sourceFile },
     getText: () => sourceText,
   } as unknown as TextDocument;
+  readonly callPrepareResults: unknown[][] = [];
 
   createPosition(line: number, character: number): unknown {
     return { line, character };
@@ -108,7 +109,9 @@ class FakeHierarchyHost implements HierarchyProviderHost {
   executeCommand(command: string, ...args: readonly unknown[]): PromiseLike<unknown> {
     this.events.push(command);
     this.calls.push({ command, args });
-    if (command === 'vscode.prepareCallHierarchy') return Promise.resolve([this.middleCall]);
+    if (command === 'vscode.prepareCallHierarchy') {
+      return Promise.resolve(this.callPrepareResults.shift() ?? [this.middleCall]);
+    }
     if (command === 'vscode.provideIncomingCalls') {
       return Promise.resolve([{ from: this.rootCall, fromRanges: [range(7, 9, 19)] }]);
     }
@@ -122,13 +125,44 @@ class FakeHierarchyHost implements HierarchyProviderHost {
   }
 }
 
+test('cold C++ call hierarchy retries a transient empty prepare result in one request', async () => {
+  const host = new FakeHierarchyHost();
+  host.callPrepareResults.push([], [host.middleCall]);
+  const bridge = new HierarchyProviderBridge(host, pathAccess, () => 1_000);
+  const prepared = parseHierarchyPrepareBridgeResponse(await bridge.handle(
+    context,
+    request(HIERARCHY_BRIDGE_METHODS.prepare, {
+      kind: 'call', file: 'src/hierarchy.cpp', line: 4, column: 17,
+    }),
+    new AbortController().signal,
+  ));
+  assert.equal(prepared.status, 'completed');
+  assert.equal(host.calls.filter(({ command }) => command === 'vscode.prepareCallHierarchy').length, 2);
+});
+
+test('an empty C++ prepare outside a callable token remains a valid empty result', async () => {
+  const host = new FakeHierarchyHost();
+  host.callPrepareResults.push([]);
+  const bridge = new HierarchyProviderBridge(host, pathAccess, () => 1_000);
+  const prepared = parseHierarchyPrepareBridgeResponse(await bridge.handle(
+    context,
+    request(HIERARCHY_BRIDGE_METHODS.prepare, {
+      kind: 'call', file: 'src/hierarchy.cpp', line: 1, column: 1,
+    }),
+    new AbortController().signal,
+  ));
+  assert.equal(prepared.status, 'completed');
+  assert.equal(prepared.status === 'completed' && prepared.nodes.length, 0);
+  assert.equal(host.calls.filter(({ command }) => command === 'vscode.prepareCallHierarchy').length, 1);
+});
+
 test('call hierarchy bridge activates first, retains private items, and maps call-site frames', async () => {
   const host = new FakeHierarchyHost();
   const bridge = new HierarchyProviderBridge(host, pathAccess, () => 1_000);
   const prepared = parseHierarchyPrepareBridgeResponse(await bridge.handle(
     context,
     request(HIERARCHY_BRIDGE_METHODS.prepare, {
-      kind: 'call', file: 'src/hierarchy.ts', line: 4, column: 17,
+      kind: 'call', file: 'src/hierarchy.cpp', line: 4, column: 17,
     }),
     new AbortController().signal,
   ));
@@ -137,7 +171,7 @@ test('call hierarchy bridge activates first, retains private items, and maps cal
   assert.deepEqual(prepared.nodes, [{
     nodeId: 'n1',
     symbol: {
-      name: 'middleCall', kind: 'function', file: 'src/hierarchy.ts', line: 4, column: 17,
+      name: 'middleCall', kind: 'function', file: 'src/hierarchy.cpp', line: 4, column: 17,
     },
   }]);
   assert.deepEqual(host.events.slice(0, 2), ['activate', 'vscode.prepareCallHierarchy']);
@@ -155,7 +189,7 @@ test('call hierarchy bridge activates first, retains private items, and maps cal
     nodes: [{
       nodeId: 'n2',
       symbol: {
-        name: 'rootCall', kind: 'function', file: 'src/hierarchy.ts', line: 7, column: 17,
+        name: 'rootCall', kind: 'function', file: 'src/hierarchy.cpp', line: 7, column: 17,
       },
       callSites: [{ startLine: 8, startColumn: 10, endLine: 8, endColumn: 20 }],
     }],
@@ -183,7 +217,7 @@ test('type hierarchy bridge maps supertype and subtype nodes and rejects cross-k
   const prepared = parseHierarchyPrepareBridgeResponse(await bridge.handle(
     context,
     request(HIERARCHY_BRIDGE_METHODS.prepare, {
-      kind: 'type', file: 'src/hierarchy.ts', line: 11, column: 14,
+      kind: 'type', file: 'src/hierarchy.cpp', line: 11, column: 14,
     }),
     new AbortController().signal,
   ));
@@ -220,7 +254,7 @@ test('hierarchy bridge fails closed for malformed requests and invalid positions
   assert.deepEqual(await bridge.handle(
     context,
     request(HIERARCHY_BRIDGE_METHODS.prepare, {
-      kind: 'call', file: 'src/hierarchy.ts', line: 99, column: 1,
+      kind: 'call', file: 'src/hierarchy.cpp', line: 99, column: 1,
     }),
     new AbortController().signal,
   ), { status: 'positionOutOfRange' });

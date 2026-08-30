@@ -26,6 +26,24 @@ import {
   type VscodeProviderHost,
 } from './provider-runtime.js';
 
+const cppSourceFile = /\.(?:c|cc|cpp|cxx|h|hh|hpp|hxx|inl|ipp)$/i;
+const cppIdentifierCharacter = /[A-Za-z0-9_]/;
+const CPP_COLD_HIERARCHY_POLL_DELAYS_MS = Object.freeze([
+  0,
+  250,
+  500,
+  1_000,
+  2_000,
+  5_000,
+  5_000,
+  5_000,
+  5_000,
+  5_000,
+  5_000,
+  5_000,
+  5_000,
+] as const);
+
 export const HIERARCHY_MAX_ACTIVE_TRAVERSALS = 32;
 export const HIERARCHY_MAX_NODES_PER_TRAVERSAL = 5_000;
 export const HIERARCHY_TRAVERSAL_TTL_MS = 60_000;
@@ -197,18 +215,47 @@ const providerPosition = (
   return host.createPosition(line, character);
 };
 
+const looksLikeCppCallable = (
+  document: TextDocument,
+  input: PrepareParams,
+): boolean => {
+  if (!cppSourceFile.test(input.file)) return false;
+  const lines = document.getText().replaceAll('\r\n', '\n').replaceAll('\r', '\n').split('\n');
+  const text = lines[input.line - 1];
+  if (text === undefined || text.length === 0) return false;
+  let cursor = Math.min(input.column - 1, text.length - 1);
+  if (!cppIdentifierCharacter.test(text[cursor] ?? '') && cursor > 0 &&
+      cppIdentifierCharacter.test(text[cursor - 1] ?? '')) {
+    cursor -= 1;
+  }
+  if (!cppIdentifierCharacter.test(text[cursor] ?? '')) return false;
+  let end = cursor + 1;
+  while (end < text.length && cppIdentifierCharacter.test(text[end] ?? '')) end += 1;
+  while (end < text.length && /\s/.test(text[end] ?? '')) end += 1;
+  return text[end] === '(';
+};
+
 const prepareAdapter = (
   host: HierarchyProviderHost,
   kind: HierarchyBridgeKind,
-): ProviderCommandAdapter<PrepareParams, readonly unknown[]> => ({
-  command: kind === 'call' ? 'vscode.prepareCallHierarchy' : 'vscode.prepareTypeHierarchy',
-  requiresDocument: true,
-  buildArguments: (input, document) => {
-    if (document === undefined) throw new RangeError('Document activation invariant failed.');
-    return [document.uri, providerPosition(host, input, document)];
-  },
-  classifyResult: classifyArrayProviderResult,
-});
+): ProviderCommandAdapter<PrepareParams, readonly unknown[]> => {
+  let retryTransientEmpty = false;
+  return {
+    command: kind === 'call' ? 'vscode.prepareCallHierarchy' : 'vscode.prepareTypeHierarchy',
+    requiresDocument: true,
+    buildArguments: (input, document) => {
+      if (document === undefined) throw new RangeError('Document activation invariant failed.');
+      retryTransientEmpty = kind === 'call' && looksLikeCppCallable(document, input);
+      return [document.uri, providerPosition(host, input, document)];
+    },
+    classifyResult: (value) => {
+      const classified = classifyArrayProviderResult(value);
+      return classified.status === 'ready' && retryTransientEmpty && classified.value.length === 0
+        ? { status: 'notReady' }
+        : classified;
+    },
+  };
+};
 
 const expandAdapter = (
   direction: HierarchyBridgeDirection,
@@ -369,7 +416,13 @@ export class HierarchyProviderBridge {
       context,
       prepareAdapter(this.#host, params.kind),
       params,
-      { logicalFile: params.file, signal },
+      {
+        logicalFile: params.file,
+        signal,
+        ...(params.kind === 'call' && cppSourceFile.test(params.file)
+          ? { pollDelaysMs: CPP_COLD_HIERARCHY_POLL_DELAYS_MS }
+          : {}),
+      },
     );
     const status = invocationStatus(invocation);
     if (status !== 'completed' || invocation.status !== 'completed') return { status };

@@ -8,11 +8,11 @@ The server exposes exactly 19 tools. MCP `tools/list` is authoritative for descr
 | `health_check` | read | Diagnose bridge or document activation after uncertainty or failure. |
 | `get_capabilities` | read | Probe only capabilities that change the next action. |
 | `workspace_symbols` | read | After scoped text/AST cannot locate a symbol, return bounded semantic candidates. |
-| `document_symbols` | read | After source/AST cannot supply structure, return a bounded document outline. |
+| `document_symbols` | read | Only when source/AST cannot supply the required outline, return bounded Provider document symbols; do not use it for an ordinary C/C++ function list. |
 | `symbol_info` | read | At a known position, request only semantics unresolved by source/AST. |
 | `get_references` | read | At a known symbol, return complete semantic references when text matches are insufficient. |
 | `verify_symbol_candidates` | read | Verify bounded text/AST candidates against one target identity. |
-| `get_call_hierarchy` | read | Return bounded call relations only when source/AST is insufficient. |
+| `get_call_hierarchy` | read | Return bounded overload-aware call relations only when source/AST is insufficient; cold C/C++ requires a current compile_commands entry. |
 | `get_type_hierarchy` | read | Return bounded type relations only when source/AST is insufficient. |
 | `get_diagnostics` | read | Read diagnostics from the smallest needed scope. |
 | `rename_preview` | preview | Preview a complete semantic rename within an explicit path scope. |
@@ -57,3 +57,5 @@ On a cold C/C++ workspace, candidate discovery now runs while the target transla
 `verify_symbol_candidates` remains useful when the caller already has a smaller text/AST candidate set. It resolves the target once and classifies only submitted positions; that tool proves candidate identity, not search completeness.
 
 Most read-tool filters run after the VS Code provider returns; they reduce response size, not Provider enumeration time. `get_references` is the exception only in `auto`/`scoped` C/C++ mode, where `scopePaths` or `includeGlobs` determine candidate discovery before semantic verification. A full-workspace fast result carries `references_fast_workspace_identity_search`; an explicit bounded result carries `references_scoped_identity_search`. Incomplete proof returns an error rather than a partial set.
+
+For an ordinary C/C++ function outline, query the source AST before `document_symbols`; the Provider outline remains the fallback for semantic symbol kinds or nesting that syntax evidence cannot supply. A cold C/C++ `get_call_hierarchy` call retries a transient empty prepare result inside the same bounded request, so the caller should not issue unchanged retries. Once cpptools has parsed the target translation unit, hierarchy expansion reuses that state; keeping the active `compile_commands` complete and current is therefore the main cold-start control.

@@ -533,11 +533,11 @@ CommandFailedDetails:
 | `health_check` | Diagnose bridge or document activation after uncertainty or failure. | `Collection<HealthResult>` | `R=true,D=false,I=true,O=false` |
 | `get_capabilities` | Probe only capabilities that change the next action. | `Collection<Capability>` | `R=true,D=false,I=true,O=false` |
 | `workspace_symbols` | After scoped text/AST cannot locate a symbol, return bounded semantic candidates. | `Collection<SymbolHit>` | `R=true,D=false,I=true,O=false` |
-| `document_symbols` | After source/AST cannot supply structure, return a bounded document outline. | `Collection<DocumentSymbol>` | `R=true,D=false,I=true,O=false` |
+| `document_symbols` | Only when source/AST cannot supply the required outline, return bounded Provider document symbols; do not use it for an ordinary C/C++ function list. | `Collection<DocumentSymbol>` | `R=true,D=false,I=true,O=false` |
 | `symbol_info` | At a known position, request only semantics unresolved by source/AST. | `Collection<SymbolInfoResult>` | `R=true,D=false,I=true,O=false` |
 | `get_references` | At a known symbol, return complete semantic references when text matches are insufficient. | `Collection<ReferenceHit>` | `R=true,D=false,I=true,O=false` |
 | `verify_symbol_candidates` | Verify bounded text/AST candidates against one target identity. | `Collection<SymbolCandidateVerification>` | `R=true,D=false,I=true,O=false` |
-| `get_call_hierarchy` | Return bounded call relations only when source/AST is insufficient. | `Collection<CallHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
+| `get_call_hierarchy` | Return bounded overload-aware call relations only when source/AST is insufficient; cold C/C++ requires a current compile_commands entry. | `Collection<CallHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
 | `get_type_hierarchy` | Return bounded type relations only when source/AST is insufficient. | `Collection<TypeHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
 | `get_diagnostics` | Read diagnostics from the smallest needed scope. | `Collection<Diagnostic>` | `R=true,D=false,I=true,O=false` |
 | `rename_preview` | Preview a complete semantic rename within an explicit path scope. | `Preview` | `R=true,D=false,I=true,O=false` |

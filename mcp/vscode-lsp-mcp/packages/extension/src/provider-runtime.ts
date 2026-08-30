@@ -138,8 +138,8 @@ const validateTimeout = (value: number): number => {
 };
 
 const validatePollDelays = (value: readonly number[]): readonly number[] => {
-  if (value.length < 1 || value.length > 8 || value[0] !== 0) {
-    throw new RangeError('Provider poll delays must contain 1 through 8 entries and start with zero.');
+  if (value.length < 1 || value.length > 16 || value[0] !== 0) {
+    throw new RangeError('Provider poll delays must contain 1 through 16 entries and start with zero.');
   }
   for (const delay of value) {
     if (!Number.isSafeInteger(delay) || delay < 0 || delay > 5_000) {

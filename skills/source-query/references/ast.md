@@ -37,6 +37,7 @@ srcq <schema|capabilities|doctor> ...
 wrapper help 使用 `srcq exec --help`；原生 help 使用 `srcq exec -- run --help`。只在既有命令报告引擎、版本或协议异常时运行 `srcq doctor`、`srcq schema` 或 `srcq capabilities`，不要把探测命令作为查询前置步骤。
 
 - 已知名称且文本定位后能用有界读取可靠取得完整实现时，不使用 AST。只有边界、关系或语法身份不能由文本可靠确定时，才先限定语言、目录、glob 和准确 pattern/rule。默认 token-safe model 每项只写文件、完整 0-based end-exclusive 范围与一次源码正文；只需范围时用 locations。`@more` 或 `@cut` 表示当前可见证据不完整，不得外推全集。
+- C/C++ 单文件只需函数轮廓时，不启动冷 LSP `document_symbols`；在文件范围内使用 `run --kind function_declarator -l cpp <file>`，按源码顺序取得签名与位置，必要时再对少量目标有界读取。需要命名空间、类型嵌套或 Provider 符号分类且语法位置不足时，才升级到 LSP 文档符号。
 - parser、完整捕获、未知字段、稳定 schema 或 round-trip 使用 `--output machine`；`--yaml-out`、lossless 与 custom 本身也选择 machine。普通 model 不读取 `_sgy`，machine 才按 `_sgy.total/files/shown/omitted/complete/cache` 裁决。
 - 已有位置但语法边界仍不稳时，才用 `--cache on` 和目标文件 fingerprint 建立完整 cache，再执行 `process containing`；`containing` 与 `group-locations` 默认返回无 envelope 的定位正文，程序消费时加 `--output machine`。`cache query` 同样默认 model，完整原生 result 用 `cache get`。同文件多目标复用一份 cache，源码身份变化时重扫。
 - pattern 是目标语言语法；元变量、关系、constraints、context/selector 和 rule 只在结构要求需要时增加。调试先收窄到单文件或 stdin，再检查语言、解析、元变量和 strictness。无匹配不是继续猜 pattern 的依据；先读取实际候选源码，只有新观察能说明语言、节点形状、限定名、修饰符或 strictness 为什么应改变时才再查询，否则采用文本证据或明确当前结构结论未证。
