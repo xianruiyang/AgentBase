@@ -1,0 +1,60 @@
+{
+  "dependencies": [],
+  "id": "T009",
+  "mutation_scope": [
+    "global/AGENTS.md",
+    "global/config.toml",
+    "global/README.md",
+    "skills/subagent-orchestration/**",
+    "development/skill-routing/trigger-cases.json",
+    "development/skill-routing/evidence/**",
+    "development/codex-deployment/manage_agentbase.ps1",
+    "development/codex-deployment/managed_asset_lifecycle.json",
+    "development/codex-deployment/test_manage_agentbase.ps1",
+    "development/codex-deployment/README.md",
+    "docs/plan.md",
+    "docs/work/20260830_development_environment_governance/**"
+  ],
+  "outcome": "AgentBase 只通过 global/AGENTS.md 与 subagent-orchestration 维护 root 实际创建和 child 默认非递归行为，portable config 仅保留 6 子代理容量且不包含主动 mode 或客户端补偿",
+  "outputs": [
+    "root 真实创建顺序与 child 默认非递归的全局规则",
+    "实际创建、等待、失败与交接的 subagent-orchestration 合同",
+    "仅保留 6 子代理容量且删除主动 mode 的 portable-settings 合同",
+    "同步后的路由 evidence、治理状态与部署验证结果"
+  ],
+  "reasoning_hint": "xhigh",
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-010",
+    "DES-011",
+    "DES-012",
+    "OBS-023",
+    "UDES-006",
+    "UDES-007",
+    "REQ-004",
+    "AC-008",
+    "AC-009",
+    "CON-004"
+  ],
+  "suggested_skills": [
+    "skill-creator",
+    "change-governance",
+    "delivery-workflow",
+    "task-table-manager"
+  ],
+  "title": "加强 AGENTS 与 skill 委派边界",
+  "validation_dimensions": [
+    "behavior_owner=global_AGENTS_and_subagent_orchestration_only",
+    "root_creation_evidence=successful_child_identity",
+    "child_nesting=explicit_current_task_request_only",
+    "spawned_agent_capacity=6",
+    "portable_mode_policy=absent"
+  ],
+  "verification": [
+    "运行 skill quick_validate 与全局规则/skill 内容、结构、引用和内部冲突检查",
+    "运行静态路由合同并按增量计划刷新受影响 Routing、Policy 与 References evidence",
+    "运行 manage_agentbase Validate 和 portable-settings 确定性测试，确认容量键仍受管且 multi_agent_mode_hint_text 不再受管",
+    "不运行独立行为探针、九项最终评测或实际 Codex Publish"
+  ]
+}

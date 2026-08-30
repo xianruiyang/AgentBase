@@ -34,11 +34,11 @@
 
 ## UDES-005 用原生 mode policy 直接控制主动委派并提高容量
 
-- 状态: confirmed
+- 状态: superseded
 - 来源: 用户提出 `multi_agent_mode_hint_text` 直接方案，并要求按真实官方内容确认可配置的子代理最高数量后修改
 - 关联: REQ-004, AC-008, AC-009, CON-004
 
-主动委派由可移植 Codex 配置的原生 multi-agent mode policy 直接定义，不在 `global/AGENTS.md`、skill、Hook 或测试门禁中维护一份反向规则。并发容量使用官方公开的 `[agents].max_concurrent_threads_per_session` 子代理线程语义；当前设为 6 个 spawned-agent 线程，0.151.0 的 V2 投影为包含 root 的 7 个总槽位。后续提高容量须同时考虑模型额度、墙钟和复核成本，不把 schema 只给出下限误读为无成本上限。
+该候选曾把主动委派与并发容量一并交给 portable config；多轮真实反例证明 mode policy 不能绑定实际创建后，用户撤回主动 mode 与其他客户端级补偿，只保留公开的 `[agents].max_concurrent_threads_per_session = 6` 容量设置。容量只限制可同时打开的 child 数量，不决定是否委派。
 
 ## UDES-006 root 按需主动委派，child 默认不递归委派
 
@@ -46,4 +46,12 @@
 - 来源: 用户明确最终目标，并允许原生入口不可行时回到 AGENTS
 - 关联: REQ-004, AC-008, AC-009, DES-012
 
-主代理 `/root` 在实际任务出现独立、有界且有净收益的子问题时主动创建合适子代理，不要求用户逐次点名；`/root/...` 子代理默认自己完成收到的任务，不再创建下一层代理，只有用户、父代理或适用 AGENTS/skill 明确要求嵌套委派时例外。优先使用原生 developer mode 与 tool usage 角色分流；只有真实子线程证明该入口无效时，才允许用 AGENTS 承担同一边界，不同时保留两份相反规则。
+主代理 `/root` 在实际任务出现独立、有界且有净收益的子问题时主动创建合适子代理，不要求用户逐次点名；`/root/...` 子代理默认自己完成收到的任务，不再创建下一层代理，只有用户或父代理明确要求当前任务嵌套委派时例外。主动委派只由 `global/AGENTS.md` 与 `subagent-orchestration` 承担，不再保留同责的 developer mode、tool hint、Hook 或客户端门禁。
+
+## UDES-007 只加强 AGENTS 与 skill，容量设置单独保留
+
+- 状态: confirmed
+- 来源: 用户在行为入口无法可靠闭合后明确收缩方案，并补充要求保留子代理上限
+- 关联: REQ-004, AC-008, AC-009, CON-004, DES-011, DES-012
+
+当前实现只加强 `global/AGENTS.md` 和 `subagent-orchestration` 的 root 实际创建顺序与 child 默认非递归边界；`global/config.toml` 只保留 6 个 spawned-agent 线程的容量键，不维护主动 mode 或递归策略。不得追加客户端调度器、tool hint、自由文本解析、wait 门禁、Hook 或 Stop 补偿。

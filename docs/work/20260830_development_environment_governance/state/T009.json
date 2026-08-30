@@ -1,0 +1,20 @@
+{
+  "active_consumer": "",
+  "blocked_reason": "",
+  "ended_at": "2026-08-30T19:02:52Z",
+  "evidence_frontier": "",
+  "invalidated_source_ids": [],
+  "latest_evidence": "",
+  "next_action": "",
+  "note": "reopened: SOL-010 不再声称解决未闭合的 GAP-018，需要用更正后的来源重建完成收据；实现与验证未变化",
+  "owner": "/root",
+  "result_ref": "results/T009.r8.json",
+  "revision": 8,
+  "schema": "task.state",
+  "started_at": "2026-08-30T18:50:08Z",
+  "status": "done",
+  "task_id": "T009",
+  "uncovered_dimensions": [],
+  "validated_coverage": [],
+  "validation_case": []
+}

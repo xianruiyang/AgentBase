@@ -405,7 +405,6 @@ try {
         'max_concurrent_threads_per_session = 6'
         'default_subagent_model = "gpt-5.6-luna"'
         'default_subagent_reasoning_effort = "medium"'
-        'Root-led multi-agent delegation is active.'
         'conversationDetailMode = "STEPS_COMMANDS"'
         'ambient-suggestions-enabled = false'
     )) {

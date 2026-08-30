@@ -1,7 +1,7 @@
 {
-  "confirmation_ref": "2026-08-31:root-proactive-child-explicit-nested-delegation",
+  "confirmation_ref": "2026-08-31:agents-skill-only-with-six-child-capacity",
   "confirmed_by": "user",
-  "cycle_id": "cycle-005",
+  "cycle_id": "cycle-008",
   "documents": {
     "requirements": {
       "fingerprint": "sha256:62d03cb80e9894068a85bdd11904a427fcec73a128fd8de646fc92deca698dd3",
@@ -30,14 +30,15 @@
       "path": "requirements.md"
     },
     "user_design": {
-      "fingerprint": "sha256:24ee3fc57a082d05e87b9ef629d4c82a11751e679f859ee32229d1256d01dca6",
+      "fingerprint": "sha256:304666ea9ea8832ee4442e95b0bd4ffadfcc90adcaeac2b723e3004de8a4318e",
       "ids": [
         "UDES-001",
         "UDES-002",
         "UDES-003",
         "UDES-004",
         "UDES-005",
-        "UDES-006"
+        "UDES-006",
+        "UDES-007"
       ],
       "path": "user-design.md"
     }
@@ -198,6 +199,143 @@
             "UDES-003",
             "UDES-004",
             "UDES-005"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "2026-08-31:root-proactive-child-explicit-nested-delegation",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-005",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:62d03cb80e9894068a85bdd11904a427fcec73a128fd8de646fc92deca698dd3",
+          "ids": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007",
+            "AC-008",
+            "AC-009",
+            "AC-010",
+            "CON-001",
+            "CON-002",
+            "CON-003",
+            "CON-004",
+            "CON-005",
+            "REQ-001",
+            "REQ-002",
+            "REQ-003",
+            "REQ-004",
+            "REQ-005"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:24ee3fc57a082d05e87b9ef629d4c82a11751e679f859ee32229d1256d01dca6",
+          "ids": [
+            "UDES-001",
+            "UDES-002",
+            "UDES-003",
+            "UDES-004",
+            "UDES-005",
+            "UDES-006"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "2026-08-31:agents-skill-only-with-six-child-capacity",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-006",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:62d03cb80e9894068a85bdd11904a427fcec73a128fd8de646fc92deca698dd3",
+          "ids": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007",
+            "AC-008",
+            "AC-009",
+            "AC-010",
+            "CON-001",
+            "CON-002",
+            "CON-003",
+            "CON-004",
+            "CON-005",
+            "REQ-001",
+            "REQ-002",
+            "REQ-003",
+            "REQ-004",
+            "REQ-005"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:e3afe07157701052e124858c829c2ec349b21532297b32b75403ac2ba3783be9",
+          "ids": [
+            "UDES-001",
+            "UDES-002",
+            "UDES-003",
+            "UDES-004",
+            "UDES-005",
+            "UDES-006",
+            "UDES-007"
+          ],
+          "path": "user-design.md"
+        }
+      }
+    },
+    {
+      "confirmation_ref": "2026-08-31:agents-skill-only-with-six-child-capacity",
+      "confirmed_by": "user",
+      "cycle_id": "cycle-007",
+      "documents": {
+        "requirements": {
+          "fingerprint": "sha256:62d03cb80e9894068a85bdd11904a427fcec73a128fd8de646fc92deca698dd3",
+          "ids": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007",
+            "AC-008",
+            "AC-009",
+            "AC-010",
+            "CON-001",
+            "CON-002",
+            "CON-003",
+            "CON-004",
+            "CON-005",
+            "REQ-001",
+            "REQ-002",
+            "REQ-003",
+            "REQ-004",
+            "REQ-005"
+          ],
+          "path": "requirements.md"
+        },
+        "user_design": {
+          "fingerprint": "sha256:304666ea9ea8832ee4442e95b0bd4ffadfcc90adcaeac2b723e3004de8a4318e",
+          "ids": [
+            "UDES-001",
+            "UDES-002",
+            "UDES-003",
+            "UDES-004",
+            "UDES-005",
+            "UDES-006",
+            "UDES-007"
           ],
           "path": "user-design.md"
         }

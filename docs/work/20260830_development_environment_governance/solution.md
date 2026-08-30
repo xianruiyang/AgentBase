@@ -76,8 +76,15 @@ bootstrap、部署 README 和确定性测试中的精确 Codex CLI 版本已从 
 
 ## SOL-009 把 proactive mode 与六子代理容量接入 portable settings
 
-- 状态: blocked
+- 状态: superseded
 - 解决: GAP-012, GAP-013
 - 关联: DES-010, DES-011, DES-012, AC-008, AC-009, UDES-005, UDES-006, CON-004
 
-在 `global/config.toml` 新增公开的 `agents.max_concurrent_threads_per_session = 6` 与 root-led `multi_agent_mode_hint_text`，不显式复制 V2 总槽位设置。run6、run7 证明 mode-only 不产生真实 root spawn；run9 进一步证明 role-aware `usage_hint_text` 同样无行为收益，因此该字段退出候选。按用户允许的回退边界，`global/AGENTS.md` 负责 `/root` 先实际创建再继续不重叠工作的动作，`subagent-orchestration` 负责固定角色选择、交接，以及 child 仅在用户、父代理或适用规则明确要求当前任务嵌套时继续委派的合同；正负触发 case 分别覆盖明确嵌套与默认不嵌套。部署源白名单、managed config key 生命周期与说明已同步，但 run10、run11 证明这些提示面仍不能把模型已声明的委派决策绑定为真实 spawn；官方 tag 与 main 也没有可复用的结构化调度 owner。候选可作为最低充分规则合同继续审查，AC-008 行为目标保持 blocked，未向实际 Codex 根目录 Publish。
+该组合方案已被 run10、run11 与用户后继裁决替代。`multi_agent_mode_hint_text` 及对应部署身份退出；六子代理容量作为独立资源上限转交 SOL-010，不再与主动委派策略绑定。
+
+## SOL-010 只加强 AGENTS 与编排 skill并保留六子代理容量
+
+- 状态: confirmed
+- 关联: GAP-017, GAP-018, DES-011, DES-012, AC-008, AC-009, UDES-006, UDES-007, CON-004
+
+加强 `global/AGENTS.md`：root 在每段实质工作前裁决委派，成立后先读必要 skill 并真实调用 `spawn_agent`；在真实 child 返回前不得读取或修改拟委派内容、继续其他实质工作、声称派发或调用 `wait_agent`。加强 `subagent-orchestration` 的实际创建、失败、等待、交接和 child 默认非递归合同，并更新对应正负触发 case。保留 `[agents].max_concurrent_threads_per_session = 6` 及其 portable-settings 生命周期与测试，只作为容量上限；删除 `multi_agent_mode_hint_text` 及其部署投影。只做静态、路由和 portable-settings 受影响验证，不再运行独立行为探针、九项评测或实际 Publish。

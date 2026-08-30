@@ -65,10 +65,10 @@ corpus validator、patch capture、结果/锁/资源限制、部署生命周期�
 
 ## DES-010 portable config 唯一维护主动委派 mode policy
 
-- 状态: confirmed
+- 状态: superseded
 - 关联目标: REQ-004, AC-008, AC-009, UDES-005
 
-`global/config.toml` 的 `[features.multi_agent_v2].multi_agent_mode_hint_text` 定义角色不对称的委派授权，由现有 portable-settings 合并器、managed key 生命周期和 Status 共同维护。它只对 `/root` 撤销要求显式请求的较早 mode，并明确 `/root/...` 子代理仍须用户、父代理或适用规则明确要求才可嵌套委派；`global/AGENTS.md`、`subagent-orchestration` skill 与 Hook 不复制或加强该策略，只承担全局执行内核和角色交接。该字段是 prompt policy owner，不是客户端调度器；是否真实调用 `spawn_agent` 必须由行为证据另行验收，不能由配置读回推定。
+该候选已由真实行为反例否定并按 UDES-007 退出。`global/config.toml` 不再声明 `[features.multi_agent_v2].multi_agent_mode_hint_text`，部署白名单、生命周期、测试和说明也不保留该身份；主动委派不再由 portable config 承担。
 
 ## DES-011 公开 agents 设置维护 spawned-agent 容量
 
@@ -80,13 +80,13 @@ corpus validator、patch capture、结果/锁/资源限制、部署生命周期�
 ## DES-012 AGENTS 与编排 skill 落实 root/child 动作边界
 
 - 状态: confirmed
-- 关联目标: REQ-004, AC-008, AC-009, UDES-006
+- 关联目标: REQ-004, AC-008, AC-009, UDES-006, UDES-007
 
-DES-010 只负责高层授权；`global/AGENTS.md` 负责把 `/root` 的净收益判断落实为先实际调用 `spawn_agent`、再继续不重叠工作，并排除计划、skill 选择、文字声称和空等待。`subagent-orchestration` 在主代理主动、用户明确要求使用，或 child 收到用户、父代理或适用规则对当前任务的明确嵌套要求时选择 `evidence`、`experiment`、`operator`。没有该要求的 child 自己完成有界任务或把拆分需要返回父代理，不继续创建；明确嵌套只允许 `spawn_agent`，不授权用户任务或分叉线程。该职责分层不保留无行为收益的 `usage_hint_text`，真实 CLI 同时验收 root 正向与 child 默认非递归边界。
+`global/AGENTS.md` 是主动委派的唯一全局行为入口：`/root` 在实质工作前判断净收益，成立后必须在读取或修改拟委派内容、继续其他实质工作、声称派发或等待前，经 `subagent-orchestration` 选择角色并实际调用 `spawn_agent`。`subagent-orchestration` 只把成功返回的 child 身份视为创建，并维护创建失败、等待、交接与非重叠工作顺序。没有用户或父代理对当前任务的明确嵌套要求时，child 自己完成或返回拆分需要，不继续创建；明确嵌套不授权用户任务或分叉线程。该职责分层不依赖 developer mode、tool hint、Hook 或客户端门禁。
 
 ## DES-013 客户端闭合必须拥有结构化委派决策
 
-- 状态: confirmed
+- 状态: superseded
 - 关联目标: REQ-004, AC-008, AC-009, CON-004
 
-客户端只有在正式状态明确记录当前 agent 身份、一次结构化委派决策、对应 spawn 事实与 child 嵌套权限时，才可把决策绑定到 tool loop。不得解析模型自由文本、用当前 live-agent 列表伪造历史状态、改变 V2 `wait_agent` 的 mailbox/steer/timeout 语义，或用 Hook/Stop 门禁补偿。没有该 owner 时，portable mode、AGENTS 与 skill 只定义最低充分的提示和角色合同，行为仍须按具体模型与客户端版本单独验收。
+源码研究结论继续作为否定证据保留，但客户端结构化调度不再属于当前实施。UDES-007 已明确只加强 AGENTS 与 skill；不得据本节新增状态、解析自由文本、改变 V2 `wait_agent` 语义或引入 Hook/Stop 门禁。

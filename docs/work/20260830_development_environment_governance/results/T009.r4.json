@@ -1,0 +1,82 @@
+{
+  "changed_files": [
+    "global/AGENTS.md",
+    "global/config.toml",
+    "global/README.md",
+    "skills/subagent-orchestration/SKILL.md",
+    "skills/subagent-orchestration/references/coordination.md",
+    "development/skill-routing/trigger-cases.json",
+    "development/skill-routing/evidence/attempts.json",
+    "development/skill-routing/evidence/current.json",
+    "development/codex-deployment/manage_agentbase.ps1",
+    "development/codex-deployment/managed_asset_lifecycle.json",
+    "development/codex-deployment/test_manage_agentbase.ps1",
+    "development/codex-deployment/README.md",
+    "docs/plan.md",
+    "docs/work/20260830_development_environment_governance/current-state.md",
+    "docs/work/20260830_development_environment_governance/design.md",
+    "docs/work/20260830_development_environment_governance/solution.md",
+    "docs/work/20260830_development_environment_governance/user-design.md",
+    "docs/work/20260830_development_environment_governance/protected-baseline.json"
+  ],
+  "evidence_for": [
+    "SOL-010",
+    "DES-011",
+    "DES-012",
+    "OBS-023",
+    "UDES-006",
+    "UDES-007",
+    "REQ-004",
+    "AC-008",
+    "AC-009",
+    "CON-004"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "note": "本轮路由、策略与引用 evidence",
+      "ref": "development/skill-routing/evidence/current.json"
+    },
+    {
+      "kind": "test",
+      "note": "portable-settings 容量与部署合同确定性测试",
+      "ref": "development/codex-deployment/test_manage_agentbase.ps1"
+    },
+    {
+      "kind": "decision",
+      "note": "用户确认的 AGENTS、skill 与六子代理容量范围",
+      "ref": "docs/work/20260830_development_environment_governance/protected-baseline.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "已将主动委派行为收敛为 global/AGENTS.md 与 subagent-orchestration 的单一规则/skill 合同，并保留 6 个 spawned-agent 线程容量；portable config、部署生命周期和测试不再维护 multi_agent_mode_hint_text 或客户端补偿。",
+  "outputs": [
+    "root 在有委派净收益时先真实创建 child，再声明、等待或处理非重叠工作的规则",
+    "child 仅在用户或父代理明确要求当前任务嵌套委派时继续创建的默认边界",
+    "max_concurrent_threads_per_session = 6 的 portable-settings 容量合同",
+    "删除主动 mode 后同步的部署、路由 evidence 与治理恢复记录"
+  ],
+  "schema": "task.result",
+  "source_snapshot_ref": "sha256:74f857303fede62e15b88f3bc2f92a060b0b14cba14b5bf49d5ad2855a70f472",
+  "task_id": "T009",
+  "task_revision": 1,
+  "unresolved": [
+    "按用户范围未重新运行独立模型行为探针或九项最终评测；本结果证明规则、skill、路由与部署合同，不声称模型真实 spawn 行为已改变",
+    "历史 T007/GAP-018 的实际调用绑定缺口继续保留为既有否定证据，不属于本次实施"
+  ],
+  "validation_coverage": [
+    "behavior_owner=global_AGENTS_and_subagent_orchestration_only",
+    "root_creation_evidence=successful_child_identity",
+    "child_nesting=explicit_current_task_request_only",
+    "spawned_agent_capacity=6",
+    "portable_mode_policy=absent"
+  ],
+  "verification": [
+    "skill quick_validate: Skill is valid!",
+    "validate_contract.ps1: 129 cases，86 strict routing、28 strict reference、13/13 skills，passed",
+    "routing evidence refresh: Routing、Policy、References 受影响项 evaluate 完成，generation AD9D41D6471C76F58D6247E5B629067A3110EA661E0298099BDF81267D673E0A",
+    "manage_agentbase.ps1 -Action Validate: valid=true",
+    "test_manage_agentbase.ps1: tests=pass",
+    "活动源码定向检查：multi_agent_mode_hint_text 与 features.multi_agent_v2 均不存在；容量键在 config、部署合同、生命周期和测试四处保持为 6"
+  ]
+}

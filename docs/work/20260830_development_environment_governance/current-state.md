@@ -279,3 +279,10 @@ V2 `wait_agent` 的正式职责是等待当前 turn 的 mailbox、steer 或 time
 - 关联: OBS-021, OBS-022, DES-013, AC-008, AC-009, CON-004
 
 0.151.0 可用的 mode developer 文本、spawn tool `usage_hint_text`、全局 AGENTS 与编排 skill 都已分别进入代表任务，模型仍能先声明具体派发再跳过 `spawn_agent`。继续追加同义提示、解析自由文本、把合法 wait 改成错误或加 Hook 都不能形成可靠 owner。若未来在客户端层闭合，必须先新增结构化委派决策及 root/child 权限状态，由正式 tool loop 消费并提供可测试的 spawn 事实；在该 owner 存在前，当前只能保留最低充分的 root/child 规则合同，不能声称真实行为已验证。
+
+## OBS-023 用户将当前实施收缩为 AGENTS、skill 与容量上限
+
+- 状态: confirmed
+- 来源: 用户在 run10/run11 与客户端源码结论后明确裁决
+
+当前不再尝试保证客户端实际调用，也不继续 mode policy、tool hint、结构化调度、自由文本解析、wait 门禁或 Hook/Stop 补偿。`global/AGENTS.md` 与 `subagent-orchestration` 加强真实创建顺序和 child 默认非递归边界；`max_concurrent_threads_per_session = 6` 按用户补充要求单独保留，只控制容量。

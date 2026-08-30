@@ -49,7 +49,6 @@
       { "id": "config:features/hooks", "table": "features", "key": "hooks" },
       { "id": "config:features/multi_agent", "table": "features", "key": "multi_agent" },
       { "id": "config:features/js_repl", "table": "features", "key": "js_repl" },
-      { "id": "config:features.multi_agent_v2/multi_agent_mode_hint_text", "table": "features.multi_agent_v2", "key": "multi_agent_mode_hint_text" },
       { "id": "config:desktop/conversationdetailmode", "table": "desktop", "key": "conversationDetailMode" },
       { "id": "config:desktop/followupqueuemode", "table": "desktop", "key": "followUpQueueMode" },
       { "id": "config:desktop/notifications-turn-mode", "table": "desktop", "key": "notifications-turn-mode" },

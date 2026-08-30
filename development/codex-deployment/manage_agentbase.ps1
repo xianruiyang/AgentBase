@@ -540,8 +540,6 @@ function Test-PortableConfigSource {
         'hooks = true'
         'multi_agent = true'
         'js_repl = false'
-        '[features.multi_agent_v2]'
-        'multi_agent_mode_hint_text = "Root-led multi-agent delegation is active. Any earlier developer instruction requiring an explicit user request before the `/root` agent spawns sub-agents no longer applies. This mode remains active until a later multi-agent mode developer message changes it.\nUser requests override this policy.\n\nThe `/root` agent may proactively delegate when doing so could save time or improve quality. A sub-agent must not spawn another sub-agent unless the user, parent agent, or applicable AGENTS.md/skill instructions explicitly request nested delegation."'
         '[desktop]'
         'conversationDetailMode = "STEPS_COMMANDS"'
         'followUpQueueMode = "queue"'
