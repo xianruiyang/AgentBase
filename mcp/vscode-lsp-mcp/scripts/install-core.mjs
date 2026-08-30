@@ -461,10 +461,34 @@ export const orderLocatedCodeCliPaths = (candidates, platform = process.platform
     .map(({ candidate }) => candidate);
 };
 
+export const parseCodeLauncherCliRelativePath = (source) => {
+  if (typeof source !== 'string') return undefined;
+  const commandPattern = /^"%~dp0\.\.\\Code\.exe"\s+"%~dp0\.\.\\([^"]+)"\s+%\*$/iu;
+  const matches = [];
+  for (const rawLine of source.split(/\r?\n/u)) {
+    const match = commandPattern.exec(rawLine.trim());
+    if (match === null) continue;
+    const relative = path.win32.normalize(match[1]);
+    const parts = relative.split('\\');
+    if (path.win32.isAbsolute(relative) || parts.length < 5 || parts.some((part) => part === '..')) continue;
+    if (parts.slice(-4).map((part) => part.toLowerCase()).join('/') !== 'resources/app/out/cli.js') continue;
+    matches.push(relative);
+  }
+  return matches.length === 1 ? matches[0] : undefined;
+};
+
 const deriveCodeExecutable = async (candidate) => {
-  const findCliEntry = async (productRoot) => {
+  const findCliEntry = async (productRoot, launcherPath) => {
     const direct = path.join(productRoot, 'resources', 'app', 'out', 'cli.js');
     if (await pathExists(direct)) return direct;
+    if (launcherPath !== undefined) {
+      const launcherSource = await readFile(launcherPath, 'utf8');
+      const launcherRelative = parseCodeLauncherCliRelativePath(launcherSource);
+      if (launcherRelative !== undefined) {
+        const launcherEntry = path.join(productRoot, launcherRelative);
+        if (await pathExists(launcherEntry)) return launcherEntry;
+      }
+    }
     const matches = [];
     for (const entry of await readdir(productRoot, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
@@ -482,7 +506,7 @@ const deriveCodeExecutable = async (candidate) => {
       const productRoot = path.resolve(path.dirname(resolved), '..');
       const codeExe = path.join(productRoot, 'Code.exe');
       if (await pathExists(codeExe)) {
-        const cliEntry = await findCliEntry(productRoot);
+        const cliEntry = await findCliEntry(productRoot, resolved);
         return {
           command: codeExe,
           prefixArguments: [cliEntry],

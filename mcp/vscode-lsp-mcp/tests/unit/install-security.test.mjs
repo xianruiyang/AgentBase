@@ -12,6 +12,7 @@ import {
   defaultRoots,
   isZipSymlink,
   orderLocatedCodeCliPaths,
+  parseCodeLauncherCliRelativePath,
   realPathMatchesManagedLocation,
   validateZipEntryName,
 } from '../../scripts/install-core.mjs';
@@ -40,6 +41,24 @@ test('Windows Code CLI discovery prefers executable launchers over the extension
   assert.throws(() => orderLocatedCodeCliPaths(located, 'unsupported'), {
     code: 'UNSUPPORTED_PLATFORM',
   });
+});
+
+test('Windows Code launcher selects its active version without executing the command script', () => {
+  const launcher = [
+    '@echo off',
+    'setlocal',
+    '"%~dp0..\\Code.exe" "%~dp0..\\110a328ea5\\resources\\app\\out\\cli.js" %*',
+    'endlocal',
+  ].join('\r\n');
+  assert.equal(
+    parseCodeLauncherCliRelativePath(launcher),
+    '110a328ea5\\resources\\app\\out\\cli.js',
+  );
+  assert.equal(parseCodeLauncherCliRelativePath(`${launcher}\r\n${launcher}`), undefined);
+  assert.equal(
+    parseCodeLauncherCliRelativePath('"%~dp0..\\Code.exe" "%~dp0..\\..\\escape\\resources\\app\\out\\cli.js" %*'),
+    undefined,
+  );
 });
 
 test('managed roots reject filesystem/home roots and overlapping configuration', () => {
