@@ -2162,6 +2162,7 @@ fn render_calls_model(
     render_call_children(
         root,
         "",
+        Some(&root_definition.file),
         &mut output,
         command.model_token_budget,
         &outcome.universe,
@@ -2193,11 +2194,27 @@ fn render_calls_model(
 fn render_call_children(
     node: &CallTreeNode,
     prefix: &str,
+    visible_parent_file: Option<&Path>,
     output: &mut String,
     budget: usize,
     universe: &SourceUniverse,
     budget_truncated: &mut bool,
 ) {
+    let shared_child_file = node
+        .children
+        .iter()
+        .filter_map(|child| child.call_file.as_deref())
+        .try_fold(None::<&Path>, |shared, file| match shared {
+            None => Some(Some(file)),
+            Some(existing) if normalized_key(existing) == normalized_key(file) => {
+                Some(Some(existing))
+            }
+            Some(_) => None,
+        })
+        .flatten();
+    let mut shared_path_visible = shared_child_file.is_some_and(|shared| {
+        visible_parent_file.is_some_and(|parent| normalized_key(parent) == normalized_key(shared))
+    });
     for (index, child) in node.children.iter().enumerate() {
         if *budget_truncated {
             return;
@@ -2209,12 +2226,20 @@ fn render_call_children(
             .as_deref()
             .zip(child.call_position)
             .map(|(file, position)| {
-                format!(
-                    " {}:{}:{}",
-                    universe.render_path(file),
-                    position.line + 1,
-                    position.column + 1
-                )
+                if shared_child_file
+                    .is_some_and(|shared| normalized_key(shared) == normalized_key(file))
+                    && shared_path_visible
+                {
+                    format!(" :{}:{}", position.line + 1, position.column + 1)
+                } else {
+                    shared_path_visible = shared_child_file.is_some();
+                    format!(
+                        " {}:{}:{}",
+                        universe.render_path(file),
+                        position.line + 1,
+                        position.column + 1
+                    )
+                }
             })
             .unwrap_or_default();
         let evidence = if child.status == child.dispatch {
@@ -2243,6 +2268,7 @@ fn render_call_children(
         render_call_children(
             child,
             &child_prefix,
+            child.call_file.as_deref(),
             output,
             budget,
             universe,

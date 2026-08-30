@@ -58,6 +58,31 @@ srcq symbol references Method
 
 model 位置使用 1-based 行列，省略正常机器 envelope；范围未完整、身份歧义、动态关系和预算边界会保留最短诊断。`--output machine` 使用 0-based 行列和稳定 JSON：
 
+调用树把证据标签放在树头的 `evidence=` 与节点方括号中；方括号由“解析状态；调用形式”和可选接收者上下文组成：
+
+| 内容 | 含义 |
+| --- | --- |
+| `position-candidate` | 根目标由给定源码位置选中；只出现在树头的 evidence，不是子节点调用形式 |
+| `qualified-candidate` | C++ 候选已唯一解析到源码中的限定定义；仍不等同编译器最终绑定 |
+| `outline-candidate` | 非 C++ 候选已唯一解析到当前语言的结构定义 |
+| `lexical-candidate` | incoming 调用者来自所选范围内的词法引用与包含函数关系 |
+| `direct-candidate` | 源码直接写出了名称或静态限定调用，可继续尝试解析唯一源码定义 |
+| `typed-member-candidate` | 成员调用具有当前函数内唯一的显式词法接收者类型，可按 `Type::method` 继续解析 |
+| `member-candidate` | 观察到成员调用，但接收者类型不能由当前源码直接唯一证明 |
+| `unknown` | 调用表达式过于间接，连可稳定查询的直接名称或成员形式也未取得 |
+| `incoming-candidate` | 该节点是当前节点的调用者，位置是这条 incoming 调用边的调用点 |
+| `semantic-unknown` | 当前源码证据不能确定唯一语义身份 |
+| `ambiguous:N` | 找到 `N` 个适用定义候选，不能选择一个继续展开 |
+| `cycle` | 继续展开会回到当前递归链中的既有定义 |
+| `time-budget` | 解析该节点时耗尽查询预算，后续关系不完整 |
+| `semantic-unknown:virtual-dispatch` | 观察到虚分派能力，但静态源码扫描不能枚举真实动态调用者 |
+| `receiver=name:Type` | 接收者变量及唯一显式词法类型 |
+| `receiver=name:unknown` | 保留接收者文本，但其类型未被当前证据证明 |
+
+方括号只显示一份相同值；状态与调用形式不同时用分号连接，例如 `[qualified-candidate;direct-candidate]` 表示直接调用已唯一解析到一个 C++ 源码定义，`[semantic-unknown;member-candidate receiver=Worker:unknown]` 表示成员调用存在但接收者类型和唯一目标仍未知。
+
+model 调用树会压缩同一父节点下完全相同的调用点路径：若该路径已出现在父节点行，子节点只显示 `:line:column`；否则第一个有位置的子节点显示完整 `path:line:column`，其余同路径兄弟节点只显示 `:line:column`。缩写只继承同一父节点下已经显示的路径，不跨父节点推断。machine 视图的每个 `call.path` 始终保留完整路径。
+
 - `srcq.symbol.definition/v1`
 - `srcq.symbol.references/v1`
 - `srcq.symbol.calls/v1`

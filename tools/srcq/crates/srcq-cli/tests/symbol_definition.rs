@@ -242,6 +242,76 @@ fn cpp_outgoing_calls_expand_unique_nodes_and_stop_on_cycles_and_ambiguity() {
     assert!(tree.contains("CanBuildTool [qualified-candidate;direct-candidate]"));
     assert!(tree.contains("BuildTool [direct-candidate]"));
 
+    let shared_file = run(&[
+        "symbol",
+        "calls",
+        "CallSameFileLeaves",
+        "--only-root",
+        root,
+        "--depth",
+        "1",
+    ]);
+    assert!(shared_file.status.success());
+    let shared_file = String::from_utf8(shared_file.stdout).expect("UTF-8 shared-file tree");
+    assert_eq!(
+        shared_file
+            .lines()
+            .filter(|line| line.contains("definitions.cpp"))
+            .count(),
+        1,
+        "the model view should render a shared sibling path once"
+    );
+    assert!(shared_file.contains("FirstSameFileLeaf [direct-candidate] :"));
+    assert!(shared_file.contains("SecondSameFileLeaf [direct-candidate] :"));
+
+    let cross_file = run(&[
+        "symbol",
+        "calls",
+        "CrossFileTarget",
+        "--only-root",
+        root,
+        "--direction",
+        "incoming",
+        "--depth",
+        "1",
+    ]);
+    assert!(cross_file.status.success());
+    let cross_file = String::from_utf8(cross_file.stdout).expect("UTF-8 cross-file tree");
+    assert_eq!(
+        cross_file
+            .lines()
+            .filter(|line| line.contains("callers.cpp"))
+            .count(),
+        1,
+        "a sibling path that differs from the parent should still render once"
+    );
+    assert!(cross_file.contains("FirstCrossFileCaller [lexical-candidate;incoming-candidate]"));
+    assert!(cross_file.contains("SecondCrossFileCaller [lexical-candidate;incoming-candidate] :"));
+
+    let cross_file_machine = run(&[
+        "symbol",
+        "calls",
+        "CrossFileTarget",
+        "--only-root",
+        root,
+        "--direction",
+        "incoming",
+        "--depth",
+        "1",
+        "--output",
+        "machine",
+    ]);
+    assert!(cross_file_machine.status.success());
+    let cross_file_machine: Value =
+        serde_json::from_slice(&cross_file_machine.stdout).expect("machine cross-file tree");
+    let machine_children = cross_file_machine["root"]["children"]
+        .as_array()
+        .expect("machine cross-file children");
+    assert_eq!(machine_children.len(), 2);
+    assert!(machine_children.iter().all(|child| child["call"]["path"]
+        .as_str()
+        .is_some_and(|path| path.ends_with("callers.cpp"))));
+
     let cycle = run(&[
         "symbol",
         "calls",

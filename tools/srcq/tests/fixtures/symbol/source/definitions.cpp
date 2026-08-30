@@ -95,4 +95,24 @@ int UseFixtureWorker()
     return Worker.Tick();
 }
 
+int FirstSameFileLeaf()
+{
+    return 1;
+}
+
+int SecondSameFileLeaf()
+{
+    return 2;
+}
+
+int CallSameFileLeaves()
+{
+    return FirstSameFileLeaf() + SecondSameFileLeaf();
+}
+
+int CrossFileTarget()
+{
+    return 3;
+}
+
 Widget DirectWidget(Widget{});

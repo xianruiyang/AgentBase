@@ -24,6 +24,7 @@ srcq symbol calls --at '<path>:<line>:<column>' --direction incoming --depth 2
 - `scan=prioritized` 只证明已扫描部分中的候选；全集或不存在结论需要权威源码范围和适用根全部扫描。显式 `--only-root` 只证明该选定范围。
 - 唯一小定义会直接带正文；大定义执行返回的 `@body`，多候选先按位置或范围消歧，不批量读取全部正文。
 - 调用树只包含函数、方法和其他可调用节点；类、结构体、字段和变量用 `definition`/`references` 查询，显式接收者类型和变量名只作为调用节点上下文。树只递归唯一的直接或显式类型成员候选；`ambiguous`、`semantic-unknown`、虚调用、未解析成员分派、循环或预算叶子不能解释为没有关系。
+- model 调用树的方括号先给解析状态，再以分号给不同的调用形式，并可附 `receiver=name:Type|unknown`；`candidate` 均是源码证据边界，不等同编译器最终绑定。同一父节点的调用点路径完全相同时只显示一次，后续 `:line:column` 只继承该父节点下已显示的路径；machine 的每个 `call.path` 仍完整保留。
 
 ## 10 秒快速路径
 
