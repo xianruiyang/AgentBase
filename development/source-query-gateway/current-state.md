@@ -252,6 +252,22 @@ workspace、真实 scc、36 模式/9 oracle、AST 基线、bootstrap、插件、
 
 同一 evaluator 边界下的 v6 preflight 读回 `srcq 0.4.1` 与真实 scc `ok`；subject 第一条直接查询返回 `@more shown=80 omitted=97` 和完整 `@next`，第二条命令逐字采用提示中的 `srcq query scc exec --after ... -- <原 argv>`，exit 0 并取得第二页首项 `D:/program/AgentBase/tools/srcq/crates/srcq-core/src/profile/paths.rs`。preflight/subject 均无 WebSocket 失败、sampling retry 或 HTTP fallback，postflight 无身份漂移；experiment identity 为 `27ac16beea6ef195bd443057fc229b17af603d4d5c2aa7f54fcc31ca74ad20f5`，capsule `fce108b55bce2871e2bb153e95725cebb5dd04d2530806aa28c07d31a6257926` 验真通过。
 
+## OBS-SQG-029 P16 已形成快速源码关系 0.5.0 开发候选
+
+- 状态: verified within declared candidate scope
+- 关联: REQ-SQG-002, AC-SQG-010, AC-SQG-011, AC-SQG-012, AC-SQG-013, AC-SQG-014, AC-SQG-015, DES-SQG-016, DES-SQG-017, DES-SQG-018, DES-SQG-019, DES-SQG-020
+
+`srcq symbol` 已实现 definition、references、incoming/outgoing calls 与 capabilities，内部由 rg 有界候选和 ast-grep 结构适配组成。名称与位置身份、定义/声明、词法角色、虚分派 unknown、循环/节点/深度预算和 model/machine 分面均有直接测试；26 种 ast-grep 语言全部登记，C++ 与七种通用 relation adapter、六种 definition-only outline adapter 按实际 0.44.1 能力声明，其他语言保持 unadapted 或 not-applicable。C++ SourceUniverse 能读取 workspace、compile database 和嵌套 MSVC response file，恢复 GptProjectTest 外的 UE 定义；默认 Source/src/include 投影避免生产源码被计划证据副本污染，树内递归也不再为 `NewObject` 扫描整个 UE/SDK。
+
+完整 workspace 门禁通过；后继 add/only/exclude 测试又发现并闭合“无元数据临时 cwd 把祖先普通 `.vscode` 当作项目根”的范围反例，当前 67 项 lib、10 项关系集成、Clippy 与格式检查通过。真实 UAI release 路径的五项均值为 0.235–5.076 s，model 输出为 53–161 个 o200k Token；这些只证明当前本机实际命令，不冒充完整模型会话收益。source-query skill 与 126-case 静态合同已在排除用户无关 dirty 全局规则的 HEAD 投影中通过；实际 worktree 的规则预算仍因该 dirty 行多 10 bytes 而失败，模型路由 evidence 未刷新。项目候选未 release、未安装、未 Publish。
+
+## GAP-SQG-010 P16 仍缺非 C++ 依赖 resolver 与关系同快照续页
+
+- 状态: open
+- 关联: AC-SQG-002, AC-SQG-007, AC-SQG-009, AC-SQG-012, AC-SQG-014, AC-SQG-015, OBS-SQG-029
+
+非 C++ adapter 当前只承诺 `explicit-or-project`，尚未从 Python/Node/Cargo/Go/Java 等项目元数据恢复 workspace 外源码；关系大结果只报告省略量并允许提高 limit/预算重跑，尚未复用 query spool 的短句柄、snapshot 和无重扫恢复。当前输出不会把这些缺口伪装为完整或精确，但 TSQG-110/112 因而不能整体完成。后续应分别以一个真实非 C++ 外部依赖消费者和一个超预算引用集合闭合，不机械展开全部语言×依赖管理器矩阵。
+
 ## GAP-SQG-009 query model 续页动作已经闭环
 
 - 状态: resolved

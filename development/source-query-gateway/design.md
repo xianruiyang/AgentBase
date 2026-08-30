@@ -180,7 +180,7 @@ rg、fd 与 ast-grep 默认继续作为外部执行后端：srcq 负责 argv、�
 
 ## DES-SQG-016 源码关系由分层证据而非伪语义统一
 
-- 状态: proposed
+- 状态: confirmed
 - 满足: REQ-SQG-002, AC-SQG-010, AC-SQG-011, AC-SQG-012, AC-SQG-013, AC-SQG-014, AC-SQG-015, UDES-SQG-016, UDES-SQG-017, UDES-SQG-018, UDES-SQG-019
 
 `tools/srcq` 作为唯一公开 owner 组合现有外部 rg 与 ast-grep：源码宇宙解析器先形成有来源和完整性边界的根集合，rg 在其中完整生成词面候选；AST run/outline 和语言适配器归一化声明、定义、作用域、引用角色、调用与外层 owner；同一查询 owner 负责批处理、缓存复用、图遍历、完整性、分页和 model/machine 投影。VS Code Companion 与实际 Language Provider 继续拥有精确符号身份、类型和动态语义，srcq 不复制 Provider 业务。
@@ -189,7 +189,7 @@ rg、fd 与 ast-grep 默认继续作为外部执行后端：srcq 负责 argv、�
 
 ## DES-SQG-017 位置身份、能力注册与语言适配
 
-- 状态: proposed
+- 状态: confirmed
 - 满足: AC-SQG-010, AC-SQG-012, UDES-SQG-017
 
 源码位置是关系查询的规范符号输入，名称查询只返回候选。内部 `LanguageCapability` 注册表按实际外部引擎能力声明 parse、outline、scope、definition、reference-role、direct-call、import-binding 和 semantic-exact 等独立能力；语言适配器只维护 Tree-sitter grammar 差异，不复制 rg 扫描、图遍历、分页或输出策略。所有 ast-grep 内置语言都由 capability owner 显式登记，关系不适用、仅候选、未适配和解析失败使用不同结果。
@@ -198,14 +198,14 @@ rg、fd 与 ast-grep 默认继续作为外部执行后端：srcq 负责 argv、�
 
 ## DES-SQG-018 有界关系图不递归放大歧义
 
-- 状态: proposed
+- 状态: confirmed
 - 满足: AC-SQG-011, AC-SQG-013
 
 调用树以稳定的文件、范围、语言、符号种类和签名候选组成节点，以调用位置、方向和证据等级组成边。遍历按层批量生成 frontier 候选并复用同文件 AST，只递归展开身份唯一的边；歧义、虚分派、宏、模板、函数值、动态绑定和跨语言生成关系作为带原因的叶子保留。循环检测、节点/边预算和现有续页 owner 控制工作量与模型上下文，不能把预算耗尽、未适配或未展开表示为没有关系。
 
 ## DES-SQG-019 SourceUniverse 持有跨工作区源码范围
 
-- 状态: proposed
+- 状态: confirmed
 - 满足: AC-SQG-001, AC-SQG-007, AC-SQG-014, UDES-SQG-018
 
 关系查询内部建立可重建的 `SourceUniverse`，但不建立新的人工配置真源。它以查询目标的位置和语言为锚点，合并调用方显式根、现有编辑器多根配置、编译数据库、编译器响应文件、项目/模块清单与语言依赖元数据；每个根保留 canonical path、稳定别名、来源、相对路径解析基准、模块/依赖/版本身份、源码/生成/系统分类、适用语言与 freshness。机器面保存完整绝对路径和诊断，model 面正常只用 `project:`、`ue:`、`dep:` 等本次稳定别名表示命中；只有范围不完整会改变判断时才投影缺失来源和最短恢复动作。
@@ -216,7 +216,7 @@ C/C++ 适配器至少能从 `compile_commands.json` 读取 source、directory �
 
 ## DES-SQG-020 默认范围、显式组合与模型感知
 
-- 状态: proposed
+- 状态: confirmed
 - 满足: AC-SQG-002, AC-SQG-003, AC-SQG-007, AC-SQG-014, AC-SQG-015, UDES-SQG-018, UDES-SQG-019
 
 公开关系命令的目录输入可省略。默认 resolver 先使用源码位置；没有位置时使用调用工作目录，然后向最近的项目/语言清单、workspace 配置和编译元数据扩展。找不到任何正式元数据时，以规范化工作目录作为一个递归 `fallback` 根继续查询而不是拒绝。默认解析在关系查询内部完成；独立 scope/capability 读取只服务诊断和机器消费，不成为正常调用前置。

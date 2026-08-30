@@ -100,3 +100,15 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 | 环境与 capsule | preflight/subject 的 WebSocket failure、sampling retry、HTTP fallback 均为 0，postflight 无失败；capsule SHA-256 `fce108b55bce2871e2bb153e95725cebb5dd04d2530806aa28c07d31a6257926`，4 个原始文件和 2 个环境文件验真通过 |
 
 这些证据关闭 AC-SQG-009 与 GAP-SQG-009，范围只覆盖正常同一轮 query model 续页；压缩后恢复、cache/process offset 协议和完整端到端 A/B 收益没有改变也未被外推。正式 0.4.1 archive、真实用户 srcq 升级和 Codex Publish 未执行；后两者继续受用户暂停与逐次发布授权约束。
+
+## 8. P16 快速源码关系 0.5.0 候选
+
+| 范围 | 结果 |
+| --- | --- |
+| 组件门禁 | `cargo ci-test` 全 workspace 通过；`cargo ci-build`、`cargo lint` 与 `cargo fmt-check` 通过。随后新增 add/only/exclude 真实边界时发现无元数据临时 cwd 会把祖先普通 `.vscode` 误当项目根；移除该弱标记、只保留实际 compile database 后，当前候选的 67 项 srcq-cli lib、10 项关系集成、Clippy `-D warnings` 与格式检查通过。关系测试覆盖定义/声明、变量/字段/枚举、位置身份、同名调用点保持歧义、显式范围、引用角色、双向调用、循环、虚分派 unknown、多语言 adapter 与 26-language capability；既有 AST、rg/fd/scc、cache/process、release 与 stress 合同未退化 |
+| 真实 UAI 只读可靠性 | 从 `UeAgentCustomModelingPrimitives.cpp:295:70` 唯一选择 `UUeAgentAddPrimitiveToolBuilder::CreateRampToolBuilder`；引用只返回生产 `UeAgentInterfaceModule.cpp:101:102`，不会把 `plan/evidence/artifacts/*.cpp` 证据副本当作调用者；outgoing 把 `NewObject` 保持为 `semantic-unknown`，incoming 返回真实 `GetExtensionTools`；`BuildTool` incoming 增加 `semantic-unknown:virtual-dispatch`；名称查询还能跨 GptProjectTest workspace 找到 UE `FPaths::ProjectDir` 定义与声明 |
+| release 性能 | `srcq 0.5.0`、ripgrep 15.1.0、ast-grep 0.44.1、hyperfine 1.20.0；固定 cwd/输入、warmup 1、5 runs：definition `235.3±21.0 ms`，references `492.7±18.9 ms`，outgoing depth 2 `1.051±0.033 s`，incoming depth 2 `4.315±0.155 s`，UE external definition `5.076±0.160 s`。树内依赖解析收窄前同一 outgoing 曾为 17.417 s，该反例已由项目/显式根/当前定义文件的有界策略关闭 |
+| model Token | 本机 Python 3.14、tiktoken 0.13.0、`o200k_base`：唯一定义连完整正文 146 Token；locator/`@body` 133；引用 53；outgoing depth 2 为 93；incoming depth 2 为 92；UE 外部定义/声明及范围边界 161。`--body auto` 在本例比强制 locator 更低成本，因为避免长绝对路径续读命令；这些是实际 stdout 静态 Token，不外推为完整 Codex 会话成本 |
+| skill 与路由静态合同 | `quick_validate.py` 在 `PYTHONUTF8=1` 下通过；当前 skill/trigger 合同以 HEAD 全局规则的临时只读投影验证为 126 cases、84 strict routing、28 strict references、13/13 skills。真实 worktree 中用户保留的 `global/AGENTS.md` 改动使全局+项目规则为 28,682 bytes，比既有 28,672 预算多 10 bytes，因此正式工作区 validator 仍失败，本轮未改该文件。增量计划为 Routing/Policy 两次 evaluate、References 待 Routing；为避免用非当前全局 identity 写回 evidence，本轮未启动模型 evaluator |
+
+这些证据直接覆盖当前 0.5.0 候选的 C++ 真实消费者、已声明多语言结构机制、模型输出、确定性回归和本机冷路径量级；不证明编译器精确身份、全部语言依赖图、关系大结果同快照续页或完整 Codex 端到端 Token 收益。GptProjectTest 只作为只读语料，没有执行写入、构建或 UE 生命周期操作。未制作 release、未安装、未 Publish。

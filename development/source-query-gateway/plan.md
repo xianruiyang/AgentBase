@@ -388,7 +388,7 @@ TSQG-103—TSQG-105 已闭环。0.4.3 候选与完整组件门禁覆盖六位环
 | TSQG-110 | 接入模型投影、续页、source-query 路由与精确语义升级 | TSQG-109 | model/machine 输出、短句柄续页、skill 消费和 LSP 后备边界 | 普通模型不手工串底层命令；歧义才升级；树、引用和候选可渐进恢复且不复制 Provider 决策 |
 | TSQG-111 | 完成组件、语言机制、真实消费者与发布边界验证 | TSQG-110 | P16 验证、版本与完成审计 | 先定向后公共合同验证；候选稳定前不跑完整发布验证；未获当次明确同意不制作正式 Codex Publish |
 
-当前证据只支持 TSQG-106 的设计收敛、TSQG-107 的外部适配探针和 TSQG-112 的真实输入协议设计；尚未证明目录省略、显式组合或 SourceUniverse 能在正式实现中完整恢复各语言依赖源码。命令名称、全部语言的关系等级、outline alpha 降级和深层调用图预算仍是 proposed 设计，未完成前不得把 TSQG-108—TSQG-111 当作已经可执行的横向批量。
+0.5.0 开发候选已经闭合 TSQG-106、TSQG-107、TSQG-108 与 TSQG-109：`srcq symbol` 公开 definition/references/calls/capabilities，位置与名称身份分离，model/machine 分面和有界调用树已实现；26 种 ast-grep 语言均有显式 capability，实际适配语言按结构机制验证，未适配与不适用不会返回伪空集合。TSQG-112 已实现 anchor/cwd、workspace、C++ compile database/MSVC response file 及 add/only/exclude 组合，并在 GptProjectTest 恢复 UE 外部定义；非 C++ 语言依赖元数据 resolver 与可重建范围缓存尚未实现，继续保持 `explicit-or-project` 边界。TSQG-110 已接入紧凑 model/machine 输出与 source-query 渐进路由，但关系大结果仍以明确截断和重跑预算恢复，尚未接入同快照短句柄。TSQG-111 的完整组件门禁、真实 UAI 可靠性、release 性能与静态 Token 已完成；正式路由 evidence 因用户无关 dirty 全局规则超过预算 10 bytes 而未刷新，release/install/Codex Publish 也未获授权且未执行。这些开放项不影响当前候选已声明的有界关系能力，但不得外推为全部语言依赖全集、LSP 精确语义或已发布状态。
 
 ## 5. 停止与重开条件
 
