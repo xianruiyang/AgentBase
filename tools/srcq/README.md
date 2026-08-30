@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-- 当前版本：`srcq 0.4.3`。
+- 当前开发候选：`srcq 0.5.0`；最新正式 Release 仍为 `0.4.3`。
 - 当前固定验证引擎：`ast-grep 0.42.0`。
 - 精确验证的 ast-grep 版本：`0.41.1`、`0.42.0`、`0.44.1`；不外推为连续版本范围。
 - rg/fd 候选命令域已在 `ripgrep 15.1.0`、Codex PATH 中的 `ripgrep 15.2.0` 与 `fd 10.4.2` 上验证；29 个公开主模式均有持久分类，版本只标识证据范围，不参与运行准入。
@@ -70,6 +70,16 @@ srcq fd -t f 'CommandDispatch' .
 srcq scc --exclude-dir target,node_modules .
 ```
 
+需要定义、引用或有界调用关系时，`srcq symbol` 在一次只读调用中组合 rg 与 AST；优先使用 0-based 源码位置，目录可省略：
+
+```powershell
+srcq symbol definition --at 'Source/Module/File.cpp:41:9'
+srcq symbol references --at 'Source/Module/File.cpp:41:9'
+srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction outgoing --depth 2
+```
+
+它返回带范围与歧义边界的候选，不冒充编译器或 LSP 精确语义。语言能力、外部源码根和输出合同见[快速源码关系](docs/symbol-relations.md)。
+
 若把 `files`、`--files` 或 AST 原生命令误写到根级，srcq 只返回上述唯一入口的一行修正，不创建别名或猜测执行。分页结果的下一页只需执行页尾短命令，例如 `srcq more q17`；不要重组控制面、cursor 或原生 argv。
 
 只有调用方明确需要 machine、native/artifact、定向投影、诊断或续页时进入独立控制面：
@@ -106,6 +116,7 @@ srcq query scc doctor
 - [安全边界](docs/security.md)
 - [命令兼容](docs/compatibility.md)
 - [rg/fd/scc 查询网关](docs/query-gateway.md)
+- [快速源码关系](docs/symbol-relations.md)
 - [模型可见输出合同](docs/model-output.md)
 - [排障](docs/troubleshooting.md)
 - [开发与发布](docs/development.md)

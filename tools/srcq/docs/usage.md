@@ -7,6 +7,7 @@ srcq exec [wrapper options] -- <ast-grep argv...>
 srcq defaults [wrapper options] -- <ast-grep argv...>
 srcq cache <get|query|info|remove|gc> ...
 srcq process <validate|select|filter|count|group|sort|dedupe|merge|to-jsonl|from-jsonl|containing|group-locations> ...
+srcq symbol <capabilities|definition|references|calls> ...
 srcq <schema|capabilities|doctor> ...
 srcq <rg|fd|scc> <native argv...>
 srcq query <rg|fd|scc> <exec|defaults|doctor> ...
@@ -23,6 +24,19 @@ srcq scc --exclude-dir target .
 ```
 
 普通 scc 自动返回语言汇总，原生 `--by-file` 返回文件指标。只有明确需要固定 view、machine、lossless/raw、artifact、诊断或续页时进入 `srcq query scc`；`hotspots` 只是按启发式复杂度排序复核候选，不证明缺陷。完整合同见[查询网关](query-gateway.md)。
+
+## 快速定义、引用与调用关系
+
+优先从 0-based 源码位置调用，目录默认由工具解析：
+
+```powershell
+srcq symbol definition --at 'Source/Module/File.cpp:41:9'
+srcq symbol references --at 'Source/Module/File.cpp:41:9'
+srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction outgoing --depth 2
+srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction incoming --depth 2
+```
+
+名称输入只建立候选身份。`--add-root` 追加自动范围，`--only-root` 完全替换，`--exclude` 排除根或子树；三者都可重复。普通 model 输出在唯一小定义时直接给正文，多候选给紧凑清单，调用树对重载、虚调用和动态关系保留 unknown 叶子。只有 `scan=complete` 才覆盖全部选中根，范围完整也不等于符号身份精确。语言适配、外部源码恢复、model/machine schema 与 LSP 升级边界见[快速源码关系](symbol-relations.md)。
 
 ## 搜索、扫描与改写
 

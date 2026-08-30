@@ -1,0 +1,60 @@
+# 快速源码关系
+
+`srcq symbol` 在一个只读入口内组合 ripgrep 候选生成与 ast-grep 结构分类，用于低延迟取得定义候选、引用候选和有界调用树。它不实现编译器或 Language Provider，输出中的 `candidate`、`ambiguous` 与 `semantic-unknown` 是证据边界，不是精确语义的弱化文案。
+
+## 命令
+
+优先从源码位置发起；`PATH:LINE:COLUMN` 使用 0-based 行列：
+
+```powershell
+srcq symbol definition --at 'Source/Module/File.cpp:41:9'
+srcq symbol references --at 'Source/Module/File.cpp:41:9'
+srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction outgoing --depth 2
+srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction incoming --depth 2
+```
+
+只有名称时仍可查询，但名称只建立候选身份：
+
+```powershell
+srcq symbol definition 'Namespace::Type::Method'
+srcq symbol references Method
+```
+
+`definition` 的 `--body auto` 在唯一小定义可落入当前模型预算时直接返回完整正文；大定义返回可直接执行的 `@body` 命令；多个定义只列紧凑候选。`references` 排除已识别的声明/定义位置，并按语言能力标记 `call`、`write` 或普通 `reference`。`calls` 只递归展开唯一候选；重载、成员分派、虚调用、函数值和其他动态关系保留为带原因的叶子。`--depth` 取 1–8，`--max-nodes` 与 `--model-token-budget` 分别限制遍历和模型输出，达到预算不表示不存在更多关系。
+
+## 范围
+
+目录可以省略。含 `--at` 时从文件所属项目解析；名称查询从 `--cwd` 或当前目录解析。C++ 会只读消费 `.code-workspace`、`compile_commands.json`、`.vscode/compileCommands*.json` 和嵌套 MSVC response file，恢复项目外的本地源码根；不会启动构建系统、下载源码或扫描整盘。位于常见 `Source` 或 `src`/`include` 布局中的关系查询优先扫描对应源码树，避免把计划证据、分发副本或其他非源码 `.cpp` 当作生产关系。
+
+范围覆盖可在同一命令调整：
+
+```powershell
+--add-root PATH    # 加入自动范围，可重复
+--only-root PATH   # 只用这些文件或目录，可重复
+--exclude PATH     # 排除根或子树，可重复
+```
+
+自动定义查询按锚点、项目与已解析依赖逐步扩展，找到充分候选后停止；树内递归只在项目/显式根和当前定义文件中继续，避免一个外部库调用把整个 SDK 变成隐式扫描。自动引用和 incoming 查询也优先使用源码树；只有 machine/model 报告 `candidate_scan=complete` 或 `scan=complete` 时，结果才覆盖全部选中根。`prioritized` 表示当前候选有效但仍有已解析根未扫描；需要选定范围全集时使用 `--only-root` 明确边界。
+
+## 语言与证据
+
+`srcq symbol capabilities` 是语言能力真源，正常查询不需要预先调用。当前适配分为：
+
+- C++：结构直接定义、词法引用候选和有界调用候选，并恢复编译范围。
+- Python、TypeScript、TSX、JavaScript、Rust、Go、Java：outline 定义候选、词法引用候选和调用候选。
+- C、C#、Kotlin、PHP、Ruby、Swift：outline 定义候选。
+- Bash、Dart、Elixir、Haskell、Lua、Nix、Scala、Solidity：已登记但当前 `unadapted`。
+- CSS、HTML、JSON、YAML：源码符号关系 `not-applicable`。
+
+所有名称查询、非 C++ outline 定义、引用及调用关系都不宣称 Provider 精度。位置落在定义名称上时可选择该语法定义；位置落在调用或引用上且语法无法区分同名符号时仍返回歧义。只有该歧义会改变当前动作或结论时，才升级到 LSP 或领域工具。
+
+## 输出
+
+model 位置使用 1-based 行列，省略正常机器 envelope；范围未完整、身份歧义、动态关系和预算边界会保留最短诊断。`--output machine` 使用 0-based 行列和稳定 JSON：
+
+- `srcq.symbol.definition/v1`
+- `srcq.symbol.references/v1`
+- `srcq.symbol.calls/v1`
+- `srcq.symbol.capabilities/v1`
+
+定义候选存在时退出 0，无定义候选退出 1；输入、引擎、转换与 I/O 故障使用 srcq 的 120–127 错误域。关系命令不写源码，也不把自动发现结果持久化为第二范围真源。

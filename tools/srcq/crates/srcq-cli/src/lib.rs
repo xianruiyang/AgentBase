@@ -8,6 +8,7 @@ pub mod defaults_output;
 pub mod diagnostics;
 pub mod processor;
 pub mod query_gateway;
+pub mod symbol_query;
 
 use std::ffi::{OsStr, OsString};
 use std::fmt;
@@ -42,6 +43,7 @@ pub fn command() -> Command {
         .subcommand(direct_gateway_subcommand("rg", "ripgrep"))
         .subcommand(direct_gateway_subcommand("fd", "fd"))
         .subcommand(direct_gateway_subcommand("scc", "scc"))
+        .subcommand(symbol_subcommand())
         .subcommand(
             Command::new("more")
                 .about("Continue a model query from its short handle")
@@ -77,8 +79,188 @@ pub fn command() -> Command {
                 ),
         )
         .after_help(
-            "Operational syntax: srcq <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: srcq <schema|capabilities|doctor> ...\nCache syntax: srcq cache <get|query|info|remove|gc> ...\nProcess syntax: srcq process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...\nSource syntax: srcq <rg|fd|scc> <native argv...>\nModel continuation: srcq more <HANDLE>\nExplicit query controls: srcq query <rg|fd|scc> <exec|defaults|doctor> [options] -- <native argv...>",
+            "Operational syntax: srcq <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: srcq <schema|capabilities|doctor> ...\nCache syntax: srcq cache <get|query|info|remove|gc> ...\nProcess syntax: srcq process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...\nSource syntax: srcq <rg|fd|scc> <native argv...>\nSymbol syntax: srcq symbol definition [NAME|--at PATH:LINE:COLUMN] ...\nModel continuation: srcq more <HANDLE>\nExplicit query controls: srcq query <rg|fd|scc> <exec|defaults|doctor> [options] -- <native argv...>",
         )
+}
+
+fn symbol_subcommand() -> Command {
+    Command::new("symbol")
+        .about("Query bounded source symbol relations")
+        .subcommand_required(true)
+        .subcommand(
+            Command::new("capabilities")
+                .about("List explicit relation capability for every ast-grep language")
+                .arg(output_arg()),
+        )
+        .subcommand(symbol_relation_subcommand(
+            "definition",
+            "Find source definition candidates by name or source position",
+            true,
+        ))
+        .subcommand(symbol_relation_subcommand(
+            "references",
+            "Find bounded source reference candidates by name or source position",
+            false,
+        ))
+        .subcommand(
+            symbol_relation_subcommand("calls", "Build a bounded source call tree", false)
+                .arg(
+                    Arg::new("depth")
+                        .long("depth")
+                        .value_name("N")
+                        .default_value("1")
+                        .value_parser(clap::value_parser!(u64).range(1..=8))
+                        .help("Maximum call-tree depth"),
+                )
+                .arg(
+                    Arg::new("direction")
+                        .long("direction")
+                        .value_name("DIRECTION")
+                        .default_value("outgoing")
+                        .value_parser(PossibleValuesParser::new(["outgoing", "incoming"]))
+                        .help("Call-tree direction"),
+                )
+                .arg(
+                    Arg::new("max-nodes")
+                        .long("max-nodes")
+                        .value_name("N")
+                        .default_value("40")
+                        .value_parser(clap::value_parser!(u64).range(1..=10000))
+                        .help("Maximum call-tree nodes expanded or displayed"),
+                ),
+        )
+}
+
+fn symbol_relation_subcommand(
+    name: &'static str,
+    about: &'static str,
+    include_body: bool,
+) -> Command {
+    let command = Command::new(name)
+        .about(about)
+        .arg(
+            Arg::new("name")
+                .value_name("NAME")
+                .required_unless_present("at")
+                .conflicts_with("at")
+                .allow_hyphen_values(true),
+        )
+        .arg(
+            Arg::new("at")
+                .long("at")
+                .value_name("PATH:LINE:COLUMN")
+                .help("Resolve the zero-based source position before querying the relation"),
+        )
+        .arg(
+            Arg::new("add-root")
+                .long("add-root")
+                .value_name("PATH")
+                .action(ArgAction::Append)
+                .value_parser(clap::value_parser!(PathBuf))
+                .conflicts_with("only-root")
+                .help("Add one file or directory to the automatically resolved roots"),
+        )
+        .arg(
+            Arg::new("only-root")
+                .long("only-root")
+                .value_name("PATH")
+                .action(ArgAction::Append)
+                .value_parser(clap::value_parser!(PathBuf))
+                .help("Use only the explicitly supplied files or directories"),
+        )
+        .arg(
+            Arg::new("exclude")
+                .long("exclude")
+                .value_name("PATH")
+                .action(ArgAction::Append)
+                .value_parser(clap::value_parser!(PathBuf))
+                .help("Exclude one root or subtree from the selected scope"),
+        )
+        .arg(
+            Arg::new("cwd")
+                .long("cwd")
+                .value_name("PATH")
+                .value_parser(clap::value_parser!(PathBuf))
+                .help("Resolve relative inputs and automatic scope from this directory"),
+        )
+        .arg(
+            Arg::new("language")
+                .long("language")
+                .value_name("LANGUAGE")
+                .default_value("cpp")
+                .value_parser(PossibleValuesParser::new([
+                    "bash",
+                    "c",
+                    "cpp",
+                    "csharp",
+                    "css",
+                    "dart",
+                    "elixir",
+                    "go",
+                    "haskell",
+                    "html",
+                    "java",
+                    "javascript",
+                    "json",
+                    "kotlin",
+                    "lua",
+                    "nix",
+                    "php",
+                    "python",
+                    "ruby",
+                    "rust",
+                    "scala",
+                    "solidity",
+                    "swift",
+                    "tsx",
+                    "typescript",
+                    "yaml",
+                ]))
+                .help("Language adapter used for relation classification"),
+        )
+        .arg(output_arg())
+        .arg(
+            Arg::new("limit")
+                .long("limit")
+                .value_name("N")
+                .default_value("40")
+                .value_parser(clap::value_parser!(u64).range(1..=10000))
+                .help("Maximum relation candidates shown"),
+        )
+        .arg(
+            Arg::new("model-token-budget")
+                .long("model-token-budget")
+                .value_name("N")
+                .default_value("2048")
+                .value_parser(clap::value_parser!(u64).range(32..=1_000_000))
+                .help("Soft estimated-token budget for model output"),
+        )
+        .arg(
+            Arg::new("rg-engine")
+                .long("rg-engine")
+                .value_name("PATH")
+                .value_parser(clap::value_parser!(PathBuf))
+                .help("Explicit ripgrep executable for diagnostics or controlled tests"),
+        )
+        .arg(
+            Arg::new("ast-grep-engine")
+                .long("ast-grep-engine")
+                .value_name("PATH")
+                .value_parser(clap::value_parser!(PathBuf))
+                .help("Explicit ast-grep executable for diagnostics or controlled tests"),
+        );
+    if include_body {
+        command.arg(
+            Arg::new("body")
+                .long("body")
+                .value_name("MODE")
+                .default_value("auto")
+                .value_parser(PossibleValuesParser::new(["auto", "none", "full"]))
+                .help("Definition body projection"),
+        )
+    } else {
+        command
+    }
 }
 
 fn direct_gateway_subcommand(name: &'static str, engine_name: &'static str) -> Command {
@@ -499,7 +681,44 @@ pub enum CliAction {
     Process(ProcessCommand),
     Inspect(InspectionCommand),
     Gateway(GatewayCommand),
+    Symbol(SymbolCommand),
     More(String),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SymbolBodyMode {
+    Auto,
+    None,
+    Full,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SymbolOperation {
+    Capabilities,
+    Definition,
+    References,
+    Calls,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SymbolCommand {
+    pub operation: SymbolOperation,
+    pub name: Option<String>,
+    pub at: Option<String>,
+    pub add_roots: Vec<PathBuf>,
+    pub only_roots: Vec<PathBuf>,
+    pub excludes: Vec<PathBuf>,
+    pub cwd: Option<PathBuf>,
+    pub language: String,
+    pub body: SymbolBodyMode,
+    pub output: OutputFormat,
+    pub limit: usize,
+    pub model_token_budget: usize,
+    pub depth: usize,
+    pub max_nodes: usize,
+    pub direction: String,
+    pub rg_engine: Option<PathBuf>,
+    pub ast_grep_engine: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -824,6 +1043,7 @@ pub fn parse_cli_from(
             || value == OsStr::new("rg")
             || value == OsStr::new("fd")
             || value == OsStr::new("scc")
+            || value == OsStr::new("symbol")
             || value == OsStr::new("more")
             || value == OsStr::new("query")
     }) {
@@ -868,6 +1088,7 @@ pub fn parse_cli_from(
                 GatewayBackend::Scc,
                 values,
             ))),
+            Some(("symbol", values)) => parse_symbol_command(values).map(CliAction::Symbol),
             Some(("more", values)) => values
                 .get_one::<String>("handle")
                 .cloned()
@@ -892,6 +1113,101 @@ pub fn parse_cli_from(
         return Err(CliParseError::Guidance(recovery));
     }
     parse_invocation_from(raw).map(|invocation| CliAction::Native(Box::new(invocation)))
+}
+
+fn parse_symbol_command(matches: &ArgMatches) -> Result<SymbolCommand, CliParseError> {
+    let Some((operation, values)) = matches.subcommand() else {
+        return Err(CliParseError::MissingDelimiter);
+    };
+    let operation = match operation {
+        "capabilities" => SymbolOperation::Capabilities,
+        "definition" => SymbolOperation::Definition,
+        "references" => SymbolOperation::References,
+        "calls" => SymbolOperation::Calls,
+        _ => return Err(CliParseError::MissingDelimiter),
+    };
+    if operation == SymbolOperation::Capabilities {
+        return Ok(SymbolCommand {
+            operation,
+            name: None,
+            at: None,
+            add_roots: Vec::new(),
+            only_roots: Vec::new(),
+            excludes: Vec::new(),
+            cwd: None,
+            language: "cpp".to_owned(),
+            body: SymbolBodyMode::None,
+            output: parse_output(values),
+            limit: 40,
+            model_token_budget: 2048,
+            depth: 1,
+            max_nodes: 40,
+            direction: "outgoing".to_owned(),
+            rg_engine: None,
+            ast_grep_engine: None,
+        });
+    }
+    let body = match values
+        .try_get_one::<String>("body")
+        .ok()
+        .flatten()
+        .map(String::as_str)
+        .unwrap_or("auto")
+    {
+        "auto" => SymbolBodyMode::Auto,
+        "none" => SymbolBodyMode::None,
+        "full" => SymbolBodyMode::Full,
+        _ => return Err(CliParseError::MissingDelimiter),
+    };
+    let paths = |name: &str| {
+        values
+            .get_many::<PathBuf>(name)
+            .map(|items| items.cloned().collect())
+            .unwrap_or_default()
+    };
+    Ok(SymbolCommand {
+        operation,
+        name: values.get_one::<String>("name").cloned(),
+        at: values.get_one::<String>("at").cloned(),
+        add_roots: paths("add-root"),
+        only_roots: paths("only-root"),
+        excludes: paths("exclude"),
+        cwd: values.get_one::<PathBuf>("cwd").cloned(),
+        language: values
+            .get_one::<String>("language")
+            .cloned()
+            .unwrap_or_else(|| "cpp".to_owned()),
+        body,
+        output: parse_output(values),
+        limit: values
+            .get_one::<u64>("limit")
+            .and_then(|value| usize::try_from(*value).ok())
+            .unwrap_or(40),
+        model_token_budget: values
+            .get_one::<u64>("model-token-budget")
+            .and_then(|value| usize::try_from(*value).ok())
+            .unwrap_or(2048),
+        depth: values
+            .try_get_one::<u64>("depth")
+            .ok()
+            .flatten()
+            .and_then(|value| usize::try_from(*value).ok())
+            .unwrap_or(1),
+        max_nodes: values
+            .try_get_one::<u64>("max-nodes")
+            .ok()
+            .flatten()
+            .and_then(|value| usize::try_from(*value).ok())
+            .unwrap_or(40),
+        direction: values
+            .try_get_one::<String>("direction")
+            .ok()
+            .flatten()
+            .cloned()
+            .unwrap_or_else(|| "outgoing".to_owned()),
+        rg_engine: values.get_one::<PathBuf>("rg-engine").cloned(),
+        ast_grep_engine: values.get_one::<PathBuf>("ast-grep-engine").cloned(),
+    })
 }
 
 fn targeted_recovery(raw: &[OsString]) -> Option<&'static str> {

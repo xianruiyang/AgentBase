@@ -1,0 +1,17 @@
+id: srcq-cpp-definition-candidate
+language: Cpp
+rule:
+  any:
+    - kind: function_definition
+    - kind: class_specifier
+    - kind: struct_specifier
+    - kind: union_specifier
+    - kind: enum_specifier
+    - kind: alias_declaration
+    - kind: type_definition
+    - kind: declaration
+    - kind: field_declaration
+    - kind: parameter_declaration
+    - kind: enumerator
+severity: info
+message: source definition candidate

@@ -54,6 +54,7 @@ fn run_main() -> i32 {
         srcq_cli::CliAction::Process(command) => return execute_process(&command),
         srcq_cli::CliAction::Inspect(command) => return execute_inspection(&command),
         srcq_cli::CliAction::Gateway(command) => return srcq_cli::query_gateway::execute(&command),
+        srcq_cli::CliAction::Symbol(command) => return srcq_cli::symbol_query::execute(&command),
         srcq_cli::CliAction::More(handle) => {
             return srcq_cli::query_gateway::execute_continuation(&handle)
         }

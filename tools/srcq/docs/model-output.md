@@ -23,6 +23,7 @@
 | rg files/count/summary | 请求对象本身 | 与请求对象重复的 receipt | 分页才给续点；统计只在明确 summary/count 视图出现 |
 | scc summary/languages | 语言、文件、代码、注释、空行、行数、复杂度和字节的当前请求投影 | 原生键名、重复 totals、COCOMO、estimated cost、schedule、people | lossless/raw/artifact 才保留完整原生估算字段；复杂度只作复核候选指标 |
 | scc files/hotspots | 稳定规范化路径与直接指标；files 可用扁平行、单表头表格或目录树表格 | 未请求的语言容器、成本估算、重复路径 | files 仅在可逆、保序且实际更短时用树；分页给精确 cursor；hotspots 保持扁平排名且不声明缺陷 |
+| symbol relations | 定义定位/签名与预算内正文、引用位置/角色、有界调用树、实际歧义与动态边界 | 完整根清单、AST 节点、rg 中间候选、正常 machine schema | `prioritized`、范围未闭合、预算、歧义和 unknown 会保留最短边界；machine 保存完整范围与 0-based 位置 |
 | AST | 文件、完整范围、源码正文；当前查询确需且不与正文重复的捕获/规则/诊断 | `_sgy` envelope、ordinal、正文的重叠捕获、固定 profile/cache 字段 | 省略结果、正文截断或 cache 是继续取回的唯一入口时给最短恢复信息 |
 | doctor | 成功时 `ok` | 正常路径、cwd、expected/observed 重复、schema | 失败时给实际值、预期值和恢复入口 |
 | defaults | 分类结果及实际注入、抑制或不可推导差异 | engine、cwd、原始 argv、完整 effective argv、engine_started | `--output machine` 返回完整决策 |

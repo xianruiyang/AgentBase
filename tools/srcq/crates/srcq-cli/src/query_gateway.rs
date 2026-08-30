@@ -3594,7 +3594,7 @@ fn model_path<'a>(path: &'a Path, role: &str) -> Result<&'a str, GatewayError> {
     })
 }
 
-pub(super) fn model_text_cost(text: &str) -> usize {
+pub(crate) fn model_text_cost(text: &str) -> usize {
     let mut total = 0_usize;
     let mut ascii_word = 0_usize;
     for character in text.chars() {
