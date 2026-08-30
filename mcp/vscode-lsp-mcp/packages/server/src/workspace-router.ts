@@ -1112,7 +1112,9 @@ export class WorkspaceRouter {
           : response.reason === 'scopeUnsupported'
             ? 'Use searchMode provider for this language; fast scoped identity search currently supports C and C++.'
             : response.reason === 'targetUnresolved'
-              ? 'Confirm the exact symbol position with symbol_info, then retry; use searchMode provider only when the Provider can resolve references but not definition identity.'
+              ? 'Confirm the exact symbol position with symbol_info. On a cold C/C++ workspace, also ensure the active compile_commands contains this file and remove stale entries before retrying; use searchMode provider only when the Provider can resolve references but not definition identity.'
+              : response.reason === 'providerTimedOut'
+                ? `Ensure the active compile_commands contains the target and does not retain deleted files, then retry with scopePaths such as ${JSON.stringify([suggestedScope])}; raise timeoutMs only when the translation unit is valid but intrinsically slow.`
               : `Retry with scopePaths such as ${JSON.stringify([suggestedScope])}, raise timeoutMs for the same scoped search, or choose searchMode provider for full Provider enumeration.`,
       });
     }

@@ -255,6 +255,62 @@ test('scoped C++ references use exact-token discovery and definition identity in
   assert.equal(host.providerDocumentOpenCount, 0);
 });
 
+test('cold scoped C++ references overlap candidate discovery and retry empty target identity', async () => {
+  const headerFile = path.join(workspaceRoot, 'Source', 'settings.h');
+  const useFile = path.join(workspaceRoot, 'Source', 'settings.cpp');
+  let releaseRead: (() => void) | undefined;
+  let markReadStarted: (() => void) | undefined;
+  const readBarrier = new Promise<void>((resolve) => {
+    releaseRead = resolve;
+  });
+  const readStarted = new Promise<void>((resolve) => {
+    markReadStarted = resolve;
+  });
+  class ColdReadHost extends FakeReadHost {
+    override async readProviderText(value: unknown): Promise<string> {
+      markReadStarted?.();
+      await readBarrier;
+      return await super.readProviderText(value);
+    }
+  }
+  const host = new ColdReadHost();
+  host.documents.set(headerFile, richDocument(headerFile, 'GetMutable\n'));
+  host.documents.set(useFile, richDocument(useFile, 'GetMutable();\n'));
+  host.findResults = [uri(useFile), uri(headerFile)];
+  let definitionCalls = 0;
+  host.results.set('vscode.executeDefinitionProvider', () => {
+    definitionCalls += 1;
+    return definitionCalls === 1
+      ? []
+      : [{ uri: uri(headerFile), range: range(0, 0, 0, 10) }];
+  });
+  host.results.set('vscode.executeDeclarationProvider', []);
+  const bridge = new ReferencesDiagnosticsProviderBridge(host, pathAccess);
+  const pending = bridge.handle(await context(), request(REFERENCES_BRIDGE_METHOD, {
+    file: 'Source/settings.h',
+    line: 1,
+    column: 1,
+    contextLines: 0,
+    scopePaths: ['Source'],
+    timeoutMs: 10_000,
+    resultStart: 1,
+    resultEnd: 100,
+  }), new AbortController().signal);
+
+  await readStarted;
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(host.calls.some((call) => call.command === 'vscode.executeDefinitionProvider'), true);
+  releaseRead?.();
+  const result = parseReferencesBridgeResponse(await pending);
+
+  assert.equal(result.status, 'completed');
+  if (result.status === 'completed') {
+    assert.equal(result.available, 2);
+  }
+  assert.ok(definitionCalls >= 2);
+  assert.equal(host.calls.some((call) => call.command === 'vscode.executeReferenceProvider'), false);
+});
+
 test('incomplete scoped C++ proof fails fast without starting the global provider', async () => {
   const headerFile = path.join(workspaceRoot, 'Source', 'settings.h');
   const useFile = path.join(workspaceRoot, 'Source', 'settings.cpp');

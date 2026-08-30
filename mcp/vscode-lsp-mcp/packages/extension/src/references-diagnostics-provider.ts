@@ -36,6 +36,7 @@ import {
 import {
   SymbolIdentityResolver,
   type SymbolIdentityFailureStatus,
+  type SymbolIdentityResolution,
 } from './symbol-identity-resolver.js';
 
 interface ReferenceBridgeParams {
@@ -104,6 +105,17 @@ type ScopedReferenceResult =
       readonly warnings: readonly string[];
     };
 
+type ScopedOccurrenceSearchResult =
+  | { readonly status: 'cancelled' }
+  | {
+      readonly status: 'incomplete';
+      readonly reason: ScopedReferenceIncompleteReason;
+    }
+  | {
+      readonly status: 'completed';
+      readonly occurrences: readonly MappedReference[];
+    };
+
 interface DiagnosticEntry {
   readonly rawUri: unknown;
   readonly uri: { readonly scheme: string; readonly fsPath: string };
@@ -135,8 +147,12 @@ export interface ReferencesDiagnosticsProviderHost extends VscodeProviderHost {
 const SCOPED_REFERENCE_MAX_FILES = 2_000;
 const SCOPED_REFERENCE_MAX_TEXT_CHARACTERS = 64_000_000;
 const SCOPED_REFERENCE_MAX_OCCURRENCES = 500;
-const SCOPED_REFERENCE_TOTAL_TIMEOUT_MS = 30_000;
-const SCOPED_REFERENCE_TARGET_TIMEOUT_MS = 15_000;
+const SCOPED_REFERENCE_TOTAL_TIMEOUT_MS = 60_000;
+const SCOPED_REFERENCE_COMPLETION_RESERVE_MS = 5_000;
+const SCOPED_REFERENCE_TARGET_ATTEMPT_TIMEOUT_MS = 10_000;
+const SCOPED_REFERENCE_PROVIDER_ACTIVATION_GRACE_MS = 5_000;
+const SCOPED_REFERENCE_TARGET_RETRY_INITIAL_DELAY_MS = 250;
+const SCOPED_REFERENCE_TARGET_RETRY_MAX_DELAY_MS = 1_000;
 const SCOPED_REFERENCE_CALL_TIMEOUT_MS = 2_000;
 const SCOPED_REFERENCE_READ_CONCURRENCY = 16;
 const cppSourceFile = /\.(?:c|cc|cpp|cxx|m|mm|h|hh|hpp|hxx|inl|inc|ipp|tpp|txx|ixx|cppm)$/iu;
@@ -734,6 +750,134 @@ const mapDiagnostic = async (
   });
 };
 
+const waitForScopedTargetRetry = async (
+  delayMs: number,
+  signal: AbortSignal,
+): Promise<boolean> => {
+  if (signal.aborted) return false;
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (value: boolean): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+      resolve(value);
+    };
+    const onAbort = (): void => finish(false);
+    const timer = setTimeout(() => finish(true), delayMs);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+};
+
+const discoverScopedReferenceOccurrences = async (
+  host: ReferencesDiagnosticsProviderHost,
+  pathAccess: WorkspacePathAccess,
+  context: WorkspacePathContext,
+  input: ReferenceBridgeParams,
+  patterns: readonly BoundedSearchPattern[],
+  identifier: string,
+  deadline: number,
+  signal: AbortSignal,
+): Promise<ScopedOccurrenceSearchResult> => {
+  const files = new Map<string, { readonly file: string; readonly rawUri: unknown }>();
+  for (const pattern of patterns) {
+    if (signal.aborted) return Object.freeze({ status: 'cancelled' });
+    if (Date.now() >= deadline) {
+      return Object.freeze({ status: 'incomplete', reason: 'providerTimedOut' });
+    }
+    let found: readonly unknown[];
+    try {
+      found = await host.findFiles(
+        pattern.rootAbsolutePath,
+        pattern.pattern,
+        SCOPED_REFERENCE_MAX_FILES + 1,
+      );
+    } catch {
+      return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
+    }
+    if (found.length > SCOPED_REFERENCE_MAX_FILES) {
+      return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
+    }
+    for (const rawUri of found) {
+      const uri = uriRecord(rawUri);
+      if (uri === undefined) {
+        return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
+      }
+      let file: string;
+      try {
+        file = (await logicalPathFromProviderLocation(context, {
+          uriScheme: uri.scheme,
+          lexicalAbsolutePath: uri.fsPath,
+        }, pathAccess)).logicalPath;
+      } catch {
+        return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
+      }
+      if (!cppSourceFile.test(file) || !matchesScopePaths(file, input.scopePaths) ||
+          !matchesLogicalGlobs(file, input)) continue;
+      const key = context.platform === 'win32' ? file.toLowerCase() : file;
+      files.set(key, Object.freeze({ file, rawUri }));
+      if (files.size > SCOPED_REFERENCE_MAX_FILES) {
+        return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
+      }
+    }
+  }
+
+  let textCharacters = 0;
+  const occurrences: MappedReference[] = [];
+  const fileEntries = [...files.values()].sort((left, right) =>
+    compareTextOrdinal(left.file, right.file));
+  for (let start = 0; start < fileEntries.length; start += SCOPED_REFERENCE_READ_CONCURRENCY) {
+    if (signal.aborted) return Object.freeze({ status: 'cancelled' });
+    if (Date.now() >= deadline) {
+      return Object.freeze({ status: 'incomplete', reason: 'providerTimedOut' });
+    }
+    const batch = fileEntries.slice(start, start + SCOPED_REFERENCE_READ_CONCURRENCY);
+    let texts: readonly string[];
+    try {
+      texts = await Promise.all(batch.map((entry) => host.readProviderText(entry.rawUri)));
+    } catch {
+      return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
+    }
+    for (const [index, entry] of batch.entries()) {
+      const text = texts[index];
+      if (text === undefined) {
+        return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
+      }
+      textCharacters += text.length;
+      if (textCharacters > SCOPED_REFERENCE_MAX_TEXT_CHARACTERS) {
+        return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
+      }
+      const uri = uriRecord(entry.rawUri);
+      if (uri === undefined) {
+        return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
+      }
+      const positions = pointsAtTextOffsets(text, cppIdentifierOccurrences(text, identifier));
+      for (const position of positions) {
+        occurrences.push(Object.freeze({
+          location: Object.freeze({
+            rawUri: entry.rawUri,
+            uri,
+            point: Object.freeze({ line: position.line, character: position.character }),
+          }),
+          hit: Object.freeze({
+            file: entry.file,
+            line: position.line + 1,
+            column: position.character + 1,
+          }),
+        }));
+        if (occurrences.length > SCOPED_REFERENCE_MAX_OCCURRENCES) {
+          return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
+        }
+      }
+    }
+  }
+  return Object.freeze({
+    status: 'completed',
+    occurrences: Object.freeze(occurrences),
+  });
+};
+
 export class ReferencesDiagnosticsProviderBridge {
   readonly #host: ReferencesDiagnosticsProviderHost;
   readonly #defaultTimeoutMs: number;
@@ -763,6 +907,43 @@ export class ReferencesDiagnosticsProviderBridge {
       pathAccess,
       ...(defaultTimeoutMs === undefined ? {} : { defaultTimeoutMs }),
     });
+  }
+
+  async #resolveScopedTarget(
+    context: WorkspacePathContext,
+    position: SymbolCandidatePosition,
+    signal: AbortSignal,
+    deadline: number,
+  ): Promise<SymbolIdentityResolution> {
+    const startedAt = Date.now();
+    let retryDelayMs = SCOPED_REFERENCE_TARGET_RETRY_INITIAL_DELAY_MS;
+    while (true) {
+      if (signal.aborted) return Object.freeze({ status: 'cancelled' });
+      const remaining = Math.max(0, Math.ceil(deadline - Date.now()));
+      if (remaining === 0) return Object.freeze({ status: 'timedOut' });
+      const target = await this.#identity.resolveTarget(
+        context,
+        position,
+        signal,
+        Math.min(SCOPED_REFERENCE_TARGET_ATTEMPT_TIMEOUT_MS, remaining),
+      );
+      const providerMayStillActivate = target.status === 'unavailable' &&
+        Date.now() - startedAt < SCOPED_REFERENCE_PROVIDER_ACTIVATION_GRACE_MS;
+      if (target.status === 'resolved' || target.status === 'cancelled' ||
+          (target.status !== 'unresolved' && target.status !== 'notReady' &&
+           target.status !== 'timedOut' && !providerMayStillActivate)) {
+        return target;
+      }
+      const delayMs = Math.min(retryDelayMs, Math.max(0, deadline - Date.now()));
+      if (delayMs === 0) return Object.freeze({ status: 'timedOut' });
+      if (!await waitForScopedTargetRetry(delayMs, signal)) {
+        return Object.freeze({ status: 'cancelled' });
+      }
+      retryDelayMs = Math.min(
+        SCOPED_REFERENCE_TARGET_RETRY_MAX_DELAY_MS,
+        retryDelayMs * 2,
+      );
+    }
   }
 
   async #scopedCppReferences(
@@ -806,19 +987,31 @@ export class ReferencesDiagnosticsProviderBridge {
       const remaining = deadline - Date.now();
       return remaining < 1 ? undefined : Math.min(maximumMs, remaining);
     };
-    const targetTimeout = callTimeout(Math.max(
-      this.#scopedReferenceCallTimeoutMs,
-      SCOPED_REFERENCE_TARGET_TIMEOUT_MS,
-    ));
-    if (targetTimeout === undefined) {
-      return Object.freeze({ status: 'incomplete', reason: 'providerTimedOut' });
-    }
-    const target = await this.#identity.resolveTarget(
+    const remainingAtStart = Math.max(0, deadline - Date.now());
+    const completionReserve = Math.min(
+      SCOPED_REFERENCE_COMPLETION_RESERVE_MS,
+      Math.floor(remainingAtStart / 5),
+    );
+    const targetDeadline = deadline - completionReserve;
+    const occurrenceSearch = discoverScopedReferenceOccurrences(
+      this.#host,
+      this.#pathAccess,
+      context,
+      input,
+      patterns,
+      identifier,
+      deadline,
+      signal,
+    );
+    const targetSearch = this.#resolveScopedTarget(
       context,
       { file: input.file, line: input.line, column: input.column },
       signal,
-      targetTimeout,
+      targetDeadline,
     );
+    const [target, discovery] = await Promise.all([targetSearch, occurrenceSearch]);
+    if (discovery.status === 'cancelled') return Object.freeze({ status: 'cancelled' });
+    if (discovery.status === 'incomplete') return discovery;
     if (target.status === 'cancelled') return Object.freeze({ status: 'cancelled' });
     if (target.status !== 'resolved') {
       return Object.freeze({
@@ -828,101 +1021,8 @@ export class ReferencesDiagnosticsProviderBridge {
     }
     const targetAnchors = new Set(target.anchors);
 
-    const files = new Map<string, { readonly file: string; readonly rawUri: unknown }>();
-    for (const pattern of patterns) {
-      if (signal.aborted) return Object.freeze({ status: 'cancelled' });
-      if (Date.now() >= deadline) {
-        return Object.freeze({ status: 'incomplete', reason: 'providerTimedOut' });
-      }
-      let found: readonly unknown[];
-      try {
-        found = await this.#host.findFiles(
-          pattern.rootAbsolutePath,
-          pattern.pattern,
-          SCOPED_REFERENCE_MAX_FILES + 1,
-        );
-      } catch {
-        return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
-      }
-      if (found.length > SCOPED_REFERENCE_MAX_FILES) {
-        return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
-      }
-      for (const rawUri of found) {
-        const uri = uriRecord(rawUri);
-        if (uri === undefined) {
-          return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
-        }
-        let file: string;
-        try {
-          file = (await logicalPathFromProviderLocation(context, {
-            uriScheme: uri.scheme,
-            lexicalAbsolutePath: uri.fsPath,
-          }, this.#pathAccess)).logicalPath;
-        } catch {
-          return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
-        }
-        if (!cppSourceFile.test(file) || !matchesScopePaths(file, input.scopePaths) ||
-            !matchesLogicalGlobs(file, input)) continue;
-        const key = context.platform === 'win32' ? file.toLowerCase() : file;
-        files.set(key, Object.freeze({ file, rawUri }));
-        if (files.size > SCOPED_REFERENCE_MAX_FILES) {
-          return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
-        }
-      }
-    }
-
-    let textCharacters = 0;
-    const occurrences: MappedReference[] = [];
-    const fileEntries = [...files.values()].sort((left, right) =>
-      compareTextOrdinal(left.file, right.file));
-    for (let start = 0; start < fileEntries.length; start += SCOPED_REFERENCE_READ_CONCURRENCY) {
-      if (signal.aborted) return Object.freeze({ status: 'cancelled' });
-      if (Date.now() >= deadline) {
-        return Object.freeze({ status: 'incomplete', reason: 'providerTimedOut' });
-      }
-      const batch = fileEntries.slice(start, start + SCOPED_REFERENCE_READ_CONCURRENCY);
-      let texts: readonly string[];
-      try {
-        texts = await Promise.all(batch.map((entry) => this.#host.readProviderText(entry.rawUri)));
-      } catch {
-        return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
-      }
-      for (const [index, entry] of batch.entries()) {
-        const text = texts[index];
-        if (text === undefined) {
-          return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
-        }
-        textCharacters += text.length;
-        if (textCharacters > SCOPED_REFERENCE_MAX_TEXT_CHARACTERS) {
-          return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
-        }
-        const uri = uriRecord(entry.rawUri);
-        if (uri === undefined) {
-          return Object.freeze({ status: 'incomplete', reason: 'providerFailed' });
-        }
-        const positions = pointsAtTextOffsets(text, cppIdentifierOccurrences(text, identifier));
-        for (const position of positions) {
-          occurrences.push(Object.freeze({
-            location: Object.freeze({
-              rawUri: entry.rawUri,
-              uri,
-              point: Object.freeze({ line: position.line, character: position.character }),
-            }),
-            hit: Object.freeze({
-              file: entry.file,
-              line: position.line + 1,
-              column: position.character + 1,
-            }),
-          }));
-          if (occurrences.length > SCOPED_REFERENCE_MAX_OCCURRENCES) {
-            return Object.freeze({ status: 'incomplete', reason: 'scopeBudgetExceeded' });
-          }
-        }
-      }
-    }
-
     const verified: MappedReference[] = [];
-    for (const occurrence of occurrences) {
+    for (const occurrence of discovery.occurrences) {
       const sameTargetFile = context.platform === 'win32'
         ? occurrence.hit.file.toLowerCase() === input.file.toLowerCase()
         : occurrence.hit.file === input.file;
