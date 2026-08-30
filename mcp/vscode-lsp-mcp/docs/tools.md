@@ -12,7 +12,7 @@ The server exposes exactly 19 tools. MCP `tools/list` is authoritative for descr
 | `symbol_info` | read | At a known position, request only semantics unresolved by source/AST. |
 | `get_references` | read | At a known symbol, return complete semantic references when text matches are insufficient. |
 | `verify_symbol_candidates` | read | Verify bounded text/AST candidates against one target identity. |
-| `get_call_hierarchy` | read | Return bounded overload-aware call relations only when source/AST is insufficient; cold C/C++ requires a current compile_commands entry. |
+| `get_call_hierarchy` | read | Return bounded overload-aware call relations only when source/AST is insufficient; cold C/C++ may open a no-focus preview and requires a current compile_commands entry. |
 | `get_type_hierarchy` | read | Return bounded semantic inheritance relations only when the active language Provider supports them; use source AST for cpptools C/C++. |
 | `get_diagnostics` | read | Read diagnostics from the smallest needed scope. |
 | `rename_preview` | preview | Preview a complete semantic rename within an explicit path scope. |
@@ -24,7 +24,7 @@ The server exposes exactly 19 tools. MCP `tools/list` is authoritative for descr
 | `format_apply` | mutation | Apply one unexpired formatting preview after change validation. |
 | `execute_command` | mutation | Execute one selected standard command, trusted task, or authorized custom command; never arbitrary shell. |
 
-Only `rename_apply`, `code_action_apply`, `format_apply`, and `execute_command` are marked destructive. Preview and read tools are read-only/idempotent; the four mutation tools are not treated as idempotent.
+Only `rename_apply`, `code_action_apply`, `format_apply`, and `execute_command` are marked destructive. Preview and read tools do not change workspace files and are idempotent; the four mutation tools are not treated as idempotent. A cold C/C++ call-hierarchy read may make its target visible in a preview editor without taking focus so cpptools prioritizes that translation unit.
 
 ## Response contract
 
@@ -58,6 +58,6 @@ On a cold C/C++ workspace, candidate discovery now runs while the target transla
 
 Most read-tool filters run after the VS Code provider returns; they reduce response size, not Provider enumeration time. `get_references` is the exception only in `auto`/`scoped` C/C++ mode, where `scopePaths` or `includeGlobs` determine candidate discovery before semantic verification. A full-workspace fast result carries `references_fast_workspace_identity_search`; an explicit bounded result carries `references_scoped_identity_search`. Incomplete proof returns an error rather than a partial set.
 
-For an ordinary C/C++ function outline, query the source AST before `document_symbols`; the Provider outline remains the fallback for semantic symbol kinds or nesting that syntax evidence cannot supply. A cold C/C++ `get_call_hierarchy` call retries a transient empty prepare result inside the same bounded request, so the caller should not issue unchanged retries. Once cpptools has parsed the target translation unit, hierarchy expansion reuses that state; keeping the active `compile_commands` complete and current is therefore the main cold-start control.
+For an ordinary C/C++ function outline, query the source AST before `document_symbols`; the Provider outline remains the fallback for semantic symbol kinds or nesting that syntax evidence cannot supply. A cold C/C++ `get_call_hierarchy` call makes a previously hidden target visible in a preview editor without taking focus, then retries a transient empty prepare result inside the same bounded request, so the caller should not issue unchanged retries. This prioritizes the active translation unit but does not remove its intrinsic parse cost. Once cpptools has parsed the target, hierarchy expansion reuses that state; keeping the active `compile_commands` complete and current remains the main cold-start control.
 
 The supported cpptools line registers Call Hierarchy but not a C/C++ Type Hierarchy Provider. For C/C++ inheritance, locate the type name with bounded text search and query the relevant files for AST `base_class_clause` nodes, expanding only the direct relations needed. `get_type_hierarchy` remains available for language extensions that actually implement VS Code Type Hierarchy; an empty unsupported result must not be retried as if it were cold C++ indexing.

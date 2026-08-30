@@ -420,7 +420,10 @@ export class HierarchyProviderBridge {
         logicalFile: params.file,
         signal,
         ...(params.kind === 'call' && cppSourceFile.test(params.file)
-          ? { pollDelaysMs: CPP_COLD_HIERARCHY_POLL_DELAYS_MS }
+          ? {
+              pollDelaysMs: CPP_COLD_HIERARCHY_POLL_DELAYS_MS,
+              prioritizeDocument: true,
+            }
           : {}),
       },
     );

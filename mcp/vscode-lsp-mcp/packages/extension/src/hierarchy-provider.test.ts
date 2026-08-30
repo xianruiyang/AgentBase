@@ -106,6 +106,11 @@ class FakeHierarchyHost implements HierarchyProviderHost {
     return Promise.resolve(this.document);
   }
 
+  prioritizeTextDocument(document: TextDocument): void {
+    assert.equal(document, this.document);
+    this.events.push('prioritize');
+  }
+
   executeCommand(command: string, ...args: readonly unknown[]): PromiseLike<unknown> {
     this.events.push(command);
     this.calls.push({ command, args });
@@ -174,7 +179,10 @@ test('call hierarchy bridge activates first, retains private items, and maps cal
       name: 'middleCall', kind: 'function', file: 'src/hierarchy.cpp', line: 4, column: 17,
     },
   }]);
-  assert.deepEqual(host.events.slice(0, 2), ['activate', 'vscode.prepareCallHierarchy']);
+  assert.deepEqual(
+    host.events.slice(0, 3),
+    ['activate', 'prioritize', 'vscode.prepareCallHierarchy'],
+  );
   assert.equal(JSON.stringify(prepared).includes('privateProviderState'), false);
 
   const incoming = parseHierarchyExpandBridgeResponse(await bridge.handle(
@@ -222,6 +230,7 @@ test('type hierarchy bridge maps supertype and subtype nodes and rejects cross-k
     new AbortController().signal,
   ));
   assert.equal(prepared.status, 'completed');
+  assert.equal(host.events.includes('prioritize'), false);
   if (prepared.status !== 'completed') return;
   const supertype = parseHierarchyExpandBridgeResponse(await bridge.handle(
     context,

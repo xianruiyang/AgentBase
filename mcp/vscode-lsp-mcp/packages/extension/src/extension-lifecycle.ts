@@ -623,6 +623,16 @@ export const createSystemExtensionRegistrationService = async (
       vscode.commands.executeCommand(command, ...args),
     interruptProviderCall: createVscodeProviderCallInterrupter(vscode),
     openTextDocument: (path: string) => vscode.workspace.openTextDocument(path),
+    prioritizeTextDocument: async (document: TextDocument) => {
+      const alreadyVisible = vscode.window.visibleTextEditors.some(
+        (editor) => editor.document.uri.toString() === document.uri.toString(),
+      );
+      if (alreadyVisible) return;
+      await vscode.window.showTextDocument(document, {
+        preserveFocus: true,
+        preview: true,
+      });
+    },
     openProviderDocument: (uri: unknown) => vscode.workspace.openTextDocument(uri as never),
     readProviderText: async (uri: unknown) => {
       const providerUri = uri as Uri;

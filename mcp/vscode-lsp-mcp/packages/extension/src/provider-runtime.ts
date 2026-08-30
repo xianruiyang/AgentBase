@@ -97,6 +97,7 @@ export interface ProviderCommandAdapter<TInput, TResult> {
 export interface ProviderInvocationOptions {
   readonly logicalFile?: string;
   readonly pollDelaysMs?: readonly number[];
+  readonly prioritizeDocument?: boolean;
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
 }
@@ -105,6 +106,7 @@ export interface VscodeProviderHost {
   executeCommand(command: string, ...args: readonly unknown[]): PromiseLike<unknown>;
   interruptProviderCall?(request: ProviderCallInterruption): PromiseLike<void> | void;
   openTextDocument(path: string): PromiseLike<TextDocument>;
+  prioritizeTextDocument?(document: TextDocument): PromiseLike<void> | void;
 }
 
 export interface ProviderCallInterruption {
@@ -352,6 +354,15 @@ export class ProviderRuntime {
           deadlineAt,
           options.signal,
         );
+        if (options.prioritizeDocument === true &&
+            this.#host.prioritizeTextDocument !== undefined) {
+          const targetDocument = document;
+          await this.#runPhase(
+            () => this.#host.prioritizeTextDocument?.(targetDocument),
+            deadlineAt,
+            options.signal,
+          );
+        }
       } catch (error) {
         if (error instanceof WorkspaceBoundaryError) throw error;
         if (error instanceof InvocationInterrupted) {

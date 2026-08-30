@@ -537,7 +537,7 @@ CommandFailedDetails:
 | `symbol_info` | At a known position, request only semantics unresolved by source/AST. | `Collection<SymbolInfoResult>` | `R=true,D=false,I=true,O=false` |
 | `get_references` | At a known symbol, return complete semantic references when text matches are insufficient. | `Collection<ReferenceHit>` | `R=true,D=false,I=true,O=false` |
 | `verify_symbol_candidates` | Verify bounded text/AST candidates against one target identity. | `Collection<SymbolCandidateVerification>` | `R=true,D=false,I=true,O=false` |
-| `get_call_hierarchy` | Return bounded overload-aware call relations only when source/AST is insufficient; cold C/C++ requires a current compile_commands entry. | `Collection<CallHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
+| `get_call_hierarchy` | Return bounded overload-aware call relations only when source/AST is insufficient; cold C/C++ may open a no-focus preview and requires a current compile_commands entry. | `Collection<CallHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
 | `get_type_hierarchy` | Return bounded semantic inheritance relations only when the active language Provider supports them; use source AST for cpptools C/C++. | `Collection<TypeHierarchyEntry>` | `R=true,D=false,I=true,O=false` |
 | `get_diagnostics` | Read diagnostics from the smallest needed scope. | `Collection<Diagnostic>` | `R=true,D=false,I=true,O=false` |
 | `rename_preview` | Preview a complete semantic rename within an explicit path scope. | `Preview` | `R=true,D=false,I=true,O=false` |

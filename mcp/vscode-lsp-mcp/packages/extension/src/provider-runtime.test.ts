@@ -62,6 +62,7 @@ const documentSymbolsAdapter: ProviderCommandAdapter<null, readonly unknown[]> =
 class Host implements VscodeProviderHost {
   results: unknown[] = [[]];
   opened: string[] = [];
+  prioritized: TextDocument[] = [];
   calls: Array<{ readonly args: readonly unknown[]; readonly command: string }> = [];
   interruptProviderCall?: (request: ProviderCallInterruption) => PromiseLike<void> | void;
 
@@ -73,6 +74,10 @@ class Host implements VscodeProviderHost {
   openTextDocument(path: string): PromiseLike<TextDocument> {
     this.opened.push(path);
     return Promise.resolve(fakeDocument(path));
+  }
+
+  prioritizeTextDocument(document: TextDocument): void {
+    this.prioritized.push(document);
   }
 }
 
@@ -86,8 +91,22 @@ test('hidden documents activate without UI and empty provider arrays are success
   assert.equal(result.status, 'completed');
   assert.deepEqual(result.status === 'completed' ? result.value : undefined, []);
   assert.deepEqual(host.opened, ['D:\\workspace\\app\\src\\main.ts']);
+  assert.equal(host.prioritized.length, 0);
   assert.equal(host.calls.length, 1);
   assert.equal(host.calls[0]?.command, 'vscode.executeDocumentSymbolProvider');
+});
+
+test('document prioritization is explicit and completes before provider invocation', async () => {
+  const host = new Host();
+  const runtime = new ProviderRuntime({ host, pathAccess });
+  const result = await runtime.invoke(context, documentSymbolsAdapter, null, {
+    logicalFile: 'src/main.ts',
+    pollDelaysMs: [0],
+    prioritizeDocument: true,
+  });
+  assert.equal(result.status, 'completed');
+  assert.equal(host.prioritized.length, 1);
+  assert.equal(host.calls.length, 1);
 });
 
 test('explicit not-ready results use only the bounded poll schedule', async () => {

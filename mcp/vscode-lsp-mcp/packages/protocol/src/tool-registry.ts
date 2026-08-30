@@ -93,7 +93,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'get_call_hierarchy',
-    description: 'Return bounded overload-aware call relations only when source/AST is insufficient; cold C/C++ requires a current compile_commands entry.',
+    description: 'Return bounded overload-aware call relations only when source/AST is insufficient; cold C/C++ may open a no-focus preview and requires a current compile_commands entry.',
     readOnly: true,
     destructive: false,
     idempotent: true,
