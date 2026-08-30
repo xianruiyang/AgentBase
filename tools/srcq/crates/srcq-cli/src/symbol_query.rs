@@ -539,34 +539,44 @@ fn expand_incoming_node(
         }
         *nodes += 1;
         let mut child = CallTreeNode {
-            name: owner.name.clone(),
+            name: owner.definition.as_ref().map_or_else(
+                || owner.name.clone(),
+                |definition| definition.qualified_name.clone(),
+            ),
             dispatch: "incoming-candidate",
             status: "lexical-candidate".to_owned(),
             receiver: None,
             receiver_type: None,
             call_file: Some(reference.file),
             call_position: Some(reference.position),
-            definition: None,
+            definition: owner.definition.clone(),
             children: Vec::new(),
         };
         if depth + 1 < command.depth {
-            let resolution = match resolve_callee(
-                &owner.name,
-                command,
-                &query.universe,
-                &owner.file,
-                deadline,
-                resolution_cache,
-            ) {
-                Ok(resolution) => resolution,
-                Err(error) if error.time_limited => {
-                    child.status = "time-budget".to_owned();
-                    node.children.push(child);
-                    *time_limited = true;
-                    *scan_complete = false;
-                    return Ok(());
+            let resolution = if let Some(definition) = owner.definition.clone() {
+                CalleeResolution {
+                    total: 1,
+                    definition: Some(definition),
                 }
-                Err(error) => return Err(error),
+            } else {
+                match resolve_callee(
+                    &owner.name,
+                    command,
+                    &query.universe,
+                    &owner.file,
+                    deadline,
+                    resolution_cache,
+                ) {
+                    Ok(resolution) => resolution,
+                    Err(error) if error.time_limited => {
+                        child.status = "time-budget".to_owned();
+                        node.children.push(child);
+                        *time_limited = true;
+                        *scan_complete = false;
+                        return Ok(());
+                    }
+                    Err(error) => return Err(error),
+                }
             };
             child.status = match resolution.total {
                 0 => "semantic-unknown".to_owned(),
@@ -1799,7 +1809,7 @@ fn scan_containing_functions(
             .read_stdout()
             .map_err(|error| SymbolFailure::io(format!("cannot read ast-grep output: {error}")))?;
         owners.extend(if language.key == "cpp" {
-            cpp::parse_function_owner_stream(&bytes, &universe.cwd)
+            cpp::parse_function_owner_stream(&bytes, &universe.cwd, universe)
                 .map_err(SymbolFailure::conversion)?
         } else {
             generic::parse_function_owner_stream(&bytes, &universe.cwd, language.key)

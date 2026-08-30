@@ -4,15 +4,15 @@ The server exposes exactly 19 tools. MCP `tools/list` is authoritative for descr
 
 | Tool | Class | Purpose |
 |---|---|---|
-| `list_workspaces` | read | Resolve an unknown workspace and root aliases. |
+| `list_workspaces` | read | Resolve an unknown workspace and root aliases once; reuse `workspaceId` until the window restarts. |
 | `health_check` | read | Diagnose bridge or document activation after uncertainty or failure. |
 | `get_capabilities` | read | Probe only capabilities that change the next action. |
 | `workspace_symbols` | read | After scoped text/AST cannot locate a symbol, return bounded semantic candidates. |
 | `document_symbols` | read | Only when source/AST cannot supply the required outline, return bounded Provider document symbols; do not use it for an ordinary C/C++ function list. |
 | `symbol_info` | read | At a known position, request only semantics unresolved by source/AST. |
-| `get_references` | read | At a known symbol, return complete semantic references when text matches are insufficient. |
-| `verify_symbol_candidates` | read | Verify bounded text/AST candidates against one target identity. |
-| `get_call_hierarchy` | read | Return bounded overload-aware call relations only when source/AST is insufficient; cold C/C++ may open a no-focus preview and requires a current compile_commands entry. |
+| `get_references` | read | Enumerate exact references only when completeness beyond known candidates is required; for C/C++ bound `scopePaths` before Provider mode. |
+| `verify_symbol_candidates` | read | Verify bounded source/AST positions against one identity without expanding or claiming completeness beyond that set. |
+| `get_call_hierarchy` | read | Resolve overload or dynamic call relations only when source candidates are insufficient; an empty Provider tree does not negate source evidence. |
 | `get_type_hierarchy` | read | Return bounded semantic inheritance relations only when the active language Provider supports them; use source AST for cpptools C/C++. |
 | `get_diagnostics` | read | Read diagnostics from the smallest needed scope. |
 | `rename_preview` | preview | Preview a complete semantic rename within an explicit path scope. |

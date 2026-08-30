@@ -745,8 +745,8 @@ const validateRelease = async ({ destination, manifest, verificationRoot }) => {
   } finally {
     await client.close().catch(() => undefined);
   }
-  assert.equal(tools.tools.length, 18);
-  assert.equal(new Set(tools.tools.map(({ name }) => name)).size, 18);
+  assert.equal(tools.tools.length, 19);
+  assert.equal(new Set(tools.tools.map(({ name }) => name)).size, 19);
   assert.equal(health.isError, undefined);
   assert.equal(health.structuredContent, undefined);
   assert.equal(health.content.length, 1);

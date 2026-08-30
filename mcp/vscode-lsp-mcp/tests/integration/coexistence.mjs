@@ -187,7 +187,7 @@ try {
       stderrBytes: session.stderrBytes(),
     };
   }
-  assert.equal(processEvidence.vscodeLspMcp.toolCount, 18);
+  assert.equal(processEvidence.vscodeLspMcp.toolCount, 19);
 
   report = {
     schemaVersion: 1,

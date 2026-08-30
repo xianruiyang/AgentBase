@@ -115,4 +115,19 @@ int CrossFileTarget()
     return 3;
 }
 
+int SharedIncomingLeaf()
+{
+    return 4;
+}
+
+int RepeatedIncomingOwner()
+{
+    return SharedIncomingLeaf();
+}
+
+int SharedIncomingTop()
+{
+    return RepeatedIncomingOwner();
+}
+
 Widget DirectWidget(Widget{});

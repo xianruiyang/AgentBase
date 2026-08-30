@@ -37,23 +37,30 @@ pub(crate) fn inline_rules(target: &str, include_scopes: bool) -> String {
         })
         .collect::<Vec<_>>();
     if include_scopes {
-        rules.extend([
-            ("srcq.cpp.scope.function", "function_definition"),
-            ("srcq.cpp.scope.class", "class_specifier"),
-            ("srcq.cpp.scope.struct", "struct_specifier"),
-            ("srcq.cpp.scope.union", "union_specifier"),
-            ("srcq.cpp.scope.enum", "enum_specifier"),
-            ("srcq.cpp.scope.namespace", "namespace_definition"),
-        ].into_iter().map(|(id, kind)| {
-        format!(
-            "id: {id}\nlanguage: Cpp\nrule:\n  all:\n    - kind: {kind}\n    - has:\n        stopBy: end\n        regex: '^{regex}$'\nseverity: info\nmessage: lexical scope candidate"
-        )
-        }));
+        rules.extend(lexical_scope_rules(&regex));
     }
     rules.push(format!(
         "id: srcq.cpp.declaration.init\nlanguage: Cpp\nrule:\n  all:\n    - kind: declaration\n    - has:\n        stopBy: end\n        kind: init_declarator\n    - has:\n        stopBy: end\n        regex: '^{regex}$'\nseverity: info\nmessage: direct-initialized variable marker"
     ));
     rules.join("\n---\n")
+}
+
+fn lexical_scope_rules(regex: &str) -> Vec<String> {
+    [
+        ("srcq.cpp.scope.function", "function_definition"),
+        ("srcq.cpp.scope.class", "class_specifier"),
+        ("srcq.cpp.scope.struct", "struct_specifier"),
+        ("srcq.cpp.scope.union", "union_specifier"),
+        ("srcq.cpp.scope.enum", "enum_specifier"),
+        ("srcq.cpp.scope.namespace", "namespace_definition"),
+    ]
+    .into_iter()
+    .map(|(id, kind)| {
+        format!(
+            "id: {id}\nlanguage: Cpp\nrule:\n  all:\n    - kind: {kind}\n    - has:\n        stopBy: end\n        regex: '^{regex}$'\nseverity: info\nmessage: lexical scope candidate"
+        )
+    })
+    .collect()
 }
 
 fn regex_escape(value: &str) -> String {
@@ -157,6 +164,7 @@ pub(crate) struct FunctionOwnerCandidate {
     pub(crate) range: SourceRange,
     pub(crate) name: String,
     pub(crate) signature: String,
+    pub(crate) definition: Option<DefinitionCandidate>,
 }
 
 #[derive(Clone, Debug)]
@@ -509,18 +517,21 @@ pub(crate) fn annotate_explicit_member_types(
 pub(crate) fn containing_function_rules(target: &str) -> String {
     let target = target.rsplit("::").next().unwrap_or(target);
     let regex = regex_escape(target).replace('\'', "''");
-    format!(
+    let mut rules = vec![format!(
         "id: srcq.cpp.containing-function\nlanguage: Cpp\nrule:\n  all:\n    - kind: function_definition\n    - has:\n        stopBy: end\n        regex: '^{regex}$'\nseverity: info\nmessage: containing function candidate"
-    )
+    )];
+    rules.extend(lexical_scope_rules(&regex));
+    rules.join("\n---\n")
 }
 
 pub(crate) fn parse_function_owner_stream(
     bytes: &[u8],
     cwd: &Path,
+    universe: &SourceUniverse,
 ) -> Result<Vec<FunctionOwnerCandidate>, String> {
     let text = std::str::from_utf8(bytes)
         .map_err(|_| "ast-grep containing-function output was not UTF-8".to_owned())?;
-    let mut owners = Vec::new();
+    let mut records = Vec::new();
     for (index, line) in text.lines().enumerate() {
         if line.trim().is_empty() {
             continue;
@@ -531,15 +542,42 @@ pub(crate) fn parse_function_owner_stream(
                 index + 1
             )
         })?;
-        let record = parse_record(&value, cwd)?;
-        let Some((name, _)) = any_function_name(&record.text) else {
+        records.push(parse_record(&value, cwd)?);
+    }
+    let scopes = build_scopes(&records);
+    let mut owners = Vec::new();
+    for record in records {
+        if record.rule_id != "srcq.cpp.containing-function" {
+            continue;
+        }
+        let Some((name, offset)) = any_function_name(&record.text) else {
             continue;
         };
+        let qualified_name = qualify(&record, &name, &scopes);
+        let file = fs::canonicalize(&record.file).unwrap_or_else(|_| record.file.clone());
+        let signature = compact_signature(function_header(&record.text));
+        let definition = DefinitionCandidate {
+            root_alias: universe.root_for(&file).map(|root| root.alias.clone()),
+            file: file.clone(),
+            range: record.range,
+            name_position: offset_position(record.range.start, &record.text, offset),
+            qualified_name,
+            symbol_kind: if name.contains("::") {
+                "method".to_owned()
+            } else {
+                "function".to_owned()
+            },
+            role: DefinitionRole::Definition,
+            signature: signature.clone(),
+            text: record.text,
+            ast_kind: "function_definition".to_owned(),
+        };
         owners.push(FunctionOwnerCandidate {
-            file: fs::canonicalize(&record.file).unwrap_or(record.file),
+            file,
             range: record.range,
             name,
-            signature: compact_signature(function_header(&record.text)),
+            signature,
+            definition: Some(definition),
         });
     }
     owners.sort_by(|left, right| {

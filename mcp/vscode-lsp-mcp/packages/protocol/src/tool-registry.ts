@@ -29,7 +29,7 @@ interface ToolMetadata {
 const TOOL_METADATA: readonly ToolMetadata[] = [
   {
     name: 'list_workspaces',
-    description: 'Resolve an unknown workspace and root aliases.',
+    description: 'Resolve an unknown workspace and root aliases once; reuse workspaceId until the window restarts.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -77,7 +77,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'get_references',
-    description: 'At a known symbol, return complete semantic references when text matches are insufficient.',
+    description: 'Enumerate exact references only when completeness beyond known candidates is required; for C/C++ bound scopePaths before provider mode.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -85,7 +85,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'verify_symbol_candidates',
-    description: 'Verify bounded text/AST candidates against one target identity.',
+    description: 'Verify bounded source/AST positions against one identity without expanding or claiming completeness beyond that set.',
     readOnly: true,
     destructive: false,
     idempotent: true,
@@ -93,7 +93,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'get_call_hierarchy',
-    description: 'Return bounded overload-aware call relations only when source/AST is insufficient; cold C/C++ may open a no-focus preview and requires a current compile_commands entry.',
+    description: 'Resolve overload or dynamic call relations only when source candidates are insufficient; an empty Provider tree does not negate source evidence.',
     readOnly: true,
     destructive: false,
     idempotent: true,

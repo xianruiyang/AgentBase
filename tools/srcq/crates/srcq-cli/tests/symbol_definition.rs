@@ -312,6 +312,31 @@ fn cpp_outgoing_calls_expand_unique_nodes_and_stop_on_cycles_and_ambiguity() {
         .as_str()
         .is_some_and(|path| path.ends_with("callers.cpp"))));
 
+    let repeated_owner = run(&[
+        "symbol",
+        "calls",
+        "SharedIncomingLeaf",
+        "--only-root",
+        root,
+        "--direction",
+        "incoming",
+        "--depth",
+        "2",
+        "--output",
+        "machine",
+    ]);
+    assert!(repeated_owner.status.success());
+    let repeated_owner: Value =
+        serde_json::from_slice(&repeated_owner.stdout).expect("repeated owner machine tree");
+    let owner = &repeated_owner["root"]["children"][0];
+    assert_eq!(owner["status"], "qualified-candidate");
+    assert_eq!(owner["name"], "RepeatedIncomingOwner");
+    assert_eq!(
+        owner["definition"]["qualified_name"],
+        "RepeatedIncomingOwner"
+    );
+    assert_eq!(owner["children"][0]["name"], "SharedIncomingTop");
+
     let cycle = run(&[
         "symbol",
         "calls",

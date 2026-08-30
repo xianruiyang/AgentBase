@@ -85,6 +85,7 @@ pub(crate) fn parse_function_owner_stream(
             range: record.range,
             name,
             signature,
+            definition: None,
         });
     }
     Ok(owners)

@@ -9,3 +9,11 @@ int SecondCrossFileCaller()
 {
     return CrossFileTarget();
 }
+
+namespace OtherIncoming
+{
+int RepeatedIncomingOwner()
+{
+    return 0;
+}
+}
