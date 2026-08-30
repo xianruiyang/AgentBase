@@ -3,10 +3,10 @@
   "evaluation_kind": "skill-routing",
   "fingerprint_schema": "phase-visible-lf-v2",
   "evaluator": {
-    "id": "agentbase-routing-3dd6d4f139dd4d61821f8b16914951de",
+    "id": "agentbase-routing-d75db8c7c25d41958c1a97195d24ddfc",
     "model": "gpt-5.6-sol",
     "runtime": "codex-cli 0.148.0/windows/read-only/ephemeral/cases-only-v4/catalog-59454531671D1A0C/shell-38fed52b24194b4f",
-    "evaluated_at_utc": "2026-08-29T19:53:51.1568627+00:00",
+    "evaluated_at_utc": "2026-08-30T14:44:26.1994696+00:00",
     "isolation_mode": "detached-capsule",
     "repository_accessed": false,
     "hidden_expectations_accessed": false,
@@ -38,9 +38,9 @@
       "workspace_dependencies"
     ]
   },
-  "evaluation_capsule_sha256": "2A1C85990F362351FD47CA09DDADE00DA77DBE7C67966BBDE6EF7CACB720F75B",
-  "candidate_bundle_sha256": "A1E2E937F0B36A18311FD85D4177A6CB77E7628B17FA313A808168B0A0A855D4",
-  "evaluation_input_sha256": "D10FD0843215D26C448379EB053EFE3340E31587FD8F373C6B34AAE1B66FE20F",
+  "evaluation_capsule_sha256": "D5E1BA1CD79764FEC75CE0B83DC2025D4099365A64B2407DCAA77AA03404D643",
+  "candidate_bundle_sha256": "79385AF65D58EE153D648578FE098850746557F3170F12886C693706B18874C6",
+  "evaluation_input_sha256": "6C2C1D99B63F42591D5ED4FEDDFFB154418C01EE2794230DE191FCD917D474C0",
   "cases": [
     {
       "id": "mechanical-document-edit",
@@ -186,6 +186,20 @@
     },
     {
       "id": "ast-syntactic-definition-range",
+      "selected_skills": [
+        "source-query"
+      ],
+      "selected_peer_skills": []
+    },
+    {
+      "id": "fast-symbol-relation-candidates",
+      "selected_skills": [
+        "source-query"
+      ],
+      "selected_peer_skills": []
+    },
+    {
+      "id": "fast-symbol-time-budget-recovery",
       "selected_skills": [
         "source-query"
       ],
@@ -845,17 +859,17 @@
       "selected_peer_skills": []
     }
   ],
-  "receipt_id": "9825f946cb56472e8d6f03d2805ebf7a",
-  "evaluation_generation_sha256": "261F82CBD070C0B8ECD3904C9A44E679DBDAD84F832588945ABA94EE65186091",
+  "receipt_id": "60752b264cb141cab3529bcdc9d12229",
+  "evaluation_generation_sha256": "22FA6E6A7F03BB851652A2C46E4B08E9B23D4E1974142D218CEFBE892A279AC0",
   "policy_evaluation": {
     "schema_version": 4,
     "evaluation_kind": "behavior-policy",
     "fingerprint_schema": "phase-visible-lf-v2",
     "evaluator": {
-      "id": "agentbase-policy-4e1391ddd75c4cf7b20eac481bd26524",
+      "id": "agentbase-policy-643d3ae380e34abb8dd4136b53611569",
       "model": "gpt-5.6-sol",
       "runtime": "codex-cli 0.148.0/windows/read-only/ephemeral/cases-only-v4/catalog-59454531671D1A0C/shell-38fed52b24194b4f",
-      "evaluated_at_utc": "2026-08-29T19:54:31.1920626+00:00",
+      "evaluated_at_utc": "2026-08-30T14:44:24.5360229+00:00",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false,
@@ -887,9 +901,9 @@
         "workspace_dependencies"
       ]
     },
-    "evaluation_capsule_sha256": "DBDCFF6792536F2EBAD7CC881DEEBDFAB8EE41FEFA272008425B32FA45DA30B7",
-    "candidate_bundle_sha256": "B113155B4FF029345416CB470CEDD4C660EDA7221AABCD37AAA2D91722FF2277",
-    "evaluation_input_sha256": "47D1C1B93AEAD10EF88F240E482F6040FD4D66E42D2FD597AC432B1654AAD48C",
+    "evaluation_capsule_sha256": "74D793F94D52765437C68141C8D72CEE69609D6D9B2F22A4BC605C7802A79D79",
+    "candidate_bundle_sha256": "A316C23F27A5DD0B26D9C27ACF41753C47A02B6B7BDC482FBE5F8A1F91A95BDD",
+    "evaluation_input_sha256": "01094F50980913FBB07D83BE61D7ADE44C490431B16BF0066CE31DBAD967833C",
     "cases": [
       {
         "id": "mechanical-document-edit",
@@ -913,7 +927,6 @@
           "fact_first",
           "challenge_false_premise",
           "no_alternative_execution",
-          "long_term_total_cost",
           "collaborative_requirement_insight"
         ]
       },
@@ -922,8 +935,7 @@
         "behavior_tags": [
           "read_only",
           "no_alternative_execution",
-          "quality_token_speed_order",
-          "impact_closure"
+          "quality_token_speed_order"
         ]
       },
       {
@@ -941,7 +953,6 @@
           "read_only",
           "fact_first",
           "no_alternative_execution",
-          "long_term_total_cost",
           "observable_behavior_accountability",
           "rule_execution_failure_localization"
         ]
@@ -953,30 +964,29 @@
           "no_alternative_execution",
           "vertical_validation_closure",
           "expensive_action_preflight",
-          "adaptive_execution_plan"
+          "evidence_checkpoint_before_continue"
         ]
       },
       {
         "id": "stable-candidate-validation-boundary",
         "behavior_tags": [
           "modify_authorized_scope",
-          "protected_user_baseline",
-          "stable_candidate_validation"
+          "stable_candidate_validation",
+          "protected_user_baseline"
         ]
       },
       {
         "id": "model-interaction-tool-read",
         "behavior_tags": [
           "read_only",
-          "no_alternative_execution",
-          "model_interaction_surface"
+          "model_interaction_surface",
+          "quality_token_speed_order"
         ]
       },
       {
         "id": "model-interaction-generated-report-read",
         "behavior_tags": [
           "read_only",
-          "no_alternative_execution",
           "model_interaction_surface",
           "minimal_evidence_closure"
         ]
@@ -997,9 +1007,7 @@
           "modify_authorized_scope",
           "fact_first",
           "architecture_integrated",
-          "authority_lifecycle",
-          "impact_closure",
-          "adaptive_execution_plan"
+          "authority_lifecycle"
         ]
       },
       {
@@ -1010,8 +1018,7 @@
           "no_alternative_execution",
           "long_term_total_cost",
           "architecture_integrated",
-          "authority_lifecycle",
-          "rule_execution_failure_localization"
+          "authority_lifecycle"
         ]
       },
       {
@@ -1020,8 +1027,7 @@
           "modify_authorized_scope",
           "fact_first",
           "architecture_integrated",
-          "authority_lifecycle",
-          "impact_closure"
+          "authority_lifecycle"
         ]
       },
       {
@@ -1037,7 +1043,6 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
-          "long_term_total_cost",
           "architecture_integrated",
           "authority_lifecycle",
           "impact_closure"
@@ -1052,7 +1057,6 @@
           "authority_lifecycle",
           "impact_closure",
           "protected_user_baseline",
-          "final_user_scope_only",
           "vertical_validation_closure",
           "evidence_checkpoint_before_continue"
         ]
@@ -1075,15 +1079,14 @@
         "id": "specified-synthesis-artifact",
         "behavior_tags": [
           "modify_authorized_scope",
-          "local_task_fast_path"
+          "collaborative_requirement_insight"
         ]
       },
       {
         "id": "cpp-include-edit",
         "behavior_tags": [
           "modify_authorized_scope",
-          "impact_closure",
-          "stable_candidate_validation"
+          "impact_closure"
         ]
       },
       {
@@ -1093,8 +1096,7 @@
           "fact_first",
           "architecture_integrated",
           "authority_lifecycle",
-          "impact_closure",
-          "adaptive_execution_plan"
+          "impact_closure"
         ]
       },
       {
@@ -1112,11 +1114,25 @@
         ]
       },
       {
+        "id": "fast-symbol-relation-candidates",
+        "behavior_tags": [
+          "read_only",
+          "minimal_evidence_closure"
+        ]
+      },
+      {
+        "id": "fast-symbol-time-budget-recovery",
+        "behavior_tags": [
+          "read_only",
+          "fact_first",
+          "minimal_evidence_closure"
+        ]
+      },
+      {
         "id": "ast-no-match-needs-source-evidence",
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "evidence_checkpoint_before_continue",
           "minimal_evidence_closure"
         ]
       },
@@ -1124,6 +1140,7 @@
         "id": "semantic-definition-from-use-site",
         "behavior_tags": [
           "read_only",
+          "fact_first",
           "minimal_evidence_closure"
         ]
       },
@@ -1131,7 +1148,6 @@
         "id": "workspace-symbols-conditional-search",
         "behavior_tags": [
           "read_only",
-          "quality_token_speed_order",
           "minimal_evidence_closure"
         ]
       },
@@ -1160,7 +1176,7 @@
         "id": "ordinary-hyperfine-benchmark",
         "behavior_tags": [
           "read_only",
-          "quality_token_speed_order"
+          "expensive_action_preflight"
         ]
       },
       {
@@ -1176,8 +1192,7 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "tool_defect_reproduction",
-          "minimal_evidence_closure"
+          "tool_defect_reproduction"
         ]
       },
       {
@@ -1227,6 +1242,7 @@
         "id": "powershell-command-authoring",
         "behavior_tags": [
           "read_only",
+          "fact_first",
           "local_task_fast_path"
         ]
       },
@@ -1234,8 +1250,8 @@
         "id": "semantic-safe-rename",
         "behavior_tags": [
           "modify_authorized_scope",
+          "fact_first",
           "impact_closure",
-          "stable_candidate_validation",
           "minimal_evidence_closure"
         ]
       },
@@ -1244,7 +1260,6 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "model_interaction_surface",
           "minimal_evidence_closure"
         ]
       },
@@ -1263,8 +1278,7 @@
       {
         "id": "qq-direct-message-required",
         "behavior_tags": [
-          "modify_authorized_scope",
-          "no_scope_expansion"
+          "modify_authorized_scope"
         ]
       },
       {
@@ -1279,23 +1293,20 @@
         "id": "cross-turn-dependent-plan",
         "behavior_tags": [
           "modify_authorized_scope",
+          "adaptive_execution_plan",
           "document_authority",
-          "cli_assistive_only",
-          "adaptive_execution_plan"
+          "cli_assistive_only"
         ]
       },
       {
         "id": "full-delivery-chain",
         "behavior_tags": [
           "modify_authorized_scope",
-          "architecture_integrated",
-          "impact_closure",
+          "collaborative_requirement_insight",
           "protected_user_baseline",
           "final_user_scope_only",
           "document_authority",
           "cli_assistive_only",
-          "collaborative_requirement_insight",
-          "stable_candidate_validation",
           "adaptive_execution_plan"
         ]
       },
@@ -1304,10 +1315,11 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "document_authority",
           "vertical_validation_closure",
           "expensive_action_preflight",
-          "evidence_checkpoint_before_continue"
+          "evidence_checkpoint_before_continue",
+          "document_authority",
+          "cli_assistive_only"
         ]
       },
       {
@@ -1315,21 +1327,20 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
-          "architecture_integrated",
-          "impact_closure",
-          "document_authority",
           "vertical_validation_closure",
-          "evidence_checkpoint_before_continue"
+          "evidence_checkpoint_before_continue",
+          "document_authority",
+          "cli_assistive_only"
         ]
       },
       {
         "id": "dimension-bounded-validation-plan",
         "behavior_tags": [
           "modify_authorized_scope",
+          "dimension_bounded_validation",
           "document_authority",
           "cli_assistive_only",
-          "vertical_validation_closure",
-          "dimension_bounded_validation"
+          "local_mechanical_gates"
         ]
       },
       {
@@ -1337,8 +1348,7 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "vertical_validation_closure",
-          "dimension_bounded_validation",
-          "stable_candidate_validation"
+          "dimension_bounded_validation"
         ]
       },
       {
@@ -1361,8 +1371,7 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "no_scope_expansion",
-          "protected_user_baseline",
-          "adaptive_execution_plan"
+          "protected_user_baseline"
         ]
       },
       {
@@ -1445,7 +1454,7 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
-          "evidence_checkpoint_before_continue",
+          "vertical_validation_closure",
           "bounded_subagent_delegation"
         ]
       },
@@ -1460,7 +1469,7 @@
       {
         "id": "subagent-implicit-evidence-benefit",
         "behavior_tags": [
-          "modify_authorized_scope",
+          "read_only",
           "fact_first",
           "minimal_evidence_closure",
           "bounded_subagent_delegation"
@@ -1486,16 +1495,14 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "vertical_validation_closure",
-          "evidence_checkpoint_before_continue",
           "bounded_subagent_delegation"
         ]
       },
       {
         "id": "subagent-known-build-operator",
         "behavior_tags": [
-          "modify_authorized_scope",
+          "read_only",
           "expensive_action_preflight",
-          "stable_candidate_validation",
           "bounded_subagent_delegation"
         ]
       },
@@ -1503,7 +1510,7 @@
         "id": "subagent-scriptable-batch-no-benefit",
         "behavior_tags": [
           "modify_authorized_scope",
-          "quality_token_speed_order",
+          "local_task_fast_path",
           "bounded_subagent_delegation"
         ]
       },
@@ -1511,6 +1518,7 @@
         "id": "subagent-user-forbids",
         "behavior_tags": [
           "read_only",
+          "minimal_evidence_closure",
           "bounded_subagent_delegation"
         ]
       },
@@ -1519,6 +1527,7 @@
         "behavior_tags": [
           "read_only",
           "local_task_fast_path",
+          "minimal_evidence_closure",
           "bounded_subagent_delegation"
         ]
       },
@@ -1577,14 +1586,14 @@
         "id": "coordinate-frame-conversion",
         "behavior_tags": [
           "read_only",
-          "collaborative_requirement_insight"
+          "fact_first"
         ]
       },
       {
         "id": "transform-formula-convention",
         "behavior_tags": [
           "read_only",
-          "collaborative_requirement_insight"
+          "fact_first"
         ]
       },
       {
@@ -1592,18 +1601,17 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
-          "vertical_validation_closure",
-          "stable_candidate_validation"
+          "vertical_validation_closure"
         ]
       },
       {
         "id": "formal-entry-migration",
         "behavior_tags": [
           "modify_authorized_scope",
-          "long_term_total_cost",
           "architecture_integrated",
           "authority_lifecycle",
-          "impact_closure"
+          "impact_closure",
+          "long_term_total_cost"
         ]
       },
       {
@@ -1611,8 +1619,8 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
-          "impact_closure",
-          "document_authority"
+          "document_authority",
+          "impact_closure"
         ]
       },
       {
@@ -1622,17 +1630,17 @@
           "fact_first",
           "long_term_total_cost",
           "architecture_integrated",
-          "impact_closure",
-          "vertical_validation_closure"
+          "impact_closure"
         ]
       },
       {
         "id": "single-error-no-enforcement-system",
         "behavior_tags": [
           "modify_authorized_scope",
-          "fact_first",
           "challenge_false_premise",
-          "long_term_total_cost"
+          "long_term_total_cost",
+          "no_scope_expansion",
+          "local_task_fast_path"
         ]
       },
       {
@@ -1640,7 +1648,6 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "impact_closure",
-          "vertical_validation_closure",
           "adaptive_execution_plan"
         ]
       },
@@ -1655,14 +1662,14 @@
       {
         "id": "skill-intact-context-reuse",
         "behavior_tags": [
-          "read_only",
+          "modify_authorized_scope",
           "skill_context_lifecycle"
         ]
       },
       {
         "id": "skill-after-compaction-reload",
         "behavior_tags": [
-          "read_only",
+          "modify_authorized_scope",
           "skill_context_lifecycle"
         ]
       },
@@ -1677,23 +1684,22 @@
       {
         "id": "skill-known-change-reload",
         "behavior_tags": [
-          "read_only",
+          "modify_authorized_scope",
           "skill_context_lifecycle"
         ]
       },
       {
         "id": "current-context-is-sufficient",
         "behavior_tags": [
-          "minimal_evidence_closure",
-          "skill_context_lifecycle"
+          "modify_authorized_scope",
+          "local_task_fast_path"
         ]
       },
       {
         "id": "ordinary-completion-no-qq",
         "behavior_tags": [
           "read_only",
-          "final_user_scope_only",
-          "no_scope_expansion"
+          "final_user_scope_only"
         ]
       },
       {
@@ -1707,6 +1713,7 @@
         "id": "known-file-content-search",
         "behavior_tags": [
           "read_only",
+          "local_task_fast_path",
           "minimal_evidence_closure"
         ]
       },
@@ -1721,8 +1728,7 @@
         "id": "single-turn-checklist",
         "behavior_tags": [
           "read_only",
-          "local_task_fast_path",
-          "adaptive_execution_plan"
+          "local_task_fast_path"
         ]
       },
       {
@@ -1737,8 +1743,7 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "challenge_false_premise",
-          "no_alternative_execution"
+          "challenge_false_premise"
         ]
       },
       {
@@ -1747,7 +1752,6 @@
           "modify_authorized_scope",
           "long_term_total_cost",
           "architecture_integrated",
-          "authority_lifecycle",
           "no_scope_expansion"
         ]
       },
@@ -1763,11 +1767,10 @@
         "id": "workflow-cli-gate-boundary",
         "behavior_tags": [
           "modify_authorized_scope",
-          "long_term_total_cost",
           "document_authority",
           "cli_assistive_only",
           "local_mechanical_gates",
-          "adaptive_execution_plan"
+          "long_term_total_cost"
         ]
       },
       {
@@ -1775,6 +1778,7 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "cli_assistive_only",
+          "local_mechanical_gates",
           "local_task_fast_path"
         ]
       },
@@ -1790,7 +1794,6 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "model_interaction_surface",
           "minimal_evidence_closure"
         ]
       },
@@ -1821,7 +1824,6 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "no_scope_expansion",
-          "final_user_scope_only",
           "local_task_fast_path",
           "adaptive_execution_plan"
         ]
@@ -1830,8 +1832,7 @@
         "id": "ui-spatial-layout-with-peer",
         "behavior_tags": [
           "read_only",
-          "fact_first",
-          "minimal_evidence_closure"
+          "fact_first"
         ]
       },
       {
@@ -1860,31 +1861,30 @@
         "id": "delivery-requirements-contract",
         "behavior_tags": [
           "modify_authorized_scope",
-          "no_scope_expansion",
+          "fact_first",
+          "collaborative_requirement_insight",
           "protected_user_baseline",
           "document_authority",
-          "collaborative_requirement_insight",
-          "adaptive_execution_plan"
+          "no_scope_expansion"
         ]
       },
       {
         "id": "delivery-planning-contract",
         "behavior_tags": [
           "modify_authorized_scope",
-          "architecture_integrated",
-          "no_scope_expansion",
           "protected_user_baseline",
           "document_authority",
-          "adaptive_execution_plan"
+          "no_scope_expansion"
         ]
       },
       {
         "id": "delivery-task-contract",
         "behavior_tags": [
           "modify_authorized_scope",
-          "no_scope_expansion",
           "document_authority",
-          "adaptive_execution_plan"
+          "cli_assistive_only",
+          "adaptive_execution_plan",
+          "no_scope_expansion"
         ]
       },
       {
@@ -1892,8 +1892,6 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
-          "architecture_integrated",
-          "impact_closure",
           "protected_user_baseline",
           "document_authority",
           "cli_assistive_only",
@@ -1905,32 +1903,32 @@
         "id": "task-cli-authoring-references",
         "behavior_tags": [
           "modify_authorized_scope",
-          "no_scope_expansion",
           "document_authority",
           "cli_assistive_only",
-          "local_mechanical_gates"
+          "local_mechanical_gates",
+          "no_scope_expansion"
         ]
       },
       {
         "id": "task-cli-execution-references",
         "behavior_tags": [
           "modify_authorized_scope",
-          "no_scope_expansion",
           "document_authority",
           "cli_assistive_only",
-          "local_mechanical_gates"
+          "local_mechanical_gates",
+          "no_scope_expansion",
+          "stable_candidate_validation"
         ]
       },
       {
         "id": "task-cli-completion-references",
         "behavior_tags": [
           "read_only",
-          "fact_first",
-          "no_scope_expansion",
           "final_user_scope_only",
           "document_authority",
           "cli_assistive_only",
-          "local_mechanical_gates"
+          "local_mechanical_gates",
+          "minimal_evidence_closure"
         ]
       },
       {
@@ -1942,17 +1940,17 @@
         ]
       }
     ],
-    "receipt_id": "be0b9d6c4e1d4fb1aa2428fbce79e02a"
+    "receipt_id": "c3dbb593cd5f43a58f63d20af1db1b8a"
   },
   "reference_evaluation": {
     "schema_version": 4,
     "evaluation_kind": "routing-reference-policy",
     "fingerprint_schema": "phase-visible-lf-v2",
     "evaluator": {
-      "id": "agentbase-references-1d92af02bf0b4fbb9db105bef24353b7",
+      "id": "agentbase-references-78281385e4ac4103a015507c80b36fa8",
       "model": "gpt-5.6-sol",
       "runtime": "codex-cli 0.148.0/windows/read-only/ephemeral/cases-only-v4/catalog-59454531671D1A0C/shell-38fed52b24194b4f",
-      "evaluated_at_utc": "2026-08-29T19:58:20.9074758+00:00",
+      "evaluated_at_utc": "2026-08-30T15:04:09.8349192+00:00",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false,
@@ -1984,10 +1982,10 @@
         "workspace_dependencies"
       ]
     },
-    "evaluation_capsule_sha256": "6014FF7F521D2CC2E4BF4548671CFDD1A42F5DA380A6A1AB5E44B3F74E434EC6",
-    "candidate_bundle_sha256": "643EAD520B3BBCD9025FDC18E68021ED8FA2239D5DDFFB7F2D4AA2B317BB5221",
-    "evaluation_input_sha256": "48E759B5A3B3C041547674D00B151F4156839765D21034C5AAE995B67309322B",
-    "routing_reference_selection_sha256": "7B746EDFC168C24971F5AF861783B6A2A7E111B00E0367D847E1664991DDE0B8",
+    "evaluation_capsule_sha256": "0E2DC0ACC9E02A6D3DFB6CA1CF8C7B4BFF91A6EBB84439B12CE56E9313F936EB",
+    "candidate_bundle_sha256": "FCD61C706CD75B5663F5062B9685975CF29E7B5471631730A81623497B84509A",
+    "evaluation_input_sha256": "9D48EF5B960471E55C6CA71DFF875F47D18F5594CF6B698C046A44892D582449",
+    "routing_reference_selection_sha256": "9314C83F3B48EBE4C3F0DBF6DE12E0F95B2741921948E27E4DFE9DEFCF966337",
     "cases": [
       {
         "id": "observable-model-error-review",
@@ -2088,29 +2086,27 @@
             "skill": "delivery-workflow",
             "references": [
               "artifact-contracts.md",
-              "execution-contracts.md",
-              "iteration.md",
-              "planning-contracts.md",
               "target-contracts.md",
-              "tooling.md"
+              "planning-contracts.md",
+              "execution-contracts.md",
+              "iteration.md"
             ]
           },
           {
             "skill": "execution-governor",
             "references": [
-              "decision-frontier.md",
-              "failure-and-cost.md"
+              "decision-frontier.md"
             ]
           },
           {
             "skill": "task-table-manager",
             "references": [
-              "authoring-tooling.md",
-              "execution-tooling.md",
-              "execution.md",
-              "query-tooling.md",
               "task-contracts.md",
-              "tooling.md"
+              "execution.md",
+              "tooling.md",
+              "query-tooling.md",
+              "authoring-tooling.md",
+              "execution-tooling.md"
             ]
           }
         ]
@@ -2151,11 +2147,34 @@
         ]
       },
       {
+        "id": "fast-symbol-relation-candidates",
+        "selected_references": [
+          {
+            "skill": "source-query",
+            "references": [
+              "symbol-relations.md"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "fast-symbol-time-budget-recovery",
+        "selected_references": [
+          {
+            "skill": "source-query",
+            "references": [
+              "symbol-relations.md"
+            ]
+          }
+        ]
+      },
+      {
         "id": "semantic-definition-from-use-site",
         "selected_references": [
           {
             "skill": "source-query",
             "references": [
+              "symbol-relations.md",
               "lsp.md"
             ]
           }
@@ -2167,6 +2186,7 @@
           {
             "skill": "source-query",
             "references": [
+              "symbol-relations.md",
               "lsp.md"
             ]
           }
@@ -2211,12 +2231,11 @@
           {
             "skill": "task-table-manager",
             "references": [
-              "authoring-tooling.md",
-              "execution-tooling.md",
-              "execution.md",
-              "query-tooling.md",
               "task-contracts.md",
-              "tooling.md"
+              "execution.md",
+              "tooling.md",
+              "authoring-tooling.md",
+              "execution-tooling.md"
             ]
           }
         ]
@@ -2228,22 +2247,23 @@
             "skill": "delivery-workflow",
             "references": [
               "artifact-contracts.md",
+              "target-contracts.md",
+              "planning-contracts.md",
               "execution-contracts.md",
               "iteration.md",
-              "planning-contracts.md",
-              "target-contracts.md",
               "tooling.md"
             ]
           },
           {
             "skill": "task-table-manager",
             "references": [
+              "task-contracts.md",
+              "execution.md",
+              "tooling.md",
+              "query-tooling.md",
               "authoring-tooling.md",
               "execution-tooling.md",
-              "execution.md",
-              "query-tooling.md",
-              "task-contracts.md",
-              "tooling.md"
+              "completion-tooling.md"
             ]
           }
         ]
@@ -2261,9 +2281,9 @@
           {
             "skill": "task-table-manager",
             "references": [
-              "query-tooling.md",
               "task-contracts.md",
-              "tooling.md"
+              "tooling.md",
+              "query-tooling.md"
             ]
           }
         ]
@@ -2275,9 +2295,9 @@
             "skill": "delivery-workflow",
             "references": [
               "artifact-contracts.md",
+              "planning-contracts.md",
               "execution-contracts.md",
-              "iteration.md",
-              "planning-contracts.md"
+              "iteration.md"
             ]
           },
           {
@@ -2290,9 +2310,9 @@
           {
             "skill": "task-table-manager",
             "references": [
-              "execution-tooling.md",
               "execution.md",
-              "tooling.md"
+              "tooling.md",
+              "execution-tooling.md"
             ]
           }
         ]
@@ -2304,8 +2324,8 @@
             "skill": "delivery-workflow",
             "references": [
               "artifact-contracts.md",
-              "execution-contracts.md",
-              "planning-contracts.md"
+              "planning-contracts.md",
+              "execution-contracts.md"
             ]
           },
           {
@@ -2317,9 +2337,9 @@
           {
             "skill": "task-table-manager",
             "references": [
-              "authoring-tooling.md",
               "task-contracts.md",
-              "tooling.md"
+              "tooling.md",
+              "authoring-tooling.md"
             ]
           }
         ]
@@ -2354,16 +2374,19 @@
             "skill": "delivery-workflow",
             "references": [
               "artifact-contracts.md",
+              "target-contracts.md",
               "execution-contracts.md",
-              "iteration.md",
-              "target-contracts.md"
+              "iteration.md"
             ]
           },
           {
             "skill": "task-table-manager",
             "references": [
+              "task-contracts.md",
               "execution.md",
-              "task-contracts.md"
+              "tooling.md",
+              "query-tooling.md",
+              "execution-tooling.md"
             ]
           }
         ]
@@ -2387,8 +2410,8 @@
           {
             "skill": "subagent-orchestration",
             "references": [
-              "coordination.md",
-              "evidence-packet.md"
+              "evidence-packet.md",
+              "coordination.md"
             ]
           }
         ]
@@ -2399,8 +2422,8 @@
           {
             "skill": "subagent-orchestration",
             "references": [
-              "coordination.md",
-              "evidence-packet.md"
+              "evidence-packet.md",
+              "coordination.md"
             ]
           }
         ]
@@ -2411,8 +2434,8 @@
           {
             "skill": "subagent-orchestration",
             "references": [
-              "coordination.md",
-              "experiment-lifecycle.md"
+              "experiment-lifecycle.md",
+              "coordination.md"
             ]
           }
         ]
@@ -2429,8 +2452,8 @@
           {
             "skill": "subagent-orchestration",
             "references": [
-              "coordination.md",
-              "experiment-lifecycle.md"
+              "experiment-lifecycle.md",
+              "coordination.md"
             ]
           }
         ]
@@ -2441,8 +2464,8 @@
           {
             "skill": "subagent-orchestration",
             "references": [
-              "coordination.md",
-              "experiment-lifecycle.md"
+              "experiment-lifecycle.md",
+              "coordination.md"
             ]
           }
         ]
@@ -2453,8 +2476,8 @@
           {
             "skill": "subagent-orchestration",
             "references": [
-              "coordination.md",
-              "evidence-packet.md"
+              "evidence-packet.md",
+              "coordination.md"
             ]
           }
         ]
@@ -2465,8 +2488,8 @@
           {
             "skill": "subagent-orchestration",
             "references": [
-              "coordination.md",
-              "experiment-lifecycle.md"
+              "experiment-lifecycle.md",
+              "coordination.md"
             ]
           }
         ]
@@ -2477,8 +2500,8 @@
           {
             "skill": "subagent-orchestration",
             "references": [
-              "coordination.md",
-              "evidence-packet.md"
+              "evidence-packet.md",
+              "coordination.md"
             ]
           }
         ]
@@ -2489,8 +2512,8 @@
           {
             "skill": "subagent-orchestration",
             "references": [
-              "coordination.md",
-              "operator-execution.md"
+              "operator-execution.md",
+              "coordination.md"
             ]
           }
         ]
@@ -2507,8 +2530,8 @@
           {
             "skill": "subagent-orchestration",
             "references": [
-              "coordination.md",
-              "operator-execution.md"
+              "operator-execution.md",
+              "coordination.md"
             ]
           }
         ]
@@ -2586,7 +2609,6 @@
           {
             "skill": "change-governance",
             "references": [
-              "lifecycle-and-entry.md",
               "verification-and-gates.md"
             ]
           },
@@ -2594,17 +2616,17 @@
             "skill": "delivery-workflow",
             "references": [
               "artifact-contracts.md",
-              "execution-contracts.md",
-              "planning-contracts.md",
               "target-contracts.md",
-              "tooling.md"
+              "planning-contracts.md",
+              "execution-contracts.md"
             ]
           },
           {
             "skill": "task-table-manager",
             "references": [
               "task-contracts.md",
-              "tooling.md"
+              "tooling.md",
+              "authoring-tooling.md"
             ]
           }
         ]
@@ -2669,18 +2691,18 @@
             "skill": "delivery-workflow",
             "references": [
               "artifact-contracts.md",
+              "planning-contracts.md",
               "execution-contracts.md",
-              "iteration.md",
-              "planning-contracts.md"
+              "iteration.md"
             ]
           },
           {
             "skill": "task-table-manager",
             "references": [
-              "execution-tooling.md",
               "execution.md",
+              "tooling.md",
               "query-tooling.md",
-              "tooling.md"
+              "execution-tooling.md"
             ]
           }
         ]
@@ -2691,9 +2713,9 @@
           {
             "skill": "task-table-manager",
             "references": [
-              "authoring-tooling.md",
               "task-contracts.md",
-              "tooling.md"
+              "tooling.md",
+              "authoring-tooling.md"
             ]
           }
         ]
@@ -2704,9 +2726,9 @@
           {
             "skill": "task-table-manager",
             "references": [
-              "execution-tooling.md",
               "execution.md",
-              "tooling.md"
+              "tooling.md",
+              "execution-tooling.md"
             ]
           }
         ]
@@ -2718,16 +2740,16 @@
             "skill": "delivery-workflow",
             "references": [
               "artifact-contracts.md",
+              "target-contracts.md",
               "execution-contracts.md",
-              "iteration.md",
-              "target-contracts.md"
+              "iteration.md"
             ]
           },
           {
             "skill": "task-table-manager",
             "references": [
-              "completion-tooling.md",
-              "tooling.md"
+              "tooling.md",
+              "completion-tooling.md"
             ]
           }
         ]
@@ -2744,6 +2766,6 @@
         ]
       }
     ],
-    "receipt_id": "5f939ccb3da245f58f3204610bc46ec8"
+    "receipt_id": "8aead71adad84e63aae12d3c249323e9"
   }
 }

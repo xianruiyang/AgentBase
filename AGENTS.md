@@ -2,7 +2,7 @@
 
 ## 项目职责
 
-must: 本文件只补充 `AgentBase` 项目约定，继承全局 `AGENTS.md`；项目架构、正式入口和当前状态以 `README.md` 为索引，不在本文件重复维护易失效的数量、哈希或发布日期
+must: 本文件只补充 `AgentBase` 项目约定，继承全局 `AGENTS.md`；项目架构、正式入口和状态以 `README.md` 为索引，不重复维护易失效的数量、哈希或发布日期
 
 must: 权威 owner：`docs/requirements.md`（目标合同）、`docs/plan.md`（方向/决策/子计划/实践/重开）、`global/AGENTS.md`（候选全局规则）、`global/config.toml`/`global/hooks.template.json`/`global/agents/`（可移植设置）；`skills/`、`.agents/plugins/marketplace.json`、`mcp/`、`tools/`、`development/agent-evaluation/` 依次管 skill/插件发现/MCP/非 MCP 工具/最终评测，其他 `development/` 只放开发/验证/打包/部署资料
 

@@ -129,7 +129,13 @@ try {
         ([pscustomobject]@{ type = 'item.completed'; item = [pscustomobject]@{ type = 'mcp_tool_call' } } | ConvertTo-Json -Compress)
         ([pscustomobject]@{
             type = 'turn.completed'
-            usage = [pscustomobject]@{ input_tokens = 120; cached_input_tokens = 20; output_tokens = 30 }
+            usage = [pscustomobject]@{
+                input_tokens = 120
+                cached_input_tokens = 20
+                cache_write_input_tokens = 0
+                output_tokens = 30
+                reasoning_output_tokens = 0
+            }
         } | ConvertTo-Json -Compress)
     )
     $jsonlSummary = Get-AgentBaseCodexJsonlSummary -Text ($jsonlLines -join "`n")

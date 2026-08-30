@@ -11,10 +11,10 @@ description: 为复杂变更裁决根因与因果机制、争议测试 oracle、
 
 ## 选择参考
 
-- bug 或故障链路的根因、系统机制、反复失效、差距或上游判断会改变动作时，完整读取 [causal-analysis.md](references/causal-analysis.md)；当前失败分类与重试熔断已由 `$execution-governor` 覆盖、这里只裁决长期入口时不重复读取。
+- bug 或故障链路的根因、系统机制、反复失效、差距或上游判断会改变动作时，完整读取 [causal-analysis.md](references/causal-analysis.md)；若同一请求还要求修复、验收或证明原输入/机制不再失败，同时读取 [verification-and-gates.md](references/verification-and-gates.md)。当前失败分类与重试熔断已由 `$execution-governor` 覆盖、这里只裁决长期入口时不重复读取。
 - 多个入口或第二状态源的方案裁决、长期职责或权威入口变化、共享职责形成、跨消费者影响传播、迁移兼容、原型转正、临时路径风险评审或绕行退出条件时，完整读取 [lifecycle-and-entry.md](references/lifecycle-and-entry.md)；只定位现有规则、路由、动作或写回中的修复层仍归 causal，不因要求指出修复 owner 读取本项。
 - 维护 `project-metadata.md`、`file-metadata.md` 或重构同类长期状态记录时，完整读取 [records-and-metadata.md](references/records-and-metadata.md)。
-- 需要证明反复失效、循环依赖或其他已修复机制确实改变，裁决测试 oracle，设计共享阻断门禁，或执行跨契约完成审计时，完整读取 [verification-and-gates.md](references/verification-and-gates.md)；仅把已有反例作为原因证据且不设计验证或门禁时仍归 causal。
+- 需要证明反复失效、循环依赖或其他已修复机制确实改变，分析受支持场景中可预防的模型行为与验证/反馈缺口，裁决测试 oracle，设计共享阻断门禁，或执行跨契约完成审计时，完整读取 [verification-and-gates.md](references/verification-and-gates.md)；仅把已有反例作为原因证据且不分析验证或门禁时仍归 causal。
 - 同一任务跨越多个边界时读取所有对应文件；不要加载无关参考。
 
 ## 工作流
