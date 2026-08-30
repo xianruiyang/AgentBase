@@ -60,3 +60,21 @@ int VirtualWorker::RunVirtual()
 {
     return 1;
 }
+
+namespace Alpha::Beta::Gamma
+{
+int NestedLeaf()
+{
+    return 1;
+}
+
+int NestedMiddle()
+{
+    return NestedLeaf();
+}
+}
+
+int NestedTop()
+{
+    return Alpha::Beta::Gamma::NestedMiddle();
+}

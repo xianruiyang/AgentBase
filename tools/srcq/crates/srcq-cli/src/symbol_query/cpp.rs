@@ -554,10 +554,9 @@ fn build_scopes(records: &[AstRecord]) -> Vec<ScopeNode> {
         .iter()
         .filter_map(|record| {
             let (name, kind) = match record.rule_id.as_str() {
-                "srcq.cpp.namespace" | "srcq.cpp.scope.namespace" => (
-                    keyword_name(&record.text, &["namespace"]),
-                    ScopeKind::Namespace,
-                ),
+                "srcq.cpp.namespace" | "srcq.cpp.scope.namespace" => {
+                    (namespace_name(&record.text), ScopeKind::Namespace)
+                }
                 "srcq.cpp.class" | "srcq.cpp.scope.class" => {
                     (keyword_name(&record.text, &["class"]), ScopeKind::Type)
                 }
@@ -869,6 +868,41 @@ fn keyword_name(text: &str, keywords: &[&str]) -> Option<(String, usize)> {
     (offset > start).then(|| (text[start..offset].to_owned(), start))
 }
 
+fn namespace_name(text: &str) -> Option<(String, usize)> {
+    let namespace = text.find("namespace")?;
+    if !boundary_before(text, namespace) || !boundary_after(text, namespace + "namespace".len()) {
+        return None;
+    }
+    let start = skip_whitespace(text, namespace + "namespace".len());
+    let mut offset = start;
+    let mut parts = Vec::new();
+    loop {
+        offset = skip_whitespace(text, offset);
+        let identifier_start = offset;
+        while offset < text.len() {
+            let character = text[offset..].chars().next()?;
+            if !is_identifier_character(character) {
+                break;
+            }
+            offset += character.len_utf8();
+        }
+        if offset == identifier_start {
+            break;
+        }
+        let part = &text[identifier_start..offset];
+        if part == "inline" {
+            continue;
+        }
+        parts.push(part);
+        offset = skip_whitespace(text, offset);
+        if !text[offset..].starts_with("::") {
+            break;
+        }
+        offset += 2;
+    }
+    (!parts.is_empty()).then(|| (parts.join("::"), start))
+}
+
 fn looks_like_declarator(text: &str, offset: usize, length: usize) -> bool {
     let after = skip_whitespace(text, offset + length);
     matches!(
@@ -998,7 +1032,7 @@ fn offset_position(start: SourcePosition, text: &str, offset: usize) -> SourcePo
 
 #[cfg(test)]
 mod tests {
-    use super::{function_name, keyword_name, DefinitionRole};
+    use super::{function_name, keyword_name, namespace_name, DefinitionRole};
 
     #[test]
     fn function_name_rejects_substrings_body_calls_and_return_types() {
@@ -1023,5 +1057,14 @@ mod tests {
             keyword_name("namespace Other { int Value; }", &["namespace"]),
             Some(("Other".to_owned(), 10))
         );
+        assert_eq!(
+            namespace_name("namespace UE::UAI::Module { int Value; }"),
+            Some(("UE::UAI::Module".to_owned(), 10))
+        );
+        assert_eq!(
+            namespace_name("inline namespace UE :: inline UAI { int Value; }"),
+            Some(("UE::UAI".to_owned(), 17))
+        );
+        assert_eq!(namespace_name("namespace { int Value; }"), None);
     }
 }

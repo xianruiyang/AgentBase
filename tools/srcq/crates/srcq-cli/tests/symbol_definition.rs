@@ -315,6 +315,70 @@ fn cpp_incoming_calls_find_callers_and_stop_on_cycles() {
 }
 
 #[test]
+fn cpp_nested_namespace_call_trees_match_the_exact_bounded_source_oracle() {
+    let root = fixture_source();
+    let root = root.to_str().expect("UTF-8 fixture path");
+
+    let outgoing = run(&[
+        "symbol",
+        "calls",
+        "NestedMiddle",
+        "--only-root",
+        root,
+        "--depth",
+        "1",
+        "--output",
+        "machine",
+    ]);
+    assert!(outgoing.status.success());
+    let outgoing: Value = serde_json::from_slice(&outgoing.stdout).expect("outgoing JSON");
+    assert_eq!(outgoing["scope"]["candidate_scan"], "complete");
+    assert_eq!(outgoing["nodes"], 2);
+    assert_eq!(outgoing["truncated"], false);
+    assert_eq!(outgoing["time_limited"], false);
+    assert_eq!(
+        outgoing["root"]["definition"]["qualified_name"],
+        "Alpha::Beta::Gamma::NestedMiddle"
+    );
+    let outgoing_children = outgoing["root"]["children"]
+        .as_array()
+        .expect("outgoing children");
+    assert_eq!(outgoing_children.len(), 1);
+    assert_eq!(outgoing_children[0]["name"], "NestedLeaf");
+    assert_eq!(outgoing_children[0]["dispatch"], "direct-candidate");
+
+    let incoming = run(&[
+        "symbol",
+        "calls",
+        "NestedMiddle",
+        "--only-root",
+        root,
+        "--direction",
+        "incoming",
+        "--depth",
+        "1",
+        "--output",
+        "machine",
+    ]);
+    assert!(incoming.status.success());
+    let incoming: Value = serde_json::from_slice(&incoming.stdout).expect("incoming JSON");
+    assert_eq!(incoming["scope"]["candidate_scan"], "complete");
+    assert_eq!(incoming["nodes"], 2);
+    assert_eq!(incoming["truncated"], false);
+    assert_eq!(incoming["time_limited"], false);
+    assert_eq!(
+        incoming["root"]["definition"]["qualified_name"],
+        "Alpha::Beta::Gamma::NestedMiddle"
+    );
+    let incoming_children = incoming["root"]["children"]
+        .as_array()
+        .expect("incoming children");
+    assert_eq!(incoming_children.len(), 1);
+    assert_eq!(incoming_children[0]["name"], "NestedTop");
+    assert_eq!(incoming_children[0]["dispatch"], "incoming-candidate");
+}
+
+#[test]
 fn outline_definition_adapters_cover_representative_language_mechanisms() {
     let root = multilang_source();
     let cases = [
