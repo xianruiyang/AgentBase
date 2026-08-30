@@ -101,7 +101,7 @@ const TOOL_METADATA: readonly ToolMetadata[] = [
   },
   {
     name: 'get_type_hierarchy',
-    description: 'Return bounded type relations only when source/AST is insufficient.',
+    description: 'Return bounded semantic inheritance relations only when the active language Provider supports them; use source AST for cpptools C/C++.',
     readOnly: true,
     destructive: false,
     idempotent: true,

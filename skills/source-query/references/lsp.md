@@ -14,7 +14,7 @@
 - 已经由 `srcq rg` 或 AST 得到更小候选集时，可改用 `verify_symbol_candidates`；只把 `verified` 计入同符号结果，`mismatched` 排除，`unresolved` 或位置错误保留为未证，完整性不得超过文本/AST 实际覆盖范围。
 - 只有结论必须依赖 Provider 自身枚举时才把 `get_references.searchMode` 设为 `provider`，并按需传入最长 300000 ms 的 `timeoutMs`；include/exclude 只过滤 Provider 输出，不能缩小其内部扫描。客户端工具超时必须高于该值并预留桥接收尾时间。
 - 记录 Provider、工作区和文档版本边界；超时、不可用、部分结果和陈旧文档不得解释为空集合或完整答案。
-- 冷 C/C++ 调用层级会在一次请求内有界等待瞬时空的 prepare 结果；不要用相同输入反复调用。保持活动 `compile_commands` 含目标文件且不含已删除条目，首次语义解析完成后复用同一 VS Code 窗口的 Provider 状态。
+- 冷 C/C++ 调用层级会在一次请求内有界等待瞬时空的 prepare 结果；不要用相同输入反复调用。保持活动 `compile_commands` 含目标文件且不含已删除条目，首次语义解析完成后复用同一 VS Code 窗口的 Provider 状态。cpptools C/C++ 没有 Type Hierarchy Provider，继承关系返回 AST 路径，不用 LSP 空结果反复试探。
 
 ## 职责边界
 
