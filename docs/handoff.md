@@ -10,7 +10,7 @@
 
 - 当前已推送实现链为：`aafefc6`（查询工具、skill 与 MCP 升级路径）、`1a6e76e`（skill 引用路由收敛）、`2845ff8`（并存 VS Code 更新目录的安装发现）。`main` 与 `origin/main` 为 `0/0`。
 - AgentBase 已通过 `DirectCompatibility + InstallPortableSettings` 正式发布，发布后 Status 为 `published:true`；本次更新 11 个受管对象，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260830-231906-5f1dad37`。
-- 当前唯一 tracked dirty 是 `global/AGENTS.md` 的源码读取规则 hunk。它未提交、未推送，不得被清理、回退或混入无关提交；本次 Publish 使用当前工作树，因此实际 Codex 安装已包含该 hunk。仓库上游与安装候选在这一点上有明确的未提交边界。
+- `global/AGENTS.md` 的源码读取规则已纳入项目历史；它要求已知符号后直接有界读取完整定义、签名依赖和相邻契约，并只在当前职责确需且规模有界时读取完整文件。实际 Codex 安装已包含相同内容，仓库候选与受管安装在该规则上对齐；当前预期无 tracked dirty。
 - `dist/`、`target/`、MCP 日志和构建输出仍是忽略的可重建资产，不是项目真源。
 
 ## 已安装运行时与真实状态
@@ -38,7 +38,7 @@
 
 ## 下个对话的最小恢复步骤
 
-1. 读取根 `README.md` 与本文件，运行 `git status --short`；保留 `global/AGENTS.md` 唯一 dirty hunk，不清理、不回退、不自动提交。
+1. 读取根 `README.md` 与本文件，运行 `git status --short`；当前预期无 tracked dirty，若出现改动先确认归属，不清理、不回退、不自动提交未知内容。
 2. 确认 `HEAD` 与上游关系；若上述实现链仍在当前历史中且本地与上游为 `0/0`，当前源码没有开放实施项，不因缺少新行为观察自动重开。
 3. 任务依赖真实安装状态时，只读运行部署说明中的 `DirectCompatibility + InstallPortableSettings Status`、srcq Status 和 MCP status；不得从安装副本反推项目真源。
 4. 需要 LSP 时先调用一次 `list_workspaces`。若结果为空且 VS Code 项目已打开，要求用户在对应窗口 Reload Window，再重新读 workspace；不重装、不重发、不原样循环 doctor。
@@ -50,7 +50,7 @@
 ```text
 请接手 D:\program\AgentBase。
 
-先读取 D:\program\AgentBase\README.md 和 D:\program\AgentBase\docs\handoff.md，按其中“下个对话的最小恢复步骤”恢复。先运行 git status --short；保留 global/AGENTS.md 现有未提交修改，不清理、回退或自动提交，也不要从 Codex 安装副本反推项目源码。
+先读取 D:\program\AgentBase\README.md 和 D:\program\AgentBase\docs\handoff.md，按其中“下个对话的最小恢复步骤”恢复。先运行 git status --short；若存在未提交修改，先确认归属，不清理、回退或自动提交未知内容，也不要从 Codex 安装副本反推项目源码。
 
 恢复后只读确认当前 HEAD/upstream、AgentBase 的 DirectCompatibility + InstallPortableSettings Status、srcq 0.5.0 Status，以及 vscode-lsp-mcp 0.2.0 status/list_workspaces。若 VS Code 已打开而 workspace 仍为 0，先告诉我需要 Reload Window，不要自行关闭编辑器或重新安装。
 
