@@ -55,7 +55,7 @@ const NOT_APPLICABLE: &[(&str, &str)] = &[
 fn has_generic_relation_adapter(key: &str) -> bool {
     matches!(
         key,
-        "go" | "java" | "javascript" | "python" | "rust" | "tsx" | "typescript"
+        "c" | "csharp" | "go" | "java" | "javascript" | "python" | "rust" | "tsx" | "typescript"
     )
 }
 
@@ -160,6 +160,8 @@ pub(crate) fn source_glob(key: &str) -> Option<&'static str> {
 
 pub(crate) fn occurrence_kinds(key: &str) -> Option<&'static [&'static str]> {
     match key {
+        "c" => Some(&["identifier"]),
+        "csharp" => Some(&["identifier"]),
         "python" => Some(&["identifier"]),
         "typescript" | "tsx" => Some(&[
             "identifier",
@@ -186,6 +188,8 @@ pub(crate) fn occurrence_kinds(key: &str) -> Option<&'static [&'static str]> {
 
 pub(crate) fn call_kinds(key: &str) -> Option<&'static [&'static str]> {
     match key {
+        "c" => Some(&["call_expression"]),
+        "csharp" => Some(&["invocation_expression", "object_creation_expression"]),
         "python" => Some(&["call"]),
         "typescript" | "tsx" | "javascript" | "rust" | "go" => Some(&["call_expression"]),
         "java" => Some(&["method_invocation", "object_creation_expression"]),
@@ -195,6 +199,8 @@ pub(crate) fn call_kinds(key: &str) -> Option<&'static [&'static str]> {
 
 pub(crate) fn function_kinds(key: &str) -> Option<&'static [&'static str]> {
     match key {
+        "c" => Some(&["function_definition"]),
+        "csharp" => Some(&["method_declaration", "constructor_declaration"]),
         "python" => Some(&["function_definition"]),
         "typescript" | "tsx" | "javascript" => Some(&[
             "function_declaration",

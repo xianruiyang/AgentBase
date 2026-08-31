@@ -553,6 +553,8 @@ fn cpp_explicit_receiver_types_add_owner_and_variable_context_without_claiming_l
 fn outline_definition_adapters_cover_representative_language_mechanisms() {
     let root = multilang_source();
     let cases = [
+        ("c", "c_execute", "sample.c", "function"),
+        ("csharp", "Execute", "sample.cs", "method"),
         ("python", "execute", "sample.py", "method"),
         ("typescript", "value", "sample.ts", "field"),
         ("rust", "rust_wrapper", "sample.rs", "function"),
@@ -730,6 +732,28 @@ fn symbol_capabilities_cover_every_registered_ast_language_without_false_support
         .expect("python capability");
     assert_eq!(python["definition"], "candidate-only");
     assert_eq!(python["references"], "lexical-candidate");
+    let c = document["languages"]
+        .as_array()
+        .and_then(|languages| {
+            languages
+                .iter()
+                .find(|language| language["language"] == "c")
+        })
+        .expect("C capability");
+    assert_eq!(c["definition"], "candidate-only");
+    assert_eq!(c["references"], "lexical-candidate");
+    assert_eq!(c["calls"], "candidate");
+    let csharp = document["languages"]
+        .as_array()
+        .and_then(|languages| {
+            languages
+                .iter()
+                .find(|language| language["language"] == "csharp")
+        })
+        .expect("C# capability");
+    assert_eq!(csharp["definition"], "candidate-only");
+    assert_eq!(csharp["references"], "lexical-candidate");
+    assert_eq!(csharp["calls"], "candidate");
     let bash = document["languages"]
         .as_array()
         .and_then(|languages| {
@@ -754,6 +778,8 @@ fn symbol_capabilities_cover_every_registered_ast_language_without_false_support
 fn generic_relation_adapters_keep_lexical_references_and_incoming_callers_bounded() {
     let root = multilang_source();
     let cases = [
+        ("c", "c_execute", "sample.c", "c_wrapper"),
+        ("csharp", "Execute", "sample.cs", "CSharpWrapper"),
         ("python", "execute", "sample.py", "python_wrapper"),
         ("typescript", "execute", "sample.ts", "typeScriptWrapper"),
         ("rust", "execute", "sample.rs", "rust_wrapper"),
@@ -825,4 +851,65 @@ fn generic_relation_adapters_keep_lexical_references_and_incoming_callers_bounde
     assert!(depth.status.success());
     let depth = String::from_utf8(depth.stdout).expect("UTF-8 depth call tree");
     assert!(depth.contains("python_leaf [outline-candidate;direct-candidate]"));
+
+    let c = root.join("sample.c");
+    let c = c.to_str().expect("UTF-8 fixture path");
+    let c_outgoing = run(&[
+        "symbol",
+        "calls",
+        "c_middle",
+        "--language",
+        "c",
+        "--only-root",
+        c,
+        "--depth",
+        "2",
+    ]);
+    assert!(c_outgoing.status.success());
+    let c_outgoing = String::from_utf8(c_outgoing.stdout).expect("UTF-8 C outgoing calls");
+    assert!(c_outgoing.contains("c_leaf [outline-candidate;direct-candidate]"));
+
+    let csharp = root.join("sample.cs");
+    let csharp = csharp.to_str().expect("UTF-8 fixture path");
+    let csharp_outgoing = run(&[
+        "symbol",
+        "calls",
+        "CSharpMiddle",
+        "--language",
+        "csharp",
+        "--only-root",
+        csharp,
+        "--depth",
+        "2",
+    ]);
+    assert!(csharp_outgoing.status.success());
+    let csharp_outgoing =
+        String::from_utf8(csharp_outgoing.stdout).expect("UTF-8 C# outgoing calls");
+    assert!(csharp_outgoing.contains("CSharpLeaf [outline-candidate;direct-candidate]"));
+
+    let csharp_member_calls = run(&[
+        "symbol",
+        "calls",
+        "CSharpWrapper",
+        "--language",
+        "csharp",
+        "--only-root",
+        csharp,
+        "--output",
+        "machine",
+    ]);
+    assert!(csharp_member_calls.status.success());
+    let csharp_member_calls: Value =
+        serde_json::from_slice(&csharp_member_calls.stdout).expect("C# member call JSON");
+    let csharp_children = csharp_member_calls["root"]["children"]
+        .as_array()
+        .expect("C# member call children");
+    assert!(csharp_children.iter().any(|child| {
+        child["name"] == "Execute"
+            && child["dispatch"] == "member-candidate"
+            && child["status"] == "semantic-unknown"
+    }));
+    assert!(csharp_children.iter().any(|child| {
+        child["name"] == "CSharpWorker" && child["dispatch"] == "direct-candidate"
+    }));
 }

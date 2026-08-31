@@ -51,12 +51,12 @@ C++ incoming 直接复用 AST 已确认的包含函数定义继续展开，不�
 `srcq symbol capabilities` 是语言能力真源，正常查询不需要预先调用。当前适配分为：
 
 - C++：结构直接定义、词法引用候选和有界调用候选，并恢复编译范围。
-- Python、TypeScript、TSX、JavaScript、Rust、Go、Java：outline 定义候选、词法引用候选和调用候选。
-- C、C#、Kotlin、PHP、Ruby、Swift：outline 定义候选。
+- C、C#、Python、TypeScript、TSX、JavaScript、Rust、Go、Java：outline 定义候选、词法引用候选和调用候选。
+- Kotlin、PHP、Ruby、Swift：outline 定义候选。
 - Bash、Dart、Elixir、Haskell、Lua、Nix、Scala、Solidity：已登记但当前 `unadapted`。
 - CSS、HTML、JSON、YAML：源码符号关系 `not-applicable`。
 
-所有名称查询、非 C++ outline 定义、引用及调用关系都不宣称 Provider 精度。位置落在定义名称上时可选择该语法定义；位置落在调用或引用上且语法无法区分同名符号时仍返回歧义。只有该歧义会改变当前动作或结论时，才升级到 LSP 或领域工具。
+所有名称查询、非 C++ outline 定义、引用及调用关系都不宣称 Provider 精度。C 原型、C# 文件级 namespace、重载、宏、条件编译、partial class、扩展方法和别名绑定不会因语言进入 generic adapter 就被提升为精确关系；当前 0.44.1 证据只覆盖 outline 定义、标识符词法引用及直接、成员和构造调用候选。位置落在定义名称上时可选择该语法定义；位置落在调用或引用上且语法无法区分同名符号时仍返回歧义。只有该歧义会改变当前动作或结论时，才升级到 LSP 或领域工具。
 
 ## 输出
 
