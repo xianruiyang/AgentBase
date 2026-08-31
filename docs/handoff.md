@@ -4,14 +4,14 @@
 
 ## 一句话状态
 
-开发环境与门禁治理 T001—T006 已闭环：Windows SWE 候选与 Verifier 已迁移为受信任本地双工作区，旧 elevated setup、权限画像、ACL/canary、认证 hardlink、preflight 和专用 cleanup 已从生产入口与测试退出；旧 ACL 保护的 workspace、sandbox runtime 与 sandbox check 残留经用户明确授权的一次管理员清理后物理删除。本轮没有 Publish；T007 只保留有明确重开条件的客户端能力阻塞。
+开发环境与门禁治理 T001—T006 已闭环：Windows SWE 候选与 Verifier 已迁移为受信任本地双工作区，旧 elevated setup、权限画像、ACL/canary、认证 hardlink、preflight 和专用 cleanup 已从生产入口与测试退出；旧 ACL 保护的 workspace、sandbox runtime 与 sandbox check 残留经用户明确授权的一次管理员清理后物理删除。2026-08-31 已正式发布当前全局规则、`subagent-orchestration` 与 6 子代理容量，发布后 formal gap 为 0；T007 只保留有明确重开条件的客户端能力阻塞。
 
 ## 当前源码、发布与未提交边界
 
 - 本轮治理改动归属 `development/agent-evaluation/`、根/组件文档及 `docs/work/20260830_development_environment_governance/`；后续若这些路径重新出现未提交修改，先确认归属，不清理、回退或自动提交未知内容。
 - T001—T006 已完成只读入口、受信任本地 candidate/Verifier/recover、旧 strict-safety 生命周期退出、当前 owner/入口更新、无消费者残留清理和跨契约完成审计。T007 的客户端主动调度行为仍保持 blocked，只有出现正式结构化委派机制时才按任务表重开，不影响本轮环境治理完成。
-- 当前候选尚未 Publish。真实 Codex 安装仍是此前发布基线，不能从安装副本反推本轮项目源码，也不能把源码候选能力说成已安装生效。
-- 上次 Publish 授权已经消耗；任何新的正式 Publish 都必须取得用户针对当次操作的明确同意。Git 维护与私有上游同步授权不等于 Publish 授权。
+- `DirectCompatibility + InstallPortableSettings` 已于 2026-08-31 10:15（Asia/Shanghai）正式发布：`AGENTS.md`、`config.toml` 和 `subagent-orchestration` 的两个文件实际变化，Status 为 `managed_payload_formally_published=true`、gap 0。evaluator 开发源码不属于 Codex payload，安装副本仍不得反推项目源码；当前运行也不会追溯加载新规则。
+- 本次 Publish 授权已经消耗；任何新的正式 Publish 都必须取得用户针对当次操作的明确同意。Git 维护与私有上游同步授权不等于 Publish 授权。
 - `.codex/`、`codexRuntimeLogFile/`、`node_modules/`、`dist/`、`target/`、覆盖率、测试缓存和部署沙箱是本地状态或可重建产物，不是项目真源。
 
 ## 最终评测当前合同
