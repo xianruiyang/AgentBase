@@ -23,6 +23,8 @@ srcq query scc doctor
 
 ## Engine 与执行问题
 
+- rg 报告残缺 pattern（例如只剩反斜杠）或把 pattern 当成路径：先按 [PowerShell 正则与原生 argv](usage.md#powershell-正则与原生-argv) 检查调用层。PowerShell 不以反斜杠转义双引号；用变量/数组、原生 `-e` 和 `--` 固定 token 边界，再通过 `srcq query rg defaults --output machine -- ...` 查看实际 `user_argv`。srcq 无法还原 shell 启动前已经拆开的参数。
+- rg 明确报告 look-around/backreference 不受支持：这是默认 regex 引擎边界；只有查询确实需要该语义时显式使用 `-P`/`--pcre2`。不要把正常语法拒绝当作 srcq 降级，也不要让 wrapper 自动切换引擎。
 - `engine_not_found`：安装 ast-grep，或向 `srcq doctor --engine <path>` / `srcq exec --engine <path> -- ...` 传绝对可执行文件。
 - scc backend 不可用：确认独立安装的 `scc.exe` 已进入当前进程 PATH，或向 `srcq query scc doctor --engine <path>` 和后续控制命令传同一绝对路径。刚由 bootstrap 修改 PATH 时必须重启 Codex 桌面宿主。
 - scc 投影失败：保留原生退出码和有界诊断；model 的协议回退来自同一次捕获，不要无变化重跑。确需原始字段时使用 lossless/raw/artifact，不把 COCOMO 或复杂度估算当作缺陷结论。

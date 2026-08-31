@@ -124,6 +124,7 @@
     "ast-no-match-needs-source-evidence",
     "bounded-file-discovery",
     "powershell-command-authoring",
+    "powershell-native-regex-argv",
     "current-context-is-sufficient",
     "ordinary-completion-no-qq",
     "cpp-word-in-document",
@@ -1025,6 +1026,21 @@
       ],
       "forbidden_skills": [
         "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "powershell-native-regex-argv",
+      "kind": "positive",
+      "request": "请在 PowerShell 7 中编写一条 srcq rg 正则查询；pattern 含双引号、反斜杠和前导连字符，必须保持每个原生 argv token，不要把调用层转义问题诊断成 srcq 产品缺陷。",
+      "expected_skills": [
+        "powershell-usage"
+      ],
+      "forbidden_skills": [
+        "source-query",
+        "symbol-structure-workflow"
       ],
       "expected_change_governance_references": [],
       "expected_behavior_tags": [],

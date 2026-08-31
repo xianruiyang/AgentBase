@@ -196,6 +196,67 @@ fn direct_backend_tokens_never_enter_the_wrapper_control_namespace() {
 }
 
 #[test]
+fn powershell_preserves_regex_arguments_for_direct_rg() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    fs::write(
+        directory.path().join("src/regex.txt"),
+        "{\"model\":\"gpt-5.6-sol\",\"reasoning_effort\":\"high\"}\nmodel 123\n-foo\n",
+    )
+    .expect("regex fixture");
+
+    let srcq_directory = Path::new(env!("CARGO_BIN_EXE_srcq"))
+        .parent()
+        .expect("srcq binary directory");
+    let inherited_path = env::var_os("PATH").unwrap_or_default();
+    let command_path = env::join_paths(
+        std::iter::once(srcq_directory.to_path_buf()).chain(env::split_paths(&inherited_path)),
+    )
+    .expect("PowerShell PATH");
+    let script = r#"
+$Pattern = '"model"|reasoning_effort|reasoningEffort|"effort"'
+$RgArgs = @('rg', '-n', '-e', $Pattern, '--', 'src/regex.txt')
+& srcq.exe @RgArgs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+$Pattern = 'model(?=\s+\d)'
+$RgArgs = @('rg', '-n', '-P', '-e', $Pattern, '--', 'src/regex.txt')
+& srcq.exe @RgArgs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+$Pattern = '-foo'
+$RgArgs = @('rg', '-n', '-e', $Pattern, '--', 'src/regex.txt')
+& srcq.exe @RgArgs
+exit $LASTEXITCODE
+"#;
+    let output = Command::new("pwsh.exe")
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            script,
+        ])
+        .current_dir(directory.path())
+        .env("PATH", command_path)
+        .env("LOCALAPPDATA", local.path())
+        .output()
+        .expect("PowerShell direct rg query");
+    assert!(
+        output.status.success(),
+        "stdout={}\nstderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("UTF-8 PowerShell rg output"),
+        "src/regex.txt:1:{\"model\":\"gpt-5.6-sol\",\"reasoning_effort\":\"high\"}\n\
+src/regex.txt:2:model 123\n\
+src/regex.txt:3:-foo\n"
+    );
+}
+
+#[test]
 fn direct_queries_choose_compact_path_trees_after_observing_results() {
     let directory = fixture();
     let local = tempfile::tempdir().expect("local app data");

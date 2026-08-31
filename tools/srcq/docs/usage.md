@@ -25,6 +25,35 @@ srcq scc --exclude-dir target .
 
 普通 scc 自动返回语言汇总，原生 `--by-file` 返回文件指标。只有明确需要固定 view、machine、lossless/raw、artifact、诊断或续页时进入 `srcq query scc`；`hotspots` 只是按启发式复杂度排序复核候选，不证明缺陷。完整合同见[查询网关](query-gateway.md)。
 
+### PowerShell 正则与原生 argv
+
+PowerShell 在启动 `srcq` 前已经完成引号和 token 解析；`srcq` 只能保持收到的 argv，不能还原被 shell 拆开的 pattern。正则含引号、反斜杠、空参数或前导 `-` 时，把每个 token 放入变量或数组，pattern 用原生 `-e` 传入，路径放在原生 `--` 后。PowerShell 不以反斜杠转义双引号，不要在双引号字符串中使用 C 风格 `\"`：
+
+```powershell
+$Pattern = '"model"|reasoning_effort|reasoningEffort|"effort"'
+$Target = 'session.jsonl'
+$RgArgs = @('rg', '-n', '-e', $Pattern, '--', $Target)
+& srcq.exe @RgArgs
+if ($LASTEXITCODE -gt 1) { throw "srcq rg failed with exit code $LASTEXITCODE" }
+```
+
+rg 默认 regex 引擎不支持 look-around 或 backreference；只有任务确实需要该语义时才显式使用 `-P`/`--pcre2`，不要由 wrapper 自动切换：
+
+```powershell
+$Pattern = 'model(?=\s+\d)'
+$RgArgs = @('rg', '-n', '-P', '-e', $Pattern, '--', $Target)
+& srcq.exe @RgArgs
+if ($LASTEXITCODE -gt 1) { throw "srcq rg failed with exit code $LASTEXITCODE" }
+```
+
+若需区分 shell 拆参、srcq 注入与引擎错误，先查看 srcq 实际收到的数组；`defaults` 不发现或启动引擎：
+
+```powershell
+srcq query rg defaults --output machine --view grouped -- -n -e $Pattern -- $Target
+```
+
+其中 `user_argv` 是调用方传入的 token，`injected_argv` 是结构化投影所需的固定参数，`effective_argv` 是最终引擎 argv。该诊断不能证明正则本身有效；默认引擎的语法错误仍以原生 rg stderr 和退出码为准。
+
 ## 快速定义、引用与调用关系
 
 优先从 0-based 源码位置调用，目录默认由工具解析：

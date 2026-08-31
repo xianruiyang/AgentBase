@@ -6,7 +6,8 @@
 
 1. 固定实际工作目录、完整命令、输入范围和 PATH 中 `srcq.exe` 的版本；不从源码构建目录或缓存替换运行时。
 2. 只读取发生问题的入口帮助。普通入口参数属于原生 rg/fd/scc；显式 `query ... exec` 的 wrapper 参数位于 `--` 前、原生参数位于其后。以 `-` 开头的 rg pattern 使用原生 `-e VALUE`，不要把 pattern 误解析成选项。
-3. 输入、实现和环境未变时只重放一次原命令；已经取得同一失败后不靠重复运行期待不同结果。只有修正了已确认的输入或机制，才运行一次能区分新旧解释的复现。
+3. PowerShell 在 `srcq` 启动前已经形成 argv；含正则、引号、反斜杠或空参数时按 `powershell-usage` 让每个 token 独立传入。rg pattern 优先由单引号文本赋给变量并经 `-e $Pattern` 传入，路径放在原生 `--` 后；不得用 C 风格 `\"` 转义 PowerShell 双引号。边界仍不清楚时，用 `srcq query rg defaults --output machine -- ...` 读取 `user_argv`、`injected_argv` 与 `effective_argv`；该投影只证明 srcq 实际收到的参数，不证明正则有效。
+4. 输入、实现和环境未变时只重放一次原命令；已经取得同一失败后不靠重复运行期待不同结果。只有修正了已确认的输入或机制，才运行一次能区分新旧解释的复现。
 
 ## 分类
 
