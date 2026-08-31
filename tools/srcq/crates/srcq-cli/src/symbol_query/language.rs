@@ -82,6 +82,11 @@ fn code_capability(key: &'static str, ast_grep: &'static str) -> LanguageCapabil
         calls: if adapted { "candidate" } else { "unadapted" },
         scope: if key == "csharp" {
             "project-compile-aware"
+        } else if matches!(
+            key,
+            "go" | "javascript" | "python" | "rust" | "tsx" | "typescript"
+        ) {
+            "project-metadata-aware"
         } else {
             "explicit-or-project"
         },

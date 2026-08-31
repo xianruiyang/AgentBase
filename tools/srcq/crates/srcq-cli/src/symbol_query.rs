@@ -1,8 +1,14 @@
 mod cpp;
 mod csharp;
 mod generic;
+mod go;
+mod javascript;
 mod language;
+mod python;
+mod rust_lang;
 mod scope;
+mod typed;
+mod typescript;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
@@ -731,7 +737,10 @@ fn incoming_callers(
             if observed_call.is_none() {
                 continue;
             }
-            let matching_call = if query.language.key == "csharp" {
+            let matching_call = if matches!(
+                query.language.key,
+                "csharp" | "go" | "javascript" | "python" | "rust" | "typescript" | "tsx"
+            ) {
                 observed_call
             } else {
                 None
@@ -2030,6 +2039,16 @@ fn scan_containing_functions(
 ) -> Result<Vec<FunctionOwnerCandidate>, SymbolFailure> {
     let inline_rules = if language.key == "cpp" {
         cpp::containing_function_rules(target)
+    } else if language.key == "go" {
+        go::containing_function_rules(language.ast_grep, target)
+    } else if language.key == "javascript" {
+        javascript::containing_function_rules(language.ast_grep, target)
+    } else if language.key == "python" {
+        python::containing_function_rules(language.ast_grep, target)
+    } else if language.key == "rust" {
+        rust_lang::containing_function_rules(language.ast_grep, target)
+    } else if matches!(language.key, "typescript" | "tsx") {
+        typescript::containing_function_rules(language.ast_grep, target)
     } else {
         generic::containing_function_rules(
             language.ast_grep,
@@ -2072,6 +2091,21 @@ fn scan_containing_functions(
             .map_err(|error| SymbolFailure::io(format!("cannot read ast-grep output: {error}")))?;
         owners.extend(if language.key == "cpp" {
             cpp::parse_function_owner_stream(&bytes, &universe.cwd, universe)
+                .map_err(SymbolFailure::conversion)?
+        } else if language.key == "go" {
+            go::parse_function_owner_stream(&bytes, &universe.cwd)
+                .map_err(SymbolFailure::conversion)?
+        } else if language.key == "javascript" {
+            javascript::parse_function_owner_stream(&bytes, &universe.cwd)
+                .map_err(SymbolFailure::conversion)?
+        } else if language.key == "python" {
+            python::parse_function_owner_stream(&bytes, &universe.cwd)
+                .map_err(SymbolFailure::conversion)?
+        } else if language.key == "rust" {
+            rust_lang::parse_function_owner_stream(&bytes, &universe.cwd)
+                .map_err(SymbolFailure::conversion)?
+        } else if matches!(language.key, "typescript" | "tsx") {
+            typescript::parse_function_owner_stream(&bytes, &universe.cwd)
                 .map_err(SymbolFailure::conversion)?
         } else {
             generic::parse_function_owner_stream(&bytes, &universe.cwd, language.key)
@@ -2125,6 +2159,11 @@ fn calls_for_definition(
             context.deadline,
             resolution_cache,
         )?;
+    } else if matches!(
+        context.language.key,
+        "go" | "javascript" | "python" | "rust" | "typescript" | "tsx"
+    ) {
+        typed::annotate_explicit_member_types(context.language.key, &mut calls, scan, definition);
     }
     Ok(calls)
 }
@@ -2170,6 +2209,11 @@ fn call_for_definition_at(
             context.deadline,
             resolution_cache,
         )?;
+    } else if matches!(
+        context.language.key,
+        "go" | "javascript" | "python" | "rust" | "typescript" | "tsx"
+    ) {
+        typed::annotate_explicit_member_types(context.language.key, &mut calls, scan, definition);
     }
     Ok(calls.pop())
 }
@@ -2192,6 +2236,11 @@ fn cache_call_scans(
     let rules = match context.language.key {
         "cpp" => cpp::call_rules().to_owned(),
         "csharp" => csharp::call_rules(),
+        "go" => go::call_rules(context.language.ast_grep),
+        "javascript" => javascript::call_rules(context.language.ast_grep),
+        "python" => python::call_rules(context.language.ast_grep),
+        "rust" => rust_lang::call_rules(context.language.ast_grep),
+        "typescript" | "tsx" => typescript::call_rules(context.language.ast_grep),
         _ => generic::call_rules(
             context.language.ast_grep,
             language::call_kinds(context.language.key).ok_or_else(|| {
@@ -2235,11 +2284,24 @@ fn cache_call_scans(
                 .map_err(SymbolFailure::conversion)?,
             "csharp" => csharp::parse_call_stream(&bytes, &context.universe.cwd)
                 .map_err(SymbolFailure::conversion)?,
+            "go" => go::parse_call_stream(&bytes, &context.universe.cwd)
+                .map_err(SymbolFailure::conversion)?,
+            "javascript" => javascript::parse_call_stream(&bytes, &context.universe.cwd)
+                .map_err(SymbolFailure::conversion)?,
+            "python" => python::parse_call_stream(&bytes, &context.universe.cwd)
+                .map_err(SymbolFailure::conversion)?,
+            "rust" => rust_lang::parse_call_stream(&bytes, &context.universe.cwd)
+                .map_err(SymbolFailure::conversion)?,
+            "typescript" | "tsx" => typescript::parse_call_stream(&bytes, &context.universe.cwd)
+                .map_err(SymbolFailure::conversion)?,
             _ => generic::parse_call_stream(&bytes, &context.universe.cwd)
                 .map_err(SymbolFailure::conversion)?,
         };
         combined.calls.append(&mut scan.calls);
         combined.bindings.append(&mut scan.bindings);
+        combined
+            .unresolved_bindings
+            .append(&mut scan.unresolved_bindings);
         combined.type_scopes.append(&mut scan.type_scopes);
         combined.lexical_scopes.append(&mut scan.lexical_scopes);
     }
@@ -2256,6 +2318,12 @@ fn cache_call_scans(
                     .collect(),
                 bindings: combined
                     .bindings
+                    .iter()
+                    .filter(|candidate| normalized_key(&candidate.file) == key)
+                    .cloned()
+                    .collect(),
+                unresolved_bindings: combined
+                    .unresolved_bindings
                     .iter()
                     .filter(|candidate| normalized_key(&candidate.file) == key)
                     .cloned()

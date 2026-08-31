@@ -139,6 +139,7 @@ pub(crate) struct DirectCallCandidate {
 pub(crate) struct CallScan {
     pub(crate) calls: Vec<DirectCallCandidate>,
     pub(crate) bindings: Vec<TypeBindingCandidate>,
+    pub(crate) unresolved_bindings: Vec<NameBindingCandidate>,
     pub(crate) type_scopes: Vec<TypeScopeCandidate>,
     pub(crate) lexical_scopes: Vec<LexicalScopeCandidate>,
 }
@@ -148,6 +149,7 @@ impl CallScan {
         Self {
             calls,
             bindings: Vec::new(),
+            unresolved_bindings: Vec::new(),
             type_scopes: Vec::new(),
             lexical_scopes: Vec::new(),
         }
@@ -168,6 +170,14 @@ pub(crate) struct TypeBindingCandidate {
     pub(crate) range: SourceRange,
     pub(crate) name: String,
     pub(crate) type_name: String,
+    pub(crate) scope: TypeBindingScope,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NameBindingCandidate {
+    pub(crate) file: PathBuf,
+    pub(crate) range: SourceRange,
+    pub(crate) name: String,
     pub(crate) scope: TypeBindingScope,
 }
 

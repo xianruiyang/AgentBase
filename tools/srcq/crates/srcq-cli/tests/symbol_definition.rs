@@ -32,6 +32,30 @@ fn run(arguments: &[&str]) -> Output {
         .expect("srcq symbol definition")
 }
 
+fn machine_calls(language: &str, target: &str, file: &str, incoming: bool) -> Value {
+    let mut arguments = vec![
+        "symbol",
+        "calls",
+        target,
+        "--language",
+        language,
+        "--only-root",
+        file,
+        "--output",
+        "machine",
+    ];
+    if incoming {
+        arguments.extend(["--direction", "incoming"]);
+    }
+    let output = run(&arguments);
+    assert!(
+        output.status.success(),
+        "{language} {target}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).expect("machine calls JSON")
+}
+
 #[test]
 fn cpp_definition_distinguishes_definitions_calls_declarations_and_lexical_owners() {
     let root = fixture_source();
@@ -737,6 +761,20 @@ fn symbol_capabilities_cover_every_registered_ast_language_without_false_support
         .expect("python capability");
     assert_eq!(python["definition"], "candidate-only");
     assert_eq!(python["references"], "lexical-candidate");
+    assert_eq!(python["calls"], "candidate");
+    assert_eq!(python["scope"], "project-metadata-aware");
+    for key in ["go", "javascript", "rust", "tsx", "typescript"] {
+        let language = document["languages"]
+            .as_array()
+            .and_then(|languages| {
+                languages
+                    .iter()
+                    .find(|language| language["language"] == key)
+            })
+            .unwrap_or_else(|| panic!("{key} capability"));
+        assert_eq!(language["calls"], "candidate", "{key}");
+        assert_eq!(language["scope"], "project-metadata-aware", "{key}");
+    }
     let c = document["languages"]
         .as_array()
         .and_then(|languages| {
@@ -823,7 +861,18 @@ fn generic_relation_adapters_keep_lexical_references_and_incoming_callers_bounde
         ]);
         assert!(incoming.status.success(), "{language} incoming calls");
         let incoming = String::from_utf8(incoming.stdout).expect("UTF-8 incoming calls");
-        assert!(incoming.contains(&format!("{caller} [lexical-candidate;incoming-candidate]")));
+        let edge = if matches!(
+            language,
+            "go" | "javascript" | "python" | "rust" | "tsx" | "typescript"
+        ) {
+            "typed-member-candidate"
+        } else {
+            "lexical-candidate"
+        };
+        assert!(
+            incoming.contains(&format!("{caller} [{edge};incoming-candidate")),
+            "{language} incoming:\n{incoming}"
+        );
     }
 
     let python = root.join("sample.py");
@@ -840,7 +889,9 @@ fn generic_relation_adapters_keep_lexical_references_and_incoming_callers_bounde
     assert!(outgoing.status.success());
     let outgoing = String::from_utf8(outgoing.stdout).expect("UTF-8 outgoing calls");
     assert!(outgoing.starts_with("calls outgoing depth=1 nodes=3 evidence=outline-candidate\n"));
-    assert!(outgoing.contains("execute [semantic-unknown;member-candidate]"));
+    assert!(outgoing.contains(
+        "PythonWorker::execute [typed-member-candidate receiver=PythonWorker():PythonWorker]"
+    ));
 
     let depth = run(&[
         "symbol",
@@ -891,6 +942,201 @@ fn generic_relation_adapters_keep_lexical_references_and_incoming_callers_bounde
     let csharp_outgoing =
         String::from_utf8(csharp_outgoing.stdout).expect("UTF-8 C# outgoing calls");
     assert!(csharp_outgoing.contains("CSharpLeaf [outline-candidate;direct-candidate]"));
+}
+
+#[test]
+fn typescript_typed_relations_respect_scope_and_disambiguate_calls() {
+    let typescript = multilang_source().join("typed_receivers.ts");
+    let typescript = typescript.to_str().expect("UTF-8 fixture path");
+    let outgoing = run(&[
+        "symbol",
+        "calls",
+        "Owner::run",
+        "--language",
+        "typescript",
+        "--only-root",
+        typescript,
+        "--depth",
+        "2",
+        "--output",
+        "machine",
+    ]);
+    assert!(
+        outgoing.status.success(),
+        "{}",
+        String::from_utf8_lossy(&outgoing.stderr)
+    );
+    let outgoing: Value =
+        serde_json::from_slice(&outgoing.stdout).expect("TypeScript outgoing JSON");
+    let children = outgoing["root"]["children"]
+        .as_array()
+        .expect("outgoing children");
+    assert!(
+        children
+            .iter()
+            .filter(|call| call["name"] == "PrimaryWorker::execute"
+                && call["dispatch"] == "typed-member-candidate"
+                && call["status"] == "outline-candidate")
+            .count()
+            >= 4
+    );
+    assert!(children.iter().any(
+        |call| call["name"] == "Owner::execute" && call["dispatch"] == "typed-member-candidate"
+    ));
+    assert!(children
+        .iter()
+        .any(|call| call["name"] == "PrimaryWorker::create"
+            && call["dispatch"] == "typed-member-candidate"));
+    assert!(children
+        .iter()
+        .any(|call| call["name"] == "AlternateWorker::execute" && call["receiver"] == "scoped"));
+    assert!(children
+        .iter()
+        .filter(|call| call["receiver"] == "scoped")
+        .any(|call| call["status"] == "semantic-unknown"));
+    assert!(children
+        .iter()
+        .any(|call| call["receiver"] == "conflict" && call["status"] == "semantic-unknown"));
+
+    let incoming = run(&[
+        "symbol",
+        "calls",
+        "PrimaryWorker::execute",
+        "--language",
+        "typescript",
+        "--only-root",
+        typescript,
+        "--direction",
+        "incoming",
+        "--output",
+        "machine",
+    ]);
+    assert!(
+        incoming.status.success(),
+        "{}",
+        String::from_utf8_lossy(&incoming.stderr)
+    );
+    let incoming: Value =
+        serde_json::from_slice(&incoming.stdout).expect("TypeScript incoming JSON");
+    let children = incoming["root"]["children"]
+        .as_array()
+        .expect("incoming children");
+    assert!(children
+        .iter()
+        .any(|call| call["name"] == "arrowCaller" && call["receiver_type"] == "PrimaryWorker"));
+    assert!(!children
+        .iter()
+        .any(|call| call["receiver_type"] == "AlternateWorker"));
+}
+
+#[test]
+fn typed_language_adapters_preserve_static_identity_and_dynamic_unknowns() {
+    let root = multilang_source();
+
+    let go = root.join("typed_go.go");
+    let go = go.to_str().expect("UTF-8 Go fixture path");
+    let outgoing = machine_calls("go", "consume", go, false);
+    let children = outgoing["root"]["children"].as_array().expect("Go calls");
+    for receiver in ["a", "b", "c", "local", "created", "Alpha"] {
+        assert!(children.iter().any(|call| call["receiver"] == receiver
+            && call["name"] == "Alpha::Ping"
+            && call["dispatch"] == "typed-member-candidate"));
+    }
+    assert!(children
+        .iter()
+        .any(|call| call["receiver"] == "any" && call["status"] == "semantic-unknown"));
+    assert!(children
+        .iter()
+        .any(|call| call["name"] == "<indirect>" && call["status"] == "semantic-unknown"));
+    let shadowed = machine_calls("go", "uppercaseShadow", go, false);
+    let shadowed = shadowed["root"]["children"]
+        .as_array()
+        .expect("Go shadowed calls");
+    assert!(shadowed.iter().any(|call| call["receiver"] == "Alpha"
+        && call["name"] == "Ping"
+        && call["status"] == "semantic-unknown"
+        && call["receiver_type"].is_null()));
+    let incoming = machine_calls("go", "Alpha::Ping", go, true);
+    let children = incoming["root"]["children"]
+        .as_array()
+        .expect("Go incoming calls");
+    assert!(children
+        .iter()
+        .any(|call| call["name"] == "Run" && call["receiver_type"] == "Alpha"));
+    assert!(!children.iter().any(|call| call["receiver_type"] == "Beta"));
+
+    let python = root.join("typed_python.py");
+    let python = python.to_str().expect("UTF-8 Python fixture path");
+    let outgoing = machine_calls("python", "Holder::exercise", python, false);
+    let children = outgoing["root"]["children"]
+        .as_array()
+        .expect("Python calls");
+    for receiver in ["local", "self.member"] {
+        assert!(children.iter().any(|call| call["receiver"] == receiver
+            && call["name"] == "Alpha::ping"
+            && call["dispatch"] == "typed-member-candidate"));
+    }
+    assert!(children.iter().any(|call| call["receiver"] == "self"
+        && call["name"] == "Holder::exercise"
+        && call["dispatch"] == "typed-member-candidate"));
+    assert!(children
+        .iter()
+        .any(|call| call["receiver"] == "dynamic" && call["status"] == "semantic-unknown"));
+    assert!(children.iter().any(|call| call["receiver"] == "value"
+        && call["status"] == "semantic-unknown"
+        && call["receiver_type"].is_null()));
+    let incoming = machine_calls("python", "Alpha::ping", python, true);
+    let children = incoming["root"]["children"]
+        .as_array()
+        .expect("Python incoming calls");
+    assert!(children
+        .iter()
+        .any(|call| call["name"] == "nested" && call["receiver_type"] == "Alpha"));
+    assert!(!children.iter().any(|call| call["receiver_type"] == "Beta"));
+
+    let rust = root.join("typed_rust.rs");
+    let rust = rust.to_str().expect("UTF-8 Rust fixture path");
+    let outgoing = machine_calls("rust", "Alpha::exercise", rust, false);
+    let children = outgoing["root"]["children"].as_array().expect("Rust calls");
+    for receiver in ["explicit", "borrowed", "local", "made", "built", "self"] {
+        assert!(children.iter().any(|call| call["receiver"] == receiver
+            && call["name"] == "Alpha::ping"
+            && call["receiver_type"] == "Alpha"));
+    }
+    assert!(children
+        .iter()
+        .any(|call| call["receiver"] == "opaque" && call["status"] == "semantic-unknown"));
+    let incoming = machine_calls("rust", "Alpha::ping", rust, true);
+    let children = incoming["root"]["children"]
+        .as_array()
+        .expect("Rust incoming calls");
+    assert!(children.iter().any(|call| call["name"] == "field_call"
+        && call["receiver"] == "self.child"
+        && call["receiver_type"] == "Alpha"));
+    assert!(!children.iter().any(|call| call["receiver_type"] == "Beta"));
+
+    let javascript = root.join("typed_javascript.js");
+    let javascript = javascript.to_str().expect("UTF-8 JavaScript fixture path");
+    let outgoing = machine_calls("javascript", "Harness::execute", javascript, false);
+    let children = outgoing["root"]["children"]
+        .as_array()
+        .expect("JavaScript calls");
+    for receiver in ["local", "this.field", "Alpha"] {
+        assert!(children.iter().any(|call| call["receiver"] == receiver
+            && call["name"] == "Alpha::run"
+            && call["receiver_type"] == "Alpha"));
+    }
+    assert!(children
+        .iter()
+        .any(|call| call["name"] == "<indirect>" && call["status"] == "semantic-unknown"));
+    let incoming = machine_calls("javascript", "Alpha::run", javascript, true);
+    let children = incoming["root"]["children"]
+        .as_array()
+        .expect("JavaScript incoming calls");
+    assert!(children
+        .iter()
+        .any(|call| call["name"] == "expressionOwner" && call["receiver_type"] == "Alpha"));
+    assert!(!children.iter().any(|call| call["receiver_type"] == "Beta"));
 }
 
 #[test]

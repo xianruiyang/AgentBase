@@ -28,6 +28,7 @@ sha2.workspace = true
 srcq-core = { path = "../srcq-core" }
 thiserror.workspace = true
 tempfile.workspace = true
+toml.workspace = true
 
 [lints]
 workspace = true

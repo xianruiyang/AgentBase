@@ -275,7 +275,16 @@ workspace、真实 scc、36 模式/9 oracle、AST 基线、bootstrap、插件、
 - 状态: open
 - 关联: AC-SQG-002, AC-SQG-007, AC-SQG-009, AC-SQG-012, AC-SQG-014, AC-SQG-015, OBS-SQG-029, OBS-SQG-030
 
-当前源码候选已为 C# 恢复解决方案内 SDK 项目的默认 Compile 集、Include/Remove、链接文件和 ProjectReference，并在静态不能判定条件、显式 import 或属性时降级为 `incomplete`；它仍不解析 NuGet 源码或执行完整 MSBuild。Python/Node/Cargo/Go/Java 等其他非 C++ adapter 尚未从语言项目元数据恢复 workspace 外源码；关系大结果也仍只报告省略量并允许提高 limit/预算重跑，尚未复用 query spool 的短句柄、snapshot 和无重扫恢复。当前输出不会把这些缺口伪装为完整或精确，但 TSQG-110/112 因而不能整体完成。后续应分别以一个真实的剩余语言外部依赖消费者和一个超预算引用集合闭合，不机械展开全部语言×依赖管理器矩阵。
+当前源码候选已为 C# 恢复解决方案内 SDK 项目的默认 Compile 集、Include/Remove、链接文件和 ProjectReference，并在静态不能判定条件、显式 import 或属性时降级为 `incomplete`；它仍不解析 NuGet 源码或执行完整 MSBuild。TypeScript/TSX/JavaScript、Rust、Go、Python 也已分别从 tsconfig/jsconfig/package 本地引用、Cargo workspace/path、go.work/go.mod 本地路径和 pyproject 静态 source/path 恢复项目外源码根，损坏、缺失或不支持的配置显式产生 issue；Java 等其余非 C++ adapter 仍只有项目递归或显式根。关系大结果仍只报告省略量并允许提高 limit/预算重跑，尚未复用 query spool 的短句柄、snapshot 和无重扫恢复。当前输出不会把这些缺口伪装为完整或精确，但 TSQG-110/112 因而仍不能整体完成。后续范围验证应选真实外部依赖消费者，不机械展开全部语言×依赖管理器矩阵。
+
+## GAP-SQG-011 常用语言缺类型、限定名与 callable owner 适配
+
+- 状态: resolved
+- 关联: REQ-SQG-002, AC-SQG-010, AC-SQG-011, AC-SQG-012, AC-SQG-013, AC-SQG-016, DES-SQG-016, DES-SQG-017, DES-SQG-018, DES-SQG-021, OBS-SQG-029, UDES-SQG-020
+
+当前源码候选已在既有查询、缓存、图遍历和输出 owner 内增加共享 typed relation 中间层，并由 Go、Python、Rust、JavaScript、TypeScript/TSX 适配器声明自身调用、绑定、词法范围、当前类型与 callable AST。五种语言可以从显式类型、构造或复合字面量、当前接收者、字段和静态限定生成 `typed-member-candidate`；Go 方法 receiver 会进入限定定义身份，适用的 function/method、arrow/function expression、lambda 和 closure 不再借外层参数类型。incoming 保留观察到的调用形式，并排除已证明属于其他接收者类型的同名调用。
+
+语言项目 resolver 已接入 `SourceUniverse` 唯一入口，只读解析本地静态元数据，不读取 dependency cache、不下载或启动语言工具。当前没有证据支持重载、trait/interface 或动态分派、函数值、复杂泛型/union、宏/生成代码和运行时属性的精确绑定；这些机制不属于本差距的候选精度承诺，仍由 `semantic-unknown` 与按需 LSP/领域工具承担。该状态只描述未发布源码候选，不表示已制作 Release、安装或 Codex Publish。
 
 ## GAP-SQG-009 query model 续页动作已经闭环
 

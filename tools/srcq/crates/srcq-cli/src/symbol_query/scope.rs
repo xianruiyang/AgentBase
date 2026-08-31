@@ -7,6 +7,7 @@ use serde_json::Value;
 use crate::SymbolCommand;
 
 mod csharp;
+mod language_project;
 
 const MAX_METADATA_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_RESPONSE_BYTES: u64 = 16 * 1024 * 1024;
@@ -152,6 +153,12 @@ pub(crate) fn resolve(
             alias_hint: Some("project".to_owned()),
         });
         discover_workspace_roots(&project_root, &mut candidates, &mut issues);
+        language_project::discover(
+            &command.language,
+            &project_root,
+            &mut candidates,
+            &mut issues,
+        );
         if command.language == "csharp" {
             csharp_compile_scope_resolved = csharp::discover_compile_files(
                 &project_root,
@@ -1159,6 +1166,29 @@ mod tests {
         assert_eq!(universe.roots.len(), 1);
         assert!(universe.compile_files.is_empty());
         assert!(universe.compile_directories.is_empty());
+    }
+
+    #[test]
+    fn language_project_issues_make_automatic_scope_incomplete_but_only_root_stays_bounded() {
+        let fixture = tempdir().expect("fixture");
+        let project = fixture.path().join("project");
+        let selected = fixture.path().join("selected");
+        fs::create_dir_all(project.join(".git")).expect("git marker");
+        fs::create_dir_all(&selected).expect("selected");
+        write(&project.join("tsconfig.json"), "{/* unterminated");
+        let mut automatic = command();
+        automatic.language = "typescript".to_owned();
+        let universe = resolve(&automatic, &project, None).expect("automatic universe");
+        assert_eq!(universe.status, ScopeStatus::Incomplete);
+        assert!(universe
+            .issues
+            .iter()
+            .any(|issue| issue.code == "project-config-unreadable"));
+
+        automatic.only_roots = vec![selected];
+        let universe = resolve(&automatic, &project, None).expect("bounded universe");
+        assert_eq!(universe.status, ScopeStatus::Bounded);
+        assert!(universe.issues.is_empty());
     }
 
     #[test]

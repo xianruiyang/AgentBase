@@ -218,3 +218,18 @@ fd model renderer 使用可逆紧凑基数树并合并单子链；rg 按正文�
 组件验收覆盖共享 rg/fd/scc renderer、特殊 argv 的真实 PowerShell 往返、连续分页、snapshot fingerprint 和 scc 单次扫描；随后用 P12 修复后的 evaluator 运行一个新鲜 candidate subject，只有真实命令事件取得第二页且环境、网络和 postflight 有效时关闭差距。
 
 `srcq 0.4.1` 已实现该合同。全 workspace build/test/lint/fmt、query gateway 34/34、skill 静态合同与部署 Validate 通过；特殊 argv 测试实际把 `@next` 交给新 PowerShell 进程执行，第二页成功且 fixture 日志只有一次 scc 扫描。独立 v6 experiment `27ac16be…20f5` 的 preflight 与 subject 均为零 WebSocket 失败、零 sampling retry、零 HTTP fallback；subject 直接执行提示命令，27.522 秒取得第二页首项 `D:/program/AgentBase/tools/srcq/crates/srcq-core/src/profile/paths.rs`。capsule `fce108b5…7926` 验真通过。真实安装与 Publish 均未执行。
+
+## SOL-SQG-017 以共享 typed relation 骨架扩展五种常用语言
+
+- 状态: resolved
+- 解决: GAP-SQG-010, GAP-SQG-011
+- 满足: REQ-SQG-002, AC-SQG-010, AC-SQG-011, AC-SQG-012, AC-SQG-013, AC-SQG-014, AC-SQG-015, AC-SQG-016, DES-SQG-016, DES-SQG-017, DES-SQG-018, DES-SQG-019, DES-SQG-020, DES-SQG-021, UDES-SQG-020
+- 依赖: TSQG-109, TSQG-112
+
+先在现有 `symbol_query` owner 内提取共享 typed relation 中间层，保持 C++/C# 专用 adapter、候选数据模型、缓存、图遍历和输出合同不变；TypeScript 以显式参数/局部/字段类型、`new` 初始化、当前类型和同名方法 incoming 过滤完成首个纵向闭环。该消费者成立后，JavaScript 接入可直接证明的构造与当前类关系，Python、Go、Rust 分别接入自身显式类型、构造/复合字面量、方法接收者、静态类型或语言路径限定与 callable owner。任何语言都只在唯一且词法有效的源码证据上提升为 typed 或 qualified candidate，动态反例继续 unknown。
+
+范围侧在 `SourceUniverse` 唯一入口下增加语言 resolver：TypeScript/JavaScript 读取 tsconfig/jsconfig 与本地 project/package 引用，Rust 读取 Cargo workspace 和 path dependency，Go 读取 go.work/go.mod 的本地 use/replace，Python 读取 pyproject 的静态 package/source 布局；不能静态解释的配置产生 issue 并降级，不调用语言工具或下载依赖。首个 TypeScript 行为闭环通过后才扩写其余语言 fixture 与测试，避免在共享中间契约未证时先建设五语言矩阵。
+
+验证按“共享 typed 正反例 → 每语言一个类型/模块收窄正例与一个动态/冲突反例 → 项目 resolver 正例与 incomplete 反例 → 现有 C++/C# 回归 → srcq 受影响组件门禁”扩展。组件候选稳定前不运行发布门禁、完整独立模型评测或九题评测；本方案不包含 Release、安装或 Codex Publish，任何 Publish 仍需用户针对当次操作另行明确同意。
+
+当前源码候选已按该方案实现：共享 `CallScan`/typed relation 持有显式与未解析绑定、类型和 callable scope；五个语言 adapter 只声明语言 AST 与静态证据；Go 方法 receiver 进入限定定义身份且同名大写参数会遮蔽类型声明。Node、Cargo、Go、Python 本地项目 resolver 接入 `SourceUniverse`，配置错误、缺失、不支持的 glob 和 256 项上限均产生 issue。定向符号关系测试 21/21、scope 定向测试 23/23、完整 `cargo ci-test`、`cargo ci-build`、`cargo lint`、`cargo fmt-check` 与 skill routing contract 均通过；独立只读复核未发现残留高优先级问题。真实 ast-grep 专用测试仍按既有环境变量合同 ignored；本轮未制作 Release、安装或 Codex Publish。

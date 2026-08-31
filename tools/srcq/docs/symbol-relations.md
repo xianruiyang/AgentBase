@@ -15,7 +15,9 @@ srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction outgoing --dept
 srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction incoming --depth 2
 ```
 
-位置上的 `A::B` 静态限定名会直接保留为查询目标。C++ 成员调用会保留接收者；当当前函数内恰有一个在调用前声明的显式参数或局部变量类型时，输出 `Type::method [typed-member-candidate receiver=object:Type]` 并允许继续解析该候选。C# 还会使用当前词法块或 Lambda/local function 内有效的显式参数/局部变量、`var x = new Type(...)`、当前类型的字段/属性、跨 partial 文件的唯一字段/属性、短属性链及源码内唯一静态类型形成同等级的类型候选；相邻块的同名局部变量分别绑定，已经离开声明作用域的名称不继承旧类型，incoming 会排除已证明属于其他接收者类型的同名调用。`auto`、不同类型的同名绑定、`dynamic`、扩展方法、返回值/索引器组成的复杂链及其他不能从当前源码直接证明的接收者仍保持 `semantic-unknown`，不会用猜测消除歧义。
+位置上的 `A::B` 静态限定名会直接保留为查询目标。C++ 成员调用会保留接收者；当当前函数内恰有一个在调用前声明的显式参数或局部变量类型时，输出 `Type::method [typed-member-candidate receiver=object:Type]` 并允许继续解析该候选。C# 还会使用当前词法块或 Lambda/local function 内有效的显式参数/局部变量、`var x = new Type(...)`、当前类型的字段/属性、跨 partial 文件的唯一字段/属性、短属性链及源码内唯一静态类型形成同等级的类型候选。
+
+Go、Python、Rust、JavaScript、TypeScript/TSX 现在通过同一 typed relation 中间层取得语言等价证据：Go 使用方法 receiver、参数、`var`/`:=`、复合字面量和类型 selector；Python 使用 annotation、构造赋值、`self`/`cls` 与实例成员；Rust 使用参数/引用、`let`、struct/`new` 构造、`self`、字段和 inherent `impl` 路径；JavaScript 使用 `new` 局部/字段/构造赋值、当前实例和静态类调用；TypeScript/TSX 再增加显式参数、局部与字段类型。函数、方法、arrow/function expression、lambda、closure 等适用 callable 由各自 AST owner 归属。相邻块的同名局部变量分别绑定，已经离开声明作用域的名称不继承旧类型，incoming 会排除已证明属于其他接收者类型的同名调用。不同类型的同名绑定、union 或复杂泛型、interface/trait object、`dynamic`、计算属性、函数值、宏/生成代码、monkey patch、返回值/索引器组成的复杂链及其他不能从当前源码直接证明的接收者仍保持 `semantic-unknown`，不会用猜测消除歧义。
 
 只有名称时仍可查询，但名称只建立候选身份：
 
@@ -28,7 +30,9 @@ srcq symbol references Method
 
 ## 范围
 
-目录可以省略。含 `--at` 时从文件所属项目解析；名称查询从 `--cwd` 或当前目录解析。C++ 会只读消费 `.code-workspace`、`compile_commands.json`、`.vscode/compileCommands*.json` 和嵌套 MSVC response file，恢复项目外的本地源码根。C# 会只读解析 `.sln`、Microsoft.NET.Sdk 系列 `.csproj`、默认 `Compile` 集、`Compile Include/Remove` 与 `ProjectReference`，把链接源码纳入范围并排除已移除或不属于解决方案的仓库文件；唯一项目图即使解析出零个 Compile 文件也保持完整空集，不会退回仓库扫描。未发现项目、不可识别的 `.sln`/`.slnx`、多个顶层 `.sln`、无锚点或同一锚点目录发现多个 `.csproj`、自定义 SDK、显式 MSBuild import、任一祖先 Directory.Build 输入、条件 item/property、会改变默认输出排除的属性、项目外 wildcard item 或超出项目/文件上限时报告 `scope=incomplete`，不会调用 MSBuild 或把近似集合标成 resolved。两种解析都不会启动构建系统、下载源码或扫描整盘。位于常见 `Source` 或 `src`/`include` 布局中的关系查询优先扫描对应源码树，避免把计划证据、分发副本或其他非源码文件当作生产关系。
+目录可以省略。含 `--at` 时从文件所属项目解析；名称查询从 `--cwd` 或当前目录解析。C++ 会只读消费 `.code-workspace`、`compile_commands.json`、`.vscode/compileCommands*.json` 和嵌套 MSVC response file，恢复项目外的本地源码根。C# 会只读解析 `.sln`、Microsoft.NET.Sdk 系列 `.csproj`、默认 `Compile` 集、`Compile Include/Remove` 与 `ProjectReference`，把链接源码纳入范围并排除已移除或不属于解决方案的仓库文件；唯一项目图即使解析出零个 Compile 文件也保持完整空集，不会退回仓库扫描。未发现项目、不可识别的 `.sln`/`.slnx`、多个顶层 `.sln`、无锚点或同一锚点目录发现多个 `.csproj`、自定义 SDK、显式 MSBuild import、任一祖先 Directory.Build 输入、条件 item/property、会改变默认输出排除的属性、项目外 wildcard item 或超出项目/文件上限时报告 `scope=incomplete`，不会调用 MSBuild 或把近似集合标成 resolved。
+
+TypeScript/TSX/JavaScript 只读消费 `tsconfig.json`/`jsconfig.json` references 和 `package.json` 的本地 file/link/workspace 引用；Rust 消费 Cargo workspace 与 path dependency；Go 消费 `go.work use` 和 `go.mod replace` 的本地路径；Python 消费 `pyproject.toml` 中可静态识别的 `src`、package-dir 与 path dependency。这些 resolver 只加入已经存在的本地目录，不读取 package cache、registry、site-packages 或 `node_modules`，不展开不受支持的 workspace glob；损坏、缺失或超出静态子集的元数据产生 scope issue 并令自动范围为 `incomplete`。所有项目解析都不会启动构建器、语言服务、包管理器、下载源码或扫描整盘。位于常见 `Source` 或 `src`/`include` 布局中的关系查询优先扫描对应源码树，避免把计划证据、分发副本或其他非源码文件当作生产关系。
 
 范围覆盖可在同一命令调整：
 
@@ -52,7 +56,8 @@ C++ incoming 直接复用 AST 已确认的包含函数定义继续展开，不�
 
 - C++：结构直接定义、词法引用候选和有界调用候选，并恢复编译范围。
 - C#：outline 定义候选、词法引用候选和调用候选；显式源码类型可收窄成员调用，并恢复解决方案的静态 Compile 范围。
-- C、Python、TypeScript、TSX、JavaScript、Rust、Go、Java：outline 定义候选、词法引用候选和调用候选。
+- Go、Python、Rust、JavaScript、TypeScript、TSX：outline 定义候选、词法引用候选和调用候选；语言等价的显式类型、构造、当前接收者、字段或静态限定可收窄成员调用，并恢复可静态识别的本地项目元数据范围。
+- C、Java：outline 定义候选、词法引用候选和调用候选。
 - Kotlin、PHP、Ruby、Swift：outline 定义候选。
 - Bash、Dart、Elixir、Haskell、Lua、Nix、Scala、Solidity：已登记但当前 `unadapted`。
 - CSS、HTML、JSON、YAML：源码符号关系 `not-applicable`。
@@ -72,7 +77,7 @@ model 位置使用 1-based 行列，省略正常机器 envelope；范围未完�
 | `outline-candidate` | 非 C++ 候选已唯一解析到当前语言的结构定义 |
 | `lexical-candidate` | incoming 调用者来自所选范围内的词法引用与包含函数关系 |
 | `direct-candidate` | 源码直接写出了名称或静态限定调用，可继续尝试解析唯一源码定义 |
-| `typed-member-candidate` | 成员调用具有唯一的显式源码接收者类型；C++ 使用函数内词法类型，C# 还可使用唯一字段/属性、partial 短链或源码静态类型，并按 `Type::method` 继续解析 |
+| `typed-member-candidate` | 成员调用具有唯一的显式源码接收者类型；C++ 使用函数内词法类型，C# 还可使用唯一字段/属性、partial 短链或源码静态类型；Go/Python/Rust/JavaScript/TypeScript/TSX 使用各自可直接证明的类型、构造、当前接收者、字段或静态限定，并按 `Type::method` 继续解析 |
 | `member-candidate` | 观察到成员调用，但接收者类型不能由当前源码直接唯一证明 |
 | `unknown` | 调用表达式过于间接，连可稳定查询的直接名称或成员形式也未取得 |
 | `incoming-candidate` | 该节点是当前节点的调用者，位置是这条 incoming 调用边的调用点 |

@@ -324,6 +324,7 @@ pub(crate) fn parse_outline_stream(
         collect_items(
             items,
             &namespace_parts,
+            language,
             &file,
             &source,
             target,
@@ -356,6 +357,7 @@ fn csharp_file_namespace(source: &str) -> Vec<String> {
 fn collect_items(
     items: &[Value],
     parents: &[String],
+    language: &str,
     file: &Path,
     source: &str,
     target: &str,
@@ -367,7 +369,17 @@ fn collect_items(
         let Some(name) = item.get("name").and_then(Value::as_str) else {
             continue;
         };
-        let mut qualified_parts = parents.to_vec();
+        let mut qualified_parts = if language == "go"
+            && item.get("astKind").and_then(Value::as_str) == Some("method_declaration")
+        {
+            item.get("signature")
+                .and_then(Value::as_str)
+                .and_then(super::go::method_receiver_type)
+                .map(|receiver| vec![receiver])
+                .unwrap_or_else(|| parents.to_vec())
+        } else {
+            parents.to_vec()
+        };
         qualified_parts.push(name.to_owned());
         let qualified_name = qualified_parts.join("::");
         if name == target_last
@@ -387,6 +399,7 @@ fn collect_items(
             collect_items(
                 members,
                 &qualified_parts,
+                language,
                 file,
                 source,
                 target,

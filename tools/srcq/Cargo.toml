@@ -25,6 +25,7 @@ portable-pty = "=0.9.0"
 sha2 = "=0.10.9"
 tempfile = "=3.23.0"
 thiserror = "=2.0.18"
+toml = "=0.8.23"
 ctrlc = { version = "=3.5.2", features = ["termination"] }
 ulid = "=1.2.1"
 

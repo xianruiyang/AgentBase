@@ -229,6 +229,17 @@ resolver 同时为每个根记录 `selected-by` 和 coverage：自动解析缺�
 
 model renderer 在普通单根、完整且无歧义时省略范围信封。多个根实际贡献结果时用本次稳定短别名标注路径；`scope-bounded`、`scope-incomplete`、零结果或预算未覆盖全部选定根时，追加一行最短范围摘要，并在可恢复时提供携带原查询的完整目录调整命令，但不得复用只表示同快照分页的 `@next`。machine 面始终保留 root identity、canonical path、来源、选择原因、扫描状态和 unresolved inputs，分页沿同一 SourceUniverse snapshot 继续，不重新发现或改写目录集合。
 
+## DES-SQG-021 共享关系骨架承载语言等价适配
+
+- 状态: confirmed
+- 满足: REQ-SQG-002, AC-SQG-010, AC-SQG-011, AC-SQG-012, AC-SQG-013, AC-SQG-014, AC-SQG-015, AC-SQG-016, UDES-SQG-020
+
+`symbol_query` 继续唯一持有命令解析、`SourceUniverse`、候选数据模型、批量 AST 扫描、单次调用缓存、调用图展开、预算和 model/machine 输出；不得为每种语言复制查询或图算法。共享 typed relation 层只归一化调用、接收者、绑定、词法 scope、当前类型和 callable owner 的中间表示，Go、Python、Rust、JavaScript、TypeScript 适配器各自声明 AST 节点、限定名、显式类型与构造语法。语言适配器只在同一词法范围、调用前可见且唯一的源码证据上生成 `typed-member-candidate` 或静态限定候选，冲突、越界和动态形式保持 `semantic-unknown`。
+
+`SourceUniverse` 在既有自动/追加/精确/排除组合中调用语言项目 resolver。resolver 只读取已存在的 manifest、workspace 与本地路径引用，返回规范化源码文件或源码根、来源和 unresolved issue；不写配置、不持久化发现结果、不扫描整盘，也不启动语言工具。公共范围 owner 统一计算 `resolved`、`bounded` 与 `incomplete`，语言 resolver 只负责自身元数据语义，避免 C++、C# 或某个包管理器规则进入公共路径。
+
+TypeScript 作为首个纵向消费者验证共享 typed relation 中间契约，因为显式类型和 `new` 初始化能直接区分适配器缺口与公共图算法；该闭环成立后，JavaScript 只复用其无类型语法与构造推断部分，Python、Go、Rust 分别接入自身 grammar 和项目 resolver。共享层反例会熔断全部横向扩展；单语言差异失败只回到该适配器，不借其他语言通过降低其证据边界。
+
 ## 4. 版本与迁移边界
 
 当前以 ripgrep 15.1.0、Codex PATH 中的 ripgrep 15.2.0、fd 10.4.2 和迁移前已验证的 ast-grep 0.41.1、0.42.0、0.44.1 标记 Windows 行为证据；这些身份限定各项测试结论，不定义允许运行的连续或离散版本范围。完整兼容表示可启动后端的公开命令都能通过相应命令域调用并保持原生语义，不表示所有模式都能结构化压缩；未验证版本的质量声明只覆盖本次实际输出和退出，不能外推未执行模式。`tools/srcq/Cargo.toml` 的 workspace package version 是当前 srcq 候选版本的唯一默认来源；构建参数只允许显式制作另一个已声明的 srcq 版本，不能长期用覆盖值掩盖源码、README、SBOM、release helper 与运行时版本不一致。
