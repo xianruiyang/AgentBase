@@ -112,3 +112,15 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 | skill 与路由静态合同 | P16 原始验证时，`quick_validate.py` 在 `PYTHONUTF8=1` 下通过；skill/trigger 合同以当时 HEAD 全局规则的临时只读投影验证为 126 cases、84 strict routing、28 strict references、13/13 skills。当时 worktree 的 `global/AGENTS.md` 用户改动使规则预算多 10 bytes，因此没有用非当前全局 identity 写回 evaluator evidence；该 dirty 边界后续已退出当前 worktree。本轮未改变全局规则、skill 或路由合同，因而没有重跑静态合同或模型 evaluator |
 
 这些证据直接覆盖 0.5.0 的 C++ 真实消费者，以及 Go、Python、Rust、JavaScript、TypeScript、TSX、Java、C 与 C# 共用的 generic relation engine。C/C# 通过语言节点表、最小 fixture、references、incoming/outgoing、深度展开与 capability 测试接入，没有新增第二套关系算法；候选关系不证明 C 原型/宏、C# overload/partial/extension method/alias/file-scoped namespace 等编译器语义，也不证明全部语言依赖图、关系大结果同快照续页或完整 Codex 端到端 Token 收益。GptProjectTest 只作为只读语料，没有执行写入、构建或 UE 生命周期操作。`srcq-v0.5.0` 的两次 clean archive 均为 `20a11d2685b286a5c4343c805d40791eb0d54a052ca71c45eb3b9f40fa306fe2`；manifest 只声明 ast-grep 0.44.1，最新 RustSec 1233 项 advisory 审计无发现，安装生命周期、发布后二进制的 AST/rg/fd/scc/symbol/cache/process、8 个 GitHub 资产及真实认证下载/隔离安装/Status/卸载均通过。用户默认安装与 Codex Publish 未执行。
+
+## 9. P17 多语言 typed relation 0.6.0 Release
+
+| 范围 | 结果 |
+| --- | --- |
+| 最终源码与组件门禁 | workspace `cargo ci-test`、`cargo ci-build`、`cargo lint`、`cargo fmt-check` 全部通过；TypeScript、JavaScript、Python、Go、Rust 共享 typed relation 与本地项目 resolver 的正反例，既有 C++/C# 回归和 21 项关系集成同跑。15 个真实 ignored 测试在 ast-grep 0.44.1 原生二进制上单线程通过，覆盖 run/scan/rewrite、profile、LSP、completion/new、PTY、协议与 Windows Ctrl-C |
+| 供应链 | Windows 目标 66 个第三方包的许可证表达式与打包文本审计通过；RustSec 在线 fetch 遇到 GitHub I/O 失败后没有原样重试，改用本机 2026-08-31 11:44+02:00 更新、commit `ba9db2a77a6a0fe93bc63a3d9b730e08b145aff5` 的 1233 条 advisory 数据库离线审计，138 个 Cargo 依赖无发现 |
+| 可复现发布包 | `srcq-v0.6.0` 来源 commit 为 `9bee175a1005485f6591fffa9ea3bdf0862d0c84`，232 文件来源快照为 `sha256:9cb34f2343403788270200a1cb00fae8c550a5caad2a441cadb662a5b1861e11`；同 commit/epoch 的两次 clean Windows MSVC 构建中 archive、checksum、manifest、SBOM 与第三方许可证逐项哈希一致，归档 SHA-256 为 `552ff93b24f7bb01d71bfa895f3aa4c766f9024b75a4986d878934bb0d1ee38f` |
+| 安装与原生行为 | Windows PowerShell 5.1 下 0.5.0→0.6.0 的安装、幂等、Status 完整性、PATH、新进程、篡改/不安全 ZIP 拒绝、失败升级回滚、成功升级、未知文件/配置/cache 保留和卸载通过；候选归档的 version、doctor、scc doctor、rg、fd、scc、AST、TypeScript typed symbol、process 与 cache 原生 smoke 全部通过 |
+| 正式 Release | GitHub Release `srcq-v0.6.0` 为非 draft、非 prerelease，标签精确指向最终 commit，8 个资产均为 uploaded 且 GitHub digest 与本地一致；从私有 Release 通过 `gh` 认证真实下载后，在隔离目录完成安装、`integrity=verified`、version/doctor/scc doctor 与卸载 |
+
+这些证据只覆盖 0.6.0 声明的静态候选与本地项目范围；编译器重载、interface/trait 或动态分派、函数值、复杂泛型/union、宏/生成代码、运行时绑定、其余语言依赖全集和关系大结果同快照续页仍保持 unknown/incomplete。用户默认安装仍为 ready 0.5.0；本次发布没有修改 AgentBase Codex payload，也没有运行无关九项模型评测。

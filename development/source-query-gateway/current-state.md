@@ -261,30 +261,39 @@ workspace、真实 scc、36 模式/9 oracle、AST 基线、bootstrap、插件、
 
 完整 workspace 门禁通过；后继 add/only/exclude 测试又发现并闭合“无元数据临时 cwd 把祖先普通 `.vscode` 当作项目根”的范围反例，当前 70 项 srcq-cli lib、12 项关系集成、Clippy 与格式检查通过。C/C# 新增的 references、incoming/outgoing、深度展开和 capability 测试证明公共算法已接入；C 原型、宏，C# overload、partial、extension method、alias 与 file-scoped namespace 等未建模语义继续保持 candidate/unknown 边界。活动 AST、透传、协议、压力与发布验证已统一到 ast-grep 0.44.1；P0 保存的 0.41.1/0.42.0 快照只属于历史证据，不再构成当前支持或发布矩阵。真实 UAI release 路径的五项均值为 0.235–5.076 s，model 输出为 53–161 个 o200k Token；这些只证明当前本机实际命令，不冒充完整模型会话收益。本轮未改变全局规则、skill 或路由合同，因此未重跑模型路由评测。`srcq-v0.5.0` 已于 2026-08-31 发布，标签指向 `ae465953a838b168fe9485ca9e9e6546ad14ba74`，Windows 归档 SHA-256 为 `20a11d2685b286a5c4343c805d40791eb0d54a052ca71c45eb3b9f40fa306fe2`；8 个资产、真实认证下载、隔离安装/Status/卸载均已读回。用户默认安装与 Codex Publish 未执行。
 
-## OBS-SQG-030 C# 无 LSP 关系与静态项目范围已形成源码候选
+## OBS-SQG-030 C# 无 LSP 关系与静态项目范围已形成 0.6.0 来源
 
-- 状态: verified in source candidate, unreleased
+- 状态: verified in 0.6.0 release source
 - 关联: REQ-SQG-002, AC-SQG-010, AC-SQG-012, AC-SQG-014, DES-SQG-016, DES-SQG-019, DES-SQG-020, TSQG-109, TSQG-112
 
-当前源码候选在既有 relation owner 内增加 C# 专用调用分类：当前词法块或 Lambda/local function 内有效的显式参数/局部、`var = new`、字段/属性、跨 partial 文件的唯一成员、短属性链和源码静态类型可形成 `typed-member-candidate`；相邻块的同名局部分别解析，已离开作用域或 `dynamic` 等未证接收者继续保留，incoming 会排除已证明属于其他接收者类型的同名调用。incoming 复用已知根定义、批量 AST 扫描候选文件并只为命中调用解析接收者，不重复执行定义/范围恢复或解析调用者内全部调用。VMTSingleMachine 的两个 `GetStatusAsync` 已按接收者类型分别收敛为 4 个 client caller 与 3 个 engine caller，`VmtController.MeasureOnceAsync` 的 10 个 `_services.Vmt` caller 全部取得 `VmtController` 类型证据，三项均在默认预算内返回 `candidate_scan=complete`。
+0.6.0 来源在既有 relation owner 内增加 C# 专用调用分类：当前词法块或 Lambda/local function 内有效的显式参数/局部、`var = new`、字段/属性、跨 partial 文件的唯一成员、短属性链和源码静态类型可形成 `typed-member-candidate`；相邻块的同名局部分别解析，已离开作用域或 `dynamic` 等未证接收者继续保留，incoming 会排除已证明属于其他接收者类型的同名调用。incoming 复用已知根定义、批量 AST 扫描候选文件并只为命中调用解析接收者，不重复执行定义/范围恢复或解析调用者内全部调用。VMTSingleMachine 的两个 `GetStatusAsync` 已按接收者类型分别收敛为 4 个 client caller 与 3 个 engine caller，`VmtController.MeasureOnceAsync` 的 10 个 `_services.Vmt` caller 全部取得 `VmtController` 类型证据，三项均在默认预算内返回 `candidate_scan=complete`。
 
-同一候选还只读解析 `.sln` 与 Microsoft.NET.Sdk 系列 `.csproj` 的默认 Compile 集、Include/Remove、链接源码和 ProjectReference；SDK 默认隐藏目录及项目根 `bin/obj` 排除已按本机 .NET SDK 9.0.310/10.0.201 正式 targets 校准，MSBuild `*` 不跨目录。VMTSingleMachine 读回 141 个 Compile 文件且 `scope=resolved`。fixture 正例证明移除文件与不属于解决方案的仓库 `.cs` 不再进入定义全集，已解析的空 Compile 集也不会退回仓库扫描；无项目、不可识别 solution、自定义 SDK、条件 item、多 `.sln`/`.csproj`、任一祖先 Directory.Build、显式 import、影响默认输出排除的属性及项目外 wildcard Remove 反例证明无法静态展开时返回 `scope=incomplete`。项目图限制为 4096 个项目与 100000 个 Compile 文件，同项目 wildcard 复用一次候选枚举。实现不调用 LSP、Roslyn、MSBuild 或 dotnet build；重载、扩展方法、继承/接口分派、动态调用、复杂表达式链及 block-scoped/multiple namespace 的完整限定名仍不宣称精确。当前尚未制作新 Release、安装或 Codex Publish。
+同一来源还只读解析 `.sln` 与 Microsoft.NET.Sdk 系列 `.csproj` 的默认 Compile 集、Include/Remove、链接源码和 ProjectReference；SDK 默认隐藏目录及项目根 `bin/obj` 排除已按本机 .NET SDK 9.0.310/10.0.201 正式 targets 校准，MSBuild `*` 不跨目录。VMTSingleMachine 读回 141 个 Compile 文件且 `scope=resolved`。fixture 正例证明移除文件与不属于解决方案的仓库 `.cs` 不再进入定义全集，已解析的空 Compile 集也不会退回仓库扫描；无项目、不可识别 solution、自定义 SDK、条件 item、多 `.sln`/`.csproj`、任一祖先 Directory.Build、显式 import、影响默认输出排除的属性及项目外 wildcard Remove 反例证明无法静态展开时返回 `scope=incomplete`。项目图限制为 4096 个项目与 100000 个 Compile 文件，同项目 wildcard 复用一次候选枚举。实现不调用 LSP、Roslyn、MSBuild 或 dotnet build；重载、扩展方法、继承/接口分派、动态调用、复杂表达式链及 block-scoped/multiple namespace 的完整限定名仍不宣称精确。该能力已随 `srcq-v0.6.0` 发布；用户默认安装与 Codex Publish 未执行。
 
-## GAP-SQG-010 P16 仍缺非 C++ 依赖 resolver 与关系同快照续页
+## OBS-SQG-031 P17 多语言 typed relation 已发布为 0.6.0
+
+- 状态: verified and released within declared candidate scope
+- 关联: REQ-SQG-002, AC-SQG-010, AC-SQG-011, AC-SQG-012, AC-SQG-013, AC-SQG-014, AC-SQG-016, DES-SQG-021, SOL-SQG-017, TSQG-113, TSQG-114, TSQG-115, TSQG-116, TSQG-117, TSQG-118
+
+`srcq-v0.6.0` 指向 `9bee175a1005485f6591fffa9ea3bdf0862d0c84`；232 文件的来源快照为 `sha256:9cb34f2343403788270200a1cb00fae8c550a5caad2a441cadb662a5b1861e11`。两次 clean Windows MSVC 构建的全部 5 个候选资产逐项一致，归档 SHA-256 为 `552ff93b24f7bb01d71bfa895f3aa4c766f9024b75a4986d878934bb0d1ee38f`。GitHub Release 共 8 个资产且 digest 与本地一致；真实私有 Release 认证下载、隔离安装、完整性 Status、version、doctor、scc doctor 和卸载均通过。
+
+workspace test/build/lint/fmt、15 个 ast-grep 0.44.1 真实 ignored 测试、Windows 目标 66 个第三方包许可证审计，以及 2026-08-31 更新的 1233 条 RustSec advisory 数据库对 138 个 Cargo 依赖的审计均通过。PowerShell 5.1 的 0.5.0→0.6.0 安装、幂等、完整性拒绝、失败升级回滚、PATH、新进程、升级和卸载生命周期通过；发布归档的 AST、rg、fd、scc、typed symbol、process 与 cache 原生 smoke 也通过。用户默认安装仍为 ready 0.5.0，本次没有执行 AgentBase Codex Publish 或九项模型评测。
+
+## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open
 - 关联: AC-SQG-002, AC-SQG-007, AC-SQG-009, AC-SQG-012, AC-SQG-014, AC-SQG-015, OBS-SQG-029, OBS-SQG-030
 
-当前源码候选已为 C# 恢复解决方案内 SDK 项目的默认 Compile 集、Include/Remove、链接文件和 ProjectReference，并在静态不能判定条件、显式 import 或属性时降级为 `incomplete`；它仍不解析 NuGet 源码或执行完整 MSBuild。TypeScript/TSX/JavaScript、Rust、Go、Python 也已分别从 tsconfig/jsconfig/package 本地引用、Cargo workspace/path、go.work/go.mod 本地路径和 pyproject 静态 source/path 恢复项目外源码根，损坏、缺失或不支持的配置显式产生 issue；Java 等其余非 C++ adapter 仍只有项目递归或显式根。关系大结果仍只报告省略量并允许提高 limit/预算重跑，尚未复用 query spool 的短句柄、snapshot 和无重扫恢复。当前输出不会把这些缺口伪装为完整或精确，但 TSQG-110/112 因而仍不能整体完成。后续范围验证应选真实外部依赖消费者，不机械展开全部语言×依赖管理器矩阵。
+0.6.0 已为 C# 恢复解决方案内 SDK 项目的默认 Compile 集、Include/Remove、链接文件和 ProjectReference，并在静态不能判定条件、显式 import 或属性时降级为 `incomplete`；它仍不解析 NuGet 源码或执行完整 MSBuild。TypeScript/TSX/JavaScript、Rust、Go、Python 也已分别从 tsconfig/jsconfig/package 本地引用、Cargo workspace/path、go.work/go.mod 本地路径和 pyproject 静态 source/path 恢复项目外源码根，损坏、缺失或不支持的配置显式产生 issue；Java 等其余非 C++ adapter 仍只有项目递归或显式根。关系大结果仍只报告省略量并允许提高 limit/预算重跑，尚未复用 query spool 的短句柄、snapshot 和无重扫恢复。当前输出不会把这些缺口伪装为完整或精确，但 TSQG-110/112 因而仍不能整体完成。后续范围验证应选真实外部依赖消费者，不机械展开全部语言×依赖管理器矩阵。
 
 ## GAP-SQG-011 常用语言缺类型、限定名与 callable owner 适配
 
 - 状态: resolved
 - 关联: REQ-SQG-002, AC-SQG-010, AC-SQG-011, AC-SQG-012, AC-SQG-013, AC-SQG-016, DES-SQG-016, DES-SQG-017, DES-SQG-018, DES-SQG-021, OBS-SQG-029, UDES-SQG-020
 
-当前源码候选已在既有查询、缓存、图遍历和输出 owner 内增加共享 typed relation 中间层，并由 Go、Python、Rust、JavaScript、TypeScript/TSX 适配器声明自身调用、绑定、词法范围、当前类型与 callable AST。五种语言可以从显式类型、构造或复合字面量、当前接收者、字段和静态限定生成 `typed-member-candidate`；Go 方法 receiver 会进入限定定义身份，适用的 function/method、arrow/function expression、lambda 和 closure 不再借外层参数类型。incoming 保留观察到的调用形式，并排除已证明属于其他接收者类型的同名调用。
+0.6.0 已在既有查询、缓存、图遍历和输出 owner 内增加共享 typed relation 中间层，并由 Go、Python、Rust、JavaScript、TypeScript/TSX 适配器声明自身调用、绑定、词法范围、当前类型与 callable AST。五种语言可以从显式类型、构造或复合字面量、当前接收者、字段和静态限定生成 `typed-member-candidate`；Go 方法 receiver 会进入限定定义身份，适用的 function/method、arrow/function expression、lambda 和 closure 不再借外层参数类型。incoming 保留观察到的调用形式，并排除已证明属于其他接收者类型的同名调用。
 
-语言项目 resolver 已接入 `SourceUniverse` 唯一入口，只读解析本地静态元数据，不读取 dependency cache、不下载或启动语言工具。当前没有证据支持重载、trait/interface 或动态分派、函数值、复杂泛型/union、宏/生成代码和运行时属性的精确绑定；这些机制不属于本差距的候选精度承诺，仍由 `semantic-unknown` 与按需 LSP/领域工具承担。该状态只描述未发布源码候选，不表示已制作 Release、安装或 Codex Publish。
+语言项目 resolver 已接入 `SourceUniverse` 唯一入口，只读解析本地静态元数据，不读取 dependency cache、不下载或启动语言工具。当前没有证据支持重载、trait/interface 或动态分派、函数值、复杂泛型/union、宏/生成代码和运行时属性的精确绑定；这些机制不属于本差距的候选精度承诺，仍由 `semantic-unknown` 与按需 LSP/领域工具承担。该能力已随 0.6.0 发布；用户默认安装仍为 0.5.0，AgentBase Codex Publish 未执行。
 
 ## GAP-SQG-009 query model 续页动作已经闭环
 
