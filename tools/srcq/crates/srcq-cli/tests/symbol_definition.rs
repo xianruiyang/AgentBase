@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -17,6 +18,10 @@ fn fixture_source() -> PathBuf {
 
 fn multilang_source() -> PathBuf {
     workspace_root().join("tests/fixtures/symbol/multilang")
+}
+
+fn csharp_scope_source() -> PathBuf {
+    workspace_root().join("tests/fixtures/symbol/csharp_scope")
 }
 
 fn run(arguments: &[&str]) -> Output {
@@ -554,7 +559,7 @@ fn outline_definition_adapters_cover_representative_language_mechanisms() {
     let root = multilang_source();
     let cases = [
         ("c", "c_execute", "sample.c", "function"),
-        ("csharp", "Execute", "sample.cs", "method"),
+        ("csharp", "CSharpWorker.Execute", "sample.cs", "method"),
         ("python", "execute", "sample.py", "method"),
         ("typescript", "value", "sample.ts", "field"),
         ("rust", "rust_wrapper", "sample.rs", "function"),
@@ -754,6 +759,7 @@ fn symbol_capabilities_cover_every_registered_ast_language_without_false_support
     assert_eq!(csharp["definition"], "candidate-only");
     assert_eq!(csharp["references"], "lexical-candidate");
     assert_eq!(csharp["calls"], "candidate");
+    assert_eq!(csharp["scope"], "project-compile-aware");
     let bash = document["languages"]
         .as_array()
         .and_then(|languages| {
@@ -779,7 +785,6 @@ fn generic_relation_adapters_keep_lexical_references_and_incoming_callers_bounde
     let root = multilang_source();
     let cases = [
         ("c", "c_execute", "sample.c", "c_wrapper"),
-        ("csharp", "Execute", "sample.cs", "CSharpWrapper"),
         ("python", "execute", "sample.py", "python_wrapper"),
         ("typescript", "execute", "sample.ts", "typeScriptWrapper"),
         ("rust", "execute", "sample.rs", "rust_wrapper"),
@@ -886,30 +891,496 @@ fn generic_relation_adapters_keep_lexical_references_and_incoming_callers_bounde
     let csharp_outgoing =
         String::from_utf8(csharp_outgoing.stdout).expect("UTF-8 C# outgoing calls");
     assert!(csharp_outgoing.contains("CSharpLeaf [outline-candidate;direct-candidate]"));
+}
 
-    let csharp_member_calls = run(&[
+#[test]
+fn csharp_explicit_receiver_types_bound_same_named_calls_without_lsp() {
+    let root = multilang_source();
+    let csharp = root.join("sample.cs");
+    let csharp = csharp.to_str().expect("UTF-8 fixture path");
+
+    let outgoing = run(&[
         "symbol",
         "calls",
-        "CSharpWrapper",
+        "CSharpTypedReceivers",
         "--language",
         "csharp",
         "--only-root",
         csharp,
+        "--depth",
+        "2",
         "--output",
         "machine",
     ]);
-    assert!(csharp_member_calls.status.success());
-    let csharp_member_calls: Value =
-        serde_json::from_slice(&csharp_member_calls.stdout).expect("C# member call JSON");
-    let csharp_children = csharp_member_calls["root"]["children"]
+    assert!(outgoing.status.success());
+    let outgoing: Value = serde_json::from_slice(&outgoing.stdout).expect("C# outgoing JSON");
+    let outgoing_children = outgoing["root"]["children"]
         .as_array()
-        .expect("C# member call children");
-    assert!(csharp_children.iter().any(|child| {
-        child["name"] == "Execute"
-            && child["dispatch"] == "member-candidate"
-            && child["status"] == "semantic-unknown"
+        .expect("C# outgoing children");
+    for receiver in ["worker", "_worker", "local"] {
+        let call = outgoing_children
+            .iter()
+            .find(|child| child["receiver"] == receiver)
+            .unwrap_or_else(|| panic!("typed C# call for {receiver}"));
+        assert_eq!(call["name"], "CSharpWorker::Execute");
+        assert_eq!(call["dispatch"], "typed-member-candidate");
+        assert_eq!(call["receiver_type"], "CSharpWorker");
+        assert_eq!(call["status"], "outline-candidate");
+        assert_eq!(
+            call["definition"]["qualified_name"],
+            "SrcqSamples::CSharpWorker::Execute"
+        );
+    }
+    let alternate_call = outgoing_children
+        .iter()
+        .find(|child| child["receiver"] == "_alternate")
+        .expect("alternate typed C# call");
+    assert_eq!(alternate_call["name"], "CSharpAlternateWorker::Execute");
+    assert_eq!(alternate_call["receiver_type"], "CSharpAlternateWorker");
+    assert_eq!(alternate_call["status"], "outline-candidate");
+
+    let incoming = run(&[
+        "symbol",
+        "calls",
+        "CSharpWorker.Execute",
+        "--language",
+        "csharp",
+        "--only-root",
+        csharp,
+        "--direction",
+        "incoming",
+        "--output",
+        "machine",
+    ]);
+    assert!(incoming.status.success());
+    let incoming: Value = serde_json::from_slice(&incoming.stdout).expect("C# incoming JSON");
+    assert_eq!(
+        incoming["root"]["definition"]["qualified_name"],
+        "SrcqSamples::CSharpWorker::Execute"
+    );
+    let incoming_children = incoming["root"]["children"]
+        .as_array()
+        .expect("C# incoming children");
+    assert_eq!(incoming_children.len(), 5);
+    assert_eq!(
+        incoming_children
+            .iter()
+            .filter(|child| child["receiver_type"] == "CSharpWorker")
+            .count(),
+        4
+    );
+    assert!(incoming_children.iter().any(|child| {
+        child["name"] == "CSharpUnknownReceiver"
+            && child["receiver"] == "worker"
+            && child["receiver_type"].is_null()
     }));
-    assert!(csharp_children.iter().any(|child| {
-        child["name"] == "CSharpWorker" && child["dispatch"] == "direct-candidate"
+    assert!(incoming_children
+        .iter()
+        .all(|child| child["receiver_type"] != "CSharpAlternateWorker"));
+
+    let alternate_incoming = run(&[
+        "symbol",
+        "calls",
+        "CSharpAlternateWorker.Execute",
+        "--language",
+        "csharp",
+        "--only-root",
+        csharp,
+        "--direction",
+        "incoming",
+        "--output",
+        "machine",
+    ]);
+    assert!(alternate_incoming.status.success());
+    let alternate_incoming: Value =
+        serde_json::from_slice(&alternate_incoming.stdout).expect("alternate C# incoming JSON");
+    let alternate_children = alternate_incoming["root"]["children"]
+        .as_array()
+        .expect("alternate C# incoming children");
+    assert_eq!(alternate_children.len(), 2);
+    assert!(alternate_children.iter().any(|child| {
+        child["receiver"] == "_alternate" && child["receiver_type"] == "CSharpAlternateWorker"
     }));
+    assert!(alternate_children.iter().any(|child| {
+        child["name"] == "CSharpUnknownReceiver" && child["receiver_type"].is_null()
+    }));
+}
+
+#[test]
+fn csharp_local_and_lambda_bindings_respect_lexical_scope_without_lsp() {
+    let source = multilang_source().join("csharp_lexical.cs");
+    let source = source.to_str().expect("UTF-8 fixture path");
+
+    let siblings = run(&[
+        "symbol",
+        "calls",
+        "CSharpSiblingScopes",
+        "--language",
+        "csharp",
+        "--only-root",
+        source,
+        "--output",
+        "machine",
+    ]);
+    assert!(siblings.status.success());
+    let siblings: Value = serde_json::from_slice(&siblings.stdout).expect("C# sibling-scope JSON");
+    let sibling_calls = siblings["root"]["children"]
+        .as_array()
+        .expect("C# sibling-scope calls")
+        .iter()
+        .filter(|call| call["receiver"] == "scoped")
+        .collect::<Vec<_>>();
+    assert_eq!(sibling_calls.len(), 2);
+    assert_eq!(sibling_calls[0]["receiver_type"], "CSharpLexicalWorker");
+    assert_eq!(
+        sibling_calls[1]["receiver_type"],
+        "CSharpLexicalAlternateWorker"
+    );
+
+    let lambda = run(&[
+        "symbol",
+        "calls",
+        "CSharpLambdaScope",
+        "--language",
+        "csharp",
+        "--only-root",
+        source,
+        "--output",
+        "machine",
+    ]);
+    assert!(lambda.status.success());
+    let lambda: Value = serde_json::from_slice(&lambda.stdout).expect("C# lambda-scope JSON");
+    let worker_calls = lambda["root"]["children"]
+        .as_array()
+        .expect("C# lambda-scope calls")
+        .iter()
+        .filter(|call| call["receiver"] == "worker")
+        .collect::<Vec<_>>();
+    assert_eq!(worker_calls.len(), 2);
+    assert_eq!(
+        worker_calls[0]["receiver_type"],
+        "CSharpLexicalAlternateWorker"
+    );
+    assert_eq!(worker_calls[1]["receiver_type"], "CSharpLexicalWorker");
+
+    let exited = run(&[
+        "symbol",
+        "calls",
+        "CSharpExitedScope",
+        "--language",
+        "csharp",
+        "--only-root",
+        source,
+        "--output",
+        "machine",
+    ]);
+    assert!(exited.status.success());
+    let exited: Value = serde_json::from_slice(&exited.stdout).expect("C# exited-scope JSON");
+    let exited_call = exited["root"]["children"]
+        .as_array()
+        .expect("C# exited-scope calls")
+        .iter()
+        .find(|call| call["receiver"] == "scoped")
+        .expect("out-of-scope receiver remains visible");
+    assert!(exited_call["receiver_type"].is_null());
+    assert_eq!(exited_call["status"], "semantic-unknown");
+}
+
+#[test]
+fn csharp_partial_members_property_chains_and_source_static_types_resolve_without_lsp() {
+    let root = multilang_source();
+    let root = root.to_str().expect("UTF-8 fixture path");
+
+    let property_chain = run(&[
+        "symbol",
+        "calls",
+        "CSharpPropertyChain",
+        "--language",
+        "csharp",
+        "--only-root",
+        root,
+        "--depth",
+        "2",
+        "--output",
+        "machine",
+    ]);
+    assert!(property_chain.status.success());
+    let property_chain: Value =
+        serde_json::from_slice(&property_chain.stdout).expect("C# property-chain JSON");
+    let property_children = property_chain["root"]["children"]
+        .as_array()
+        .expect("C# property-chain children");
+    assert_eq!(property_children.len(), 1);
+    assert_eq!(property_children[0]["name"], "CSharpWorker::Execute");
+    assert_eq!(property_children[0]["dispatch"], "typed-member-candidate");
+    assert_eq!(property_children[0]["receiver"], "_services.Worker");
+    assert_eq!(property_children[0]["receiver_type"], "CSharpWorker");
+    assert_eq!(property_children[0]["status"], "outline-candidate");
+    assert_eq!(
+        property_children[0]["definition"]["qualified_name"],
+        "SrcqSamples::CSharpWorker::Execute"
+    );
+
+    let static_call = run(&[
+        "symbol",
+        "calls",
+        "CSharpStaticCall",
+        "--language",
+        "csharp",
+        "--only-root",
+        root,
+        "--depth",
+        "2",
+        "--output",
+        "machine",
+    ]);
+    assert!(static_call.status.success());
+    let static_call: Value =
+        serde_json::from_slice(&static_call.stdout).expect("C# static-call JSON");
+    let static_children = static_call["root"]["children"]
+        .as_array()
+        .expect("C# static-call children");
+    assert_eq!(static_children.len(), 1);
+    assert_eq!(
+        static_children[0]["name"],
+        "SrcqSamples::CSharpStaticWorker::Execute"
+    );
+    assert_eq!(
+        static_children[0]["receiver_type"],
+        "SrcqSamples::CSharpStaticWorker"
+    );
+    assert_eq!(static_children[0]["status"], "outline-candidate");
+}
+
+#[test]
+fn csharp_solution_compile_items_exclude_removed_and_unowned_repository_files() {
+    let root = csharp_scope_source();
+    let root = root.to_str().expect("UTF-8 fixture path");
+
+    for target in ["LinkedOnly", "LibraryOnly"] {
+        let definition = run(&[
+            "symbol",
+            "definition",
+            target,
+            "--language",
+            "csharp",
+            "--cwd",
+            root,
+            "--body",
+            "none",
+            "--output",
+            "machine",
+        ]);
+        assert!(definition.status.success(), "definition for {target}");
+        let definition: Value =
+            serde_json::from_slice(&definition.stdout).expect("C# scoped definition JSON");
+        assert_eq!(definition["scope"]["status"], "resolved");
+        assert_eq!(definition["scope"]["compile_file_hints"], 3);
+        assert_eq!(definition["scope"]["issues"], serde_json::json!([]));
+        assert_eq!(definition["candidate_scan"], "complete");
+        assert_eq!(definition["definition_total"], 1);
+    }
+
+    for target in ["LegacyOnly", "RepositoryOnly"] {
+        let definition = run(&[
+            "symbol",
+            "definition",
+            target,
+            "--language",
+            "csharp",
+            "--cwd",
+            root,
+            "--body",
+            "none",
+            "--output",
+            "machine",
+        ]);
+        assert_eq!(definition.status.code(), Some(1), "definition for {target}");
+        let definition: Value =
+            serde_json::from_slice(&definition.stdout).expect("C# excluded definition JSON");
+        assert_eq!(definition["scope"]["status"], "resolved");
+        assert_eq!(definition["scope"]["compile_file_hints"], 3);
+        assert_eq!(definition["candidate_scan"], "complete");
+        assert_eq!(definition["definition_total"], 0);
+    }
+
+    let references = run(&[
+        "symbol",
+        "references",
+        "LibraryOnly",
+        "--language",
+        "csharp",
+        "--cwd",
+        root,
+        "--output",
+        "machine",
+    ]);
+    assert!(references.status.success());
+    let references: Value =
+        serde_json::from_slice(&references.stdout).expect("C# scoped references JSON");
+    assert_eq!(references["scope"]["candidate_scan"], "complete");
+    assert_eq!(references["reference_total"], 1);
+}
+
+#[test]
+fn csharp_conditional_compile_items_report_incomplete_instead_of_claiming_msbuild_precision() {
+    let root = tempfile::tempdir().expect("temporary C# scope");
+    let project = root.path().join("Conditional");
+    fs::create_dir_all(&project).expect("conditional project directory");
+    fs::write(
+        root.path().join("Conditional.sln"),
+        "Microsoft Visual Studio Solution File, Format Version 12.00\n\
+Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"Conditional\", \"Conditional\\Conditional.csproj\", \"{33333333-3333-3333-3333-333333333333}\"\n\
+EndProject\nGlobal\nEndGlobal\n",
+    )
+    .expect("conditional solution");
+    fs::write(
+        project.join("Conditional.csproj"),
+        "<Project Sdk=\"Microsoft.NET.Sdk\">\n\
+  <ItemGroup Condition=\"'$(Configuration)' == 'Release'\">\n\
+    <Compile Remove=\"ConditionalOnly.cs\" />\n\
+  </ItemGroup>\n\
+</Project>\n",
+    )
+    .expect("conditional project");
+    fs::write(
+        project.join("Stable.cs"),
+        "namespace ConditionalScope; class Stable { }\n",
+    )
+    .expect("stable source");
+    fs::write(
+        project.join("ConditionalOnly.cs"),
+        "namespace ConditionalScope; class ConditionalOnly { }\n",
+    )
+    .expect("conditional source");
+    let root = root.path().to_str().expect("UTF-8 temporary C# scope");
+    let definition = run(&[
+        "symbol",
+        "definition",
+        "Stable",
+        "--language",
+        "csharp",
+        "--cwd",
+        root,
+        "--body",
+        "none",
+        "--output",
+        "machine",
+    ]);
+    assert!(definition.status.success());
+    let definition: Value =
+        serde_json::from_slice(&definition.stdout).expect("conditional C# scope JSON");
+    assert_eq!(definition["scope"]["status"], "incomplete");
+    assert!(definition["scope"]["issues"]
+        .as_array()
+        .expect("C# scope issues")
+        .iter()
+        .any(|issue| issue["code"] == "csharp-item-condition-unresolved"));
+    assert_eq!(definition["definition_total"], 1);
+}
+
+#[test]
+fn csharp_resolved_empty_compile_scope_does_not_fall_back_to_repository_files() {
+    let root = tempfile::tempdir().expect("temporary empty C# scope");
+    let project = root.path().join("Empty");
+    fs::create_dir_all(&project).expect("empty project directory");
+    fs::write(
+        root.path().join("Empty.sln"),
+        "Microsoft Visual Studio Solution File, Format Version 12.00\n\
+Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"Empty\", \"Empty\\Empty.csproj\", \"{44444444-4444-4444-4444-444444444444}\"\n\
+EndProject\nGlobal\nEndGlobal\n",
+    )
+    .expect("empty solution");
+    fs::write(
+        project.join("Empty.csproj"),
+        "<Project Sdk=\"Microsoft.NET.Sdk\">\n\
+  <PropertyGroup><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>\n\
+</Project>\n",
+    )
+    .expect("empty project");
+    fs::write(
+        project.join("Stray.cs"),
+        "namespace EmptyScope; class MustNotBeScanned { }\n",
+    )
+    .expect("stray source");
+
+    let root = root.path().to_str().expect("UTF-8 temporary C# scope");
+    let definition = run(&[
+        "symbol",
+        "definition",
+        "MustNotBeScanned",
+        "--language",
+        "csharp",
+        "--cwd",
+        root,
+        "--body",
+        "none",
+        "--output",
+        "machine",
+    ]);
+    assert_eq!(definition.status.code(), Some(1));
+    let definition: Value =
+        serde_json::from_slice(&definition.stdout).expect("empty C# scope JSON");
+    assert_eq!(definition["scope"]["status"], "resolved");
+    assert_eq!(definition["scope"]["compile_file_hints"], 0);
+    assert_eq!(definition["scope"]["issues"], serde_json::json!([]));
+    assert_eq!(definition["candidate_scan"], "complete");
+    assert_eq!(definition["definition_total"], 0);
+}
+
+#[test]
+fn csharp_ambiguous_and_unevaluated_msbuild_inputs_never_claim_complete_scope() {
+    let root = tempfile::tempdir().expect("temporary ambiguous C# scope");
+    let project = root.path().join("App");
+    fs::create_dir_all(&project).expect("ambiguous project directory");
+    let solution = "Microsoft Visual Studio Solution File, Format Version 12.00\n\
+Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"App\", \"App\\App.csproj\", \"{55555555-5555-5555-5555-555555555555}\"\n\
+EndProject\nGlobal\nEndGlobal\n";
+    fs::write(root.path().join("One.sln"), solution).expect("first solution");
+    fs::write(root.path().join("Two.sln"), solution).expect("second solution");
+    fs::write(root.path().join("Directory.Build.props"), "<Project />\n")
+        .expect("Directory.Build input");
+    fs::write(project.join("Custom.props"), "<Project />\n").expect("custom import");
+    fs::write(
+        project.join("App.csproj"),
+        "<Project Sdk=\"Microsoft.NET.Sdk\">\n\
+  <Import Project=\"Custom.props\" />\n\
+</Project>\n",
+    )
+    .expect("ambiguous project");
+    fs::write(
+        project.join("Stable.cs"),
+        "namespace App; class Stable { }\n",
+    )
+    .expect("stable source");
+
+    let root = root.path().to_str().expect("UTF-8 temporary C# scope");
+    let definition = run(&[
+        "symbol",
+        "definition",
+        "Stable",
+        "--language",
+        "csharp",
+        "--cwd",
+        root,
+        "--body",
+        "none",
+        "--output",
+        "machine",
+    ]);
+    assert!(definition.status.success());
+    let definition: Value =
+        serde_json::from_slice(&definition.stdout).expect("ambiguous C# scope JSON");
+    assert_eq!(definition["scope"]["status"], "incomplete");
+    let issues = definition["scope"]["issues"]
+        .as_array()
+        .expect("ambiguous C# scope issues");
+    for expected in [
+        "csharp-solution-selection-ambiguous",
+        "csharp-directory-build-unresolved",
+        "csharp-project-import-unresolved",
+    ] {
+        assert!(issues.iter().any(|issue| issue["code"] == expected));
+    }
+    assert_eq!(definition["definition_total"], 1);
 }

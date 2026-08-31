@@ -6,6 +6,8 @@ use serde_json::Value;
 
 use crate::SymbolCommand;
 
+mod csharp;
+
 const MAX_METADATA_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_RESPONSE_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_RESPONSE_DEPTH: usize = 16;
@@ -85,6 +87,7 @@ pub(crate) struct SourceUniverse {
     pub(crate) project_root: PathBuf,
     pub(crate) roots: Vec<SourceRoot>,
     pub(crate) compile_files: Vec<PathBuf>,
+    pub(crate) csharp_compile_scope_resolved: bool,
     pub(crate) compile_directories: Vec<PathBuf>,
     pub(crate) excludes: Vec<PathBuf>,
     pub(crate) issues: Vec<ScopeIssue>,
@@ -111,6 +114,15 @@ impl SourceUniverse {
             .iter()
             .any(|excluded| path.starts_with(excluded))
     }
+
+    pub(crate) fn has_complete_csharp_compile_scope(&self) -> bool {
+        self.status != ScopeStatus::Incomplete
+            && self.csharp_compile_scope_resolved
+            && self
+                .compile_files
+                .iter()
+                .all(|path| lower_extension(path).as_deref() == Some("cs"))
+    }
 }
 
 pub(crate) fn resolve(
@@ -128,6 +140,7 @@ pub(crate) fn resolve(
     let project_root = canonical_existing(&project_root, cwd, "project root")?;
     let mut candidates = Vec::new();
     let mut compile_files = Vec::new();
+    let mut csharp_compile_scope_resolved = false;
     let mut compile_directories = Vec::new();
     let mut issues = Vec::new();
     let explicitly_bounded = !command.only_roots.is_empty() || !command.excludes.is_empty();
@@ -139,7 +152,14 @@ pub(crate) fn resolve(
             alias_hint: Some("project".to_owned()),
         });
         discover_workspace_roots(&project_root, &mut candidates, &mut issues);
-        if command.language == "cpp" {
+        if command.language == "csharp" {
+            csharp_compile_scope_resolved = csharp::discover_compile_files(
+                &project_root,
+                anchor_file,
+                &mut compile_files,
+                &mut issues,
+            );
+        } else if command.language == "cpp" {
             discover_compile_roots(
                 &project_root,
                 &mut candidates,
@@ -196,6 +216,7 @@ pub(crate) fn resolve(
         project_root,
         roots,
         compile_files,
+        csharp_compile_scope_resolved,
         compile_directories,
         excludes,
         issues,
@@ -900,6 +921,201 @@ mod tests {
             .issues
             .iter()
             .any(|issue| issue.code == "response-missing"));
+    }
+
+    #[test]
+    fn multiple_unanchored_csharp_projects_mark_automatic_scope_incomplete() {
+        let fixture = tempdir().expect("fixture");
+        let project = fixture.path().join("project");
+        fs::create_dir_all(project.join(".git")).expect("git marker");
+        for name in ["One", "Two"] {
+            write(
+                &project.join(format!("{name}/{name}.csproj")),
+                "<Project Sdk=\"Microsoft.NET.Sdk\" />\n",
+            );
+            write(
+                &project.join(format!("{name}/Source.cs")),
+                &format!("class {name} {{ }}\n"),
+            );
+        }
+        let mut command = command();
+        command.language = "csharp".to_owned();
+
+        let universe = resolve(&command, &project, None).expect("source universe");
+        assert_eq!(universe.status, ScopeStatus::Incomplete);
+        assert!(universe.csharp_compile_scope_resolved);
+        assert!(universe
+            .issues
+            .iter()
+            .any(|issue| issue.code == "csharp-project-selection-ambiguous"));
+    }
+
+    #[test]
+    fn loose_csharp_sources_without_a_project_keep_scope_incomplete() {
+        let fixture = tempdir().expect("fixture");
+        let project = fixture.path().join("project");
+        fs::create_dir_all(project.join(".git")).expect("git marker");
+        write(&project.join("Loose.cs"), "class Loose { }\n");
+        let mut command = command();
+        command.language = "csharp".to_owned();
+
+        let universe = resolve(&command, &project, None).expect("source universe");
+        assert_eq!(universe.status, ScopeStatus::Incomplete);
+        assert!(!universe.csharp_compile_scope_resolved);
+        assert!(universe
+            .issues
+            .iter()
+            .any(|issue| issue.code == "csharp-project-selection-missing"));
+    }
+
+    #[test]
+    fn csharp_scope_reports_parent_build_inputs_and_output_properties() {
+        let fixture = tempdir().expect("fixture");
+        let parent = fixture.path().join("parent");
+        let project = parent.join("project");
+        fs::create_dir_all(project.join(".git")).expect("git marker");
+        write(&parent.join("Directory.Build.props"), "<Project />\n");
+        write(
+            &project.join("App/App.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><BaseIntermediateOutputPath>artifacts/obj</BaseIntermediateOutputPath></PropertyGroup></Project>\n",
+        );
+        write(&project.join("App/Source.cs"), "class Source { }\n");
+        let mut command = command();
+        command.language = "csharp".to_owned();
+
+        let universe = resolve(&command, &project, None).expect("source universe");
+        assert_eq!(universe.status, ScopeStatus::Incomplete);
+        for expected in [
+            "csharp-directory-build-unresolved",
+            "csharp-property-unresolved",
+        ] {
+            assert!(universe.issues.iter().any(|issue| issue.code == expected));
+        }
+    }
+
+    #[test]
+    fn external_wildcard_compile_remove_is_never_claimed_as_resolved() {
+        let fixture = tempdir().expect("fixture");
+        let project = fixture.path().join("project");
+        fs::create_dir_all(project.join(".git")).expect("git marker");
+        write(
+            &project.join("App/App.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include=\"..\\Shared\\Linked.cs\" /><Compile Remove=\"..\\Shared\\*.cs\" /></ItemGroup></Project>\n",
+        );
+        let linked = project.join("App/../Shared/Linked.cs");
+        write(&linked, "class Linked { }\n");
+        let mut command = command();
+        command.language = "csharp".to_owned();
+
+        let universe = resolve(&command, &project, None).expect("source universe");
+        assert_eq!(universe.status, ScopeStatus::Incomplete);
+        assert!(universe
+            .issues
+            .iter()
+            .any(|issue| issue.code == "csharp-compile-remove-unresolved"));
+    }
+
+    #[test]
+    fn csharp_sdk_default_compile_excludes_match_project_relative_output_and_hidden_folders() {
+        let fixture = tempdir().expect("fixture");
+        let project = fixture.path().join("project");
+        fs::create_dir_all(project.join(".git")).expect("git marker");
+        write(
+            &project.join("App/App.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\" />\n",
+        );
+        let source = project.join("App/Source.cs");
+        let nested_bin = project.join("App/Sub/bin/Legal.cs");
+        let root_bin = project.join("App/bin/Generated.cs");
+        let hidden = project.join("App/.generated/Hidden.cs");
+        for path in [&source, &nested_bin, &root_bin, &hidden] {
+            write(path, "class Source { }\n");
+        }
+        let mut command = command();
+        command.language = "csharp".to_owned();
+
+        let universe = resolve(&command, &project, None).expect("source universe");
+        assert_eq!(universe.status, ScopeStatus::Resolved);
+        let compile_files = universe
+            .compile_files
+            .iter()
+            .map(|path| path.canonicalize().expect("canonical compile file"))
+            .collect::<Vec<_>>();
+        assert!(compile_files.contains(&source.canonicalize().expect("source")));
+        assert!(compile_files.contains(&nested_bin.canonicalize().expect("nested bin")));
+        assert!(!compile_files.contains(&root_bin.canonicalize().expect("root bin")));
+        assert!(!compile_files.contains(&hidden.canonicalize().expect("hidden")));
+    }
+
+    #[test]
+    fn malformed_solution_cannot_fall_back_to_a_resolved_project_scope() {
+        let fixture = tempdir().expect("fixture");
+        let project = fixture.path().join("project");
+        fs::create_dir_all(project.join(".git")).expect("git marker");
+        write(
+            &project.join("Broken.sln"),
+            "Microsoft Visual Studio Solution File, Format Version 12.00\nGlobal\nEndGlobal\n",
+        );
+        write(
+            &project.join("App/App.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\" />\n",
+        );
+        write(&project.join("App/Source.cs"), "class Source { }\n");
+        let mut command = command();
+        command.language = "csharp".to_owned();
+
+        let universe = resolve(&command, &project, None).expect("source universe");
+        assert_eq!(universe.status, ScopeStatus::Incomplete);
+        assert!(universe
+            .issues
+            .iter()
+            .any(|issue| issue.code == "csharp-solution-projects-unresolved"));
+    }
+
+    #[test]
+    fn csharp_msbuild_single_segment_wildcard_does_not_recurse() {
+        let fixture = tempdir().expect("fixture");
+        let project = fixture.path().join("project");
+        fs::create_dir_all(project.join(".git")).expect("git marker");
+        write(
+            &project.join("App/App.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include=\"*.cs\" /></ItemGroup></Project>\n",
+        );
+        let root_source = project.join("App/Root.cs");
+        let nested_source = project.join("App/Sub/Nested.cs");
+        write(&root_source, "class Root { }\n");
+        write(&nested_source, "class Nested { }\n");
+        let mut command = command();
+        command.language = "csharp".to_owned();
+
+        let universe = resolve(&command, &project, None).expect("source universe");
+        assert_eq!(universe.status, ScopeStatus::Resolved);
+        assert_eq!(universe.compile_files.len(), 1);
+        assert_eq!(
+            universe.compile_files[0],
+            root_source.canonicalize().expect("root source")
+        );
+    }
+
+    #[test]
+    fn custom_csharp_sdk_never_claims_microsoft_sdk_compile_semantics() {
+        let fixture = tempdir().expect("fixture");
+        let project = fixture.path().join("project");
+        fs::create_dir_all(project.join(".git")).expect("git marker");
+        write(
+            &project.join("App/App.csproj"),
+            "<Project Sdk=\"Custom.Build.Sdk/1.0.0\" />\n",
+        );
+        write(&project.join("App/Source.cs"), "class Source { }\n");
+        let mut command = command();
+        command.language = "csharp".to_owned();
+
+        let universe = resolve(&command, &project, None).expect("source universe");
+        assert_eq!(universe.status, ScopeStatus::Incomplete);
+        assert!(universe
+            .issues
+            .iter()
+            .any(|issue| issue.code == "csharp-sdk-unresolved"));
     }
 
     #[test]

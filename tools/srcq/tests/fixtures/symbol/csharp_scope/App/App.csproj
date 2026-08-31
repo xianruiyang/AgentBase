@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Remove="Legacy.cs" />
+    <Compile Include="..\Shared\Linked.cs" Link="Shared\Linked.cs" />
+    <ProjectReference Include="..\Library\Library.csproj" />
+  </ItemGroup>
+</Project>

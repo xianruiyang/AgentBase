@@ -261,12 +261,21 @@ workspace、真实 scc、36 模式/9 oracle、AST 基线、bootstrap、插件、
 
 完整 workspace 门禁通过；后继 add/only/exclude 测试又发现并闭合“无元数据临时 cwd 把祖先普通 `.vscode` 当作项目根”的范围反例，当前 70 项 srcq-cli lib、12 项关系集成、Clippy 与格式检查通过。C/C# 新增的 references、incoming/outgoing、深度展开和 capability 测试证明公共算法已接入；C 原型、宏，C# overload、partial、extension method、alias 与 file-scoped namespace 等未建模语义继续保持 candidate/unknown 边界。活动 AST、透传、协议、压力与发布验证已统一到 ast-grep 0.44.1；P0 保存的 0.41.1/0.42.0 快照只属于历史证据，不再构成当前支持或发布矩阵。真实 UAI release 路径的五项均值为 0.235–5.076 s，model 输出为 53–161 个 o200k Token；这些只证明当前本机实际命令，不冒充完整模型会话收益。本轮未改变全局规则、skill 或路由合同，因此未重跑模型路由评测。`srcq-v0.5.0` 已于 2026-08-31 发布，标签指向 `ae465953a838b168fe9485ca9e9e6546ad14ba74`，Windows 归档 SHA-256 为 `20a11d2685b286a5c4343c805d40791eb0d54a052ca71c45eb3b9f40fa306fe2`；8 个资产、真实认证下载、隔离安装/Status/卸载均已读回。用户默认安装与 Codex Publish 未执行。
 
+## OBS-SQG-030 C# 无 LSP 关系与静态项目范围已形成源码候选
+
+- 状态: verified in source candidate, unreleased
+- 关联: REQ-SQG-002, AC-SQG-010, AC-SQG-012, AC-SQG-014, DES-SQG-016, DES-SQG-019, DES-SQG-020, TSQG-109, TSQG-112
+
+当前源码候选在既有 relation owner 内增加 C# 专用调用分类：当前词法块或 Lambda/local function 内有效的显式参数/局部、`var = new`、字段/属性、跨 partial 文件的唯一成员、短属性链和源码静态类型可形成 `typed-member-candidate`；相邻块的同名局部分别解析，已离开作用域或 `dynamic` 等未证接收者继续保留，incoming 会排除已证明属于其他接收者类型的同名调用。incoming 复用已知根定义、批量 AST 扫描候选文件并只为命中调用解析接收者，不重复执行定义/范围恢复或解析调用者内全部调用。VMTSingleMachine 的两个 `GetStatusAsync` 已按接收者类型分别收敛为 4 个 client caller 与 3 个 engine caller，`VmtController.MeasureOnceAsync` 的 10 个 `_services.Vmt` caller 全部取得 `VmtController` 类型证据，三项均在默认预算内返回 `candidate_scan=complete`。
+
+同一候选还只读解析 `.sln` 与 Microsoft.NET.Sdk 系列 `.csproj` 的默认 Compile 集、Include/Remove、链接源码和 ProjectReference；SDK 默认隐藏目录及项目根 `bin/obj` 排除已按本机 .NET SDK 9.0.310/10.0.201 正式 targets 校准，MSBuild `*` 不跨目录。VMTSingleMachine 读回 141 个 Compile 文件且 `scope=resolved`。fixture 正例证明移除文件与不属于解决方案的仓库 `.cs` 不再进入定义全集，已解析的空 Compile 集也不会退回仓库扫描；无项目、不可识别 solution、自定义 SDK、条件 item、多 `.sln`/`.csproj`、任一祖先 Directory.Build、显式 import、影响默认输出排除的属性及项目外 wildcard Remove 反例证明无法静态展开时返回 `scope=incomplete`。项目图限制为 4096 个项目与 100000 个 Compile 文件，同项目 wildcard 复用一次候选枚举。实现不调用 LSP、Roslyn、MSBuild 或 dotnet build；重载、扩展方法、继承/接口分派、动态调用、复杂表达式链及 block-scoped/multiple namespace 的完整限定名仍不宣称精确。当前尚未制作新 Release、安装或 Codex Publish。
+
 ## GAP-SQG-010 P16 仍缺非 C++ 依赖 resolver 与关系同快照续页
 
 - 状态: open
-- 关联: AC-SQG-002, AC-SQG-007, AC-SQG-009, AC-SQG-012, AC-SQG-014, AC-SQG-015, OBS-SQG-029
+- 关联: AC-SQG-002, AC-SQG-007, AC-SQG-009, AC-SQG-012, AC-SQG-014, AC-SQG-015, OBS-SQG-029, OBS-SQG-030
 
-非 C++ adapter 当前只承诺 `explicit-or-project`，尚未从 Python/Node/Cargo/Go/Java 等项目元数据恢复 workspace 外源码；关系大结果只报告省略量并允许提高 limit/预算重跑，尚未复用 query spool 的短句柄、snapshot 和无重扫恢复。当前输出不会把这些缺口伪装为完整或精确，但 TSQG-110/112 因而不能整体完成。后续应分别以一个真实非 C++ 外部依赖消费者和一个超预算引用集合闭合，不机械展开全部语言×依赖管理器矩阵。
+当前源码候选已为 C# 恢复解决方案内 SDK 项目的默认 Compile 集、Include/Remove、链接文件和 ProjectReference，并在静态不能判定条件、显式 import 或属性时降级为 `incomplete`；它仍不解析 NuGet 源码或执行完整 MSBuild。Python/Node/Cargo/Go/Java 等其他非 C++ adapter 尚未从语言项目元数据恢复 workspace 外源码；关系大结果也仍只报告省略量并允许提高 limit/预算重跑，尚未复用 query spool 的短句柄、snapshot 和无重扫恢复。当前输出不会把这些缺口伪装为完整或精确，但 TSQG-110/112 因而不能整体完成。后续应分别以一个真实的剩余语言外部依赖消费者和一个超预算引用集合闭合，不机械展开全部语言×依赖管理器矩阵。
 
 ## GAP-SQG-009 query model 续页动作已经闭环
 

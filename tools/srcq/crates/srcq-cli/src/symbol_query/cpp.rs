@@ -138,7 +138,9 @@ pub(crate) struct DirectCallCandidate {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CallScan {
     pub(crate) calls: Vec<DirectCallCandidate>,
-    bindings: Vec<TypeBindingCandidate>,
+    pub(crate) bindings: Vec<TypeBindingCandidate>,
+    pub(crate) type_scopes: Vec<TypeScopeCandidate>,
+    pub(crate) lexical_scopes: Vec<LexicalScopeCandidate>,
 }
 
 impl CallScan {
@@ -146,16 +148,41 @@ impl CallScan {
         Self {
             calls,
             bindings: Vec::new(),
+            type_scopes: Vec::new(),
+            lexical_scopes: Vec::new(),
         }
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub(crate) enum TypeBindingScope {
+    Lexical,
+    Local,
+    Parameter,
+    Member,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct TypeBindingCandidate {
-    file: PathBuf,
-    range: SourceRange,
-    name: String,
-    type_name: String,
+pub(crate) struct TypeBindingCandidate {
+    pub(crate) file: PathBuf,
+    pub(crate) range: SourceRange,
+    pub(crate) name: String,
+    pub(crate) type_name: String,
+    pub(crate) scope: TypeBindingScope,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct TypeScopeCandidate {
+    pub(crate) file: PathBuf,
+    pub(crate) range: SourceRange,
+    pub(crate) type_name: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct LexicalScopeCandidate {
+    pub(crate) file: PathBuf,
+    pub(crate) range: SourceRange,
+    pub(crate) callable: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -449,6 +476,7 @@ pub(crate) fn parse_call_stream(bytes: &[u8], cwd: &Path) -> Result<CallScan, St
                     range: record.range,
                     name,
                     type_name,
+                    scope: TypeBindingScope::Lexical,
                 });
             }
         }

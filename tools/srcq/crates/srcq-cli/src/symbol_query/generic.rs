@@ -283,6 +283,7 @@ pub(crate) fn parse_outline_stream(
     bytes: &[u8],
     target: &str,
     universe: &SourceUniverse,
+    language: &str,
 ) -> Result<Vec<DefinitionCandidate>, String> {
     let stream = std::str::from_utf8(bytes)
         .map_err(|_| "ast-grep outline output was not UTF-8".to_owned())?;
@@ -315,9 +316,14 @@ pub(crate) fn parse_outline_stream(
             .get("items")
             .and_then(Value::as_array)
             .ok_or_else(|| "ast-grep outline record is missing items".to_owned())?;
+        let namespace_parts = if language == "csharp" {
+            csharp_file_namespace(&source)
+        } else {
+            Vec::new()
+        };
         collect_items(
             items,
-            &[],
+            &namespace_parts,
             &file,
             &source,
             target,
@@ -327,6 +333,23 @@ pub(crate) fn parse_outline_stream(
         )?;
     }
     Ok(candidates)
+}
+
+fn csharp_file_namespace(source: &str) -> Vec<String> {
+    source
+        .lines()
+        .find_map(|line| {
+            let line = line.trim();
+            let namespace = line.strip_prefix("namespace ")?.strip_suffix(';')?.trim();
+            let parts = namespace
+                .split('.')
+                .map(str::trim)
+                .filter(|part| !part.is_empty() && part.chars().all(is_identifier))
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>();
+            (!parts.is_empty()).then_some(parts)
+        })
+        .unwrap_or_default()
 }
 
 #[allow(clippy::too_many_arguments)]

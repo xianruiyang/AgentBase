@@ -1,4 +1,5 @@
 mod cpp;
+mod csharp;
 mod generic;
 mod language;
 mod scope;
@@ -193,6 +194,20 @@ struct CalleeResolution {
     definition: Option<DefinitionCandidate>,
 }
 
+struct CallQueryContext<'a> {
+    ast_grep: &'a Path,
+    universe: &'a SourceUniverse,
+    language: language::LanguageCapability,
+    deadline: QueryDeadline,
+    command: &'a SymbolCommand,
+}
+
+type IncomingCaller = (
+    ReferenceCandidate,
+    FunctionOwnerCandidate,
+    Option<DirectCallCandidate>,
+);
+
 pub fn execute(command: &SymbolCommand) -> i32 {
     match command.operation {
         SymbolOperation::Capabilities => {
@@ -342,6 +357,7 @@ fn execute_calls_inner(
             &query,
             deadline,
             &mut resolution_cache,
+            &mut call_cache,
             &mut active,
             &mut nodes,
             &mut truncated,
@@ -413,14 +429,14 @@ fn expand_call_node(
     if depth >= command.depth {
         return Ok(());
     }
-    let calls = match calls_for_definition(
-        &query.ast_grep,
-        definition,
-        &query.universe,
-        query.language,
+    let context = CallQueryContext {
+        ast_grep: &query.ast_grep,
+        universe: &query.universe,
+        language: query.language,
         deadline,
-        call_cache,
-    ) {
+        command,
+    };
+    let calls = match calls_for_definition(definition, &context, call_cache, resolution_cache) {
         Ok(calls) => calls,
         Err(error) if error.time_limited => {
             *time_limited = true;
@@ -512,6 +528,7 @@ fn expand_incoming_node(
     query: &ResolvedQuery,
     deadline: QueryDeadline,
     resolution_cache: &mut BTreeMap<String, CalleeResolution>,
+    call_cache: &mut BTreeMap<String, cpp::CallScan>,
     active: &mut BTreeSet<String>,
     nodes: &mut usize,
     truncated: &mut bool,
@@ -521,18 +538,24 @@ fn expand_incoming_node(
     if depth >= command.depth {
         return Ok(());
     }
-    let (callers, caller_scan_complete) =
-        match incoming_callers(definition, command, query, deadline) {
-            Ok(result) => result,
-            Err(error) if error.time_limited => {
-                *time_limited = true;
-                *scan_complete = false;
-                return Ok(());
-            }
-            Err(error) => return Err(error),
-        };
+    let (callers, caller_scan_complete) = match incoming_callers(
+        definition,
+        command,
+        query,
+        deadline,
+        call_cache,
+        resolution_cache,
+    ) {
+        Ok(result) => result,
+        Err(error) if error.time_limited => {
+            *time_limited = true;
+            *scan_complete = false;
+            return Ok(());
+        }
+        Err(error) => return Err(error),
+    };
     *scan_complete &= caller_scan_complete;
-    for (reference, owner) in callers {
+    for (reference, owner, matching_call) in callers {
         if *nodes >= command.max_nodes {
             *truncated = true;
             break;
@@ -544,9 +567,16 @@ fn expand_incoming_node(
                 |definition| definition.qualified_name.clone(),
             ),
             dispatch: "incoming-candidate",
-            status: "lexical-candidate".to_owned(),
-            receiver: None,
-            receiver_type: None,
+            status: matching_call.as_ref().map_or_else(
+                || "lexical-candidate".to_owned(),
+                |call| call.dispatch.to_owned(),
+            ),
+            receiver: matching_call
+                .as_ref()
+                .and_then(|call| call.receiver.clone()),
+            receiver_type: matching_call
+                .as_ref()
+                .and_then(|call| call.receiver_type.clone()),
             call_file: Some(reference.file),
             call_position: Some(reference.position),
             definition: owner.definition.clone(),
@@ -598,6 +628,7 @@ fn expand_incoming_node(
                         query,
                         deadline,
                         resolution_cache,
+                        call_cache,
                         active,
                         nodes,
                         truncated,
@@ -618,23 +649,12 @@ fn incoming_callers(
     command: &SymbolCommand,
     query: &ResolvedQuery,
     deadline: QueryDeadline,
-) -> Result<(Vec<(ReferenceCandidate, FunctionOwnerCandidate)>, bool), SymbolFailure> {
-    let mut reference_command = command.clone();
-    reference_command.operation = SymbolOperation::References;
-    reference_command.name = Some(
-        definition
-            .qualified_name
-            .rsplit("::")
-            .next()
-            .unwrap_or(&definition.qualified_name)
-            .to_owned(),
-    );
-    reference_command.at = None;
-    reference_command.limit = command.max_nodes;
-    let references = execute_references_inner(&reference_command, deadline)?;
-    let scan_complete = references.scan_complete;
+    call_cache: &mut BTreeMap<String, cpp::CallScan>,
+    resolution_cache: &mut BTreeMap<String, CalleeResolution>,
+) -> Result<(Vec<IncomingCaller>, bool), SymbolFailure> {
+    let (references, scan_complete) =
+        references_for_known_definition(definition, command, query, deadline)?;
     let call_references = references
-        .references
         .into_iter()
         .filter(|reference| reference.role == "call")
         .collect::<Vec<_>>();
@@ -653,6 +673,14 @@ fn incoming_callers(
         deadline,
     )?;
     let mut callers = Vec::new();
+    let context = CallQueryContext {
+        ast_grep: &query.ast_grep,
+        universe: &query.universe,
+        language: query.language,
+        deadline,
+        command,
+    };
+    cache_call_scans(&files, &context, call_cache)?;
     for reference in call_references {
         let owner = owners
             .iter()
@@ -672,7 +700,49 @@ fn incoming_callers(
             })
             .cloned();
         if let Some(owner) = owner {
-            callers.push((reference, owner));
+            let scan_definition = owner
+                .definition
+                .clone()
+                .unwrap_or_else(|| DefinitionCandidate {
+                    file: owner.file.clone(),
+                    range: owner.range,
+                    name_position: owner.range.start,
+                    qualified_name: owner.name.clone(),
+                    symbol_kind: "method".to_owned(),
+                    role: DefinitionRole::Definition,
+                    signature: owner.signature.clone(),
+                    text: String::new(),
+                    ast_kind: "method_declaration".to_owned(),
+                    root_alias: query
+                        .universe
+                        .root_for(&owner.file)
+                        .map(|root| root.alias.clone()),
+                });
+            let observed_call = call_for_definition_at(
+                &scan_definition,
+                reference.position,
+                &context,
+                call_cache,
+                resolution_cache,
+            )?
+            .filter(|call| {
+                call.callee.rsplit("::").next() == definition.qualified_name.rsplit("::").next()
+            });
+            if observed_call.is_none() {
+                continue;
+            }
+            let matching_call = if query.language.key == "csharp" {
+                observed_call
+            } else {
+                None
+            };
+            if matching_call.as_ref().is_some_and(|call| {
+                call.dispatch == "typed-member-candidate"
+                    && !qualified_suffix_matches(&definition.qualified_name, &call.callee)
+            }) {
+                continue;
+            }
+            callers.push((reference, owner, matching_call));
         }
     }
     callers.sort_by(|left, right| {
@@ -682,6 +752,116 @@ fn incoming_callers(
             .then_with(|| left.0.position.column.cmp(&right.0.position.column))
     });
     Ok((callers, scan_complete))
+}
+
+fn references_for_known_definition(
+    definition: &DefinitionCandidate,
+    command: &SymbolCommand,
+    query: &ResolvedQuery,
+    deadline: QueryDeadline,
+) -> Result<(Vec<ReferenceCandidate>, bool), SymbolFailure> {
+    let roots = reference_scan_inputs(command, query, std::slice::from_ref(definition));
+    let mut scanned_roots = query
+        .universe
+        .roots
+        .iter()
+        .filter(|root| {
+            roots.iter().any(|selected| {
+                normalized_key(selected) == normalized_key(&root.path)
+                    || root.path.starts_with(selected)
+            })
+        })
+        .map(|root| normalized_key(&root.path))
+        .collect::<BTreeSet<_>>();
+    if query.language.key == "csharp"
+        && query.universe.has_complete_csharp_compile_scope()
+        && path_set_contains_all(&roots, &query.universe.compile_files)
+    {
+        scanned_roots.extend(
+            query
+                .universe
+                .roots
+                .iter()
+                .map(|root| normalized_key(&root.path)),
+        );
+    }
+    let scan_complete = scanned_roots.len() == query.universe.roots.len();
+    let lexical_target = definition
+        .qualified_name
+        .rsplit("::")
+        .next()
+        .unwrap_or(&definition.qualified_name);
+    let candidate_files = find_candidate_files(
+        &query.rg,
+        lexical_target,
+        &roots,
+        &query.universe,
+        query.language,
+        deadline,
+    )?;
+    let occurrences = scan_occurrences(
+        &query.ast_grep,
+        lexical_target,
+        &candidate_files,
+        &query.universe,
+        query.language,
+        deadline,
+    )?;
+    let definition_key = (
+        normalized_key(&definition.file),
+        definition.name_position.line,
+        definition.name_position.column,
+    );
+    let mut documents = BTreeMap::new();
+    let mut references = Vec::new();
+    for occurrence in occurrences {
+        let occurrence_key = (
+            normalized_key(&occurrence.file),
+            occurrence.range.start.line,
+            occurrence.range.start.column,
+        );
+        if occurrence_key == definition_key {
+            continue;
+        }
+        let document = source_document(&occurrence.file, &mut documents)?;
+        if query.language.key == "cpp"
+            && !qualified_occurrence_matches(
+                document,
+                occurrence.range.start,
+                &definition.qualified_name,
+            )
+        {
+            continue;
+        }
+        references.push(ReferenceCandidate {
+            role: reference_role(document, occurrence.range.end),
+            file: occurrence.file,
+            position: occurrence.range.start,
+            root_alias: occurrence.root_alias,
+        });
+    }
+    references.sort_by(|left, right| {
+        normalized_key(&left.file)
+            .cmp(&normalized_key(&right.file))
+            .then_with(|| left.position.line.cmp(&right.position.line))
+            .then_with(|| left.position.column.cmp(&right.position.column))
+    });
+    references.dedup_by(|left, right| {
+        normalized_key(&left.file) == normalized_key(&right.file) && left.position == right.position
+    });
+    references.truncate(command.max_nodes);
+    Ok((references, scan_complete))
+}
+
+fn qualified_suffix_matches(definition: &str, candidate: &str) -> bool {
+    definition == candidate || definition.ends_with(&format!("::{candidate}"))
+}
+
+fn source_range_size(range: SourceRange) -> (usize, usize) {
+    (
+        range.end.line.saturating_sub(range.start.line),
+        range.end.column.saturating_sub(range.start.column),
+    )
 }
 
 fn position_in_range(position: SourcePosition, range: SourceRange) -> bool {
@@ -709,16 +889,38 @@ fn resolve_callee(
     child_command.add_roots.clear();
     child_command.only_roots = bounded_relation_roots(universe, local_file);
     let outcome = execute_inner(&child_command, deadline)?;
-    let resolution = CalleeResolution {
-        total: outcome.definition_total,
-        definition: (outcome.definition_total == 1).then(|| outcome.definitions[0].clone()),
+    let local_definitions = outcome
+        .definitions
+        .iter()
+        .filter(|definition| normalized_key(&definition.file) == normalized_key(local_file))
+        .cloned()
+        .collect::<Vec<_>>();
+    let (total, definition) = if outcome.definition_total > 1 && local_definitions.len() == 1 {
+        (1, local_definitions.into_iter().next())
+    } else {
+        (
+            outcome.definition_total,
+            (outcome.definition_total == 1).then(|| outcome.definitions[0].clone()),
+        )
     };
+    let resolution = CalleeResolution { total, definition };
     cache.insert(cache_key, resolution.clone());
     Ok(resolution)
 }
 
 fn bounded_relation_roots(universe: &SourceUniverse, local_file: &Path) -> Vec<PathBuf> {
-    let mut roots = relation_source_roots(universe, local_file);
+    let explicit_only = universe.roots.iter().all(|root| root.source == "explicit");
+    let mut roots = if explicit_only {
+        universe
+            .roots
+            .iter()
+            .map(|root| root.path.clone())
+            .collect()
+    } else if universe.has_complete_csharp_compile_scope() {
+        universe.compile_files.clone()
+    } else {
+        relation_source_roots(universe, local_file)
+    };
     roots.push(local_file.to_path_buf());
     roots.extend(
         universe
@@ -786,7 +988,7 @@ fn execute_references_inner(
     definitions.extend(definition_outcome.declarations);
     let position_matched = definition_outcome.position_matched;
     let roots = reference_scan_inputs(command, &query, &definitions);
-    let scanned_roots = query
+    let mut scanned_roots = query
         .universe
         .roots
         .iter()
@@ -798,6 +1000,18 @@ fn execute_references_inner(
         })
         .map(|root| normalized_key(&root.path))
         .collect::<BTreeSet<_>>();
+    if query.language.key == "csharp"
+        && query.universe.has_complete_csharp_compile_scope()
+        && path_set_contains_all(&roots, &query.universe.compile_files)
+    {
+        scanned_roots.extend(
+            query
+                .universe
+                .roots
+                .iter()
+                .map(|root| normalized_key(&root.path)),
+        );
+    }
     let scan_complete = scanned_roots.len() == query.universe.roots.len();
     let lexical_target = query.target.rsplit("::").next().unwrap_or(&query.target);
     let candidate_files = find_candidate_files(
@@ -905,6 +1119,14 @@ fn reference_scan_inputs(
             .map(|root| root.path.clone())
             .collect();
     }
+    if query.language.key == "csharp" && query.universe.has_complete_csharp_compile_scope() {
+        let mut inputs = query.universe.compile_files.clone();
+        inputs.extend(query.anchor_file.iter().cloned());
+        inputs.extend(definitions.iter().map(|definition| definition.file.clone()));
+        inputs.sort_by_key(|path| normalized_key(path));
+        inputs.dedup_by(|left, right| normalized_key(left) == normalized_key(right));
+        return inputs;
+    }
     let mut inputs = Vec::new();
     for local_file in query
         .anchor_file
@@ -962,6 +1184,12 @@ fn execute_inner(
                 scanned_roots.insert(normalized_key(&root.path));
             }
         }
+        if command.language == "csharp"
+            && universe.has_complete_csharp_compile_scope()
+            && same_path_set(&phase, &universe.compile_files)
+        {
+            scanned_roots.extend(universe.roots.iter().map(|root| normalized_key(&root.path)));
+        }
         if command.only_roots.is_empty()
             && candidates
                 .iter()
@@ -1002,6 +1230,7 @@ fn resolve_query(command: &SymbolCommand) -> Result<ResolvedQuery, SymbolFailure
         .map_err(|error| SymbolFailure::io(format!("cannot read current directory: {error}")))?;
     let cwd = canonical_directory(command.cwd.as_deref().unwrap_or(&launch_cwd), &launch_cwd)?;
     let (target, anchor_file, anchor_position) = resolve_target(command, &cwd)?;
+    let target = language::normalize_query_target(capability.key, target);
     let universe =
         scope::resolve(command, &cwd, anchor_file.as_deref()).map_err(SymbolFailure::input)?;
     let environment = SystemEngineEnvironment::from_process_environment();
@@ -1112,14 +1341,20 @@ fn scan_phases(
     if let Some(anchor_file) = anchor_file {
         phases.push(vec![anchor_file.to_path_buf()]);
     }
-    let primary = universe
-        .roots
-        .iter()
-        .filter(|root| matches!(root.source, "project" | "explicit"))
-        .map(|root| root.path.clone())
-        .collect::<Vec<_>>();
-    if !primary.is_empty() {
-        phases.push(primary);
+    let complete_csharp_scope =
+        command.language == "csharp" && universe.has_complete_csharp_compile_scope();
+    if complete_csharp_scope {
+        phases.push(universe.compile_files.clone());
+    } else {
+        let primary = universe
+            .roots
+            .iter()
+            .filter(|root| matches!(root.source, "project" | "explicit"))
+            .map(|root| root.path.clone())
+            .collect::<Vec<_>>();
+        if !primary.is_empty() {
+            phases.push(primary);
+        }
     }
     let external_compile_files = universe
         .compile_files
@@ -1127,7 +1362,7 @@ fn scan_phases(
         .filter(|path| !path.starts_with(&universe.project_root))
         .cloned()
         .collect::<Vec<_>>();
-    if !external_compile_files.is_empty() {
+    if !complete_csharp_scope && !external_compile_files.is_empty() {
         phases.push(external_compile_files);
     }
     let external_compile_directories = universe
@@ -1158,6 +1393,28 @@ fn scan_phases(
         );
     }
     phases
+}
+
+fn same_path_set(left: &[PathBuf], right: &[PathBuf]) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .map(|path| normalized_key(path))
+            .collect::<BTreeSet<_>>()
+            == right
+                .iter()
+                .map(|path| normalized_key(path))
+                .collect::<BTreeSet<_>>()
+}
+
+fn path_set_contains_all(superset: &[PathBuf], subset: &[PathBuf]) -> bool {
+    let superset = superset
+        .iter()
+        .map(|path| normalized_key(path))
+        .collect::<BTreeSet<_>>();
+    subset
+        .iter()
+        .all(|path| superset.contains(&normalized_key(path)))
 }
 
 fn canonical_directory(path: &Path, base: &Path) -> Result<PathBuf, SymbolFailure> {
@@ -1413,6 +1670,11 @@ fn find_candidate_files(
     language: language::LanguageCapability,
     deadline: QueryDeadline,
 ) -> Result<Vec<PathBuf>, SymbolFailure> {
+    let search_target = if language.key == "cpp" {
+        target
+    } else {
+        target.rsplit("::").next().unwrap_or(target)
+    };
     let mut paths = Vec::new();
     for batch in path_batches(roots, WINDOWS_BATCH_CHARS) {
         let mut request = ProcessRequest::new(rg, &universe.cwd);
@@ -1432,7 +1694,7 @@ fn find_candidate_files(
             "--word-regexp",
             &format!("--glob={glob}"),
             "--",
-            target,
+            search_target,
         ]
         .into_iter()
         .map(OsString::from)
@@ -1566,7 +1828,7 @@ fn scan_outline_candidates(
             .read_stdout()
             .map_err(|error| SymbolFailure::io(format!("cannot read ast-grep outline: {error}")))?;
         candidates.extend(
-            generic::parse_outline_stream(&bytes, target, universe)
+            generic::parse_outline_stream(&bytes, target, universe, language.key)
                 .map_err(SymbolFailure::conversion)?,
         );
     }
@@ -1829,42 +2091,133 @@ fn scan_containing_functions(
 }
 
 fn calls_for_definition(
-    ast_grep: &Path,
     definition: &DefinitionCandidate,
-    universe: &SourceUniverse,
-    language: language::LanguageCapability,
-    deadline: QueryDeadline,
+    context: &CallQueryContext<'_>,
     cache: &mut BTreeMap<String, cpp::CallScan>,
+    resolution_cache: &mut BTreeMap<String, CalleeResolution>,
 ) -> Result<Vec<DirectCallCandidate>, SymbolFailure> {
     let key = normalized_key(&definition.file);
     if !cache.contains_key(&key) {
-        let mut request = ProcessRequest::new(ast_grep, &universe.cwd);
-        let rules = if language.key == "cpp" {
-            cpp::call_rules().to_owned()
-        } else {
-            generic::call_rules(
-                language.ast_grep,
-                language::call_kinds(language.key).ok_or_else(|| {
-                    SymbolFailure::input(format!(
-                        "language {} has no direct-call adapter",
-                        language.key
-                    ))
-                })?,
-            )
-        };
+        cache_call_scans(std::slice::from_ref(&definition.file), context, cache)?;
+    }
+    let scan = cache
+        .get(&key)
+        .ok_or_else(|| SymbolFailure::conversion("call scan cache lost its result"))?;
+    let mut calls = scan
+        .calls
+        .iter()
+        .filter(|call| {
+            normalized_key(&call.file) == normalized_key(&definition.file)
+                && source_range_contains(definition.range, call.range)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if context.language.key == "cpp" {
+        cpp::annotate_explicit_member_types(&mut calls, scan, definition);
+    } else if context.language.key == "csharp" {
+        csharp::annotate_explicit_member_types(&mut calls, scan, definition);
+        annotate_csharp_cross_file_types(
+            &mut calls,
+            scan,
+            definition,
+            context.command,
+            context.universe,
+            context.deadline,
+            resolution_cache,
+        )?;
+    }
+    Ok(calls)
+}
+
+fn call_for_definition_at(
+    definition: &DefinitionCandidate,
+    position: SourcePosition,
+    context: &CallQueryContext<'_>,
+    cache: &mut BTreeMap<String, cpp::CallScan>,
+    resolution_cache: &mut BTreeMap<String, CalleeResolution>,
+) -> Result<Option<DirectCallCandidate>, SymbolFailure> {
+    let key = normalized_key(&definition.file);
+    if !cache.contains_key(&key) {
+        cache_call_scans(std::slice::from_ref(&definition.file), context, cache)?;
+    }
+    let scan = cache
+        .get(&key)
+        .ok_or_else(|| SymbolFailure::conversion("call scan cache lost its result"))?;
+    let Some(call) = scan
+        .calls
+        .iter()
+        .filter(|call| {
+            normalized_key(&call.file) == key
+                && source_range_contains(definition.range, call.range)
+                && position_in_range(position, call.range)
+        })
+        .min_by_key(|call| source_range_size(call.range))
+        .cloned()
+    else {
+        return Ok(None);
+    };
+    let mut calls = vec![call];
+    if context.language.key == "cpp" {
+        cpp::annotate_explicit_member_types(&mut calls, scan, definition);
+    } else if context.language.key == "csharp" {
+        csharp::annotate_explicit_member_types(&mut calls, scan, definition);
+        annotate_csharp_cross_file_types(
+            &mut calls,
+            scan,
+            definition,
+            context.command,
+            context.universe,
+            context.deadline,
+            resolution_cache,
+        )?;
+    }
+    Ok(calls.pop())
+}
+
+fn cache_call_scans(
+    files: &[PathBuf],
+    context: &CallQueryContext<'_>,
+    cache: &mut BTreeMap<String, cpp::CallScan>,
+) -> Result<(), SymbolFailure> {
+    let mut missing = files
+        .iter()
+        .filter(|file| !cache.contains_key(&normalized_key(file)))
+        .cloned()
+        .collect::<Vec<_>>();
+    missing.sort_by_key(|file| normalized_key(file));
+    missing.dedup_by(|left, right| normalized_key(left) == normalized_key(right));
+    if missing.is_empty() {
+        return Ok(());
+    }
+    let rules = match context.language.key {
+        "cpp" => cpp::call_rules().to_owned(),
+        "csharp" => csharp::call_rules(),
+        _ => generic::call_rules(
+            context.language.ast_grep,
+            language::call_kinds(context.language.key).ok_or_else(|| {
+                SymbolFailure::input(format!(
+                    "language {} has no direct-call adapter",
+                    context.language.key
+                ))
+            })?,
+        ),
+    };
+    let mut combined = cpp::CallScan::default();
+    for batch in path_batches(&missing, WINDOWS_BATCH_CHARS) {
+        let mut request = ProcessRequest::new(context.ast_grep, &context.universe.cwd);
         request.args = [
             OsString::from("scan"),
             OsString::from("--inline-rules"),
-            OsString::from(rules),
+            OsString::from(&rules),
             OsString::from("--json=stream"),
-            definition.file.as_os_str().to_owned(),
         ]
         .into_iter()
+        .chain(batch.iter().map(|path| path.as_os_str().to_owned()))
         .collect();
         request.forward_stderr = false;
         request.max_stdout_bytes = Some(MAX_AST_STDOUT_BYTES);
         request.max_stderr_bytes = Some(MAX_ENGINE_STDERR_BYTES);
-        let outcome = run_budgeted(request, deadline, "ast-grep call scan")?;
+        let outcome = run_budgeted(request, context.deadline, "ast-grep call scan")?;
         let code = outcome.exit_code();
         if code != 0 {
             return Err(engine_exit_failure(
@@ -1877,29 +2230,186 @@ fn calls_for_definition(
             .output
             .read_stdout()
             .map_err(|error| SymbolFailure::io(format!("cannot read ast-grep output: {error}")))?;
+        let mut scan = match context.language.key {
+            "cpp" => cpp::parse_call_stream(&bytes, &context.universe.cwd)
+                .map_err(SymbolFailure::conversion)?,
+            "csharp" => csharp::parse_call_stream(&bytes, &context.universe.cwd)
+                .map_err(SymbolFailure::conversion)?,
+            _ => generic::parse_call_stream(&bytes, &context.universe.cwd)
+                .map_err(SymbolFailure::conversion)?,
+        };
+        combined.calls.append(&mut scan.calls);
+        combined.bindings.append(&mut scan.bindings);
+        combined.type_scopes.append(&mut scan.type_scopes);
+        combined.lexical_scopes.append(&mut scan.lexical_scopes);
+    }
+    for file in missing {
+        let key = normalized_key(&file);
         cache.insert(
             key.clone(),
-            if language.key == "cpp" {
-                cpp::parse_call_stream(&bytes, &universe.cwd).map_err(SymbolFailure::conversion)?
-            } else {
-                generic::parse_call_stream(&bytes, &universe.cwd)
-                    .map_err(SymbolFailure::conversion)?
+            cpp::CallScan {
+                calls: combined
+                    .calls
+                    .iter()
+                    .filter(|candidate| normalized_key(&candidate.file) == key)
+                    .cloned()
+                    .collect(),
+                bindings: combined
+                    .bindings
+                    .iter()
+                    .filter(|candidate| normalized_key(&candidate.file) == key)
+                    .cloned()
+                    .collect(),
+                type_scopes: combined
+                    .type_scopes
+                    .iter()
+                    .filter(|candidate| normalized_key(&candidate.file) == key)
+                    .cloned()
+                    .collect(),
+                lexical_scopes: combined
+                    .lexical_scopes
+                    .iter()
+                    .filter(|candidate| normalized_key(&candidate.file) == key)
+                    .cloned()
+                    .collect(),
             },
         );
     }
-    let scan = cache
-        .get(&key)
-        .ok_or_else(|| SymbolFailure::conversion("call scan cache lost its result"))?;
-    let mut calls = scan
-        .calls
-        .iter()
-        .filter(|call| source_range_contains(definition.range, call.range))
-        .cloned()
-        .collect::<Vec<_>>();
-    if language.key == "cpp" {
-        cpp::annotate_explicit_member_types(&mut calls, scan, definition);
+    Ok(())
+}
+
+fn annotate_csharp_cross_file_types(
+    calls: &mut [DirectCallCandidate],
+    scan: &cpp::CallScan,
+    definition: &DefinitionCandidate,
+    command: &SymbolCommand,
+    universe: &SourceUniverse,
+    deadline: QueryDeadline,
+    resolution_cache: &mut BTreeMap<String, CalleeResolution>,
+) -> Result<(), SymbolFailure> {
+    let lexical_owner = csharp::containing_type_name(scan, definition);
+    let qualified_owner = definition
+        .qualified_name
+        .rsplit_once("::")
+        .map(|(owner, _)| owner.to_owned())
+        .or_else(|| lexical_owner.clone());
+    for call in calls {
+        if call.dispatch != "member-candidate" {
+            continue;
+        }
+        let Some(receiver) = call.receiver.as_deref() else {
+            continue;
+        };
+        let Some(chain) = csharp::receiver_chain(receiver) else {
+            continue;
+        };
+        let Some(first) = chain.first() else {
+            continue;
+        };
+        if first == "base" {
+            continue;
+        }
+        let mut current_type =
+            csharp::explicit_receiver_type(scan, definition, first, call.range.start);
+        if current_type.is_none() && first == "this" {
+            current_type = qualified_owner.clone();
+        }
+        if current_type.is_none() {
+            if let Some(owner) = qualified_owner.as_deref() {
+                current_type = resolve_csharp_member_type(
+                    owner,
+                    first,
+                    command,
+                    universe,
+                    &call.file,
+                    deadline,
+                    resolution_cache,
+                )?;
+            }
+        }
+        if current_type.is_none() {
+            current_type = resolve_csharp_source_type(
+                first,
+                command,
+                universe,
+                &call.file,
+                deadline,
+                resolution_cache,
+            )?;
+        }
+        for member in chain.iter().skip(1) {
+            let Some(owner) = current_type.as_deref() else {
+                break;
+            };
+            current_type = resolve_csharp_member_type(
+                owner,
+                member,
+                command,
+                universe,
+                &call.file,
+                deadline,
+                resolution_cache,
+            )?;
+        }
+        if let Some(type_name) = current_type {
+            csharp::qualify_call(call, &type_name);
+        }
     }
-    Ok(calls)
+    Ok(())
+}
+
+fn resolve_csharp_member_type(
+    owner: &str,
+    member: &str,
+    command: &SymbolCommand,
+    universe: &SourceUniverse,
+    local_file: &Path,
+    deadline: QueryDeadline,
+    resolution_cache: &mut BTreeMap<String, CalleeResolution>,
+) -> Result<Option<String>, SymbolFailure> {
+    let target = format!("{owner}::{member}");
+    let cache_anchor = universe
+        .compile_files
+        .first()
+        .map_or(local_file, PathBuf::as_path);
+    let resolution = resolve_callee(
+        &target,
+        command,
+        universe,
+        cache_anchor,
+        deadline,
+        resolution_cache,
+    )?;
+    Ok(resolution.definition.as_ref().and_then(|definition| {
+        matches!(definition.symbol_kind.as_str(), "field" | "property")
+            .then(|| csharp::definition_member_type(&definition.signature))
+            .flatten()
+    }))
+}
+
+fn resolve_csharp_source_type(
+    target: &str,
+    command: &SymbolCommand,
+    universe: &SourceUniverse,
+    local_file: &Path,
+    deadline: QueryDeadline,
+    resolution_cache: &mut BTreeMap<String, CalleeResolution>,
+) -> Result<Option<String>, SymbolFailure> {
+    let resolution = resolve_callee(
+        target,
+        command,
+        universe,
+        local_file,
+        deadline,
+        resolution_cache,
+    )?;
+    Ok(resolution.definition.and_then(|definition| {
+        matches!(
+            definition.symbol_kind.as_str(),
+            "type" | "class" | "struct" | "record" | "interface" | "enum"
+        )
+        .then_some(definition.qualified_name)
+    }))
 }
 
 fn source_range_contains(outer: SourceRange, inner: SourceRange) -> bool {

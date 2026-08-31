@@ -15,7 +15,7 @@ srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction outgoing --dept
 srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction incoming --depth 2
 ```
 
-位置上的 `A::B` 静态限定名会直接保留为查询目标。C++ 成员调用会保留接收者；当当前函数内恰有一个在调用前声明的显式参数或局部变量类型时，输出 `Type::method [typed-member-candidate receiver=object:Type]` 并允许继续解析该候选。`auto`、成员链、不同类型的同名绑定及其他不能从当前源码直接证明的接收者仍保持 `semantic-unknown`，不会用猜测消除歧义。
+位置上的 `A::B` 静态限定名会直接保留为查询目标。C++ 成员调用会保留接收者；当当前函数内恰有一个在调用前声明的显式参数或局部变量类型时，输出 `Type::method [typed-member-candidate receiver=object:Type]` 并允许继续解析该候选。C# 还会使用当前词法块或 Lambda/local function 内有效的显式参数/局部变量、`var x = new Type(...)`、当前类型的字段/属性、跨 partial 文件的唯一字段/属性、短属性链及源码内唯一静态类型形成同等级的类型候选；相邻块的同名局部变量分别绑定，已经离开声明作用域的名称不继承旧类型，incoming 会排除已证明属于其他接收者类型的同名调用。`auto`、不同类型的同名绑定、`dynamic`、扩展方法、返回值/索引器组成的复杂链及其他不能从当前源码直接证明的接收者仍保持 `semantic-unknown`，不会用猜测消除歧义。
 
 只有名称时仍可查询，但名称只建立候选身份：
 
@@ -28,7 +28,7 @@ srcq symbol references Method
 
 ## 范围
 
-目录可以省略。含 `--at` 时从文件所属项目解析；名称查询从 `--cwd` 或当前目录解析。C++ 会只读消费 `.code-workspace`、`compile_commands.json`、`.vscode/compileCommands*.json` 和嵌套 MSVC response file，恢复项目外的本地源码根；不会启动构建系统、下载源码或扫描整盘。位于常见 `Source` 或 `src`/`include` 布局中的关系查询优先扫描对应源码树，避免把计划证据、分发副本或其他非源码 `.cpp` 当作生产关系。
+目录可以省略。含 `--at` 时从文件所属项目解析；名称查询从 `--cwd` 或当前目录解析。C++ 会只读消费 `.code-workspace`、`compile_commands.json`、`.vscode/compileCommands*.json` 和嵌套 MSVC response file，恢复项目外的本地源码根。C# 会只读解析 `.sln`、Microsoft.NET.Sdk 系列 `.csproj`、默认 `Compile` 集、`Compile Include/Remove` 与 `ProjectReference`，把链接源码纳入范围并排除已移除或不属于解决方案的仓库文件；唯一项目图即使解析出零个 Compile 文件也保持完整空集，不会退回仓库扫描。未发现项目、不可识别的 `.sln`/`.slnx`、多个顶层 `.sln`、无锚点或同一锚点目录发现多个 `.csproj`、自定义 SDK、显式 MSBuild import、任一祖先 Directory.Build 输入、条件 item/property、会改变默认输出排除的属性、项目外 wildcard item 或超出项目/文件上限时报告 `scope=incomplete`，不会调用 MSBuild 或把近似集合标成 resolved。两种解析都不会启动构建系统、下载源码或扫描整盘。位于常见 `Source` 或 `src`/`include` 布局中的关系查询优先扫描对应源码树，避免把计划证据、分发副本或其他非源码文件当作生产关系。
 
 范围覆盖可在同一命令调整：
 
@@ -51,12 +51,13 @@ C++ incoming 直接复用 AST 已确认的包含函数定义继续展开，不�
 `srcq symbol capabilities` 是语言能力真源，正常查询不需要预先调用。当前适配分为：
 
 - C++：结构直接定义、词法引用候选和有界调用候选，并恢复编译范围。
-- C、C#、Python、TypeScript、TSX、JavaScript、Rust、Go、Java：outline 定义候选、词法引用候选和调用候选。
+- C#：outline 定义候选、词法引用候选和调用候选；显式源码类型可收窄成员调用，并恢复解决方案的静态 Compile 范围。
+- C、Python、TypeScript、TSX、JavaScript、Rust、Go、Java：outline 定义候选、词法引用候选和调用候选。
 - Kotlin、PHP、Ruby、Swift：outline 定义候选。
 - Bash、Dart、Elixir、Haskell、Lua、Nix、Scala、Solidity：已登记但当前 `unadapted`。
 - CSS、HTML、JSON、YAML：源码符号关系 `not-applicable`。
 
-所有名称查询、非 C++ outline 定义、引用及调用关系都不宣称 Provider 精度。C 原型、C# 文件级 namespace、重载、宏、条件编译、partial class、扩展方法和别名绑定不会因语言进入 generic adapter 就被提升为精确关系；当前 0.44.1 证据只覆盖 outline 定义、标识符词法引用及直接、成员和构造调用候选。位置落在定义名称上时可选择该语法定义；位置落在调用或引用上且语法无法区分同名符号时仍返回歧义。只有该歧义会改变当前动作或结论时，才升级到 LSP 或领域工具。
+所有名称查询、非 C++ outline 定义、引用及调用关系都不宣称 Provider 精度。C 原型、宏和条件编译，C# 重载、扩展方法、别名绑定、继承/接口分派及动态调用都不会因静态类型候选而被提升为精确关系；partial 只在唯一可定位的显式成员类型链内合并证据，不等同编译器绑定。当前 C# 限定名只完整覆盖 file-scoped namespace 与已建模类型范围；同一文件中的多个或 block-scoped namespace 不能稳定恢复完整限定名时保持候选/歧义。当前 0.44.1 证据覆盖 outline 定义、标识符词法引用、直接/成员/构造调用候选以及上述 C# 类型收窄。位置落在定义名称上时可选择该语法定义；位置落在调用或引用上且语法无法区分同名符号时仍返回歧义。只有该歧义会改变当前动作或结论时，才升级到 LSP 或领域工具。
 
 ## 输出
 
@@ -71,7 +72,7 @@ model 位置使用 1-based 行列，省略正常机器 envelope；范围未完�
 | `outline-candidate` | 非 C++ 候选已唯一解析到当前语言的结构定义 |
 | `lexical-candidate` | incoming 调用者来自所选范围内的词法引用与包含函数关系 |
 | `direct-candidate` | 源码直接写出了名称或静态限定调用，可继续尝试解析唯一源码定义 |
-| `typed-member-candidate` | 成员调用具有当前函数内唯一的显式词法接收者类型，可按 `Type::method` 继续解析 |
+| `typed-member-candidate` | 成员调用具有唯一的显式源码接收者类型；C++ 使用函数内词法类型，C# 还可使用唯一字段/属性、partial 短链或源码静态类型，并按 `Type::method` 继续解析 |
 | `member-candidate` | 观察到成员调用，但接收者类型不能由当前源码直接唯一证明 |
 | `unknown` | 调用表达式过于间接，连可稳定查询的直接名称或成员形式也未取得 |
 | `incoming-candidate` | 该节点是当前节点的调用者，位置是这条 incoming 调用边的调用点 |
@@ -92,6 +93,6 @@ model 调用树会压缩同一父节点下完全相同的调用点路径：若�
 - `srcq.symbol.calls/v1`
 - `srcq.symbol.capabilities/v1`
 
-调用节点的 `receiver` 与 `receiver_type` 是可空字段：前者保存源码中的成员接收者，后者只在显式词法类型唯一时出现。它们不证明别名展开、模板实例化或运行时分派。
+调用节点的 `receiver` 与 `receiver_type` 是可空字段：前者保存源码中的成员接收者，后者只在上述显式源码类型链唯一时出现。它们不证明别名展开、模板实例化、重载选择、扩展方法、继承分派或运行时类型。
 
 定义候选存在时退出 0，无定义候选退出 1；输入、引擎、转换与 I/O 故障使用 srcq 的 120–127 错误域。关系命令不写源码，也不把自动发现结果持久化为第二范围真源。

@@ -80,7 +80,11 @@ fn code_capability(key: &'static str, ast_grep: &'static str) -> LanguageCapabil
             "unadapted"
         },
         calls: if adapted { "candidate" } else { "unadapted" },
-        scope: "explicit-or-project",
+        scope: if key == "csharp" {
+            "project-compile-aware"
+        } else {
+            "explicit-or-project"
+        },
     }
 }
 
@@ -155,6 +159,14 @@ pub(crate) fn source_glob(key: &str) -> Option<&'static str> {
         "tsx" => Some("*.tsx"),
         "typescript" => Some("*.{ts,mts,cts}"),
         _ => None,
+    }
+}
+
+pub(crate) fn normalize_query_target(key: &str, target: String) -> String {
+    if key == "csharp" {
+        target.replace('.', "::")
+    } else {
+        target
     }
 }
 
