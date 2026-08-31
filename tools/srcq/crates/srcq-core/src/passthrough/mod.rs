@@ -621,7 +621,7 @@ mod tests {
         commit_metadata(MetadataRequest {
             output: &output,
             channel: PassthroughChannel::Lsp,
-            engine_version: "0.42.0",
+            engine_version: "0.44.1",
             user_argv: &user,
             effective_argv: &effective,
             started_at: SystemTime::UNIX_EPOCH,

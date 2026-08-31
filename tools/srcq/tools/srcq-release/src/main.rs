@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-const FIXED_AST_GREP: &str = "0.42.0";
-const VERIFIED_AST_GREP: [&str; 3] = ["0.41.1", "0.42.0", "0.44.1"];
+const FIXED_AST_GREP: &str = "0.44.1";
+const VERIFIED_AST_GREP: [&str; 1] = ["0.44.1"];
 const VERIFIED_RIPGREP: [&str; 2] = ["15.1.0", "15.2.0"];
 const VERIFIED_FD: [&str; 1] = ["10.4.2"];
 const VERIFIED_SCC: [&str; 1] = ["3.7.0"];
@@ -805,7 +805,8 @@ fn crc32(bytes: &[u8]) -> u32 {
 mod tests {
     use super::{
         allowed_license_expression, crc32, deterministic_zip, native_engine_compatibility,
-        third_party_licenses_preamble, unix_to_rfc3339, ZipEntry, REQUIRED_EXECUTABLES,
+        third_party_licenses_preamble, unix_to_rfc3339, ZipEntry, FIXED_AST_GREP,
+        REQUIRED_EXECUTABLES,
     };
 
     #[test]
@@ -842,6 +843,8 @@ mod tests {
     #[test]
     fn release_contract_declares_every_external_query_engine() {
         let engines = native_engine_compatibility();
+        assert_eq!(FIXED_AST_GREP, "0.44.1");
+        assert_eq!(engines["astGrep"]["verified"][0], FIXED_AST_GREP);
         assert_eq!(engines["scc"]["executable"], "scc.exe");
         assert_eq!(engines["scc"]["verified"][0], "3.7.0");
         assert_eq!(

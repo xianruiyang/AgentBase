@@ -311,7 +311,7 @@ mod tests {
         let argv = vec![OsString::from("run")];
         let audit = CacheAudit::from_argv(
             "ast-grep",
-            "0.42.0",
+            "0.44.1",
             &workspace,
             &argv,
             &argv,

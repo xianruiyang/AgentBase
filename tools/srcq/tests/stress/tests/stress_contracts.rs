@@ -37,7 +37,7 @@ fn large_jsonl_dual_stream_cache_and_context_remain_bounded() {
     let engine_path = engine();
     let audit = CacheAudit::from_argv(
         engine_path,
-        "0.42.0",
+        "0.44.1",
         workspace.clone(),
         &user_argv,
         &user_argv,

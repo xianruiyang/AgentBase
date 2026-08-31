@@ -7,9 +7,9 @@ use srcq_core::codec::parse_yaml_documents;
 
 #[test]
 #[ignore = "requires SRCQ_AST_GREP to point to a real ast-grep binary"]
-fn real_help_version_completions_and_new_match_native_042() {
+fn real_help_version_completions_and_new_match_native_044() {
     let engine = PathBuf::from(
-        std::env::var_os("SRCQ_AST_GREP").expect("SRCQ_AST_GREP must name ast-grep 0.42.0"),
+        std::env::var_os("SRCQ_AST_GREP").expect("SRCQ_AST_GREP must name ast-grep 0.44.1"),
     );
     let directory = tempfile::tempdir().expect("temporary raw fixture");
 

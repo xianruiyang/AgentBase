@@ -4,7 +4,7 @@
 
 ```powershell
 $env:SRCQ_AST_GREP = '<absolute-path-to-ast-grep-binary>'
-$env:SRCQ_AST_GREP_EXPECTED_VERSION = 'ast-grep 0.42.0'
+$env:SRCQ_AST_GREP_EXPECTED_VERSION = 'ast-grep 0.44.1'
 cargo test -p srcq-protocol-tests --test real_protocol -- --ignored --test-threads=1
 ```
 

@@ -3,7 +3,7 @@
 ## 环境
 
 - Rust 1.85.0，最小 profile；`rust-toolchain.toml` 固定版本及 rustfmt/clippy。
-- ast-grep 0.44.1 用于固定版真实集成与 `srcq symbol` outline 关系验证；普通 AST 多版本矩阵还使用 0.41.1 与 0.42.0。
+- ast-grep 0.44.1 是普通 AST、透传、协议、压力测试与 `srcq symbol` outline 关系验证的唯一基线。
 - scc 3.7.0 用于 query gateway 的真实汇总、逐文件、json2、显式格式与输出副作用集成；fixture 另覆盖未来字段形状、协议变化和错误退出。
 - Node/Python 不是构建或运行依赖。
 
@@ -26,7 +26,7 @@ cargo lint
 cargo fmt-check
 ```
 
-真实 ast-grep ignored 测试需要把 `SRCQ_AST_GREP` 指向原生文件，并把 `SRCQ_AST_GREP_EXPECTED_VERSION` 设置为完整 `--version` 行（当前关系基线对应 `ast-grep 0.44.1`），再按 package/版本顺序运行；普通 AST 的 0.41.1/0.42.0 精确矩阵仍按各测试身份单独执行。真实 scc 测试使用 PATH 或 `SRCQ_SCC_PATH`。不要并行执行共享 fixture 的全部 ignored 测试。
+真实 ast-grep ignored 测试需要把 `SRCQ_AST_GREP` 指向原生 0.44.1 文件，并把 `SRCQ_AST_GREP_EXPECTED_VERSION` 设置为完整 `ast-grep 0.44.1`，再按 package 顺序运行。真实 scc 测试使用 PATH 或 `SRCQ_SCC_PATH`。不要并行执行共享 fixture 的全部 ignored 测试。
 
 `cargo lint` 与 `cargo ci-test` 都包含 `--all-targets --all-features`；不要用缺少 `test-helper` feature 的普通 workspace test 替代正式门禁。真实引擎测试还需要显式传入 `-- --ignored`。
 

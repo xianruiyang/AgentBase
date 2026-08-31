@@ -427,7 +427,7 @@ mod tests {
     #[test]
     fn ast_grep_path_name_wins_without_touching_sg() {
         let environment =
-            FakeEnvironment::new(Some("path/ast-grep"), Some("path/sg"), "ast-grep 0.42.0");
+            FakeEnvironment::new(Some("path/ast-grep"), Some("path/sg"), "ast-grep 0.44.1");
         let discovered = discover_engine(None, Path::new("launch"), &environment)
             .expect("ast-grep PATH candidate should resolve");
         assert_eq!(discovered.source, EngineSource::PathAstGrep);
@@ -438,11 +438,11 @@ mod tests {
 
     #[test]
     fn sg_fallback_requires_ast_grep_identity() {
-        let trusted = FakeEnvironment::new(None, Some("path/sg"), "ast-grep 0.41.1");
+        let trusted = FakeEnvironment::new(None, Some("path/sg"), "ast-grep 0.44.1");
         let discovered = discover_engine(None, Path::new("launch"), &trusted)
             .expect("trusted sg should resolve");
         assert_eq!(discovered.source, EngineSource::PathSg);
-        assert_eq!(discovered.version_line.as_deref(), Some("ast-grep 0.41.1"));
+        assert_eq!(discovered.version_line.as_deref(), Some("ast-grep 0.44.1"));
         assert_eq!(trusted.probe_count.get(), 1);
 
         let untrusted = FakeEnvironment::new(None, Some("path/sg"), "sg 1.0.0");

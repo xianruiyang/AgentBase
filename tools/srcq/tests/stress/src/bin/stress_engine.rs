@@ -10,7 +10,7 @@ fn main() -> io::Result<()> {
         .first()
         .is_some_and(|arg| arg == "--version" || arg == "-V")
     {
-        println!("ast-grep 0.42.0");
+        println!("ast-grep 0.44.1");
         return Ok(());
     }
     let records = numeric_flag(&args, "--stress-records=").unwrap_or(1);

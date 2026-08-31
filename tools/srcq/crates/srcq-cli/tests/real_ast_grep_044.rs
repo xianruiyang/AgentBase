@@ -10,7 +10,7 @@ use srcq_core::codec::parse_yaml_documents;
 #[ignore = "requires SRCQ_AST_GREP to point to a real ast-grep binary"]
 fn real_ast_grep_run_scan_stdin_and_exit_gate() {
     let engine = PathBuf::from(
-        std::env::var_os("SRCQ_AST_GREP").expect("SRCQ_AST_GREP must name ast-grep 0.42.0"),
+        std::env::var_os("SRCQ_AST_GREP").expect("SRCQ_AST_GREP must name ast-grep 0.44.1"),
     );
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -22,7 +22,7 @@ fn real_ast_grep_run_scan_stdin_and_exit_gate() {
         .expect("read ast-grep version");
     assert!(version.status.success());
     let expected_version = std::env::var("SRCQ_AST_GREP_EXPECTED_VERSION")
-        .unwrap_or_else(|_| "ast-grep 0.42.0".to_owned());
+        .unwrap_or_else(|_| "ast-grep 0.44.1".to_owned());
     assert_eq!(
         String::from_utf8(version.stdout)
             .expect("UTF-8 version")
@@ -214,7 +214,7 @@ fn real_ast_grep_run_scan_stdin_and_exit_gate() {
 #[ignore = "requires SRCQ_AST_GREP to point to a real ast-grep binary"]
 fn real_scan_formats_severity_and_native_limit_match_the_wrapper() {
     let engine = PathBuf::from(
-        std::env::var_os("SRCQ_AST_GREP").expect("SRCQ_AST_GREP must name ast-grep 0.42.0"),
+        std::env::var_os("SRCQ_AST_GREP").expect("SRCQ_AST_GREP must name ast-grep 0.44.1"),
     );
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -377,7 +377,7 @@ fn real_scan_formats_severity_and_native_limit_match_the_wrapper() {
 #[ignore = "requires SRCQ_AST_GREP to point to a real ast-grep binary"]
 fn real_update_all_preserves_run_and_scan_file_modifications() {
     let engine = PathBuf::from(
-        std::env::var_os("SRCQ_AST_GREP").expect("SRCQ_AST_GREP must name ast-grep 0.42.0"),
+        std::env::var_os("SRCQ_AST_GREP").expect("SRCQ_AST_GREP must name ast-grep 0.44.1"),
     );
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()

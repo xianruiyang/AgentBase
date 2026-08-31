@@ -10,14 +10,14 @@ use srcq_core::codec::parse_yaml_documents;
 #[ignore = "requires SRCQ_AST_GREP to point to a real ast-grep binary"]
 fn real_lsp_initialize_request_shutdown_exit_is_byte_identical() {
     let engine = PathBuf::from(
-        std::env::var_os("SRCQ_AST_GREP").expect("SRCQ_AST_GREP must name ast-grep 0.42.0"),
+        std::env::var_os("SRCQ_AST_GREP").expect("SRCQ_AST_GREP must name ast-grep 0.44.1"),
     );
     let version = Command::new(&engine)
         .arg("--version")
         .output()
         .expect("read ast-grep version");
     let expected_version = std::env::var("SRCQ_AST_GREP_EXPECTED_VERSION")
-        .unwrap_or_else(|_| "ast-grep 0.42.0".to_owned());
+        .unwrap_or_else(|_| "ast-grep 0.44.1".to_owned());
     assert_eq!(
         String::from_utf8(version.stdout)
             .expect("UTF-8 version")

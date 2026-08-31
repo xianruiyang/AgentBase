@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use srcq_core::codec::parse_yaml_documents;
 
-const EXPECTED_VERSION: &str = "ast-grep 0.42.0";
+const EXPECTED_VERSION: &str = "ast-grep 0.44.1";
 
 #[test]
 #[ignore = "requires SRCQ_AST_GREP and a real platform PTY"]

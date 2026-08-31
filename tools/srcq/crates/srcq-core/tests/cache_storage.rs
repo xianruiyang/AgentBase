@@ -58,7 +58,7 @@ fn audit(suffix: &str) -> CacheAudit {
     effective.push(OsString::from("--json=stream"));
     CacheAudit::from_argv(
         "C:/tools/ast-grep.exe",
-        "0.42.0",
+        "0.44.1",
         "D:/work/repo",
         &user,
         &effective,

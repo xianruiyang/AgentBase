@@ -41,6 +41,6 @@ srcq 的基本契约是“显式原生 argv 优先，缺省时做安全补全”
 
 ## 版本与平台声明
 
-当前固定基线为 ast-grep 0.44.1，`srcq symbol` 的 outline 关系能力只在该基线声明；Windows x86_64 的普通 AST 兼容面还精确验证了 0.41.1 与 0.42.0。scc backend 当前精确验证 `scc 3.7.0`。支持声明只覆盖对应能力的这些精确版本，不把中间未运行版本推断为兼容。未知命令继续使用 raw fallback，不能据此宣称其全部语义已认证。
+当前唯一验证基线为 ast-grep 0.44.1，普通 AST、透传、协议与 `srcq symbol` outline 关系能力均只在该版本声明；不维护较早版本的现行兼容矩阵。scc backend 当前精确验证 `scc 3.7.0`。未知命令继续使用 raw fallback，不能据此宣称其全部语义已认证。
 
-唯一维护平台是 Windows x86_64 MSVC，现有证据覆盖三版本真实 run/scan/rewrite/cache、TTY/LSP、确定性 release 和 PowerShell 5.1 安装生命周期。其他平台不进入构建、测试、安装或发布范围。
+唯一维护平台是 Windows x86_64 MSVC，现有证据覆盖 ast-grep 0.44.1 的真实 run/scan/rewrite/cache、TTY/LSP、确定性 release 和 PowerShell 5.1 安装生命周期。其他平台不进入构建、测试、安装或发布范围。

@@ -15,7 +15,7 @@ fn real_run_rewrite_and_scan_shapes_project_as_known_records() {
         .output()
         .expect("read version");
     let expected_version = std::env::var("SRCQ_AST_GREP_EXPECTED_VERSION")
-        .unwrap_or_else(|_| "ast-grep 0.42.0".to_owned());
+        .unwrap_or_else(|_| "ast-grep 0.44.1".to_owned());
     assert_eq!(
         String::from_utf8(version.stdout)
             .expect("UTF-8 version")

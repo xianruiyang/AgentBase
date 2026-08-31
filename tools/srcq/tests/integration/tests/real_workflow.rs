@@ -14,7 +14,7 @@ use srcq_core::{
 };
 use tempfile::TempDir;
 
-const EXPECTED_VERSION: &str = "ast-grep 0.42.0";
+const EXPECTED_VERSION: &str = "ast-grep 0.44.1";
 
 #[test]
 #[ignore = "requires SRCQ_AST_GREP to point to a real ast-grep binary"]
