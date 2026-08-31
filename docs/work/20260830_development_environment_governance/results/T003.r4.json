@@ -1,0 +1,58 @@
+{
+  "changed_files": [
+    "development/agent-evaluation/agent_eval.py",
+    "development/agent-evaluation/agentbase_codex.py",
+    "development/agent-evaluation/evaluation_core.py",
+    "development/agent-evaluation/windows_verifier.py",
+    "development/agent-evaluation/test_agent_evaluation_infrastructure.ps1",
+    "development/agent-evaluation/candidate_preflight.ps1",
+    "development/agent-evaluation/sandbox_runtime_cleanup.ps1",
+    "development/agent-evaluation/collect_native_validation.ps1",
+    "development/agent-evaluation/corpus/schema.json",
+    "development/agent-evaluation/tests/test_evaluation.py"
+  ],
+  "evidence_for": [
+    "SOL-002",
+    "DES-004",
+    "DES-005",
+    "AC-002",
+    "AC-005",
+    "UDES-002"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "cli",
+      "note": "当前命令集合只含 validate/list/next/check/prepare/oracle/run/recover/report",
+      "ref": "development/agent-evaluation/agent_eval.py --help"
+    },
+    {
+      "kind": "audit",
+      "note": "退出术语只剩测试中的显式否定断言；生产实现、schema 和验证入口均无旧生命周期引用",
+      "ref": "development/agent-evaluation"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "最终评测生产入口和测试已退出 elevated sandbox、ACL/deny/canary、认证 hardlink、permission profile、model catalog projection、preflight、setup/status/check 与专用 sandbox cleanup 生命周期；只保留工作区、patch、身份、锁、超时、报告与恢复等有当前消费者的机械合同。",
+  "outputs": [
+    "删除 candidate_preflight.ps1、sandbox_runtime_cleanup.ps1、collect_native_validation.ps1",
+    "删除 sandbox-status、sandbox-setup、sandbox-check、assess CLI 及其生产代码",
+    "删除只证明旧安全画像的测试并补充受信任本地执行合同测试"
+  ],
+  "schema": "task.result",
+  "task_id": "T003",
+  "task_revision": 1,
+  "unresolved": [
+    "当前文档仍有旧现状描述，由 T004 更新",
+    "没有运行真实模型或九题评测"
+  ],
+  "validation_coverage": [
+    "implementation=no-legacy-sandbox-runtime",
+    "test-oracle=current-mechanical-contracts-only",
+    "cli-contract=no-setup-status-check-assess"
+  ],
+  "verification": [
+    "agent_eval.py --help：exit 0，旧 sandbox 与 assess 子命令不存在",
+    "精确引用审计：生产实现/schema/验证脚本无旧入口与字段",
+    "确定性 unittest discover：60 tests passed"
+  ]
+}

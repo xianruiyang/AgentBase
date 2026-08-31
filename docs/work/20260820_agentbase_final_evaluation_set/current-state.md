@@ -1,5 +1,7 @@
 # 当前状态与差距
 
+> 生命周期：2026-08-21 失败现场记录，不是当前状态 owner。当前实现与状态由 [`development/agent-evaluation/README.md`](../../../development/agent-evaluation/README.md) 和[开发环境治理任务表](../20260830_development_environment_governance/TASK_TABLE.md)维护。
+
 ## OBS-001 旧草案使用 Pier/Linux，不能评价完整 AgentBase
 
 - 状态: confirmed

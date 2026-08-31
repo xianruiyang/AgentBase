@@ -1,0 +1,56 @@
+{
+  "changed_files": [
+    "development/agent-evaluation/agent_eval.py",
+    "development/agent-evaluation/evaluation_core.py",
+    "development/agent-evaluation/tests/test_evaluation.py"
+  ],
+  "evidence_for": [
+    "SOL-001",
+    "DES-002",
+    "DES-003",
+    "AC-002",
+    "AC-004",
+    "AC-007",
+    "REQ-003"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "note": "三个只读状态命令不解析安装 Codex 根或 sandbox runtime",
+      "ref": "development/agent-evaluation/tests/test_evaluation.py"
+    },
+    {
+      "kind": "runtime",
+      "note": "当前 corpus、空状态与现有本地状态的真实 CLI 读回",
+      "ref": "development/agent-evaluation/agent_eval.py validate/list/report --view machine"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "validate、list 和 report 已从当前 corpus 与本地状态直接生成结果，不再解析安装 Codex 根目录或读取 sandbox runtime；真正需要候选运行时的 oracle、run、recover 与 sandbox 旧入口仍显式执行其自身前置。",
+  "outputs": [
+    "通用 resolve_context 只校验项目、state 与 work 根边界",
+    "运行时相关命令在自己的入口校验可选安装 Codex 根",
+    "validate/list/report 的空状态与现有本地状态真实读回"
+  ],
+  "schema": "task.result",
+  "source_snapshot_ref": "sha256:c083a469c8a5f6000b022e4e3424cb0b26045e4e65883e29289eedb72b890f36",
+  "task_id": "T001",
+  "task_revision": 1,
+  "unresolved": [
+    "候选与 Verifier 仍消费旧 sandbox runtime；由 T002 迁移后，T003 才删除 strict-safety 资产与自证门禁",
+    "本结果没有运行九题 oracle、模型候选或完整组件回归"
+  ],
+  "validation_coverage": [
+    "command=validate",
+    "command=list",
+    "command=report",
+    "local-state-presence=empty-temporary-roots",
+    "local-state-presence=existing-default-state"
+  ],
+  "verification": [
+    "python -X utf8 -m unittest discover -s development\\agent-evaluation\\tests -p test_evaluation.py -k test_read_only_status_commands_do_not_resolve_sandbox_runtime：1 test passed",
+    "agent_eval.py validate --view machine：exit 0，9 tasks，external_actions=false",
+    "agent_eval.py list --suite smoke --view machine：exit 0，2 tasks，当前 source=prepared、qualification=pending",
+    "agent_eval.py report --suite smoke --view machine：exit 0，0/4 current runs，infrastructure_failed=0"
+  ]
+}

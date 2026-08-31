@@ -101,17 +101,15 @@ Formal Validate checks only the actual deployment payload, the structural global
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Validate -ProjectRoot (Get-Location).Path
 ```
 
-Validate and Publish deliberately do not run the real candidate permission probe or the cross-owner final assessment. Those explicit entries use the same elevated profile as a future candidate; first use can request administrator approval and configure the native Windows sandbox, so they must not be hidden inside a routine gate:
+Validate and Publish deliberately do not run the Windows SWE corpus, qualification, Verifier or candidate model. Inspecting host/task prerequisites remains a separate read-only action:
 
 ```powershell
 python.exe -X utf8 .\development\agent-evaluation\agent_eval.py check --suite all
-python.exe -X utf8 .\development\agent-evaluation\agent_eval.py sandbox-check --view machine
-python.exe -X utf8 .\development\agent-evaluation\agent_eval.py assess --suite all --view machine
 ```
 
-`check` is read-only and reports missing base/task tools, including pnpm only when the selected suite needs it. `sandbox-check` runs no model but requires the formal elevated host-default-deny policy: minimal runtime paths, the candidate workspace and one per-attempt tmpdir are reopened, the complete `.agents/skills` projection is narrowed to read-only, and state/project/installed-root probes remain unreadable. It also runs hash-pinned srcq AST/cache, pagination, fd tree, scc machine and artifact round trips before a model can start. Known missing administrator setup returns `blocked-precondition` instead of falling back to unelevated. `assess` consumes the native Validate result, that permission result, current routing evidence and the selected SWE report without refreshing model evidence, running qualification, installing dependencies or publishing.
+`check` reports missing base/task tools, including pnpm only when the selected suite needs it. It does not install software, prepare external sources, run a Verifier or call a model. The final evaluator no longer owns a Windows sandbox setup/status/permission-probe lifecycle; candidate and Verifier runs are explicit component operations documented in `development/agent-evaluation/README.md`.
 
-`run`, `recover`, `sandbox-check`, and `assess` accept `--installed-codex-root`; it defaults to `CODEX_HOME` or `%USERPROFILE%\.codex`. The evaluator denies that complete root to candidate tools and proves both staged and original `auth.json` are unreadable before a model can start. Pass the same explicit root to recovery when the original run used a non-default installation.
+`run` accepts `--installed-codex-root`; it defaults to `CODEX_HOME` or `%USERPROFILE%\.codex` and uses that root only for existing authentication and session usage accounting. Candidate configuration and agents are projected from repository truth; credentials are not copied or linked. `recover` consumes the recorded candidate result and runs only the independent Verifier, so it neither needs the installation root nor calls a model.
 
 The repeatable tests cover lifecycle identity continuity, explicit retirement, safe config-key provenance and removal, default preservation, explicit settings and custom-agent installation, resolved hook paths, unrelated Skill and agent preservation, seeded retired-path detection/removal/restoration, wrong-kind refusal, cross-scope provenance, and rollback:
 

@@ -23,7 +23,7 @@ AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、ski
 | [`development/codex-qq-hook/`](development/codex-qq-hook/) | QQ Webhook 辅助程序与开发资料；运行脚本仍由对应 skill 所有 |
 | [`development/source-query-gateway/`](development/source-query-gateway/plan.md) | 源码查询专项需求、设计、计划和实践证据 |
 | [`development/skill-routing/`](development/skill-routing/README.md) | 静态触发合同与脱离仓库的分阶段路由评估 |
-| [`development/agent-evaluation/`](development/agent-evaluation/README.md) | 固定 DeepSWE 题目/计分语义、Windows candidate/verifier 双工作区与逐题资格/结果组成的派生最终评测集 |
+| [`development/agent-evaluation/`](development/agent-evaluation/README.md) | 固定 DeepSWE 题目/计分语义、受信任本地 candidate 与独立 Verifier 工作区、逐题资格/恢复/结果组成的派生最终评测集 |
 | [`development/plugin-packaging/`](development/plugin-packaging/README.md) | `agentbase-core` 插件模板、过滤打包和官方校验入口 |
 | [`development/codex-deployment/`](development/codex-deployment/README.md) | Windows 主机准备、校验、增量发布、状态读回与回滚 |
 | [`development/responsibility-lifecycle.md`](development/responsibility-lifecycle.md) | 公共职责形成、消费者接入和穿透式更新的设计分析 |

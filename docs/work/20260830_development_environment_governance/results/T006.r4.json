@@ -1,0 +1,82 @@
+{
+  "changed_files": [
+    "development/agent-evaluation/**",
+    "development/codex-deployment/README.md",
+    "README.md",
+    "global/README.md",
+    "docs/requirements.md",
+    "docs/plan.md",
+    "docs/handoff.md",
+    "docs/work/20260820_agentbase_final_evaluation_set/**",
+    "docs/work/20260822_windows_sandbox_ownership_repair/**",
+    "docs/work/20260830_development_environment_governance/**"
+  ],
+  "evidence_for": [
+    "SOL-005",
+    "AC-001",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "REQ-001",
+    "REQ-002",
+    "REQ-003"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "component-test",
+      "note": "62 项确定性基础设施测试通过且禁用模型 evaluator",
+      "ref": "development/agent-evaluation/test_agent_evaluation_infrastructure.ps1"
+    },
+    {
+      "kind": "current-contract",
+      "note": "当前 CLI、candidate、Verifier、recover 和保留机械边界",
+      "ref": "development/agent-evaluation/README.md"
+    },
+    {
+      "kind": "recovery-state",
+      "note": "T001—T006 完成、T007 明确重开条件、无 Publish",
+      "ref": "docs/handoff.md"
+    },
+    {
+      "kind": "post-cleanup-readback",
+      "note": "旧 sandbox 状态为 0，正式状态根保留",
+      "ref": "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\agent-evaluation-state"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "metadata": {
+    "model_evaluation_run": false,
+    "nine_task_evaluation_run": false,
+    "publish_performed": false,
+    "t007_is_separate_reopen_condition": true
+  },
+  "outcome": "开发环境治理 T001—T006 已由当前源码、组件验证、CLI/引用审计、文档状态、任务依赖和宿主清理读回闭合：受信任本地 candidate 与独立 Verifier 是唯一评测运行路径，旧敌对安全生命周期及其脚本、测试、状态和本地残留均已退出，保留门禁均有当前机械契约或真实消费者。",
+  "outputs": [
+    "当前 evaluator 唯一 CLI、双工作区与 verifier-only recover 合同",
+    "62/62 模型禁用的确定性基础设施验证证据",
+    "旧生产入口与宿主 ACL 残留的退出证据",
+    "总计划、handoff、历史工作包和任务表的最终一致状态"
+  ],
+  "schema": "task.result",
+  "source_snapshot_ref": "sha256:38f0a6321eafc85a1044eebfd688d4823e135fa69249c90a8c1b7ba1ee191b6b",
+  "task_id": "T006",
+  "task_revision": 1,
+  "unresolved": [],
+  "validation_coverage": [
+    "component-contract=trusted-local-candidate-independent-verifier-and-recover",
+    "consumer-impact=current-cli-docs-deployment-and-task-results-aligned",
+    "lifecycle-exit=source-tests-cli-historical-docs-and-host-residuals",
+    "documentation-status=T001-through-T006-complete-no-publish",
+    "dirty-boundary=all-current-changes-attributed-to-governance"
+  ],
+  "verification": [
+    "test_agent_evaluation_infrastructure.ps1：62/62 passed，model evaluator disabled",
+    "Python py_compile 与 invoke_candidate.ps1 PowerShell AST 解析通过",
+    "agent_eval.py --help 仅含 validate/list/next/check/prepare/oracle/run/recover/report",
+    "失败 candidate recover 定向回归通过，且只记录 recovery_failure，不捕获 patch、不启动 Verifier",
+    "生产入口退役引用审计、当前文档状态审计与 git diff --check 通过",
+    "管理员清理后 workspace 不存在、legacy state count=0，六个正式状态根均保留"
+  ]
+}

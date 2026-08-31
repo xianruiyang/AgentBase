@@ -1,0 +1,56 @@
+{
+  "changed_files": [
+    "development/agent-evaluation/agent_eval.py",
+    "development/agent-evaluation/agentbase_codex.py",
+    "development/agent-evaluation/evaluation_core.py",
+    "development/agent-evaluation/invoke_candidate.ps1",
+    "development/agent-evaluation/windows_verifier.py",
+    "development/agent-evaluation/corpus/final-v1.json",
+    "development/agent-evaluation/corpus/schema.json",
+    "development/agent-evaluation/tests/test_evaluation.py"
+  ],
+  "evidence_for": [
+    "SOL-001",
+    "DES-002",
+    "DES-003",
+    "AC-003",
+    "AC-004",
+    "REQ-003"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "note": "候选投影、本地 CLI、独立 Verifier、patch、锁、超时、收据与 recover 的确定性覆盖",
+      "ref": "development/agent-evaluation/tests/test_evaluation.py"
+    },
+    {
+      "kind": "implementation",
+      "note": "本地 Codex exec 启动器，不再安装或复用专用 sandbox runtime",
+      "ref": "development/agent-evaluation/invoke_candidate.ps1"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "prepare、oracle、run 和 recover 已迁移到普通受信任本地候选与独立 Verifier 工作区；候选配置、custom agents 和 skills 按 attempt 投影，安装 Codex 根只用于 auth 与 session usage accounting，patch、身份、锁、超时、收据和 verifier-only recover 合同保留。",
+  "outputs": [
+    "候选使用 danger-full-access、approval_policy=never、ignore-user-config 的本地 Codex CLI 入口",
+    "Verifier 直接在独立工作区执行哈希固定依赖与检查",
+    "recover 只复用候选收据并重跑 Verifier，不重跑模型"
+  ],
+  "schema": "task.result",
+  "task_id": "T002",
+  "task_revision": 1,
+  "unresolved": [
+    "未运行真实模型或九题评测，按本次范围留给显式评测任务",
+    "当前运行中的 Codex 不会追溯加载未 Publish 的候选规则"
+  ],
+  "validation_coverage": [
+    "candidate-stage=local-trusted-runner",
+    "verifier-stage=local-independent-workspace",
+    "recovery-stage=verifier-only-without-model-rerun"
+  ],
+  "verification": [
+    "Python py_compile：agent_eval.py、agentbase_codex.py、evaluation_core.py、windows_verifier.py 与测试文件通过",
+    "invoke_candidate.ps1 PowerShell AST 解析通过",
+    "AGENTBASE_AGENT_EVALUATOR_DISABLED=1 下 unittest discover：60 tests passed"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "changed_files": [
+    "README.md",
+    "docs/requirements.md",
+    "docs/plan.md",
+    "docs/handoff.md",
+    "development/codex-deployment/README.md",
+    "development/agent-evaluation/README.md",
+    "docs/work/20260820_agentbase_final_evaluation_set/requirements.md",
+    "docs/work/20260820_agentbase_final_evaluation_set/design.md",
+    "docs/work/20260820_agentbase_final_evaluation_set/current-state.md",
+    "docs/work/20260820_agentbase_final_evaluation_set/solution.md",
+    "docs/work/20260820_agentbase_final_evaluation_set/verification.md",
+    "docs/work/20260820_agentbase_final_evaluation_set/user-design.md"
+  ],
+  "evidence_for": [
+    "SOL-003",
+    "DES-001",
+    "DES-005",
+    "AC-001",
+    "AC-006",
+    "REQ-001"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "documentation",
+      "note": "当前 evaluator 唯一组件说明与命令入口",
+      "ref": "development/agent-evaluation/README.md"
+    },
+    {
+      "kind": "requirements",
+      "note": "双工作区、共享环境和旧生命周期退出的根合同",
+      "ref": "docs/requirements.md#AC-063"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "根 README/requirements/plan/handoff、部署说明和最终评测组件说明已统一指向受信任本地 candidate、独立 Verifier 与当前 CLI；旧最终评测交付链已标记为历史/被治理方案替代，elevated sandbox 合同不再充当现行 owner。",
+  "outputs": [
+    "当前 owner、CLI、投影、双工作区、恢复与证据边界说明",
+    "AC-063—AC-065 当前替代合同及旧生命周期 superseded 裁决",
+    "历史最终评测需求/设计/状态/方案/验证的生命周期横幅"
+  ],
+  "schema": "task.result",
+  "task_id": "T004",
+  "task_revision": 1,
+  "unresolved": [
+    "T005/T006 完成后需把 handoff 的进行中状态更新为最终提交状态"
+  ],
+  "validation_coverage": [
+    "owner=current-component-and-root-requirements",
+    "entrypoint=current-cli-only",
+    "lifecycle=legacy-docs-superseded",
+    "status=governance-in-progress-no-publish"
+  ],
+  "verification": [
+    "当前文档精确引用审计：旧入口只出现在退出说明或历史标记中",
+    "部署说明只保留 check 只读入口，不再列出 sandbox-check/assess",
+    "handoff 明确当前未 Publish、T005/T006 尚待完成和恢复边界"
+  ]
+}

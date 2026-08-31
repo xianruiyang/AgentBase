@@ -9,7 +9,6 @@ import os
 import re
 import shutil
 import sys
-import tempfile
 import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -32,39 +31,20 @@ from agentbase_codex import (  # noqa: E402
     CODEX_RUN_RESULT_SCHEMA,
     CODEX_USAGE_FIELDS,
     REQUIRED_CANDIDATE_TOOLS,
-    WINDOWS_SANDBOX_LOCAL_BINDING_ENV_KEY,
     api_pricing_snapshot,
     candidate_capability_contract,
-    candidate_preflight_failed_checks,
     candidate_runtime_tools,
-    cleanup_candidate_runtime_temp,
-    cleanup_evaluation_runtime_transients,
-    evaluation_runtime_config_identity_descriptor,
-    evaluation_runtime_home_controlled_identity,
-    evaluation_runtime_transients_absent,
     format_usd_nanos,
-    invalidate_sandbox_runtime,
     invoke_candidate,
-    invoke_candidate_preflight,
-    invoke_sandbox_setup,
-    resolve_codex_identity,
-    sandbox_backend_snapshot,
-    sandbox_runtime_status as get_sandbox_runtime_status,
     stage_candidate_metadata,
-    stage_candidate_skill_projection,
-    stage_candidate_tool_probe_manifest,
-    sync_evaluation_runtime_home,
-    write_ready_sandbox_runtime_state,
+    verifier_runtime_tools,
 )
 from evaluation_core import (  # noqa: E402
     CaseLock,
-    ControlledRuntimeDriftError,
     EvaluationError,
     PreconditionError,
     QUALIFICATION_SCHEMA,
     RECOVERABLE_ATTEMPT_STAGES,
-    SandboxRuntimeInvalidError,
-    SandboxSetupApprovalError,
     apply_windows_adapter_baseline,
     bounded_text,
     candidate_receipt_dir,
@@ -93,11 +73,8 @@ from evaluation_core import (  # noqa: E402
     require_profile,
     require_task,
     require_within,
-    run_capture,
     sha256_bytes,
     sha256_file,
-    sandbox_runtime_home,
-    sandbox_runtime_root,
     suite_task_ids,
     task_map,
     update_attempt as persist_attempt,
@@ -109,8 +86,6 @@ from evaluation_core import (  # noqa: E402
     verify_windows_adapter_assets,
     with_receipt_hash,
     write_immutable_receipt,
-    write_json_atomic,
-    write_text_atomic,
 )
 from windows_verifier import (  # noqa: E402
     VERIFIER_RESULT_SCHEMA,
@@ -133,7 +108,6 @@ def resolve_context(
         project_root,
         state_root,
         work_root,
-        installed_codex_root_from_args(args),
     )
     corpus = load_corpus(corpus_path)
     verify_windows_adapter_assets(project_root, corpus)
@@ -156,12 +130,8 @@ def default_dotenv_path() -> Path:
 
 def require_installed_codex_runtime(
     installed_codex_root: Path,
-    *,
-    require_model_catalog: bool,
 ) -> None:
     required = ["auth.json"]
-    if require_model_catalog:
-        required.append("models_cache.json")
     missing = [name for name in required if not (installed_codex_root / name).is_file()]
     if missing:
         raise PreconditionError(
@@ -188,7 +158,6 @@ def process_environment(projection: Mapping[str, str]) -> dict[str, str]:
         environment = sanitized_process_environment(projection)
     except CodexRuntimeError as exc:
         raise EvaluationError(str(exc)) from exc
-    environment[WINDOWS_SANDBOX_LOCAL_BINDING_ENV_KEY] = "1"
     return environment
 
 
@@ -469,128 +438,11 @@ def _codex_executable_from_tools(tools: Mapping[str, Any]) -> Path:
     return path
 
 
-def _pwsh_executable_from_tools(tools: Mapping[str, Any]) -> Path:
-    try:
-        identity = tools["tools"]["pwsh"]
-        path = Path(str(identity["path"])).resolve()
-        expected_sha256 = str(identity["sha256"])
-    except (KeyError, TypeError) as exc:
-        raise EvaluationError("runtime tool identity omits PowerShell") from exc
-    if not path.is_file() or sha256_file(path) != expected_sha256:
-        raise EvaluationError("runtime PowerShell changed after identity capture")
-    return path
-
-
-def _resolve_current_codex_identity(
-    project_root: Path,
-    explicit_path: Path | None,
-) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(
-        prefix="codex-identity-",
-        ignore_cleanup_errors=True,
-    ) as directory:
-        return resolve_codex_identity(
-            project_root,
-            Path(directory) / "codex.json",
-            explicit_path,
-        )
-
-
-def _prepare_ready_sandbox_runtime(
-    *,
-    project_root: Path,
-    state_root: Path,
-    installed_codex_root: Path,
-    corpus: Mapping[str, Any],
-    codex_identity: Mapping[str, Any],
-) -> tuple[Path, dict[str, Any], dict[str, Any]]:
-    home, controlled = sync_evaluation_runtime_home(
-        project_root,
-        state_root,
-        installed_codex_root,
-        corpus,
-    )
-    cleanup_evaluation_runtime_transients(home)
-    status = get_sandbox_runtime_status(
-        project_root,
-        state_root,
-        installed_codex_root,
-        corpus,
-        codex_identity,
-    )
-    runtime_use = status.get("runtime_use")
-    if status.get("ready") is not True or not isinstance(runtime_use, dict):
-        reasons = ", ".join(str(item) for item in status.get("reason_codes", []))
-        raise PreconditionError(
-            "evaluation sandbox runtime is not ready"
-            + (f" ({reasons})" if reasons else "")
-            + "; run sandbox-setup explicitly"
-        )
-    if runtime_use.get("controlled_identity_sha256") != controlled.get(
-        "identity_sha256"
-    ):
-        raise EvaluationError("sandbox runtime controlled identity changed during preparation")
-    return home, dict(runtime_use), controlled
-
-
-def _precheck_sandbox_runtime(
-    *,
-    project_root: Path,
-    state_root: Path,
-    installed_codex_root: Path,
-    corpus: Mapping[str, Any],
-    explicit_codex_path: Path | None,
-) -> None:
-    codex_identity = _resolve_current_codex_identity(
-        project_root,
-        explicit_codex_path,
-    )
-    with CaseLock(state_root, "sandbox-runtime"):
-        _prepare_ready_sandbox_runtime(
-            project_root=project_root,
-            state_root=state_root,
-            installed_codex_root=installed_codex_root,
-            corpus=corpus,
-            codex_identity=codex_identity,
-        )
-
-
-def _invalidate_runtime_after_rejection(
-    state_root: Path,
-    error: SandboxRuntimeInvalidError,
-    *,
-    expected_identity_sha256: str,
-    runtime_lock_held: bool = False,
-) -> PreconditionError:
-    def invalidate() -> dict[str, Any]:
-        return invalidate_sandbox_runtime(
-            state_root,
-            "codex-rejected-prepared-runtime",
-            expected_identity_sha256=expected_identity_sha256,
-        )
-
-    state = invalidate() if runtime_lock_held else None
-    if state is None:
-        with CaseLock(state_root, "sandbox-runtime"):
-            state = invalidate()
-    if (
-        state.get("status") == "ready"
-        and state.get("identity_sha256") != expected_identity_sha256
-    ):
-        return PreconditionError(
-            f"{bounded_text(str(error), 400)}; the rejected runtime was superseded "
-            "by a newer ready runtime, so retry the command"
-        )
-    return PreconditionError(
-        f"{bounded_text(str(error), 400)}; runtime was invalidated and sandbox-setup is required"
-    )
-
-
 def _verifier_runtime_identity(
     task: Mapping[str, Any],
     runtime_tools: Mapping[str, Any],
 ) -> dict[str, Any]:
-    names = ["codex", "git", "pwsh"]
+    names = ["git", "pwsh"]
     names.append("python" if task["toolchain"]["kind"] == "python" else "node")
     try:
         selected = {name: dict(runtime_tools["tools"][name]) for name in names}
@@ -605,16 +457,9 @@ def _verifier_runtime_identity(
 
 def command_oracle(args: argparse.Namespace) -> int:
     project_root, corpus_path, state_root, work_root, corpus = resolve_context(args)
-    installed_codex_root = installed_codex_root_from_args(args)
+    ensure_evaluation_roots(project_root, state_root, work_root)
     task_id = args.task
     require_task(corpus, task_id)
-    _precheck_sandbox_runtime(
-        project_root=project_root,
-        state_root=state_root,
-        installed_codex_root=installed_codex_root,
-        corpus=corpus,
-        explicit_codex_path=args.codex_executable,
-    )
     descriptor, projection = resolve_network(args)
     environment = process_environment(projection)
     prepare_sources(state_root, corpus, [task_id], environment)
@@ -628,109 +473,74 @@ def command_oracle(args: argparse.Namespace) -> int:
     run_id = f"oracle-{task_id}-{int(time.time())}-{os.getpid()}"
     run_root = state_root / "qualification-runs" / run_id
     run_root.mkdir(parents=True, exist_ok=False)
-    tools = candidate_runtime_tools(project_root, run_root, args.codex_executable)
+    tools = verifier_runtime_tools(require_task(corpus, task_id))
     verifier_runtime = _verifier_runtime_identity(require_task(corpus, task_id), tools)
-    codex_executable = _codex_executable_from_tools(tools)
-    pwsh_executable = _pwsh_executable_from_tools(tools)
     repetitions: list[dict[str, Any]] = []
     p2p_exclusions: list[str] = []
     baseline_policy = require_task(corpus, task_id).get("windows_oracle", {}).get(
         "p2p_baseline_policy"
     )
-    sandbox_runtime: dict[str, Any] | None = None
     with CaseLock(state_root, f"oracle:{task_id}"):
-        with CaseLock(state_root, "sandbox-runtime"):
-            codex_home, sandbox_runtime, _ = _prepare_ready_sandbox_runtime(
+        for index in range(int(corpus["adapter"]["qualification_repetitions"])):
+            noop = verify_patch(
                 project_root=project_root,
                 state_root=state_root,
-                installed_codex_root=installed_codex_root,
+                work_root=work_root,
                 corpus=corpus,
-                codex_identity=tools["tools"]["codex"],
+                task_id=task_id,
+                run_name=f"{run_id}/{index:02d}-noop",
+                patch_kind="noop",
+                candidate_patch=None,
+                artifact_root=run_root / f"{index:02d}-noop",
+                network_environment=environment,
+                retain_workspace=args.retain_workspace,
+                p2p_exclusions=p2p_exclusions,
             )
-            try:
-                for index in range(
-                    int(corpus["adapter"]["qualification_repetitions"])
-                ):
-                    noop = verify_patch(
-                        project_root=project_root,
-                        state_root=state_root,
-                        work_root=work_root,
-                        corpus=corpus,
-                        task_id=task_id,
-                        run_name=f"{run_id}/{index:02d}-noop",
-                        patch_kind="noop",
-                        candidate_patch=None,
-                        artifact_root=run_root / f"{index:02d}-noop",
-                        network_environment=environment,
-                        codex_executable=codex_executable,
-                        pwsh_executable=pwsh_executable,
-                        codex_home=codex_home,
-                        sandbox_runtime=sandbox_runtime,
-                        retain_workspace=args.retain_workspace,
-                        p2p_exclusions=p2p_exclusions,
+            if noop["grade"]["reward"]["reward"] != 0:
+                raise EvaluationError("Windows no-op oracle must score 0")
+            observed_noop_exclusions = list(
+                noop.get("observed_baseline_p2p_exclusions", [])
+            )
+            if baseline_policy in {
+                "exclude-stable-skips",
+                "exclude-stable-nonpassing",
+            }:
+                if index == 0:
+                    p2p_exclusions = observed_noop_exclusions
+                elif observed_noop_exclusions != p2p_exclusions:
+                    raise EvaluationError(
+                        "Windows no-op baseline exclusions changed across repetitions"
                     )
-                    if noop["grade"]["reward"]["reward"] != 0:
-                        raise EvaluationError("Windows no-op oracle must score 0")
-                    observed_noop_exclusions = list(
-                        noop.get("observed_baseline_p2p_exclusions", [])
-                    )
-                    if baseline_policy in {
-                        "exclude-stable-skips",
-                        "exclude-stable-nonpassing",
-                    }:
-                        if index == 0:
-                            p2p_exclusions = observed_noop_exclusions
-                        elif observed_noop_exclusions != p2p_exclusions:
-                            raise EvaluationError(
-                                "Windows no-op baseline exclusions changed across repetitions"
-                            )
-                    elif observed_noop_exclusions:
-                        raise EvaluationError(
-                            "Windows baseline outcomes were projected without an enabled policy"
-                        )
-                    reference = verify_patch(
-                        project_root=project_root,
-                        state_root=state_root,
-                        work_root=work_root,
-                        corpus=corpus,
-                        task_id=task_id,
-                        run_name=f"{run_id}/{index:02d}-reference",
-                        patch_kind="reference",
-                        candidate_patch=None,
-                        artifact_root=run_root / f"{index:02d}-reference",
-                        network_environment=environment,
-                        codex_executable=codex_executable,
-                        pwsh_executable=pwsh_executable,
-                        codex_home=codex_home,
-                        sandbox_runtime=sandbox_runtime,
-                        retain_workspace=args.retain_workspace,
-                        p2p_exclusions=p2p_exclusions,
-                    )
-                    if reference["grade"]["reward"]["reward"] != 1:
-                        raise EvaluationError("Windows reference oracle must score 1")
-                    if list(
-                        reference.get("observed_baseline_p2p_exclusions", [])
-                    ) != p2p_exclusions:
-                        raise EvaluationError(
-                            "Windows reference changed the stable P2P exclusion frontier"
-                        )
-                    if (
-                        noop["dependency_identity"]["identity_sha256"]
-                        != reference["dependency_identity"]["identity_sha256"]
-                    ):
-                        raise EvaluationError(
-                            "no-op and reference dependency identities differ"
-                        )
-                    repetitions.append({"noop": noop, "reference": reference})
-            except SandboxRuntimeInvalidError as exc:
-                raise _invalidate_runtime_after_rejection(
-                    state_root,
-                    exc,
-                    expected_identity_sha256=str(sandbox_runtime["identity_sha256"]),
-                    runtime_lock_held=True,
-                ) from exc
-            finally:
-                cleanup_evaluation_runtime_transients(codex_home)
+            elif observed_noop_exclusions:
+                raise EvaluationError(
+                    "Windows baseline outcomes were projected without an enabled policy"
+                )
+            reference = verify_patch(
+                project_root=project_root,
+                state_root=state_root,
+                work_root=work_root,
+                corpus=corpus,
+                task_id=task_id,
+                run_name=f"{run_id}/{index:02d}-reference",
+                patch_kind="reference",
+                candidate_patch=None,
+                artifact_root=run_root / f"{index:02d}-reference",
+                network_environment=environment,
+                retain_workspace=args.retain_workspace,
+                p2p_exclusions=p2p_exclusions,
+            )
+            if reference["grade"]["reward"]["reward"] != 1:
+                raise EvaluationError("Windows reference oracle must score 1")
+            if list(reference.get("observed_baseline_p2p_exclusions", [])) != p2p_exclusions:
+                raise EvaluationError(
+                    "Windows reference changed the stable P2P exclusion frontier"
+                )
+            if (
+                noop["dependency_identity"]["identity_sha256"]
+                != reference["dependency_identity"]["identity_sha256"]
+            ):
+                raise EvaluationError("no-op and reference dependency identities differ")
+            repetitions.append({"noop": noop, "reference": reference})
     dependency_ids = {
         item[mode]["dependency_identity"]["identity_sha256"]
         for item in repetitions
@@ -762,17 +572,6 @@ def command_oracle(args: argparse.Namespace) -> int:
         "runtime_environment": descriptor,
         "runtime_tools_identity_sha256": tools["identity_sha256"],
         "p2p_exclusions": p2p_exclusions,
-        "sandbox_runtime": {
-            "identity_sha256": sandbox_runtime["identity_sha256"],
-            "controlled_identity_sha256": sandbox_runtime[
-                "controlled_identity_sha256"
-            ],
-            "backend_identity_sha256": sandbox_runtime[
-                "backend_identity_sha256"
-            ],
-            "persistent_and_shared": True,
-            "setup_invoked": False,
-        },
         "repetitions": repetitions,
         "qualified": True,
         "leaderboard_comparable": False,
@@ -834,9 +633,6 @@ def _run_candidate_verifier(
     attempt_root: Path,
     patch: Path,
     environment: Mapping[str, str],
-    runtime_tools: Mapping[str, Any],
-    codex_home: Path,
-    sandbox_runtime: Mapping[str, Any],
     expected_dependency_sha256: str,
     p2p_exclusions: Sequence[str],
     retain_workspace: bool,
@@ -852,10 +648,6 @@ def _run_candidate_verifier(
         candidate_patch=patch,
         artifact_root=attempt_root / "verifier",
         network_environment=environment,
-        codex_executable=_codex_executable_from_tools(runtime_tools),
-        pwsh_executable=_pwsh_executable_from_tools(runtime_tools),
-        codex_home=codex_home,
-        sandbox_runtime=sandbox_runtime,
         retain_workspace=retain_workspace,
         p2p_exclusions=p2p_exclusions,
     )
@@ -902,21 +694,12 @@ def _cleanup_candidate_workspace(
 def command_run(args: argparse.Namespace) -> int:
     project_root, corpus_path, state_root, work_root, corpus = resolve_context(args)
     installed_codex_root = installed_codex_root_from_args(args)
-    require_installed_codex_runtime(
-        installed_codex_root,
-        require_model_catalog=True,
-    )
+    ensure_evaluation_roots(project_root, state_root, work_root, installed_codex_root)
+    require_installed_codex_runtime(installed_codex_root)
     task_id = args.task
     profile_name = args.profile
     task = require_task(corpus, task_id)
     require_profile(corpus, profile_name)
-    _precheck_sandbox_runtime(
-        project_root=project_root,
-        state_root=state_root,
-        installed_codex_root=installed_codex_root,
-        corpus=corpus,
-        explicit_codex_path=args.codex_executable,
-    )
     descriptor, projection = resolve_network(args)
     environment = process_environment(projection)
     verify_deep_swe(state_root, corpus)
@@ -928,13 +711,8 @@ def command_run(args: argparse.Namespace) -> int:
         profile=profile_name,
         retry_reason=args.retry_reason,
     )
-    codex_home: Path | None = None
-    sandbox_runtime: dict[str, Any] | None = None
     try:
-        with (
-            CaseLock(state_root, f"candidate:{task_id}:{profile_name}"),
-            CaseLock(state_root, "sandbox-runtime"),
-        ):
+        with CaseLock(state_root, f"candidate:{task_id}:{profile_name}"):
             candidate_workspace = create_workspace(
                 state_root,
                 work_root,
@@ -982,7 +760,10 @@ def command_run(args: argparse.Namespace) -> int:
                 attempt_root,
                 args.codex_executable,
             )
-            verifier_runtime = _verifier_runtime_identity(task, runtime_tools)
+            verifier_runtime = _verifier_runtime_identity(
+                task,
+                verifier_runtime_tools(task),
+            )
             qualification = find_matching_qualification(
                 qualifications,
                 dependency["identity_sha256"],
@@ -992,12 +773,24 @@ def command_run(args: argparse.Namespace) -> int:
                 raise PreconditionError(
                     "no current Windows qualification matches the resolved dependencies; run oracle"
                 )
-            expected_config_identity = evaluation_runtime_config_identity_descriptor(
+            metadata = stage_candidate_metadata(
                 project_root,
                 state_root,
-                installed_codex_root,
                 corpus,
+                task_id,
+                candidate_workspace,
+                attempt_root,
+                dependency_values,
             )
+            projected_config = metadata["codex_projection"]
+            config_descriptor = {
+                "schema": "agentbase.windows-swe-codex-projection/v1",
+                "identity_sha256": projected_config["identity_sha256"],
+                "files": projected_config["files"],
+                "shell_environment_policy_sha256": projected_config[
+                    "shell_environment_policy_sha256"
+                ],
+            }
             identity = candidate_run_identity(
                 project_root=project_root,
                 corpus_path=corpus_path,
@@ -1008,7 +801,7 @@ def command_run(args: argparse.Namespace) -> int:
                 dependency_identity=dependency,
                 runtime_environment=descriptor,
                 runtime_tools=runtime_tools,
-                config_descriptor=expected_config_identity,
+                config_descriptor=config_descriptor,
             )
             attempt = update_attempt(
                 attempt_root,
@@ -1053,27 +846,6 @@ def command_run(args: argparse.Namespace) -> int:
                 identity["identity_sha256"],
                 args.retry_reason,
             )
-            codex_home, sandbox_runtime, controlled = _prepare_ready_sandbox_runtime(
-                project_root=project_root,
-                state_root=state_root,
-                installed_codex_root=installed_codex_root,
-                corpus=corpus,
-                codex_identity=runtime_tools["tools"]["codex"],
-            )
-            config_descriptor = controlled["config"]
-            if config_descriptor.get("identity") != expected_config_identity:
-                raise EvaluationError("evaluation runtime config identity changed")
-            metadata = stage_candidate_metadata(
-                project_root,
-                state_root,
-                corpus,
-                task_id,
-                candidate_workspace,
-                attempt_root,
-                runtime_tools,
-                dependency,
-                dependency_values,
-            )
             attempt = update_attempt(
                 attempt_root,
                 attempt,
@@ -1085,11 +857,7 @@ def command_run(args: argparse.Namespace) -> int:
             codex_result = invoke_candidate(
                 project_root=project_root,
                 workspace=candidate_workspace,
-                state_root=state_root,
                 attempt_root=attempt_root,
-                codex_home=codex_home,
-                runtime_temp=attempt_root / "runtime-temp",
-                sandbox_runtime=sandbox_runtime,
                 installed_codex_root=installed_codex_root,
                 corpus=corpus,
                 profile_name=profile_name,
@@ -1104,11 +872,6 @@ def command_run(args: argparse.Namespace) -> int:
                 stage="candidate-finished",
                 codex_result=codex_result,
             )
-            if codex_result.get("runtime_cleanup", {}).get("passed") is not True:
-                raise EvaluationError(
-                    "candidate output is preserved, but same-sandbox runtime cleanup failed; "
-                    f"recover --attempt-id {attempt_id} after correcting the cleanup path"
-                )
             patch_path = attempt_root / "candidate.patch"
             try:
                 patch = capture_candidate_patch(candidate_workspace, task, patch_path)
@@ -1174,9 +937,6 @@ def command_run(args: argparse.Namespace) -> int:
                 attempt_root=attempt_root,
                 patch=patch_path,
                 environment=environment,
-                runtime_tools=runtime_tools,
-                codex_home=codex_home,
-                sandbox_runtime=sandbox_runtime,
                 expected_dependency_sha256=dependency["identity_sha256"],
                 p2p_exclusions=qualification.get("p2p_exclusions", []),
                 retain_workspace=args.retain_workspace,
@@ -1224,17 +984,6 @@ def command_run(args: argparse.Namespace) -> int:
             )
             return 0
     except PreconditionError as exc:
-        failure: PreconditionError = exc
-        if isinstance(exc, SandboxRuntimeInvalidError):
-            if sandbox_runtime is None:
-                raise EvaluationError(
-                    "sandbox runtime rejection omitted the prepared runtime identity"
-                ) from exc
-            failure = _invalidate_runtime_after_rejection(
-                state_root,
-                exc,
-                expected_identity_sha256=str(sandbox_runtime["identity_sha256"]),
-            )
         workspace_value = attempt.get("candidate_workspace")
         workspace_cleanup = (
             _cleanup_candidate_workspace(
@@ -1250,11 +999,9 @@ def command_run(args: argparse.Namespace) -> int:
             attempt,
             status="blocked-precondition",
             stage=attempt.get("stage", "unknown"),
-            failure=str(failure),
+            failure=str(exc),
             workspace_cleanup=workspace_cleanup,
         )
-        if failure is not exc:
-            raise failure from exc
         raise
     except Exception as exc:
         failure_changes: dict[str, Any] = {
@@ -1282,20 +1029,11 @@ def command_run(args: argparse.Namespace) -> int:
             **failure_changes,
         )
         raise
-    finally:
-        if codex_home is not None:
-            cleanup_evaluation_runtime_transients(codex_home)
-        runtime_temp = attempt_root / "runtime-temp"
-        if runtime_temp.exists():
-            try:
-                runtime_temp.rmdir()
-            except OSError:
-                pass
 
 
 def command_recover(args: argparse.Namespace) -> int:
     project_root, corpus_path, state_root, work_root, corpus = resolve_context(args)
-    installed_codex_root = installed_codex_root_from_args(args)
+    ensure_evaluation_roots(project_root, state_root, work_root)
     attempt_root, attempt = load_attempt(state_root, args.attempt_id)
     if attempt.get("stage") == "terminal":
         receipt_path = attempt.get("receipt_path")
@@ -1324,13 +1062,8 @@ def command_recover(args: argparse.Namespace) -> int:
     task = require_task(corpus, task_id)
     workspace = Path(str(attempt["candidate_workspace"])).resolve()
     require_within(work_root, workspace)
-    codex_home: Path | None = None
-    sandbox_runtime: dict[str, Any] | None = None
     try:
-        with (
-            CaseLock(state_root, f"candidate:{task_id}:{profile_name}"),
-            CaseLock(state_root, "sandbox-runtime"),
-        ):
+        with CaseLock(state_root, f"candidate:{task_id}:{profile_name}"):
             descriptor, projection = rematerialize_network(attempt["runtime_environment"])
             environment = process_environment(projection)
             verify_deep_swe(state_root, corpus)
@@ -1358,102 +1091,25 @@ def command_recover(args: argparse.Namespace) -> int:
             ):
                 raise PreconditionError("the attempt qualification is no longer current")
 
-            try:
-                recorded_codex = Path(
-                    str(attempt["runtime_tools"]["tools"]["codex"]["path"])
-                ).resolve()
-            except (KeyError, TypeError) as exc:
-                raise EvaluationError("attempt runtime identity omits Codex") from exc
-            current_tools = candidate_runtime_tools(
-                project_root,
-                attempt_root / "recovery-runtime",
-                recorded_codex,
-            )
-            config_identity = evaluation_runtime_config_identity_descriptor(
-                project_root,
-                state_root,
-                installed_codex_root,
-                corpus,
-            )
-            identity = candidate_run_identity(
-                project_root=project_root,
-                corpus_path=corpus_path,
-                corpus=corpus,
-                task_id=task_id,
-                profile_name=profile_name,
-                qualification_receipt=qualification,
-                dependency_identity=attempt["dependency_identity"],
-                runtime_environment=descriptor,
-                runtime_tools=current_tools,
-                config_descriptor=config_identity,
+            recorded_identity = attempt.get("candidate_identity")
+            identity = validate_identity(
+                recorded_identity,
+                schema="agentbase.windows-swe-candidate-identity/v1",
             )
             if identity["identity_sha256"] != attempt.get("candidate_identity_sha256"):
-                raise PreconditionError(
-                    "the frozen candidate identity changed; this attempt cannot be recovered"
-                )
-            recorded_identity = attempt.get("candidate_identity")
-            if recorded_identity is not None:
-                validate_identity(
-                    recorded_identity,
-                    schema="agentbase.windows-swe-candidate-identity/v1",
-                )
-                if canonical_bytes(recorded_identity) != canonical_bytes(identity):
-                    raise EvaluationError(
-                        "recorded candidate identity payload does not match its hash"
-                    )
+                raise EvaluationError("attempt candidate identity payload disagrees with its hash")
 
             codex_result = attempt.get("codex_result")
-            if not isinstance(codex_result, dict):
+            if (
+                not isinstance(codex_result, dict)
+                or codex_result.get("schema") != CODEX_RUN_RESULT_SCHEMA
+                or codex_result.get("status") != "completed"
+                or codex_result.get("model_invoked") is not True
+                or codex_result.get("exit_code") != 0
+                or codex_result.get("execution_environment")
+                != "trusted-local-workspace"
+            ):
                 raise EvaluationError("recoverable attempt omits its completed candidate result")
-            runtime_cleanup = codex_result.get("runtime_cleanup")
-            if not isinstance(runtime_cleanup, dict) or runtime_cleanup.get("passed") is not True:
-                metadata = attempt.get("candidate_metadata")
-                if not isinstance(metadata, dict):
-                    raise EvaluationError(
-                        "recoverable attempt omits the staged runtime cleanup identity"
-                    )
-                codex_home, sandbox_runtime, _ = _prepare_ready_sandbox_runtime(
-                    project_root=project_root,
-                    state_root=state_root,
-                    installed_codex_root=installed_codex_root,
-                    corpus=corpus,
-                    codex_identity=current_tools["tools"]["codex"],
-                )
-                runtime_cleanup = cleanup_candidate_runtime_temp(
-                    workspace=workspace,
-                    attempt_root=attempt_root,
-                    runtime_temp=attempt_root / "runtime-temp",
-                    codex_home=codex_home,
-                    codex_executable_path=_codex_executable_from_tools(current_tools),
-                    pwsh_executable_path=Path(
-                        str(metadata["runtime_cleanup_shell_path"])
-                    ),
-                    expected_pwsh_sha256=str(
-                        metadata["runtime_cleanup_shell_sha256"]
-                    ),
-                    cleanup_script_path=Path(
-                        str(metadata["runtime_cleanup_script_path"])
-                    ),
-                    expected_cleanup_script_sha256=str(
-                        metadata["runtime_cleanup_script_sha256"]
-                    ),
-                    permission_profile=str(
-                        corpus["codex"]["candidate_permission_profile"]
-                    ),
-                    process_environment=environment,
-                )
-                codex_result = {**codex_result, "runtime_cleanup": runtime_cleanup}
-                write_json_atomic(attempt_root / "codex-result.json", codex_result)
-                attempt = update_attempt(
-                    attempt_root,
-                    attempt,
-                    codex_result=codex_result,
-                    recovery_runtime_cleanup=runtime_cleanup,
-                )
-                if runtime_cleanup.get("passed") is not True:
-                    raise EvaluationError(
-                        "candidate runtime cleanup still fails; preserved output was not rerun"
-                    )
 
             patch_path = attempt_root / "candidate.patch"
             if not patch_path.is_file():
@@ -1527,14 +1183,6 @@ def command_recover(args: argparse.Namespace) -> int:
                 ):
                     raise EvaluationError("cached verifier receipt does not match the attempt")
             else:
-                if codex_home is None or sandbox_runtime is None:
-                    codex_home, sandbox_runtime, _ = _prepare_ready_sandbox_runtime(
-                        project_root=project_root,
-                        state_root=state_root,
-                        installed_codex_root=installed_codex_root,
-                        corpus=corpus,
-                        codex_identity=current_tools["tools"]["codex"],
-                    )
                 attempt = update_attempt(
                     attempt_root,
                     attempt,
@@ -1550,9 +1198,6 @@ def command_recover(args: argparse.Namespace) -> int:
                     attempt_root=attempt_root,
                     patch=patch_path,
                     environment=environment,
-                    runtime_tools=current_tools,
-                    codex_home=codex_home,
-                    sandbox_runtime=sandbox_runtime,
                     expected_dependency_sha256=attempt["dependency_identity"][
                         "identity_sha256"
                     ],
@@ -1598,585 +1243,12 @@ def command_recover(args: argparse.Namespace) -> int:
             )
             return 0
     except Exception as exc:
-        failure: Exception = exc
-        if isinstance(exc, SandboxRuntimeInvalidError):
-            if sandbox_runtime is None:
-                raise EvaluationError(
-                    "sandbox runtime rejection omitted the prepared runtime identity"
-                ) from exc
-            failure = _invalidate_runtime_after_rejection(
-                state_root,
-                exc,
-                expected_identity_sha256=str(sandbox_runtime["identity_sha256"]),
-            )
         update_attempt(
             attempt_root,
             attempt,
-            recovery_failure=bounded_text(str(failure), 600),
+            recovery_failure=bounded_text(str(exc), 600),
         )
-        if failure is not exc:
-            raise failure from exc
         raise
-    finally:
-        if codex_home is not None:
-            cleanup_evaluation_runtime_transients(codex_home)
-
-
-def command_sandbox_status(args: argparse.Namespace) -> int:
-    project_root, _, state_root, _, corpus = resolve_context(args)
-    installed_codex_root = installed_codex_root_from_args(args)
-    codex_identity = _resolve_current_codex_identity(
-        project_root,
-        args.codex_executable,
-    )
-    status = get_sandbox_runtime_status(
-        project_root,
-        state_root,
-        installed_codex_root,
-        corpus,
-        codex_identity,
-    )
-    result = {
-        **status,
-        "external_actions": {
-            "sandbox_process_launched": False,
-            "host_sandbox_setup_invoked": False,
-            "administrator_approval_requested": False,
-            "model_invoked": False,
-            "published": False,
-        },
-    }
-    reasons = ", ".join(status["reason_codes"]) or "none"
-    human = (
-        f"SANDBOX STATUS: {status['status']}\n"
-        f"├─ reasons: {reasons}\n"
-        "├─ setup/UAC: not invoked\n"
-        "└─ recovery: "
-        + (status["recovery_action"] or "none")
-    )
-    print_result(result, view=args.view, human=human)
-    return 0
-
-
-def command_sandbox_setup(args: argparse.Namespace) -> int:
-    if os.environ.get("AGENTBASE_AGENT_EVALUATOR_DISABLED") == "1":
-        raise EvaluationError("sandbox setup is disabled by the deterministic test gate")
-    project_root, _, state_root, work_root, corpus = resolve_context(args)
-    installed_codex_root = installed_codex_root_from_args(args)
-    state_root.mkdir(parents=True, exist_ok=True)
-    work_root.mkdir(parents=True, exist_ok=True)
-    codex_identity = _resolve_current_codex_identity(
-        project_root,
-        args.codex_executable,
-    )
-    setup_result: dict[str, Any] | None = None
-    setup_attempted = False
-    runtime_state_refreshed = False
-    approval_error: SandboxSetupApprovalError | None = None
-    with CaseLock(state_root, "sandbox-runtime"):
-        codex_home, _ = sync_evaluation_runtime_home(
-            project_root,
-            state_root,
-            installed_codex_root,
-            corpus,
-        )
-        cleanup_evaluation_runtime_transients(codex_home)
-        before = get_sandbox_runtime_status(
-            project_root,
-            state_root,
-            installed_codex_root,
-            corpus,
-            codex_identity,
-        )
-        if (
-            before.get("ready") is not True
-            and before.get("checks", {}).get("runtime_state_refreshable") is True
-        ):
-            backend = sandbox_backend_snapshot(codex_home)
-            write_ready_sandbox_runtime_state(
-                state_root,
-                codex_identity,
-                backend,
-            )
-            runtime_state_refreshed = True
-        if before.get("ready") is not True and not runtime_state_refreshed:
-            runtime_root = sandbox_runtime_root(state_root)
-            runtime_root.mkdir(parents=True, exist_ok=True)
-            runtime_directory_path: Path | None = None
-            setup_workspace_path: Path | None = None
-            setup_backend_committed = False
-            try:
-                try:
-                    with (
-                        tempfile.TemporaryDirectory(
-                            prefix="setup-",
-                            dir=runtime_root,
-                            ignore_cleanup_errors=True,
-                        ) as runtime_directory,
-                        tempfile.TemporaryDirectory(
-                            prefix="sandbox-setup-",
-                            dir=work_root,
-                            ignore_cleanup_errors=True,
-                        ) as workspace_directory,
-                    ):
-                        runtime_directory_path = Path(runtime_directory).resolve()
-                        setup_workspace_path = Path(workspace_directory).resolve()
-                        setup_attempted = True
-                        setup_result = invoke_sandbox_setup(
-                            project_root=project_root,
-                            workspace=setup_workspace_path,
-                            state_root=state_root,
-                            codex_home=codex_home,
-                            runtime_temp=runtime_directory_path / "process-temp",
-                            result_path=runtime_directory_path / "setup-result.json",
-                            codex_executable_path=Path(str(codex_identity["path"])),
-                            permission_profile=str(
-                                corpus["codex"]["verifier_permission_profile"]
-                            ),
-                            process_environment=process_environment({}),
-                        )
-                        backend = sandbox_backend_snapshot(codex_home)
-                        write_ready_sandbox_runtime_state(
-                            state_root,
-                            codex_identity,
-                            backend,
-                        )
-                        setup_backend_committed = True
-                finally:
-                    if runtime_directory_path is not None and runtime_directory_path.exists():
-                        remove_managed_tree(runtime_root, runtime_directory_path)
-                    if setup_workspace_path is not None and setup_workspace_path.exists():
-                        remove_managed_tree(work_root, setup_workspace_path)
-            except SandboxSetupApprovalError as exc:
-                invalidate_sandbox_runtime(state_root, "explicit-sandbox-setup-failed")
-                approval_error = exc
-            except Exception:
-                invalidate_sandbox_runtime(
-                    state_root,
-                    (
-                        "explicit-sandbox-setup-cleanup-failed"
-                        if setup_backend_committed
-                        else "explicit-sandbox-setup-failed"
-                    ),
-                )
-                raise
-        cleanup_evaluation_runtime_transients(codex_home)
-        after = get_sandbox_runtime_status(
-            project_root,
-            state_root,
-            installed_codex_root,
-            corpus,
-            codex_identity,
-        )
-        if approval_error is None and after.get("ready") is not True:
-            raise EvaluationError(
-                "sandbox setup completed without establishing a reusable ready state"
-            )
-    if approval_error is not None:
-        result = {
-            "schema": "agentbase.windows-swe-sandbox-setup-command/v1",
-            "status": "blocked-precondition",
-            "setup_invoked": setup_attempted,
-            "setup_completed": False,
-            "runtime_state_refreshed": runtime_state_refreshed,
-            "reused_existing_runtime": False,
-            "setup_result": None,
-            "sandbox_runtime": after,
-            "blocking_precondition": {
-                "reason_code": "windows-sandbox-administrator-approval-not-completed",
-                "summary": "The one-time explicit Windows sandbox setup was not approved.",
-                "diagnostic": bounded_text(str(approval_error), 600),
-                "recovery_action": (
-                    "When ready to approve one Windows UAC prompt, run sandbox-setup "
-                    "explicitly once; normal evaluation commands will not retry it."
-                ),
-            },
-            "external_actions": {
-                "sandbox_process_launched": setup_attempted,
-                "host_sandbox_setup_attempted": setup_attempted,
-                "administrator_approval_may_have_been_requested": setup_attempted,
-                "administrator_approval_completed": False,
-                "model_invoked": False,
-                "network_enabled": False,
-                "software_installed": False,
-                "published": False,
-            },
-        }
-        human = (
-            "SANDBOX SETUP blocked-precondition\n"
-            "├─ administrator approval: not completed\n"
-            "├─ automatic retry: disabled\n"
-            "├─ temporary assets: removed; runtime invalidated\n"
-            "└─ model/network/install/publish: not invoked"
-        )
-        print_result(result, view=args.view, human=human)
-        return 3
-    result = {
-        "schema": "agentbase.windows-swe-sandbox-setup-command/v1",
-        "status": "ready",
-        "setup_invoked": setup_attempted,
-        "setup_completed": setup_attempted,
-        "runtime_state_refreshed": runtime_state_refreshed,
-        "reused_existing_runtime": not setup_attempted,
-        "setup_result": setup_result,
-        "sandbox_runtime": after,
-        "external_actions": {
-            "sandbox_process_launched": setup_attempted,
-            "host_sandbox_setup_attempted": setup_attempted,
-            "administrator_approval_may_have_been_requested": setup_attempted,
-            "administrator_approval_completed": setup_attempted,
-            "model_invoked": False,
-            "network_enabled": False,
-            "software_installed": False,
-            "published": False,
-        },
-    }
-    human = (
-        "SANDBOX SETUP ready\n"
-        f"├─ elevated setup invoked: {'yes' if setup_attempted else 'no; existing runtime reused'}\n"
-        f"├─ runtime state refreshed: {'yes' if runtime_state_refreshed else 'no'}\n"
-        "├─ future evaluation commands: setup disabled; reuse only\n"
-        "└─ model/network/install/publish: not invoked"
-    )
-    print_result(result, view=args.view, human=human)
-    return 0
-
-
-def build_sandbox_assessment(
-    *,
-    project_root: Path,
-    state_root: Path,
-    work_root: Path,
-    installed_codex_root: Path,
-    corpus: Mapping[str, Any],
-    codex_executable: Path | None = None,
-) -> dict[str, Any]:
-    started = time.perf_counter()
-    installed_codex_root = installed_codex_root.resolve()
-    ensure_evaluation_roots(project_root, state_root, work_root, installed_codex_root)
-    require_installed_codex_runtime(
-        installed_codex_root,
-        require_model_catalog=False,
-    )
-    state_root.mkdir(parents=True, exist_ok=True)
-    work_root.mkdir(parents=True, exist_ok=True)
-    capability_contract = candidate_capability_contract(project_root, corpus)
-    launcher_result: dict[str, Any] | None = None
-    blocking_precondition: dict[str, Any] | None = None
-    runtime_failure: dict[str, Any] | None = None
-    skill_projection: dict[str, Any] | None = None
-    sandbox_runtime: dict[str, Any] | None = None
-    runtime_status: dict[str, Any] | None = None
-    controlled: dict[str, Any] | None = None
-    with (
-        tempfile.TemporaryDirectory(
-            prefix="sandbox-check-",
-            dir=state_root,
-            ignore_cleanup_errors=True,
-        ) as state_directory,
-        tempfile.TemporaryDirectory(
-            prefix="sandbox-check-",
-            dir=work_root,
-            ignore_cleanup_errors=True,
-        ) as work_directory,
-        CaseLock(state_root, "sandbox-runtime"),
-    ):
-        runtime_root = Path(state_directory).resolve()
-        workspace = Path(work_directory).resolve()
-        runtime_tools = candidate_runtime_tools(
-            project_root,
-            runtime_root,
-            codex_executable,
-        )
-        codex_home, controlled = sync_evaluation_runtime_home(
-            project_root,
-            state_root,
-            installed_codex_root,
-            corpus,
-        )
-        cleanup_evaluation_runtime_transients(codex_home)
-        runtime_status = get_sandbox_runtime_status(
-            project_root,
-            state_root,
-            installed_codex_root,
-            corpus,
-            runtime_tools["tools"]["codex"],
-        )
-        if runtime_status.get("ready") is not True:
-            blocking_precondition = {
-                "reason_code": "windows-elevated-sandbox-setup-required",
-                "summary": (
-                    "The persistent elevated Windows sandbox runtime is not ready. "
-                    "No Codex sandbox process was launched."
-                ),
-                "diagnostic": ", ".join(runtime_status.get("reason_codes", [])),
-                "recovery_action": "Run sandbox-setup explicitly, then rerun sandbox-check.",
-                "retryable_after_environment_change": True,
-            }
-        else:
-            sandbox_runtime = dict(runtime_status["runtime_use"])
-            metadata_root = workspace / ".agentbase"
-            metadata_root.mkdir(parents=True, exist_ok=False)
-            shutil.copy2(
-                project_root
-                / "development"
-                / "agent-evaluation"
-                / "candidate_preflight.ps1",
-                metadata_root / "preflight.ps1",
-            )
-            cleanup_script_path = metadata_root / "runtime-cleanup.ps1"
-            shutil.copy2(
-                project_root
-                / "development"
-                / "agent-evaluation"
-                / "sandbox_runtime_cleanup.ps1",
-                cleanup_script_path,
-            )
-            canary_path = runtime_root / "denied-state-canary.txt"
-            denied_auth_path = codex_home / "auth.json"
-            write_text_atomic(canary_path, "agentbase-denied-state-canary\n")
-            write_text_atomic(
-                denied_auth_path,
-                "agentbase-fake-auth-canary-no-credentials\n",
-            )
-            skill_projection = stage_candidate_skill_projection(
-                project_root,
-                workspace,
-                metadata_root,
-            )
-            tool_probe = stage_candidate_tool_probe_manifest(
-                metadata_root,
-                runtime_tools,
-            )
-            sandbox_process_environment = process_environment({})
-            try:
-                launcher_result = invoke_candidate_preflight(
-                    project_root=project_root,
-                    workspace=workspace,
-                    state_root=state_root,
-                    codex_home=codex_home,
-                    runtime_temp=runtime_root / "runtime-temp",
-                    sandbox_runtime=sandbox_runtime,
-                    canary_path=canary_path,
-                    denied_auth_path=denied_auth_path,
-                    installed_codex_root=installed_codex_root,
-                    skill_root_path=Path(str(skill_projection["root"])),
-                    skill_probe_manifest_path=Path(
-                        str(skill_projection["manifest_path"])
-                    ),
-                    expected_skill_probe_manifest_sha256=str(
-                        skill_projection["manifest_sha256"]
-                    ),
-                    expected_skill_file_count=int(skill_projection["file_count"]),
-                    tool_probe_manifest_path=Path(str(tool_probe["path"])),
-                    expected_tool_probe_manifest_sha256=str(tool_probe["sha256"]),
-                    expected_tool_probes={
-                        str(name): str(expected_sha256)
-                        for name, expected_sha256 in tool_probe["expected_tools"].items()
-                    },
-                    preflight_output_path=metadata_root / "preflight.json",
-                    result_path=runtime_root / "sandbox-check.json",
-                    permission_profile=str(
-                        corpus["codex"]["candidate_permission_profile"]
-                    ),
-                    codex_executable_path=_codex_executable_from_tools(runtime_tools),
-                    cleanup_script_path=cleanup_script_path,
-                    expected_cleanup_script_sha256=sha256_file(cleanup_script_path),
-                    cleanup_shell_path=Path(runtime_tools["tools"]["pwsh"]["path"]),
-                    expected_cleanup_shell_sha256=str(
-                        runtime_tools["tools"]["pwsh"]["sha256"]
-                    ),
-                    process_environment=sandbox_process_environment,
-                )
-                actual_controlled = evaluation_runtime_home_controlled_identity(
-                    codex_home
-                )
-                if actual_controlled.get("identity_sha256") != controlled.get(
-                    "identity_sha256"
-                ):
-                    raise ControlledRuntimeDriftError(
-                        "evaluation runtime controlled assets changed during candidate preflight"
-                    )
-                if launcher_result["status"] == "failed":
-                    failed_checks = candidate_preflight_failed_checks(
-                        launcher_result["preflight"],
-                        expected_skill_file_count=int(skill_projection["file_count"]),
-                        expected_skill_probe_manifest_sha256=str(
-                            skill_projection["manifest_sha256"]
-                        ),
-                        expected_tool_probe_manifest_sha256=str(tool_probe["sha256"]),
-                        expected_tool_probes={
-                            str(name): str(expected_sha256)
-                            for name, expected_sha256 in tool_probe[
-                                "expected_tools"
-                            ].items()
-                        },
-                    )
-                    runtime_failure = {
-                        "reason_code": "candidate-preflight-failed",
-                        "failed_checks": failed_checks,
-                        "summary": (
-                            "The prepared sandbox ran, but one or more acceptance "
-                            "checks failed."
-                        ),
-                    }
-            except ControlledRuntimeDriftError as exc:
-                cleanup_evaluation_runtime_transients(codex_home)
-                codex_home, controlled = sync_evaluation_runtime_home(
-                    project_root,
-                    state_root,
-                    installed_codex_root,
-                    corpus,
-                )
-                runtime_status = get_sandbox_runtime_status(
-                    project_root,
-                    state_root,
-                    installed_codex_root,
-                    corpus,
-                    runtime_tools["tools"]["codex"],
-                )
-                blocking_precondition = {
-                    "reason_code": "evaluation-runtime-controlled-assets-drifted",
-                    "summary": (
-                        "A generated evaluation runtime asset changed during preflight; "
-                        "the sandbox backend was preserved and the controlled assets "
-                        "were restored."
-                    ),
-                    "diagnostic": bounded_text(str(exc), 600),
-                    "recovery_action": "Rerun sandbox-check; sandbox-setup is not required.",
-                    "retryable_after_environment_change": True,
-                }
-            except SandboxRuntimeInvalidError as exc:
-                invalidate_sandbox_runtime(
-                    state_root,
-                    "codex-rejected-prepared-runtime",
-                    expected_identity_sha256=str(sandbox_runtime["identity_sha256"]),
-                )
-                runtime_status = get_sandbox_runtime_status(
-                    project_root,
-                    state_root,
-                    installed_codex_root,
-                    corpus,
-                    runtime_tools["tools"]["codex"],
-                )
-                blocking_precondition = {
-                    "reason_code": "windows-elevated-sandbox-runtime-invalidated",
-                    "summary": "Codex rejected the prepared persistent sandbox runtime.",
-                    "diagnostic": bounded_text(str(exc), 600),
-                    "recovery_action": "Run sandbox-setup explicitly, then rerun sandbox-check.",
-                    "retryable_after_environment_change": True,
-                }
-            finally:
-                cleanup_evaluation_runtime_transients(codex_home)
-    temporary_assets_removed = not runtime_root.exists() and not workspace.exists()
-    if not temporary_assets_removed:
-        raise EvaluationError("sandbox assessment did not remove its temporary assets")
-    if not evaluation_runtime_transients_absent(sandbox_runtime_home(state_root)):
-        raise EvaluationError("sandbox assessment left authentication or model-catalog state")
-    if blocking_precondition is not None:
-        status = "blocked-precondition"
-    elif runtime_failure is not None:
-        status = "failed"
-    elif launcher_result is not None:
-        status = "passed"
-    else:
-        raise EvaluationError("sandbox assessment reached no terminal status")
-    return {
-        "schema": "agentbase.windows-swe-sandbox-assessment/v5",
-        "status": status,
-        "passed": status == "passed",
-        "duration_seconds": round(time.perf_counter() - started, 3),
-        "candidate_config_identity": controlled["config"]["identity"],
-        "skill_projection": (
-            {
-                "identity_sha256": skill_projection[
-                    "projection_identity_sha256"
-                ],
-                "file_count": skill_projection["file_count"],
-                "temporary": True,
-            }
-            if skill_projection is not None
-            else None
-        ),
-        "runtime_tools_identity_sha256": runtime_tools["identity_sha256"],
-        "runtime_tools": runtime_tools,
-        "sandbox_runtime": {
-            "status": runtime_status["status"],
-            "persistent": True,
-            "setup_invoked": False,
-            "runtime_use": sandbox_runtime,
-        },
-        "capability_contract": capability_contract,
-        "runtime_probe": launcher_result,
-        "blocking_precondition": blocking_precondition,
-        "failure": runtime_failure,
-        "temporary_assets_removed": temporary_assets_removed,
-        "external_actions": {
-            "model_invoked": False,
-            "network_enabled": False,
-            "host_sandbox_setup_invoked": False,
-            "host_sandbox_setup_may_be_requested": False,
-            "software_installed": False,
-            "published": False,
-        },
-    }
-
-
-def command_sandbox_check(args: argparse.Namespace) -> int:
-    project_root, _, state_root, work_root, corpus = resolve_context(args)
-    result = build_sandbox_assessment(
-        project_root=project_root,
-        state_root=state_root,
-        work_root=work_root,
-        installed_codex_root=installed_codex_root_from_args(args),
-        corpus=corpus,
-        codex_executable=args.codex_executable,
-    )
-    if result["status"] == "passed":
-        runtime_probe = result.get("runtime_probe")
-        if not isinstance(runtime_probe, dict):
-            raise EvaluationError("candidate sandbox assessment omitted its runtime probe")
-        preflight = runtime_probe.get("preflight")
-        if not isinstance(preflight, dict) or preflight.get("passed") is not True:
-            raise EvaluationError("candidate sandbox assessment did not pass")
-        human = (
-            "SANDBOX CHECK passed\n"
-            "├─ host default/project/state/auth boundaries: denied\n"
-            "├─ complete skill projection: hash-readable and write-denied\n"
-            "├─ workspace write + attempt temp/appdata/home scope: passed\n"
-            "├─ exact CLI identities + srcq doctors/workflow round trips: passed\n"
-            "└─ model/network/install/publish: not invoked"
-        )
-        exit_code = 0
-    elif result["status"] == "blocked-precondition":
-        blocking = result.get("blocking_precondition")
-        if not isinstance(blocking, dict):
-            raise EvaluationError("blocked sandbox assessment omitted its precondition")
-        human = (
-            "SANDBOX CHECK blocked-precondition\n"
-            "├─ required backend: elevated native Windows sandbox\n"
-            "├─ reason: persistent runtime is absent, stale, or invalidated\n"
-            f"├─ recovery: {blocking['recovery_action']}\n"
-            "└─ sandbox/model/network/install/publish: not invoked"
-        )
-        exit_code = 3
-    elif result["status"] == "failed":
-        failure = result.get("failure")
-        if not isinstance(failure, dict) or not isinstance(failure.get("failed_checks"), list):
-            raise EvaluationError("failed sandbox assessment omitted its failed checks")
-        failed_checks = ", ".join(str(item) for item in failure["failed_checks"])
-        human = (
-            "SANDBOX CHECK failed\n"
-            "├─ elevated sandbox: launched\n"
-            f"├─ failed checks: {failed_checks}\n"
-            "├─ candidate model: not invoked\n"
-            "└─ install/publish: not invoked"
-        )
-        exit_code = 2
-    else:
-        raise EvaluationError("candidate sandbox assessment returned an unknown status")
-    print_result(result, view=args.view, human=human)
-    return exit_code
 
 
 def _nonnegative_number(value: Any, *, field: str) -> int | float | None:
@@ -2773,421 +1845,6 @@ def command_report(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_json_command(
-    argv: Sequence[str],
-    *,
-    cwd: Path,
-    timeout: int,
-    label: str,
-) -> dict[str, Any]:
-    completed = run_capture(argv, cwd=cwd, timeout=timeout)
-    try:
-        text = completed.stdout.decode("utf-8", errors="strict")
-        value = json.loads(text)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise EvaluationError(f"{label} did not return one JSON document") from exc
-    if not isinstance(value, dict):
-        raise EvaluationError(f"{label} result must be an object")
-    return value
-
-
-def _collect_native_validation(project_root: Path) -> dict[str, Any]:
-    value = _run_json_command(
-        [
-            "pwsh.exe",
-            "-NoProfile",
-            "-NonInteractive",
-            "-File",
-            str(project_root / "development" / "agent-evaluation" / "collect_native_validation.ps1"),
-            "-ProjectRoot",
-            str(project_root),
-        ],
-        cwd=project_root,
-        timeout=1800,
-        label="native validation",
-    )
-    validation = value.get("validation")
-    status = value.get("status")
-    passed = value.get("passed")
-    if value.get("schema") != "agentbase.native-validation/v2":
-        raise EvaluationError("native validation returned an invalid evidence envelope")
-    if status == "passed":
-        if passed is not True or not isinstance(validation, dict) or validation.get("action") != "Validate":
-            raise EvaluationError("passed native validation omitted its Validate result")
-        if value.get("diagnostic") is not None:
-            raise EvaluationError("passed native validation returned a failure diagnostic")
-    elif status == "failed":
-        if passed is not False or validation is not None:
-            raise EvaluationError("failed native validation returned inconsistent evidence")
-        diagnostic = value.get("diagnostic")
-        if not isinstance(diagnostic, str) or not diagnostic.strip():
-            raise EvaluationError("failed native validation omitted its diagnostic")
-    else:
-        raise EvaluationError("native validation returned an unknown status")
-    if _nonnegative_number(
-        value.get("duration_seconds"), field="native duration_seconds"
-    ) is None:
-        raise EvaluationError("native validation omitted duration_seconds")
-    return value
-
-
-def _collect_routing_assessment(project_root: Path) -> dict[str, Any]:
-    routing_root = project_root / "development" / "skill-routing"
-    plan = _run_json_command(
-        [
-            "pwsh.exe",
-            "-NoProfile",
-            "-NonInteractive",
-            "-File",
-            str(routing_root / "get_routing_evaluation_plan.ps1"),
-            "-ProjectRoot",
-            str(project_root),
-            "-View",
-            "machine",
-        ],
-        cwd=project_root,
-        timeout=600,
-        label="routing evaluation plan",
-    )
-    phases = plan.get("phases")
-    if plan.get("schema_version") != 1 or not isinstance(phases, dict):
-        raise EvaluationError("routing evaluation plan has an invalid schema")
-    phase_names = ("Routing", "Policy", "References")
-    if set(phases) != set(phase_names):
-        raise EvaluationError("routing evaluation plan omits or adds phases")
-    for field in ("evaluation_count", "reuse_count", "blocked_count", "pending_count"):
-        value = plan.get(field)
-        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            raise EvaluationError(f"routing plan {field} must be a non-negative integer")
-    current_path = routing_root / "evidence" / "current.json"
-    attempts_path = routing_root / "evidence" / "attempts.json"
-    current = read_json(current_path) if current_path.is_file() else None
-    ledger = read_json(attempts_path) if attempts_path.is_file() else None
-    if current is not None and current.get("schema_version") != 4:
-        raise EvaluationError("routing current evidence has an invalid schema")
-    if ledger is not None and (
-        ledger.get("schema_version") != 3 or not isinstance(ledger.get("attempts"), list)
-    ):
-        raise EvaluationError("routing attempt ledger has an invalid schema")
-    generation = str(plan.get("evaluation_generation_sha256") or "")
-    cycle_attempts = []
-    if ledger is not None:
-        for attempt in ledger["attempts"]:
-            if not isinstance(attempt, dict):
-                raise EvaluationError("routing attempt ledger contains a non-object attempt")
-            if attempt.get("cycle_id") == generation:
-                cycle_attempts.append(attempt)
-    usage_totals = {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0}
-    duration_ms = 0
-    usage_complete_attempts = 0
-    outcomes: dict[str, int] = {}
-    origins: dict[str, int] = {}
-    failure_count = 0
-    for attempt in cycle_attempts:
-        duration = attempt.get("duration_ms")
-        if isinstance(duration, bool) or not isinstance(duration, int) or duration < 0:
-            raise EvaluationError("routing attempt duration_ms must be a non-negative integer")
-        duration_ms += duration
-        values: dict[str, int | None] = {}
-        for field in usage_totals:
-            token_value = attempt.get(field)
-            if token_value is not None and (
-                isinstance(token_value, bool) or not isinstance(token_value, int) or token_value < 0
-            ):
-                raise EvaluationError(f"routing attempt {field} must be non-negative or null")
-            values[field] = token_value
-            if token_value is not None:
-                usage_totals[field] += token_value
-        if all(value is not None for value in values.values()):
-            usage_complete_attempts += 1
-        outcome = str(attempt.get("outcome") or "unknown")
-        origin = str(attempt.get("origin") or "unknown")
-        outcomes[outcome] = outcomes.get(outcome, 0) + 1
-        origins[origin] = origins.get(origin, 0) + 1
-        if outcome != "passed":
-            failure_count += 1
-    if plan["blocked_count"] > 0:
-        status = "blocked"
-    elif plan["evaluation_count"] > 0 or plan["pending_count"] > 0:
-        status = "pending-evaluation"
-    elif plan["reuse_count"] == len(phase_names) and current is not None:
-        status = "current"
-    else:
-        status = "incomplete"
-    receipt_ids = None
-    case_counts = None
-    if current is not None:
-        policy = current.get("policy_evaluation")
-        references = current.get("reference_evaluation")
-        if not isinstance(policy, dict) or not isinstance(references, dict):
-            raise EvaluationError("routing current evidence omits nested phase evidence")
-        receipt_ids = {
-            "Routing": current.get("receipt_id"),
-            "Policy": policy.get("receipt_id"),
-            "References": references.get("receipt_id"),
-        }
-        case_counts = {
-            "Routing": len(current.get("cases", [])),
-            "Policy": len(policy.get("cases", [])),
-            "References": len(references.get("cases", [])),
-        }
-    return {
-        "schema": "agentbase.routing-assessment/v1",
-        "status": status,
-        "generation_sha256": generation,
-        "phase_plan": {
-            name: {
-                "action": phases[name].get("action"),
-                "reason": phases[name].get("reason"),
-            }
-            for name in phase_names
-        },
-        "plan_counts": {
-            "evaluate": plan["evaluation_count"],
-            "reuse": plan["reuse_count"],
-            "blocked": plan["blocked_count"],
-            "pending": plan["pending_count"],
-        },
-        "current_evidence": {
-            "present": current is not None,
-            "sha256": sha256_file(current_path) if current is not None else None,
-            "receipt_ids": receipt_ids,
-            "case_counts": case_counts,
-        },
-        "current_cycle_attempts": {
-            "ledger_present": ledger is not None,
-            "count": len(cycle_attempts),
-            "outcomes": dict(sorted(outcomes.items())),
-            "origins": dict(sorted(origins.items())),
-            "failures": failure_count,
-            "duration_ms": duration_ms,
-            "usage_complete_attempts": usage_complete_attempts,
-            "usage_missing_attempts": len(cycle_attempts) - usage_complete_attempts,
-            **usage_totals,
-            "total_tokens": usage_totals["input_tokens"] + usage_totals["output_tokens"],
-        },
-        "external_actions": {"model_invoked": False, "evidence_refreshed": False},
-    }
-
-
-def build_final_assessment(
-    *,
-    project_root: Path,
-    corpus_path: Path,
-    state_root: Path,
-    work_root: Path,
-    installed_codex_root: Path,
-    corpus: Mapping[str, Any],
-    suite: str,
-    result_offset: int,
-    result_limit: int,
-    attempt_limit: int,
-    codex_executable: Path | None,
-) -> dict[str, Any]:
-    native = _collect_native_validation(project_root)
-    sandbox = build_sandbox_assessment(
-        project_root=project_root,
-        state_root=state_root,
-        work_root=work_root,
-        installed_codex_root=installed_codex_root,
-        corpus=corpus,
-        codex_executable=codex_executable,
-    )
-    routing = _collect_routing_assessment(project_root)
-    swe = build_swe_report(
-        project_root=project_root,
-        corpus_path=corpus_path,
-        state_root=state_root,
-        corpus=corpus,
-        suite=suite,
-        result_offset=result_offset,
-        result_limit=result_limit,
-        attempt_limit=attempt_limit,
-    )
-    sandbox_status = sandbox.get("status")
-    if sandbox.get("schema") != "agentbase.windows-swe-sandbox-assessment/v5":
-        raise EvaluationError("sandbox assessment returned an invalid evidence envelope")
-    if sandbox_status == "passed":
-        if sandbox.get("passed") is not True or not isinstance(sandbox.get("runtime_probe"), dict):
-            raise EvaluationError("passed sandbox assessment omitted its runtime probe")
-        if sandbox.get("blocking_precondition") is not None or sandbox.get("failure") is not None:
-            raise EvaluationError("passed sandbox assessment returned failure evidence")
-    elif sandbox_status == "blocked-precondition":
-        if sandbox.get("passed") is not False or sandbox.get("runtime_probe") is not None:
-            raise EvaluationError("blocked sandbox assessment returned inconsistent evidence")
-        if not isinstance(sandbox.get("blocking_precondition"), dict):
-            raise EvaluationError("blocked sandbox assessment omitted its precondition")
-        if sandbox.get("failure") is not None:
-            raise EvaluationError("blocked sandbox assessment also returned a runtime failure")
-    elif sandbox_status == "failed":
-        if sandbox.get("passed") is not False or not isinstance(
-            sandbox.get("runtime_probe"), dict
-        ):
-            raise EvaluationError("failed sandbox assessment omitted its runtime probe")
-        if sandbox.get("blocking_precondition") is not None or not isinstance(
-            sandbox.get("failure"), dict
-        ):
-            raise EvaluationError("failed sandbox assessment returned inconsistent evidence")
-    else:
-        raise EvaluationError("sandbox assessment returned an unknown status")
-    if _nonnegative_number(
-        sandbox.get("duration_seconds"), field="sandbox duration_seconds"
-    ) is None:
-        raise EvaluationError("sandbox assessment omitted duration_seconds")
-    if sandbox.get("capability_contract") != swe["candidate_capabilities"]:
-        raise EvaluationError("sandbox and SWE reports disagree on candidate capabilities")
-    external_status = (
-        "complete"
-        if swe["summary"]["qualified_tasks"] == swe["summary"]["task_count"]
-        and swe["summary"]["static_current_runs"] == swe["summary"]["expected_runs"]
-        else "pending-evidence"
-    )
-    swe_health = swe["infrastructure_health"]
-    routing_health = routing["current_cycle_attempts"]
-    failed_dimensions = []
-    blocked_dimensions = []
-    pending_dimensions = []
-    if native["status"] != "passed":
-        failed_dimensions.append("windows-native-contract")
-    if sandbox_status == "failed":
-        failed_dimensions.append("candidate-verifier-isolation")
-    elif sandbox_status == "blocked-precondition":
-        blocked_dimensions.append("candidate-verifier-isolation")
-    if routing["status"] == "blocked":
-        blocked_dimensions.append("routing-behavior")
-    elif routing["status"] != "current":
-        pending_dimensions.append("routing-behavior")
-    if external_status != "complete":
-        pending_dimensions.append("external-generalization-reward")
-    health_failures = (
-        swe_health["infrastructure_failed"]
-        + swe_health["cleanup_errors"]
-        + routing_health["failures"]
-        + (1 if native["status"] != "passed" else 0)
-        + (1 if sandbox_status == "failed" else 0)
-    )
-    if health_failures > 0:
-        infrastructure_status = "degraded"
-        assessment_status = "degraded"
-    elif blocked_dimensions:
-        infrastructure_status = "blocked-precondition"
-        assessment_status = "blocked-precondition"
-    elif pending_dimensions:
-        infrastructure_status = "healthy"
-        assessment_status = "evidence-pending"
-    else:
-        infrastructure_status = "healthy"
-        assessment_status = "current"
-    dimensions = {
-        "windows-native-contract": {
-            "status": native["status"],
-            "evidence": native,
-        },
-        "candidate-verifier-isolation": {
-            "status": sandbox_status,
-            "evidence": sandbox,
-        },
-        "routing-behavior": {
-            "status": routing["status"],
-            "evidence": routing,
-        },
-        "external-generalization-reward": {
-            "status": external_status,
-            "evidence": swe,
-        },
-        "cost-and-time": {
-            "status": "reported",
-            "known_total_tokens": (
-                swe["cost_and_time"]["known_total_tokens"]
-                + routing_health["total_tokens"]
-            ),
-            "known_cached_input_tokens": (
-                swe["cost_and_time"]["known_cached_input_tokens"]
-                + routing_health["cached_input_tokens"]
-            ),
-            "swe": swe["cost_and_time"],
-            "swe_selected_api_equivalent_cost": swe["cost_and_time"][
-                "api_equivalent_cost"
-            ],
-            "swe_current_identity_attempt_api_equivalent_cost": swe_health[
-                "current_identity_cost_and_time"
-            ]["api_equivalent_cost"],
-            "routing_current_cycle": routing_health,
-            "unpriced_scopes": [
-                "routing model calls lack per-response model/cache-write evidence in this contract",
-                "Codex subscription billing and deterministic host work are not API token charges",
-            ],
-            "native_validation_duration_seconds": native["duration_seconds"],
-            "sandbox_assessment_duration_seconds": sandbox["duration_seconds"],
-        },
-        "infrastructure-health": {
-            "status": infrastructure_status,
-            "known_failure_count": health_failures,
-            "swe": swe_health,
-            "routing_current_cycle": routing_health,
-            "failed_dimensions": failed_dimensions,
-            "blocked_preconditions": blocked_dimensions,
-            "pending_evidence": pending_dimensions,
-        },
-    }
-    return {
-        "schema": "agentbase.final-assessment/v2",
-        "suite": suite,
-        "status": assessment_status,
-        "evidence_state": {
-            "failed_dimensions": failed_dimensions,
-            "blocked_dimensions": blocked_dimensions,
-            "pending_dimensions": pending_dimensions,
-        },
-        "dimensions": dimensions,
-        "candidate_capability_contract": swe["candidate_capabilities"],
-        "installation_status": "not-assessed",
-        "composite_score": None,
-        "leaderboard_comparable": False,
-        "external_actions": {
-            "model_invoked": False,
-            "routing_evidence_refreshed": False,
-            "qualification_run": False,
-            "host_sandbox_setup_invoked": False,
-            "host_sandbox_setup_may_be_requested": False,
-            "software_installed": False,
-            "published": False,
-        },
-    }
-
-
-def command_assess(args: argparse.Namespace) -> int:
-    project_root, corpus_path, state_root, work_root, corpus = resolve_context(args)
-    result = build_final_assessment(
-        project_root=project_root,
-        corpus_path=corpus_path,
-        state_root=state_root,
-        work_root=work_root,
-        installed_codex_root=installed_codex_root_from_args(args),
-        corpus=corpus,
-        suite=args.suite,
-        result_offset=args.result_offset,
-        result_limit=args.result_limit,
-        attempt_limit=args.attempt_limit,
-        codex_executable=args.codex_executable,
-    )
-    dimensions = result["dimensions"]
-    swe_summary = dimensions["external-generalization-reward"]["evidence"]["summary"]
-    human = (
-        f"AGENTBASE FINAL ASSESSMENT ({args.suite}): {result['status']}\n"
-        f"├─ Windows native contracts: {dimensions['windows-native-contract']['status']}\n"
-        f"├─ candidate/verifier isolation: {dimensions['candidate-verifier-isolation']['status']}\n"
-        f"├─ routing behavior: {dimensions['routing-behavior']['status']}\n"
-        f"├─ Windows SWE: qualified {swe_summary['qualified_tasks']}/{swe_summary['task_count']}, "
-        f"runs {swe_summary['static_current_runs']}/{swe_summary['expected_runs']}\n"
-        f"├─ infrastructure: {dimensions['infrastructure-health']['status']}\n"
-        f"├─ installation: {result['installation_status']}\n"
-        "└─ composite score: none; no model, install, qualification, or publish was invoked"
-    )
-    print_result(result, view=args.view, human=human)
-    return 0
-
-
 def add_context_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--project-root", default=str(default_project_root()))
     parser.add_argument("--corpus")
@@ -3216,7 +1873,7 @@ def add_installed_codex_root_argument(parser: argparse.ArgumentParser) -> None:
         "--installed-codex-root",
         type=Path,
         default=default_codex_root(),
-        help="installed Codex root that owns auth.json and models_cache.json",
+        help="installed Codex root used for auth.json and session usage accounting",
     )
 
 
@@ -3265,9 +1922,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_context_arguments(oracle)
     add_view_argument(oracle)
     add_network_arguments(oracle)
-    add_installed_codex_root_argument(oracle)
     oracle.add_argument("--task", required=True)
-    oracle.add_argument("--codex-executable", type=Path)
     oracle.add_argument("--retain-workspace", action="store_true")
     oracle.set_defaults(handler=command_oracle)
 
@@ -3287,54 +1942,9 @@ def build_parser() -> argparse.ArgumentParser:
     recover = subparsers.add_parser("recover", help="resume verifier work without rerunning a model")
     add_context_arguments(recover)
     add_view_argument(recover)
-    add_installed_codex_root_argument(recover)
     recover.add_argument("--attempt-id", required=True)
     recover.add_argument("--retain-workspace", action="store_true")
     recover.set_defaults(handler=command_recover)
-
-    sandbox_status = subparsers.add_parser(
-        "sandbox-status",
-        help="read persistent sandbox readiness without launching Codex or requesting UAC",
-    )
-    add_context_arguments(sandbox_status)
-    add_view_argument(sandbox_status)
-    add_installed_codex_root_argument(sandbox_status)
-    sandbox_status.add_argument("--codex-executable", type=Path)
-    sandbox_status.set_defaults(handler=command_sandbox_status)
-
-    sandbox_setup = subparsers.add_parser(
-        "sandbox-setup",
-        help="explicitly initialize the persistent elevated sandbox; may request UAC once",
-    )
-    add_context_arguments(sandbox_setup)
-    add_view_argument(sandbox_setup)
-    add_installed_codex_root_argument(sandbox_setup)
-    sandbox_setup.add_argument("--codex-executable", type=Path)
-    sandbox_setup.set_defaults(handler=command_sandbox_setup)
-
-    sandbox_check = subparsers.add_parser(
-        "sandbox-check",
-        help="reuse the prepared runtime for a no-model permission and tool probe",
-    )
-    add_context_arguments(sandbox_check)
-    add_view_argument(sandbox_check)
-    add_installed_codex_root_argument(sandbox_check)
-    sandbox_check.add_argument("--codex-executable", type=Path)
-    sandbox_check.set_defaults(handler=command_sandbox_check)
-
-    assess = subparsers.add_parser(
-        "assess",
-        help="run no-model native/isolation checks and aggregate all final evidence dimensions",
-    )
-    add_context_arguments(assess)
-    add_view_argument(assess)
-    add_installed_codex_root_argument(assess)
-    assess.add_argument("--suite", choices=("smoke", "core", "rotation", "all"), default="all")
-    assess.add_argument("--result-offset", type=int, default=0)
-    assess.add_argument("--result-limit", type=int, default=100)
-    assess.add_argument("--attempt-limit", type=int, default=20)
-    assess.add_argument("--codex-executable", type=Path)
-    assess.set_defaults(handler=command_assess)
 
     report = subparsers.add_parser("report", help="aggregate immutable evidence")
     add_context_arguments(report)

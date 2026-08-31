@@ -1,5 +1,7 @@
 # 用户目标设计
 
+> 生命周期：历史用户设计输入。九题与双工作区目标保留，旧严格隔离实现已被 2026-08-30 开发环境治理替代；当前合同见 [`development/agent-evaluation/README.md`](../../../development/agent-evaluation/README.md)。
+
 ## UDES-001 采用九题难度分级 Windows 语料
 
 - 状态: confirmed

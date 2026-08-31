@@ -19,10 +19,7 @@
   },
   "codex": {
     "auth_mode": "existing-codex-auth-json",
-    "transport_overlay": "codex-eval-overlay.toml",
-    "sandbox_implementation": "elevated",
-    "candidate_permission_profile": "agentbase_candidate",
-    "verifier_permission_profile": "agentbase_verifier"
+    "transport_overlay": "codex-eval-overlay.toml"
   },
   "profiles": {
     "sol": {
@@ -583,7 +580,7 @@
     "reward_range": [0, 1],
     "dimensions": [
       "windows-native-contract",
-      "candidate-verifier-isolation",
+      "candidate-verifier-independent-workspaces",
       "routing-behavior",
       "external-generalization-reward",
       "cost-and-time",

@@ -1,0 +1,49 @@
+{
+  "changed_files": [],
+  "evidence_for": [
+    "SOL-004",
+    "GAP-005",
+    "DES-006",
+    "AC-006",
+    "CON-001"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "post-cleanup-readback",
+      "note": "旧 sandbox 子目录为 0；六个正式状态根均保留",
+      "ref": "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\agent-evaluation-state"
+    },
+    {
+      "kind": "source-audit",
+      "note": "退役生产脚本与 CLI 引用已退出",
+      "ref": "development/agent-evaluation"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "metadata": {
+    "administrator_cleanup_authorized_by_user": true,
+    "deleted_target_count": 4,
+    "publish_performed": false
+  },
+  "outcome": "空 CI/测试缓存与退出评测路径的无恢复价值仓库和宿主残留均已清理；旧 ACL 保护的 workspace、sandbox runtime 与 sandbox check 目录经用户明确授权的一次管理员清理后物理退出，当前仍有消费者的正式评测状态、benchmark、QQ hook 和日志边界保持不变。",
+  "outputs": [
+    "已删除 C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\agent-evaluation-workspaces",
+    "已删除 state 下 sandbox-runtime 与两个 sandbox-check-* 目录",
+    "已保留 sources、attempts、qualification-runs、qualifications、results、locks 六个正式状态根"
+  ],
+  "schema": "task.result",
+  "task_id": "T005",
+  "task_revision": 1,
+  "unresolved": [],
+  "validation_coverage": [
+    "repository-source=retired-assets-removed",
+    "ignored-cache=removed-where-accessible",
+    "host-runtime-state=legacy-acl-residuals-removed",
+    "preserved-consumers=formal-evaluator-state-and-unrelated-runtime-assets"
+  ],
+  "verification": [
+    "管理员清理收据 status=completed，deleted=4；清理后 workspace 不存在且 legacy state directory count=0",
+    "清理后逐项读回 sources、attempts、qualification-runs、qualifications、results、locks 均存在",
+    "生产入口退役引用审计通过；candidate_preflight.ps1、sandbox_runtime_cleanup.ps1、collect_native_validation.ps1 与 sandbox setup/status/check 不再被调用"
+  ]
+}

@@ -1,5 +1,5 @@
-# Evaluation-only transport. This is merged into a generated config outside the
-# repository; it is not an AgentBase portable-setting source.
+# Evaluation-only transport. This is projected as per-run CLI overrides; it is
+# not an AgentBase portable-setting source.
 model_provider = "agentbase_eval_http"
 
 [model_providers.agentbase_eval_http]

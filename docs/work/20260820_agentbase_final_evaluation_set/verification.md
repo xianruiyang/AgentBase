@@ -1,5 +1,7 @@
 # 验证记录
 
+> 生命周期：历史验证记录，仅证明当时实现。当前确定性入口与未运行边界见 [`development/agent-evaluation/README.md`](../../../development/agent-evaluation/README.md)；不得把本文的 sandbox 探针当作现行门禁。
+
 ## VER-001 确定性基础设施
 
 - 状态: passed

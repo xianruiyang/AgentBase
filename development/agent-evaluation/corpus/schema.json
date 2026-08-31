@@ -71,13 +71,10 @@
     "codex": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["auth_mode", "transport_overlay", "sandbox_implementation", "candidate_permission_profile", "verifier_permission_profile"],
+      "required": ["auth_mode", "transport_overlay"],
       "properties": {
         "auth_mode": { "const": "existing-codex-auth-json" },
-        "transport_overlay": { "const": "codex-eval-overlay.toml" },
-        "sandbox_implementation": { "const": "elevated" },
-        "candidate_permission_profile": { "const": "agentbase_candidate" },
-        "verifier_permission_profile": { "const": "agentbase_verifier" }
+        "transport_overlay": { "const": "codex-eval-overlay.toml" }
       }
     },
     "profile": {

@@ -14,8 +14,6 @@ $testRoot = Join-Path $evaluationRoot 'tests'
 $python = (Get-Command python.exe -ErrorAction Stop).Source
 $syntaxErrors = @()
 foreach ($scriptName in @(
-    'candidate_preflight.ps1',
-    'collect_native_validation.ps1',
     'invoke_candidate.ps1'
 )) {
     $tokens = $null

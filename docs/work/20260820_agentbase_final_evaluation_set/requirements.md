@@ -1,5 +1,7 @@
 # AgentBase Windows SWE 最终评测集需求
 
+> 生命周期：历史需求基线。2026-08-30 起，运行架构与当前入口由 [`development/agent-evaluation/README.md`](../../../development/agent-evaluation/README.md) 和[开发环境治理方案](../20260830_development_environment_governance/solution.md)替代；本文中的 elevated sandbox、权限画像和 preflight 不再是现行合同。
+
 ## REQ-001 建立可逐题选择的差异化最终评测集
 
 - 状态: confirmed

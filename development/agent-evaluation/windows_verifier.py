@@ -15,18 +15,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from agentbase_codex import (
-    evaluation_runtime_home_controlled_identity,
-    is_elevated_sandbox_runtime_rejection,
-    sandbox_backend_snapshot,
-    sandbox_backend_runner_files,
-    sandbox_runtime_use_is_valid,
-    validate_sandbox_runtime_state,
-)
 from evaluation_core import (
-    ControlledRuntimeDriftError,
     EvaluationError,
-    SandboxRuntimeInvalidError,
     apply_git_patch,
     apply_windows_adapter_baseline,
     bounded_text,
@@ -35,13 +25,11 @@ from evaluation_core import (
     dependency_runtime_projection,
     elapsed_seconds,
     git_output,
-    prepare_sandbox_writable_root,
     read_json,
     remove_managed_tree,
     require_task,
     require_within,
     run_capture,
-    sandbox_temp_environment,
     sha256_bytes,
     sha256_file,
     task_asset_root,
@@ -59,9 +47,6 @@ PYTHON_PROXY_BOOTSTRAP_WHEEL = (
 )
 PYTHON_PROXY_BOOTSTRAP_SHA256 = (
     "2725bd0a9925919b9b51739eea5f9e2bae91e83288108a9ad338b2e3a4435ee5"
-)
-SANDBOX_RUNTIME_CLEANUP_SOURCE = (
-    Path(__file__).resolve().parent / "sandbox_runtime_cleanup.ps1"
 )
 VERIFIER_RESULT_SCHEMA = "agentbase.windows-swe-verifier-result/v4"
 MAX_VERIFIER_REPORT_BYTES = 64 * 1024 * 1024
@@ -259,16 +244,16 @@ def _task_runtime_environment(
     return environment
 
 
-def _absolute_sandbox_child_argv(argv: Sequence[str]) -> list[str]:
+def _absolute_child_argv(argv: Sequence[str]) -> list[str]:
     if not argv:
-        raise EvaluationError("sandbox child command is empty")
+        raise EvaluationError("verifier child command is empty")
     executable = Path(str(argv[0]))
     if not executable.is_absolute():
         raise EvaluationError(
-            f"sandbox child executable must use an absolute path: {argv[0]}"
+            f"verifier child executable must use an absolute path: {argv[0]}"
         )
     if not executable.is_file():
-        raise EvaluationError(f"sandbox child executable is not a file: {executable}")
+        raise EvaluationError(f"verifier child executable is not a file: {executable}")
     return [str(executable.resolve()), *[str(item) for item in argv[1:]]]
 
 
@@ -564,88 +549,8 @@ def dependency_identity(
     return {**payload, "identity_sha256": sha256_bytes(canonical_bytes(payload))}
 
 
-def _assert_sandbox_runtime_reusable(
-    codex_home: Path,
-    sandbox_runtime: Mapping[str, Any],
+def _run_trusted_local_check(
     *,
-    full_backend_check: bool,
-) -> None:
-    if not sandbox_runtime_use_is_valid(sandbox_runtime):
-        raise EvaluationError("verifier received an invalid sandbox runtime descriptor")
-    state_path = Path(str(sandbox_runtime.get("state_path", ""))).resolve()
-    try:
-        state = validate_sandbox_runtime_state(read_json(state_path))
-    except EvaluationError as exc:
-        raise SandboxRuntimeInvalidError(
-            "sandbox runtime state changed before verifier launch; run sandbox-setup explicitly"
-        ) from exc
-    if (
-        state.get("status") != "ready"
-        or state.get("identity_sha256") != sandbox_runtime.get("identity_sha256")
-    ):
-        raise SandboxRuntimeInvalidError(
-            "sandbox runtime was invalidated before verifier launch; run sandbox-setup explicitly"
-        )
-    required = (
-        codex_home.resolve() / ".sandbox" / "setup_marker.json",
-        codex_home.resolve() / "cap_sid",
-    )
-    if any(not path.is_file() for path in required) or not (
-        codex_home.resolve() / ".sandbox-secrets"
-    ).is_dir():
-        raise SandboxRuntimeInvalidError(
-            "sandbox backend changed before verifier launch; run sandbox-setup explicitly"
-        )
-    try:
-        sandbox_backend_runner_files(codex_home)
-    except EvaluationError as exc:
-        raise SandboxRuntimeInvalidError(
-            "sandbox command runner changed before verifier launch; run sandbox-setup explicitly"
-        ) from exc
-    if full_backend_check:
-        try:
-            backend = sandbox_backend_snapshot(codex_home)
-        except EvaluationError as exc:
-            raise SandboxRuntimeInvalidError(
-                "sandbox backend changed before verifier launch; run sandbox-setup explicitly"
-            ) from exc
-        if backend.get("identity_sha256") != sandbox_runtime.get(
-            "backend_identity_sha256"
-        ):
-            raise SandboxRuntimeInvalidError(
-                "sandbox backend identity changed; run sandbox-setup explicitly"
-            )
-
-
-def _sandbox_environment(
-    base_environment: Mapping[str, str],
-    codex_home: Path,
-    runtime_temp: Path,
-) -> dict[str, str]:
-    environment = dict(base_environment)
-    for key in list(environment):
-        if key.upper() in {
-            "ALL_PROXY",
-            "HTTP_PROXY",
-            "HTTPS_PROXY",
-            "NO_PROXY",
-            "OPENAI_API_KEY",
-            "OPENAI_API_BASE",
-            "OPENAI_BASE_URL",
-            "AZURE_OPENAI_API_KEY",
-        } or key.upper().startswith("CODEX_"):
-            environment.pop(key, None)
-    environment["CODEX_HOME"] = str(codex_home.resolve())
-    environment.update(sandbox_temp_environment(runtime_temp))
-    return environment
-
-
-def _run_sandboxed_check(
-    *,
-    codex_executable: Path,
-    codex_home: Path,
-    sandbox_runtime: Mapping[str, Any],
-    permission_profile: str,
     argv: Sequence[str],
     workspace: Path,
     base_environment: Mapping[str, str],
@@ -653,102 +558,18 @@ def _run_sandboxed_check(
     timeout: int,
     log_path: Path,
 ) -> dict[str, Any]:
-    child_argv = _absolute_sandbox_child_argv(argv)
-    _assert_sandbox_runtime_reusable(
-        codex_home,
-        sandbox_runtime,
-        full_backend_check=False,
-    )
-    prepare_sandbox_writable_root(
-        workspace.parent,
-        workspace,
-        create_runtime_subdirs=False,
-    )
-    runtime_temp = workspace.resolve() / ".agentbase-verifier" / "runtime-temp"
-    prepare_sandbox_writable_root(workspace, runtime_temp)
-    environment = _sandbox_environment(
-        base_environment,
-        codex_home,
-        runtime_temp,
-    )
+    """Run one verifier command in its disposable, independent workspace."""
+
+    environment = dict(base_environment)
     environment.update(command_environment)
-    sandbox_argv = [
-        str(codex_executable.resolve()),
-        "sandbox",
-        "-P",
-        permission_profile,
-        "-C",
-        str(workspace.resolve()),
-        "--",
-        *child_argv,
-    ]
-    record = _run_logged(
-        sandbox_argv,
+    return _run_logged(
+        _absolute_child_argv(argv),
         workspace=workspace,
         environment=environment,
         timeout=timeout,
         log_path=log_path,
         check=False,
     )
-    if record["exit_code"] != 0:
-        diagnostic = log_path.read_bytes()[: 1024 * 1024].decode(
-            "utf-8", errors="replace"
-        )
-        if is_elevated_sandbox_runtime_rejection(diagnostic):
-            raise SandboxRuntimeInvalidError(
-                "Codex rejected the prepared sandbox runtime; run sandbox-setup explicitly"
-            )
-    return record
-
-
-def _stage_sandbox_runtime_cleanup(workspace: Path) -> Path:
-    if not SANDBOX_RUNTIME_CLEANUP_SOURCE.is_file():
-        raise EvaluationError("sandbox runtime cleanup script is missing")
-    destination = workspace.resolve() / ".agentbase-verifier" / "runtime-cleanup.ps1"
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(SANDBOX_RUNTIME_CLEANUP_SOURCE, destination)
-    return destination
-
-
-def _cleanup_sandbox_runtime_temp(
-    *,
-    cleanup_script: Path,
-    codex_executable: Path,
-    pwsh_executable: Path,
-    codex_home: Path,
-    sandbox_runtime: Mapping[str, Any],
-    permission_profile: str,
-    workspace: Path,
-    base_environment: Mapping[str, str],
-    artifact_root: Path,
-) -> None:
-    runtime_temp = workspace.resolve() / ".agentbase-verifier" / "runtime-temp"
-    if not runtime_temp.exists():
-        return
-    record = _run_sandboxed_check(
-        codex_executable=codex_executable,
-        codex_home=codex_home,
-        sandbox_runtime=sandbox_runtime,
-        permission_profile=permission_profile,
-        argv=[
-            str(pwsh_executable.resolve()),
-            "-NoProfile",
-            "-NonInteractive",
-            "-File",
-            str(cleanup_script.resolve()),
-            "-WorkspaceRoot",
-            str(workspace.resolve()),
-            "-RuntimeTempPath",
-            str(runtime_temp),
-        ],
-        workspace=workspace,
-        base_environment=base_environment,
-        command_environment={},
-        timeout=120,
-        log_path=artifact_root.resolve() / "runtime-cleanup.log",
-    )
-    if record["exit_code"] != 0:
-        raise EvaluationError("sandbox runtime cleanup failed")
 
 
 def _ctrf_document(tests: Sequence[Mapping[str, Any]], tool: str) -> dict[str, Any]:
@@ -873,14 +694,14 @@ def write_gate_ctrf(path: Path, *, name: str, tool: str, exit_code: int) -> None
     )
 
 
-def _copy_sandbox_report(source: Path, destination: Path, sandbox_root: Path) -> None:
-    resolved = require_within(sandbox_root, source)
+def _copy_staged_report(source: Path, destination: Path, staging_root: Path) -> None:
+    resolved = require_within(staging_root, source)
     if resolved.is_symlink() or not resolved.is_file():
-        raise EvaluationError(f"sandboxed check did not produce a regular report: {source.name}")
+        raise EvaluationError(f"verifier check did not produce a regular report: {source.name}")
     size = resolved.stat().st_size
     if size > MAX_VERIFIER_REPORT_BYTES:
         raise EvaluationError(
-            f"sandboxed check report exceeds {MAX_VERIFIER_REPORT_BYTES} bytes: {source.name}"
+            f"verifier check report exceeds {MAX_VERIFIER_REPORT_BYTES} bytes: {source.name}"
         )
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(resolved, destination)
@@ -888,19 +709,19 @@ def _copy_sandbox_report(source: Path, destination: Path, sandbox_root: Path) ->
 
 def _materialize_report(
     report: Mapping[str, Any],
-    sandbox_reports_root: Path,
+    staged_reports_root: Path,
     reports_root: Path,
     exit_code: int,
 ) -> None:
     kind = report["kind"]
     output_relative = str(report["path"])
     output = reports_root / output_relative
-    sandbox_output = sandbox_reports_root / output_relative
+    staged_output = staged_reports_root / output_relative
     raw_relative = str(report.get("raw_path", report["path"]))
     raw = reports_root / raw_relative
-    sandbox_raw = sandbox_reports_root / raw_relative
+    staged_raw = staged_reports_root / raw_relative
     if kind == "junit":
-        _copy_sandbox_report(sandbox_output, output, sandbox_reports_root)
+        _copy_staged_report(staged_output, output, staged_reports_root)
         return
     if kind == "gate-ctrf":
         write_gate_ctrf(
@@ -910,7 +731,7 @@ def _materialize_report(
             exit_code=exit_code,
         )
         return
-    _copy_sandbox_report(sandbox_raw, raw, sandbox_reports_root)
+    _copy_staged_report(staged_raw, raw, staged_reports_root)
     if kind == "jest-json-to-ctrf":
         convert_jest_json(raw, output, str(report.get("tool", "jest")))
     elif kind == "junit-to-ctrf":
@@ -931,36 +752,28 @@ def run_checks(
     workspace: Path,
     artifact_root: Path,
     values: Mapping[str, str],
-    codex_executable: Path,
-    codex_home: Path,
-    sandbox_runtime: Mapping[str, Any],
-    permission_profile: str,
     base_environment: Mapping[str, str],
 ) -> list[dict[str, Any]]:
     reports_root = artifact_root.resolve() / "reports"
-    sandbox_reports_root = workspace.resolve() / ".agentbase-verifier" / "reports"
+    staged_reports_root = workspace.resolve() / ".agentbase-verifier" / "reports"
     logs_root = artifact_root.resolve() / "check-logs"
     reports_root.mkdir(parents=True, exist_ok=True)
-    sandbox_reports_root.mkdir(parents=True, exist_ok=False)
+    staged_reports_root.mkdir(parents=True, exist_ok=False)
     records: list[dict[str, Any]] = []
     gate_failed = False
     task_environment = _task_runtime_environment(task, values, base_environment)
     for index, check in enumerate(task["checks"]):
         report = check["report"]
         report_path = reports_root / str(report["path"])
-        sandbox_report_path = sandbox_reports_root / str(report["path"])
-        sandbox_raw_path = sandbox_reports_root / str(
+        staged_report_path = staged_reports_root / str(report["path"])
+        staged_raw_path = staged_reports_root / str(
             report.get("raw_path", report["path"])
         )
         if gate_failed:
             records.append({"id": check["id"], "status": "skipped-after-gate"})
             continue
         for before_index, before in enumerate(check.get("before", [])):
-            before_record = _run_sandboxed_check(
-                codex_executable=codex_executable,
-                codex_home=codex_home,
-                sandbox_runtime=sandbox_runtime,
-                permission_profile=permission_profile,
+            before_record = _run_trusted_local_check(
                 argv=_expanded_argv(before, values),
                 workspace=workspace,
                 base_environment=base_environment,
@@ -973,14 +786,10 @@ def run_checks(
         argv = _expanded_argv(
             check,
             values,
-            report=sandbox_report_path,
-            raw_report=sandbox_raw_path,
+            report=staged_report_path,
+            raw_report=staged_raw_path,
         )
-        record = _run_sandboxed_check(
-            codex_executable=codex_executable,
-            codex_home=codex_home,
-            sandbox_runtime=sandbox_runtime,
-            permission_profile=permission_profile,
+        record = _run_trusted_local_check(
             argv=argv,
             workspace=workspace,
             base_environment=base_environment,
@@ -992,7 +801,7 @@ def run_checks(
         record["bucket"] = check["bucket"]
         _materialize_report(
             report,
-            sandbox_reports_root,
+            staged_reports_root,
             reports_root,
             int(record["exit_code"]),
         )
@@ -1181,10 +990,6 @@ def verify_patch(
     candidate_patch: Path | None,
     artifact_root: Path,
     network_environment: Mapping[str, str],
-    codex_executable: Path,
-    pwsh_executable: Path,
-    codex_home: Path,
-    sandbox_runtime: Mapping[str, Any],
     retain_workspace: bool = False,
     p2p_exclusions: Sequence[str] = (),
 ) -> dict[str, Any]:
@@ -1201,7 +1006,6 @@ def verify_patch(
     )
     started = time.monotonic()
     result: dict[str, Any]
-    cleanup_script: Path | None = None
     try:
         dependency, values = prepare_dependencies(
             task,
@@ -1260,28 +1064,11 @@ def verify_patch(
                 ),
             }
         )
-        home_identity = evaluation_runtime_home_controlled_identity(codex_home)
-        if home_identity.get("identity_sha256") != sandbox_runtime.get(
-            "controlled_identity_sha256"
-        ):
-            raise ControlledRuntimeDriftError(
-                "evaluation runtime controlled assets changed before verifier launch"
-            )
-        _assert_sandbox_runtime_reusable(
-            codex_home,
-            sandbox_runtime,
-            full_backend_check=True,
-        )
-        cleanup_script = _stage_sandbox_runtime_cleanup(workspace)
         checks = run_checks(
             task=task,
             workspace=workspace,
             artifact_root=artifact_root,
             values=values,
-            codex_executable=codex_executable,
-            codex_home=codex_home,
-            sandbox_runtime=sandbox_runtime,
-            permission_profile=str(corpus["codex"]["verifier_permission_profile"]),
             base_environment=network_environment,
         )
         failed_gate = next(
@@ -1318,17 +1105,7 @@ def verify_patch(
             "created_at": utc_now(),
             "duration_seconds": elapsed_seconds(started),
             "workspace": str(workspace.resolve()),
-            "sandbox_runtime": {
-                "schema": str(sandbox_runtime["schema"]),
-                "identity_sha256": str(sandbox_runtime["identity_sha256"]),
-                "controlled_identity_sha256": str(
-                    sandbox_runtime["controlled_identity_sha256"]
-                ),
-                "backend_identity_sha256": str(
-                    sandbox_runtime["backend_identity_sha256"]
-                ),
-                "shared_host_runtime": True,
-            },
+            "execution_environment": "trusted-local-independent-workspace",
             "dependency_identity": dependency,
             "applied_patches": applied_patches,
             "checks": checks,
@@ -1341,33 +1118,6 @@ def verify_patch(
         )
     finally:
         active_exception = sys.exc_info()[0] is not None
-        verifier_runtime_temp = (
-            workspace.resolve() / ".agentbase-verifier" / "runtime-temp"
-        )
-        sandbox_cleanup_succeeded = not verifier_runtime_temp.exists()
-        if cleanup_script is not None and verifier_runtime_temp.exists():
-            try:
-                _cleanup_sandbox_runtime_temp(
-                    cleanup_script=cleanup_script,
-                    codex_executable=codex_executable,
-                    pwsh_executable=pwsh_executable,
-                    codex_home=codex_home,
-                    sandbox_runtime=sandbox_runtime,
-                    permission_profile=str(corpus["codex"]["verifier_permission_profile"]),
-                    workspace=workspace,
-                    base_environment=network_environment,
-                    artifact_root=artifact_root,
-                )
-                sandbox_cleanup_succeeded = True
-            except Exception:
-                if not active_exception:
-                    raise
-        if sandbox_cleanup_succeeded and verifier_runtime_temp.exists():
-            try:
-                remove_managed_tree(workspace, verifier_runtime_temp)
-            except Exception:
-                if not active_exception:
-                    raise
         if not retain_workspace and workspace.exists():
             try:
                 resolved = require_within(work_root.resolve(), workspace)

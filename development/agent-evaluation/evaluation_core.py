@@ -23,9 +23,6 @@ CORPUS_SCHEMA = "agentbase.windows-swe-corpus/v4"
 CORPUS_ID = "agentbase-windows-swe-v1"
 QUALIFICATION_SCHEMA = "agentbase.windows-swe-qualification/v3"
 WINDOWS_ADAPTER_ROOT = Path("development/agent-evaluation/windows-adapters")
-PYTEST_DEBUG_TEMPROOT_ENV_KEY = "PYTEST_DEBUG_TEMPROOT"
-PYTEST_ADDOPTS_ENV_KEY = "PYTEST_ADDOPTS"
-PYTEST_RETENTION_ADDOPTS = "--override-ini=tmp_path_retention_policy=none"
 REQUIRED_ASSETS = (
     "instruction.md",
     "task.toml",
@@ -91,18 +88,6 @@ class EvaluationError(RuntimeError):
 
 class PreconditionError(EvaluationError):
     """A caller must establish required evidence before an evaluation can run."""
-
-
-class ControlledRuntimeDriftError(PreconditionError):
-    """A generated runtime asset changed without invalidating the sandbox backend."""
-
-
-class SandboxRuntimeInvalidError(PreconditionError):
-    """Codex rejected a runtime that passed the framework's readiness checks."""
-
-
-class SandboxSetupApprovalError(PreconditionError):
-    """The explicit Windows sandbox setup did not receive administrator approval."""
 
 
 def utc_now() -> str:
@@ -198,24 +183,12 @@ def default_work_root() -> Path:
     return _local_app_data() / "AgentBase" / "agent-evaluation-workspaces"
 
 
-def sandbox_runtime_root(state_root: Path) -> Path:
-    return state_root.resolve() / "sandbox-runtime"
-
-
-def sandbox_runtime_home(state_root: Path) -> Path:
-    return sandbox_runtime_root(state_root) / "codex-home"
-
-
-def sandbox_runtime_state_path(state_root: Path) -> Path:
-    return sandbox_runtime_root(state_root) / "runtime.json"
-
-
 def ensure_disjoint_roots(state_root: Path, work_root: Path) -> None:
     state = state_root.resolve()
     work = work_root.resolve()
     if state == work or state in work.parents or work in state.parents:
         raise EvaluationError(
-            "state_root and work_root must be disjoint; the candidate sandbox denies state_root"
+            "state_root and work_root must be disjoint; candidate and verifier state must stay separate"
         )
 
 
@@ -223,15 +196,16 @@ def ensure_evaluation_roots(
     project_root: Path,
     state_root: Path,
     work_root: Path,
-    codex_root: Path,
+    codex_root: Path | None = None,
 ) -> None:
-    """Keep generated evaluation state away from project and installed Codex assets."""
+    """Keep generated evaluation state away from project and optional runtime assets."""
 
     ensure_disjoint_roots(state_root, work_root)
     protected = {
         "project_root": project_root.resolve(),
-        "codex_root": codex_root.resolve(),
     }
+    if codex_root is not None:
+        protected["codex_root"] = codex_root.resolve()
     generated = {
         "state_root": state_root.resolve(),
         "work_root": work_root.resolve(),
@@ -254,87 +228,6 @@ def require_within(root: Path, candidate: Path) -> Path:
     if resolved_candidate == resolved_root or resolved_root not in resolved_candidate.parents:
         raise EvaluationError(f"path escapes managed root {resolved_root}: {resolved_candidate}")
     return resolved_candidate
-
-
-def prepare_sandbox_writable_root(
-    root: Path,
-    candidate: Path,
-    *,
-    create_runtime_subdirs: bool = True,
-) -> Path:
-    """Create one managed sandbox write root that remains removable by its host owner."""
-
-    resolved = require_within(root, candidate)
-    if resolved.exists():
-        attributes = getattr(resolved.lstat(), "st_file_attributes", 0)
-        if (
-            not resolved.is_dir()
-            or resolved.is_symlink()
-            or bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-        ):
-            raise EvaluationError(f"sandbox writable root is not a regular directory: {resolved}")
-    else:
-        resolved.mkdir(parents=True)
-    system_root = os.environ.get("SystemRoot", "").strip()
-    username = os.environ.get("USERNAME", "").strip()
-    domain = os.environ.get("USERDOMAIN", "").strip()
-    if not system_root or not username:
-        raise EvaluationError("cannot resolve the Windows owner for a sandbox writable root")
-    icacls = Path(system_root).resolve() / "System32" / "icacls.exe"
-    if not icacls.is_file():
-        raise EvaluationError("Windows icacls.exe is unavailable")
-    principal = f"{domain}\\{username}" if domain else username
-    completed = subprocess.run(
-        [
-            str(icacls),
-            str(resolved),
-            "/grant:r",
-            f"{principal}:(OI)(CI)F",
-            "/Q",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        timeout=60,
-        check=False,
-    )
-    if completed.returncode != 0:
-        detail = bounded_text(completed.stdout.decode("utf-8", errors="replace"), 500)
-        raise EvaluationError(f"cannot preserve host cleanup access on {resolved}: {detail}")
-    if create_runtime_subdirs:
-        for name in ("appdata", "home", "localappdata"):
-            (resolved / name).mkdir(exist_ok=True)
-        pytest_users = {
-            value.strip()
-            for key in ("LOGNAME", "USER", "LNAME", "USERNAME")
-            if (value := os.environ.get(key, "")).strip()
-        }
-        pytest_users.add("unknown")
-        for value in sorted(pytest_users):
-            if (
-                value in {".", ".."}
-                or Path(value).name != value
-                or any(character in value for character in '\\/:*?"<>|')
-            ):
-                continue
-            (resolved / f"pytest-of-{value}").mkdir(exist_ok=True)
-    return resolved
-
-
-def sandbox_temp_environment(runtime_temp: Path) -> dict[str, str]:
-    resolved = runtime_temp.resolve()
-    return {
-        "TEMP": str(resolved),
-        "TMP": str(resolved),
-        "TMPDIR": str(resolved),
-        "APPDATA": str(resolved / "appdata"),
-        "HOME": str(resolved / "home"),
-        "LOCALAPPDATA": str(resolved / "localappdata"),
-        "USERPROFILE": str(resolved / "home"),
-        PYTEST_DEBUG_TEMPROOT_ENV_KEY: str(resolved),
-        PYTEST_ADDOPTS_ENV_KEY: PYTEST_RETENTION_ADDOPTS,
-        "NO_COLOR": "1",
-        "PYTHONUTF8": "1",
-    }
 
 
 def dependency_runtime_projection(
@@ -554,9 +447,6 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
             required={
                 "auth_mode",
                 "transport_overlay",
-                "sandbox_implementation",
-                "candidate_permission_profile",
-                "verifier_permission_profile",
             },
             optional=None,
             errors=errors,
@@ -564,9 +454,6 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
         expected_codex = {
             "auth_mode": "existing-codex-auth-json",
             "transport_overlay": "codex-eval-overlay.toml",
-            "sandbox_implementation": "elevated",
-            "candidate_permission_profile": "agentbase_candidate",
-            "verifier_permission_profile": "agentbase_verifier",
         }
         for key, value in expected_codex.items():
             if codex.get(key) != value:
@@ -1137,11 +1024,9 @@ def framework_identity(project_root: Path) -> dict[str, Any]:
             "development/agent-evaluation/agent_eval.py",
             "development/agent-evaluation/agentbase_codex.py",
             "development/agent-evaluation/api_pricing_snapshot.json",
-            "development/agent-evaluation/candidate_preflight.ps1",
             "development/agent-evaluation/codex-eval-overlay.toml",
             "development/agent-evaluation/evaluation_core.py",
             "development/agent-evaluation/invoke_candidate.ps1",
-            "development/agent-evaluation/sandbox_runtime_cleanup.ps1",
             "development/agent-evaluation/vendor",
             "development/agent-evaluation/windows-adapters",
             "development/agent-evaluation/windows_verifier.py",
@@ -1487,6 +1372,7 @@ def create_workspace(
         "\n# AgentBase evaluation runtime\n"
         ".agentbase/\n"
         ".agents/skills/\n"
+        ".codex/\n"
         ".agentbase-venv/\n"
         "node_modules/\n"
         "ctrf/\n"

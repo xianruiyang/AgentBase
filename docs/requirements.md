@@ -700,7 +700,7 @@ AgentBase 应以固定、可审计的任务语料组合 Windows 原生合同、�
 - 来源: REQ-015 对整体项目评价的原子化
 - 关联: REQ-015, AC-056
 
-最终报告分别显示当前项目身份的 Windows 原生验证、候选能力合同及真实权限验收、路由 evidence、所选 Windows SWE 任务资格、覆盖与 reward、时间成本、按官方 API 单价折算的候选模型美元成本和基础设施健康。模型成本必须按每次真实请求的模型、普通输入、缓存命中、缓存写入、输出及适用长上下文倍率计算，覆盖主代理、全部后代子代理和同一评测身份下已调用模型的失败或重试尝试；价格来源、观察日期和身份进入报告与 framework identity，价格变化不得静默重算旧结果。通过 ChatGPT/Codex 后端运行时，该数值只表示 API 等价价值，不冒充订阅或账户实际账单。投影、配置、运行前身份、真实 sandbox 探测与另行取证能力必须分层表达；合同失败、宿主前置条件阻塞和待补外部证据分别列出。证据齐备与整体质量判断分开表达，`composite_score` 保持为空，不用任意加权总分掩盖未测范围或某一合同失败；派生结果不得表示为官方 DeepSWE leaderboard 成绩。
+最终报告分别显示当前项目身份的 Windows 原生验证、候选能力合同及真实运行收据、路由 evidence、所选 Windows SWE 任务资格、覆盖与 reward、时间成本、按官方 API 单价折算的候选模型美元成本和基础设施健康。模型成本必须按每次真实请求的模型、普通输入、缓存命中、缓存写入、输出及适用长上下文倍率计算，覆盖主代理、全部后代子代理和同一评测身份下已调用模型的失败或重试尝试；价格来源、观察日期和身份进入报告与 framework identity，价格变化不得静默重算旧结果。通过 ChatGPT/Codex 后端运行时，该数值只表示 API 等价价值，不冒充订阅或账户实际账单。投影、配置、运行前身份、真实候选/Verifier 收据与另行取证能力必须分层表达；合同失败、宿主前置条件阻塞和待补外部证据分别列出。证据齐备与整体质量判断分开表达，`composite_score` 保持为空，不用任意加权总分掩盖未测范围或某一合同失败；派生结果不得表示为官方 DeepSWE leaderboard 成绩。
 
 ## AC-062 日常验证只检查最终评测基础设施
 
@@ -708,46 +708,41 @@ AgentBase 应以固定、可审计的任务语料组合 Windows 原生合同、�
 - 来源: REQ-015 与用户降低独立验证耗时、Token 的既有要求
 - 关联: REQ-015, AC-055, CON-007
 
-corpus、权限配置、选择、身份、收据、恢复、patch 边界、报告转换和评价投影由 evaluator 禁用的 Windows 本地确定性入口覆盖；仅在最终评测合同或基础设施受影响且候选稳定后显式运行，不由正式 Validate 或 Publish 无条件消费；这些入口不得克隆外部任务、安装题目依赖、执行 qualification、运行外部 Verifier、启动模型或初始化 elevated sandbox。
+corpus、候选投影、选择、身份、收据、恢复、patch 边界和报告转换由 evaluator 禁用的 Windows 本地确定性入口覆盖；仅在最终评测合同或基础设施受影响且候选稳定后显式运行，不由正式 Validate 或 Publish 无条件消费；该入口不得克隆外部任务、安装题目依赖、执行 qualification、运行 Verifier 或启动模型。
 
-## AC-063 候选与 Verifier 使用独立 Windows 信任边界
+## AC-063 候选与 Verifier 使用独立本地工作区
 
 - 状态: confirmed
-- 来源: 用户确认独立代理与 verifier 指环境隔离并要求完善
+- 来源: 开发环境与门禁治理 REQ-003、DES-002—DES-005
 - 关联: REQ-015, AC-059, AC-060
 
-本条的 `network disabled` 精确指离线身份禁止非 loopback 出站；候选与 Verifier 必须通过 Codex 正式 local-binding 配置访问自己的 loopback 测试服务器。评测运行时必须在共享 shell 策略的一般 `CODEX_*` 过滤后派生唯一受管例外 `CODEX_NETWORK_ALLOW_LOCAL_BINDING=1`，使每条 sandbox 命令都维持同一持久防火墙身份；该非凭据控制位不能开放非 loopback 网络，不得扩展为自由 ambient `CODEX_*` 投影，也不得为运行本地回归而开放外网或删除 DeepSWE 基线节点。
+候选与 Verifier 作为受信任本地开发进程运行，从同一固定 base 创建互不共享题目依赖、测试配置和运行残留的独立工作区。唯一题目数据通道是按允许路径、文件数、大小和 Git mode 校验的 binary patch。候选结束后，Verifier 在自己的工作区准备同一身份的依赖，应用固定 Windows adapter、候选 patch 和 hidden tests，生成工作区内报告，再由可信父进程复制或转换为 state artifact。
 
-候选只能看到任务说明、基础源码、仓库自身指令与公开测试。Windows elevated permission profile 必须以宿主根默认 deny、最小运行时 read、候选 workspace read/write、完整 `.agents/skills` 投影 read-only、单一 attempt tmpdir write 和 network disabled 形成边界，并实际通过权限与工具 preflight：隐藏状态、项目根 canary、staged auth 与原始 installed auth 不可读；skill 的 `SKILL.md`、references、scripts 与 assets 全树按清单固定哈希且全部可读、不可写；workspace 写探针通过，`TEMP/TMP/TMPDIR/APPDATA/LOCALAPPDATA/HOME/USERPROFILE` 只指向该 attempt 临时面，npm、pnpm、Git 或构建工具不得为解析 home 越过 workspace ACL 读取宿主用户目录。launcher 校验 child stdout，并把能够决定模型未启动与 `blocked-precondition` 的结构化结果写入 denied state，候选可写的 workspace 副本只用于诊断。模型前冻结的基础 CLI 及该题实际 venv Python 或 npm/pnpm 运行时必须经同一 workspace 清单绑定绝对路径、可执行文件 SHA-256 和参数，sandbox child 验证清单哈希后按这些精确路径执行；除 `srcq`/scc doctor 外，还必须实际完成 AST/cache、rg 分页续读、fd tree、scc machine 和 artifact 往返。候选 prompt 必须显式指向该题已经准备并固定身份的 Python venv 或 npm/pnpm scripts，并从同一 corpus 的 `base` bucket 派生不含报告参数或隐藏测试过滤名的公开回归命令与当前 workspace Git safe-directory 前缀，不能让公开检查静默落到另一套依赖或靠失败猜测测试入口。无模型 app-server preflight 与模型 CLI 必须分别以内存 CLI override 标记同一动态 workspace trusted，不得把项目历史写入受控 `config.toml`；preflight 后必须复核完整受控身份并在漂移时失效运行时。Codex 服务连接所需网络投影不得进入模型 shell：`shell_environment_policy` 必须启用默认 secret-name 排除，并显式过滤 proxy、OpenAI/Codex、认证、凭据与 Git 控制变量；无模型 `sandbox-check` 的 launcher 环境也必须经过同一共享净化 owner。shell、`apply_patch`、公开测试和自定义 subagent 属于候选模型动作，配置或无模型 preflight 不冒充其行为证据；host/thread/MCP 依赖能力由各自 owner 另行评价。原生 unelevated 后端不能完整执行该读写拆分时不得作为等价降级；宿主 elevated 初始化未就绪必须报告为可恢复前置条件，而非能力通过或候选失败。候选结束后才从相同 base 创建独立 Verifier 工作区。两边可以复用同一主机级 sandbox 后端和受控配置，但不共享题目依赖、测试配置或运行残留；唯一题目数据通道是按路径、数量、大小和 Git mode 校验的 binary patch。Verifier 先在原始提交安装第三方依赖，再注入候选 patch 与隐藏测试；sandbox 测试报告只能写入 Verifier workspace，可信父进程校验文件边界与大小后才复制或转换到 state artifact。题目必需的 patch 后 build/codegen/可编辑元数据刷新和测试只在独立 network-disabled profile 中运行并留证。
+候选工作区每次从项目真源生成 .codex/config.toml、.codex/agents/ 与 .agents/skills/：全局规则作为 developer_instructions，portable config 的适用键、自定义 agents 与完整 skill 树按文件身份记录。安装 Codex 根只用于读取既有认证和统计 session 使用量，不复制或链接 auth.json，不投影 model catalog，不维护独立 Codex home。候选 CLI 固定使用 --ignore-user-config、sandbox_mode=danger-full-access、approval_policy=never、禁用 hooks/web search 和当前 workspace trusted override；仓库已占用保留投影路径时在模型前失败，不覆盖仓库内容。
 
-需要 Windows fixture adapter 的题目，候选与 Verifier 各自在安装依赖后将同一哈希固定补丁提交为干净基线；需要 loopback 服务时必须使用动态端口，并在服务线程或底层任务启动失败时直接传播原因，不得依赖固定宿主端口或无界等待。候选结果和两侧校验均相对该 adapter 基线，adapter 不得进入候选 patch，也不得成为改写上游隐藏资产的第二入口。
+运行身份覆盖 corpus、framework、任务、上游提交、Windows adapter、候选投影、模型 profile、工具、依赖和共享 shell 策略。模型 shell 继续过滤 ambient OpenAI/Codex 凭据、常见 token、Git 工作区覆盖和未冻结控制变量；这项凭据边界不冒充网络隔离。需要网络安全保证的任务由相应网络 owner 单独提供与验证，最终评测器不再用 Windows sandbox、权限画像或防火墙自证替代。
 
-Sandbox 运行临时根必须同时保证隔离进程可写和宿主可恢复清理。对 Python 3.13+ 将 pytest `0700` 目录转换为隔离身份私有 DACL 的行为，两侧必须由共享合同预建可继承的 pytest 用户根，并固定进程内临时目录零保留；不得把清理失败留给无界宿主 ACL 重试、额外管理员批准或下一次运行。
+需要 Windows fixture adapter 的题目，候选与 Verifier 各自在依赖准备后应用同一哈希固定补丁并形成干净基线；候选结果相对该基线生成，adapter 不得进入候选 patch。题目允许修改范围直接来自 corpus allowed_patch_paths，不得用通用禁令排除官方解法所需配置或 snapshot，也不得放宽 patch 门禁。
 
-候选 prompt 的逐题允许修改范围必须直接来自同一 corpus `allowed_patch_paths`；不得以通用禁令排除官方解法所需的配置或 snapshot，也不得放宽最终 patch 门禁。
-
-进入 elevated sandbox 的首个 child 不得依赖低权限账户的 `PATH`：候选 preflight 必须使用同一冻结工具清单中已复核哈希的 PowerShell 绝对路径，Verifier 的每条 sandbox 命令也必须在启动 Codex 前把 `argv[0]` 展开并验证为已存在的绝对文件。
-
-候选权限 profile 必须继承官方 `:workspace` 基线，再用更具体规则维持 root/state/project/installed deny、候选 workspace write、`.agentbase`/skills/Git/Codex 元数据 read-only、attempt tmpdir write，并按冻结身份逐文件只读开放基础 CLI；不能用依赖低权限 `PATH` 或扩大整个包目录读取代替。project 与 installed 根分别以一个精确目录 deny 进入 Codex 正式 Windows sandbox manager，由可继承 deny-read ACL 覆盖既有与后建内容；不得为获得同一边界而按随时间增长的顶层 glob 枚举宿主状态。state 根仍以精确 deny 保护，只对正式 runtime home 做最小 reopen，且不得为此枚举秘密。sandbox write root 在开放给低权限账户前必须保留宿主 owner 的可继承清理权限，child 创建的缓存或报告不得使可信父进程无法收据分类或终态清理。
-
-## AC-064 独立 Codex 服务环境与模型 shell 使用同一共享隔离合同
+保留的运行门禁只覆盖有真实消费者的机械边界：固定资产和依赖身份、双工作区分离、patch 边界、attempt/qualification/receipt 身份、锁与 CAS、超时和后代进程树终止、有界日志、失败分类及无模型恢复。配置存在不证明模型行为；真实候选、子代理、检查和 reward 必须由对应运行收据证明。
+## AC-064 Codex 服务环境与模型 shell 使用同一共享环境合同
 
 - 状态: confirmed
-- 来源: 用户要求修复独立 Codex 的 `.env`/权限边界并在完整能力复核后继续完善
+- 来源: 用户要求修复独立 Codex 的 .env/凭据边界并在开发环境治理中移除伪隔离
 - 关联: REQ-014, REQ-015, AC-055, AC-056, AC-060, AC-063
 
-独立 Codex 的服务进程可以消费经过脱敏、冻结并进入运行身份的连接环境，但该投影不得自动进入模型 shell。所有会允许模型执行工具的 evaluator 必须消费 `development/common/codex_shell_environment_policy.json` 这一个机器真源：启用 Codex 默认 secret-name 排除，并过滤 proxy、OpenAI/Codex、Git/SSH、云/包管理器凭据命名空间、语言注入变量与工作流控制变量；策略文件哈希进入运行身份，调用方不得通过自由 config 覆盖。领域运行时只有在受管值、消费者、用途和安全边界均已固定时才能派生显式 `set`，派生后的完整策略身份必须进入运行身份；Windows SWE 的 local-binding 控制位是当前唯一例外。只返回结构化 cases 且任何 tool event 都判失败的路由 evaluator 也使用同一策略，但策略加强不改变成功运行的模型可见 capsule，不要求对相同语义重采样。服务 launcher 自身的 ambient 凭据与控制变量继续由共享 runtime 净化，网络投影只在确有连接消费者时显式重加。
+Codex 服务进程可以消费经过脱敏、冻结并进入运行身份的连接环境，但该投影不得自动进入模型 shell。所有允许模型执行工具的 evaluator 消费 development/common/codex_shell_environment_policy.json 这一个机器真源：启用 Codex 默认 secret-name 排除，并过滤 proxy、OpenAI/Codex、Git/SSH、云/包管理器凭据命名空间、语言注入变量与工作流控制变量；策略文件哈希进入运行身份，调用方不得通过自由 config 覆盖。服务 launcher 的网络投影只在确有连接消费者时显式重加。
 
-## AC-065 elevated sandbox 初始化与日常评测分离
+共享环境合同只负责环境变量与凭据投影，不负责伪造宿主权限隔离。候选运行使用仓库投影配置和既有 Codex 认证；Verifier 不消费 Codex 认证。路由 evaluator、最终评测器和其他消费者分别证明自己的输出合同，不能用“环境已净化”替代模型行为、网络策略、patch 或评分证据。
+## AC-065 旧 elevated sandbox 生命周期退出
 
-- 状态: confirmed
-- 来源: 用户要求先完善测试框架，并明确指出每次 sandbox 运行都请求权限不可接受
-- 关联: REQ-015, REQ-014, AC-060, AC-062, AC-063
+- 状态: superseded
+- 来源: 开发环境与门禁治理 SOL-002、DES-005、AC-002、AC-005
+- 关联: REQ-015, AC-062, AC-063, AC-064
 
-评测框架只维护 state root 内一个持久 Codex home：项目 AGENTS/config/agents 是可重建受控面，`.sandbox`、`.sandbox-bin`、`.sandbox-secrets` 与 `cap_sid` 是主机运行态。只有显式 `sandbox-setup` 可以调用 Codex 的 elevated 初始化并可能请求管理员批准；状态已经就绪时再次调用必须直接复用。`sandbox-status` 不写持久状态、不启动 sandbox，`sandbox-check`、`assess`、`oracle`、`run`、`recover` 与 Verifier 必须在启动 Codex 前核对当前 Codex 可执行文件、受控配置、setup 状态、非秘密后端身份和临时资产清洁度，缺失或失效时阻断并指向 setup，不得隐式初始化。进程写回可重建 AGENTS/config/agents 只属于受控资产漂移：本次阻断并由正式同步恢复，不得失效仍有效的 elevated 后端或要求 UAC；只有 Codex 明确拒绝已验收后端，或 setup state、runner、稳定后端身份确实失效时才使后续调用在启动前阻断并指向 setup。管理员批准取消必须形成有界 `blocked-precondition`，清理临时资产并保持失效，任何入口不得自动重试。`.sandbox-secrets` 只检查为非 reparse 的真实目录并允许为空，内容与文件名不得被枚举或进入收据、日志、模型交互面；逐次 auth hardlink、模型目录投影、TEMP/TMP/TMPDIR/APPDATA/LOCALAPPDATA 必须在全局 runtime 锁内创建并在退出后清理。Codex 可执行文件、持久后端或受控配置变化的恢复动作必须明确，不以无界重试或重复 UAC 吸收。
+此前的持久 sandbox home、elevated setup/status/check、permission profile、ACL/deny/canary 探针、认证 hardlink、model catalog projection、无模型 app-server preflight、专用 runtime identity 和清理脚本均已退出正式入口，不保留兼容命令或迁移适配。它们保护的是未形成当前消费者的敌对租户假设，实际增加了 UAC、动态 SID、权限清单和清理状态的高频维护，并遮蔽候选与 Verifier 的真实开发失败。
 
-Codex 自有 `cap_sid` 按 workspace/tmpdir 动态扩展，属于受结构校验的主机注册表而非稳定安装指纹；运行时身份只能绑定 Codex、setup marker、command runner 与 protected-directory 存在性等稳定核心，不得因注册表新增合法 SID 映射而要求重新 UAC。旧静态哈希状态只有在 Codex 身份、稳定核心、受控配置和注册表结构都仍有效时，才可由显式 `sandbox-setup` 无 sandbox 启动地迁移；child 可执行文件缺失、测试失败或其他普通命令错误不得触发后端失效，只有 Codex 明确拒绝 elevated 后端时才可失效。setup 已写入并验收新后端后若只因 Windows 延迟释放临时目录而清理失败，必须保留独立失效原因；后续显式 setup 在受控配置、Codex 身份和后端完全匹配时只刷新状态并清理，不得再次启动 sandbox 或请求 UAC。
-
+当前替代合同由 AC-063 定义：受信任本地候选、独立 Verifier 工作区和有消费者的机械边界。普通命令错误、工具失败或工作区残留按对应命令、锁、超时和托管目录合同处理，不得重新引入宿主权限画像、无界重试或重复管理员批准。网络、凭据和破坏性操作的真实安全边界继续由各自 owner 维护，不因本条退出。
 ## CON-001 质量、Token、速度按序优化
 
 - 状态: confirmed

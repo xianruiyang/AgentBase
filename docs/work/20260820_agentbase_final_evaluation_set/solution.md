@@ -1,5 +1,7 @@
 # 实施方案
 
+> 生命周期：历史方案。权限 preflight、真实 permission acceptance 和宿主默认 deny 路径已于 2026-08-30 退出；替代方案见[开发环境治理方案](../20260830_development_environment_governance/solution.md)。
+
 ## SOL-001 以 Windows v2 corpus 替换 Pier 草案
 
 - 状态: implemented

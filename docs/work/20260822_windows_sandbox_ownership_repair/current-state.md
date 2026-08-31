@@ -1,5 +1,7 @@
 # Windows sandbox 所有权修复现状
 
+> 生命周期：历史完成记录。2026-08-30 起，评测运行时合同已由 `docs/work/20260830_development_environment_governance/` 接替；本文关于 `sandbox-setup`、elevated 评测后端和候选 runner 的现在时描述只说明当时边界，不再定义当前入口或待办。当前合同以 `development/agent-evaluation/README.md`、`docs/requirements.md` 和 `docs/plan.md` 为准。
+
 ## OBS-001 全局 portable source 错误拥有 elevated 后端
 
 - 状态: confirmed

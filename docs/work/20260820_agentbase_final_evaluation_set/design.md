@@ -1,5 +1,7 @@
 # 模型设计
 
+> 生命周期：历史设计。2026-08-30 的开发环境治理已用受信任本地候选与独立 Verifier 工作区替代本文的专用 sandbox runtime；当前设计见 [`development/agent-evaluation/README.md`](../../../development/agent-evaluation/README.md)。
+
 ## DES-001 最终评测由单一 Windows owner 维护
 
 - 状态: confirmed
