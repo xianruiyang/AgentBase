@@ -258,7 +258,7 @@ function Get-ManagedAssetLifecycleContract {
         foreach ($previous in $previousUnits) {
             $id = [string]$previous.id
             if (-not $contractById.ContainsKey($id)) {
-                throw "Previously published managed asset was deleted from the lifecycle contract: $id"
+                throw "Previously deployed managed asset was deleted from the lifecycle contract: $id"
             }
             $current = $contractById[$id]
             Assert-AgentBaseLifecycleIdentityEqual -Expected $previous -Actual $current -Context 'Managed-asset lifecycle transition'
@@ -345,7 +345,7 @@ function Get-ManagedAssetLifecycleReceiptUnits {
             state = [string]$unit.state
             delivery_modes = @($unit.delivery_modes)
             requires_portable_settings = [bool]$unit.requires_portable_settings
-            publication_in_scope = $inScope
+            deployment_in_scope = $inScope
         }
         if ([string]$unit.kind -eq 'path') {
             $receipt.relative_path = [string]$unit.relative_path

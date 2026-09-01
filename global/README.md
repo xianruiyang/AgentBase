@@ -25,4 +25,4 @@
 
 `hooks.template.json` 只描述 hook 入口与有界运行参数。`SessionStart` 通过 `reasoning-governor` 的权威线程读回，在新上下文和压缩后投影一行当前 next-turn 档位，并只用可丢弃的有限缓存抑制相同 `resume`；缓存不持有或设置推理状态。新机器仍须通过 `/hooks` 审查并信任实际命令；信任哈希不会迁移。`agents/` 只管理 `evidence`、`experiment` 与 `operator` 三个自定义角色，不覆盖 Codex 内置代理或目标主机的其他个人代理。旧 `luna`、`sol` 与更早的 `terra` 由部署生命周期作为退役受管资产处理，不保留同责候选。
 
-修改这些文件后，按[部署说明](../development/codex-deployment/README.md#validate)运行部署合同验证。正式安装仍需要用户对当次 `Publish` 的明确同意。
+修改这些文件后，按[部署说明](../development/codex-deployment/README.md#validate)运行部署合同验证。向真实 Codex 根执行 `Deploy` 仍需要用户对当次部署的明确同意。

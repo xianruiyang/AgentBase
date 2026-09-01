@@ -28,13 +28,13 @@
           <ListEntry>
             <ListItems>
               <ListItem>
-                <Label>published</Label>
-                <ScriptBlock>if ($_.managed_payload_formally_published) { 'true' } else { 'false' }</ScriptBlock>
+                <Label>deployed</Label>
+                <ScriptBlock>if ($_.managed_payload_formally_deployed) { 'true' } else { 'false' }</ScriptBlock>
               </ListItem>
               <ListItem>
-                <ItemSelectionCondition><ScriptBlock>$_.formal_publication_gap_count -gt 0</ScriptBlock></ItemSelectionCondition>
+                <ItemSelectionCondition><ScriptBlock>$_.formal_deployment_gap_count -gt 0</ScriptBlock></ItemSelectionCondition>
                 <Label>gaps</Label>
-                <ScriptBlock>@($_.formal_publication_gaps) -join ','</ScriptBlock>
+                <ScriptBlock>@($_.formal_deployment_gaps) -join ','</ScriptBlock>
               </ListItem>
               <ListItem>
                 <ItemSelectionCondition><ScriptBlock>$_.plugin_installation_in_scope</ScriptBlock></ItemSelectionCondition>
@@ -57,16 +57,16 @@
       </ListControl>
     </View>
     <View>
-      <Name>AgentBase.Deployment.PublishResult</Name>
+      <Name>AgentBase.Deployment.DeployResult</Name>
       <ViewSelectedBy>
-        <TypeName>AgentBase.Deployment.PublishResult</TypeName>
+        <TypeName>AgentBase.Deployment.DeployResult</TypeName>
       </ViewSelectedBy>
       <ListControl>
         <ListEntries>
           <ListEntry>
             <ListItems>
               <ListItem>
-                <Label>published</Label>
+                <Label>deployed</Label>
                 <ScriptBlock>'true'</ScriptBlock>
               </ListItem>
               <ListItem>

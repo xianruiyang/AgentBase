@@ -8,13 +8,7 @@
 
 ## 部署与迁移
 
-`global/hooks.template.json` 是 AgentBase 的 hook 配置真源，`development/codex-deployment/manage_agentbase.ps1` 是把 skill 与 hooks 安装到 Codex home 的唯一项目入口。复制仓库到另一台 Windows 机器后，使用：
-
-```powershell
-& '.\development\codex-deployment\manage_agentbase.ps1' -Action Publish -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -InstallPortableSettings
-```
-
-部署入口会解析目标机器的 Codex 根目录、备份并验证安装文件；不要复制旧机器绝对路径或手工维护第二份 `hooks.json` 示例。安装后重启 Codex，并在 `/hooks` 中审核和信任新机器上的实际命令。hook 信任哈希属于宿主状态，不随仓库迁移。
+`global/hooks.template.json` 是 AgentBase 的 hook 配置真源，[Codex 部署说明](../codex-deployment/README.md)是安装 skill 与 hooks 的唯一命令 owner；本文件不复制部署命令。部署入口会解析目标机器的 Codex 根目录、备份并验证安装文件；不要复制旧机器绝对路径或手工维护第二份 `hooks.json` 示例。安装后重启 Codex，并在 `/hooks` 中审核和信任新机器上的实际命令。hook 信任哈希属于宿主状态，不随仓库迁移。
 
 ## 验证
 

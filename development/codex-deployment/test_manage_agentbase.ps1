@@ -77,19 +77,30 @@ if (-not [string]::IsNullOrWhiteSpace($RetainedTestRootToClean)) {
 }
 
 try {
+    $legacyActionRejected = $false
+    try {
+        & $manage -Action Publish -ProjectRoot $ProjectRoot | Out-Null
+    }
+    catch {
+        $legacyActionRejected = $_.Exception.Message -match 'Publish'
+    }
+    if (-not $legacyActionRejected) {
+        throw 'Legacy Action Publish is still accepted'
+    }
+
     $oldLocalAppData = $env:LOCALAPPDATA
     try {
         $env:LOCALAPPDATA = Join-Path $externalPreflightRoot "localappdata"
         New-Item -ItemType Directory -Path $env:LOCALAPPDATA -Force | Out-Null
         $externalCodexRoot = Join-Path $externalPreflightRoot "codex"
         try {
-            & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $externalCodexRoot | Out-Null
+            & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $externalCodexRoot | Out-Null
         }
         catch {
             $externalPreflightRejected = $_.Exception.Message -match 'srcq runtime is not ready'
         }
         if (-not $externalPreflightRejected -or (Test-Path -LiteralPath (Join-Path $externalCodexRoot 'AGENTS.md'))) {
-            throw "Publish did not reject a missing srcq runtime before writing the payload"
+            throw "Deploy did not reject a missing srcq runtime before writing the payload"
         }
     }
     finally {
@@ -171,7 +182,7 @@ try {
     $wrongKindRetiredHash = (Get-FileHash -LiteralPath $wrongKindRetiredPath -Algorithm SHA256).Hash
     $wrongKindRetirementRejected = $false
     try {
-        & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot | Out-Null
+        & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $codexRoot | Out-Null
     }
     catch {
         $wrongKindRetirementRejected = $_.Exception.Message -like "Retired managed path has unexpected kind*"
@@ -180,7 +191,7 @@ try {
         -not (Test-Path -LiteralPath $wrongKindRetiredPath -PathType Leaf) -or
         (Get-FileHash -LiteralPath $wrongKindRetiredPath -Algorithm SHA256).Hash -ne $wrongKindRetiredHash -or
         (Get-FileHash -LiteralPath (Join-Path $codexRoot "AGENTS.md") -Algorithm SHA256).Hash -ne $originalAgentsHash) {
-        throw "Publish did not safely reject a retired managed path with the wrong kind"
+        throw "Deploy did not safely reject a retired managed path with the wrong kind"
     }
     Remove-Item -LiteralPath $wrongKindRetiredPath -Force
 
@@ -198,130 +209,141 @@ try {
         $retiredFixtureHashes[[string]$retiredPath.id] = (Get-FileHash -LiteralPath $fixtureProbePath -Algorithm SHA256).Hash
     }
 
-    $prePublishStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
-    if ([int]$prePublishStatus.retired_managed_path_present_count -ne $retiredDefaultPaths.Count -or
-        @($prePublishStatus.formal_publication_gaps) -notcontains "retired_managed_paths_present") {
-        throw "Status did not expose the installed retired managed paths before publication"
+    $preDeployStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    if ([int]$preDeployStatus.retired_managed_path_present_count -ne $retiredDefaultPaths.Count -or
+        @($preDeployStatus.formal_deployment_gaps) -notcontains "retired_managed_paths_present") {
+        throw "Status did not expose the installed retired managed paths before deployment"
     }
-    $prePublishDisplay = ($prePublishStatus | Out-String -Width 4096).Trim()
-    if ($prePublishDisplay -notmatch '(?m)^published\s*:\s*false\r?$' -or
-        $prePublishDisplay -notmatch '(?m)^gaps\s*:.*retired_managed_paths_present' -or
-        $prePublishDisplay -match 'source_bundle_sha256|installed_bundle_sha256|codex_root') {
-        throw "Status default display did not retain only the actionable publication diagnosis"
+    $preDeployDisplay = ($preDeployStatus | Out-String -Width 4096).Trim()
+    if ($preDeployDisplay -notmatch '(?m)^deployed\s*:\s*false\r?$' -or
+        $preDeployDisplay -notmatch '(?m)^gaps\s*:.*retired_managed_paths_present' -or
+        $preDeployDisplay -match 'source_bundle_sha256|installed_bundle_sha256|codex_root') {
+        throw "Status default display did not retain only the actionable deployment diagnosis"
     }
 
-    $defaultPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
-    if (-not [bool]$defaultPublish.skills_installed -or [bool]$defaultPublish.hooks_installed -or [bool]$defaultPublish.portable_settings_installed) {
-        throw "Default publish reported an inconsistent direct-compatibility payload"
+    $defaultDeploy = & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    if (-not [bool]$defaultDeploy.skills_installed -or [bool]$defaultDeploy.hooks_installed -or [bool]$defaultDeploy.portable_settings_installed) {
+        throw "Default deploy reported an inconsistent direct-compatibility payload"
     }
-    if ([bool]$defaultPublish.portable_settings_installed) {
-        throw "Default publish unexpectedly installed portable settings"
+    if ([bool]$defaultDeploy.portable_settings_installed) {
+        throw "Default deploy unexpectedly installed portable settings"
     }
-    if ([bool]$defaultPublish.runtime_prerequisite_in_scope) {
+    if ([bool]$defaultDeploy.runtime_prerequisite_in_scope) {
         throw "Deployment sandbox unexpectedly consumed the host srcq installation"
     }
-    if ([int]$defaultPublish.retired_managed_path_removed_count -ne $retiredDefaultPaths.Count) {
-        throw "Default publish did not report all retired managed paths"
+    if ([int]$defaultDeploy.retired_managed_path_removed_count -ne $retiredDefaultPaths.Count) {
+        throw "Default deploy did not report all retired managed paths"
     }
-    $defaultPublishDisplay = ($defaultPublish | Out-String -Width 4096).Trim()
-    if ($defaultPublishDisplay -notmatch '(?m)^published\s*:\s*true\r?$' -or
-        $defaultPublishDisplay -notmatch '(?m)^changed\s*:\s*\d+\r?$' -or
-        $defaultPublishDisplay -notmatch '(?m)^backup\s*:' -or
-        $defaultPublishDisplay -match 'source_bundle_sha256|routing_evidence_sha256|managed_asset_lifecycle_sha256') {
-        throw "Publish default display did not retain the result and rollback handle without machine-only identities"
+    $defaultDeployDisplay = ($defaultDeploy | Out-String -Width 4096).Trim()
+    if ($defaultDeployDisplay -notmatch '(?m)^deployed\s*:\s*true\r?$' -or
+        $defaultDeployDisplay -notmatch '(?m)^changed\s*:\s*\d+\r?$' -or
+        $defaultDeployDisplay -notmatch '(?m)^backup\s*:' -or
+        $defaultDeployDisplay -match 'source_bundle_sha256|routing_evidence_sha256|managed_asset_lifecycle_sha256') {
+        throw "Deploy default display did not retain the result and rollback handle without machine-only identities"
     }
-    $defaultPublishMachine = ($defaultPublish | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
-    if ([string]$defaultPublishMachine.action -ne 'Publish' -or
-        [string]$defaultPublishMachine.source_bundle_sha256 -ne [string]$defaultPublish.source_bundle_sha256 -or
-        [string]$defaultPublishMachine.backup_path -ne [string]$defaultPublish.backup_path) {
-        throw "Publish compact display changed the complete machine-readable object"
+    $defaultDeployMachine = ($defaultDeploy | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
+    if ([string]$defaultDeployMachine.action -ne 'Deploy' -or
+        [string]$defaultDeployMachine.source_bundle_sha256 -ne [string]$defaultDeploy.source_bundle_sha256 -or
+        [string]$defaultDeployMachine.backup_path -ne [string]$defaultDeploy.backup_path) {
+        throw "Deploy compact display changed the complete machine-readable object"
     }
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "config.toml") -Algorithm SHA256).Hash -ne $originalConfigHash) {
-        throw "Default publish changed config.toml"
+        throw "Default deploy changed config.toml"
     }
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "hooks.json") -Algorithm SHA256).Hash -ne $originalHooksHash) {
-        throw "Default publish changed hooks.json"
+        throw "Default deploy changed hooks.json"
     }
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\luna.toml") -Algorithm SHA256).Hash -ne $originalLunaHash) {
-        throw "Default publish changed a custom agent"
+        throw "Default deploy changed a custom agent"
     }
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\user-agent.toml") -Algorithm SHA256).Hash -ne $originalUserAgentHash) {
-        throw "Default publish changed an unrelated custom agent"
+        throw "Default deploy changed an unrelated custom agent"
     }
     $installedRuntimeArtifacts = @(Get-ChildItem -LiteralPath (Join-Path $codexRoot "skills") -Recurse -Force -File | Where-Object {
         $_.FullName -match '(?i)[\\/]__pycache__[\\/]' -or $_.Extension -in @('.pyc', '.pyo')
     })
     if ($installedRuntimeArtifacts.Count -ne 0) {
-        throw "Default publish copied runtime artifacts into the Codex skill payload"
+        throw "Default deploy copied runtime artifacts into the Codex skill payload"
     }
     $installedProjectOnlyArtifacts = @(Get-ChildItem -LiteralPath (Join-Path $codexRoot "skills") -Recurse -Force -File | Where-Object {
         $relativePath = $_.FullName.Substring((Join-Path $codexRoot "skills").Length + 1).Replace('\', '/')
         Test-AgentBaseProjectOnlyArtifact -RelativePath $relativePath
     })
     if ($installedProjectOnlyArtifacts.Count -ne 0) {
-        throw "Default publish copied project-only tests or benchmarks into the Codex skill payload"
+        throw "Default deploy copied project-only tests or benchmarks into the Codex skill payload"
     }
     if (-not (Test-Path -LiteralPath (Join-Path $codexRoot "skills\source-query\SKILL.md") -PathType Leaf)) {
-        throw "Default publish omitted the formal source-query skill"
+        throw "Default deploy omitted the formal source-query skill"
     }
-    $defaultManifest = Get-Content -LiteralPath (Join-Path $defaultPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([int]$defaultManifest.schema_version -ne 7 -or
-        [string]$defaultManifest.managed_asset_lifecycle_sha256 -ne [string]$defaultPublish.managed_asset_lifecycle_sha256 -or
-        @($defaultManifest.managed_asset_units).Count -ne [int]$defaultPublish.managed_asset_unit_count) {
-        throw "Default publish manifest did not record the complete managed-asset lifecycle"
+    $defaultManifestPath = Join-Path $defaultDeploy.backup_path "manifest.json"
+    $defaultManifest = Get-Content -LiteralPath $defaultManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([int]$defaultManifest.schema_version -ne 8 -or
+        [string]$defaultManifest.managed_asset_lifecycle_sha256 -ne [string]$defaultDeploy.managed_asset_lifecycle_sha256 -or
+        @($defaultManifest.managed_asset_units).Count -ne [int]$defaultDeploy.managed_asset_unit_count) {
+        throw "Default deploy manifest did not record the complete managed-asset lifecycle"
     }
     foreach ($retiredPath in $retiredDefaultPaths) {
         $relativeRetiredPath = ([string]$retiredPath.path).Replace('/', '\')
         if (Test-Path -LiteralPath (Join-Path $codexRoot $relativeRetiredPath)) {
-            throw "Default publish retained a retired managed path: $relativeRetiredPath"
+            throw "Default deploy retained a retired managed path: $relativeRetiredPath"
         }
         $retiredTargetState = @($defaultManifest.targets | Where-Object { [string]$_.relative_path -eq $relativeRetiredPath })
         $backupProbePath = if ([string]$retiredPath.kind -eq 'directory') {
-            Join-Path $defaultPublish.backup_path "payload\$relativeRetiredPath\SKILL.md"
+            Join-Path $defaultDeploy.backup_path "payload\$relativeRetiredPath\SKILL.md"
         }
         else {
-            Join-Path $defaultPublish.backup_path "payload\$relativeRetiredPath"
+            Join-Path $defaultDeploy.backup_path "payload\$relativeRetiredPath"
         }
         if ($retiredTargetState.Count -ne 1 -or [string]$retiredTargetState[0].desired_state -ne "absent" -or
             -not [bool]$retiredTargetState[0].existed_before -or
             -not (Test-Path -LiteralPath $backupProbePath -PathType Leaf) -or
             (Get-FileHash -LiteralPath $backupProbePath -Algorithm SHA256).Hash -ne $retiredFixtureHashes[[string]$retiredPath.id]) {
-            throw "Default publish did not preserve a recoverable retirement receipt: $relativeRetiredPath"
+            throw "Default deploy did not preserve a recoverable retirement receipt: $relativeRetiredPath"
         }
     }
     $queryRuntimeArtifacts = @(Get-ChildItem -LiteralPath (Join-Path $codexRoot "skills\source-query") -Recurse -Force -File | Where-Object {
         $_.Extension -eq '.exe' -or $_.Name -in @('sgy.exe', 'srcq.exe')
     })
     if ($queryRuntimeArtifacts.Count -ne 0) {
-        throw "Default publish copied a private source-query runtime"
+        throw "Default deploy copied a private source-query runtime"
     }
     $defaultStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
-    if (-not [bool]$defaultStatus.managed_payload_formally_published -or
+    if (-not [bool]$defaultStatus.managed_payload_formally_deployed -or
         -not [bool]$defaultStatus.manifest_matches_managed_asset_lifecycle -or
         [int]$defaultStatus.retired_managed_path_present_count -ne 0) {
-        throw "Status did not recognize the current direct-compatibility publish"
+        throw "Status did not recognize the current direct-compatibility deploy"
     }
     $defaultStatusDisplay = ($defaultStatus | Out-String -Width 4096).Trim()
-    if ($defaultStatusDisplay -notmatch '(?m)^published\s*:\s*true\r?$' -or
+    if ($defaultStatusDisplay -notmatch '(?m)^deployed\s*:\s*true\r?$' -or
         $defaultStatusDisplay -match '(?m)^gaps\s*:|source_bundle_sha256|installed_bundle_sha256') {
         throw "Healthy Status default display included non-actionable machine detail"
     }
+    $defaultManifest.schema_version = 7
+    $defaultManifest.state = 'published'
+    Write-FixtureText -Path $defaultManifestPath -Text ($defaultManifest | ConvertTo-Json -Depth 10)
+    $legacyManifestStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    if (-not [bool]$legacyManifestStatus.managed_payload_formally_deployed) {
+        throw 'Status did not read a legacy schema 7 published manifest as deployment history'
+    }
+    $defaultManifest.schema_version = 8
+    $defaultManifest.state = 'deployed'
+    Write-FixtureText -Path $defaultManifestPath -Text ($defaultManifest | ConvertTo-Json -Depth 10)
 
     $staleProjectTestPath = Join-Path $codexRoot "skills\codex-event-logger\tests\stale_project_test.py"
     New-Item -ItemType Directory -Path (Split-Path -Parent $staleProjectTestPath) -Force | Out-Null
     Write-FixtureText -Path $staleProjectTestPath -Text ("project-only" + [Environment]::NewLine)
     $staleTestStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
-    if ([bool]$staleTestStatus.managed_payload_formally_published -or @($staleTestStatus.formal_publication_gaps) -notcontains "installed_payload_differs_from_source") {
+    if ([bool]$staleTestStatus.managed_payload_formally_deployed -or @($staleTestStatus.formal_deployment_gaps) -notcontains "installed_payload_differs_from_source") {
         throw "Status did not report a stale project-only test in the managed Codex payload"
     }
-    $testCleanupPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
-    $testCleanupManifest = Get-Content -LiteralPath (Join-Path $testCleanupPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([int]$testCleanupPublish.changed_path_count -ne 1 -or @($testCleanupManifest.targets).Count -ne 1 -or
+    $testCleanupDeploy = & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    $testCleanupManifest = Get-Content -LiteralPath (Join-Path $testCleanupDeploy.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([int]$testCleanupDeploy.changed_path_count -ne 1 -or @($testCleanupManifest.targets).Count -ne 1 -or
         [string]$testCleanupManifest.targets[0].relative_path -ne "skills\codex-event-logger\tests\stale_project_test.py" -or
         [string]$testCleanupManifest.targets[0].desired_state -ne "absent" -or
         (Test-Path -LiteralPath $staleProjectTestPath) -or
         (Test-Path -LiteralPath (Split-Path -Parent $staleProjectTestPath))) {
-        throw "Incremental publish did not remove a stale project-only test from the Codex payload"
+        throw "Incremental deploy did not remove a stale project-only test from the Codex payload"
     }
 
     $changedSkillPath = Join-Path $codexRoot "skills\codex-event-logger\SKILL.md"
@@ -329,23 +351,23 @@ try {
     Write-FixtureText -Path $changedSkillPath -Text ("corrupted installed skill" + [Environment]::NewLine)
     $sentinelWriteTime = [DateTime]::SpecifyKind([DateTime]::Parse("2020-01-02T03:04:05"), [DateTimeKind]::Utc)
     [IO.File]::SetLastWriteTimeUtc($untouchedSkillPath, $sentinelWriteTime)
-    $repairPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
-    $repairManifest = Get-Content -LiteralPath (Join-Path $repairPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([int]$repairPublish.changed_path_count -ne 1 -or @($repairManifest.targets).Count -ne 1 -or [string]$repairManifest.targets[0].relative_path -ne "skills\codex-event-logger\SKILL.md") {
-        throw "Incremental publish did not limit the transaction to the changed managed file"
+    $repairDeploy = & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    $repairManifest = Get-Content -LiteralPath (Join-Path $repairDeploy.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([int]$repairDeploy.changed_path_count -ne 1 -or @($repairManifest.targets).Count -ne 1 -or [string]$repairManifest.targets[0].relative_path -ne "skills\codex-event-logger\SKILL.md") {
+        throw "Incremental deploy did not limit the transaction to the changed managed file"
     }
     if ([IO.File]::GetLastWriteTimeUtc($untouchedSkillPath) -ne $sentinelWriteTime) {
-        throw "Incremental publish rewrote an unchanged managed file"
+        throw "Incremental deploy rewrote an unchanged managed file"
     }
-    $noOpPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
-    $noOpManifest = Get-Content -LiteralPath (Join-Path $noOpPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([int]$noOpPublish.changed_path_count -ne 0 -or @($noOpManifest.targets).Count -ne 0) {
-        throw "No-op publish created changed payload targets"
+    $noOpDeploy = & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    $noOpManifest = Get-Content -LiteralPath (Join-Path $noOpDeploy.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([int]$noOpDeploy.changed_path_count -ne 0 -or @($noOpManifest.targets).Count -ne 0) {
+        throw "No-op deploy created changed payload targets"
     }
     if ([IO.File]::GetLastWriteTimeUtc($untouchedSkillPath) -ne $sentinelWriteTime) {
-        throw "No-op publish touched an unchanged managed file"
+        throw "No-op deploy touched an unchanged managed file"
     }
-    $defaultRollback = & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $defaultPublish.backup_path
+    $defaultRollback = & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $defaultDeploy.backup_path
     $defaultRollbackDisplay = ($defaultRollback | Out-String -Width 4096).Trim()
     if ($defaultRollbackDisplay -notmatch '(?m)^rolled_back\s*:\s*true\r?$' -or
         $defaultRollbackDisplay -notmatch '(?m)^restored\s*:\s*\d+\r?$' -or
@@ -362,19 +384,19 @@ try {
     }
     $rolledBackStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
     if ([int]$rolledBackStatus.retired_managed_path_present_count -ne $retiredDefaultPaths.Count -or
-        @($rolledBackStatus.formal_publication_gaps) -notcontains "retired_managed_paths_present") {
+        @($rolledBackStatus.formal_deployment_gaps) -notcontains "retired_managed_paths_present") {
         throw "Status did not expose restored retired paths after rollback"
     }
 
-    $settingsPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings
-    if (-not [bool]$settingsPublish.portable_settings_installed) {
-        throw "Portable-settings publish did not report settings installation"
+    $settingsDeploy = & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings
+    if (-not [bool]$settingsDeploy.portable_settings_installed) {
+        throw "Portable-settings deploy did not report settings installation"
     }
-    if ([int]$settingsPublish.portable_agent_count -ne 3) {
-        throw "Portable-settings publish reported an unexpected custom-agent count"
+    if ([int]$settingsDeploy.portable_agent_count -ne 3) {
+        throw "Portable-settings deploy reported an unexpected custom-agent count"
     }
-    if ([int]$settingsPublish.retired_managed_path_removed_count -ne $retiredPortablePaths.Count) {
-        throw "Portable-settings publish did not retire the restored legacy paths"
+    if ([int]$settingsDeploy.retired_managed_path_removed_count -ne $retiredPortablePaths.Count) {
+        throw "Portable-settings deploy did not retire the restored legacy paths"
     }
     $installedConfigText = Get-Content -LiteralPath (Join-Path $codexRoot "config.toml") -Raw -Encoding UTF8
     foreach ($preservedHostFragment in @(
@@ -391,7 +413,7 @@ try {
         'trust_level = "trusted"'
     )) {
         if (-not $installedConfigText.Contains($preservedHostFragment)) {
-            throw "Portable-settings publish removed host-owned config: $preservedHostFragment"
+            throw "Portable-settings deploy removed host-owned config: $preservedHostFragment"
         }
     }
     foreach ($portableFragment in @(
@@ -409,11 +431,11 @@ try {
         'ambient-suggestions-enabled = false'
     )) {
         if (-not $installedConfigText.Contains($portableFragment)) {
-            throw "Portable-settings publish did not install a managed setting: $portableFragment"
+            throw "Portable-settings deploy did not install a managed setting: $portableFragment"
         }
     }
     $settingsStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings
-    if (-not [bool]$settingsStatus.managed_payload_formally_published -or -not [bool]$settingsStatus.installed_matches_source) {
+    if (-not [bool]$settingsStatus.managed_payload_formally_deployed -or -not [bool]$settingsStatus.installed_matches_source) {
         throw "Status did not compare portable config by its managed contract"
     }
     $installedHooksText = Get-Content -LiteralPath (Join-Path $codexRoot "hooks.json") -Raw -Encoding UTF8
@@ -449,10 +471,10 @@ try {
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "agents\user-agent.toml") -Algorithm SHA256).Hash -ne $originalUserAgentHash) {
         throw "Unrelated custom agent was changed"
     }
-    $manifest = Get-Content -LiteralPath (Join-Path $settingsPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $manifest = Get-Content -LiteralPath (Join-Path $settingsDeploy.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
     $windowsSandboxLifecycle = @($manifest.managed_asset_units | Where-Object { [string]$_.id -eq 'config:windows/sandbox' })
     if ($windowsSandboxLifecycle.Count -ne 1 -or [string]$windowsSandboxLifecycle[0].state -ne 'transferred') {
-        throw "Portable-settings publish did not preserve the Windows sandbox ownership transfer"
+        throw "Portable-settings deploy did not preserve the Windows sandbox ownership transfer"
     }
     $manifestTargets = @($manifest.targets.relative_path | Sort-Object)
     if ($manifestTargets -notcontains "config.toml" -or $manifestTargets -notcontains "hooks.json") {
@@ -463,25 +485,25 @@ try {
             throw "Portable custom agent is missing from the rollback manifest: $agentName"
         }
     }
-    if ([int]$manifest.schema_version -ne 7 -or [string]::IsNullOrWhiteSpace([string]$manifest.installed_contract_bundle_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evidence_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evaluation_capsule_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.managed_asset_lifecycle_sha256) -or @($manifest.managed_asset_units).Count -eq 0) {
-        throw "Publish manifest is missing the current routing and managed-asset lifecycle receipts"
+    if ([int]$manifest.schema_version -ne 8 -or [string]::IsNullOrWhiteSpace([string]$manifest.installed_contract_bundle_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evidence_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evaluation_capsule_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.managed_asset_lifecycle_sha256) -or @($manifest.managed_asset_units).Count -eq 0) {
+        throw "Deploy manifest is missing the current routing and managed-asset lifecycle receipts"
     }
-    $scopeBridgePublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
-    $scopeBridgeManifest = Get-Content -LiteralPath (Join-Path $scopeBridgePublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $scopeBridgeDeploy = & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    $scopeBridgeManifest = Get-Content -LiteralPath (Join-Path $scopeBridgeDeploy.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
     $scopeBridgeConfigReceipts = @($scopeBridgeManifest.managed_asset_units | Where-Object {
         [string]$_.kind -eq 'config_key' -and [string]$_.state -eq 'present'
     })
     if ($scopeBridgeConfigReceipts.Count -eq 0 -or
         @($scopeBridgeConfigReceipts | Where-Object { [string]::IsNullOrWhiteSpace([string]$_.last_managed_source_fingerprint) }).Count -ne 0) {
-        throw "A publication outside portable-settings scope did not carry config provenance from the latest lifecycle receipt"
+        throw "A deployment outside portable-settings scope did not carry config provenance from the latest lifecycle receipt"
     }
 
     $installedCacheRoot = Join-Path $codexRoot "skills\codex-event-logger\tests\__pycache__"
     New-Item -ItemType Directory -Path $installedCacheRoot -Force | Out-Null
     [IO.File]::WriteAllBytes((Join-Path $installedCacheRoot "runtime-probe.pyc"), [byte[]]@(5, 6, 7, 8))
 
-    & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $scopeBridgePublish.backup_path | Out-Null
-    & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $settingsPublish.backup_path | Out-Null
+    & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $scopeBridgeDeploy.backup_path | Out-Null
+    & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $settingsDeploy.backup_path | Out-Null
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "AGENTS.md") -Algorithm SHA256).Hash -ne $originalAgentsHash) {
         throw "Rollback did not restore AGENTS.md"
     }
@@ -517,12 +539,12 @@ try {
     New-Item -ItemType Directory -Path $pluginConflictSkill -Force | Out-Null
     Write-FixtureText -Path (Join-Path $pluginConflictSkill "SKILL.md") -Text ("direct compatibility conflict" + [Environment]::NewLine)
     $pluginConflictStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings -SkillDeliveryMode Plugin
-    if ([bool]$pluginConflictStatus.plugin_mode_ready -or [int]$pluginConflictStatus.direct_compatibility_conflict_count -ne 1 -or [bool]$pluginConflictStatus.managed_payload_formally_published) {
+    if ([bool]$pluginConflictStatus.plugin_mode_ready -or [int]$pluginConflictStatus.direct_compatibility_conflict_count -ne 1 -or [bool]$pluginConflictStatus.managed_payload_formally_deployed) {
         throw "Plugin status did not expose the direct-compatibility conflict"
     }
     $pluginConflictRejected = $false
     try {
-        & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings -SkillDeliveryMode Plugin | Out-Null
+        & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings -SkillDeliveryMode Plugin | Out-Null
     }
     catch {
         $pluginConflictRejected = $_.Exception.Message -like "Plugin delivery mode requires the direct-compatibility skills*"
@@ -532,8 +554,8 @@ try {
     }
     Remove-Item -LiteralPath $pluginConflictSkill -Recurse -Force
 
-    $pluginPublish = & $manage -Action Publish -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings -SkillDeliveryMode Plugin
-    if ([bool]$pluginPublish.skills_installed -or [bool]$pluginPublish.hooks_installed -or -not [bool]$pluginPublish.plugin_installation_must_be_verified_separately) {
+    $pluginDeploy = & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings -SkillDeliveryMode Plugin
+    if ([bool]$pluginDeploy.skills_installed -or [bool]$pluginDeploy.hooks_installed -or -not [bool]$pluginDeploy.plugin_installation_must_be_verified_separately) {
         throw "Plugin delivery mode reported an inconsistent managed payload"
     }
     $pluginManagedSkill = Join-Path $codexRoot "skills\codex-event-logger"
@@ -543,7 +565,7 @@ try {
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "hooks.json") -Algorithm SHA256).Hash -ne $originalHooksHash) {
         throw "Plugin delivery mode changed global hooks instead of using bundled plugin hooks"
     }
-    $pluginManifest = Get-Content -LiteralPath (Join-Path $pluginPublish.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $pluginManifest = Get-Content -LiteralPath (Join-Path $pluginDeploy.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
     $pluginTargets = @($pluginManifest.targets.relative_path)
     $pluginRetiredRelativePaths = @($retiredPluginPaths | ForEach-Object { ([string]$_.path).Replace('/', '\') })
     $pluginRetiredTargets = @($pluginManifest.targets | Where-Object { $pluginRetiredRelativePaths -contains [string]$_.relative_path })
@@ -554,10 +576,10 @@ try {
         throw "Plugin delivery manifest does not contain the expected retired paths or contains global hooks"
     }
     $pluginStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -InstallPortableSettings -SkillDeliveryMode Plugin
-    if (-not [bool]$pluginStatus.managed_payload_formally_published -or [bool]$pluginStatus.plugin_installation_inspected -or -not [bool]$pluginStatus.plugin_mode_ready -or [int]$pluginStatus.direct_compatibility_conflict_count -ne 0) {
+    if (-not [bool]$pluginStatus.managed_payload_formally_deployed -or [bool]$pluginStatus.plugin_installation_inspected -or -not [bool]$pluginStatus.plugin_mode_ready -or [int]$pluginStatus.direct_compatibility_conflict_count -ne 0) {
         throw "Plugin delivery status did not distinguish the managed payload from external plugin installation"
     }
-    & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $pluginPublish.backup_path | Out-Null
+    & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $pluginDeploy.backup_path | Out-Null
     if ((Get-FileHash -LiteralPath (Join-Path $codexRoot "AGENTS.md") -Algorithm SHA256).Hash -ne $originalAgentsHash) {
         throw "Plugin delivery rollback did not restore AGENTS.md"
     }
@@ -570,8 +592,8 @@ try {
 
     $succeeded = $true
     $result = [pscustomobject]@{
-        default_publish_preserved_settings = $true
-        explicit_publish_merged_portable_settings = $true
+        default_deploy_preserved_settings = $true
+        explicit_deploy_merged_portable_settings = $true
         host_owned_config_preserved = $true
         custom_agents_installed = $true
         hooks_root_resolved = $true
@@ -579,18 +601,18 @@ try {
         runtime_artifacts_excluded = $true
         project_only_tests_and_benchmarks_excluded = $true
         runtime_cache_ignored_for_rollback_drift = $true
-        single_file_incremental_publish = $true
-        no_op_publish_touched_nothing = $true
+        single_file_incremental_deploy = $true
+        no_op_deploy_touched_nothing = $true
         retired_managed_paths_removed = $true
         retired_managed_paths_rollback_restored = $true
         retired_wrong_kind_rejected = $true
         status_derived_from_manifest_and_fingerprints = $true
-        lifecycle_provenance_crossed_publication_scope = $true
+        lifecycle_provenance_crossed_deployment_scope = $true
         plugin_delivery_rejected_parallel_direct_entry = $true
         plugin_delivery_omitted_direct_skills_and_hooks = $true
         compact_default_display_preserved_machine_contract = $true
         compact_status_display_retained_actionable_gaps = $true
-        publish_rejected_missing_srcq_runtime = $externalPreflightRejected
+        deploy_rejected_missing_srcq_runtime = $externalPreflightRejected
         deployment_sandbox_ignored_host_srcq = $true
         unrelated_skill_preserved = $true
         unrelated_agent_preserved = $true

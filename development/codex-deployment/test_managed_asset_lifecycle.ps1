@@ -90,7 +90,7 @@ try {
     $carriedConfigUnit = @($outOfScopeReceipt | Where-Object { [string]$_.id -eq 'config:root/managed_key' })
     if ($carriedConfigUnit.Count -ne 1 -or
         [string]$carriedConfigUnit[0].last_managed_source_fingerprint -ne [string]$managedConfigUnit.source_fingerprint) {
-        throw 'An out-of-scope publication did not carry the last managed config provenance forward'
+        throw 'An out-of-scope deployment did not carry the last managed config provenance forward'
     }
 
     $missingPresentRejected = $false
@@ -123,7 +123,7 @@ try {
         state = 'present'
         delivery_modes = @('DirectCompatibility')
         requires_portable_settings = $false
-        publication_in_scope = $true
+        deployment_in_scope = $true
         relative_path = 'ghost.txt'
         path_kind = 'file'
     }
@@ -132,10 +132,10 @@ try {
         $null = Get-ManagedAssetLifecycleContract -Path $basePath -CurrentPathUnits @($pathA, $pathB) -CurrentConfigUnits @($managedConfigUnit) -PreviousManifest $previousWithGhost
     }
     catch {
-        $deletedHistoryRejected = $_.Exception.Message -like 'Previously published managed asset was deleted from the lifecycle contract*'
+        $deletedHistoryRejected = $_.Exception.Message -like 'Previously deployed managed asset was deleted from the lifecycle contract*'
     }
     if (-not $deletedHistoryRejected) {
-        throw 'Lifecycle validation did not reject deletion of a previously published identity'
+        throw 'Lifecycle validation did not reject deletion of a previously deployed identity'
     }
 
     $transitionDocument = $baseDocument | ConvertTo-Json -Depth 8 | ConvertFrom-Json
@@ -239,7 +239,7 @@ try {
         current_inventory_matches_lifecycle = $true
         disappeared_present_unit_rejected = $true
         unregistered_current_unit_rejected = $true
-        published_identity_deletion_rejected = $true
+        deployed_identity_deletion_rejected = $true
         explicit_cross_mode_retirement_accepted = $true
         missing_replacement_identity_rejected = $true
         config_provenance_carried_across_scope = $true

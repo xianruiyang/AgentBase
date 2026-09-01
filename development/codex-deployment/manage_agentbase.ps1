@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("Validate", "Status", "Publish", "Rollback")]
+    [ValidateSet("Validate", "Status", "Deploy", "Rollback")]
     [string]$Action = "Validate",
     [string]$ProjectRoot,
     [string]$CodexRoot,
@@ -29,14 +29,14 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
 }
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 
-if ($InstallPortableSettings -and @("Publish", "Status") -notcontains $Action) {
-    throw "InstallPortableSettings is valid only with Action Publish or Status"
+if ($InstallPortableSettings -and @("Deploy", "Status") -notcontains $Action) {
+    throw "InstallPortableSettings is valid only with Action Deploy or Status"
 }
 
 function Set-AgentBaseResultType {
     param(
         [psobject]$Result,
-        [ValidateSet("Validate", "Status", "Publish", "Rollback")]
+        [ValidateSet("Validate", "Status", "Deploy", "Rollback")]
         [string]$Kind
     )
 
@@ -372,13 +372,13 @@ function Get-ValidatedRoutingEvidence {
     }
 }
 
-function Get-LatestPublishedManifest {
+function Get-LatestDeploymentManifest {
     param(
         [string]$InstallRoot,
         [ValidateSet("DirectCompatibility", "Plugin")]
         [string]$DeliveryMode = "DirectCompatibility",
         [bool]$PortableSettingsInstalled = $false,
-        [switch]$IgnorePublicationScope,
+        [switch]$IgnoreDeploymentScope,
         [int]$MinimumSchemaVersion = 1
     )
 
@@ -405,7 +405,11 @@ function Get-LatestPublishedManifest {
         catch {
             continue
         }
-        if ([string]$manifest.state -ne "published" -or @(1, 2, 3, 4, 5, 6, 7) -notcontains [int]$manifest.schema_version) {
+        $schemaVersion = [int]$manifest.schema_version
+        $manifestState = [string]$manifest.state
+        $isLegacyPublishedManifest = @(1, 2, 3, 4, 5, 6, 7) -contains $schemaVersion -and $manifestState -eq 'published'
+        $isDeploymentManifest = $schemaVersion -eq 8 -and $manifestState -eq 'deployed'
+        if (-not $isLegacyPublishedManifest -and -not $isDeploymentManifest) {
             continue
         }
         if ([int]$manifest.schema_version -lt $MinimumSchemaVersion) {
@@ -420,7 +424,7 @@ function Get-LatestPublishedManifest {
         else {
             "DirectCompatibility"
         }
-        if (-not $IgnorePublicationScope -and
+        if (-not $IgnoreDeploymentScope -and
             ($manifestMode -ne $DeliveryMode -or [bool]$manifest.portable_settings_installed -ne $PortableSettingsInstalled)) {
             continue
         }
@@ -981,13 +985,13 @@ if ($Action -eq "Validate") {
     return
 }
 
-$CodexRoot = Resolve-CodexRoot -RequestedRoot $CodexRoot -Create ($Action -eq "Publish")
+$CodexRoot = Resolve-CodexRoot -RequestedRoot $CodexRoot -Create ($Action -eq "Deploy")
 
 if ($Action -eq "Status") {
-    $publishRecord = Get-LatestPublishedManifest -InstallRoot $CodexRoot -DeliveryMode $SkillDeliveryMode -PortableSettingsInstalled ([bool]$InstallPortableSettings)
-    $manifest = if ($null -eq $publishRecord) { $null } else { $publishRecord.document }
-    $lifecyclePublishRecord = Get-LatestPublishedManifest -InstallRoot $CodexRoot -IgnorePublicationScope -MinimumSchemaVersion 7
-    $lifecycleManifest = if ($null -eq $lifecyclePublishRecord) { $null } else { $lifecyclePublishRecord.document }
+    $deployRecord = Get-LatestDeploymentManifest -InstallRoot $CodexRoot -DeliveryMode $SkillDeliveryMode -PortableSettingsInstalled ([bool]$InstallPortableSettings)
+    $manifest = if ($null -eq $deployRecord) { $null } else { $deployRecord.document }
+    $lifecycleDeployRecord = Get-LatestDeploymentManifest -InstallRoot $CodexRoot -IgnoreDeploymentScope -MinimumSchemaVersion 7
+    $lifecycleManifest = if ($null -eq $lifecycleDeployRecord) { $null } else { $lifecycleDeployRecord.document }
     $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode -PreviousManifest $lifecycleManifest
     $srcqRuntime = if (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot) {
         [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null; scc_doctor_ok = $null; scc_version = $null }
@@ -1026,18 +1030,18 @@ if ($Action -eq "Status") {
         $manifest.PSObject.Properties.Name -contains 'managed_asset_lifecycle_sha256' -and
         [string]$manifest.managed_asset_lifecycle_sha256 -eq [string]$source.managed_asset_lifecycle.sha256
     $installedMatchesSource = $installedFingerprint -eq $sourceFingerprint
-    $publicationGaps = New-Object 'System.Collections.Generic.List[string]'
-    if (-not $installedMatchesSource) { $publicationGaps.Add("installed_payload_differs_from_source") }
-    if ($null -eq $manifest) { $publicationGaps.Add("published_manifest_missing") }
-    elseif (-not $manifestMatchesSource) { $publicationGaps.Add("published_manifest_source_is_stale") }
-    if ($null -ne $manifest -and -not $manifestMatchesInstalled) { $publicationGaps.Add("installed_payload_differs_from_manifest") }
-    if ($null -ne $manifest -and -not $manifestEvidenceMatches) { $publicationGaps.Add("published_manifest_routing_evidence_is_stale") }
-    if ($null -ne $manifest -and -not $manifestLifecycleMatches) { $publicationGaps.Add("published_manifest_managed_asset_lifecycle_is_stale") }
-    if ($retiredManagedTargets.Count -gt 0) { $publicationGaps.Add("retired_managed_paths_present") }
-    if ($retiredConfigDiagnostics.Count -gt 0) { $publicationGaps.Add('retired_managed_config_keys_present') }
-    if ($retiredConfigModified.Count -gt 0) { $publicationGaps.Add('retired_managed_config_keys_modified') }
-    if ($retiredConfigUnverifiable.Count -gt 0) { $publicationGaps.Add('retired_managed_config_keys_unverifiable') }
-    if (-not $pluginModeReady) { $publicationGaps.Add("plugin_mode_has_direct_compatibility_conflicts") }
+    $deploymentGaps = New-Object 'System.Collections.Generic.List[string]'
+    if (-not $installedMatchesSource) { $deploymentGaps.Add("installed_payload_differs_from_source") }
+    if ($null -eq $manifest) { $deploymentGaps.Add("deployment_manifest_missing") }
+    elseif (-not $manifestMatchesSource) { $deploymentGaps.Add("deployment_manifest_source_is_stale") }
+    if ($null -ne $manifest -and -not $manifestMatchesInstalled) { $deploymentGaps.Add("installed_payload_differs_from_manifest") }
+    if ($null -ne $manifest -and -not $manifestEvidenceMatches) { $deploymentGaps.Add("deployment_manifest_routing_evidence_is_stale") }
+    if ($null -ne $manifest -and -not $manifestLifecycleMatches) { $deploymentGaps.Add("deployment_manifest_managed_asset_lifecycle_is_stale") }
+    if ($retiredManagedTargets.Count -gt 0) { $deploymentGaps.Add("retired_managed_paths_present") }
+    if ($retiredConfigDiagnostics.Count -gt 0) { $deploymentGaps.Add('retired_managed_config_keys_present') }
+    if ($retiredConfigModified.Count -gt 0) { $deploymentGaps.Add('retired_managed_config_keys_modified') }
+    if ($retiredConfigUnverifiable.Count -gt 0) { $deploymentGaps.Add('retired_managed_config_keys_unverifiable') }
+    if (-not $pluginModeReady) { $deploymentGaps.Add("plugin_mode_has_direct_compatibility_conflicts") }
     $result = [pscustomobject]@{
         action = "Status"
         codex_root = $CodexRoot
@@ -1048,7 +1052,7 @@ if ($Action -eq "Status") {
         installed_contract_bundle_sha256 = $installedFingerprint
         installed_full_bundle_sha256 = $installedFullFingerprint
         installed_matches_source = $installedMatchesSource
-        latest_publish_manifest = if ($null -eq $publishRecord) { $null } else { $publishRecord.path }
+        latest_deployment_manifest = if ($null -eq $deployRecord) { $null } else { $deployRecord.path }
         manifest_matches_source = $manifestMatchesSource
         manifest_matches_installed = $manifestMatchesInstalled
         manifest_matches_routing_evidence = $manifestEvidenceMatches
@@ -1060,9 +1064,9 @@ if ($Action -eq "Status") {
         retired_managed_config_key_present_count = $retiredConfigDiagnostics.Count
         retired_managed_config_key_conflict_count = $retiredConfigModified.Count + $retiredConfigUnverifiable.Count
         retired_managed_config_key_conflicts = @($retiredConfigDiagnostics | Where-Object { [string]$_.status -ne 'removable' } | ForEach-Object { "$($_.id):$($_.status)" })
-        managed_payload_formally_published = $installedMatchesSource -and $manifestMatchesSource -and $manifestMatchesInstalled -and $manifestEvidenceMatches -and $manifestLifecycleMatches -and $retiredManagedTargets.Count -eq 0 -and $retiredConfigDiagnostics.Count -eq 0 -and $pluginModeReady
-        formal_publication_gap_count = $publicationGaps.Count
-        formal_publication_gaps = @($publicationGaps)
+        managed_payload_formally_deployed = $installedMatchesSource -and $manifestMatchesSource -and $manifestMatchesInstalled -and $manifestEvidenceMatches -and $manifestLifecycleMatches -and $retiredManagedTargets.Count -eq 0 -and $retiredConfigDiagnostics.Count -eq 0 -and $pluginModeReady
+        formal_deployment_gap_count = $deploymentGaps.Count
+        formal_deployment_gaps = @($deploymentGaps)
         plugin_installation_in_scope = $SkillDeliveryMode -eq "Plugin"
         plugin_installation_inspected = $false
         plugin_mode_ready = if ($SkillDeliveryMode -eq "Plugin") { $pluginModeReady } else { $null }
@@ -1083,13 +1087,13 @@ if ($Action -eq "Status") {
     return
 }
 
-if ($Action -eq "Publish") {
+if ($Action -eq "Deploy") {
     $srcqRuntime = if (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot) {
         [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null; scc_doctor_ok = $null; scc_version = $null }
     } else {
         Get-SrcqRuntimePreflight -Root $ProjectRoot -Required $true
     }
-    $previousLifecycleRecord = Get-LatestPublishedManifest -InstallRoot $CodexRoot -IgnorePublicationScope -MinimumSchemaVersion 7
+    $previousLifecycleRecord = Get-LatestDeploymentManifest -InstallRoot $CodexRoot -IgnoreDeploymentScope -MinimumSchemaVersion 7
     $previousLifecycleManifest = if ($null -eq $previousLifecycleRecord) { $null } else { $previousLifecycleRecord.document }
     $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode -PreviousManifest $previousLifecycleManifest
     $retiredConfigBlockingDiagnostics = @($source.retired_config_diagnostics | Where-Object { [string]$_.status -ne 'removable' })
@@ -1150,7 +1154,7 @@ if ($Action -eq "Publish") {
             }
         })
         $manifest = [ordered]@{
-            schema_version = 7
+            schema_version = 8
             state = "prepared"
             created_at_utc = [DateTime]::UtcNow.ToString("o")
             project_root = $ProjectRoot
@@ -1232,8 +1236,8 @@ if ($Action -eq "Publish") {
         }
         $manifest.installed_bundle_sha256 = Get-FullInstalledBundleFingerprint -Targets $changeTargets
         $manifest.installed_contract_bundle_sha256 = $installedContractFingerprint
-        $manifest.state = "published"
-        Set-ObjectProperty -Object $manifest -Name "published_at_utc" -Value ([DateTime]::UtcNow.ToString("o"))
+        $manifest.state = "deployed"
+        Set-ObjectProperty -Object $manifest -Name "deployed_at_utc" -Value ([DateTime]::UtcNow.ToString("o"))
         Write-JsonFile -Path $manifestPath -Value $manifest
     }
     catch {
@@ -1258,7 +1262,7 @@ if ($Action -eq "Publish") {
                 }
             }
             if ($null -ne $manifest) {
-                $manifest.state = "restored_after_publish_failure"
+                $manifest.state = "restored_after_deploy_failure"
                 Set-ObjectProperty -Object $manifest -Name "failure" -Value $_.Exception.Message
                 Write-JsonFile -Path $manifestPath -Value $manifest
             }
@@ -1273,7 +1277,7 @@ if ($Action -eq "Publish") {
     }
 
     $result = [pscustomobject]@{
-        action = "Publish"
+        action = "Deploy"
         codex_root = $CodexRoot
         skill_delivery_mode = $SkillDeliveryMode
         source_bundle_sha256 = $sourceFingerprint
@@ -1304,7 +1308,7 @@ if ($Action -eq "Publish") {
         srcq_scc_doctor_ok = $srcqRuntime.scc_doctor_ok
         scc_version = $srcqRuntime.scc_version
     }
-    Set-AgentBaseResultType -Result $result -Kind Publish
+    Set-AgentBaseResultType -Result $result -Kind Deploy
     return
 }
 
@@ -1319,8 +1323,12 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw "Backup manifest is missing: $manifestPath"
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if (@(1, 2, 3, 4, 5, 6, 7) -notcontains [int]$manifest.schema_version -or [string]$manifest.state -ne "published") {
-    throw "Backup is not in a publish state that can be rolled back: $($manifest.state)"
+$manifestSchemaVersion = [int]$manifest.schema_version
+$activeDeploymentState = [string]$manifest.state
+$isLegacyPublishedManifest = @(1, 2, 3, 4, 5, 6, 7) -contains $manifestSchemaVersion -and $activeDeploymentState -eq 'published'
+$isDeploymentManifest = $manifestSchemaVersion -eq 8 -and $activeDeploymentState -eq 'deployed'
+if (-not $isLegacyPublishedManifest -and -not $isDeploymentManifest) {
+    throw "Backup is not in an active deployment state that can be rolled back: $($manifest.state)"
 }
 if (-not [string]::Equals([IO.Path]::GetFullPath([string]$manifest.codex_root), [IO.Path]::GetFullPath($CodexRoot), [StringComparison]::OrdinalIgnoreCase)) {
     throw "Backup manifest belongs to a different Codex root: $($manifest.codex_root)"
@@ -1346,7 +1354,7 @@ $rollbackTargets = @($manifest.targets | ForEach-Object {
 
 $installedFingerprint = Get-BundleFingerprint -Targets $rollbackTargets -Side installed
 if (-not $AllowInstalledDrift -and $installedFingerprint -ne [string]$manifest.installed_bundle_sha256) {
-    throw "Installed AgentBase files changed after publish; refusing rollback without -AllowInstalledDrift"
+    throw "Installed AgentBase files changed after deployment; refusing rollback without -AllowInstalledDrift"
 }
 
 $retiredRoot = Join-Path $BackupPath ("retired-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
@@ -1423,7 +1431,7 @@ catch {
             Move-Item -LiteralPath $retiredTarget -Destination $installedTarget
         }
     }
-    $manifest.state = "published"
+    $manifest.state = $activeDeploymentState
     Set-ObjectProperty -Object $manifest -Name "rollback_failure" -Value $_.Exception.Message
     Write-JsonFile -Path $manifestPath -Value $manifest
     throw

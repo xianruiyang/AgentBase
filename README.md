@@ -1,12 +1,12 @@
 # AgentBase
 
-AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、skill、插件、MCP、CLI 及其开发与部署合同。仓库内容是项目真源；只有用户针对当次发布明确同意后，正式部署入口才会把选定内容增量安装到 Codex。
+AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、skill、插件、MCP、CLI 及其开发与部署合同。仓库内容是项目真源；只有用户针对当次部署明确同意后，正式部署入口才会把选定内容增量安装到 Codex。部署只改变指定环境，发行才形成版本、标签或分发资产。
 
 ## 从哪里开始
 
 - [根本需求](docs/requirements.md)：项目长期用户目标、可验收结果和约束。
 - [项目总计划](docs/plan.md)：总体方向、跨计划决策、子计划关系、实践结论和重开条件。
-- [项目规则](AGENTS.md)：AgentBase 内的职责、维护、验证、发布和 Git 边界。
+- [项目规则](AGENTS.md)：AgentBase 内的职责、维护、验证、部署、发行和 Git 边界。
 - [全局候选与可移植设置](global/README.md)：`global/AGENTS.md`、`config.toml`、hooks 和自定义子代理的职责与边界。
 
 普通组件内工作从本页定位 owner 后读取对应说明；只有选择、新建、替代或重开子计划，改变跨组件方向，或需要裁决多个正式 owner 时继续读取总计划。
@@ -25,7 +25,7 @@ AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、ski
 | [`development/skill-routing/`](development/skill-routing/README.md) | 静态触发合同与脱离仓库的分阶段路由评估 |
 | [`development/agent-evaluation/`](development/agent-evaluation/README.md) | 固定 DeepSWE 题目/计分语义、受信任本地 candidate 与独立 Verifier 工作区、逐题资格/恢复/结果组成的派生最终评测集 |
 | [`development/plugin-packaging/`](development/plugin-packaging/README.md) | `agentbase-core` 插件模板、过滤打包和官方校验入口 |
-| [`development/codex-deployment/`](development/codex-deployment/README.md) | Windows 主机准备、校验、增量发布、状态读回与回滚 |
+| [`development/codex-deployment/`](development/codex-deployment/README.md) | Windows 主机准备、校验、增量部署、状态读回与回滚 |
 | [`development/responsibility-lifecycle.md`](development/responsibility-lifecycle.md) | 公共职责形成、消费者接入和穿透式更新的设计分析 |
 | [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) | 仓库级插件发现入口；只指向可重建的本地打包产物 |
 
@@ -45,10 +45,10 @@ AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、ski
 
 组件许可证独立生效：`mcp/vscode-lsp-mcp` 使用 Apache-2.0，`tools/srcq` 使用 MIT OR Apache-2.0。仓库根目前没有统一 `LICENSE`，不能把组件许可证外推为整个 AgentBase 的授权。
 
-## 验证与发布导航
+## 验证、部署与发行导航
 
-本仓库不维护远程 CI，GitHub Actions 也不是项目验证入口；远端只承担源码与历史同步。按实际影响范围在 Windows 主机运行对应组件说明中的最小充分验证：[`test_routing_infrastructure.ps1`](development/skill-routing/test_routing_infrastructure.ps1) 并行运行零模型 Token 的路由基础设施回归，[`test_agent_evaluation_infrastructure.ps1`](development/agent-evaluation/test_agent_evaluation_infrastructure.ps1) 以 evaluator 禁用状态验证最终评测 corpus、宿主默认拒绝、候选 workspace 写入、完整 skill 树只读投影、逐 attempt 临时面、模型 shell/launcher 环境净化、题目固定运行时提示、工具身份、srcq 关键工作流、patch、报告、收据和恢复边界；该确定性入口不会克隆题目、安装依赖、执行 qualification、启动模型或触发 elevated sandbox 初始化。这些组件测试只在对应组件受影响且候选稳定后运行一次，不由日常 Validate 或 Publish 无条件串联。全局规则与 skill 的结构、引用和触发集合由 [`validate_contract.ps1`](development/skill-routing/validate_contract.ps1) 检查；规则语义由行为用例与路由 evidence 验证，不复制成精确文案门禁。正式独立路由模型证据先由 [`get_routing_evaluation_plan.ps1`](development/skill-routing/get_routing_evaluation_plan.ps1) 按阶段裁决，再由 [`refresh_routing_evidence.ps1`](development/skill-routing/refresh_routing_evidence.ps1) 只运行必要阶段并登记复用；Windows SWE 只通过 [`agent_eval.py`](development/agent-evaluation/agent_eval.py) 显式执行无模型权限验收、跨 owner 最终证据汇总及逐题资格/候选运行，部署合同由 [`manage_agentbase.ps1`](development/codex-deployment/manage_agentbase.ps1) 校验，其他组件沿各自 README 或清单中的正式本地入口验证。只有显式 `sandbox-setup` 可以初始化持久 elevated Windows sandbox 并可能请求一次管理员批准；`sandbox-status` 纯只读，`sandbox-check`、`assess`、逐题 oracle 与候选运行只复用已经验收的运行时，缺失或失效时在启动 Codex 前阻断。它们都不进入日常 Validate 或 Publish 前置。
+本仓库不维护远程 CI，GitHub Actions 也不是项目验证入口；远端只承担源码与历史同步。按实际影响范围在 Windows 主机运行对应组件说明中的最小充分验证：[`test_routing_infrastructure.ps1`](development/skill-routing/test_routing_infrastructure.ps1) 并行运行零模型 Token 的路由基础设施回归，[`test_agent_evaluation_infrastructure.ps1`](development/agent-evaluation/test_agent_evaluation_infrastructure.ps1) 以 evaluator 禁用状态验证最终评测 corpus、宿主默认拒绝、候选 workspace 写入、完整 skill 树只读投影、逐 attempt 临时面、模型 shell/launcher 环境净化、题目固定运行时提示、工具身份、srcq 关键工作流、patch、报告、收据和恢复边界；该确定性入口不会克隆题目、安装依赖、执行 qualification、启动模型或触发 elevated sandbox 初始化。这些组件测试只在对应组件受影响且候选稳定后运行一次，不由日常 Validate 或 Deploy 无条件串联。全局规则与 skill 的结构、引用和触发集合由 [`validate_contract.ps1`](development/skill-routing/validate_contract.ps1) 检查；规则语义由行为用例与路由 evidence 验证，不复制成精确文案门禁。正式独立路由模型证据先由 [`get_routing_evaluation_plan.ps1`](development/skill-routing/get_routing_evaluation_plan.ps1) 按阶段裁决，再由 [`refresh_routing_evidence.ps1`](development/skill-routing/refresh_routing_evidence.ps1) 只运行必要阶段并登记复用；Windows SWE 只通过 [`agent_eval.py`](development/agent-evaluation/agent_eval.py) 显式执行无模型权限验收、跨 owner 最终证据汇总及逐题资格/候选运行，部署合同由 [`manage_agentbase.ps1`](development/codex-deployment/manage_agentbase.ps1) 校验，其他组件沿各自 README 或清单中的正式本地入口验证。只有显式 `sandbox-setup` 可以初始化持久 elevated Windows sandbox 并可能请求一次管理员批准；`sandbox-status` 纯只读，`sandbox-check`、`assess`、逐题 oracle 与候选运行只复用已经验收的运行时，缺失或失效时在启动 Codex 前阻断。它们都不进入日常 Validate 或 Deploy 前置。
 
-插件构建、Codex 发布模式、主机前置条件、只读状态和回滚命令分别由[插件打包说明](development/plugin-packaging/README.md)与[部署说明](development/codex-deployment/README.md)维护。每次向真实 Codex 根目录执行 `Publish` 前都必须取得用户针对该次发布的明确同意；Git 同步、此前发布授权或验证通过均不能替代。
+插件构建、Codex 部署模式、主机前置条件、只读状态和回滚命令分别由[插件打包说明](development/plugin-packaging/README.md)与[部署说明](development/codex-deployment/README.md)维护。每次向真实 Codex 根目录执行 `Deploy` 前都必须取得用户针对当次部署的明确同意；Git 同步、此前部署授权或验证通过均不能替代。
 
-发布状态不在 README 手工维护。使用部署说明中的只读 `Status` 入口按所选分发范围读取当前项目、安装副本、发布清单和路由证据的关系。发布成功只证明文件已安装；当前 Codex 运行不会追溯加载新规则，需在新任务或重启后的运行中使用。
+部署状态不在 README 手工维护。使用部署说明中的只读 `Status` 入口按所选部署范围读取当前项目、安装副本、部署清单和路由证据的关系。部署成功只证明文件已安装；当前 Codex 运行不会追溯加载新规则，需在新任务或重启后的运行中使用。组件发行状态由各组件的 Release 合同独立维护。

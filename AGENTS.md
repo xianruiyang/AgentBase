@@ -8,7 +8,7 @@ must: 权威 owner：`docs/requirements.md`（目标合同）、`docs/plan.md`�
 
 must: 由部署入口显式传入的 Codex 根目录中的同名内容是安装目标，不是项目真源；不得从安装副本反向决定项目内容，也不得绕过项目正式入口形成双向同步
 
-must: 本项目只维护 Windows 宿主；项目自有规则、skill、工具、MCP、构建、测试、部署和发布不得新增或保留非 Windows 平台的正式入口、运行时、兼容承诺、测试矩阵或延期路线，外部协议与文件格式中的平台术语不因此改写
+must: 本项目只维护 Windows 宿主；项目自有规则、skill、工具、MCP、构建、测试、部署和发行不得新增或保留非 Windows 平台的正式入口、运行时、兼容承诺、测试矩阵或延期路线，外部协议与文件格式中的平台术语不因此改写
 
 must: 本项目不维护 GitHub Actions 或其他远程 CI workflow、runner、required check 和计费自动化；远端仓库只承担源码与历史同步，项目验证通过 Windows 主机上的正式本地入口按影响范围执行，不得把缺少远程 CI 当作待修缺口；重新引入前必须取得用户对外部执行与资源成本的明确裁决
 
@@ -18,7 +18,7 @@ must: 修改前先读取根 `README.md` 和受影响组件最近的正式说明�
 
 must: 任务需要选择、新建、替代或重开子计划，改变跨组件方向，或裁决多个正式 owner 时读取 `docs/plan.md`；普通组件内任务不因本条加载总计划
 
-must: 不手工创建 `backup`、`copy`、`draft` 等冗余副本；只有正式发布流程生成的可回滚备份或用户明确要求的副本可以保留
+must: 不手工创建 `backup`、`copy`、`draft` 等冗余副本；只有正式部署流程生成的可回滚备份或用户明确要求的副本可以保留
 
 must: `.codex/`、`codexRuntimeLogFile/`、`node_modules/`、`dist/`、`target/`、运行日志、覆盖率和部署沙箱是本地状态或可重建产物，不得作为项目真源提交
 
@@ -34,11 +34,11 @@ must: 新增或修改模型直接读取、生成或维护的工具返回、文�
 
 must: 文档只更新被本次改动直接影响的事实，删除或改写已经失效的状态，不机械追加新的“当前状态”段落
 
-## 验证与发布
+## 验证、部署与发行
 
-must: 本项目“发布/更新”默认仅指经正式入口应用候选到消费者并读回；版本、标签、远端/分发资产及完整验证须用户明确要求
+must: 本项目中，“部署/Deploy”是将仓库候选应用到指定消费者并读回；“发行/Release”是形成版本、标签或分发资产；“更新”按对象执行安装或部署，不等同发行
 
-must: 用户授权准备/复现/部署 AgentBase Windows 主机时，以下入口安装/升级并读回 PowerShell 7、fd、scc、hyperfine、Python 3、Node.js LTS、ast-grep、用户级 Codex CLI，再按 `tools/srcq/docs/installation.md` 安装/升级 `srcq` 并读回 Status、`srcq doctor`、`srcq query scc doctor`；PATH 变化后重启 Codex 桌面宿主，再开新任务发布：
+must: 用户授权准备/复现/部署 AgentBase Windows 主机时，以下入口安装/升级并读回 PowerShell 7、fd、scc、hyperfine、Python 3、Node.js LTS、ast-grep、用户级 Codex CLI，再按 `tools/srcq/docs/installation.md` 安装/升级 `srcq` 并读回 Status、`srcq doctor`、`srcq query scc doctor`；PATH 变化后重启 Codex 桌面宿主，再开新任务验证：
 
 ```powershell
 & (Join-Path (Get-Location).Path 'development\codex-deployment\bootstrap_windows.ps1') -Action Install
@@ -52,7 +52,7 @@ must: 全局规则或 skill 变更至少运行：
 & (Join-Path (Get-Location).Path 'development\skill-routing\validate_contract.ps1') -ProjectRoot (Get-Location).Path
 ```
 
-must: 路由基础设施变化后运行 `test_routing_infrastructure.ps1`；规则、skill 或触发合同变化后，`Validate`/`Publish` 前按 `get_routing_evaluation_plan.ps1` 刷新 evidence：只执行 `evaluate`，`reuse` 经 oracle 与来源链证明，`pending-routing` 待 Routing 后重算；同输入 oracle 失败不重采样，身份或来源异常须阻断。部署只验证 payload、evidence 与可恢复写入；组件回归仅在受影响且稳定后运行一次
+must: 路由基础设施变化后运行 `test_routing_infrastructure.ps1`；规则、skill 或触发合同变化后，`Validate`/`Deploy` 前按 `get_routing_evaluation_plan.ps1` 刷新 evidence：只执行 `evaluate`，`reuse` 经 oracle 与来源链证明，`pending-routing` 待 Routing 后重算；同输入 oracle 失败不重采样，身份或来源异常须阻断。部署只验证 payload、evidence 与可恢复写入；组件回归仅在受影响且稳定后运行一次
 
 must: 最终评测合同变更后运行 `development/agent-evaluation/test_agent_evaluation_infrastructure.ps1`；门禁禁用 evaluator，外部 clone 仅由显式 `prepare`/单题 `oracle`，依赖与 Verifier 仅由单题 `oracle`/`run`，qualification 仅由 `oracle`、模型仅由 `run` 触发
 
@@ -62,17 +62,17 @@ must: 修改 `global/config.toml`、`global/hooks.template.json`、`global/agent
 & (Join-Path (Get-Location).Path 'development\codex-deployment\manage_agentbase.ps1') -Action Validate -ProjectRoot (Get-Location).Path
 ```
 
-should: 修改 `mcp/vscode-lsp-mcp` 或 `tools/srcq` 时，先运行其 README 或清单定义的受影响模块验证；只有公共契约或发布范围受影响时才运行完整验证
+should: 修改 `mcp/vscode-lsp-mcp` 或 `tools/srcq` 时，先运行其 README 或清单定义的受影响模块验证；只有公共契约或发行范围受影响时才运行完整验证
 
 must: 修改模型交互面合同后，分别验证模型读取面的决策充分性与渐进恢复、模型修改面的唯一真源与局部可验证性、机器面的结构稳定性、派生产物可重建性和实际消费者接入；Token 收益使用真实 tokenizer 或项目已验证的保守估算衡量，字节数、字段删减和文件变短只作为局部证据
 
-must: 每次使用正式部署入口向实际 Codex 根目录执行 `Publish` 前，必须取得用户针对该次发布的明确同意；Git 维护或远端同步授权、此前的发布授权、验证完成、状态查询以及用户未反对都不得继承或替代该次同意。新的多 skill 部署在插件包通过官方校验且目标环境已单独验证插件安装后使用 `Plugin` 模式，已有直接安装仅在尚未完成迁移时使用 `DirectCompatibility`，两者不得同时启用；一次正式发布产生的一份回滚备份是有效部署资产，不再另建手工备份：
+must: 每次向真实 Codex 根执行 `Deploy` 前须取得当次明确授权，不继承 Git、先前授权、验证、状态或沉默；新多 skill 部署在插件包与目标环境验证后使用 `Plugin`，未迁移的既有安装使用 `DirectCompatibility`，不得同时启用；一次部署只保留正式入口生成的一份回滚备份：
 
 ```powershell
-& (Join-Path (Get-Location).Path 'development\codex-deployment\manage_agentbase.ps1') -Action Publish -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -SkillDeliveryMode Plugin -InstallPortableSettings
+& (Join-Path (Get-Location).Path 'development\codex-deployment\manage_agentbase.ps1') -Action Deploy -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -SkillDeliveryMode Plugin -InstallPortableSettings
 ```
 
-must: 发布只证明文件已安装并通过发布合同；Codex 每次运行启动时构建指令链，因此当前运行不会追溯加载新规则，行为变化需要在新任务或重启会话中验证
+must: 部署只证明文件已安装并通过部署合同；Codex 每次运行启动时构建指令链，因此当前运行不会追溯加载新规则，行为变化需要在新任务或重启会话中验证
 
 ## Git 维护边界
 
