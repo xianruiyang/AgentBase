@@ -172,6 +172,7 @@ struct SourceDocument {
 #[derive(Clone, Debug)]
 struct CallTreeNode {
     name: String,
+    qualified_name: Option<String>,
     dispatch: &'static str,
     status: String,
     receiver: Option<String>,
@@ -341,6 +342,7 @@ fn execute_calls_inner(
     let mut scan_complete = definitions.scan_complete;
     let mut root = CallTreeNode {
         name: root_definition.qualified_name.clone(),
+        qualified_name: Some(root_definition.qualified_name.clone()),
         dispatch: "root",
         status: if definitions.position_matched {
             "position-candidate".to_owned()
@@ -374,6 +376,7 @@ fn execute_calls_inner(
             if nodes < command.max_nodes {
                 root.children.push(CallTreeNode {
                     name: "dynamic callers".to_owned(),
+                    qualified_name: None,
                     dispatch: "semantic-unknown:virtual-dispatch",
                     status: "semantic-unknown:virtual-dispatch".to_owned(),
                     receiver: None,
@@ -458,6 +461,7 @@ fn expand_call_node(
         *nodes += 1;
         let mut child = CallTreeNode {
             name: call.callee.clone(),
+            qualified_name: call.callee.contains("::").then(|| call.callee.clone()),
             dispatch: call.dispatch,
             status: match call.dispatch {
                 "direct-candidate" | "typed-member-candidate" => call.dispatch.to_owned(),
@@ -568,9 +572,10 @@ fn expand_incoming_node(
         }
         *nodes += 1;
         let mut child = CallTreeNode {
-            name: owner.definition.as_ref().map_or_else(
-                || owner.name.clone(),
-                |definition| definition.qualified_name.clone(),
+            name: owner.name.clone(),
+            qualified_name: owner.definition.as_ref().map_or_else(
+                || owner.qualified_name.clone(),
+                |definition| Some(definition.qualified_name.clone()),
             ),
             dispatch: "incoming-candidate",
             status: matching_call.as_ref().map_or_else(
@@ -596,7 +601,7 @@ fn expand_incoming_node(
                 }
             } else {
                 match resolve_callee(
-                    &owner.name,
+                    owner.qualified_name.as_deref().unwrap_or(&owner.name),
                     command,
                     &query.universe,
                     &owner.file,
@@ -713,7 +718,10 @@ fn incoming_callers(
                     file: owner.file.clone(),
                     range: owner.range,
                     name_position: owner.range.start,
-                    qualified_name: owner.name.clone(),
+                    qualified_name: owner
+                        .qualified_name
+                        .clone()
+                        .unwrap_or_else(|| owner.name.clone()),
                     symbol_kind: "method".to_owned(),
                     role: DefinitionRole::Definition,
                     signature: owner.signature.clone(),
@@ -2842,7 +2850,8 @@ fn render_call_children(
         };
         let line = format!(
             "{prefix}{connector} {} [{evidence}{receiver}]{}\n",
-            child.name, location,
+            child.qualified_name.as_deref().unwrap_or(&child.name),
+            location,
         );
         if crate::query_gateway::model_text_cost(output)
             + crate::query_gateway::model_text_cost(&line)
@@ -2909,6 +2918,7 @@ fn render_calls_machine(
 fn machine_call_node(node: &CallTreeNode, universe: &SourceUniverse) -> Value {
     json!({
         "name": node.name,
+        "qualified_name": node.qualified_name,
         "dispatch": node.dispatch,
         "status": node.status,
         "receiver": node.receiver,

@@ -9,7 +9,7 @@
 ## 当前状态
 
 - 当前正式 Release：`srcq 0.6.0`。
-- `0.6.0` 在不依赖 LSP 的前提下增加 C# 词法作用域内的显式类型调用、partial 成员/短属性链、源码静态类型和 `.sln`/`.csproj` Compile 范围解析；Go、Python、Rust、JavaScript、TypeScript/TSX 复用一套 typed relation 中间层，从显式类型、构造、当前接收者、字段和静态限定形成类型候选，并只读恢复本地项目引用范围。动态分派、函数值、宏/生成代码和不能唯一证明的类型仍保持 unknown。
+- `0.6.0` 在不依赖 LSP 的前提下增加 C# 词法作用域内的显式类型调用、partial 成员/短属性链、源码静态类型和 `.sln`/`.csproj` Compile 范围解析；Go、Python、Rust、JavaScript、TypeScript/TSX 复用一套 typed relation 中间层，从显式类型、构造、当前接收者、字段和静态限定形成类型候选，并只读恢复本地项目引用范围。当前源码还会为 JavaScript、TypeScript/TSX 类方法的 incoming 调用者保留由 AST 外层 class 直接证明的可选限定身份；动态分派、函数值、宏/生成代码和不能唯一证明的类型仍保持 unknown。
 - 当前固定验证引擎：`ast-grep 0.44.1`；`srcq symbol` 的 outline 关系能力以该版本为正式开发基线。
 - 当前 AST、透传、协议、压力与发布验证统一使用 ast-grep `0.44.1`；不再维护较早版本的现行兼容矩阵。
 - rg/fd 候选命令域已在 `ripgrep 15.1.0`、Codex PATH 中的 `ripgrep 15.2.0` 与 `fd 10.4.2` 上验证；29 个公开主模式均有持久分类，版本只标识证据范围，不参与运行准入。

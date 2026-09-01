@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 
 use super::cpp::{
-    CallScan, DefinitionCandidate, DirectCallCandidate, NameBindingCandidate, SourcePosition,
-    SourceRange, TypeBindingCandidate, TypeBindingScope, TypeScopeCandidate,
+    CallScan, DefinitionCandidate, DirectCallCandidate, FunctionOwnerCandidate,
+    NameBindingCandidate, SourcePosition, SourceRange, TypeBindingCandidate, TypeBindingScope,
+    TypeScopeCandidate,
 };
 use super::scope::normalized_key;
 
@@ -27,6 +28,23 @@ pub(crate) fn kind_rules(ast_language: &str, prefix: &str, kinds: &[(&str, &str)
         })
         .collect::<Vec<_>>()
         .join("\n---\n")
+}
+
+pub(crate) fn ecmascript_containing_function_rules(ast_language: &str, target: &str) -> String {
+    let target = target.rsplit("::").next().unwrap_or(target);
+    let escaped = regex_escape(target).replace('\'', "''");
+    let owner_rules = [
+        ("function", "function_declaration"),
+        ("method", "method_definition"),
+        ("variable", "variable_declarator"),
+    ]
+    .into_iter()
+    .map(|(id, kind)| format!("id: srcq.typed.owner.{id}\nlanguage: {ast_language}\nrule:\n  all:\n    - kind: {kind}\n    - has:\n        stopBy: end\n        regex: '^{escaped}$'\nseverity: info\nmessage: typed callable owner candidate"))
+    .collect::<Vec<_>>()
+    .join("\n---\n");
+    format!(
+        "{owner_rules}\n---\nid: srcq.typed.owner.scope-class\nlanguage: {ast_language}\nrule:\n  kind: class_declaration\nseverity: info\nmessage: typed callable owner class"
+    )
 }
 
 pub(crate) fn parse_records(
@@ -81,6 +99,67 @@ pub(crate) fn parse_records(
         });
     }
     Ok(records)
+}
+
+pub(crate) fn parse_ecmascript_function_owner_stream(
+    bytes: &[u8],
+    cwd: &Path,
+    language: &str,
+    strict: bool,
+) -> Result<Vec<FunctionOwnerCandidate>, String> {
+    let records = parse_records(bytes, cwd, language)?;
+    let class_scopes = records
+        .iter()
+        .filter(|record| record.id == "srcq.typed.owner.scope-class")
+        .filter_map(|record| {
+            ecmascript_class_name(&record.text)
+                .map(|name| (record.file.clone(), record.range, name))
+        })
+        .collect::<Vec<_>>();
+    let mut owners = Vec::new();
+    for record in records
+        .into_iter()
+        .filter(|record| record.id != "srcq.typed.owner.scope-class")
+    {
+        let Some(name) = ecmascript_callable_owner_name(&record.id, &record.text) else {
+            if strict {
+                return Err(format!(
+                    "cannot extract {language} callable owner from {}",
+                    record.id
+                ));
+            }
+            continue;
+        };
+        let qualified_name = record
+            .id
+            .ends_with(".method")
+            .then(|| {
+                class_scopes
+                    .iter()
+                    .filter(|(file, range, _)| {
+                        normalized_key(file) == normalized_key(&record.file)
+                            && contains(*range, record.range)
+                    })
+                    .min_by_key(|(_, range, _)| range_size(*range))
+                    .map(|(_, _, type_name)| format!("{type_name}::{name}"))
+            })
+            .flatten();
+        owners.push(FunctionOwnerCandidate {
+            file: record.file,
+            range: record.range,
+            name,
+            qualified_name,
+            signature: record
+                .text
+                .lines()
+                .next()
+                .unwrap_or(&record.text)
+                .trim()
+                .to_owned(),
+            definition: None,
+        });
+    }
+    Ok(owners)
 }
 
 fn record_position(value: Option<&Value>) -> Result<SourcePosition, String> {
@@ -146,7 +225,13 @@ fn receiver_type(
         if let Some(field) = receiver
             .strip_prefix(current)
             .and_then(|value| value.strip_prefix('.'))
-            .filter(|name| is_identifier(name))
+            .filter(|name| {
+                if matches!(language, "javascript" | "typescript" | "tsx") {
+                    is_ecmascript_identifier(name)
+                } else {
+                    is_identifier(name)
+                }
+            })
         {
             return unique_member_type(scan, containing_type?, field);
         }
@@ -324,6 +409,57 @@ pub(crate) fn outer_call_open(text: &str) -> Option<usize> {
     }
     None
 }
+pub(crate) fn ecmascript_callable_owner_name(id: &str, text: &str) -> Option<String> {
+    let header = text.lines().find(|line| !line.trim().is_empty())?.trim();
+    if id.ends_with("variable") {
+        return ecmascript_identifier_prefix(header);
+    }
+    if id.ends_with("function") {
+        let mut parts = header.split_whitespace();
+        while let Some(part) = parts.next() {
+            if part == "function" || part == "function*" {
+                return ecmascript_identifier_prefix(parts.next()?.trim_start_matches('*'));
+            }
+            if let Some(name) = part
+                .strip_prefix("function*")
+                .filter(|name| !name.is_empty())
+            {
+                return ecmascript_identifier_prefix(name);
+            }
+        }
+        return None;
+    }
+    let before = header.split_once('(')?.0.trim_end();
+    ecmascript_identifier_prefix(
+        before
+            .split_whitespace()
+            .next_back()?
+            .trim_start_matches('*'),
+    )
+}
+fn ecmascript_class_name(text: &str) -> Option<String> {
+    ecmascript_identifier_prefix(text.trim().strip_prefix("class ")?.trim_start())
+}
+pub(crate) fn ecmascript_member_declaration_name(value: &str) -> Option<String> {
+    let candidate = value
+        .split_whitespace()
+        .next_back()?
+        .trim_end_matches(['?', '!']);
+    let name = ecmascript_identifier_prefix(candidate)?;
+    (name.len() == candidate.len()).then_some(name)
+}
+fn ecmascript_identifier_prefix(value: &str) -> Option<String> {
+    let mut characters = value.chars().peekable();
+    let mut name = String::new();
+    if characters.peek() == Some(&'#') {
+        name.push('#');
+        characters.next();
+    }
+    name.extend(characters.take_while(|character| {
+        *character == '_' || *character == '$' || character.is_alphanumeric()
+    }));
+    (!name.is_empty() && name != "#").then_some(name)
+}
 fn contains(outer: SourceRange, inner: SourceRange) -> bool {
     position_le(outer.start, inner.start) && position_le(inner.end, outer.end)
 }
@@ -345,6 +481,76 @@ pub(crate) fn is_identifier(value: &str) -> bool {
             .chars()
             .all(|c| c == '_' || c == '$' || c.is_alphanumeric())
 }
+pub(crate) fn is_ecmascript_identifier(value: &str) -> bool {
+    let identifier = value
+        .strip_prefix('#')
+        .filter(|identifier| !identifier.is_empty())
+        .unwrap_or(value);
+    is_identifier(identifier)
+}
 pub(crate) fn is_type_name(value: &str) -> bool {
     !value.is_empty() && value.split('.').all(is_identifier)
+}
+fn regex_escape(value: &str) -> String {
+    let mut escaped = String::new();
+    for character in value.chars() {
+        if matches!(
+            character,
+            '\\' | '.' | '^' | '$' | '|' | '?' | '*' | '+' | '(' | ')' | '[' | ']' | '{' | '}'
+        ) {
+            escaped.push('\\');
+        }
+        escaped.push(character);
+    }
+    escaped
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        ecmascript_callable_owner_name, ecmascript_member_declaration_name,
+        is_ecmascript_identifier,
+    };
+
+    #[test]
+    fn ecmascript_callable_owner_names_cover_async_private_and_function_forms() {
+        assert_eq!(
+            ecmascript_callable_owner_name(
+                "srcq.typed.owner.method",
+                "async #pump(): Promise<void> {}",
+            )
+            .as_deref(),
+            Some("#pump")
+        );
+        assert_eq!(
+            ecmascript_callable_owner_name(
+                "srcq.typed.owner.method",
+                "public static async close<T>(): Promise<void> {}",
+            )
+            .as_deref(),
+            Some("close")
+        );
+        assert_eq!(
+            ecmascript_callable_owner_name(
+                "srcq.typed.owner.function",
+                "export async function* stream(): AsyncIterable<void> {}",
+            )
+            .as_deref(),
+            Some("stream")
+        );
+        assert_eq!(
+            ecmascript_callable_owner_name(
+                "srcq.typed.owner.variable",
+                "arrowOwner = async () => undefined",
+            )
+            .as_deref(),
+            Some("arrowOwner")
+        );
+        assert_eq!(
+            ecmascript_member_declaration_name("public readonly #connection!").as_deref(),
+            Some("#connection")
+        );
+        assert!(is_ecmascript_identifier("#connection"));
+        assert!(!is_ecmascript_identifier("#"));
+    }
 }

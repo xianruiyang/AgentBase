@@ -152,6 +152,7 @@ pub(crate) fn parse_function_owner_stream(
             file: record.file,
             range: record.range,
             name,
+            qualified_name: None,
             signature,
             definition: None,
         });

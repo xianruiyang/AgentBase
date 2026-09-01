@@ -26,37 +26,14 @@ pub(crate) fn call_rules(ast_language: &str) -> String {
 }
 
 pub(crate) fn containing_function_rules(ast_language: &str, target: &str) -> String {
-    let target = target.rsplit("::").next().unwrap_or(target);
-    let escaped = regex_escape(target);
-    [("function", "function_declaration"), ("method", "method_definition"), ("variable", "variable_declarator")]
-        .into_iter().map(|(id, kind)| format!("id: srcq.typed.owner.{id}\nlanguage: {ast_language}\nrule:\n  all:\n    - kind: {kind}\n    - has:\n        stopBy: end\n        regex: '^{escaped}$'\nseverity: info\nmessage: typed callable owner candidate"))
-        .collect::<Vec<_>>().join("\n---\n")
+    typed::ecmascript_containing_function_rules(ast_language, target)
 }
 
 pub(crate) fn parse_function_owner_stream(
     bytes: &[u8],
     cwd: &Path,
 ) -> Result<Vec<FunctionOwnerCandidate>, String> {
-    let mut owners = Vec::new();
-    for record in typed::parse_records(bytes, cwd, "TypeScript owner")? {
-        let name = owner_name(&record.id, &record.text)
-            .ok_or_else(|| format!("cannot extract TypeScript owner from {}", record.id))?;
-        let signature = record
-            .text
-            .lines()
-            .next()
-            .unwrap_or(&record.text)
-            .trim()
-            .to_owned();
-        owners.push(FunctionOwnerCandidate {
-            file: record.file,
-            range: record.range,
-            name,
-            signature,
-            definition: None,
-        });
-    }
-    Ok(owners)
+    typed::parse_ecmascript_function_owner_stream(bytes, cwd, "TypeScript", true)
 }
 
 pub(crate) fn parse_call_stream(bytes: &[u8], cwd: &Path) -> Result<CallScan, String> {
@@ -75,7 +52,7 @@ pub(crate) fn parse_call_stream(bytes: &[u8], cwd: &Path) -> Result<CallScan, St
                 });
             }
             "srcq.typed.parameter" | "srcq.typed.parameter-optional" => {
-                if let Some((name, type_name)) = explicit_binding(&record.text) {
+                if let Some((name, type_name)) = explicit_binding(&record.text, false) {
                     scan.bindings.push(TypeBindingCandidate {
                         file: record.file,
                         range: record.range,
@@ -86,7 +63,8 @@ pub(crate) fn parse_call_stream(bytes: &[u8], cwd: &Path) -> Result<CallScan, St
                 }
             }
             "srcq.typed.binding-variable" | "srcq.typed.binding-field" => {
-                if let Some((name, type_name)) = explicit_or_created_binding(&record.text) {
+                let member = record.id.ends_with("field");
+                if let Some((name, type_name)) = explicit_or_created_binding(&record.text, member) {
                     scan.bindings.push(TypeBindingCandidate {
                         file: record.file,
                         range: record.range,
@@ -128,40 +106,32 @@ pub(crate) fn parse_call_stream(bytes: &[u8], cwd: &Path) -> Result<CallScan, St
     Ok(scan)
 }
 
-fn explicit_or_created_binding(text: &str) -> Option<(String, String)> {
-    explicit_binding(text).or_else(|| {
+fn explicit_or_created_binding(text: &str, member: bool) -> Option<(String, String)> {
+    explicit_binding(text, member).or_else(|| {
         let (name, initializer) = text.split_once('=')?;
-        let name = name.trim();
+        let name = binding_name(name, member)?;
         let type_name = typed::created_type(initializer)?;
-        typed::is_identifier(name).then(|| (name.to_owned(), type_name))
+        Some((name, type_name))
     })
 }
-fn explicit_binding(text: &str) -> Option<(String, String)> {
+fn explicit_binding(text: &str, member: bool) -> Option<(String, String)> {
     let head = text.split('=').next()?.trim();
     let (name, type_name) = head.split_once(':')?;
-    let name = name.trim().trim_end_matches('?').trim();
+    let name = binding_name(name, member)?;
     let type_name = type_name.trim();
-    (typed::is_identifier(name) && typed::is_type_name(type_name))
-        .then(|| (name.to_owned(), type_name.to_owned()))
+    typed::is_type_name(type_name).then(|| (name, type_name.to_owned()))
+}
+fn binding_name(value: &str, member: bool) -> Option<String> {
+    let value = value.trim().trim_end_matches(['?', '!']).trim();
+    if member {
+        typed::ecmascript_member_declaration_name(value)
+    } else {
+        typed::is_identifier(value).then(|| value.to_owned())
+    }
 }
 fn class_name(text: &str) -> Option<String> {
     identifier_prefix(text.trim().strip_prefix("class ")?.trim_start())
 }
-fn owner_name(id: &str, text: &str) -> Option<String> {
-    let text = text.trim();
-    if id.ends_with("variable") {
-        return identifier_prefix(text);
-    }
-    if id.ends_with("function") {
-        return identifier_prefix(text.strip_prefix("function ")?.trim_start());
-    }
-    let before = text.split_once('(')?.0.trim();
-    before
-        .split_whitespace()
-        .next_back()
-        .and_then(identifier_prefix)
-}
-
 fn call_name(text: &str) -> (String, &'static str, Option<String>, Option<String>) {
     let text = text.trim();
     let Some(open) = typed::outer_call_open(text) else {
@@ -171,7 +141,7 @@ fn call_name(text: &str) -> (String, &'static str, Option<String>, Option<String
     if let Some((receiver, member)) = callee.rsplit_once('.') {
         let receiver = receiver.trim();
         let member = member.trim();
-        if typed::is_identifier(member) {
+        if typed::is_ecmascript_identifier(member) {
             if let Some(receiver_type) = typed::created_type(receiver) {
                 return (
                     format!("{receiver_type}::{member}"),
@@ -209,18 +179,5 @@ fn simple_receiver(value: &str) -> bool {
         || value == "this"
         || value
             .strip_prefix("this.")
-            .is_some_and(typed::is_identifier)
-}
-fn regex_escape(value: &str) -> String {
-    let mut escaped = String::new();
-    for character in value.chars() {
-        if matches!(
-            character,
-            '\\' | '.' | '^' | '$' | '|' | '?' | '*' | '+' | '(' | ')' | '[' | ']' | '{' | '}'
-        ) {
-            escaped.push('\\');
-        }
-        escaped.push(character);
-    }
-    escaped.replace('\'', "''")
+            .is_some_and(typed::is_ecmascript_identifier)
 }

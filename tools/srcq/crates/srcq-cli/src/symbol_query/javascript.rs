@@ -96,34 +96,14 @@ pub(crate) fn parse_call_stream(bytes: &[u8], cwd: &Path) -> Result<CallScan, St
 }
 
 pub(crate) fn containing_function_rules(ast_language: &str, target: &str) -> String {
-    let escaped = regex_escape(target.rsplit("::").next().unwrap_or(target));
-    [("function", "function_declaration"), ("method", "method_definition"), ("variable", "variable_declarator")].into_iter().map(|(id, kind)| format!("id: srcq.typed.owner.{id}\nlanguage: {ast_language}\nrule:\n  all:\n    - kind: {kind}\n    - has:\n        stopBy: end\n        regex: '^{escaped}$'\nseverity: info\nmessage: typed callable owner candidate")).collect::<Vec<_>>().join("\n---\n")
+    typed::ecmascript_containing_function_rules(ast_language, target)
 }
 
 pub(crate) fn parse_function_owner_stream(
     bytes: &[u8],
     cwd: &Path,
 ) -> Result<Vec<FunctionOwnerCandidate>, String> {
-    let mut owners = Vec::new();
-    for record in typed::parse_records(bytes, cwd, "JavaScript owner")? {
-        let Some(name) = owner_name(&record.id, &record.text) else {
-            continue;
-        };
-        owners.push(FunctionOwnerCandidate {
-            file: record.file,
-            range: record.range,
-            name,
-            signature: record
-                .text
-                .lines()
-                .next()
-                .unwrap_or(&record.text)
-                .trim()
-                .to_owned(),
-            definition: None,
-        });
-    }
-    Ok(owners)
+    typed::parse_ecmascript_function_owner_stream(bytes, cwd, "JavaScript", false)
 }
 
 fn created_binding(text: &str) -> Option<(String, String)> {
@@ -136,26 +116,16 @@ fn created_member_binding(text: &str) -> Option<(String, String)> {
     let (name, value) = text.split_once('=')?;
     let name = name.trim().strip_prefix("this.")?;
     let ty = typed::created_type(value)?;
-    typed::is_identifier(name).then(|| (name.to_owned(), ty))
+    typed::is_ecmascript_identifier(name).then(|| (name.to_owned(), ty))
 }
 fn created_field_binding(text: &str) -> Option<(String, String)> {
     let (name, value) = text.split_once('=')?;
-    let name = name.trim();
+    let name = typed::ecmascript_member_declaration_name(name.trim())?;
     let ty = typed::created_type(value)?;
-    typed::is_identifier(name).then(|| (name.to_owned(), ty))
+    Some((name, ty))
 }
 fn class_name(text: &str) -> Option<String> {
     identifier_prefix(text.trim().strip_prefix("class ")?.trim_start())
-}
-fn owner_name(id: &str, text: &str) -> Option<String> {
-    let text = text.trim();
-    if id.ends_with("variable") {
-        identifier_prefix(text)
-    } else if id.ends_with("function") {
-        identifier_prefix(text.strip_prefix("function ")?.trim_start())
-    } else {
-        identifier_prefix(text.split_once('(')?.0.trim())
-    }
 }
 fn call_name(text: &str) -> (String, &'static str, Option<String>, Option<String>) {
     let text = text.trim();
@@ -166,7 +136,7 @@ fn call_name(text: &str) -> (String, &'static str, Option<String>, Option<String
     if let Some((receiver, member)) = callee.rsplit_once('.') {
         let receiver = receiver.trim();
         let member = member.trim();
-        if typed::is_identifier(member) {
+        if typed::is_ecmascript_identifier(member) {
             if let Some(ty) = typed::created_type(receiver) {
                 return (
                     format!("{ty}::{member}"),
@@ -179,7 +149,7 @@ fn call_name(text: &str) -> (String, &'static str, Option<String>, Option<String
                 || receiver == "this"
                 || receiver
                     .strip_prefix("this.")
-                    .is_some_and(typed::is_identifier)
+                    .is_some_and(typed::is_ecmascript_identifier)
             {
                 return (
                     member.to_owned(),
@@ -203,17 +173,4 @@ fn identifier_prefix(value: &str) -> Option<String> {
         .take_while(|c| *c == '_' || *c == '$' || c.is_alphanumeric())
         .collect::<String>();
     (!name.is_empty()).then_some(name)
-}
-fn regex_escape(value: &str) -> String {
-    let mut out = String::new();
-    for c in value.chars() {
-        if matches!(
-            c,
-            '\\' | '.' | '^' | '$' | '|' | '?' | '*' | '+' | '(' | ')' | '[' | ']' | '{' | '}'
-        ) {
-            out.push('\\');
-        }
-        out.push(c);
-    }
-    out.replace('\'', "''")
 }

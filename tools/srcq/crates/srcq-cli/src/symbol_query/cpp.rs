@@ -200,6 +200,7 @@ pub(crate) struct FunctionOwnerCandidate {
     pub(crate) file: PathBuf,
     pub(crate) range: SourceRange,
     pub(crate) name: String,
+    pub(crate) qualified_name: Option<String>,
     pub(crate) signature: String,
     pub(crate) definition: Option<DefinitionCandidate>,
 }
@@ -614,6 +615,7 @@ pub(crate) fn parse_function_owner_stream(
             file,
             range: record.range,
             name,
+            qualified_name: Some(definition.qualified_name.clone()),
             signature,
             definition: Some(definition),
         });

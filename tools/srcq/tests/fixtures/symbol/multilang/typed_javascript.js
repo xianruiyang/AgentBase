@@ -3,6 +3,7 @@ class Beta { run() {} }
 
 class Harness {
   field = new Alpha();
+  #privateField = new Alpha();
   constructor() { this.other = new Beta(); }
   execute() {
     const local = new Alpha();
@@ -14,6 +15,7 @@ class Harness {
     this["field"].run();
     local["run"]();
   }
+  async #privateCaller() { this.#privateField.run(); }
 }
 
 const arrowOwner = () => { const local = new Beta(); local.run(); };

@@ -1024,9 +1024,35 @@ fn typescript_typed_relations_respect_scope_and_disambiguate_calls() {
     assert!(children
         .iter()
         .any(|call| call["name"] == "arrowCaller" && call["receiver_type"] == "PrimaryWorker"));
+    assert!(children.iter().any(|call| call["name"] == "#privateCaller"
+        && call["qualified_name"] == "Owner::#privateCaller"
+        && call["receiver_type"] == "PrimaryWorker"));
+    assert!(children.iter().any(|call| call["name"] == "run"
+        && call["qualified_name"] == "Owner::run"
+        && call["receiver_type"] == "PrimaryWorker"));
     assert!(!children
         .iter()
         .any(|call| call["receiver_type"] == "AlternateWorker"));
+
+    let incoming_model = run(&[
+        "symbol",
+        "calls",
+        "PrimaryWorker::execute",
+        "--language",
+        "typescript",
+        "--only-root",
+        typescript,
+        "--direction",
+        "incoming",
+    ]);
+    assert!(
+        incoming_model.status.success(),
+        "{}",
+        String::from_utf8_lossy(&incoming_model.stderr)
+    );
+    let incoming_model = String::from_utf8_lossy(&incoming_model.stdout);
+    assert!(incoming_model.contains("Owner::run"));
+    assert!(incoming_model.contains("Owner::#privateCaller"));
 }
 
 #[test]
@@ -1136,6 +1162,12 @@ fn typed_language_adapters_preserve_static_identity_and_dynamic_unknowns() {
     assert!(children
         .iter()
         .any(|call| call["name"] == "expressionOwner" && call["receiver_type"] == "Alpha"));
+    assert!(children.iter().any(|call| call["name"] == "#privateCaller"
+        && call["qualified_name"] == "Harness::#privateCaller"
+        && call["receiver_type"] == "Alpha"));
+    assert!(children.iter().any(|call| call["name"] == "execute"
+        && call["qualified_name"] == "Harness::execute"
+        && call["receiver_type"] == "Alpha"));
     assert!(!children.iter().any(|call| call["receiver_type"] == "Beta"));
 }
 
