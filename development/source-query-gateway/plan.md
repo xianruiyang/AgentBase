@@ -157,6 +157,10 @@ symbol 正文两版均未触发目标工具；frontmatter 可达版才在 C# 产
 
 结构化证据分别为 [symbol](evidence/audit-result-symbol-skill-v1.json)、[工具前推理](evidence/audit-result-pretool-reasoning-prompt-v1.json)、[精炼推理](evidence/audit-result-concise-reasoning-prompt-v1.json)和[单页长度](evidence/audit-result-page-length-v1.json)。这轮只增加开发证据和状态记录，不修改正式规则、skill、srcq 或部署内容。重开条件是出现能替代失败/回退而非叠加调用、逐题质量不退化且总 Token 与短长价格都下降的新机制；同机制不重采样。
 
+### 3.12 2026-09-02 搜索 argv 修复与提示复测
+
+普通搜索常驻规则已从含混的 backend argv 占位改为精确的 `srcq rg`/`srcq fd` 参数边界，并明确 Windows glob 不能作为路径、fd 只有一个 positional pattern；普通查询仍不触发 `source-query`。修复基础环境、工具前立即调用和精炼书面推理继续各自保持独立 identity，固定三题各两次。基础环境为 `36/42`；立即调用虽升到 `37/42`，但 Token、两种价格和耗时全部回退，六次可见首条也没有消失；精炼推理保持 `36/42` 且降低 Token/价格/耗时，但完整答案由 `4/6` 降到 `3/6`，reasoning output 上升，并发生一次 literal-glob 规则违例。两类提示均不进入正式规则，搜索 argv 澄清保留在仓库真源但未部署或发布；同措辞不再重采样，只有新的可观察机制或工具层能力才重开。
+
 ## 4. 阶段与任务
 
 ### P0 固定分支合同和 AST 基线

@@ -84,7 +84,7 @@ must: 用户未固定时，下一段实质工作前独立于领域 skill、计�
 
 must: `/root` 对用户未禁止且独立有界、有并行净收益的子问题，先经 `$subagent-orchestration` 创建；无真实 child 时不声称派发、空等或代做；子代理仅按用户或父代理对本任务的明确嵌套要求再创建
 
-must: 全集、不存在或唯一结论先从最近正式来源确认权威源码范围；发现/搜索只经 PATH 中的 `srcq fd <fd argv...>`/`srcq rg <rg argv...>` 且只查该范围，不预载高级 skill/说明；已知符号后停止搜索，直接有界读取其完整定义、签名依赖和相邻契约；仅当前职责确需且规模已知有界时读完整文件；文本不足才经 srcq 升级 AST，符号语义仍不足才用 LSP，证据充分即停止
+must: 全集、不存在或唯一结论先从最近正式来源确认权威源码范围；发现/搜索只用 PATH 的 `srcq fd <options> <one-pattern> <paths>` 或 `srcq rg <options> <pattern> <paths>`；不得重复选择器；Windows 通配用 rg `--glob` 或 fd 唯一 pattern，多模式拆调或合并正则，不用 `dir/*.ext` 路径；只查该范围，不预载高级 skill/说明；已知符号后停止搜索，直接有界读取其完整定义、签名依赖和相邻契约；仅当前职责确需且规模已知有界时读完整文件；文本不足才经 srcq 升级 AST，符号语义仍不足才用 LSP，证据充分即停止
 
 must: 源码语言/文件数/代码/注释/空行/复杂度用 PATH 中的 `srcq scc <scc argv...>`；普通使用不加载 source-query，高级投影或缺页才加载；不得裸调 scc，其复杂度和 COCOMO 成本/工期不证明缺陷、质量或完成
 

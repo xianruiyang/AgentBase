@@ -181,3 +181,13 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 | srcq page 4096 | `38/42` | Token `+9.424%`；价格 `-2.349%/-2.131%`；耗时 `-8.339%` | 无实际续页，但质量与总 Token 失败；保持 2048 |
 
 所有候选均为完整 Control 的单一允许差异，环境 diff 无意外项，Codex `0.151.0-alpha.7.2`、Luna medium/default、srcq 0.7.0、三题、重复次数、只读与无 subject 子代理合同不变。原始 summary、experiment、事件与 hash 保留在各结构化审计登记的 `%LOCALAPPDATA%` 位置。验证只覆盖这些实验 identity；正式规则、skill、srcq、安装环境、Deploy 与 Release 均未改变。
+
+## 14. 搜索 argv 修复后的提示复测
+
+| 环境/测试项 | 严格 required | Token | 短/长价格 | 耗时 | 命令失败 | 裁决 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| 修复后基础环境 | `36/42`，完整 `4/6` | `961,379` | `$0.0563248/$0.1050554` | `335.796 s` | `1/47` | 搜索 argv 澄清保留；剩余为猜错相对路径 |
+| 工具前立即调用 | `37/42`，完整 `3/6` | `1,056,104`（`+9.853%`） | `+14.944%/+14.932%` | `+11.434%` | `0/39` | 6/6 仍先发可见说明；不采纳 |
+| 精炼书面推理 | `36/42`，完整 `3/6` | `836,411`（`-12.999%`） | `-2.836%/-2.850%` | `-2.977%` | `2/39` | reasoning output `+1.666%` 且有一次 literal-glob 违例；不采纳 |
+
+三个环境使用同一完整 Control、Codex `0.151.0-alpha.7.2`、Luna medium/default、srcq 0.7.0、固定三题各两次、只读且禁用 subject 子代理。三次正式运行均无 postflight failure。并行 `prepare` 曾因共享基础 home 的惰性 skill/cache 写入使首个 pretool 候选出现环境差异，runner 已拒绝该身份；随后从稳定基础 home 重建为 `pretool2-r2` 并串行预检，失败身份未进入结果。证据见 [搜索 argv](evidence/audit-result-search-command-grammar-v1.json)、[工具前推理 v2](evidence/audit-result-pretool-reasoning-prompt-v2.json)和[精炼推理 v2](evidence/audit-result-concise-reasoning-prompt-v2.json)。本轮未 Deploy、Release、运行完整验证或九项评测。

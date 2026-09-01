@@ -327,6 +327,15 @@ workspace test/build/lint/fmt、15 个 ast-grep 0.44.1 真实 ignored 测试、W
 
 这四类实验没有修改正式 `global/AGENTS.md`、`skills/source-query`、仓库或已安装 `srcq`，也没有执行 Deploy、Release、完整验证或九项评测。后续只有新的工具能力或可观察机制能同时消除失败调用、保持逐项质量并降低总 Token 与两种价格时才重开；不再通过更强规则或更小页长重采样同一输入。
 
+## OBS-SQG-036 普通搜索 argv 修复后的两类提示已独立重跑
+
+- 状态: verified within experiments `7f8e5132…25da`, `4b012f43…c7c1`, `36c1dca9…1381`
+- 关联: OBS-SQG-034, OBS-SQG-035
+
+此前 318 个命令执行项中的重复 `srcq rg rg`、把 Windows glob 当原生路径和 fd 多 pattern 误用，来自常驻规则把后端 argv 写成容易再次补入命令名的占位形式。`global/AGENTS.md` 已改成明确的 selector、pattern、options 与 paths 边界，并同步普通 rg/fd 的路由反例；`source-query` 仍不为普通 rg/fd 触发。修复后基础环境的 47 次命令没有重复 selector 或 literal-glob 失败，但有一次猜错 vcxproj 相对路径；六题严格质量为 `36/42`，Token `961,379`，短/长价格 `$0.0563248/$0.1050554`。
+
+在该基础环境上，“工具明确后立即调用”得到 `37/42`，但完整答案从 `4/6` 降至 `3/6`，六次仍全部先发可见说明，平均首条从 63 增至 68.333 字符；Token、短/长价格、耗时分别 `+9.853%`、`+14.944%/+14.932%`、`+11.434%`，不采纳。“精炼书面推理”得到 `36/42` 且完整答案降至 `3/6`，Token、价格、耗时分别 `-12.999%`、`-2.836%/-2.850%`、`-2.977%`，但 reasoning output `+1.666%`，并再次出现一次规则已禁止的 Windows literal-glob 路径，因此也不采纳。原始数据与评分见 [搜索 argv](evidence/audit-result-search-command-grammar-v1.json)、[工具前推理 v2](evidence/audit-result-pretool-reasoning-prompt-v2.json)和[精炼推理 v2](evidence/audit-result-concise-reasoning-prompt-v2.json)。仓库规则尚未部署或发布。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open

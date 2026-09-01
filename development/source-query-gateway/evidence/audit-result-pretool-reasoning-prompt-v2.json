@@ -1,0 +1,49 @@
+{
+  "schema": "agentbase.pretool-reasoning-prompt-audit/v2",
+  "created_utc": "2026-09-01T19:48:29Z",
+  "test_item": "when the next tool, scope, and arguments are known, call it immediately and keep only reasoning needed for that call",
+  "allowed_difference": "candidate AGENTS.md one rule over the repaired command-grammar Control",
+  "experiment_identity": "4b012f436435108f47a9184efb53f439ff6e699d3ed79418995221cf73c9c7c1",
+  "control": {
+    "required_passed": 36,
+    "required_total": 42,
+    "quality_complete_runs": 4,
+    "actual_total_tokens": 961379,
+    "reasoning_output_tokens": 5282,
+    "elapsed_ms": 335796,
+    "standard_price_usd_scenarios": [0.0563248, 0.1050554],
+    "visible_first_message": {"present_before_first_tool_runs": 6, "run_count": 6, "mean_chars": 63.0}
+  },
+  "candidate": {
+    "required_by_case_and_run": {"csharp": [7, 5], "cpp": [6, 7], "typescript": [6, 6]},
+    "required_passed": 37,
+    "required_total": 42,
+    "quality_complete_runs": 3,
+    "actual_total_tokens": 1056104,
+    "input_tokens": 1041533,
+    "cached_input_tokens": 894720,
+    "output_tokens": 14571,
+    "reasoning_output_tokens": 6945,
+    "elapsed_ms": 374190,
+    "standard_price_usd_scenarios": [0.0647422, 0.1207418],
+    "command_execution_items": 39,
+    "failed_command_execution_items": 0,
+    "visible_first_message": {"present_before_first_tool_runs": 6, "run_count": 6, "mean_chars": 68.333},
+    "relative_to_control_percent": {
+      "actual_total_tokens": 9.853,
+      "reasoning_output_tokens": 31.484,
+      "elapsed_ms": 11.434,
+      "short_price": 14.944,
+      "long_price": 14.932
+    }
+  },
+  "decision": "reject",
+  "reason": "aggregate required rose by one but complete-run stability fell, all six runs still emitted a visible pre-tool message, and tokens, reasoning output, both price scenarios, and elapsed time regressed",
+  "limitation": "hidden internal reasoning text is unavailable; the experiment measures usage, visible event order, final-answer quality, and command outcomes",
+  "raw_evidence": {
+    "location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/control-v16-grammar-experiments-20260902/pretool2-r2",
+    "experiment_sha256": "23ceeea737452c2d64c41753daa05e2232440b426b02c0118982fb87574a715f",
+    "summary_sha256": "e7ffba2eead7eb3b4591249c73d58bf642a6a789b8029446458bebb74a1be53d"
+  },
+  "production_effect": "none"
+}
