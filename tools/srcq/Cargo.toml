@@ -27,6 +27,7 @@ tempfile = "=3.23.0"
 thiserror = "=2.0.18"
 toml = "=0.8.23"
 ctrlc = { version = "=3.5.2", features = ["termination"] }
+encoding_rs = "=0.8.35"
 ulid = "=1.2.1"
 
 [workspace.lints.rust]

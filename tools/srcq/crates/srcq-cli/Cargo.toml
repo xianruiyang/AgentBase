@@ -20,6 +20,7 @@ required-features = ["test-helper"]
 
 [dependencies]
 clap.workspace = true
+encoding_rs.workspace = true
 fs2.workspace = true
 globset.workspace = true
 quick-xml.workspace = true

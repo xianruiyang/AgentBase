@@ -95,6 +95,12 @@ int UseFixtureWorker()
     return Worker.Tick();
 }
 
+int UseInlineWorker()
+{
+    InlineWorker InlineLocal;
+    return InlineLocal.RunInline();
+}
+
 int FirstSameFileLeaf()
 {
     return 1;

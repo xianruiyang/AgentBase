@@ -747,7 +747,7 @@ fn incoming_callers(
             }
             let matching_call = if matches!(
                 query.language.key,
-                "csharp" | "go" | "javascript" | "python" | "rust" | "typescript" | "tsx"
+                "cpp" | "csharp" | "go" | "javascript" | "python" | "rust" | "typescript" | "tsx"
             ) {
                 observed_call
             } else {
@@ -841,15 +841,6 @@ fn references_for_known_definition(
             continue;
         }
         let document = source_document(&occurrence.file, &mut documents)?;
-        if query.language.key == "cpp"
-            && !qualified_occurrence_matches(
-                document,
-                occurrence.range.start,
-                &definition.qualified_name,
-            )
-        {
-            continue;
-        }
         references.push(ReferenceCandidate {
             role: reference_role(document, occurrence.range.end),
             file: occurrence.file,
@@ -1081,11 +1072,6 @@ fn execute_references_inner(
             continue;
         }
         let document = source_document(&occurrence.file, &mut documents)?;
-        if query.language.key == "cpp"
-            && !qualified_occurrence_matches(document, occurrence.range.start, &query.target)
-        {
-            continue;
-        }
         references.push(ReferenceCandidate {
             role: reference_role(document, occurrence.range.end),
             file: occurrence.file,
@@ -1275,6 +1261,9 @@ fn finish_definition_outcome(
     scanned_roots: BTreeSet<String>,
     mut candidates: Vec<DefinitionCandidate>,
 ) -> Result<QueryOutcome, SymbolFailure> {
+    if command.language == "cpp" {
+        cpp::promote_methods_from_declarations(&mut candidates);
+    }
     let position_matched = select_anchor_candidates(&mut candidates, anchor_file, anchor_position);
     candidates.sort_by(|left, right| {
         left.role
@@ -1524,12 +1513,9 @@ fn identifier_at(
             path.display()
         )));
     }
-    let text = fs::read_to_string(path).map_err(|error| {
-        SymbolFailure::conversion(format!(
-            "cannot read UTF-8 source {}: {error}",
-            path.display()
-        ))
-    })?;
+    let source = fs::read(path)
+        .map_err(|error| SymbolFailure::io(format!("cannot read {}: {error}", path.display())))?;
+    let text = decode_source_text(path, source)?;
     let line_text = text
         .lines()
         .nth(line)
@@ -1687,11 +1673,7 @@ fn find_candidate_files(
     language: language::LanguageCapability,
     deadline: QueryDeadline,
 ) -> Result<Vec<PathBuf>, SymbolFailure> {
-    let search_target = if language.key == "cpp" {
-        target
-    } else {
-        target.rsplit("::").next().unwrap_or(target)
-    };
+    let search_target = target.rsplit("::").next().unwrap_or(target);
     let mut paths = Vec::new();
     for batch in path_batches(roots, WINDOWS_BATCH_CHARS) {
         let mut request = ProcessRequest::new(rg, &universe.cwd);
@@ -1771,14 +1753,15 @@ fn scan_candidates(
     }
     let direct_rules = cpp::inline_rules(target, false);
     let direct = run_ast_scan(ast_grep, target, files, universe, &direct_rules, deadline)?;
-    if !direct.is_empty()
+    if !target.contains("::")
+        && !direct.is_empty()
         && !direct
             .iter()
             .any(|candidate| !candidate.qualified_name.contains("::"))
     {
         return Ok(direct);
     }
-    let mut scope_files = if direct.is_empty() && target.contains("::") {
+    let mut scope_files = if target.contains("::") {
         files.to_vec()
     } else {
         direct
@@ -1893,80 +1876,164 @@ fn run_ast_scan(
                 .map_err(SymbolFailure::conversion)?,
         );
     }
-    candidates.extend(scan_cpp_header_declarations(
-        ast_grep, target, files, universe, deadline,
+    candidates.extend(scan_cpp_headers(
+        ast_grep,
+        target,
+        files,
+        universe,
+        inline_rules,
+        deadline,
     )?);
     Ok(candidates)
 }
 
-fn scan_cpp_header_declarations(
+fn scan_cpp_headers(
     ast_grep: &Path,
     target: &str,
     files: &[PathBuf],
     universe: &SourceUniverse,
+    inline_rules: &str,
     deadline: QueryDeadline,
 ) -> Result<Vec<DefinitionCandidate>, SymbolFailure> {
     let mut candidates = Vec::new();
-    for file in files.iter().filter(|file| {
-        file.extension()
-            .and_then(|extension| extension.to_str())
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("h"))
-    }) {
-        let metadata = fs::metadata(file).map_err(|error| {
-            SymbolFailure::io(format!(
-                "cannot inspect C++ header {}: {error}",
-                file.display()
-            ))
-        })?;
-        if metadata.len() > MAX_SOURCE_POSITION_BYTES {
-            return Err(SymbolFailure::input(format!(
-                "C++ header exceeds the {} byte relation-query limit: {}",
-                MAX_SOURCE_POSITION_BYTES,
-                file.display()
-            )));
-        }
-        let source = fs::read(file).map_err(|error| {
-            SymbolFailure::io(format!(
-                "cannot read C++ header {}: {error}",
-                file.display()
-            ))
-        })?;
-        let mut request = ProcessRequest::new(ast_grep, &universe.cwd);
-        request.args = [
-            "run",
-            "--stdin",
-            "--kind",
-            "function_declarator",
-            "--lang",
-            "cpp",
-            "--json=stream",
-        ]
-        .into_iter()
-        .map(OsString::from)
-        .collect();
-        request.stdin = StdinMode::Bytes(source);
-        request.forward_stderr = false;
-        request.max_stdout_bytes = Some(MAX_AST_STDOUT_BYTES);
-        request.max_stderr_bytes = Some(MAX_ENGINE_STDERR_BYTES);
-        let outcome = run_budgeted(request, deadline, "ast-grep C++ header scan")?;
-        let code = outcome.exit_code();
-        if !matches!(code, 0 | 1) {
-            return Err(engine_exit_failure(
-                "ast-grep",
-                code,
-                &outcome.output.read_stderr(),
-            ));
-        }
-        let bytes = outcome
-            .output
-            .read_stdout()
-            .map_err(|error| SymbolFailure::io(format!("cannot read ast-grep output: {error}")))?;
+    for file in files
+        .iter()
+        .filter(|file| language::requires_explicit_parse("cpp", file))
+    {
+        let bytes = run_cpp_header_inline_scan(
+            ast_grep,
+            file,
+            inline_rules,
+            universe,
+            deadline,
+            "ast-grep C++ header definition scan",
+        )?;
         candidates.extend(
-            cpp::parse_header_declarator_stream(&bytes, file, target, universe)
+            cpp::parse_header_scan_stream(&bytes, &universe.cwd, file, target, universe)
                 .map_err(SymbolFailure::conversion)?,
         );
     }
     Ok(candidates)
+}
+
+fn run_cpp_header_inline_scan(
+    ast_grep: &Path,
+    file: &Path,
+    inline_rules: &str,
+    universe: &SourceUniverse,
+    deadline: QueryDeadline,
+    operation: &'static str,
+) -> Result<Vec<u8>, SymbolFailure> {
+    let metadata = fs::metadata(file).map_err(|error| {
+        SymbolFailure::io(format!(
+            "cannot inspect C++ header {}: {error}",
+            file.display()
+        ))
+    })?;
+    if metadata.len() > MAX_SOURCE_POSITION_BYTES {
+        return Err(SymbolFailure::input(format!(
+            "C++ header exceeds the {} byte relation-query limit: {}",
+            MAX_SOURCE_POSITION_BYTES,
+            file.display()
+        )));
+    }
+    let source = fs::read(file).map_err(|error| {
+        SymbolFailure::io(format!(
+            "cannot read C++ header {}: {error}",
+            file.display()
+        ))
+    })?;
+    let source = normalize_ast_stdin_source(file, source)?;
+    let mut request = ProcessRequest::new(ast_grep, &universe.cwd);
+    request.args = [
+        OsString::from("scan"),
+        OsString::from("--stdin"),
+        OsString::from("--inline-rules"),
+        OsString::from(inline_rules),
+        OsString::from("--json=stream"),
+    ]
+    .into_iter()
+    .collect();
+    request.stdin = StdinMode::Bytes(source);
+    request.forward_stderr = false;
+    request.max_stdout_bytes = Some(MAX_AST_STDOUT_BYTES);
+    request.max_stderr_bytes = Some(MAX_ENGINE_STDERR_BYTES);
+    let outcome = run_budgeted(request, deadline, operation)?;
+    let code = outcome.exit_code();
+    if code != 0 {
+        return Err(engine_exit_failure(
+            "ast-grep",
+            code,
+            &outcome.output.read_stderr(),
+        ));
+    }
+    outcome
+        .output
+        .read_stdout()
+        .map_err(|error| SymbolFailure::io(format!("cannot read ast-grep output: {error}")))
+}
+
+fn normalize_ast_stdin_source(file: &Path, source: Vec<u8>) -> Result<Vec<u8>, SymbolFailure> {
+    decode_source_text(file, source).map(String::into_bytes)
+}
+
+fn decode_source_text(file: &Path, source: Vec<u8>) -> Result<String, SymbolFailure> {
+    if let Some(bytes) = source.strip_prefix(&[0xff, 0xfe]) {
+        if bytes.len() % 2 != 0 {
+            return Err(SymbolFailure::input(format!(
+                "UTF-16LE source has an incomplete code unit: {}",
+                file.display()
+            )));
+        }
+        let units = bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&units).map_err(|error| {
+            SymbolFailure::input(format!(
+                "cannot decode UTF-16LE source {}: {error}",
+                file.display()
+            ))
+        })
+    } else if let Some(bytes) = source.strip_prefix(&[0xfe, 0xff]) {
+        if bytes.len() % 2 != 0 {
+            return Err(SymbolFailure::input(format!(
+                "UTF-16BE source has an incomplete code unit: {}",
+                file.display()
+            )));
+        }
+        let units = bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_be_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&units).map_err(|error| {
+            SymbolFailure::input(format!(
+                "cannot decode UTF-16BE source {}: {error}",
+                file.display()
+            ))
+        })
+    } else if source.contains(&0) {
+        Err(SymbolFailure::input(format!(
+            "source contains NUL bytes; UTF-16 text requires a BOM: {}",
+            file.display()
+        )))
+    } else {
+        match String::from_utf8(source) {
+            Ok(text) => Ok(text),
+            Err(error) => {
+                let bytes = error.into_bytes();
+                let (decoded, had_errors) = encoding_rs::GBK.decode_without_bom_handling(&bytes);
+                if had_errors || decoded.contains('\0') {
+                    Err(SymbolFailure::input(format!(
+                        "source is not valid UTF-8, BOM-marked UTF-16, or Windows GBK text: {}",
+                        file.display()
+                    )))
+                } else {
+                    Ok(decoded.into_owned())
+                }
+            }
+        }
+    }
 }
 
 fn scan_occurrences(
@@ -2023,6 +2090,25 @@ fn scan_occurrences(
             cpp::parse_occurrence_stream(&bytes, &universe.cwd, universe)
                 .map_err(SymbolFailure::conversion)?,
         );
+    }
+    if language.key == "cpp" {
+        for file in files
+            .iter()
+            .filter(|file| language::requires_explicit_parse(language.key, file))
+        {
+            let bytes = run_cpp_header_inline_scan(
+                ast_grep,
+                file,
+                &inline_rules,
+                universe,
+                deadline,
+                "ast-grep C++ header occurrence scan",
+            )?;
+            occurrences.extend(
+                cpp::parse_header_occurrence_stream(&bytes, &universe.cwd, file, universe)
+                    .map_err(SymbolFailure::conversion)?,
+            );
+        }
     }
     occurrences.sort_by(|left, right| {
         normalized_key(&left.file)
@@ -2119,6 +2205,25 @@ fn scan_containing_functions(
             generic::parse_function_owner_stream(&bytes, &universe.cwd, language.key)
                 .map_err(SymbolFailure::conversion)?
         });
+    }
+    if language.key == "cpp" {
+        for file in files
+            .iter()
+            .filter(|file| language::requires_explicit_parse(language.key, file))
+        {
+            let bytes = run_cpp_header_inline_scan(
+                ast_grep,
+                file,
+                &inline_rules,
+                universe,
+                deadline,
+                "ast-grep C++ header owner scan",
+            )?;
+            owners.extend(
+                cpp::parse_header_function_owner_stream(&bytes, &universe.cwd, file, universe)
+                    .map_err(SymbolFailure::conversion)?,
+            );
+        }
     }
     owners.sort_by(|left, right| {
         normalized_key(&left.file)
@@ -2313,6 +2418,36 @@ fn cache_call_scans(
         combined.type_scopes.append(&mut scan.type_scopes);
         combined.lexical_scopes.append(&mut scan.lexical_scopes);
     }
+    if context.language.key == "cpp" {
+        for file in missing
+            .iter()
+            .filter(|file| language::requires_explicit_parse(context.language.key, file))
+        {
+            let bytes = run_cpp_header_inline_scan(
+                context.ast_grep,
+                file,
+                &rules,
+                context.universe,
+                context.deadline,
+                "ast-grep C++ header call scan",
+            )?;
+            let key = normalized_key(file);
+            combined
+                .calls
+                .retain(|candidate| normalized_key(&candidate.file) != key);
+            combined
+                .bindings
+                .retain(|candidate| normalized_key(&candidate.file) != key);
+            combined
+                .type_scopes
+                .retain(|candidate| normalized_key(&candidate.file) != key);
+            let mut scan = cpp::parse_header_call_stream(&bytes, &context.universe.cwd, file)
+                .map_err(SymbolFailure::conversion)?;
+            combined.calls.append(&mut scan.calls);
+            combined.bindings.append(&mut scan.bindings);
+            combined.type_scopes.append(&mut scan.type_scopes);
+        }
+    }
     for file in missing {
         let key = normalized_key(&file);
         cache.insert(
@@ -2499,12 +2634,10 @@ fn source_document<'a>(
 ) -> Result<&'a SourceDocument, SymbolFailure> {
     let key = normalized_key(path);
     if !documents.contains_key(&key) {
-        let text = fs::read_to_string(path).map_err(|error| {
-            SymbolFailure::conversion(format!(
-                "cannot read UTF-8 source {}: {error}",
-                path.display()
-            ))
+        let source = fs::read(path).map_err(|error| {
+            SymbolFailure::io(format!("cannot read source {}: {error}", path.display()))
         })?;
+        let text = decode_source_text(path, source)?;
         let mut line_offsets = vec![0];
         line_offsets.extend(
             text.bytes()
@@ -2516,32 +2649,6 @@ fn source_document<'a>(
     documents
         .get(&key)
         .ok_or_else(|| SymbolFailure::io("source document cache lost an inserted entry"))
-}
-
-fn qualified_occurrence_matches(
-    document: &SourceDocument,
-    position: SourcePosition,
-    target: &str,
-) -> bool {
-    if !target.contains("::") {
-        return true;
-    }
-    let Some(line_start) = document.line_offsets.get(position.line).copied() else {
-        return false;
-    };
-    let occurrence = line_start.saturating_add(position.column);
-    if occurrence > document.text.len() {
-        return false;
-    }
-    let start = occurrence.saturating_sub(target.len().saturating_mul(3).max(128));
-    let end = occurrence
-        .saturating_add(target.rsplit("::").next().map_or(0, str::len))
-        .min(document.text.len());
-    document.text[start..end]
-        .chars()
-        .filter(|character| !character.is_whitespace())
-        .collect::<String>()
-        .ends_with(target)
 }
 
 fn reference_role(document: &SourceDocument, end: SourcePosition) -> &'static str {
@@ -3358,8 +3465,8 @@ fn write_stdout(bytes: Vec<u8>) -> Result<(), SymbolFailure> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_source_position, path_batches};
-    use std::path::PathBuf;
+    use super::{decode_source_text, parse_source_position, path_batches};
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn windows_source_position_splits_from_the_right() {
@@ -3374,5 +3481,24 @@ mod tests {
         let paths = [PathBuf::from("one.cpp"), PathBuf::from("two.cpp")];
         let batches = path_batches(&paths, 12);
         assert_eq!(batches.iter().map(|batch| batch.len()).sum::<usize>(), 2);
+    }
+
+    #[test]
+    fn source_decoding_supports_common_windows_project_text() {
+        let utf16 = [0xff, 0xfe, b'i', 0, b'n', 0, b't', 0, b';', 0];
+        assert_eq!(
+            decode_source_text(Path::new("utf16.h"), utf16.to_vec()).expect("BOM-marked UTF-16"),
+            "int;"
+        );
+        assert!(decode_source_text(
+            Path::new("bomless-utf16.h"),
+            [b'i', 0, b'n', 0, b't', 0].to_vec()
+        )
+        .is_err());
+        assert_eq!(
+            decode_source_text(Path::new("legacy-code-page.h"), b"// \xd6\xd0\n".to_vec())
+                .expect("GBK source"),
+            "// 中\n"
+        );
     }
 }

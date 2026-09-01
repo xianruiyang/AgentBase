@@ -17,6 +17,8 @@ srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction incoming --dept
 
 位置上的 `A::B` 静态限定名会直接保留为查询目标。C++ 成员调用会保留接收者；当当前函数内恰有一个在调用前声明的显式参数或局部变量类型时，输出 `Type::method [typed-member-candidate receiver=object:Type]` 并允许继续解析该候选。C# 还会使用当前词法块或 Lambda/local function 内有效的显式参数/局部变量、`var x = new Type(...)`、当前类型的字段/属性、跨 partial 文件的唯一字段/属性、短属性链及源码内唯一静态类型形成同等级的类型候选。
 
+C++ 的 `.h/.hh/.hpp/.hxx/.inl/.ipp/.ixx` 由同一语言注册表显式按 C++ 解析，类内带函数体成员归为 definition、无函数体成员归为 declaration；类外成员只有在同一候选范围内存在相同限定名的类内 method 声明时才提升为 method，namespace free function 和 `friend` function 不凭 `::` 或包含类型范围猜成成员。字段、参数和局部的简单 `name(.|->name)*` 链只使用直接源码类型；`std::shared_ptr`、`std::unique_ptr`、`std::weak_ptr`、`std::optional` 只按登记白名单取首个模板实参，函数返回、索引、cast、括号和其他模板保持 unknown。源码读取接受 UTF-8、带 BOM 的 UTF-16 和无解码错误的 Windows GBK；含 NUL 的无 BOM UTF-16 或仍无法解码的文本返回明确输入错误。
+
 Go、Python、Rust、JavaScript、TypeScript/TSX 现在通过同一 typed relation 中间层取得语言等价证据：Go 使用方法 receiver、参数、`var`/`:=`、复合字面量和类型 selector；Python 使用 annotation、构造赋值、`self`/`cls` 与实例成员；Rust 使用参数/引用、`let`、struct/`new` 构造、`self`、字段和 inherent `impl` 路径；JavaScript 使用 `new` 局部/字段/构造赋值、当前实例和静态类调用；TypeScript/TSX 再增加显式参数、局部与字段类型。函数、方法、arrow/function expression、lambda、closure 等适用 callable 由各自 AST owner 归属；JavaScript、TypeScript/TSX 类方法还会从同批 AST class 范围取得调用者限定身份。相邻块的同名局部变量分别绑定，已经离开声明作用域的名称不继承旧类型，incoming 会排除已证明属于其他接收者类型的同名调用。不同类型的同名绑定、union 或复杂泛型、interface/trait object、`dynamic`、计算属性、函数值、宏/生成代码、monkey patch、返回值/索引器组成的复杂链及其他不能从当前源码直接证明的接收者仍保持 `semantic-unknown`，不会用猜测消除歧义。
 
 只有名称时仍可查询，但名称只建立候选身份：

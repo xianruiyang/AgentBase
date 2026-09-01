@@ -242,8 +242,14 @@ fn cpp_references_exclude_definition_sites_and_keep_identity_and_access_roles() 
     assert_eq!(qualified["schema"], "srcq.symbol.references/v1");
     assert_eq!(qualified["identity"], "qualified-candidate");
     assert_eq!(qualified["definition_total"], 1);
-    assert_eq!(qualified["reference_total"], 1);
-    assert_eq!(qualified["references"][0]["role"], "call");
+    assert_eq!(qualified["reference_total"], 3);
+    assert!(qualified["references"]
+        .as_array()
+        .expect("qualified lexical references")
+        .iter()
+        .all(|reference| {
+            reference["role"] == "call" && reference["evidence"] == "lexical-candidate"
+        }));
 
     let variable = run(&["symbol", "references", "GlobalValue", "--only-root", root]);
     assert!(variable.status.success());
@@ -314,8 +320,8 @@ fn cpp_outgoing_calls_expand_unique_nodes_and_stop_on_cycles_and_ambiguity() {
         1,
         "a sibling path that differs from the parent should still render once"
     );
-    assert!(cross_file.contains("FirstCrossFileCaller [lexical-candidate;incoming-candidate]"));
-    assert!(cross_file.contains("SecondCrossFileCaller [lexical-candidate;incoming-candidate] :"));
+    assert!(cross_file.contains("FirstCrossFileCaller [direct-candidate;incoming-candidate]"));
+    assert!(cross_file.contains("SecondCrossFileCaller [direct-candidate;incoming-candidate] :"));
 
     let cross_file_machine = run(&[
         "symbol",
@@ -457,6 +463,162 @@ fn cpp_incoming_calls_find_callers_and_stop_on_cycles() {
     let virtual_dispatch =
         String::from_utf8(virtual_dispatch.stdout).expect("UTF-8 virtual incoming tree");
     assert!(virtual_dispatch.contains("dynamic callers [semantic-unknown:virtual-dispatch]"));
+}
+
+#[test]
+fn cpp_header_inline_method_is_a_definition_but_bodyless_method_stays_a_declaration() {
+    let root = fixture_source();
+    let root = root.to_str().expect("UTF-8 fixture path");
+
+    let definition = run(&[
+        "symbol",
+        "definition",
+        "InlineWorker::RunInline",
+        "--only-root",
+        root,
+        "--body",
+        "none",
+        "--output",
+        "machine",
+    ]);
+    assert!(definition.status.success());
+    let definition: Value =
+        serde_json::from_slice(&definition.stdout).expect("inline method definition JSON");
+    assert_eq!(definition["definition_total"], 1);
+    assert_eq!(definition["declaration_total"], 0);
+    assert_eq!(
+        definition["definitions"][0]["qualified_name"],
+        "InlineWorker::RunInline"
+    );
+
+    let incoming = run(&[
+        "symbol",
+        "calls",
+        "InlineWorker::RunInline",
+        "--only-root",
+        root,
+        "--direction",
+        "incoming",
+        "--depth",
+        "1",
+        "--output",
+        "machine",
+    ]);
+    assert!(incoming.status.success());
+    let incoming: Value =
+        serde_json::from_slice(&incoming.stdout).expect("inline incoming calls JSON");
+    let callers = incoming["root"]["children"]
+        .as_array()
+        .expect("inline incoming callers");
+    assert_eq!(callers.len(), 6);
+    assert!(callers.iter().any(|caller| {
+        caller["name"] == "CallInline"
+            && caller["qualified_name"] == "InlineWorker::CallInline"
+            && caller["definition"]["qualified_name"] == "InlineWorker::CallInline"
+    }));
+    assert!(callers
+        .iter()
+        .any(|caller| caller["name"] == "UseInlineWorker"));
+    for qualified_name in [
+        "InlineWorkerHolder::CallMember",
+        "InlineWorkerChain::CallChain",
+        "InlineWorkerSharedHolder::CallShared",
+        "InlineWorkerLateHolder::CallLate",
+    ] {
+        assert!(callers
+            .iter()
+            .any(|caller| caller["qualified_name"] == qualified_name));
+    }
+
+    let declaration = run(&[
+        "symbol",
+        "definition",
+        "InlineWorker::DeclaredInline",
+        "--only-root",
+        root,
+        "--body",
+        "none",
+        "--output",
+        "machine",
+    ]);
+    assert_eq!(declaration.status.code(), Some(1));
+    let declaration: Value =
+        serde_json::from_slice(&declaration.stdout).expect("inline declaration JSON");
+    assert_eq!(declaration["definition_total"], 0);
+    assert_eq!(declaration["declaration_total"], 1);
+
+    let out_of_line = run(&[
+        "symbol",
+        "definition",
+        "VirtualWorker::RunVirtual",
+        "--only-root",
+        root,
+        "--body",
+        "none",
+        "--output",
+        "machine",
+    ]);
+    assert!(out_of_line.status.success());
+    let out_of_line: Value =
+        serde_json::from_slice(&out_of_line.stdout).expect("out-of-line method JSON");
+    assert_eq!(out_of_line["definition_total"], 1);
+    assert_eq!(out_of_line["definitions"][0]["symbol_kind"], "method");
+
+    let friend = run(&[
+        "symbol",
+        "definition",
+        "FriendFree",
+        "--only-root",
+        root,
+        "--body",
+        "none",
+        "--output",
+        "machine",
+    ]);
+    assert!(friend.status.success());
+    let friend: Value =
+        serde_json::from_slice(&friend.stdout).expect("friend function definition JSON");
+    assert_eq!(friend["definition_total"], 1);
+    assert_eq!(friend["definitions"][0]["qualified_name"], "FriendFree");
+    assert_eq!(friend["definitions"][0]["symbol_kind"], "function");
+
+    let ordinary_inline = run(&[
+        "symbol",
+        "definition",
+        "OrdinaryInline",
+        "--only-root",
+        root,
+        "--body",
+        "none",
+        "--output",
+        "machine",
+    ]);
+    assert!(ordinary_inline.status.success());
+    let ordinary_inline: Value = serde_json::from_slice(&ordinary_inline.stdout)
+        .expect("comment-adjacent inline method definition JSON");
+    assert_eq!(
+        ordinary_inline["definitions"][0]["qualified_name"],
+        "CommentFriendHolder::OrdinaryInline"
+    );
+    assert_eq!(ordinary_inline["definitions"][0]["symbol_kind"], "method");
+
+    let declarator_probe = run(&[
+        "symbol",
+        "definition",
+        "DeclaratorProbe",
+        "--only-root",
+        root,
+        "--body",
+        "none",
+        "--output",
+        "machine",
+    ]);
+    assert!(declarator_probe.status.success());
+    let declarator_probe: Value = serde_json::from_slice(&declarator_probe.stdout)
+        .expect("declarator prefix noise definition JSON");
+    assert_eq!(declarator_probe["definition_total"], 1);
+    assert_eq!(declarator_probe["declaration_total"], 0);
+    assert_eq!(declarator_probe["definitions"][0]["symbol_kind"], "type");
 }
 
 #[test]

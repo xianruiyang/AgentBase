@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use serde_json::json;
 
 use srcq_core::invocation::OutputFormat;
@@ -167,6 +169,20 @@ pub(crate) fn source_glob(key: &str) -> Option<&'static str> {
     }
 }
 
+pub(crate) fn requires_explicit_parse(key: &str, path: &Path) -> bool {
+    if key != "cpp" {
+        return false;
+    }
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "h" | "hh" | "hpp" | "hxx" | "inl" | "ipp" | "ixx"
+            )
+        })
+}
+
 pub(crate) fn normalize_query_target(key: &str, target: String) -> String {
     if key == "csharp" {
         target.replace('.', "::")
@@ -262,4 +278,18 @@ pub(crate) fn render(output: OutputFormat) -> Vec<u8> {
         ));
     }
     text.into_bytes()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::requires_explicit_parse;
+    use std::path::Path;
+
+    #[test]
+    fn explicit_parse_routing_is_owned_by_the_language_registry() {
+        assert!(requires_explicit_parse("cpp", Path::new("worker.h")));
+        assert!(requires_explicit_parse("cpp", Path::new("worker.IPP")));
+        assert!(!requires_explicit_parse("cpp", Path::new("worker.cpp")));
+        assert!(!requires_explicit_parse("c", Path::new("worker.h")));
+    }
 }

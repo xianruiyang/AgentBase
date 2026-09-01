@@ -219,6 +219,7 @@ struct ScopeNode {
     range: SourceRange,
     name: String,
     kind: ScopeKind,
+    text: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -244,25 +245,30 @@ pub(crate) fn parse_scan_stream(
     target: &str,
     universe: &SourceUniverse,
 ) -> Result<Vec<DefinitionCandidate>, String> {
-    let text = std::str::from_utf8(bytes)
-        .map_err(|_| "ast-grep definition output was not UTF-8".to_owned())?;
-    let mut records = Vec::new();
-    for (index, line) in text.lines().enumerate() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let value: Value = serde_json::from_str(line).map_err(|error| {
-            format!(
-                "invalid ast-grep definition JSON at record {}: {error}",
-                index + 1
-            )
-        })?;
-        records.push(parse_record(&value, cwd)?);
-    }
-    let scopes = build_scopes(&records);
+    let records = parse_records(bytes, cwd, None, "definition")?;
+    parse_definition_records(&records, target, universe)
+}
+
+pub(crate) fn parse_header_scan_stream(
+    bytes: &[u8],
+    cwd: &Path,
+    file: &Path,
+    target: &str,
+    universe: &SourceUniverse,
+) -> Result<Vec<DefinitionCandidate>, String> {
+    let records = parse_records(bytes, cwd, Some(file), "C++ header definition")?;
+    parse_definition_records(&records, target, universe)
+}
+
+fn parse_definition_records(
+    records: &[AstRecord],
+    target: &str,
+    universe: &SourceUniverse,
+) -> Result<Vec<DefinitionCandidate>, String> {
+    let scopes = build_scopes(records);
     let target_last = target.rsplit("::").next().unwrap_or(target);
     let mut candidates = Vec::new();
-    for record in &records {
+    for record in records {
         let direct_initialized = records.iter().any(|candidate| {
             candidate.rule_id == "srcq.cpp.declaration.init"
                 && normalized_key(&candidate.file) == normalized_key(&record.file)
@@ -277,7 +283,13 @@ pub(crate) fn parse_scan_stream(
         ) {
             continue;
         }
-        let qualified_name = qualify(record, &extracted.name, &scopes);
+        let friend_function =
+            extracted.ast_kind == "function_definition" && is_friend_function(record, &scopes);
+        let qualified_name = if friend_function {
+            qualify_excluding_type_scopes(record, &extracted.name, &scopes)
+        } else {
+            qualify(record, &extracted.name, &scopes)
+        };
         if target.contains("::")
             && qualified_name != target
             && !qualified_name.ends_with(&format!("::{target}"))
@@ -289,13 +301,22 @@ pub(crate) fn parse_scan_stream(
         }
         let file = fs::canonicalize(&record.file).unwrap_or_else(|_| record.file.clone());
         let name_position = offset_position(record.range.start, &record.text, extracted.offset);
+        let symbol_kind = if extracted.ast_kind == "function_definition" {
+            if is_inside_type_scope(record, &scopes) && !friend_function {
+                "method"
+            } else {
+                "function"
+            }
+        } else {
+            extracted.symbol_kind
+        };
         candidates.push(DefinitionCandidate {
             root_alias: universe.root_for(&file).map(|root| root.alias.clone()),
             file,
             range: record.range,
             name_position,
             qualified_name,
-            symbol_kind: extracted.symbol_kind.to_owned(),
+            symbol_kind: symbol_kind.to_owned(),
             role: extracted.role,
             signature: extracted.signature,
             text: record.text.clone(),
@@ -324,79 +345,22 @@ pub(crate) fn parse_scan_stream(
     Ok(candidates)
 }
 
-pub(crate) fn parse_header_declarator_stream(
-    bytes: &[u8],
-    file: &Path,
-    target: &str,
-    universe: &SourceUniverse,
-) -> Result<Vec<DefinitionCandidate>, String> {
-    let text = std::str::from_utf8(bytes)
-        .map_err(|_| "ast-grep header output was not UTF-8".to_owned())?;
-    let target_last = target.rsplit("::").next().unwrap_or(target);
-    let file = fs::canonicalize(file).unwrap_or_else(|_| file.to_path_buf());
-    let mut candidates = Vec::new();
-    for (index, line) in text.lines().enumerate() {
-        if line.trim().is_empty() {
-            continue;
+pub(crate) fn promote_methods_from_declarations(candidates: &mut [DefinitionCandidate]) {
+    let declared_methods = candidates
+        .iter()
+        .filter(|candidate| {
+            candidate.role == DefinitionRole::Declaration && candidate.symbol_kind == "method"
+        })
+        .map(|candidate| candidate.qualified_name.clone())
+        .collect::<BTreeSet<_>>();
+    for candidate in candidates {
+        if candidate.role == DefinitionRole::Definition
+            && candidate.symbol_kind == "function"
+            && declared_methods.contains(&candidate.qualified_name)
+        {
+            candidate.symbol_kind = "method".to_owned();
         }
-        let value: Value = serde_json::from_str(line).map_err(|error| {
-            format!(
-                "invalid ast-grep C++ header JSON at record {}: {error}",
-                index + 1
-            )
-        })?;
-        let declarator = value
-            .get("text")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "ast-grep header record is missing text".to_owned())?;
-        let Some(open) = declarator.find('(') else {
-            continue;
-        };
-        let head = declarator[..open].trim_end();
-        let start = qualified_start(head, head.len());
-        let name = head[start..].trim();
-        if name.rsplit("::").next() != Some(target_last) {
-            continue;
-        }
-        let qualified_name = if target.contains("::") {
-            target.to_owned()
-        } else {
-            name.to_owned()
-        };
-        let range = value
-            .get("range")
-            .ok_or_else(|| "ast-grep header record is missing range".to_owned())?;
-        let range = SourceRange {
-            start: parse_position(
-                range
-                    .get("start")
-                    .ok_or_else(|| "ast-grep header range is missing start".to_owned())?,
-            )?,
-            end: parse_position(
-                range
-                    .get("end")
-                    .ok_or_else(|| "ast-grep header range is missing end".to_owned())?,
-            )?,
-        };
-        let signature = value
-            .get("lines")
-            .and_then(Value::as_str)
-            .map(compact_signature)
-            .unwrap_or_else(|| compact_signature(declarator));
-        candidates.push(DefinitionCandidate {
-            root_alias: universe.root_for(&file).map(|root| root.alias.clone()),
-            file: file.clone(),
-            range,
-            name_position: offset_position(range.start, declarator, start),
-            qualified_name,
-            symbol_kind: "method".to_owned(),
-            role: DefinitionRole::Declaration,
-            signature,
-            text: declarator.to_owned(),
-            ast_kind: "function_declarator".to_owned(),
-        });
     }
-    Ok(candidates)
 }
 
 pub(crate) fn occurrence_rules(target: &str) -> String {
@@ -412,20 +376,26 @@ pub(crate) fn parse_occurrence_stream(
     cwd: &Path,
     universe: &SourceUniverse,
 ) -> Result<Vec<OccurrenceCandidate>, String> {
-    let text = std::str::from_utf8(bytes)
-        .map_err(|_| "ast-grep occurrence output was not UTF-8".to_owned())?;
+    let records = parse_records(bytes, cwd, None, "occurrence")?;
+    parse_occurrence_records(records, universe)
+}
+
+pub(crate) fn parse_header_occurrence_stream(
+    bytes: &[u8],
+    cwd: &Path,
+    file: &Path,
+    universe: &SourceUniverse,
+) -> Result<Vec<OccurrenceCandidate>, String> {
+    let records = parse_records(bytes, cwd, Some(file), "C++ header occurrence")?;
+    parse_occurrence_records(records, universe)
+}
+
+fn parse_occurrence_records(
+    records: Vec<AstRecord>,
+    universe: &SourceUniverse,
+) -> Result<Vec<OccurrenceCandidate>, String> {
     let mut occurrences = Vec::new();
-    for (index, line) in text.lines().enumerate() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let value: Value = serde_json::from_str(line).map_err(|error| {
-            format!(
-                "invalid ast-grep occurrence JSON at record {}: {error}",
-                index + 1
-            )
-        })?;
-        let record = parse_record(&value, cwd)?;
+    for record in records {
         let file = fs::canonicalize(&record.file).unwrap_or(record.file);
         occurrences.push(OccurrenceCandidate {
             root_alias: universe.root_for(&file).map(|root| root.alias.clone()),
@@ -448,24 +418,26 @@ pub(crate) fn parse_occurrence_stream(
 }
 
 pub(crate) fn call_rules() -> &'static str {
-    "id: srcq.cpp.call\nlanguage: Cpp\nrule:\n  kind: call_expression\nseverity: info\nmessage: direct call candidate\n---\nid: srcq.cpp.binding.declaration\nlanguage: Cpp\nrule:\n  kind: declaration\nseverity: info\nmessage: explicit type binding candidate\n---\nid: srcq.cpp.binding.parameter\nlanguage: Cpp\nrule:\n  kind: parameter_declaration\nseverity: info\nmessage: explicit parameter type candidate"
+    "id: srcq.cpp.call\nlanguage: Cpp\nrule:\n  kind: call_expression\nseverity: info\nmessage: direct call candidate\n---\nid: srcq.cpp.binding.declaration\nlanguage: Cpp\nrule:\n  kind: declaration\nseverity: info\nmessage: explicit type binding candidate\n---\nid: srcq.cpp.binding.parameter\nlanguage: Cpp\nrule:\n  kind: parameter_declaration\nseverity: info\nmessage: explicit parameter type candidate\n---\nid: srcq.cpp.binding.field\nlanguage: Cpp\nrule:\n  kind: field_declaration\nseverity: info\nmessage: explicit field type binding candidate\n---\nid: srcq.cpp.type.class\nlanguage: Cpp\nrule:\n  kind: class_specifier\nseverity: info\nmessage: class type scope candidate\n---\nid: srcq.cpp.type.struct\nlanguage: Cpp\nrule:\n  kind: struct_specifier\nseverity: info\nmessage: struct type scope candidate\n---\nid: srcq.cpp.type.union\nlanguage: Cpp\nrule:\n  kind: union_specifier\nseverity: info\nmessage: union type scope candidate"
 }
 
 pub(crate) fn parse_call_stream(bytes: &[u8], cwd: &Path) -> Result<CallScan, String> {
-    let text =
-        std::str::from_utf8(bytes).map_err(|_| "ast-grep call output was not UTF-8".to_owned())?;
+    let records = parse_records(bytes, cwd, None, "call")?;
+    parse_call_records(records)
+}
+
+pub(crate) fn parse_header_call_stream(
+    bytes: &[u8],
+    cwd: &Path,
+    file: &Path,
+) -> Result<CallScan, String> {
+    let records = parse_records(bytes, cwd, Some(file), "C++ header call")?;
+    parse_call_records(records)
+}
+
+fn parse_call_records(records: Vec<AstRecord>) -> Result<CallScan, String> {
     let mut scan = CallScan::default();
-    for (index, line) in text.lines().enumerate() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let value: Value = serde_json::from_str(line).map_err(|error| {
-            format!(
-                "invalid ast-grep call JSON at record {}: {error}",
-                index + 1
-            )
-        })?;
-        let record = parse_record(&value, cwd)?;
+    for record in records {
         let file = fs::canonicalize(&record.file).unwrap_or(record.file);
         if record.rule_id == "srcq.cpp.call" {
             let (callee, dispatch, receiver) = call_name(&record.text);
@@ -479,15 +451,38 @@ pub(crate) fn parse_call_stream(bytes: &[u8], cwd: &Path) -> Result<CallScan, St
             });
         } else if matches!(
             record.rule_id.as_str(),
-            "srcq.cpp.binding.declaration" | "srcq.cpp.binding.parameter"
+            "srcq.cpp.binding.declaration"
+                | "srcq.cpp.binding.parameter"
+                | "srcq.cpp.binding.field"
         ) {
             if let Some((type_name, name)) = simple_type_binding(&record.text) {
+                let scope = match record.rule_id.as_str() {
+                    "srcq.cpp.binding.parameter" => TypeBindingScope::Parameter,
+                    "srcq.cpp.binding.field" => TypeBindingScope::Member,
+                    _ => TypeBindingScope::Lexical,
+                };
                 scan.bindings.push(TypeBindingCandidate {
                     file,
                     range: record.range,
                     name,
                     type_name,
-                    scope: TypeBindingScope::Lexical,
+                    scope,
+                });
+            }
+        } else if matches!(
+            record.rule_id.as_str(),
+            "srcq.cpp.type.class" | "srcq.cpp.type.struct" | "srcq.cpp.type.union"
+        ) {
+            let keyword = match record.rule_id.as_str() {
+                "srcq.cpp.type.class" => "class",
+                "srcq.cpp.type.struct" => "struct",
+                _ => "union",
+            };
+            if let Some((type_name, _)) = keyword_name(&record.text, &[keyword]) {
+                scan.type_scopes.push(TypeScopeCandidate {
+                    file,
+                    range: record.range,
+                    type_name,
                 });
             }
         }
@@ -510,6 +505,18 @@ pub(crate) fn parse_call_stream(bytes: &[u8], cwd: &Path) -> Result<CallScan, St
             .then_with(|| left.name.cmp(&right.name))
     });
     scan.bindings.dedup();
+    scan.type_scopes.sort_by(|left, right| {
+        normalized_key(&left.file)
+            .cmp(&normalized_key(&right.file))
+            .then_with(|| left.range.start.line.cmp(&right.range.start.line))
+            .then_with(|| left.range.start.column.cmp(&right.range.start.column))
+            .then_with(|| left.type_name.cmp(&right.type_name))
+    });
+    scan.type_scopes.dedup_by(|left, right| {
+        normalized_key(&left.file) == normalized_key(&right.file)
+            && left.range == right.range
+            && left.type_name == right.type_name
+    });
     Ok(scan)
 }
 
@@ -518,39 +525,149 @@ pub(crate) fn annotate_explicit_member_types(
     scan: &CallScan,
     definition: &DefinitionCandidate,
 ) {
+    let implicit_receiver_type = (definition.symbol_kind == "method")
+        .then(|| {
+            definition
+                .qualified_name
+                .rsplit_once("::")
+                .map(|(owner, _)| owner)
+        })
+        .flatten();
     for call in calls {
+        if call.dispatch == "direct-candidate"
+            && !call.callee.contains("::")
+            && implicit_receiver_type.is_some()
+        {
+            let receiver_type = implicit_receiver_type.expect("checked implicit receiver type");
+            call.callee = format!("{receiver_type}::{}", call.callee);
+            call.dispatch = "typed-member-candidate";
+            call.receiver_type = Some(receiver_type.to_owned());
+            continue;
+        }
         if call.dispatch != "member-candidate" {
             continue;
         }
-        let Some(receiver) = call
-            .receiver
-            .as_deref()
-            .filter(|value| is_simple_identifier(value))
-        else {
+        let Some(receiver) = call.receiver.as_deref() else {
             continue;
         };
-        let types = scan
-            .bindings
-            .iter()
-            .filter(|binding| {
-                normalized_key(&binding.file) == normalized_key(&call.file)
-                    && contains(definition.range, binding.range)
-                    && position_le(binding.range.start, call.range.start)
-                    && binding.name == receiver
-            })
-            .map(|binding| binding.type_name.clone())
-            .collect::<BTreeSet<_>>();
-        if types.len() != 1 {
+        if receiver == "this" && implicit_receiver_type.is_some() {
+            let receiver_type = implicit_receiver_type.expect("checked implicit receiver type");
+            call.callee = format!("{receiver_type}::{}", call.callee);
+            call.dispatch = "typed-member-candidate";
+            call.receiver_type = Some(receiver_type.to_owned());
             continue;
         }
-        let type_name = types
-            .into_iter()
-            .next()
-            .expect("one explicit receiver type");
+        let Some(type_name) = receiver_type(receiver, scan, definition, call) else {
+            continue;
+        };
         call.callee = format!("{type_name}::{}", call.callee);
         call.dispatch = "typed-member-candidate";
         call.receiver_type = Some(type_name);
     }
+}
+
+fn receiver_type(
+    receiver: &str,
+    scan: &CallScan,
+    definition: &DefinitionCandidate,
+    call: &DirectCallCandidate,
+) -> Option<String> {
+    let chain = simple_member_chain(receiver)?;
+    let mut current_type = visible_binding_type(chain[0], scan, definition, call)?;
+    for member in chain.into_iter().skip(1) {
+        current_type = member_binding_type(member, &current_type, scan, &call.file)?;
+    }
+    Some(current_type)
+}
+
+fn simple_member_chain(receiver: &str) -> Option<Vec<&str>> {
+    let mut offset = skip_whitespace(receiver, 0);
+    let mut chain = Vec::new();
+    loop {
+        let start = offset;
+        let first = receiver[offset..].chars().next()?;
+        if first.is_ascii_digit() || !is_identifier_character(first) {
+            return None;
+        }
+        offset += first.len_utf8();
+        while let Some(character) = receiver[offset..].chars().next() {
+            if !is_identifier_character(character) {
+                break;
+            }
+            offset += character.len_utf8();
+        }
+        chain.push(&receiver[start..offset]);
+        offset = skip_whitespace(receiver, offset);
+        if offset == receiver.len() {
+            return Some(chain);
+        }
+        if receiver[offset..].starts_with("->") {
+            offset += 2;
+        } else if receiver[offset..].starts_with('.') {
+            offset += 1;
+        } else {
+            return None;
+        }
+        offset = skip_whitespace(receiver, offset);
+    }
+}
+
+fn visible_binding_type(
+    name: &str,
+    scan: &CallScan,
+    definition: &DefinitionCandidate,
+    call: &DirectCallCandidate,
+) -> Option<String> {
+    let types = scan
+        .bindings
+        .iter()
+        .filter(|binding| {
+            normalized_key(&binding.file) == normalized_key(&call.file)
+                && binding.name == name
+                && match binding.scope {
+                    TypeBindingScope::Member => scan.type_scopes.iter().any(|scope| {
+                        normalized_key(&scope.file) == normalized_key(&call.file)
+                            && contains(scope.range, definition.range)
+                            && contains(scope.range, binding.range)
+                    }),
+                    _ => {
+                        contains(definition.range, binding.range)
+                            && position_le(binding.range.start, call.range.start)
+                    }
+                }
+        })
+        .map(|binding| binding.type_name.clone())
+        .collect::<BTreeSet<_>>();
+    (types.len() == 1)
+        .then(|| types.into_iter().next())
+        .flatten()
+}
+
+fn member_binding_type(
+    name: &str,
+    owner_type: &str,
+    scan: &CallScan,
+    file: &Path,
+) -> Option<String> {
+    let types = scan
+        .bindings
+        .iter()
+        .filter(|binding| {
+            binding.scope == TypeBindingScope::Member
+                && normalized_key(&binding.file) == normalized_key(file)
+                && binding.name == name
+                && scan.type_scopes.iter().any(|scope| {
+                    normalized_key(&scope.file) == normalized_key(file)
+                        && (scope.type_name == owner_type
+                            || owner_type.ends_with(&format!("::{}", scope.type_name)))
+                        && contains(scope.range, binding.range)
+                })
+        })
+        .map(|binding| binding.type_name.clone())
+        .collect::<BTreeSet<_>>();
+    (types.len() == 1)
+        .then(|| types.into_iter().next())
+        .flatten()
 }
 
 pub(crate) fn containing_function_rules(target: &str) -> String {
@@ -568,21 +685,32 @@ pub(crate) fn parse_function_owner_stream(
     cwd: &Path,
     universe: &SourceUniverse,
 ) -> Result<Vec<FunctionOwnerCandidate>, String> {
-    let text = std::str::from_utf8(bytes)
-        .map_err(|_| "ast-grep containing-function output was not UTF-8".to_owned())?;
-    let mut records = Vec::new();
-    for (index, line) in text.lines().enumerate() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let value: Value = serde_json::from_str(line).map_err(|error| {
-            format!(
-                "invalid ast-grep containing-function JSON at record {}: {error}",
-                index + 1
-            )
-        })?;
-        records.push(parse_record(&value, cwd)?);
-    }
+    parse_function_owner_stream_impl(bytes, cwd, universe)
+}
+
+pub(crate) fn parse_header_function_owner_stream(
+    bytes: &[u8],
+    cwd: &Path,
+    file: &Path,
+    universe: &SourceUniverse,
+) -> Result<Vec<FunctionOwnerCandidate>, String> {
+    let records = parse_records(bytes, cwd, Some(file), "C++ header owner")?;
+    parse_function_owner_records(records, universe)
+}
+
+fn parse_function_owner_stream_impl(
+    bytes: &[u8],
+    cwd: &Path,
+    universe: &SourceUniverse,
+) -> Result<Vec<FunctionOwnerCandidate>, String> {
+    let records = parse_records(bytes, cwd, None, "containing-function")?;
+    parse_function_owner_records(records, universe)
+}
+
+fn parse_function_owner_records(
+    records: Vec<AstRecord>,
+    universe: &SourceUniverse,
+) -> Result<Vec<FunctionOwnerCandidate>, String> {
     let scopes = build_scopes(&records);
     let mut owners = Vec::new();
     for record in records {
@@ -592,20 +720,26 @@ pub(crate) fn parse_function_owner_stream(
         let Some((name, offset)) = any_function_name(&record.text) else {
             continue;
         };
-        let qualified_name = qualify(&record, &name, &scopes);
+        let friend_function = is_friend_function(&record, &scopes);
+        let qualified_name = if friend_function {
+            qualify_excluding_type_scopes(&record, &name, &scopes)
+        } else {
+            qualify(&record, &name, &scopes)
+        };
         let file = fs::canonicalize(&record.file).unwrap_or_else(|_| record.file.clone());
         let signature = compact_signature(function_header(&record.text));
+        let symbol_kind = if is_inside_type_scope(&record, &scopes) && !friend_function {
+            "method"
+        } else {
+            "function"
+        };
         let definition = DefinitionCandidate {
             root_alias: universe.root_for(&file).map(|root| root.alias.clone()),
             file: file.clone(),
             range: record.range,
             name_position: offset_position(record.range.start, &record.text, offset),
             qualified_name,
-            symbol_kind: if name.contains("::") {
-                "method".to_owned()
-            } else {
-                "function".to_owned()
-            },
+            symbol_kind: symbol_kind.to_owned(),
             role: DefinitionRole::Definition,
             signature: signature.clone(),
             text: record.text,
@@ -714,6 +848,9 @@ fn simple_type_binding(text: &str) -> Option<(String, String)> {
 }
 
 fn explicit_base_type(prefix: &str) -> Option<String> {
+    if let Some(inner) = pointer_like_template_argument(prefix) {
+        return explicit_base_type(inner);
+    }
     let mut without_templates = String::new();
     let mut angle_depth = 0_usize;
     for character in prefix.chars() {
@@ -752,12 +889,70 @@ fn explicit_base_type(prefix: &str) -> Option<String> {
     Some(candidate.to_owned())
 }
 
-fn is_simple_identifier(value: &str) -> bool {
-    value
-        .chars()
-        .next()
-        .is_some_and(|character| !character.is_ascii_digit() && is_identifier_character(character))
-        && value.chars().all(is_identifier_character)
+fn pointer_like_template_argument(prefix: &str) -> Option<&str> {
+    let open = prefix.find('<')?;
+    let close = prefix.rfind('>')?;
+    if close <= open {
+        return None;
+    }
+    let wrapper = prefix[..open]
+        .split_whitespace()
+        .filter(|token| !matches!(*token, "const" | "volatile" | "static" | "mutable"))
+        .next_back()?;
+    if !matches!(
+        wrapper,
+        "std::shared_ptr" | "std::unique_ptr" | "std::weak_ptr" | "std::optional"
+    ) {
+        return None;
+    }
+    let arguments = &prefix[open + 1..close];
+    let mut depth = 0_usize;
+    let end = arguments
+        .char_indices()
+        .find_map(|(offset, character)| match character {
+            '<' => {
+                depth += 1;
+                None
+            }
+            '>' => {
+                depth = depth.saturating_sub(1);
+                None
+            }
+            ',' if depth == 0 => Some(offset),
+            _ => None,
+        })
+        .unwrap_or(arguments.len());
+    Some(arguments[..end].trim())
+}
+
+fn parse_records(
+    bytes: &[u8],
+    cwd: &Path,
+    file_override: Option<&Path>,
+    stream_name: &str,
+) -> Result<Vec<AstRecord>, String> {
+    let text = std::str::from_utf8(bytes)
+        .map_err(|_| format!("ast-grep {stream_name} output was not UTF-8"))?;
+    let canonical_override =
+        file_override.map(|file| fs::canonicalize(file).unwrap_or_else(|_| file.to_path_buf()));
+    let mut records = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let value: Value = serde_json::from_str(line).map_err(|error| {
+            format!(
+                "invalid ast-grep {stream_name} JSON at record {}: {error}",
+                index + 1
+            )
+        })?;
+        let mut record = parse_record(&value, cwd)?;
+        if let Some(file) = &canonical_override {
+            record.file = file.clone();
+        }
+        records.push(record);
+    }
+    Ok(records)
 }
 
 fn parse_record(value: &Value, cwd: &Path) -> Result<AstRecord, String> {
@@ -848,9 +1043,18 @@ fn build_scopes(records: &[AstRecord]) -> Vec<ScopeNode> {
                 range: record.range,
                 name,
                 kind,
+                text: record.text.clone(),
             })
         })
         .collect()
+}
+
+fn is_inside_type_scope(record: &AstRecord, scopes: &[ScopeNode]) -> bool {
+    scopes.iter().any(|scope| {
+        scope.kind == ScopeKind::Type
+            && scope.file_key == normalized_key(&record.file)
+            && contains(scope.range, record.range)
+    })
 }
 
 fn extract_target(
@@ -904,17 +1108,118 @@ fn function_name(text: &str, target: &str) -> Option<ExtractedName> {
         return Some(ExtractedName {
             name,
             offset,
-            symbol_kind: if header[start..offset].contains("::") {
-                "method"
-            } else {
-                "function"
-            },
+            symbol_kind: "function",
             role: DefinitionRole::Definition,
             signature: compact_signature(header),
             ast_kind: "function_definition",
         });
     }
     None
+}
+
+fn is_friend_function(record: &AstRecord, scopes: &[ScopeNode]) -> bool {
+    let header = function_header(&record.text);
+    let Some((_, name_offset)) = any_function_name(header) else {
+        return false;
+    };
+    if contains_cpp_keyword(&header[..name_offset], "friend") {
+        return true;
+    }
+    scopes.iter().any(|scope| {
+        scope.kind == ScopeKind::Type
+            && scope.file_key == normalized_key(&record.file)
+            && contains(scope.range, record.range)
+            && byte_offset_at_position(scope.range.start, &scope.text, record.range.start)
+                .and_then(|offset| scope.text.get(..offset))
+                .and_then(|prefix| {
+                    prefix
+                        .rsplit([';', '{', '}'])
+                        .next()
+                        .map(|declaration_prefix| {
+                            contains_cpp_keyword(declaration_prefix, "friend")
+                        })
+                })
+                .unwrap_or(false)
+    })
+}
+
+fn byte_offset_at_position(
+    start: SourcePosition,
+    text: &str,
+    target: SourcePosition,
+) -> Option<usize> {
+    let mut position = start;
+    for (offset, character) in text.char_indices() {
+        if position == target {
+            return Some(offset);
+        }
+        if character == '\n' {
+            position.line += 1;
+            position.column = 0;
+        } else {
+            position.column += 1;
+        }
+    }
+    (position == target).then_some(text.len())
+}
+
+fn contains_cpp_keyword(text: &str, keyword: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut offset = 0_usize;
+    while offset < bytes.len() {
+        if bytes[offset..].starts_with(b"//") {
+            offset += 2;
+            while offset < bytes.len() && bytes[offset] != b'\n' {
+                offset += 1;
+            }
+            continue;
+        }
+        if bytes[offset..].starts_with(b"/*") {
+            offset += 2;
+            while offset + 1 < bytes.len() && !bytes[offset..].starts_with(b"*/") {
+                offset += 1;
+            }
+            offset = (offset + 2).min(bytes.len());
+            continue;
+        }
+        if matches!(bytes[offset], b'\'' | b'"') {
+            let quote = bytes[offset];
+            offset += 1;
+            while offset < bytes.len() {
+                if bytes[offset] == b'\\' {
+                    offset = (offset + 2).min(bytes.len());
+                } else if bytes[offset] == quote {
+                    offset += 1;
+                    break;
+                } else {
+                    offset += 1;
+                }
+            }
+            continue;
+        }
+        let Some(character) = text[offset..].chars().next() else {
+            break;
+        };
+        if !character.is_ascii_digit() && is_identifier_character(character) {
+            let start = offset;
+            offset += character.len_utf8();
+            while offset < bytes.len() {
+                let Some(next) = text[offset..].chars().next() else {
+                    break;
+                };
+                if !is_identifier_character(next) {
+                    break;
+                }
+                offset += next.len_utf8();
+            }
+            if &text[start..offset] == keyword {
+                return true;
+            }
+            continue;
+        }
+        offset += character.len_utf8();
+    }
+    false
 }
 
 fn type_name(
@@ -970,58 +1275,128 @@ fn declaration_name(
     ast_kind: &'static str,
     direct_initialized: bool,
 ) -> Option<ExtractedName> {
-    for offset in exact_occurrences(text, target) {
-        if !looks_like_declarator(text, offset, target.len()) {
-            continue;
-        }
-        let after = skip_whitespace(text, offset + target.len());
-        let role = if !direct_initialized
-            && (text.as_bytes().get(after) == Some(&b'(')
-                || text.trim_start().starts_with("extern "))
+    let header = first_header(text);
+    let offset = declarator_occurrence(header, target)?;
+    let after = skip_whitespace(header, offset + target.len());
+    let role = if !direct_initialized
+        && (header.as_bytes().get(after) == Some(&b'(')
+            || header.trim_start().starts_with("extern "))
+    {
+        DefinitionRole::Declaration
+    } else {
+        DefinitionRole::Definition
+    };
+    Some(ExtractedName {
+        name: target.to_owned(),
+        offset,
+        symbol_kind: if role == DefinitionRole::Declaration
+            && header.as_bytes().get(after) == Some(&b'(')
         {
-            DefinitionRole::Declaration
+            "function"
         } else {
-            DefinitionRole::Definition
-        };
-        return Some(ExtractedName {
-            name: target.to_owned(),
-            offset,
-            symbol_kind: if role == DefinitionRole::Declaration
-                && text.as_bytes().get(after) == Some(&b'(')
-            {
-                "function"
-            } else {
-                "variable"
-            },
-            role,
-            signature: compact_signature(text),
-            ast_kind,
-        });
-    }
-    None
+            "variable"
+        },
+        role,
+        signature: compact_signature(header),
+        ast_kind,
+    })
 }
 
 fn field_name(text: &str, target: &str) -> Option<ExtractedName> {
-    for offset in exact_occurrences(text, target) {
-        if !looks_like_declarator(text, offset, target.len()) {
-            continue;
+    let header = first_header(text);
+    let offset = declarator_occurrence(header, target)?;
+    let after = skip_whitespace(header, offset + target.len());
+    let method = header.as_bytes().get(after) == Some(&b'(');
+    Some(ExtractedName {
+        name: target.to_owned(),
+        offset,
+        symbol_kind: if method { "method" } else { "field" },
+        role: if method {
+            DefinitionRole::Declaration
+        } else {
+            DefinitionRole::Definition
+        },
+        signature: compact_signature(header),
+        ast_kind: "field_declaration",
+    })
+}
+
+fn declarator_occurrence(text: &str, target: &str) -> Option<usize> {
+    if let Some((name, offset)) = any_function_name(text) {
+        if name.rsplit("::").next() == Some(target)
+            && is_top_level_declarator_position(text, offset)
+        {
+            return Some(offset);
         }
-        let after = skip_whitespace(text, offset + target.len());
-        let method = text.as_bytes().get(after) == Some(&b'(');
-        return Some(ExtractedName {
-            name: target.to_owned(),
-            offset,
-            symbol_kind: if method { "method" } else { "field" },
-            role: if method {
-                DefinitionRole::Declaration
-            } else {
-                DefinitionRole::Definition
-            },
-            signature: compact_signature(text),
-            ast_kind: "field_declaration",
-        });
     }
-    None
+    exact_occurrences(text, target).into_iter().find(|offset| {
+        is_top_level_declarator_position(text, *offset)
+            && !has_later_identifier_before_declarator_boundary(text, *offset + target.len())
+            && text
+                .as_bytes()
+                .get(skip_whitespace(text, *offset + target.len()))
+                != Some(&b'(')
+    })
+}
+
+fn has_later_identifier_before_declarator_boundary(text: &str, start: usize) -> bool {
+    let mut offset = start;
+    let mut parentheses = 0_usize;
+    let mut angles = 0_usize;
+    while offset < text.len() {
+        let character = text[offset..]
+            .chars()
+            .next()
+            .expect("offset remains on a character boundary");
+        if parentheses == 0 && angles == 0 && matches!(character, '=' | '{' | ',' | ';' | '[') {
+            return false;
+        }
+        if !character.is_ascii_digit() && is_identifier_character(character) {
+            return true;
+        }
+        match character {
+            '(' => parentheses += 1,
+            ')' => parentheses = parentheses.saturating_sub(1),
+            '<' if parentheses == 0 => angles += 1,
+            '>' if parentheses == 0 => angles = angles.saturating_sub(1),
+            _ => {}
+        }
+        offset += character.len_utf8();
+    }
+    false
+}
+
+fn is_top_level_declarator_position(text: &str, target_offset: usize) -> bool {
+    let mut parentheses = 0_usize;
+    let mut brackets = 0_usize;
+    let mut angles = 0_usize;
+    let mut braces = 0_usize;
+    let mut initialized = false;
+    for character in text[..target_offset].chars() {
+        match character {
+            '(' => parentheses += 1,
+            ')' => parentheses = parentheses.saturating_sub(1),
+            '[' => brackets += 1,
+            ']' => brackets = brackets.saturating_sub(1),
+            '<' if parentheses == 0 && brackets == 0 => angles += 1,
+            '>' if parentheses == 0 && brackets == 0 => angles = angles.saturating_sub(1),
+            '{' if parentheses == 0 && brackets == 0 && angles == 0 => {
+                initialized = true;
+                braces += 1;
+            }
+            '}' if parentheses == 0 && brackets == 0 && angles == 0 => {
+                braces = braces.saturating_sub(1)
+            }
+            ',' if parentheses == 0 && brackets == 0 && angles == 0 && braces == 0 => {
+                initialized = false
+            }
+            '=' if parentheses == 0 && brackets == 0 && angles == 0 && braces == 0 => {
+                initialized = true
+            }
+            _ => {}
+        }
+    }
+    parentheses == 0 && brackets == 0 && angles == 0 && braces == 0 && !initialized
 }
 
 fn declarator_name(
@@ -1059,6 +1434,23 @@ fn enumerator_name(text: &str, target: &str) -> Option<ExtractedName> {
 }
 
 fn qualify(record: &AstRecord, extracted: &str, scopes: &[ScopeNode]) -> String {
+    qualify_with_scope_filter(record, extracted, scopes, false)
+}
+
+fn qualify_excluding_type_scopes(
+    record: &AstRecord,
+    extracted: &str,
+    scopes: &[ScopeNode],
+) -> String {
+    qualify_with_scope_filter(record, extracted, scopes, true)
+}
+
+fn qualify_with_scope_filter(
+    record: &AstRecord,
+    extracted: &str,
+    scopes: &[ScopeNode],
+    exclude_type_scopes: bool,
+) -> String {
     let file_key = normalized_key(&record.file);
     let mut containing = scopes
         .iter()
@@ -1077,7 +1469,7 @@ fn qualify(record: &AstRecord, extracted: &str, scopes: &[ScopeNode]) -> String 
     });
     let mut parts = Vec::new();
     for scope in containing {
-        if extracted.contains("::") && scope.kind == ScopeKind::Type {
+        if (exclude_type_scopes || extracted.contains("::")) && scope.kind == ScopeKind::Type {
             continue;
         }
         if parts.last() != Some(&scope.name) {
@@ -1311,7 +1703,8 @@ fn offset_position(start: SourcePosition, text: &str, offset: usize) -> SourcePo
 #[cfg(test)]
 mod tests {
     use super::{
-        call_name, function_name, keyword_name, namespace_name, simple_type_binding, DefinitionRole,
+        call_name, declaration_name, field_name, function_name, keyword_name, namespace_name,
+        simple_member_chain, simple_type_binding, DefinitionRole,
     };
 
     #[test]
@@ -1325,6 +1718,65 @@ mod tests {
         .expect("method definition");
         assert_eq!(found.name, "Owner::BuildTool");
         assert_eq!(found.role, DefinitionRole::Definition);
+    }
+
+    #[test]
+    fn field_name_only_accepts_the_declared_header() {
+        assert!(field_name("void Select() { object->RayCastTest(); }", "RayCastTest").is_none());
+        let declaration =
+            field_name("int RayCastTest();", "RayCastTest").expect("bodyless member declaration");
+        assert_eq!(declaration.role, DefinitionRole::Declaration);
+        assert!(field_name("int Value = RayCastTest();", "RayCastTest").is_none());
+        assert!(field_name("int Call(int value = RayCastTest());", "RayCastTest").is_none());
+        assert!(declaration_name(
+            "int Value = RayCastTest();",
+            "RayCastTest",
+            "declaration",
+            false
+        )
+        .is_none());
+        assert!(field_name("RayCastTest* Value;", "RayCastTest").is_none());
+        assert!(field_name("const RayCastTest Value;", "RayCastTest").is_none());
+        assert!(
+            declaration_name("RayCastTest* Make();", "RayCastTest", "declaration", false,)
+                .is_none()
+        );
+        assert!(declaration_name(
+            "const RayCastTest Value;",
+            "RayCastTest",
+            "declaration",
+            false,
+        )
+        .is_none());
+        let variable = declaration_name(
+            "int RayCastTest = BuildValue();",
+            "RayCastTest",
+            "declaration",
+            false,
+        )
+        .expect("declared variable before initializer");
+        assert_eq!(variable.symbol_kind, "variable");
+    }
+
+    #[test]
+    fn member_chain_accepts_only_plain_member_access() {
+        assert_eq!(
+            simple_member_chain("instance->testCloud"),
+            Some(vec!["instance", "testCloud"])
+        );
+        assert_eq!(
+            simple_member_chain(" owner . child -> value "),
+            Some(vec!["owner", "child", "value"])
+        );
+        assert_eq!(simple_member_chain("factory()->value"), None);
+        assert_eq!(simple_member_chain("items[index].value"), None);
+        assert_eq!(simple_member_chain("wrapper<T>->value"), None);
+        assert_eq!(simple_member_chain("(*holder).value"), None);
+        assert_eq!(simple_member_chain("ns::holder->value"), None);
+        assert_eq!(
+            simple_member_chain("static_cast<Owner*>(value)->child"),
+            None
+        );
     }
 
     #[test]
