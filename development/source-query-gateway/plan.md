@@ -149,6 +149,14 @@ candidate-only 全量运行的 11 次完整 usage、一次 TLS 超时和关系 c
 
 前置诊断同时发现 v14 漏记真实 `Test:58 -> Read` 调用、旧环境树漏算插件安装 cache，均已由 v15 与 runner 向前修正。此前以首个 C# 失败截断整个 Control 是错误的阶段裁决，已由完整 v3 审计替代；后续测试项必须克隆完整 Control，并在同一三题各两次合同下重新运行 Candidate 后比较，不得把 Control 自身波动归因给测试项，也不修改生产规则、skill 或 srcq 来迎合单次结果。
 
+### 3.11 2026-09-02 四类独立候选实验
+
+四类测试项没有混合：symbol skill、工具前立即调用、精炼书面推理和 srcq 默认单页长度分别使用独立 Candidate、独立 experiment identity 与独立审计。每组继续运行固定三题各两次；质量按 `answer_contract.required` 的复合项逐项计分，工具日志和 supporting 不补答案，价格仍使用协议冻结的短/长两种场景。
+
+symbol 正文两版均未触发目标工具；frontmatter 可达版才在 C# 产生 7 次 symbol 调用，但全部失败并形成坐标修正、重试和文本回退，C++/TypeScript 仍未使用。工具前提示没有移除六次首条可见说明且大幅增价；精炼推理提示只降低 reasoning output 与耗时，质量、总 Token 和价格未通过；页长 1024 明显放大续页，4096 虽降价格与耗时，却使逐项质量和总 Token 变差。四类候选全部停止并保持生产策略与 `2048` 默认值。
+
+结构化证据分别为 [symbol](evidence/audit-result-symbol-skill-v1.json)、[工具前推理](evidence/audit-result-pretool-reasoning-prompt-v1.json)、[精炼推理](evidence/audit-result-concise-reasoning-prompt-v1.json)和[单页长度](evidence/audit-result-page-length-v1.json)。这轮只增加开发证据和状态记录，不修改正式规则、skill、srcq 或部署内容。重开条件是出现能替代失败/回退而非叠加调用、逐题质量不退化且总 Token 与短长价格都下降的新机制；同机制不重采样。
+
 ## 4. 阶段与任务
 
 ### P0 固定分支合同和 AST 基线

@@ -312,6 +312,21 @@ workspace test/build/lint/fmt、15 个 ast-grep 0.44.1 真实 ignored 测试、W
 
 前置诊断发现 v14 oracle 漏记 `TemperatureCollectorSensorReader.Test:58 -> Read`，且旧环境树漏算 `plugins/cache`；历史 v14 不原位修改，v15 与当前 runner 已向前修正。此前把 C# 首项失败当成停止整个 Control 的依据属于错误裁决，C# v2 证据现在只作中间结果；完整审计见 [audit-result-current-control-code-reading-v3.json](evidence/audit-result-current-control-code-reading-v3.json)。后续 Candidate 必须在相同三题各两次的合同下比较，不能复用缩减 Control 或只跑 C#。
 
+## OBS-SQG-035 四类独立读取策略实验均未达到采纳门槛
+
+- 状态: verified within seven declared candidate identities
+- 关联: OBS-SQG-032, OBS-SQG-033, OBS-SQG-034
+
+四类测试项分别克隆完整 Control，只改一个候选面，并继续使用固定 C#/C++/TypeScript 三题各两次。`source-query` 正文的两版 symbol 规则均产生 0 次 `srcq symbol`，证明正文处于既有触发描述之外；把适用条件写入 frontmatter 后，symbol 只在两次 C# 中出现 7 次且全部因坐标或 `semantic-unknown` 失败，C++/TypeScript 仍为 0 次。可达版本 required 为 `37/42`，总 Token、短/长价格和耗时相对 Control 分别 `+52.647%`、`+26.425%/+25.395%`、`+28.424%`，因此不采纳。完整机制与三版身份见 [symbol skill 审计](evidence/audit-result-symbol-skill-v1.json)。
+
+“工具已明确时立即调用”候选在六次运行中仍全部先输出可见说明，平均首条长度只从 `61.167` 变为 `60.5` 字符；required 为 `36/42`，总 Token `+76.289%`，两种价格 `+26.990%/+27.430%`，没有观察到目标收益。[工具前推理审计](evidence/audit-result-pretool-reasoning-prompt-v1.json)只对事件顺序与 usage 下结论，不冒充能读取隐藏推理文本。
+
+“内部推理使用精炼书面短句”候选的 reasoning output `-14.425%`、耗时 `-6.091%`，但 required 降至 `37/42`，总 Token `+11.854%`，两种价格 `+1.941%/+2.354%`；低 reasoning Token 不足以证明内部措辞已经符合要求，也不能覆盖质量与价格反例。完整边界见 [精炼推理审计](evidence/audit-result-concise-reasoning-prompt-v1.json)。
+
+只改 `srcq 0.7.0` 默认单页模型预算时，`1024` 产生 8 次 `srcq more`、26 个分页标记，required `38/42`、总 Token `+63.123%`、价格约 `+33%`；`4096` 消除实际续页并让价格与耗时分别约 `-2.3%`、`-8.3%`，但 required 仍为 `38/42` 且总 Token `+9.424%`。按质量、Token、速度顺序保持正式 `2048` 默认值；两份候选二进制只存在于实验 home，没有修改仓库或安装态。完整数据见 [单页长度审计](evidence/audit-result-page-length-v1.json)。
+
+这四类实验没有修改正式 `global/AGENTS.md`、`skills/source-query`、仓库或已安装 `srcq`，也没有执行 Deploy、Release、完整验证或九项评测。后续只有新的工具能力或可观察机制能同时消除失败调用、保持逐项质量并降低总 Token 与两种价格时才重开；不再通过更强规则或更小页长重采样同一输入。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open

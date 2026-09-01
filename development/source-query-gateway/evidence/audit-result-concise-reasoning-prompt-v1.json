@@ -1,0 +1,29 @@
+{
+  "schema": "agentbase.concise-reasoning-prompt-audit/v1",
+  "created_utc": "2026-09-01T18:47:40Z",
+  "test_item": "use concise written internal reasoning, one decision-relevant fact per sentence, without colloquial self-dialogue or repetition",
+  "allowed_difference": "candidate AGENTS.md one rule",
+  "experiment_identity": "46739388f5574e5503a942740f99deff60bd2f70781b1debb9d8af05b1e85fbe",
+  "control": {"required_passed": 39, "required_total": 42, "actual_total_tokens": 856159, "reasoning_output_tokens": 5324, "elapsed_ms": 342504, "standard_price_usd_bounds": [0.06058192, 0.11398244]},
+  "candidate": {
+    "required_by_case_and_run": {"csharp": [6, 5], "cpp": [7, 7], "typescript": [6, 6]},
+    "required_passed": 37,
+    "required_total": 42,
+    "quality_complete_runs": 4,
+    "actual_total_tokens": 957650,
+    "input_tokens": 946233,
+    "cached_input_tokens": 784384,
+    "output_tokens": 11417,
+    "reasoning_output_tokens": 4556,
+    "elapsed_ms": 321643,
+    "standard_price_usd_bounds": [0.06175788, 0.11666556],
+    "command_execution_items": 32,
+    "failed_command_execution_items": 5,
+    "relative_to_control_percent": {"actual_total_tokens": 11.854, "reasoning_output_tokens": -14.425, "elapsed_ms": -6.091, "short_price": 1.941, "long_price": 2.354}
+  },
+  "decision": "reject",
+  "reason": "reasoning tokens and elapsed time fell, but required quality regressed and both price scenarios rose",
+  "limitation": "hidden reasoning prose cannot be inspected; lower reasoning token count is only a usage observation and does not prove the requested style",
+  "raw_evidence": {"location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/control-v15-isolated-experiments-20260902/concise", "experiment_sha256": "a2ecd487a9a63975d2a4a3d4886996328aa6eef669b13bca43c42f1a28d1fe86", "summary_sha256": "702c00209fd3000f59a81a8fe487eee3b6aa653134b313cb90399ecaac98bd55"},
+  "production_effect": "none"
+}

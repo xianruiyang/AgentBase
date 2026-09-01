@@ -167,3 +167,17 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 | 完成边界 | 固定三题各两次的 Control 已完成；此前首个 C# 后停止的判断无效。未运行 Candidate、完整验证或九项评测；旧缩减 skill Control 全部降为参考 |
 
 结构化证据见 [audit-result-current-control-code-reading-v3.json](evidence/audit-result-current-control-code-reading-v3.json)。本节证明固定 Control 测试已完整执行，不表示 Control 的质量或行为稳定。
+
+## 13. 四类独立候选实验
+
+| 测试项 | 严格 required | Token / 价格 / 耗时相对 Control | 机制观察与裁决 |
+| --- | --- | --- | --- |
+| symbol body advisory | `40/42` | Token `+3.766%`；价格 `-4.747%/-4.625%`；耗时 `-7.428%` | 0 次 symbol，变化不能归因于目标机制；不采纳 |
+| symbol body must | `37/42` | Token `+52.498%`；价格 `+16.390%/+16.363%`；耗时 `+17.069%` | 0 次 symbol，正文仍不可达；不采纳 |
+| symbol frontmatter reachable | `37/42` | Token `+52.647%`；价格 `+26.425%/+25.395%`；耗时 `+28.424%` | C# 7 次 symbol 全失败，C++/TS 0 次；不采纳 |
+| 工具前立即调用 | `36/42` | Token `+76.289%`；价格 `+26.990%/+27.430%`；耗时 `+15.656%` | 6/6 仍先输出可见说明；不采纳 |
+| 精炼书面推理 | `37/42` | Token `+11.854%`；价格 `+1.941%/+2.354%`；耗时 `-6.091%` | reasoning output `-14.425%`，但隐藏措辞不可审且质量/价格失败；不采纳 |
+| srcq page 1024 | `38/42` | Token `+63.123%`；价格 `+32.976%/+33.916%`；耗时 `+14.205%` | 8 次续页、26 个分页标记；不采纳 |
+| srcq page 4096 | `38/42` | Token `+9.424%`；价格 `-2.349%/-2.131%`；耗时 `-8.339%` | 无实际续页，但质量与总 Token 失败；保持 2048 |
+
+所有候选均为完整 Control 的单一允许差异，环境 diff 无意外项，Codex `0.151.0-alpha.7.2`、Luna medium/default、srcq 0.7.0、三题、重复次数、只读与无 subject 子代理合同不变。原始 summary、experiment、事件与 hash 保留在各结构化审计登记的 `%LOCALAPPDATA%` 位置。验证只覆盖这些实验 identity；正式规则、skill、srcq、安装环境、Deploy 与 Release 均未改变。

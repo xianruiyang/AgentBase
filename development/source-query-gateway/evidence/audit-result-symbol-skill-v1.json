@@ -1,0 +1,76 @@
+{
+  "schema": "agentbase.symbol-skill-experiment-audit/v1",
+  "created_utc": "2026-09-01T18:47:40Z",
+  "control": {
+    "evidence": "development/source-query-gateway/evidence/audit-result-current-control-code-reading-v3.json",
+    "required_passed": 39,
+    "required_total": 42,
+    "quality_complete_runs": 3,
+    "actual_total_tokens": 856159,
+    "elapsed_ms": 342504,
+    "standard_price_usd_bounds": [0.06058192, 0.11398244]
+  },
+  "variants": [
+    {
+      "id": "body-advisory",
+      "experiment_identity": "3e87353d00a4fd19f2b2230d80c196347c20403ecba1742b8184f71ddd7ec82b",
+      "allowed_difference": "skills/source-query/SKILL.md body only",
+      "required_by_case_and_run": {"csharp": [7, 7], "cpp": [7, 7], "typescript": [6, 6]},
+      "required_passed": 40,
+      "required_total": 42,
+      "quality_complete_runs": 4,
+      "srcq_symbol_commands": 0,
+      "actual_total_tokens": 888405,
+      "elapsed_ms": 317063,
+      "standard_price_usd_bounds": [0.05770632, 0.10871124],
+      "relative_to_control_percent": {"actual_total_tokens": 3.766, "elapsed_ms": -7.428, "short_price": -4.747, "long_price": -4.625},
+      "decision": "reject_as_symbol_evidence",
+      "reason": "the target mechanism never ran, so quality and cost variation cannot be attributed to symbol"
+    },
+    {
+      "id": "body-must-before-second-search",
+      "experiment_identity": "07806e194efd04287a035511f6a1d1dfbadf4426b6b01eed3ad8993203e33ba8",
+      "allowed_difference": "skills/source-query/SKILL.md body only",
+      "required_by_case_and_run": {"csharp": [6, 5], "cpp": [7, 7], "typescript": [6, 6]},
+      "required_passed": 37,
+      "required_total": 42,
+      "quality_complete_runs": 4,
+      "srcq_symbol_commands": 0,
+      "actual_total_tokens": 1305623,
+      "elapsed_ms": 400965,
+      "standard_price_usd_bounds": [0.0705114, 0.1326336],
+      "relative_to_control_percent": {"actual_total_tokens": 52.498, "elapsed_ms": 17.069, "short_price": 16.390, "long_price": 16.363},
+      "decision": "reject",
+      "reason": "the body remained unreachable and quality, price, tokens, and time regressed"
+    },
+    {
+      "id": "frontmatter-reachable-bounded-symbol",
+      "experiment_identity": "8b697c2d051cee8cce31be20feed700c74d8827b7900d322225aa6fa9b4fe2c0",
+      "allowed_difference": "skills/source-query/SKILL.md frontmatter and bounded symbol body rule",
+      "required_by_case_and_run": {"csharp": [6, 6], "cpp": [6, 7], "typescript": [6, 6]},
+      "required_passed": 37,
+      "required_total": 42,
+      "quality_complete_runs": 3,
+      "srcq_symbol_commands": 7,
+      "srcq_symbol_successes": 0,
+      "symbol_distribution": {"csharp": [4, 3], "cpp": [0, 0], "typescript": [0, 0]},
+      "actual_total_tokens": 1306900,
+      "elapsed_ms": 439856,
+      "standard_price_usd_bounds": [0.07659052, 0.14292884],
+      "relative_to_control_percent": {"actual_total_tokens": 52.647, "elapsed_ms": 28.424, "short_price": 26.425, "long_price": 25.395},
+      "decision": "reject",
+      "reason": "frontmatter made the mechanism reachable, but all seven C# symbol commands failed on coordinates or semantic-unknown identity and triggered retries; C++ and TypeScript still did not use symbol"
+    }
+  ],
+  "strict_scoring_notes": [
+    "each compound required item passes only when every requested clause is stated semantically in final_answer",
+    "tool output and supporting facts cannot repair an omitted answer clause",
+    "the recurring C# failure is omission of enabled-only SlotIndex ordering; additional failures are recorded by the per-run score"
+  ],
+  "raw_evidence": [
+    {"location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/control-v15-isolated-experiments-20260902/symbol", "experiment_sha256": "0abb9eeb124f1b062cfb35a2b3ad9514622b30735d8caef400a3c90f2587d642", "summary_sha256": "3b194412ee3e832ed454afd661194a146724db0e655e75df03233597382687e4"},
+    {"location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/control-v15-isolated-experiments-20260902/symbol2", "experiment_sha256": "890afaf6b6789adaefe27a8762d4586ae006e8555d1e4fc4ab4416a416a85cdc", "summary_sha256": "72a552672b3299a416b27c9412f3abacb2a46b2d81128f2012c190bcf7064ae2"},
+    {"location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/control-v15-isolated-experiments-20260902/symbol3", "experiment_sha256": "77e3632d77c4268c48864c12b5d7a82ae99f692e813759909a4d28c1baf4d106", "summary_sha256": "6ebc71c80f5389e3c4710e2841d2af37bd8792762c0a880163c969dd400c34ca"}
+  ],
+  "production_effect": "none; the repository skill, installed skill, deployed payload, and installed srcq were not changed"
+}

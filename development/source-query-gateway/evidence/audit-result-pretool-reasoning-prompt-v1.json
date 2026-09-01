@@ -1,0 +1,31 @@
+{
+  "schema": "agentbase.pretool-reasoning-prompt-audit/v1",
+  "created_utc": "2026-09-01T18:47:40Z",
+  "test_item": "when the next tool, scope, and arguments are known, call it immediately and keep only reasoning needed for that call",
+  "allowed_difference": "candidate AGENTS.md one rule",
+  "experiment_identity": "71c9e4dd00f6d584089d36797db75e4dde06fe43748b34ec3bc2b14cd8597666",
+  "control": {"required_passed": 39, "required_total": 42, "actual_total_tokens": 856159, "elapsed_ms": 342504, "standard_price_usd_bounds": [0.06058192, 0.11398244]},
+  "candidate": {
+    "required_by_case_and_run": {"csharp": [5, 6], "cpp": [6, 7], "typescript": [6, 6]},
+    "required_passed": 36,
+    "required_total": 42,
+    "quality_complete_runs": 3,
+    "actual_total_tokens": 1509313,
+    "input_tokens": 1494949,
+    "cached_input_tokens": 1329408,
+    "output_tokens": 14364,
+    "reasoning_output_tokens": 6131,
+    "elapsed_ms": 396127,
+    "standard_price_usd_bounds": [0.07693316, 0.14524792],
+    "command_execution_items": 49,
+    "failed_command_execution_items": 5,
+    "visible_first_message": {"present_before_first_tool_runs": 6, "run_count": 6, "mean_chars": 60.5},
+    "relative_to_control_percent": {"actual_total_tokens": 76.289, "reasoning_output_tokens": 15.158, "elapsed_ms": 15.656, "short_price": 26.990, "long_price": 27.430}
+  },
+  "control_visible_first_message": {"present_before_first_tool_runs": 6, "run_count": 6, "mean_chars": 61.167},
+  "decision": "reject",
+  "reason": "the observable pre-tool message remained in all runs and changed by less than one character on average, while quality, tokens, price, and time regressed",
+  "limitation": "hidden internal reasoning text is unavailable; the experiment can measure usage and visible event order, not directly certify internal wording",
+  "raw_evidence": {"location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/control-v15-isolated-experiments-20260902/pretool", "experiment_sha256": "a918671c8cdef4bc41ab0fffbfffbae2c2a43487ce1a2aef5e79f8e4e8a5e1fc", "summary_sha256": "e49099c04f37e73c406a6ca9c3c5601c07c773e4ab9f25ca98a8a99b4eae8c03"},
+  "production_effect": "none"
+}
