@@ -121,6 +121,52 @@
         "quality and Token improved in the required priority order; elapsed time regressed",
         "Codex installation remains the prior published state until separately authorized"
       ]
+    },
+    {
+      "id": "2026-09-01-cross-language-v11-luna-medium-ab",
+      "status": "directional-only",
+      "result": {
+        "experiment_identity": "dc48b019a80c9b9298f0bb2ef6e0f4eac193add97fcf6c5fc03db104357b003e",
+        "observed_summary": "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\code-search-experiments\\cross-language-cpp-ts-luna-m-20260901-02\\cross-language-fourth\\summary.json",
+        "summary_sha256": "8cd7f13920be2d86f9aaf084bd706a11155888fa49411d9c3c17122753ebd361",
+        "capsule_sha256": "8f2d4625d58cd5039aed6851d8b763b170c88c69073c9ab36283d6b696c0abc2",
+        "audit_artifact": "development/source-query-gateway/evidence/audit-result-cross-language-v11.json",
+        "audit_sha256": "9dd98aebd789e2e989c9984a7317b7a856938ade6144c9d18358806861100f53"
+      },
+      "aggregates": {
+        "control": {
+          "records": 2,
+          "total_tokens": 254902,
+          "elapsed_ms": 114259,
+          "command_count": 9,
+          "short_price_equivalent": 89766.6,
+          "long_price_equivalent": 167884.2,
+          "required_passed": 0
+        },
+        "candidate": {
+          "records": 2,
+          "total_tokens": 349881,
+          "elapsed_ms": 123880,
+          "command_count": 15,
+          "short_price_equivalent": 108261.6,
+          "long_price_equivalent": 204454.2,
+          "required_passed": 0
+        }
+      },
+      "candidate_delta_percent": {
+        "short_price_equivalent": 20.603,
+        "long_price_equivalent": 21.783,
+        "elapsed_ms": 8.42,
+        "total_tokens": 37.261,
+        "command_count": 66.667
+      },
+      "decision": "do-not-promote-candidate",
+      "identity_limits": [
+        "primary-agent contract audit only; no detached independent audit",
+        "covers two frozen C++ and TypeScript workspaces with gpt-5.6-luna medium/default and subagents disabled",
+        "all four answers were source-consistent but omitted at least one required answer-contract field",
+        "the final skill description added timeout/incomplete wording after the frozen experiment identity"
+      ]
     }
   ]
 }

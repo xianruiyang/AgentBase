@@ -97,6 +97,7 @@ NETWORK_TRANSPORT_PATTERNS = {
 }
 READ_ONLY_PREFIX = (
     "这是只读源码查找基准。不得修改文件、配置、进程或外部状态；"
+    "不得创建子代理；"
     "不得访问其他测试环境、历史答案、聚合结果或隐藏 oracle。请根据当前环境自主完成下列任务。\n\n"
 )
 PREFLIGHT_PROMPT = (
@@ -225,6 +226,19 @@ def validate_shared_shell_policy_owner(home: Path) -> None:
             "benchmark Codex homes must not define shell_environment_policy; "
             "the shared repository policy is the only owner"
         )
+
+
+def benchmark_home_execution_contract(home: Path) -> dict[str, Any]:
+    config_path = home.resolve() / "config.toml"
+    if not config_path.is_file():
+        raise ExperimentError(f"benchmark Codex config is missing: {config_path}")
+    try:
+        config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise ExperimentError(f"benchmark Codex config is invalid: {config_path}: {exc}") from exc
+    if config.get("features", {}).get("multi_agent") is not False:
+        raise ExperimentError("benchmark Codex homes must set features.multi_agent=false")
+    return {"read_only_prompt": True, "multi_agent": False}
 
 
 def allowed(path: str, patterns: list[str]) -> bool:
@@ -567,11 +581,11 @@ def validate_corpus_snapshot(
             raise ExperimentError(f"ambiguous answer_contract: {case_id}")
         if not isinstance(case.get("answer_max_lines"), int) or case["answer_max_lines"] <= 0:
             raise ExperimentError(f"invalid answer_max_lines: {case_id}")
+        if selected is not None and case_id not in selected:
+            continue
         role = case.get("workspace_role")
         if role not in workspaces:
             raise ExperimentError(f"corpus role has no workspace: {role!r}")
-        if selected is not None and case_id not in selected:
-            continue
         oracle = case.get("oracle", {})
         sources = [oracle["source"]] if "source" in oracle else list(oracle.get("sources", []))
         if oracle.get("kind") == "unique-path":
@@ -812,6 +826,7 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
         environments[name] = {
             "codex_home": str(home),
             "auth_mode": "inherited-secure-environment",
+            "execution_contract": benchmark_home_execution_contract(home),
         }
         if raw_environment.get("path_prepend"):
             path_prepend = resolve_path_prepend(home, str(raw_environment["path_prepend"]), name)

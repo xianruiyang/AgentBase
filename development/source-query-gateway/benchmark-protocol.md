@@ -17,7 +17,7 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 
 ## 3. 版本化测试内容
 
-既有测试形成以下六个种子 case，原始 prompt 和历史 oracle 已去除机器绝对路径后固化在 [benchmark-corpus-seed.json](benchmark-corpus-seed.json)。正式 corpus 为每个 case 保存 prompt、工作区角色、答案长度、最小回答合同、结构化事实关系 oracle 和适用源码快照；源码事实或回答合同变化时创建新 corpus 版本，不改写旧结果。
+既有测试形成以下六个种子 case，原始 prompt 和历史 oracle 已去除机器绝对路径后固化在 [benchmark-corpus-seed.json](benchmark-corpus-seed.json)。`v11.json` 另增两个代表 case，当前共八项。正式 corpus 为每个 case 保存 prompt、工作区角色、答案长度、最小回答合同、结构化事实关系 oracle 和适用源码快照；源码事实或回答合同变化时创建新 corpus 版本，不改写旧结果。
 
 | Case ID | 工作区角色 | 查找目标 | 质量重点 |
 | --- | --- | --- | --- |
@@ -29,6 +29,8 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 | `ue-hjson-isbarekey-occurrences` | 大型 C++ 项目 | 定义与全部调用位置 | 全集证明、定义/调用区分、结果完整性 |
 
 这六项覆盖文件、文本、结构和语义关系，短答案与完整范围，单目标与全集，以及小型/大型项目。正式扩展优先补充 0/1/N/N+1、同文件多目标、重载/嵌套、工具失败回退和 LSP 快/慢/空/失败，不为增加数量复制等价任务。
+
+`v11.json` 在上述种子上增加两个不同项目与机制的代表 case：FaceCutting3D 的 C++ 限定成员、typed receiver、非注释直接调用和公共/私有实现链，以及 OpencodeVsPlugin 的 TypeScript 类方法/局部闭包身份、事件注册/清理与状态过滤。它们用于检验共享查询决策能否跨语言和项目成立，不把某种语法或业务名称写入 skill；扩量只有在代表 case 暴露新的失效机制时进行。
 
 历史 runner 的正则 `required` 只作为旧结果的原始 oracle，不进入新正式 corpus。新 oracle 以结构化事实和关系表达，例如“字段属于哪一 DTO”“哪些行是定义、哪些是调用”；`answer_contract.required` 单独定义 prompt 必须显式回答的最小内容，`supporting` 只证明正确性或记录更强表达，不得被 auditor 静默升级为必答字段。语言同义表达由 auditor 裁决，避免把 `[start,end)` 误判为不满足 `end-exclusive`。
 
@@ -45,7 +47,7 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 - 重复次数、平衡顺序、随机种子、单回合超时和整体预算；
 - runner、monitor、汇总器和 audit schema 版本。
 
-正式独立基准固定使用正常速度 `service_tier = "default"`、`sandbox = "danger-full-access"` 和 `approval_policy = "never"`，并把 transport 显式冻结为 `websocket` 或 `http-only`。WebSocket 使用内置 ChatGPT provider；HTTP-only 使用 runner 固定的同一 ChatGPT OAuth endpoint provider，不得由自由 `extra_config` 改写。full access 用于避免 Codex 路由层在真实查询进程启动前误拦截 `srcq` 等只读命令，不授权 subject 写入；prompt 仍明确禁止修改，运行前后身份读回负责发现越界副作用。Fast/Priority、隐式 transport、其他 sandbox 或可覆盖上述身份的额外配置不得进入默认收益对照；环境准备器和 runner 都必须拒绝。
+正式独立基准固定使用正常速度 `service_tier = "default"`、`sandbox = "danger-full-access"` 和 `approval_policy = "never"`，并把 transport 显式冻结为 `websocket` 或 `http-only`。每个隔离 home 必须显式设置 `features.multi_agent = false`，runner 还要把只读与不得创建子代理写入所有 subject 的公共 prompt 前缀，并将该执行合同写入 experiment identity；单个 case 重复声明只作局部可读性补充。WebSocket 使用内置 ChatGPT provider；HTTP-only 使用 runner 固定的同一 ChatGPT OAuth endpoint provider，不得由自由 `extra_config` 改写。full access 用于避免 Codex 路由层在真实查询进程启动前误拦截 `srcq` 等只读命令，不授权 subject 写入；prompt 仍明确禁止修改，运行前后身份读回负责发现越界副作用。Fast/Priority、隐式 transport、其他 sandbox 或可覆盖上述身份的额外配置不得进入默认收益对照；环境准备器和 runner 都必须拒绝。
 
 control 与 candidate 除允许差异外必须逐项相等。环境构建不得把数据库、历史、缓存或信任状态复制进结果；认证文件只可从既有安全 home 链接到隔离 home，不复制进实验结果或环境树。隔离 home 不得位于系统临时目录，避免 Codex 拒绝建立命令 helper；默认只复制当前对照的因果 skill 集与系统 skill，不加载会触发扫描上限或注入无关上下文的大型知识 skill。预检发现额外差异时停止实验，不让 agent 运行后再解释混杂。
 

@@ -162,6 +162,21 @@ class ExperimentTests(unittest.TestCase):
             with self.assertRaisesRegex(MODULE.ExperimentError, "only owner"):
                 MODULE.validate_shared_shell_policy_owner(home)
 
+            (home / "config.toml").write_text(
+                "[features]\nmulti_agent = false\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                MODULE.benchmark_home_execution_contract(home),
+                {"read_only_prompt": True, "multi_agent": False},
+            )
+            (home / "config.toml").write_text(
+                "[features]\nmulti_agent = true\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(MODULE.ExperimentError, "multi_agent=false"):
+                MODULE.benchmark_home_execution_contract(home)
+
     def test_experiment_identity_rejects_changed_runner_source(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -350,7 +365,7 @@ class ExperimentTests(unittest.TestCase):
                     },
                     {
                         "id": "excluded",
-                        "workspace_role": "agentbase",
+                        "workspace_role": "unselected-workspace",
                         "answer_max_lines": 1,
                         "answer_contract": {"required": ["path"], "supporting": []},
                         "oracle": {
@@ -362,7 +377,7 @@ class ExperimentTests(unittest.TestCase):
             }
             workspaces = {"agentbase": {"path": str(root)}}
             MODULE.validate_corpus_snapshot(corpus, workspaces, {"selected"})
-            with self.assertRaisesRegex(MODULE.ExperimentError, "corpus source is stale"):
+            with self.assertRaisesRegex(MODULE.ExperimentError, "corpus role has no workspace"):
                 MODULE.validate_corpus_snapshot(corpus, workspaces, {"excluded"})
 
     def test_corpus_source_must_be_inside_declared_identity_scope(self) -> None:
@@ -658,6 +673,10 @@ class ExperimentTests(unittest.TestCase):
                 home = root / name
                 home.mkdir()
                 (home / "AGENTS.md").write_text("rules", encoding="utf-8")
+                (home / "config.toml").write_text(
+                    "[features]\nmulti_agent = false\n",
+                    encoding="utf-8",
+                )
                 environments[name] = {"codex_home": str(home)}
             executable = root / "codex.exe"
             executable.write_bytes(b"codex")

@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = ROOT.parents[2]
 
 
 def sha256(path: Path) -> str:
@@ -16,7 +17,7 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def aggregate(records: list[dict], environment: str) -> dict[str, int]:
+def aggregate_legacy(records: list[dict], environment: str) -> dict[str, int]:
     selected = [record for record in records if record["environment"] == environment]
     return {
         "records": len(selected),
@@ -30,33 +31,147 @@ def aggregate(records: list[dict], environment: str) -> dict[str, int]:
     }
 
 
+def aggregate_current(records: list[dict], environment: str) -> dict[str, int | float]:
+    selected = [record for record in records if record["environment"] == environment]
+    return {
+        "records": len(selected),
+        "input_tokens": sum(record["usage_breakdown"]["input_tokens"] for record in selected),
+        "cached_input_tokens": sum(
+            record["usage_breakdown"]["cache_read_input_tokens"] for record in selected
+        ),
+        "ordinary_input_tokens": sum(
+            record["usage_breakdown"]["ordinary_input_tokens"] for record in selected
+        ),
+        "output_tokens": sum(record["usage_breakdown"]["output_tokens"] for record in selected),
+        "reasoning_output_tokens": sum(
+            record["usage_breakdown"]["reasoning_output_tokens"] for record in selected
+        ),
+        "total_tokens": sum(record["actual_total_tokens"] for record in selected),
+        "elapsed_ms": sum(record["elapsed_ms"] for record in selected),
+        "command_count": sum(
+            record["completed_item_type_counts"].get("command_execution", 0)
+            for record in selected
+        ),
+        "short_price_equivalent": sum(
+            record["price_equivalent"]["short_context"]["exact"] for record in selected
+        ),
+        "long_price_equivalent": sum(
+            record["price_equivalent"]["long_context"]["exact"] for record in selected
+        ),
+    }
+
+
+def compare_aggregates(
+    experiment_id: str,
+    expected_by_environment: dict,
+    actual_by_environment: dict,
+    failures: list[str],
+) -> None:
+    for environment, expected in expected_by_environment.items():
+        actual = actual_by_environment.get(environment)
+        if actual is None:
+            failures.append(f"{experiment_id}/{environment}: environment missing")
+            continue
+        for key, expected_value in expected.items():
+            if key in actual and actual[key] != expected_value:
+                failures.append(f"{experiment_id}/{environment}: {key} mismatch")
+
+
+def verify_artifact(
+    experiment_id: str,
+    result: dict,
+    path_key: str,
+    hash_key: str,
+    failures: list[str],
+) -> dict:
+    relative_path = result.get(path_key)
+    if relative_path is None:
+        return {"declared": False}
+    path = PROJECT_ROOT / relative_path
+    item = {"declared": True, "path": relative_path, "available": path.is_file()}
+    if not path.is_file():
+        failures.append(f"{experiment_id}: {path_key} missing")
+        return item
+    actual_hash = sha256(path)
+    item["sha256"] = actual_hash
+    if actual_hash != result.get(hash_key):
+        failures.append(f"{experiment_id}: {path_key} hash mismatch")
+    return item
+
+
 def main() -> int:
     index = json.loads((ROOT / "index.json").read_text(encoding="utf-8"))
     failures: list[str] = []
     report: list[dict] = []
     for experiment in index["experiments"]:
         result = experiment["result"]
-        path = Path(result["observed_location"])
-        item = {"id": experiment["id"], "available": path.is_file()}
+        experiment_id = experiment["id"]
+        item = {"id": experiment_id}
+        observed_location = result.get("observed_location")
+        observed_summary = result.get("observed_summary")
+        if observed_location is None and observed_summary is None:
+            item["available"] = True
+            item["artifacts"] = {
+                "audit": verify_artifact(
+                    experiment_id,
+                    result,
+                    "audit_artifact",
+                    "audit_sha256",
+                    failures,
+                ),
+                "capsule_verification": verify_artifact(
+                    experiment_id,
+                    result,
+                    "capsule_verification_artifact",
+                    "capsule_verification_sha256",
+                    failures,
+                ),
+            }
+            report.append(item)
+            continue
+        path = Path(observed_location or observed_summary)
+        item["available"] = path.is_file()
         if not path.is_file():
             report.append(item)
             continue
         actual_hash = sha256(path)
         item["sha256"] = actual_hash
-        if actual_hash != result["sha256"]:
-            failures.append(f"{experiment['id']}: result hash mismatch")
+        expected_hash = result.get("sha256", result.get("summary_sha256"))
+        if actual_hash != expected_hash:
+            failures.append(f"{experiment_id}: result hash mismatch")
             report.append(item)
             continue
         payload = json.loads(path.read_text(encoding="utf-8"))
-        environments = set(experiment["aggregates"])
-        item["aggregates"] = {}
-        for environment in environments:
-            actual = aggregate(payload["records"], environment)
-            expected = experiment["aggregates"][environment]
-            for key, value in actual.items():
-                if expected[key] != value:
-                    failures.append(f"{experiment['id']}/{environment}: {key} mismatch")
-            item["aggregates"][environment] = actual
+        aggregate_fn = aggregate_legacy if observed_location else aggregate_current
+        item["aggregates"] = {
+            environment: aggregate_fn(payload["records"], environment)
+            for environment in experiment["aggregates"]
+        }
+        if observed_summary and result.get("audit_artifact"):
+            audit_path = PROJECT_ROOT / result["audit_artifact"]
+            if audit_path.is_file():
+                audit = json.loads(audit_path.read_text(encoding="utf-8"))
+                for environment in experiment["aggregates"]:
+                    item["aggregates"][environment]["required_passed"] = sum(
+                        bool(record["required_pass"])
+                        for record in audit.get("per_run_contract_audit", [])
+                        if record.get("environment") == environment
+                    )
+        compare_aggregates(
+            experiment_id,
+            experiment["aggregates"],
+            item["aggregates"],
+            failures,
+        )
+        item["artifacts"] = {
+            "audit": verify_artifact(
+                experiment_id,
+                result,
+                "audit_artifact",
+                "audit_sha256",
+                failures,
+            )
+        }
         report.append(item)
     print(json.dumps({"ok": not failures, "failures": failures, "experiments": report}, ensure_ascii=False, separators=(",", ":")))
     return 0 if not failures else 1

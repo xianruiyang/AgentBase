@@ -26,12 +26,88 @@ class CorpusValidationTests(unittest.TestCase):
                 "cases": [{
                     "id": "stale",
                     "workspace_role": "agentbase",
+                    "prompt": "find source",
+                    "answer_contract": {"required": ["source"]},
                     "oracle": {"kind": "source-relation", "source": {"path": "source.txt", "sha256": "0" * 64}},
                 }],
             }), encoding="utf-8")
             result = MODULE.validate(corpus, {"agentbase": root})
             self.assertFalse(result["ok"])
             self.assertIn("stale source", result["failures"][0])
+
+    def test_selected_case_accepts_arbitrary_workspace_role(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            selected_root = root / "selected"
+            selected_root.mkdir()
+            source = selected_root / "source.ts"
+            source.write_text("const current = true;", encoding="utf-8")
+            corpus = root / "corpus.json"
+            corpus.write_text(json.dumps({
+                "schema": MODULE.SCHEMA,
+                "cases": [
+                    {
+                        "id": "selected",
+                        "workspace_role": "typescript-project",
+                        "prompt": "find source",
+                        "answer_contract": {"required": ["source"]},
+                        "oracle": {
+                            "kind": "source-relation",
+                            "source": {"path": "source.ts", "sha256": MODULE.digest(source)},
+                        },
+                    },
+                    {
+                        "id": "unselected",
+                        "workspace_role": "unavailable-project",
+                        "prompt": "find source",
+                        "answer_contract": {"required": ["source"]},
+                        "oracle": {
+                            "kind": "source-relation",
+                            "source": {"path": "missing.cpp", "sha256": "0" * 64},
+                        },
+                    },
+                ],
+            }), encoding="utf-8")
+
+            result = MODULE.validate(
+                corpus,
+                {"typescript-project": selected_root},
+                {"selected"},
+            )
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["case_count"], 2)
+            self.assertEqual(result["validated_case_count"], 1)
+
+    def test_selected_case_requires_a_bounded_answer_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source.cpp"
+            source.write_text("int value;", encoding="utf-8")
+            corpus = root / "corpus.json"
+            corpus.write_text(json.dumps({
+                "schema": MODULE.SCHEMA,
+                "cases": [{
+                    "id": "invalid-contract",
+                    "workspace_role": "cpp-project",
+                    "prompt": "",
+                    "answer_contract": {"required": []},
+                    "oracle": {
+                        "kind": "source-relation",
+                        "source": {"path": "source.cpp", "sha256": MODULE.digest(source)},
+                        "semantic_boundary": [],
+                    },
+                }],
+            }), encoding="utf-8")
+
+            result = MODULE.validate(corpus, {"cpp-project": root})
+
+            self.assertFalse(result["ok"])
+            self.assertEqual(len(result["failures"]), 3)
+
+    def test_workspace_argument_parser_rejects_duplicates(self) -> None:
+        with self.assertRaisesRegex(ValueError, "duplicate workspace role"):
+            MODULE.parse_workspaces(["project=C:\\one", "project=C:\\two"])
 
 
 if __name__ == "__main__":

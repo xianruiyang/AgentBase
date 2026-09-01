@@ -1,0 +1,149 @@
+{
+  "schema": "agentbase.source-query-primary-contract-audit/v1",
+  "observed_capsule": "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\code-search-experiments\\cross-language-cpp-ts-luna-m-20260901-02\\cross-language-fourth\\audit-capsule.json",
+  "capsule_sha256": {
+    "declared_canonical": "8f2d4625d58cd5039aed6851d8b763b170c88c69073c9ab36283d6b696c0abc2",
+    "file": "a5f7a849cde52f0dbfa8355be5cbd92a34f22a4d8b2f5df1621b7548a59976b5"
+  },
+  "summary": {
+    "observed_location": "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\code-search-experiments\\cross-language-cpp-ts-luna-m-20260901-02\\cross-language-fourth\\summary.json",
+    "sha256": "8cd7f13920be2d86f9aaf084bd706a11155888fa49411d9c3c17122753ebd361",
+    "bytes": 213582,
+    "records": 4
+  },
+  "experiment_identity": "dc48b019a80c9b9298f0bb2ef6e0f4eac193add97fcf6c5fc03db104357b003e",
+  "execution_contract": {
+    "corpus": "development/code-search-benchmark/corpus/v11.json",
+    "selected_cases": [
+      "facecutting3d-raycast-chain",
+      "opencode-webview-message-boundary"
+    ],
+    "model": "gpt-5.6-luna",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "subagents": false,
+    "workspaces_read_only": true,
+    "record_count": 4,
+    "exit_codes_all_zero": true,
+    "timed_out_runs": 0,
+    "usage_complete_runs": 4,
+    "postflight_failures": []
+  },
+  "per_run_contract_audit": [
+    {
+      "run_id": "facecutting3d-raycast-chain__control__1",
+      "environment": "control",
+      "required_pass": false,
+      "answer_line_count": 9,
+      "answer_max_lines": 12,
+      "source_findings_consistent": true,
+      "missing_required": [
+        "the answer does not state that source candidates are not compiler binding, numeric correctness, or runtime-behavior proof"
+      ]
+    },
+    {
+      "run_id": "facecutting3d-raycast-chain__candidate__1",
+      "environment": "candidate",
+      "required_pass": false,
+      "answer_line_count": 6,
+      "answer_max_lines": 12,
+      "source_findings_consistent": true,
+      "missing_required": [
+        "the answer excludes runtime and indirect calls but does not exclude compiler binding or numeric-correctness proof"
+      ]
+    },
+    {
+      "run_id": "opencode-webview-message-boundary__control__1",
+      "environment": "control",
+      "required_pass": false,
+      "answer_line_count": 8,
+      "answer_max_lines": 12,
+      "source_findings_consistent": true,
+      "missing_required": [
+        "sessionSelected null clearing is not stated",
+        "the class method and effect-local closure are not explicitly identified as different file-and-scope identities",
+        "the source-only result is not bounded away from VS Code transport or runtime-delivery proof"
+      ]
+    },
+    {
+      "run_id": "opencode-webview-message-boundary__candidate__1",
+      "environment": "candidate",
+      "required_pass": false,
+      "answer_line_count": 7,
+      "answer_max_lines": 12,
+      "source_findings_consistent": true,
+      "missing_required": [
+        "the getSessions request and its line are omitted",
+        "the source-only result is not bounded away from VS Code transport or runtime-delivery proof"
+      ]
+    }
+  ],
+  "quality_summary": {
+    "required_passed": 0,
+    "required_total": 4,
+    "line_limit_passed": 4,
+    "source_findings_consistent": 4,
+    "decision": "no quality advantage; neither environment satisfies the complete answer contract"
+  },
+  "aggregates": {
+    "control": {
+      "records": 2,
+      "input_tokens": 251019,
+      "cached_input_tokens": 205056,
+      "ordinary_input_tokens": 45963,
+      "output_tokens": 3883,
+      "reasoning_output_tokens": 1974,
+      "total_tokens": 254902,
+      "elapsed_ms": 114259,
+      "command_count": 9,
+      "short_price_equivalent": 89766.6,
+      "long_price_equivalent": 167884.2
+    },
+    "candidate": {
+      "records": 2,
+      "input_tokens": 345858,
+      "cached_input_tokens": 290816,
+      "ordinary_input_tokens": 55042,
+      "output_tokens": 4023,
+      "reasoning_output_tokens": 1933,
+      "total_tokens": 349881,
+      "elapsed_ms": 123880,
+      "command_count": 15,
+      "short_price_equivalent": 108261.6,
+      "long_price_equivalent": 204454.2
+    }
+  },
+  "candidate_delta_percent": {
+    "short_price_equivalent": 20.603,
+    "long_price_equivalent": 21.783,
+    "elapsed_ms": 8.42,
+    "total_tokens": 37.261,
+    "command_count": 66.667
+  },
+  "per_case_candidate_delta_percent": {
+    "facecutting3d-raycast-chain": {
+      "short_price_equivalent": 11.324,
+      "long_price_equivalent": 12.36,
+      "elapsed_ms": 3.402,
+      "total_tokens": 48.158,
+      "command_count": 83.333
+    },
+    "opencode-webview-message-boundary": {
+      "short_price_equivalent": 33.216,
+      "long_price_equivalent": 34.434,
+      "elapsed_ms": 17.008,
+      "total_tokens": 18.395,
+      "command_count": 33.333
+    }
+  },
+  "decision": {
+    "status": "do-not-promote-candidate",
+    "rationale": "The candidate has no complete-contract quality advantage and is worse on both price-equivalent measures, elapsed time, total tokens, and command count in both selected cases. The preceding fixes removed the C++ encoding failure, invalid project-manifest root use, and unnecessary advanced-skill load, but ordinary search breadth remains the dominant candidate regression."
+  },
+  "limitations": [
+    "This is a primary-agent contract audit, not a detached independent audit.",
+    "The result covers only the two frozen C++ and TypeScript workspace snapshots and the declared Luna medium/default execution identity.",
+    "The final working-tree skill description added explicit timeout/incomplete wording after this experiment, so the experiment identity covers the immediately preceding candidate text rather than the exact current working tree.",
+    "No conclusion is made for other languages, projects, models, service tiers, or runtime behavior."
+  ]
+}
