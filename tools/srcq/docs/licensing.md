@@ -7,6 +7,6 @@ srcq 由使用者选择 MIT 或 Apache-2.0：根目录 `LICENSE` 说明选择，
 - `sbom.spdx.json`：SPDX 2.3 package、版本、声明许可证和依赖关系；
 - `THIRD_PARTY_LICENSES.txt`：每个第三方 package 的声明表达式、来源、实际随 crate 分发的 LICENSE/COPYING/UNLICENSE/NOTICE 文件映射及完整正文；相同正文按 SHA-256 去重。
 
-打包器拒绝无许可证、无实际许可证文件或未经审查的表达式。当前 Windows release 图为 52 个第三方 package，许可证集合仅含 MIT、Apache-2.0、BSD-2/3-Clause、Unicode-3.0 与 Unlicense 的允许组合；`unicode-ident` 的 Unicode-3.0 附加文本已包含。未发现 GPL/AGPL/LGPL 或未知许可证。
+打包器拒绝无许可证、无实际许可证文件或未经审查的表达式。当前 Windows release 图为 67 个第三方 package，许可证集合仅含 MIT、Apache-2.0、BSD-2/3-Clause、Unicode-3.0 与 Unlicense 的允许组合；`unicode-ident` 的 Unicode-3.0 附加文本和 `encoding_rs` 的 WHATWG BSD-3-Clause 文本均已包含。未发现 GPL/AGPL/LGPL 或未知许可证。
 
 ast-grep 是外部可执行依赖，不在 srcq 归档或 SBOM 的链接依赖图中；用户仍需遵守其独立许可证。漏洞审计与许可证审计是不同门禁：许可证允许不代表依赖无安全 advisory。

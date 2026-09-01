@@ -457,6 +457,7 @@ fn allowed_license_expression(expression: &str) -> bool {
             | "Unlicense OR MIT"
             | "BSD-2-Clause"
             | "BSD-3-Clause"
+            | "(Apache-2.0 OR MIT) AND BSD-3-Clause"
             | "BSD-2-Clause OR Apache-2.0 OR MIT"
             | "(MIT OR Apache-2.0) AND Unicode-3.0"
             | "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
@@ -815,6 +816,9 @@ mod tests {
             "(MIT OR Apache-2.0) AND Unicode-3.0"
         ));
         assert!(allowed_license_expression("BSD-3-Clause"));
+        assert!(allowed_license_expression(
+            "(Apache-2.0 OR MIT) AND BSD-3-Clause"
+        ));
         assert!(!allowed_license_expression("GPL-3.0-only"));
         assert!(!allowed_license_expression("NOASSERTION"));
     }
