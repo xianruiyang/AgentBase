@@ -141,6 +141,12 @@ candidate-only 全量运行的 11 次完整 usage、一次 TLS 超时和关系 c
 
 `srcq 0.7.0` 对相同 TypeScript 大页 argv 的无模型探针已完整返回且无续页标记；自动删除重复 backend 又会与合法原生搜索 pattern 歧义，因此本轮不改工具。当前继续保持正式 `global/AGENTS.md`、`source-query` skill 与生产读取策略不变，只保留新 corpus 和审计证据。只有出现能解释并消除 C# 价格反例的新机制或 runner 取得逐请求 usage 时才以新 identity 重开，不重采样现有输入期待不同结果。
 
+### 3.10 2026-09-02 完整 Control 校准
+
+用户随后确认 Control 不是缩减因果 skill 集，而是当前 Codex 完整 `AGENTS.md` 链和 skill 环境；测试项是在该 Control 上的唯一变化。benchmark preparer 因此新增 `current-control`：冻结全部安装 skills 与当前启用插件，以当前 Codex CLI 完成插件安装读回，再克隆 Candidate，并把共享插件快照纳入环境哈希。旧实验因 Control 身份不足统一降为参考，不据其数值采纳新策略。
+
+首个 C# case 在最终完整 Control 上按要求运行两次，required 均为 `7/8`，共同遗漏排序语义；第一次裸用 `rg`，第二次使用 `srcq`，实际总 Token 相差 1.827 倍。前置诊断同时发现 v14 漏记真实 `Test:58 -> Read` 调用、旧环境树漏算插件安装 cache，均已由 v15 与 runner 向前修正。按“首个重复 case 稳定且完整才扩量”的证据前沿，本轮停止 TypeScript、C++ 和广度题，不创建第三次同输入采样，也不修改生产规则、skill 或 srcq。下一次若继续实验，必须从 v15 或后继 corpus 建立同 identity 的新 Control/Candidate 配对，而不是复用本轮 v14 Control-only 数字。
+
 ## 4. 阶段与任务
 
 ### P0 固定分支合同和 AST 基线

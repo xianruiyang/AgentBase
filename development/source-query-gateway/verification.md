@@ -151,3 +151,16 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 | C# 跨语言停止反例 | `9fe4bf9b…`；candidate required `8/8` 且无失败命令，command `6→7`，短/长价格 `40342.0/74072.0→57144.8/107179.6` | 两种价格均失败，熔断规则/skill 采纳与后续扩量 |
 
 第一轮三个 experiment 均为单 case、两环境各一次，preflight/postflight、usage 与网络有效，detached capsule 分别为 `0ef6b83…`、`9327638e…`、`8c8d47be…`；完整字段和限制见 [第一轮结构化审计](evidence/audit-result-interaction-rounds-v1.json)。第二轮按同样单次配对边界完成 TS/C++/C#，完整 identity、capsule、required、价格、失败命令和工具裁决见 [第二轮结构化审计](evidence/audit-result-interaction-rounds-v2.json)。证据继续否定“raw command 数单独决定成本”，并以 C# 反例否定同一通用规则必然跨项目降价。正式规则、skill、srcq、Release 与 Codex payload 均未修改；未运行完整九项评测或 AgentBase Publish。
+
+## 12. 当前完整 Control 校准
+
+| 范围 | 结果 |
+| --- | --- |
+| Control 身份 | 当前安装 `AGENTS.md` 精确副本、24 个用户/系统 skill 目录、10 个启用 marketplace 插件与 remote-plugin cache；两侧环境树各 29,354 文件、SHA-256 同为 `7d36e7cb…d33c5`，含 1,039 个共享 marketplace 文件和 1,155 个插件安装/cache 文件，diff 为空 |
+| 执行身份 | experiment `5163fe82…c579`；Codex `0.151.0-alpha.7.2`、Luna medium/default、srcq 0.7.0、只读、hooks 与 subject 子代理关闭；preflight、两次 subject、网络与 postflight 均成功 |
+| C# 两次结果 | required `7/8`、`7/8`；实际总 Token `73,270`、`133,894`；耗时 `43.745 s`、`49.950 s`；Luna standard 短/长美元边界 `$0.0067866—$0.0126258`、`$0.00886164—$0.01666788` |
+| 行为观察 | 两次共同漏答 `ValidateUidsUnsafe` 的 `SlotIndex` 排序；第一次裸用 `rg`，第二次全程使用 `srcq`。质量缺项稳定，但查询路由与实际总 Token 相差 1.827 倍，Control 质量未闭合且路径不稳定 |
+| oracle/runner 修正 | v14 漏记 `TemperatureCollectorSensorReader.Test:58 -> Read`，旧环境树还漏算 `plugins/cache`；v15 与当前 runner 向前修正。v14 结果保持诊断证据，不与未来 v15 Candidate 拼接 |
+| 停止裁决 | 首个重复 case 已出现质量与 oracle 反例，未继续 TypeScript、C++、广度题、完整验证或九项评测；旧缩减 skill Control 全部降为参考 |
+
+结构化证据见 [audit-result-current-control-csharp-v2.json](evidence/audit-result-current-control-csharp-v2.json)。本节只完成首个证据前沿的 Control 校准，不声称完整 Control 矩阵已通过。

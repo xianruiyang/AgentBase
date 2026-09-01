@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -27,6 +28,102 @@ class PrepareBenchmarkHomesTests(unittest.TestCase):
         config = MODULE.config_text(None, (project,))
         self.assertIn("[projects.'d:\\program\\example']", config)
         self.assertIn('trust_level = "trusted"', config)
+
+    def test_current_control_clones_complete_skills_and_frozen_enabled_plugins(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            installed = root / "installed"
+            installed.mkdir()
+            (installed / "AGENTS.md").write_text(MODULE.current_route_block() + "\n", encoding="utf-8")
+            for name in ("source-query", "unrelated-current-skill"):
+                skill = installed / "skills" / name
+                skill.mkdir(parents=True)
+                (skill / "SKILL.md").write_text(name + "\n", encoding="utf-8")
+            remote_skill = (
+                installed / "plugins" / "cache" / "openai-curated-remote"
+                / "plugin-management" / "1.0" / "skills" / "plugin-management" / "SKILL.md"
+            )
+            remote_skill.parent.mkdir(parents=True)
+            remote_skill.write_text("remote plugin skill\n", encoding="utf-8")
+            marketplace = root / "installed-marketplace"
+            manifest = {
+                "name": "example",
+                "plugins": [
+                    {"name": "enabled", "source": {"source": "local", "path": "./plugins/enabled"}},
+                    {"name": "disabled", "source": {"source": "local", "path": "./plugins/disabled"}},
+                ],
+            }
+            manifest_path = marketplace / ".agents" / "plugins" / "marketplace.json"
+            manifest_path.parent.mkdir(parents=True)
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            for name in ("enabled", "disabled"):
+                plugin = marketplace / "plugins" / name
+                plugin.mkdir(parents=True)
+                (plugin / "marker.txt").write_text(name, encoding="utf-8")
+            escaped_marketplace = str(marketplace).replace("\\", "\\\\")
+            (installed / "config.toml").write_text(
+                "\n".join((
+                    "[marketplaces.example]",
+                    'source_type = "local"',
+                    f'source = "{escaped_marketplace}"',
+                    "",
+                    '[plugins."enabled@example"]',
+                    "enabled = true",
+                    "",
+                    '[plugins."disabled@example"]',
+                    "enabled = false",
+                )) + "\n",
+                encoding="utf-8",
+            )
+            srcq = root / "srcq.exe"
+            srcq.write_bytes(b"srcq-current")
+            control = root / "run" / "control"
+            candidate = root / "run" / "candidate"
+            shared = root / "run" / "shared-marketplaces"
+            enabled_plugins = MODULE.copy_current_control(installed, control, shared, srcq, None, ())
+            MODULE.clone_current_control(control, candidate, installed)
+
+            self.assertTrue((control / "skills" / "unrelated-current-skill" / "SKILL.md").is_file())
+            self.assertEqual(
+                remote_skill.read_bytes(),
+                (
+                    control / "plugins" / "cache" / "openai-curated-remote"
+                    / "plugin-management" / "1.0" / "skills" / "plugin-management" / "SKILL.md"
+                ).read_bytes(),
+            )
+            self.assertTrue((shared / "agentbase-control-example" / "plugins" / "enabled" / "marker.txt").is_file())
+            self.assertFalse((shared / "agentbase-control-example" / "plugins" / "disabled").exists())
+            frozen_manifest = json.loads(
+                (shared / "agentbase-control-example" / ".agents" / "plugins" / "marketplace.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual("agentbase-control-example", frozen_manifest["name"])
+            self.assertEqual(["enabled"], [item["name"] for item in frozen_manifest["plugins"]])
+            config = (control / "config.toml").read_text(encoding="utf-8")
+            self.assertIn('model = "gpt-5.6-luna"', config)
+            self.assertIn('multi_agent = false', config)
+            self.assertIn('plugins = true', config)
+            self.assertIn('[plugins."enabled@agentbase-control-example"]', config)
+            self.assertEqual(("enabled@agentbase-control-example",), enabled_plugins)
+            self.assertEqual(
+                (control / MODULE.ENVIRONMENT_DEPENDENCIES_FILE).read_bytes(),
+                (candidate / MODULE.ENVIRONMENT_DEPENDENCIES_FILE).read_bytes(),
+            )
+            self.assertEqual(
+                (control / "skills" / "unrelated-current-skill" / "SKILL.md").read_bytes(),
+                (candidate / "skills" / "unrelated-current-skill" / "SKILL.md").read_bytes(),
+            )
+
+    def test_current_control_plugin_install_uses_subject_home_and_requires_readback(self) -> None:
+        install = subprocess_result(0, '{"pluginId":"enabled@example"}\n', "")
+        readback = subprocess_result(0, "enabled@example  installed, enabled  1.0  path\n", "")
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=[install, readback]) as run:
+            MODULE.install_current_control_plugins(
+                Path("D:/control"), Path("D:/codex.exe"), ("enabled@example",)
+            )
+            self.assertEqual("D:/codex.exe", run.call_args_list[0].args[0][0].replace("\\", "/"))
+            self.assertEqual("plugin", run.call_args_list[0].args[0][1])
+            self.assertEqual("enabled@example", run.call_args_list[0].args[0][3])
+            self.assertTrue(run.call_args_list[0].kwargs["env"]["CODEX_HOME"].replace("\\", "/").endswith("D:/control"))
 
     def test_benchmark_home_rejects_system_temp(self) -> None:
         with self.assertRaisesRegex(SystemExit, "must not be under the system temp"):

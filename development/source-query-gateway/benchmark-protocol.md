@@ -49,16 +49,16 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 
 正式独立基准固定使用正常速度 `service_tier = "default"`、`sandbox = "danger-full-access"` 和 `approval_policy = "never"`，并把 transport 显式冻结为 `websocket` 或 `http-only`。每个隔离 home 必须显式设置 `features.multi_agent = false`，runner 还要把只读与不得创建子代理写入所有 subject 的公共 prompt 前缀，并将该执行合同写入 experiment identity；单个 case 重复声明只作局部可读性补充。WebSocket 使用内置 ChatGPT provider；HTTP-only 使用 runner 固定的同一 ChatGPT OAuth endpoint provider，不得由自由 `extra_config` 改写。full access 用于避免 Codex 路由层在真实查询进程启动前误拦截 `srcq` 等只读命令，不授权 subject 写入；prompt 仍明确禁止修改，运行前后身份读回负责发现越界副作用。Fast/Priority、隐式 transport、其他 sandbox 或可覆盖上述身份的额外配置不得进入默认收益对照；环境准备器和 runner 都必须拒绝。
 
-control 与 candidate 除允许差异外必须逐项相等。环境构建不得把数据库、历史、缓存或信任状态复制进结果；认证文件只可从既有安全 home 链接到隔离 home，不复制进实验结果或环境树。隔离 home 不得位于系统临时目录，避免 Codex 拒绝建立命令 helper；默认只复制当前对照的因果 skill 集与系统 skill，不加载会触发扫描上限或注入无关上下文的大型知识 skill。预检发现额外差异时停止实验，不让 agent 运行后再解释混杂。
+control 与 candidate 除允许差异外必须逐项相等。环境构建不得把数据库、历史、一般运行 cache 或信任状态复制进结果；认证文件只可从既有安全 home 链接到隔离 home，不复制进实验结果或环境树。隔离 home 不得位于系统临时目录，避免 Codex 拒绝建立命令 helper；迁移对照默认只复制当前差异的因果 skill 集与系统 skill。若实验的 Control 被用户定义为当前完整 `AGENTS.md + skill` 环境，则必须另用完整模式复制全部用户 skills 与当前 remote-plugin cache、冻结启用插件内容、通过指定的当前 Codex CLI 安装并读回插件，再从最终 Control 克隆 Candidate；不能以缩减因果集替代该 Control。`plugins/cache` 是插件实际加载副本而不是可忽略的一般 cache，须连同共享冻结目录在 prepare/postflight 逐文件重算。预检发现额外差异时停止实验，不让 agent 运行后再解释混杂。
 
 subject 的代理与证书环境由 runner 从 config 明确指定的 Codex `.env` 只读投影。固定 allowlist 之外的 `.env` 项不进入 child environment；runner 在注入前移除父 shell 的同类键，避免未记录继承。SOCKS 的代理端 DNS 与 ALL_PROXY 到 HTTP/HTTPS 键的 fanout 只能由 config 显式选择并进入身份，不能根据一次成功隐式猜测。`.env` 文件和原值不得复制到隔离 home、原始事件、manifest 或 capsule；prepare 只冻结键集合、转换选项与有效投影 hash，run 时重新读取，不匹配即在启动 subject 前停止。
 
-当前 srcq 迁移对照由 [prepare_benchmark_homes.py](prepare_benchmark_homes.py) 从同一个 Codex home 构建。初始迁移 control 保留旧的 rg/fd/AST 查询 skills，candidate 退出它们并从项目真源安装 `source-query`；增量对照则让两侧都保留基线 `source-query`，只替换 candidate 的当前版本。两种模式共同保留 `powershell-usage`、`symbol-structure-workflow` 与系统 skill；只有专门研究完整安装态时才显式复制其他 skills。候选二进制必须先通过真实 `srcq rg <native argv...>` 探针，再进入私有 `bin`。允许差异必须逐文件限于相应 bundle，不能把整个 skills 目录列为通配差异。正式 subject 会访问的每个工作区必须在两侧 `config.toml` 中以相同规范路径预登记为 trusted；不得依赖首次运行自动写入信任状态，否则冻结后的环境身份已变化，该批结果无效。
+当前 srcq 迁移对照由 [prepare_benchmark_homes.py](prepare_benchmark_homes.py) 从同一个 Codex home 构建。初始迁移 control 保留旧的 rg/fd/AST 查询 skills，candidate 退出它们并从项目真源安装 `source-query`；增量对照则让两侧都保留基线 `source-query`，只替换 candidate 的当前版本。完整 Control 使用 `current-control` 模式，固定 Luna medium、standard、hooks 关闭和 subject 子代理关闭这些实验约束，同时复制当前完整规则与 skills、冻结并安装当前启用插件；保留的插件 skill 名称与内容不变，快照 marketplace 使用实验专属身份以避开 Codex 保留名称。候选二进制必须先通过真实 `srcq rg <native argv...>` 探针，再进入私有 `bin`。允许差异必须逐文件限于相应 bundle，不能把整个 skills 目录列为通配差异。正式 subject 会访问的每个工作区必须在两侧 `config.toml` 中以相同规范路径预登记为 trusted；不得依赖首次运行自动写入信任状态，否则冻结后的环境身份已变化，该批结果无效。
 
 环境准备入口为：
 
 ```powershell
-python -X utf8 development\source-query-gateway\prepare_benchmark_homes.py --installed-codex-home $env:USERPROFILE\.codex --control $env:LOCALAPPDATA\AgentBase\benchmark-homes\<run-id>\control --candidate $env:LOCALAPPDATA\AgentBase\benchmark-homes\<run-id>\candidate --srcq-exe <current-srcq.exe> --trusted-project <workspace-a> --trusted-project <workspace-b>
+python -X utf8 development\source-query-gateway\prepare_benchmark_homes.py --installed-codex-home $env:USERPROFILE\.codex --control $env:LOCALAPPDATA\AgentBase\benchmark-homes\<run-id>\control --candidate $env:LOCALAPPDATA\AgentBase\benchmark-homes\<run-id>\candidate --srcq-exe <current-srcq.exe> --baseline-mode current-control --codex-exe <current-codex.exe> --trusted-project <workspace-a> --trusted-project <workspace-b>
 ```
 
 ## 5. 单次可重复流程

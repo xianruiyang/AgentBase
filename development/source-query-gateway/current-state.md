@@ -299,6 +299,17 @@ workspace test/build/lint/fmt、15 个 ast-grep 0.44.1 真实 ignored 测试、W
 
 同一第二阶段 argv 的无模型探针确认：`--model-token-budget 12000` 单独使用仍受默认 80 单元上限分页；再加 `--limit 1000` 可完整返回且无 `@more/@cut`。因此当前不是 srcq 缺少单次大页能力，而是默认投影、命令选择、失败恢复和答案完整性的组合问题。现有证据支持“交互轮次会强烈放大成本”，也证明 raw command 数不是充分指标；当前保持正式源码读取策略，不修改 `global/AGENTS.md` 或 `source-query` skill，不执行 AgentBase Publish。
 
+## OBS-SQG-034 完整 Control 首个重复 case 未达到扩量条件
+
+- 状态: verified within experiment `5163fe826bcce23a0e6c98ae5f71f4188ae1b9e4e9eb78a61c3e005af6f6c579`
+- 关联: OBS-SQG-032, OBS-SQG-033
+
+用户把 Control 明确定义为“当前 Codex 正在使用的完整 `AGENTS.md` 链与完整 skill 环境”，测试项才是叠加在该 Control 上的唯一变化。旧 runner 默认只复制查询因果 skill 且关闭插件，因此既往相关实验只保留参考价值。当前 `current-control` 模式会精确复制安装态 `AGENTS.md`、全部 24 个用户/系统 skill 目录，冻结当前 10 个已安装启用插件与 remote-plugin cache，以当前 Codex CLI 安装并读回插件，再从最终 Control 克隆 Candidate；共享 marketplace 与实际插件安装缓存都并入环境树。两侧各 29,354 个环境文件的 tree SHA-256 同为 `7d36e7cb…d33c5`，其中共享 marketplace 1,039 个、插件安装与 remote cache 1,155 个，environment diff 为空。
+
+最终 v15 C# case 使用 Codex `0.151.0-alpha.7.2`、Luna medium/default、srcq 0.7.0、只读且禁用 subject 子代理，各运行两次。required 均为 `7/8`，共同遗漏 `ValidateUidsUnsafe` 只遍历启用传感器并按 `SlotIndex` 排序。两次实际总 Token 为 `73,270`、`133,894`，耗时 `43.745 s`、`49.950 s`，Luna standard 的短/长价格边界分别为 `$0.0067866—$0.0126258`、`$0.00886164—$0.01666788`。第一次直接执行裸 `rg`，第二次按规则使用 `srcq`；语义缺项稳定复现，但查询路由和成本明显不稳定。这是 Control 的实际行为，不以规则或 skill 文件存在免责。
+
+前置诊断还发现 v14 oracle 漏记 `TemperatureCollectorSensorReader.Test:58 -> Read`，且旧环境树漏算 `plugins/cache`；历史 v14 不原位修改，v15 与当前 runner 已向前修正。由于最终同一 Control 两次都未通过完整质量，且路由与成本波动，本轮按预设停止条件不扩到 TypeScript、C++ 或广度题；v14 初跑只作诊断证据，未来精确 A/B 必须在 v15 或后继 corpus 下同 identity 重跑两侧。完整审计见 [audit-result-current-control-csharp-v2.json](evidence/audit-result-current-control-csharp-v2.json)。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open

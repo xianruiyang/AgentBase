@@ -1,0 +1,142 @@
+{
+  "schema": "agentbase.current-control-code-reading-audit/v2",
+  "created_utc": "2026-09-01T16:17:00Z",
+  "control_definition": {
+    "agents": "the current installed Codex AGENTS.md plus the target workspace AGENTS chain",
+    "skills": "all current installed user and system skills, every installed and enabled marketplace plugin, and the current remote-plugin cache",
+    "installed_agents_sha256": "1698d8da3eb0601fa2206feb003a974dbaf5fa47eab0a170ee2c8ebcdd2fc2e4",
+    "installed_skill_directories": 24,
+    "active_marketplace_plugins": 10,
+    "experiment_constraints": {
+      "model": "gpt-5.6-luna",
+      "reasoning_effort": "medium",
+      "service_tier": "default",
+      "multi_agent": false,
+      "hooks": false,
+      "subject_read_only": true
+    }
+  },
+  "environment_identity": {
+    "codex_version": "codex-cli 0.151.0-alpha.7.2",
+    "codex_sha256": "bfd4c3b971477a559eadaeae8b1e41382ccb7656bd0104970cf5c6c581f2da7d",
+    "srcq_version": "srcq 0.7.0",
+    "control_tree_sha256": "7d36e7cb7d165ccd50841cb0dfedcfba6665bb5883e16455d42cf85b8bed33c5",
+    "candidate_tree_sha256": "7d36e7cb7d165ccd50841cb0dfedcfba6665bb5883e16455d42cf85b8bed33c5",
+    "tree_file_count_each": 29354,
+    "external_marketplace_snapshot_files": 1039,
+    "plugin_install_and_remote_cache_files": 1155,
+    "environment_diff": {
+      "changed": [],
+      "unexpected": [],
+      "ok": true
+    }
+  },
+  "raw_evidence": {
+    "location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/control-v15-20260902-r4/csharp-control",
+    "experiment_identity": "5163fe826bcce23a0e6c98ae5f71f4188ae1b9e4e9eb78a61c3e005af6f6c579",
+    "experiment_sha256": "8ee41e287d8f1167d4e119954d0a8a146eb59052ea1990e86dcdbe2e1f8ddcb5",
+    "summary_sha256": "dd8ba640bcadca9a30c83bf2019b9ceed59af8d6ac94d6a3b346aab8e6fee4e9",
+    "corpus": {
+      "path": "development/code-search-benchmark/corpus/v15.json",
+      "version": "2026-09-02.1",
+      "sha256": "2901b59c174042dc82ca8974a2615b927ad21558dc532d57a2310b5d0268bd4d"
+    },
+    "postflight_failures": [],
+    "network_clean": true
+  },
+  "case": {
+    "id": "vmt-temperature-collector-sampling-chain",
+    "required_indicator_count": 8,
+    "repetitions": 2,
+    "runs": [
+      {
+        "ordinal": 1,
+        "required_passed": 7,
+        "required_total": 8,
+        "failed_required": [
+          "ValidateUidsUnsafe must state that it visits only enabled sensors ordered by SlotIndex"
+        ],
+        "elapsed_ms": 43745,
+        "command_execution_items": 2,
+        "direct_rg_observed": true,
+        "srcq_subject_command_observed": false,
+        "usage": {
+          "input_tokens": 71691,
+          "cached_input_tokens": 52480,
+          "output_tokens": 1579,
+          "reasoning_output_tokens": 640,
+          "actual_total_tokens": 73270
+        },
+        "standard_price_usd_bounds": {
+          "all_requests_short_context": 0.0067866,
+          "all_requests_long_context": 0.0126258
+        }
+      },
+      {
+        "ordinal": 2,
+        "required_passed": 7,
+        "required_total": 8,
+        "failed_required": [
+          "ValidateUidsUnsafe must state that it visits only enabled sensors ordered by SlotIndex"
+        ],
+        "elapsed_ms": 49950,
+        "command_execution_items": 4,
+        "direct_rg_observed": false,
+        "srcq_subject_command_observed": true,
+        "usage": {
+          "input_tokens": 132135,
+          "cached_input_tokens": 109312,
+          "output_tokens": 1759,
+          "reasoning_output_tokens": 523,
+          "actual_total_tokens": 133894
+        },
+        "standard_price_usd_bounds": {
+          "all_requests_short_context": 0.00886164,
+          "all_requests_long_context": 0.01666788
+        }
+      }
+    ],
+    "formal_run_totals": {
+      "elapsed_ms": 93695,
+      "input_tokens": 203826,
+      "cached_input_tokens": 161792,
+      "output_tokens": 3338,
+      "reasoning_output_tokens": 1163,
+      "actual_total_tokens": 207164,
+      "standard_price_usd_bounds": {
+        "all_requests_short_context": 0.01564824,
+        "all_requests_long_context": 0.02929368
+      }
+    },
+    "setup_preflight": {
+      "elapsed_ms": 22971,
+      "actual_total_tokens": 43486,
+      "standard_price_usd_bounds": {
+        "all_requests_short_context": 0.00509956,
+        "all_requests_long_context": 0.01006292
+      }
+    }
+  },
+  "stability": {
+    "required_score_stable": true,
+    "failed_required_identity_stable": true,
+    "query_route_stable": false,
+    "actual_total_token_ratio_max_over_min": 1.82735362467572,
+    "observation": "the same missing semantic fact reproduced, while one run bypassed srcq and the other used srcq throughout"
+  },
+  "decision": {
+    "control_quality_complete": false,
+    "expand_to_typescript_cpp_or_breadth_cases": false,
+    "reason": "the first repeated case consistently failed one required indicator; route choice and cost also varied materially",
+    "future_comparison_boundary": "a future Candidate comparison must rerun both Control and Candidate in one v15-or-later identity; reduced-skill and v14 results remain reference-only"
+  },
+  "preliminary_evidence": {
+    "path": "development/source-query-gateway/evidence/audit-result-current-control-csharp-v1.json",
+    "use": "diagnostic only",
+    "invalidated_formal_assumptions": [
+      "v14 omitted TemperatureCollectorSensorReader.Test:58 -> Read",
+      "the earlier environment tree excluded plugins/cache",
+      "the earlier home did not initially clone the current remote-plugin cache"
+    ]
+  }
+}

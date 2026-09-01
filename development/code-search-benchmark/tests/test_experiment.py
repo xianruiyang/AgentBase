@@ -323,7 +323,35 @@ class ExperimentTests(unittest.TestCase):
             (root / ".env").write_text("ALL_PROXY=secret", encoding="utf-8")
             (root / ".sandbox_migration").write_text("v2", encoding="utf-8")
             (root / "state_5.sqlite").write_bytes(b"state")
-            self.assertEqual({"AGENTS.md": MODULE.sha256_file(root / "AGENTS.md")}, MODULE.environment_tree(root))
+            (root / "cache").mkdir()
+            (root / "cache" / "runtime.txt").write_text("state", encoding="utf-8")
+            plugin = root / "plugins" / "cache" / "marketplace" / "plugin" / "1.0" / "SKILL.md"
+            plugin.parent.mkdir(parents=True)
+            plugin.write_text("plugin skill", encoding="utf-8")
+            self.assertEqual({
+                "AGENTS.md": MODULE.sha256_file(root / "AGENTS.md"),
+                "plugins/cache/marketplace/plugin/1.0/SKILL.md": MODULE.sha256_file(plugin),
+            }, MODULE.environment_tree(root))
+
+    def test_environment_tree_includes_frozen_external_dependencies(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "home"
+            external = Path(raw) / "marketplace"
+            root.mkdir()
+            external.mkdir()
+            (root / "AGENTS.md").write_text("rules\n", encoding="utf-8")
+            plugin = external / "plugin.txt"
+            plugin.write_text("v1\n", encoding="utf-8")
+            (root / "environment-dependencies.json").write_text(json.dumps({
+                "schema": "agentbase.benchmark-environment-dependencies/v1",
+                "directories": [{"id": "marketplace:example", "path": str(external)}],
+            }), encoding="utf-8")
+            before = MODULE.environment_tree(root)
+            self.assertEqual(
+                MODULE.sha256_file(plugin), before["@external/marketplace:example/plugin.txt"]
+            )
+            plugin.write_text("v2\n", encoding="utf-8")
+            self.assertNotEqual(before, MODULE.environment_tree(root))
 
     def test_corpus_snapshot_rejects_changed_oracle_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -504,6 +532,9 @@ class ExperimentTests(unittest.TestCase):
         supported = MODULE.token_pricing_contract({"model": "gpt-5.6-sol", "service_tier": "default"})
         self.assertTrue(supported["applicable"])
         self.assertEqual("default", supported["requested_service_tier"])
+        self.assertEqual(4.0, supported["short_context_uncached_input_usd_per_million"])
+        luna = MODULE.token_pricing_contract({"model": "gpt-5.6-luna", "service_tier": "default"})
+        self.assertEqual(0.20, luna["short_context_uncached_input_usd_per_million"])
         unsupported = MODULE.token_pricing_contract({"model": "other-model", "service_tier": "default"})
         self.assertFalse(unsupported["applicable"])
         breakdown = MODULE.normalize_usage({

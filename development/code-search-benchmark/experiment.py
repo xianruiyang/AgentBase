@@ -51,10 +51,10 @@ CANONICALIZATION = {
 }
 TOKEN_PRICING = {
     "schema": "agentbase.gpt-5.6-token-price-coefficients/v1",
-    "as_of": "2026-08-16",
+    "as_of": "2026-09-01",
     "model_family": "gpt-5.6",
-    "source": "https://developers.openai.com/api/docs/pricing",
-    "model_source": "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+    "source": "https://help.openai.com/en/articles/20001415",
+    "model_source": "https://developers.openai.com/api/docs/models/compare",
     "basis": "short_context_uncached_input_token",
     "long_context_threshold_input_tokens_exclusive": 272_000,
     "short_context": {
@@ -79,6 +79,12 @@ TOKEN_PRICING = {
         "reasoning_output_tokens is a subset of output_tokens and is not charged twice",
         "independent benchmarks use standard processing; Fast mode is excluded from the experiment contract",
     ],
+}
+GPT_56_STANDARD_INPUT_USD_PER_MILLION = {
+    "gpt-5.6": 4.0,
+    "gpt-5.6-sol": 4.0,
+    "gpt-5.6-terra": 2.0,
+    "gpt-5.6-luna": 0.20,
 }
 SECRET_OR_STATE_NAMES = {
     ".env", ".sandbox_migration", "auth.json", "cap_sid", "installation_id", "history.jsonl", "models_cache.json",
@@ -197,19 +203,42 @@ def git_identity(root: Path, identity_paths: list[str] | None = None) -> dict[st
     return identity
 
 
-def environment_tree(root: Path) -> dict[str, str]:
+def _directory_tree(root: Path, prefix: str = "") -> dict[str, str]:
     entries: dict[str, str] = {}
     for path in sorted(root.rglob("*")):
         if not path.is_file():
             continue
-        relative = path.relative_to(root).as_posix()
+        relative_path = path.relative_to(root)
+        relative = prefix + relative_path.as_posix()
         if path.name in SECRET_OR_STATE_NAMES or path.name.endswith(tuple(STATE_SUFFIXES)):
             continue
-        if any(part in STATE_DIRECTORIES for part in path.relative_to(root).parts):
+        plugin_install_cache = len(relative_path.parts) >= 2 and relative_path.parts[:2] == ("plugins", "cache")
+        if any(part in STATE_DIRECTORIES for part in relative_path.parts) and not plugin_install_cache:
             continue
         entries[relative] = sha256_file(path)
-        if len(entries) > MAX_ENV_FILES:
-            raise ExperimentError(f"environment tree exceeds {MAX_ENV_FILES} files: {root}")
+    return entries
+
+
+def environment_tree(root: Path) -> dict[str, str]:
+    entries = _directory_tree(root)
+    dependencies_path = root / "environment-dependencies.json"
+    if dependencies_path.is_file():
+        try:
+            dependencies = json.loads(dependencies_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ExperimentError(f"environment dependency receipt is invalid: {dependencies_path}: {exc}") from exc
+        if dependencies.get("schema") != "agentbase.benchmark-environment-dependencies/v1":
+            raise ExperimentError(f"unsupported environment dependency receipt: {dependencies_path}")
+        seen_ids: set[str] = set()
+        for dependency in dependencies.get("directories", []):
+            identity = str(dependency.get("id", ""))
+            directory = Path(str(dependency.get("path", ""))).resolve()
+            if not identity or identity in seen_ids or not directory.is_dir():
+                raise ExperimentError(f"invalid environment directory dependency: {dependency}")
+            seen_ids.add(identity)
+            entries.update(_directory_tree(directory, f"@external/{identity}/"))
+    if len(entries) > MAX_ENV_FILES:
+        raise ExperimentError(f"environment tree exceeds {MAX_ENV_FILES} files: {root}")
     return entries
 
 
@@ -390,11 +419,13 @@ def normalize_usage(usage: dict[str, Any]) -> dict[str, Any]:
 
 def token_pricing_contract(codex: dict[str, Any]) -> dict[str, Any]:
     model = str(codex.get("model", ""))
+    input_price = GPT_56_STANDARD_INPUT_USD_PER_MILLION.get(model)
     return {
         **TOKEN_PRICING,
         "experiment_model": model,
         "requested_service_tier": str(codex.get("service_tier", "")),
-        "applicable": model == "gpt-5.6" or model.startswith("gpt-5.6-"),
+        "short_context_uncached_input_usd_per_million": input_price,
+        "applicable": input_price is not None,
     }
 
 

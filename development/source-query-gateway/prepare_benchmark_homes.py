@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import tomllib
 
 
 ROOT = Path(__file__).resolve().parent
@@ -22,6 +24,8 @@ SHARED_QUERY_SKILLS = {
 PREMIGRATION_SKILLS = RETIRED_QUERY_SKILLS | SHARED_QUERY_SKILLS
 MIGRATED_SKILLS = SHARED_QUERY_SKILLS | {"source-query"}
 MINIMAL_RELEVANT_SKILLS = PREMIGRATION_SKILLS | MIGRATED_SKILLS
+ENVIRONMENT_DEPENDENCIES_FILE = "environment-dependencies.json"
+ENVIRONMENT_DEPENDENCIES_SCHEMA = "agentbase.benchmark-environment-dependencies/v1"
 OLD_ROUTE = "should: 文本内容搜索先用受限 `rg`；文件发现使用受限 `fd`；只有文本不能可靠表达语法结构时升级 AST，只有结论依赖真实符号身份时升级 LSP"
 CURRENT_ROUTE_PREFIX = "must: 全集、不存在或唯一结论先从最近正式来源确认权威源码范围；"
 PREVIOUS_SCOPE_ROUTE_PREFIX = "must: 全集、不存在或唯一结论先确认权威源码范围；源码文件与文本搜索使用 PATH 中的 `srcq fd` / `srcq rg`，"
@@ -95,6 +99,222 @@ def config_text(lsp_server: str | None, trusted_projects: tuple[Path, ...] = ())
             'trust_level = "trusted"',
         ])
     return "\n".join(lines) + "\n"
+
+
+def toml_basic_string(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def current_control_config_text(
+    lsp_server: str | None,
+    trusted_projects: tuple[Path, ...],
+    marketplaces: dict[str, Path],
+    enabled_plugins: tuple[str, ...],
+) -> str:
+    lines = [
+        'model = "gpt-5.6-luna"',
+        'model_reasoning_effort = "medium"',
+        'service_tier = "default"',
+        'project_doc_max_bytes = 65536',
+        'sandbox_mode = "danger-full-access"',
+        '',
+        '[features]',
+        'hooks = false',
+        'multi_agent = false',
+        'plugins = true',
+        'remote_plugin = true',
+        'recommended_plugins = false',
+        'apps = false',
+        'browser_use = false',
+    ]
+    if lsp_server:
+        escaped = lsp_server.replace("\\", "\\\\").replace('"', '\\"')
+        lines.extend([
+            '',
+            '[mcp_servers.vscode-lsp-mcp]',
+            'command = "node"',
+            f'args = ["{escaped}"]',
+            'startup_timeout_sec = 10',
+            'tool_timeout_sec = 120',
+            'enabled = true',
+        ])
+    for name, path in sorted(marketplaces.items()):
+        lines.extend([
+            '',
+            f'[marketplaces.{name}]',
+            'source_type = "local"',
+            f'source = {toml_basic_string(str(path.resolve()))}',
+        ])
+    for plugin in enabled_plugins:
+        lines.extend([
+            '',
+            f'[plugins.{toml_basic_string(plugin)}]',
+            'enabled = true',
+        ])
+    for project in trusted_projects:
+        key = str(project.resolve()).lower()
+        if "'" in key:
+            raise SystemExit(f"trusted project path cannot be encoded safely in TOML: {project}")
+        lines.extend([
+            '',
+            f"[projects.'{key}']",
+            'trust_level = "trusted"',
+        ])
+    return "\n".join(lines) + "\n"
+
+
+def local_path(raw: str) -> Path:
+    if raw.startswith("\\\\?\\"):
+        raw = raw[4:]
+    return Path(raw).resolve()
+
+
+def snapshot_enabled_plugin_marketplaces(installed: Path, target: Path) -> tuple[dict[str, Path], tuple[str, ...]]:
+    try:
+        config = tomllib.loads((installed / "config.toml").read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise SystemExit(f"installed Codex config is invalid: {exc}") from exc
+    enabled_plugins = tuple(sorted(
+        name for name, plugin in config.get("plugins", {}).items()
+        if isinstance(plugin, dict) and plugin.get("enabled") is True
+    ))
+    unknown = [name for name in enabled_plugins if "@" not in name]
+    if unknown:
+        raise SystemExit(f"enabled plugin identity must include a marketplace: {unknown}")
+    marketplace_names = {name.rsplit("@", 1)[1] for name in enabled_plugins}
+    target.mkdir(parents=True)
+    snapshot_paths: dict[str, Path] = {}
+    copied_plugins: set[str] = set()
+    snapshot_enabled_plugins: list[str] = []
+    for marketplace_name in sorted(marketplace_names):
+        raw_marketplace = config.get("marketplaces", {}).get(marketplace_name)
+        if not isinstance(raw_marketplace, dict) or raw_marketplace.get("source_type") != "local":
+            raise SystemExit(f"enabled plugin marketplace must be a configured local source: {marketplace_name}")
+        source = local_path(str(raw_marketplace.get("source", "")))
+        manifest_path = source / ".agents" / "plugins" / "marketplace.json"
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"plugin marketplace manifest is invalid: {manifest_path}: {exc}") from exc
+        selected = []
+        snapshot_name = f"agentbase-control-{marketplace_name}"
+        destination = target / snapshot_name
+        for plugin in manifest.get("plugins", []):
+            plugin_name = str(plugin.get("name", ""))
+            identity = f"{plugin_name}@{marketplace_name}"
+            if identity not in enabled_plugins:
+                continue
+            relative = str(plugin.get("source", {}).get("path", ""))
+            plugin_source = (source / relative).resolve()
+            if not plugin_source.is_dir():
+                raise SystemExit(f"enabled plugin source does not exist: {identity}: {plugin_source}")
+            plugin_target = (destination / relative).resolve()
+            plugin_target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(plugin_source, plugin_target)
+            selected.append(plugin)
+            copied_plugins.add(identity)
+            snapshot_enabled_plugins.append(f"{plugin_name}@{snapshot_name}")
+        filtered = dict(manifest)
+        filtered["name"] = snapshot_name
+        filtered["plugins"] = selected
+        filtered_manifest = destination / ".agents" / "plugins" / "marketplace.json"
+        filtered_manifest.parent.mkdir(parents=True, exist_ok=True)
+        filtered_manifest.write_text(
+            json.dumps(filtered, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        snapshot_paths[snapshot_name] = destination.resolve()
+    missing = sorted(set(enabled_plugins) - copied_plugins)
+    if missing:
+        raise SystemExit(f"enabled plugins missing from configured marketplace manifests: {missing}")
+    return snapshot_paths, tuple(sorted(snapshot_enabled_plugins))
+
+
+def copy_current_control(
+    installed: Path,
+    target: Path,
+    shared_marketplaces: Path,
+    srcq_exe: Path,
+    lsp_server: str | None,
+    trusted_projects: tuple[Path, ...],
+) -> tuple[str, ...]:
+    if target.exists():
+        raise SystemExit(f"target must not already exist: {target}")
+    target.mkdir(parents=True)
+    auth = installed / "auth.json"
+    if auth.is_file():
+        os.link(auth, target / "auth.json")
+    shutil.copy2(installed / "AGENTS.md", target / "AGENTS.md")
+    shutil.copytree(installed / "skills", target / "skills")
+    marketplaces, enabled_plugins = snapshot_enabled_plugin_marketplaces(installed, shared_marketplaces)
+    (target / "config.toml").write_text(
+        current_control_config_text(lsp_server, trusted_projects, marketplaces, enabled_plugins),
+        encoding="utf-8",
+    )
+    (target / ENVIRONMENT_DEPENDENCIES_FILE).write_text(
+        json.dumps({
+            "schema": ENVIRONMENT_DEPENDENCIES_SCHEMA,
+            "directories": [
+                {"id": f"marketplace:{name}", "path": str(path)}
+                for name, path in sorted(marketplaces.items())
+            ],
+        }, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (target / "bin").mkdir()
+    shutil.copy2(srcq_exe, target / "bin" / "srcq.exe")
+    remote_plugin_cache = installed / "plugins" / "cache" / "openai-curated-remote"
+    if remote_plugin_cache.is_dir():
+        shutil.copytree(
+            remote_plugin_cache,
+            target / "plugins" / "cache" / "openai-curated-remote",
+        )
+    return enabled_plugins
+
+
+def install_current_control_plugins(target: Path, codex_exe: Path, enabled_plugins: tuple[str, ...]) -> None:
+    process_environment = dict(os.environ)
+    process_environment["CODEX_HOME"] = str(target.resolve())
+    for plugin in enabled_plugins:
+        completed = subprocess.run(
+            [str(codex_exe), "plugin", "add", plugin, "--json"],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=process_environment,
+        )
+        if completed.returncode != 0:
+            detail = completed.stderr.strip() or completed.stdout.strip()
+            raise SystemExit(f"failed to install frozen Control plugin {plugin}: {detail}")
+    observed = subprocess.run(
+        [str(codex_exe), "plugin", "list"],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=process_environment,
+    )
+    if observed.returncode != 0:
+        raise SystemExit(f"failed to read back frozen Control plugins: {observed.stderr.strip()}")
+    active = {
+        plugin for plugin in enabled_plugins
+        if any(
+            line.lstrip().startswith(plugin + " ") and "installed, enabled" in line
+            for line in observed.stdout.splitlines()
+        )
+    }
+    missing = sorted(set(enabled_plugins) - active)
+    if missing:
+        raise SystemExit(f"frozen Control plugins are not active after installation: {missing}")
+
+
+def clone_current_control(control: Path, candidate: Path, installed: Path) -> None:
+    if candidate.exists():
+        raise SystemExit(f"target must not already exist: {candidate}")
+    shutil.copytree(control, candidate, ignore=shutil.ignore_patterns("auth.json"))
+    auth = installed / "auth.json"
+    if auth.is_file():
+        os.link(auth, candidate / "auth.json")
 
 
 def validate_benchmark_home_location(path: Path) -> None:
@@ -251,6 +471,11 @@ def main() -> int:
     parser.add_argument("--control", required=True, type=Path)
     parser.add_argument("--candidate", required=True, type=Path)
     parser.add_argument("--srcq-exe", required=True, type=Path)
+    parser.add_argument(
+        "--codex-exe",
+        type=Path,
+        help="current Codex CLI; required by current-control to install and read back frozen plugins",
+    )
     parser.add_argument("--vscode-lsp-server")
     parser.add_argument(
         "--trusted-project",
@@ -267,9 +492,9 @@ def main() -> int:
     parser.add_argument("--minimal", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--baseline-mode",
-        choices=("premigration", "migrated"),
+        choices=("premigration", "migrated", "current-control"),
         default="premigration",
-        help="compare the initial skill migration or an already migrated source-query baseline",
+        help="compare a query migration, or freeze the complete current AGENTS and skill environment",
     )
     parser.add_argument(
         "--baseline-srcq-exe",
@@ -297,14 +522,32 @@ def main() -> int:
         raise SystemExit("--baseline-mode migrated requires an existing --baseline-srcq-exe")
     if args.minimal and args.full_installed_skills:
         raise SystemExit("--minimal and --full-installed-skills cannot be combined")
-    copy_common(
-        installed, control, args.vscode_lsp_server, args.full_installed_skills, args.baseline_mode,
-        trusted_projects,
-    )
-    copy_common(
-        installed, candidate, args.vscode_lsp_server, args.full_installed_skills, args.baseline_mode,
-        trusted_projects,
-    )
+    if args.baseline_mode == "current-control":
+        if args.full_installed_skills or args.minimal or baseline_srcq_exe is not None:
+            raise SystemExit("current-control fixes the complete installed skill set and accepts no skill-scope flags")
+        if control.parent != candidate.parent:
+            raise SystemExit("current-control homes must share one parent for their frozen plugin snapshot")
+        codex_exe = args.codex_exe.resolve() if args.codex_exe else None
+        if codex_exe is None or not codex_exe.is_file():
+            raise SystemExit("current-control requires an existing --codex-exe")
+        shared_marketplaces = control.parent / "shared-marketplaces"
+        if shared_marketplaces.exists():
+            raise SystemExit(f"shared plugin snapshot must not already exist: {shared_marketplaces}")
+        enabled_plugins = copy_current_control(
+            installed, control, shared_marketplaces, srcq_exe, args.vscode_lsp_server, trusted_projects,
+        )
+        install_current_control_plugins(control, codex_exe, enabled_plugins)
+        clone_current_control(control, candidate, installed)
+        allowed = ""
+    else:
+        copy_common(
+            installed, control, args.vscode_lsp_server, args.full_installed_skills, args.baseline_mode,
+            trusted_projects,
+        )
+        copy_common(
+            installed, candidate, args.vscode_lsp_server, args.full_installed_skills, args.baseline_mode,
+            trusted_projects,
+        )
     if args.baseline_mode == "premigration":
         install_candidate_bundle(control, candidate, srcq_exe)
         candidate_agents = (candidate / "AGENTS.md").read_text(encoding="utf-8")
@@ -313,7 +556,7 @@ def main() -> int:
             candidate_agents.replace(OLD_ROUTE, current_route_block()), encoding="utf-8"
         )
         allowed = "AGENTS.md,bin/srcq.exe,skills/ast-grep-token-safe/**,skills/fd-usage/**,skills/rg-token-safe/**,skills/source-query/**,skills/symbol-structure-workflow/**"
-    else:
+    elif args.baseline_mode == "migrated":
         install_incremental_bundle(control, candidate, baseline_srcq_exe, srcq_exe)
         candidate_agents = (candidate / "AGENTS.md").read_text(encoding="utf-8")
         (candidate / "AGENTS.md").write_text(replace_migrated_route(candidate_agents), encoding="utf-8")
@@ -324,6 +567,8 @@ def main() -> int:
     if args.baseline_mode == "premigration":
         print("retired_in_candidate=" + ",".join(sorted(RETIRED_QUERY_SKILLS)))
     print(f"baseline_mode={args.baseline_mode}")
+    if args.baseline_mode == "current-control":
+        print(f"active_plugins={len(enabled_plugins)}")
     print(f"allowed_differences={allowed}")
     return 0
 

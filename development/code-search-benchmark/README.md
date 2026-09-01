@@ -2,7 +2,7 @@
 
 本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule，并消费 `development/common/codex_runtime.py` 的共享脱敏 launcher 环境与 `development/common/codex_shell_environment_policy.json` 的模型 shell 合同。两者不实现查询语义，也不进入 srcq 或 Codex 发布 payload。
 
-正式语料在 `corpus/`；`v14.json` 是当前候选，沿用 `v11.json` 加入的独立 C++ 与 TypeScript 项目快照，并新增中型 C# 项目快照；`v12.json`、`v13.json` 依次校准 TypeScript、C++ 题面与 required，`v14.json` 冻结 C# 限定成员、分支链和静态/运行时边界；`v1.json` 至 `v13.json` 只服务引用它们的已完成历史结果复核。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
+正式语料在 `corpus/`；`v15.json` 是当前候选，沿用 `v11.json` 加入的独立 C++ 与 TypeScript 项目快照以及 `v14.json` 的中型 C# 项目快照，并补齐完整 Control 实测发现的 `TemperatureCollectorSensorReader.Test:58 -> Read` 调用 oracle；旧版本只服务引用它们的历史结果复核。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
 
 ```powershell
 python -X utf8 development\code-search-benchmark\experiment.py prepare --config <config.json> --output <new-output-dir>
@@ -10,13 +10,13 @@ python -X utf8 development\code-search-benchmark\experiment.py run --experiment 
 python -X utf8 development\code-search-benchmark\experiment.py capsule --experiment <new-output-dir>\experiment.json
 ```
 
-隔离 home 由 `development/source-query-gateway/prepare_benchmark_homes.py` 创建，并应放在 `%LOCALAPPDATA%\AgentBase\benchmark-homes\<run-id>` 等稳定隔离根；入口会拒绝 `%TEMP%` 下的目标，因为 Codex 会拒绝在临时 home 建立命令 helper，使 subject 处于降级状态。每个正式工作区通过重复的 `--trusted-project` 在两侧配置中预登记，避免首次访问自动写入 trust 造成冻结身份漂移。默认只复制该对照的因果 skill 集：迁移前 control 保留三个旧查询 skill，迁移后环境保留 `source-query`，两侧共同保留 PowerShell 与符号编辑职责；`.system` skill 仍按 CLI 要求复制。这样避免大型无关知识 skill 触发扫描上限或给 subject 注入额外上下文。只有专门研究完整安装态时才显式使用 `--full-installed-skills`。候选二进制在复制前必须通过真实 `srcq rg <native argv...>` 探针，仅版本号相同但入口陈旧的 release 会被拒绝。
+隔离 home 由 `development/source-query-gateway/prepare_benchmark_homes.py` 创建，并应放在 `%LOCALAPPDATA%\AgentBase\benchmark-homes\<run-id>` 等稳定隔离根；入口会拒绝 `%TEMP%` 下的目标，因为 Codex 会拒绝在临时 home 建立命令 helper，使 subject 处于降级状态。每个正式工作区通过重复的 `--trusted-project` 在两侧配置中预登记，避免首次访问自动写入 trust 造成冻结身份漂移。迁移对照默认只复制因果 skill 集；专门研究用户定义的完整 Control 时使用 `--baseline-mode current-control --codex-exe <current-codex.exe>`：入口精确复制当前 `AGENTS.md`、全部用户 skills 和当前 remote-plugin cache，快照当前启用插件的 marketplace 内容，以官方 `codex plugin add` 安装并读回全部插件，再由完成后的 Control 克隆 Candidate。共享插件快照由两侧相同的依赖收据引用，其逐文件哈希与 `plugins/cache` 实际安装内容都并入环境树；不能只复制 `~/.codex/skills` 或只写 `plugins.*.enabled=true`。候选二进制在复制前必须通过真实 `srcq rg <native argv...>` 探针，仅版本号相同但入口陈旧的 release 会被拒绝。
 
 每个 subject 都由新的 `codex exec --json --ephemeral --sandbox danger-full-access` 进程执行，并强制 `approval_policy = "never"`、正常速度 `service_tier = "default"`。每个隔离 home 还必须显式设置 `features.multi_agent = false`；runner 会把只读与不得创建子代理写入公共 prompt 前缀，并把该执行合同、实际模型与 reasoning effort 一并冻结到 experiment identity。config 还必须把 `codex.transport` 明确冻结为 `websocket` 或 `http-only`；前者使用内置 ChatGPT provider，后者使用 runner 内建且同样绑定 ChatGPT OAuth endpoint 的 HTTP-only provider。full access 只解除 Codex 路由层对真实查询命令的误拦截，不改变 prompt 的只读合同；运行前后的身份读回负责发现越界修改。Fast/Priority、隐式 transport、其他 sandbox 或不匹配的 Codex 可执行文件都不属于正式基准，prepare 与 run 会拒绝对应 manifest。
 
 正式 config 必须提供 `runtime_environment.dotenv_path` 和非空 `runtime_environment.required_keys`。共享 runtime owner 只从该文件投影 `ALL_PROXY`、`HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY`、`CODEX_CA_CERTIFICATE`、`SSL_CERT_FILE`；启动 subject 前先清除父 shell 中未冻结的网络别名、OpenAI/Codex 凭据、常见 token、Git/SSH/语言注入与工作目录控制键，再注入冻结投影和当前 subject 自己的 `CODEX_HOME`。这些键只服务 Codex 连接：每次 preflight/subject 的 CLI 参数同时固定 `development/common/codex_shell_environment_policy.json`，从模型 shell 过滤 proxy、OpenAI/Codex、Git/SSH、云/包管理器凭据命名空间及语言注入变量，策略 SHA-256 进入 experiment identity，`extra_config` 不得覆盖。SOCKS 环境可显式用 `proxy_dns = "remote"` 把 `socks5` 规范化为 `socks5h`，并用 `all_proxy_fanout = "http-and-https"` 在原文件没有专用键时把有效 ALL_PROXY 投影到 HTTP/HTTPS 客户端；两项都进入实验身份，不作隐式猜测。`.env` 本身及变量值不复制进隔离 home、experiment、日志或 capsule；manifest 只保存来源、键名、转换选项和整体投影 SHA-256。prepare 后有效投影或共享 shell policy 变化会使 run 在启动 subject 前拒绝。当前 Codex 使用代理时，配置应显式指向当前安全 Codex home 的 `.env`，不能假设启动 shell 已经加载它。
 
-control/candidate home 的 `config.toml` 不得再定义 `shell_environment_policy`；prepare 会在模型前拒绝第二 owner。两侧差异继续由 home tree identity 维护，模型 shell 过滤只由共享 policy 决定。
+control/candidate home 的 `config.toml` 不得再定义 `shell_environment_policy`；prepare 会在模型前拒绝第二 owner。两侧差异继续由 home tree identity 维护；`environment-dependencies.json` 声明的冻结目录也作为带命名空间的环境树成员在 prepare 与 postflight 重算，模型 shell 过滤只由共享 policy 决定。
 
 ```json
 {
@@ -37,7 +37,7 @@ monitor 只捕获 stdout JSONL、stderr、退出、wall time、工具项和最�
 
 `summary.json` 同时保留原始 usage、逐 run 规范化分项和按环境汇总：普通输入、缓存读取、缓存写入（事件提供时）、输入、可见输出、推理输出、输出与 `input + output` 总量。推理输出是 output 子集，缓存读取/写入是 input 分类，均不得重复相加。若事件没有缓存写入量，报告保留可计量总 Token，但普通输入和价格只给上下界，不把缺失字段静默当成零。
 
-当前 GPT-5.6 价格系数随 experiment identity 冻结。以“短上下文普通输入 Token = 1”为基准，短上下文为 `普通输入 1 / 缓存读取 0.1 / 缓存写入 1.25 / 输出（含推理）6`；单次请求输入超过 272K 时，整次请求对应 `2 / 0.2 / 2.5 / 9`。subject 的 `turn.completed` 是聚合用量，不能证明其中每次模型请求是否越过阈值，因此报告分别给出全短、全长和总边界，单位是相对价格等价量而非美元。Fast 与 Standard 的绝对价格不同，但当前 GPT-5.6 的这些相对系数相同。
+当前 GPT-5.6 价格系数与实验模型的标准处理单价随 experiment identity 冻结。以“短上下文普通输入 Token = 1”为基准，短上下文为 `普通输入 1 / 缓存读取 0.1 / 缓存写入 1.25 / 输出（含推理）6`；单次请求输入超过 272K 时，整次请求对应 `2 / 0.2 / 2.5 / 9`。subject 的 `turn.completed` 是聚合用量，不能证明其中每次模型请求是否越过阈值，因此报告分别给出全短、全长和总边界；价格等价量乘相应模型的短上下文普通输入美元单价即可得到美元边界。2026-09-01 的 Luna standard 单价为 `$0.20 / 1M` 普通输入、`$0.02 / 1M` 缓存输入和 `$1.20 / 1M` 输出。Fast 不属于正式基准。
 
 每个 manifest 使用 `agentbase.code-search-benchmark/v1`，`runs` 中每项记录：
 
