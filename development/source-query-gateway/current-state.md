@@ -279,6 +279,15 @@ workspace、真实 scc、36 模式/9 oracle、AST 基线、bootstrap、插件、
 
 workspace test/build/lint/fmt、15 个 ast-grep 0.44.1 真实 ignored 测试、Windows 目标 66 个第三方包许可证审计，以及 2026-08-31 更新的 1233 条 RustSec advisory 数据库对 138 个 Cargo 依赖的审计均通过。PowerShell 5.1 的 0.5.0→0.6.0 安装、幂等、完整性拒绝、失败升级回滚、PATH、新进程、升级和卸载生命周期通过；发布归档的 AST、rg、fd、scc、typed symbol、process 与 cache 原生 smoke 也通过。用户默认安装仍为 ready 0.5.0，本次没有执行 AgentBase Codex Publish 或九项模型评测。
 
+## OBS-SQG-032 代码读取 skill 候选未满足逐实验质量与价格门槛
+
+- 状态: verified within declared experiment identities
+- 关联: OBS-SQG-012, OBS-SQG-025, OBS-SQG-029, OBS-SQG-030, OBS-SQG-031
+
+[代码读取策略审计](evidence/audit-result-code-reading-strategy-v1.json) 以“每个 case 的完整质量合同成立且价格等价成本严格下降”为晋级条件，速度允许变慢。既有 C++/TypeScript 配对结果在两项 case 上均质量未闭合且短、长价格同时上涨；唯一 C# 配对 A/B 的两个 case 价格也都上涨，后续 C# candidate-only 身份不能与其他 control 拼接为因果结果。最后只对通用的“精确文本定位→有界正文→未决项停止”候选运行一次 TypeScript 配对探针：candidate 遗漏 `getSessions`、`sessionSelected=null` 清理和非传输/运行时证明边界，短上下文价格上涨 2.229%，只有长上下文价格下降 3.722%，因此按停止条件未扩到 C++ 或 C#。
+
+仓库 `source-query` skill 策略已恢复到 Git 历史 `aafefc62187dae845944649a68750f16fe67073e` 的 `SKILL.md` 与 `symbol-relations.md`，并退役只服务未证单文件快路的 `qualified-single-file-incoming-fast-path` 触发合同。该回退不改变 `tools/srcq` 的 0.5.0/0.6.0 实现、Release 或安装状态；原始实验、capsule 与身份继续作为开发证据，未执行 AgentBase Publish。未来候选只有在同身份配对 A/B 中逐 case 通过完整质量并使适用的短、长价格场景均严格下降，才重开矩阵扩量。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open

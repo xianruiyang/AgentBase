@@ -400,6 +400,8 @@ TSQG-103—TSQG-105 已闭环。0.4.3 候选与完整组件门禁覆盖六位环
 
 用户于 2026-09-01 进一步要求 Go、Python、Rust、JavaScript、TypeScript 尽量达到 C++ 的解析效果，现由 UDES-SQG-020、AC-SQG-016、DES-SQG-021 与 SOL-SQG-017 重开并闭合 TSQG-113—118：TypeScript 首个纵向消费者先证明共享 typed relation 骨架，随后 JavaScript、Python、Go、Rust 接入各自 grammar；`SourceUniverse` 同时接入 Node、Cargo、Go 与 Python 的本地项目元数据 resolver。定向集成覆盖限定定义、outgoing、incoming、callable owner、词法越界和动态 unknown，既有 C++/C# 用例同跑；完整 srcq test/build/lint/fmt、skill routing contract 和独立只读复核均通过。“对齐 C++”只表示语言等价的项目范围、显式类型或限定候选、唯一调用递归和 callable owner，不包含编译器重载、动态分派、宏/生成代码或运行时绑定。用户随后明确授权本次 srcq GitHub Release，0.6.0 已发布并完成真实认证下载回验；用户默认安装与 AgentBase Codex Publish 未执行。
 
+后续代码读取 skill 策略实验未达到用户确认的逐 case 晋级门槛，裁决与恢复身份见 [OBS-SQG-032](current-state.md#obs-sqg-032-代码读取-skill-候选未满足逐实验质量与价格门槛) 和 [审计证据](evidence/audit-result-code-reading-strategy-v1.json)。仓库 skill 已回到 `aafefc62187dae845944649a68750f16fe67073e` 的已用策略，`tools/srcq` 的 P16/P17 产品能力与 Release 保持不变。该策略工作不保留开放实施项；只有未来同身份配对 A/B 在每个冻结代表 case 上完整通过质量合同且短、长价格等价场景均严格下降时才重开，首个反例继续熔断余下矩阵。
+
 ## 5. 停止与重开条件
 
 - AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断或 release gate 任一发生非必要变化时，停止并回到设计裁决。

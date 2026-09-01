@@ -13,19 +13,19 @@ srcq symbol calls --at '<path>:<line>:<column>' --direction outgoing --depth 2
 srcq symbol calls --at '<path>:<line>:<column>' --direction incoming --depth 2
 ```
 
-`--at` 会保留可从源码直接观察到的 `A::B` 限定名。C++ `object.method` 在当前函数内存在唯一、显式且先于调用的参数或局部变量类型时，保留 `receiver=object:Type` 并形成 `typed-member-candidate`。C# 还可从当前词法块或 Lambda/local function 内有效的显式参数/局部、`var = new`、字段/属性、跨 partial 的唯一成员、短属性链和源码静态类型形成同等级候选。Go、Python、Rust、JavaScript、TypeScript/TSX 会从各自可直接证明的方法 receiver、annotation/显式类型、构造或复合字面量、当前实例、字段及静态限定形成同等级候选；适用的 function/method、arrow/lambda/closure owner 按 AST 范围归属。它们都会用已证明的接收者类型排除其他类型的同名 incoming；离开声明作用域的名称、冲突或 union 类型、interface/trait object、`dynamic`、计算属性、函数值、宏/生成代码和复杂链仍保持未知。这些都只是源码候选，不外推别名、模板实例化或运行时类型。位置是定义或静态限定调用时，优先直接查询，不先做全仓名称扫描。
+`--at` 会保留可从源码直接观察到的 `A::B` 限定名。C++ `object.method` 在当前函数内存在唯一、显式且先于调用的参数或局部变量类型时，保留 `receiver=object:Type` 并形成 `typed-member-candidate`；这只是词法类型候选，不外推别名、模板实例化或运行时类型。无法直接证明时仍保留 `semantic-unknown`。位置是定义或静态限定调用时，优先直接查询，不先做全仓名称扫描。
 
 没有位置才按名称查询，并把结果保持为候选。正常查询不先调用 help、doctor 或 capabilities；当前语言报 `unadapted`/`not-applicable`，或需要 machine 消费时才读取对应能力或改用 `--output machine`。
 
 ## 范围与结论
 
-- 目录默认省略；工具从位置或 cwd 解析项目。C++ 还消费 workspace、编译数据库和 response file；C# 消费 `.sln`、Microsoft.NET.Sdk 系列 `.csproj`、Compile Include/Remove 和 ProjectReference，已解析的空 Compile 集不会退回仓库扫描；无项目、不可识别 solution/自定义 SDK、多解决方案/无锚点或同目录多项目、条件、任一祖先 Directory.Build、显式 import、影响默认排除的属性、项目外 wildcard item 或数量上限无法静态展开时返回 `scope=incomplete`。TypeScript/TSX/JavaScript 消费 tsconfig/jsconfig references 与 package 本地引用，Rust 消费 Cargo workspace/path，Go 消费 go.work use/go.mod replace，Python 消费 pyproject 的 src/package-dir/path；损坏、缺失或不支持的元数据同样产生 issue，不扫描依赖缓存、不下载，也不启动构建、语言服务或包管理器。
+- 目录默认省略；工具从位置或 cwd 解析项目，C++ 还消费 workspace、编译数据库和 response file，但不启动构建或扫描整盘。
 - `--add-root` 追加自动范围，`--only-root` 替换范围，`--exclude` 排除根或子树，均可重复。
 - 范围按符号真实可见性选择，而不是默认取整个仓库：`.cpp` 内 helper、匿名命名空间、`static` 定义或只需证明一个消费者时先 `--only-root <file>`；公开函数、类型和跨文件变量才扩大到持有它的模块/源码根。需要 UE/SDK 等工作区外定义时，只加入编译配置或正式项目来源确认的外部根。
 - `scan=prioritized` 只证明已扫描部分中的候选；全集或不存在结论需要权威源码范围和适用根全部扫描。显式 `--only-root` 只证明该选定范围。
 - 唯一小定义会直接带正文；大定义执行返回的 `@body`，多候选先按位置或范围消歧，不批量读取全部正文。
 - 调用树只包含函数、方法和其他可调用节点；类、结构体、字段和变量用 `definition`/`references` 查询，显式接收者类型和变量名只作为调用节点上下文。树只递归唯一的直接或显式类型成员候选；`ambiguous`、`semantic-unknown`、虚调用、未解析成员分派、循环或预算叶子不能解释为没有关系。
-- model 调用树优先显示 AST 外层类型或已解析定义直接证明的调用者限定名；方括号先给解析状态，再以分号给不同的调用形式，并可附 `receiver=name:Type|unknown`。machine 保留短 `name`，并在同一证据成立时给出可空 `qualified_name`；`candidate` 均是源码证据边界，不等同编译器最终绑定。同一父节点的调用点路径完全相同时只显示一次，后续 `:line:column` 只继承该父节点下已显示的路径；machine 的每个 `call.path` 始终完整保留。
+- model 调用树的方括号先给解析状态，再以分号给不同的调用形式，并可附 `receiver=name:Type|unknown`；`candidate` 均是源码证据边界，不等同编译器最终绑定。同一父节点的调用点路径完全相同时只显示一次，后续 `:line:column` 只继承该父节点下已显示的路径；machine 的每个 `call.path` 仍完整保留。
 
 ## 10 秒快速路径
 

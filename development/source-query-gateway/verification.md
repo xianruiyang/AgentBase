@@ -124,3 +124,14 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 | 正式 Release | GitHub Release `srcq-v0.6.0` 为非 draft、非 prerelease，标签精确指向最终 commit，8 个资产均为 uploaded 且 GitHub digest 与本地一致；从私有 Release 通过 `gh` 认证真实下载后，在隔离目录完成安装、`integrity=verified`、version/doctor/scc doctor 与卸载 |
 
 这些证据只覆盖 0.6.0 声明的静态候选与本地项目范围；编译器重载、interface/trait 或动态分派、函数值、复杂泛型/union、宏/生成代码、运行时绑定、其余语言依赖全集和关系大结果同快照续页仍保持 unknown/incomplete。用户默认安装仍为 ready 0.5.0；本次发布没有修改 AgentBase Codex payload，也没有运行无关九项模型评测。
+
+## 10. 代码读取 skill 策略回退审计
+
+| 范围 | 结果 |
+| --- | --- |
+| 晋级合同 | 每个实验 case 必须完整通过 required 质量合同，并使价格等价成本严格下降；聚合均值不能代替逐项，速度允许变慢。request 级上下文分类不可得时，短、长两种冻结价格场景都必须下降 |
+| 既有反例 | C++/TypeScript 配对审计的两个 case 均质量未闭合且两种价格上涨；C# 唯一配对 A/B 的 same-name 与 static-wiring 两项短价格分别由 `59731.0→75574.4`、`60267.8→68177.6`，后续 candidate-only 结果不与其他 control 拼接 |
+| 最小最终探针 | TypeScript experiment `d83f0dd9039447954b37eb67f33e60efba05d52906a1fca34e773add20d65519`；两侧均为 srcq 0.6.0、Luna medium/default、只读、无子代理、usage 完整且 postflight 无失败。candidate required 失败，短价格 `43695.8→44669.6`（+2.229%），长价格 `83800.6→80681.2`（-3.722%），Token +102.766%；按首个反例停止，未扩到 C++/C# |
+| 仓库结果 | `skills/source-query/SKILL.md` 与 `references/symbol-relations.md` 恢复 Git `aafefc62187dae845944649a68750f16fe67073e`；相应单文件快路触发 case 退出。`tools/srcq`、Release、安装与 Codex payload 未改变 |
+
+完整身份、raw artifact 哈希、质量缺项、价格和停止理由在 [audit-result-code-reading-strategy-v1.json](evidence/audit-result-code-reading-strategy-v1.json)。本审计只证明声明的 C#/C++/TypeScript 快照与 Luna medium/default；速度没有作为拒绝条件，也没有运行完整九项评测或 AgentBase Publish。
