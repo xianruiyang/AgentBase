@@ -36,6 +36,8 @@ must: 文档只更新被本次改动直接影响的事实，删除或改写已�
 
 ## 验证与发布
 
+must: 本项目“发布/更新”默认仅指经正式入口应用候选到消费者并读回；版本、标签、远端/分发资产及完整验证须用户明确要求
+
 must: 用户授权准备/复现/部署 AgentBase Windows 主机时，以下入口安装/升级并读回 PowerShell 7、fd、scc、hyperfine、Python 3、Node.js LTS、ast-grep、用户级 Codex CLI，再按 `tools/srcq/docs/installation.md` 安装/升级 `srcq` 并读回 Status、`srcq doctor`、`srcq query scc doctor`；PATH 变化后重启 Codex 桌面宿主，再开新任务发布：
 
 ```powershell
