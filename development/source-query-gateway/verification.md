@@ -136,3 +136,14 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 | 仓库结果 | `skills/source-query/SKILL.md` 与 `references/symbol-relations.md` 恢复 Git `aafefc62187dae845944649a68750f16fe67073e`；相应单文件快路触发 case 退出。`tools/srcq`、Release、安装与 Codex payload 未改变 |
 
 完整身份、raw artifact 哈希、质量缺项、价格和停止理由在 [audit-result-code-reading-strategy-v1.json](evidence/audit-result-code-reading-strategy-v1.json)。本审计只证明声明的 C#/C++/TypeScript 快照与 Luna medium/default；速度没有作为拒绝条件，也没有运行完整九项评测或 AgentBase Publish。
+
+## 11. 交互轮次机制实验审计
+
+| 候选 | 身份与直接结果 | 裁决 |
+| --- | --- | --- |
+| 单阶段有界批取 | `8ca84971…`；command `3→3`，工具正文 `9768→14144` Token，短/长价格 `42304.0/80336.0→50013.0/94782.0` | 机制未发生、质量与价格失败，停止 |
+| 两阶段索引→批取 | `198016c2…`；command `5→11`，工具正文 `10332→8689` Token，实际总 Token `93439→263266`，短/长价格 `43504.4/82547.8→84935.6/162683.2` | 默认 80 单元页造成 6 次续页并有一次失败命令；质量与价格失败，停止 |
+| 两阶段显式大页 | `081059d7…`；command `3→3` 且 candidate 一次失败，工具正文 `16067→9684` Token，实际总 Token `93755→85640`，短/长价格 `47921.8/91133.6→35854.2/66743.4` | 成本改善但 required 质量失败，不能采纳或扩量 |
+| srcq 无模型定向探针 | 同一第二阶段 argv；只设 12000 Token 预算返回 `@more shown=80 omitted=389`，再设 `--limit 1000` 后完整且无 `@more/@cut` | 单次大页能力已存在；分页不是缺失能力，问题位于默认策略、命令选择与消费者动作链 |
+
+三个 experiment 均为单 case、两环境各一次，preflight/postflight、usage 与网络有效，detached capsule 分别为 `0ef6b83…`、`9327638e…`、`8c8d47be…`；完整字段和限制见 [结构化审计](evidence/audit-result-interaction-rounds-v1.json)。这些证据支持“额外交互可以吞没局部输出压缩”，同时否定“raw command 数单独决定成本”。因所有 candidate 都有 required 质量失败，本轮没有修改正式规则/skill，没有运行 C++/C# 扩量、完整九项评测或 AgentBase Publish。

@@ -85,3 +85,54 @@ control 的链路是两次文本查询后回答；candidate 依次读取 `source
 - 长上下文价格场景下降即可采纳最终 TS candidate；其完整质量失败，且现有 runner 不能恢复每个请求实际属于短或长上下文档位。
 
 若下一次需要精确定位成本，runner 应在 Codex 事件能力允许时记录每次采样请求的 ordinary input、cache read、cache write、output/reasoning、前置 tool item 映射和请求上下文档位；能力不存在时必须继续把归因标为结构性估计，不伪造逐 command 账单。新的读取策略候选仍须逐 case 先通过完整质量，再严格降低适用价格等价量；一个反例即停止扩量。
+
+## 6. 2026-09-01 交互轮次机制探针 A
+
+实验 `8ca84971bd48216a8d8d692d5fb58fcf36e5ecfb725534839fa578e5125fa446` 只选择 TypeScript `opencode-webview-message-boundary`，使用 `gpt-5.6-luna`、medium、default、WebSocket、只读工作区、禁用子代理和两侧相同的 `srcq 0.6.0`。preflight 与 postflight 均通过，环境树唯一差异是 candidate `AGENTS.md` 增加一条通用策略：多个已知文本谓词先形成清单，再用同一 `srcq rg` 的重复 `-e` 与 `-C` 一次取得有界上下文，只有缺项、截断或结论歧义才补查。原始结果位于 `C:\Users\gzxt\AppData\Local\AgentBase\code-search-experiments\interaction-rounds-luna-m-20260901-01\ts-first`；detached capsule SHA-256 为 `0ef6b83b00a66b9041deb4eef41a87016aadac5c2b1ad0fa290e4b3888a73a18`。
+
+| 指标 | control | candidate | candidate 变化 |
+| --- | ---: | ---: | ---: |
+| command / agent message | 3 / 2 | 3 / 2 | 不变 |
+| 一次性可见工具正文（`o200k_base`） | 9,768 Token | 14,144 Token | +44.799% |
+| input / output Token | 90,208 / 1,424 | 100,581 / 1,748 | +11.499% / +22.753% |
+| actual total Token | 91,632 | 102,329 | +11.674% |
+| 短 / 长价格等价量 | 42,304 / 80,336 | 50,013 / 94,782 | +18.223% / +17.982% |
+| elapsed | 42,654 ms | 44,142 ms | +3.489% |
+
+candidate 第一条仍使用宽锚点和 `-C 3`，随后以 `-C 100` 读取大窗口并第三次补查；它没有执行重复 `-e` 的完整清单批取，也没有减少 command。独立 capsule 审计还确认两侧答案都未明确说明两个处理器的不同文件/作用域身份、`sessionSelected` 空值清理和源码证据不证明 VS Code 传输/运行时交付，candidate 因而未通过完整质量。
+
+该反例推翻“增加一条单阶段静态批取建议即可减少交互轮次”，没有推翻“在证据等价且轮次真实减少时可能降低成本”，因为操纵变量没有实际发生。后继候选不得原样重跑；最低信息增益方向是把未知谓词任务改为“两阶段索引→一次批量正文”：首次只枚举当前任务实际需要的定义、调用、分支或注册锚点与行号，第二次把已发现锚点合成一次有界上下文查询，除明确截断或缺少用户要求的事实外停止。该方向仍须新的独立 identity 先证明真实 command 数下降和完整质量，再讨论成本收益。
+
+## 7. 2026-09-01 交互轮次机制探针 B
+
+实验 `198016c24bdb2192fadd7c5a0d72fc0320c3414ef98159327ac656914ecfdfca` 在同一 TS case、模型、srcq、只读和单差异边界下，把候选改为强制“两阶段索引→一次批量正文”；preflight/postflight 和网络均有效，detached capsule SHA-256 为 `9327638e9e7e6a85268ecdfc54318fd3d1ec5f1be8c3fc4924950ddf6148eca9`。原始结果位于 `C:\Users\gzxt\AppData\Local\AgentBase\code-search-experiments\interaction-rounds-luna-m-20260901-02\ts-first`。
+
+| 指标 | control | candidate | candidate 变化 |
+| --- | ---: | ---: | ---: |
+| command / agent message | 5 / 2 | 11 / 2 | +6 / 不变 |
+| 一次性可见工具正文（`o200k_base`） | 10,332 Token | 8,689 Token | -15.902% |
+| input / output Token | 91,952 / 1,487 | 260,870 / 2,396 | +183.702% / +61.130% |
+| actual total Token | 93,439 | 263,266 | +181.752% |
+| 短 / 长价格等价量 | 43,504.4 / 82,547.8 | 84,935.6 / 162,683.2 | +95.235% / +97.078% |
+| elapsed | 40,631 ms | 70,151 ms | +72.654% |
+
+candidate 的前两条命令符合索引与批取形状，但第二条默认 model 页返回临时续页；随后产生 6 次 `srcq more`、两次同类 Provider 补查和一次 App 分支补查。它的一次性可见工具正文比 control 少 15.902%，聚合 input 却多 183.702%，进一步支持“较短工具正文不能抵消额外交互轮次”的原线索。独立审计确认 candidate 还缺 `sessionSelected` 空值清理和源码证据不证明传输/运行时交付，质量与两种价格均失败。
+
+这次反例推翻“只规定两阶段即可得到两次模型工具交互”；被推翻的直接原因不是 `srcq` 缺少恢复协议，而是默认 80 个证据单元硬页上限使一次宽批取转成模型逐页动作。对同一第二阶段 argv 的无模型定向探针显示：只提高 `--model-token-budget 12000` 仍返回 `@more shown=80 omitted=389`；同时设置 `--limit 1000 --model-token-budget 12000` 后完整返回且无 `@more/@cut`。因此现有 0.6.0 控制面具备单次大页能力，后继仅剩一个有新增判别信息的静态候选：两阶段第二步显式使用该控制面，并在回答前核对用户事实清单和源码语义边界；若仍不能真实降低 command、完整质量和两种价格，则停止规则层实验。
+
+## 8. 2026-09-01 交互轮次机制探针 C 与总体裁决
+
+[三候选结构化审计](audit-result-interaction-rounds-v1.json)登记了完整 identity、capsule、raw root、质量、usage、价格与停止理由。最终实验 `081059d7871752f250d40fe21f4edc016dfc9f28d03ee1ffa8f6f9a63aad24bb` 使用“两阶段 + 显式 `--limit 1000`/`--model-token-budget 12000` + 回答清单”；preflight/postflight 有效，detached capsule SHA-256 为 `8c8d47be12ed2eecbf2c13a503c0b7815698d4137136a695fe656fb953a8dbb9`。
+
+| 指标 | control | candidate | candidate 变化 |
+| --- | ---: | ---: | ---: |
+| command / failed command | 3 / 0 | 3 / 1 | command 不变，candidate 多 1 次失败 |
+| 一次性可见工具正文（`o200k_base`） | 16,067 Token | 9,684 Token | -39.727% |
+| input / output Token | 92,185 / 1,570 | 83,985 / 1,655 | -8.895% / +5.414% |
+| actual total Token | 93,755 | 85,640 | -8.656% |
+| 短 / 长价格等价量 | 47,921.8 / 91,133.6 | 35,854.2 / 66,743.4 | -25.182% / -26.763% |
+| elapsed | 40,924 ms | 45,258 ms | +10.590% |
+
+candidate 第一条索引成功，第二条把 `--` 后的原生 argv 错写为再次包含 `rg`，exit 1；第三条用正确边界恢复并取得有界大页。因此它没有把 command 降到 2，但相对 control 的全文式读取显著减少了可见证据、ordinary input 和两种价格。独立审计确认答案仍缺初始化 `getSessions`、`sessionSelected=null` 清理和“不证明 VS Code 传输/运行时交付”的源码边界，且合并了 `agentsList`/`agentDetected` 的行号范围；质量失败阻断采纳和跨语言扩量。
+
+三次实验把原线索收敛为：交互轮次是强放大器，但 raw command 数不是充分成本指标；一次性工具正文、每轮重复上下文、ordinary/cache 构成、输出和失败恢复共同决定价格。探针 B 在工具正文少 15.902% 时因 command `5→11` 使价格近乎翻倍，直接支持额外交互可以吞没局部压缩；探针 C 在 command 同为 3 时仍因目标正文少 39.727% 而显著降价，直接否定“只看调用数”。静态规则层连续三种形状都没有同时取得更少 command、完整质量和更低价格，当前不修改正式 `global/AGENTS.md` 或 `source-query` skill。下一次只有工具或 runner 能可靠消除 argv 错形与模型逐页动作，并以非项目特定的答案完整性入口闭合首个 case 时才重开。

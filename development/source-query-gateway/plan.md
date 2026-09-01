@@ -135,6 +135,10 @@ candidate-only 全量运行的 11 次完整 usage、一次 TLS 超时和关系 c
 
 后续候选先裁决能否减少完整模型决策链：已知文件、锚点和有界范围可实验一次批取；skill、symbol、AST 或 LSP 只有能替代后续查询、正文读取、失败或回退时才可能取得净收益；任务内 `--help` 应由稳定的最小语法或正式模板消除。一次性 stdout、command 数和 skill 字节只解释机制，采纳仍逐 case 先过完整质量，再比较 aggregate usage 的 ordinary/cached/output 分项与短、长价格场景，最后才看速度。本节不重开已关闭阶段，也不授权新增 runner 或工具入口。
 
+后续三次单 case 配对进一步限定该原则，结构化结果见 [audit-result-interaction-rounds-v1.json](evidence/audit-result-interaction-rounds-v1.json)。静态单阶段规则没有减少 command；静态两阶段规则在 `srcq` 默认 80 单元页上扩成 6 次续页与其他补查，工具正文更少但价格近乎翻倍；显式 `--limit 1000` 与 `--model-token-budget 12000` 能机械消除分页，最终 candidate 工具正文和两种价格均下降，但一次 argv 错形使 command 没有减少，答案仍缺 required。故当前把“交互轮次”保留为强成本机制而非单指标，把“目标正文量、ordinary/cache/output、失败恢复”纳入同一决策链；不把显式预算配方写入正式规则，也不扩量。
+
+若重开，首个消费者必须同时证明：非项目特定的正式入口能无失败地形成完整大页或等价批取；observed command/采样结构相对可比 control 真实下降，或 runner 已取得逐请求 usage；全部 required 与源码/运行时边界通过 detached audit；短、长价格场景均严格下降。只有该纵向切片成立后才进入 C++/C#，否则继续保持当前策略。
+
 ## 4. 阶段与任务
 
 ### P0 固定分支合同和 AST 基线

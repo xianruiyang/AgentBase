@@ -290,6 +290,15 @@ workspace test/build/lint/fmt、15 个 ast-grep 0.44.1 真实 ignored 测试、W
 
 [Token 机制与优化线索审计](evidence/code-reading-token-clues-v1.md)进一步复算最终 TypeScript 与早先 C++/TypeScript 的真实命令链。最终探针中 candidate 的一次性工具正文从 18,225 降至 8,450 Token，但 command 从 2 增至 6、聚合 input 增加 74,475、实际总 Token 增加 102.766%；两个 skill 正文合计约 2,083 Token，只占总增量 2.735%。这证明当前主要线索是减少需要模型重新采样的交互轮次，并让高级查询真正替代后续文本链；它不证明每次调用有固定成本，也不证明 rg 永远优于 symbol/AST。逐请求 usage 尚不可得，固定上下文复现仍只作结构性归因。
 
+## OBS-SQG-033 交互轮次线索已形成新反例但仍无可采纳候选
+
+- 状态: verified within three declared experiment identities
+- 关联: OBS-SQG-032
+
+[三候选结构化审计](evidence/audit-result-interaction-rounds-v1.json)在同一 TypeScript case、Luna medium/default、两侧 `srcq 0.6.0`、只读且禁用 subject 子代理的边界下，只让 candidate `AGENTS.md` 增加一条通用策略。单阶段批取没有减少 command，价格上涨；两阶段索引/批取因默认 80 个证据单元分页扩成 11 条 command，虽一次性工具正文少 15.902%，实际总 Token 仍上涨 181.752%；显式大页候选把工具正文减少 39.727%、短/长价格减少 25.182%/26.763%，但 command 仍与 control 同为 3，且有一次 argv 错形恢复。三个 candidate 均遗漏适用 required 字段，未扩到 C++ 或 C#。
+
+同一第二阶段 argv 的无模型探针确认：`--model-token-budget 12000` 单独使用仍受默认 80 单元上限分页；再加 `--limit 1000` 可完整返回且无 `@more/@cut`。因此当前不是 srcq 缺少单次大页能力，而是默认投影、命令选择、失败恢复和答案完整性的组合问题。现有证据支持“交互轮次会强烈放大成本”，也证明 raw command 数不是充分指标；当前保持正式源码读取策略，不修改 `global/AGENTS.md` 或 `source-query` skill，不执行 AgentBase Publish。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open
