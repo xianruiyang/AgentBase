@@ -8,7 +8,8 @@
 
 ## 当前状态
 
-- 当前正式 Release：`srcq 0.6.0`。
+- 当前正式 Release：`srcq 0.7.0`。
+- `0.7.0` 改进无 LSP 的 C++ 限定成员关系：统一解析常见头文件与内联实现，区分类内声明、类内/类外定义、namespace 自由函数和 `friend` 函数，支持由显式字段/参数/局部类型证明的简单成员链 incoming 候选；同时支持 UTF-8、带 BOM 的 UTF-16 和严格可解码的 GBK/CP936 源码。复杂链、模板实例化、别名和运行时分派仍保持未知。
 - `0.6.0` 在不依赖 LSP 的前提下增加 C# 词法作用域内的显式类型调用、partial 成员/短属性链、源码静态类型和 `.sln`/`.csproj` Compile 范围解析；Go、Python、Rust、JavaScript、TypeScript/TSX 复用一套 typed relation 中间层，从显式类型、构造、当前接收者、字段和静态限定形成类型候选，并只读恢复本地项目引用范围。当前源码还会为 JavaScript、TypeScript/TSX 类方法的 incoming 调用者保留由 AST 外层 class 直接证明的可选限定身份；动态分派、函数值、宏/生成代码和不能唯一证明的类型仍保持 unknown。
 - 当前固定验证引擎：`ast-grep 0.44.1`；`srcq symbol` 的 outline 关系能力以该版本为正式开发基线。
 - 当前 AST、透传、协议、压力与发布验证统一使用 ast-grep `0.44.1`；不再维护较早版本的现行兼容矩阵。
@@ -24,8 +25,8 @@
 从私有 GitHub Release 认证下载正式版本并安装，不需要 Rust 或本仓库工作区；目标账号必须有仓库读取权限，且本机 `gh` 已完成认证：
 
 ```powershell
-gh release download srcq-v0.6.0 --repo xianruiyang/AgentBase --pattern install-srcq-release.ps1
-.\install-srcq-release.ps1 Install -Version 0.6.0
+gh release download srcq-v0.7.0 --repo xianruiyang/AgentBase --pattern install-srcq-release.ps1
+.\install-srcq-release.ps1 Install -Version 0.7.0
 & (Join-Path $env:LOCALAPPDATA 'Programs\srcq\current\srcq.exe') doctor
 ```
 
