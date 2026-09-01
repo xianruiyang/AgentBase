@@ -59,7 +59,8 @@
     "reasoning_effort_economy",
     "bounded_subagent_delegation",
     "adaptive_execution_plan",
-    "skill_context_lifecycle"
+    "skill_context_lifecycle",
+    "publication_scope"
   ],
   "behavior_tag_definitions": {
     "read_only": "请求只授权分析、解释、审查或查询，不修改文件、进程或外部状态。",
@@ -94,7 +95,8 @@
     "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值，线程设置入口只在配置证据会改变动作时查询，并只为可预期长期阶段且剩余收益足以覆盖切换和恢复成本时设置；孤立难题和短机械收尾沿用当前档位。",
     "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定且委派净收益成立时，事实未知而只读可得用 evidence，必须操作才能裁决路径、错误或约束未知用 experiment，目标、规则、范围与 oracle 已确认且只剩难脚本化执行用 operator，否则主代理直接完成。等待不是角色依据：观察既有执行属 evidence，启动并分析冻结输入的已知执行属 operator，修改后反复运行以发现路径属 experiment。创建这三种固定角色时必须显式且只用 fork_turns=none，上下文只经有界 capsule 传入，不省略、不用 all 或正整数，也不用通用角色绕过固定配置；子代理不得再创建子代理、新任务或分叉任务。子代理只返回稀疏结果，主代理保留目标、设计、正式验收、完成、Git、发布和外部写责任。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
-    "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。"
+    "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。",
+    "publication_scope": "用户要求把改动发布或更新到当前实际使用环境且未明确要求完整发布时，只经既有正式入口应用到指定当前消费者并读回，不隐式扩展到版本、标签、远端 Release、分发资产、其他组件或完整发布验证；只有用户明确要求完整发布、发行版本或具体扩展对象时才进入相应正式合同，未变输入的有效证据复用。"
   },
   "peer_skills": [
     {
@@ -2036,6 +2038,52 @@
       "forbidden_behavior_tags": [
         "authority_lifecycle",
         "adaptive_execution_plan"
+      ]
+    },
+    {
+      "id": "current-environment-publish-without-full-release",
+      "kind": "behavior",
+      "request": "一个本地组件的改动已经完成适用验证。现在发布到当前实际使用环境并确认生效即可；没有要求发行版本、tag、远端 Release、分发资产、其他组件或完整发布验证。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "execution-governor",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "no_scope_expansion",
+        "local_task_fast_path",
+        "publication_scope"
+      ],
+      "forbidden_behavior_tags": [
+        "expensive_action_preflight",
+        "dimension_bounded_validation"
+      ]
+    },
+    {
+      "id": "explicit-full-release-contract",
+      "kind": "behavior",
+      "request": "候选已经稳定；请完整发布新版本，按该组件正式合同完成版本、分发包、tag、远端 Release 和明确适用的完整发布门禁。",
+      "expected_skills": [
+        "execution-governor"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "expensive_action_preflight",
+        "adaptive_execution_plan",
+        "publication_scope"
+      ],
+      "forbidden_behavior_tags": [
+        "no_scope_expansion"
       ]
     },
     {
