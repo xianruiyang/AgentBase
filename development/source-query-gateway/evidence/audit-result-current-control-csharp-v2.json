@@ -1,6 +1,8 @@
 {
   "schema": "agentbase.current-control-code-reading-audit/v2",
   "created_utc": "2026-09-01T16:17:00Z",
+  "completion_scope": "interim-first-case-only",
+  "superseded_by": "development/source-query-gateway/evidence/audit-result-current-control-code-reading-v3.json",
   "control_definition": {
     "agents": "the current installed Codex AGENTS.md plus the target workspace AGENTS chain",
     "skills": "all current installed user and system skills, every installed and enabled marketplace plugin, and the current remote-plugin cache",

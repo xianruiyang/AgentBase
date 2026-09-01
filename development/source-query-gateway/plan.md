@@ -145,7 +145,9 @@ candidate-only 全量运行的 11 次完整 usage、一次 TLS 超时和关系 c
 
 用户随后确认 Control 不是缩减因果 skill 集，而是当前 Codex 完整 `AGENTS.md` 链和 skill 环境；测试项是在该 Control 上的唯一变化。benchmark preparer 因此新增 `current-control`：冻结全部安装 skills 与当前启用插件，以当前 Codex CLI 完成插件安装读回，再克隆 Candidate，并把共享插件快照纳入环境哈希。旧实验因 Control 身份不足统一降为参考，不据其数值采纳新策略。
 
-首个 C# case 在最终完整 Control 上按要求运行两次，required 均为 `7/8`，共同遗漏排序语义；第一次裸用 `rg`，第二次使用 `srcq`，实际总 Token 相差 1.827 倍。前置诊断同时发现 v14 漏记真实 `Test:58 -> Read` 调用、旧环境树漏算插件安装 cache，均已由 v15 与 runner 向前修正。按“首个重复 case 稳定且完整才扩量”的证据前沿，本轮停止 TypeScript、C++ 和广度题，不创建第三次同输入采样，也不修改生产规则、skill 或 srcq。下一次若继续实验，必须从 v15 或后继 corpus 建立同 identity 的新 Control/Candidate 配对，而不是复用本轮 v14 Control-only 数字。
+固定的 C#、C++ 与 TypeScript 三道题均在最终完整 Control 上各运行两次，required 分别为 `7/8、7/8`、`7/7、6/7`、`6/6、6/6`，总计 `39/42`。C# 两次共同遗漏排序语义，C++ 第二次遗漏一个定义行，TypeScript 两次完整；C# 与 TypeScript 的两次查询路线分别在裸 `rg` 与 `srcq` 间切换，C++ 第二次还有一次错误 argv 后恢复。六次正式运行合计 `856,159` Token、`342.504 s`，短/长价格边界 `$0.06058192—$0.11398244`，证明完整 Control 本身质量与路径均不稳定。
+
+前置诊断同时发现 v14 漏记真实 `Test:58 -> Read` 调用、旧环境树漏算插件安装 cache，均已由 v15 与 runner 向前修正。此前以首个 C# 失败截断整个 Control 是错误的阶段裁决，已由完整 v3 审计替代；后续测试项必须克隆完整 Control，并在同一三题各两次合同下重新运行 Candidate 后比较，不得把 Control 自身波动归因给测试项，也不修改生产规则、skill 或 srcq 来迎合单次结果。
 
 ## 4. 阶段与任务
 

@@ -1,0 +1,244 @@
+{
+  "schema": "agentbase.current-control-code-reading-audit/v3",
+  "created_utc": "2026-09-01T17:08:45Z",
+  "supersedes_completion_claim": "development/source-query-gateway/evidence/audit-result-current-control-csharp-v2.json",
+  "control_definition": {
+    "rules": "the current Codex active AGENTS.md chain",
+    "skills": "the current complete installed user, system, plugin, and remote-plugin skill environment",
+    "subject": {
+      "model": "gpt-5.6-luna",
+      "reasoning_effort": "medium",
+      "service_tier": "default",
+      "read_only": true,
+      "multi_agent": false
+    },
+    "required_cases": [
+      "vmt-temperature-collector-sampling-chain",
+      "facecutting3d-raycast-chain",
+      "opencode-webview-message-boundary"
+    ],
+    "repetitions_per_case": 2
+  },
+  "environment_identity": {
+    "codex_version": "codex-cli 0.151.0-alpha.7.2",
+    "codex_sha256": "bfd4c3b971477a559eadaeae8b1e41382ccb7656bd0104970cf5c6c581f2da7d",
+    "srcq_version": "srcq 0.7.0",
+    "control_tree_sha256": "7d36e7cb7d165ccd50841cb0dfedcfba6665bb5883e16455d42cf85b8bed33c5",
+    "tree_file_count": 29354,
+    "installed_user_and_system_skill_directories": 24,
+    "active_marketplace_plugins": 10,
+    "environment_diff_ok": true
+  },
+  "corpus": {
+    "path": "development/code-search-benchmark/corpus/v15.json",
+    "version": "2026-09-02.1",
+    "sha256": "2901b59c174042dc82ca8974a2615b927ad21558dc532d57a2310b5d0268bd4d"
+  },
+  "cases": [
+    {
+      "id": "vmt-temperature-collector-sampling-chain",
+      "language": "C#",
+      "required_total_per_run": 8,
+      "runs": [
+        {
+          "ordinal": 1,
+          "required_passed": 7,
+          "required_total": 8,
+          "failed_required": [
+            "ValidateUidsUnsafe must state that it visits only enabled sensors ordered by SlotIndex"
+          ],
+          "elapsed_ms": 43745,
+          "command_execution_items": 2,
+          "query_route": "bare-rg",
+          "input_tokens": 71691,
+          "cached_input_tokens": 52480,
+          "output_tokens": 1579,
+          "reasoning_output_tokens": 640,
+          "actual_total_tokens": 73270,
+          "standard_price_usd_bounds": {
+            "all_requests_short_context": 0.0067866,
+            "all_requests_long_context": 0.0126258
+          }
+        },
+        {
+          "ordinal": 2,
+          "required_passed": 7,
+          "required_total": 8,
+          "failed_required": [
+            "ValidateUidsUnsafe must state that it visits only enabled sensors ordered by SlotIndex"
+          ],
+          "elapsed_ms": 49950,
+          "command_execution_items": 4,
+          "query_route": "srcq",
+          "input_tokens": 132135,
+          "cached_input_tokens": 109312,
+          "output_tokens": 1759,
+          "reasoning_output_tokens": 523,
+          "actual_total_tokens": 133894,
+          "standard_price_usd_bounds": {
+            "all_requests_short_context": 0.00886164,
+            "all_requests_long_context": 0.01666788
+          }
+        }
+      ],
+      "stability": {
+        "required_score_stable": true,
+        "failed_required_identity_stable": true,
+        "query_route_stable": false,
+        "actual_total_token_ratio_max_over_min": 1.82735362467572
+      }
+    },
+    {
+      "id": "facecutting3d-raycast-chain",
+      "language": "C++",
+      "required_total_per_run": 7,
+      "runs": [
+        {
+          "ordinal": 1,
+          "required_passed": 7,
+          "required_total": 7,
+          "failed_required": [],
+          "elapsed_ms": 63260,
+          "command_execution_items": 5,
+          "failed_command_execution_items": 0,
+          "query_route": "srcq-and-bounded-read",
+          "input_tokens": 137243,
+          "cached_input_tokens": 107264,
+          "output_tokens": 2123,
+          "reasoning_output_tokens": 941,
+          "actual_total_tokens": 139366,
+          "standard_price_usd_bounds": {
+            "all_requests_short_context": 0.01068868,
+            "all_requests_long_context": 0.02010356
+          }
+        },
+        {
+          "ordinal": 2,
+          "required_passed": 6,
+          "required_total": 7,
+          "failed_required": [
+            "the answer did not give the 1-based definition line for BvhTree::rayCastInteral while the contract requires all three definition locations"
+          ],
+          "elapsed_ms": 71063,
+          "command_execution_items": 7,
+          "failed_command_execution_items": 1,
+          "query_route": "srcq-and-bounded-read",
+          "input_tokens": 198609,
+          "cached_input_tokens": 172032,
+          "output_tokens": 2472,
+          "reasoning_output_tokens": 1288,
+          "actual_total_tokens": 201081,
+          "standard_price_usd_bounds": {
+            "all_requests_short_context": 0.01172244,
+            "all_requests_long_context": 0.02196168
+          }
+        }
+      ],
+      "stability": {
+        "required_score_stable": false,
+        "query_route_stable": true,
+        "command_sequence_stable": false,
+        "actual_total_token_ratio_max_over_min": 1.4428268013719272
+      }
+    },
+    {
+      "id": "opencode-webview-message-boundary",
+      "language": "TypeScript",
+      "required_total_per_run": 6,
+      "runs": [
+        {
+          "ordinal": 1,
+          "required_passed": 6,
+          "required_total": 6,
+          "failed_required": [],
+          "elapsed_ms": 55912,
+          "command_execution_items": 6,
+          "failed_command_execution_items": 0,
+          "query_route": "srcq",
+          "input_tokens": 162142,
+          "cached_input_tokens": 131584,
+          "output_tokens": 1926,
+          "reasoning_output_tokens": 845,
+          "actual_total_tokens": 164068,
+          "standard_price_usd_bounds": {
+            "all_requests_short_context": 0.01105448,
+            "all_requests_long_context": 0.02095336
+          }
+        },
+        {
+          "ordinal": 2,
+          "required_passed": 6,
+          "required_total": 6,
+          "failed_required": [],
+          "elapsed_ms": 58574,
+          "command_execution_items": 4,
+          "failed_command_execution_items": 0,
+          "query_route": "bare-rg-and-bounded-read",
+          "input_tokens": 142370,
+          "cached_input_tokens": 108544,
+          "output_tokens": 2110,
+          "reasoning_output_tokens": 1087,
+          "actual_total_tokens": 144480,
+          "standard_price_usd_bounds": {
+            "all_requests_short_context": 0.01146808,
+            "all_requests_long_context": 0.02167016
+          }
+        }
+      ],
+      "stability": {
+        "required_score_stable": true,
+        "quality_complete_in_both_runs": true,
+        "query_route_stable": false,
+        "actual_total_token_ratio_max_over_min": 1.1355758582502768
+      }
+    }
+  ],
+  "totals": {
+    "formal_run_count": 6,
+    "quality_complete_run_count": 3,
+    "required_passed": 39,
+    "required_total": 42,
+    "elapsed_ms": 342504,
+    "input_tokens": 844190,
+    "cached_input_tokens": 681216,
+    "output_tokens": 11969,
+    "reasoning_output_tokens": 5324,
+    "actual_total_tokens": 856159,
+    "standard_price_usd_bounds": {
+      "all_requests_short_context": 0.06058192,
+      "all_requests_long_context": 0.11398244
+    },
+    "setup_preflights": {
+      "count": 2,
+      "elapsed_ms": 47147,
+      "actual_total_tokens": 102798,
+      "standard_price_usd_bounds": {
+        "all_requests_short_context": 0.00866016,
+        "all_requests_long_context": 0.01705032
+      }
+    }
+  },
+  "raw_evidence": [
+    {
+      "cases": ["vmt-temperature-collector-sampling-chain"],
+      "location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/control-v15-20260902-r4/csharp-control",
+      "experiment_identity": "5163fe826bcce23a0e6c98ae5f71f4188ae1b9e4e9eb78a61c3e005af6f6c579",
+      "experiment_sha256": "8ee41e287d8f1167d4e119954d0a8a146eb59052ea1990e86dcdbe2e1f8ddcb5",
+      "summary_sha256": "dd8ba640bcadca9a30c83bf2019b9ceed59af8d6ac94d6a3b346aab8e6fee4e9"
+    },
+    {
+      "cases": ["facecutting3d-raycast-chain", "opencode-webview-message-boundary"],
+      "location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/control-v15-20260902-r4/cpp-ts-control",
+      "experiment_identity": "ca61d02261ada08b9e7d1e0dee574c5a072432b2c88c8961cd7561e20ca88182",
+      "experiment_sha256": "54d8620fb56fc1928f9c7f29a301b5048070210cfbf619009a1a4b140c6e8c3b",
+      "summary_sha256": "1adf7ea048115d1b44f904c249d9d000dbf3d5171d9f2491ed7efb35703e5f56"
+    }
+  ],
+  "decision": {
+    "control_test_complete": true,
+    "control_quality_complete": false,
+    "control_behavior_stable": false,
+    "reason": "all three fixed tasks were run twice; C# missed the same required fact twice, C++ was complete once and missed one definition location once, while TypeScript was complete twice but switched between srcq and bare rg",
+    "candidate_experiment_boundary": "future test-item comparisons must clone this complete Control contract and rerun the same six observations; the earlier first-case stopping decision is invalid"
+  }
+}
