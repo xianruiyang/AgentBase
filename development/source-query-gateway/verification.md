@@ -132,6 +132,7 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 | 晋级合同 | 每个实验 case 必须完整通过 required 质量合同，并使价格等价成本严格下降；聚合均值不能代替逐项，速度允许变慢。request 级上下文分类不可得时，短、长两种冻结价格场景都必须下降 |
 | 既有反例 | C++/TypeScript 配对审计的两个 case 均质量未闭合且两种价格上涨；C# 唯一配对 A/B 的 same-name 与 static-wiring 两项短价格分别由 `59731.0→75574.4`、`60267.8→68177.6`，后续 candidate-only 结果不与其他 control 拼接 |
 | 最小最终探针 | TypeScript experiment `d83f0dd9039447954b37eb67f33e60efba05d52906a1fca34e773add20d65519`；两侧均为 srcq 0.6.0、Luna medium/default、只读、无子代理、usage 完整且 postflight 无失败。candidate required 失败，短价格 `43695.8→44669.6`（+2.229%），长价格 `83800.6→80681.2`（-3.722%），Token +102.766%；按首个反例停止，未扩到 C++/C# |
+| Token 机制复算 | [机制审计](evidence/code-reading-token-clues-v1.md)逐项核对最终 TS usage 恒等式、短/长价格公式、command 顺序及一次性可见工具正文：candidate 工具正文 `18,225→8,450` Token，但 command `2→6`、input `72,917→147,392`、output `1,197→2,886`；skill 正文约 2,083 Token，只占总增量 2.735%。早先 C++/TS 配对同样出现工具正文下降而 input 上升；逐请求 usage 不存在，故固定上下文成本只标为结构性归因 |
 | 仓库结果 | `skills/source-query/SKILL.md` 与 `references/symbol-relations.md` 恢复 Git `aafefc62187dae845944649a68750f16fe67073e`；相应单文件快路触发 case 退出。`tools/srcq`、Release、安装与 Codex payload 未改变 |
 
 完整身份、raw artifact 哈希、质量缺项、价格和停止理由在 [audit-result-code-reading-strategy-v1.json](evidence/audit-result-code-reading-strategy-v1.json)。本审计只证明声明的 C#/C++/TypeScript 快照与 Luna medium/default；速度没有作为拒绝条件，也没有运行完整九项评测或 AgentBase Publish。

@@ -129,6 +129,12 @@ candidate-only 全量运行的 11 次完整 usage、一次 TLS 超时和关系 c
 
 总体计划复核结论：根本需求、用户设计和三层 owner 划分仍成立，P0—P10 已完成，不因本次总结创建 P11 或新的运行入口。后续比较使用“最近的、同质量、同环境且 identity 可比”的已验证结果；五-skill 消融和早期运行只作方向性背景。只有出现新的适用失败、后端或协议变化、新消费者，或跨任务可重复且现有 owner 无法提供必要证据的共享机制时才重开；单次波动、局部 stdout 更短或仅能降低某个 case 的技巧不足以重开。
 
+### 3.9 2026-09-01 代码读取交互轮次机制复核
+
+[Token 机制与优化线索审计](evidence/code-reading-token-clues-v1.md)把最终 TypeScript 探针与早先 C++/TypeScript 配对的 command 链、一次性工具正文和聚合 usage 对账。三个 case 都出现 candidate 工具正文更少而 input 更高；最终 TypeScript 中 command `2→6`、一次性工具正文 `18,225→8,450` Token，但实际总 Token `74,114→150,278`。skill 正文只解释约 2.735% 的增量，更多成本随额外模型交互轮次产生；由于事件流没有逐采样 usage，这只证明当前身份中的结构性机制，不形成“每次调用固定增加多少 Token”的通用系数。
+
+后续候选先裁决能否减少完整模型决策链：已知文件、锚点和有界范围可实验一次批取；skill、symbol、AST 或 LSP 只有能替代后续查询、正文读取、失败或回退时才可能取得净收益；任务内 `--help` 应由稳定的最小语法或正式模板消除。一次性 stdout、command 数和 skill 字节只解释机制，采纳仍逐 case 先过完整质量，再比较 aggregate usage 的 ordinary/cached/output 分项与短、长价格场景，最后才看速度。本节不重开已关闭阶段，也不授权新增 runner 或工具入口。
+
 ## 4. 阶段与任务
 
 ### P0 固定分支合同和 AST 基线

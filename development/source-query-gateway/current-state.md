@@ -288,6 +288,8 @@ workspace test/build/lint/fmt、15 个 ast-grep 0.44.1 真实 ignored 测试、W
 
 仓库 `source-query` skill 策略已恢复到 Git 历史 `aafefc62187dae845944649a68750f16fe67073e` 的 `SKILL.md` 与 `symbol-relations.md`，并退役只服务未证单文件快路的 `qualified-single-file-incoming-fast-path` 触发合同。该回退不改变 `tools/srcq` 的 0.5.0/0.6.0 实现、Release 或安装状态；原始实验、capsule 与身份继续作为开发证据，未执行 AgentBase Publish。未来候选只有在同身份配对 A/B 中逐 case 通过完整质量并使适用的短、长价格场景均严格下降，才重开矩阵扩量。
 
+[Token 机制与优化线索审计](evidence/code-reading-token-clues-v1.md)进一步复算最终 TypeScript 与早先 C++/TypeScript 的真实命令链。最终探针中 candidate 的一次性工具正文从 18,225 降至 8,450 Token，但 command 从 2 增至 6、聚合 input 增加 74,475、实际总 Token 增加 102.766%；两个 skill 正文合计约 2,083 Token，只占总增量 2.735%。这证明当前主要线索是减少需要模型重新采样的交互轮次，并让高级查询真正替代后续文本链；它不证明每次调用有固定成本，也不证明 rg 永远优于 symbol/AST。逐请求 usage 尚不可得，固定上下文复现仍只作结构性归因。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open
