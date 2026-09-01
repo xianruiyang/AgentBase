@@ -1,0 +1,163 @@
+{
+  "schema": "agentbase.source-query-interaction-rounds-audit/v2",
+  "extends": "audit-result-interaction-rounds-v1.json",
+  "acceptance_contract": {
+    "unit": "each selected experiment case",
+    "quality": "candidate must satisfy every prompt-required answer field and must not be worse than its paired control",
+    "price": "candidate short- and long-context price-equivalent scenarios must both be strictly lower when request-level context classification is unavailable",
+    "speed": "secondary and may regress after quality and both price scenarios pass",
+    "failure_recovery": "a candidate intended for production must not depend on a failed command and recovery retry",
+    "stop": "one quality, price, identity, or required-entry failure stops expansion for that candidate"
+  },
+  "oracle_calibration": {
+    "problem": "the historical TypeScript and C++ answer contracts promoted useful but unasked facts to required, so compliant answers could be scored as quality failures",
+    "forward_only_versions": [
+      {
+        "corpus": "development/code-search-benchmark/corpus/v12.json",
+        "change": "the TypeScript prompt explicitly requests the two handler identities and source/runtime boundary; getSessions and the sessionSelected null branch are supporting"
+      },
+      {
+        "corpus": "development/code-search-benchmark/corpus/v13.json",
+        "change": "the C++ prompt explicitly requests the qualified source/runtime boundary; compiler binding and numeric correctness remain supporting"
+      },
+      {
+        "corpus": "development/code-search-benchmark/corpus/v14.json",
+        "change": "a C# case freezes qualified identities, direct calls, branches, fallback semantics, completeness, and a source/runtime boundary"
+      }
+    ],
+    "history_policy": "v11 through v13 remain immutable after experiment identity binding; corrections only apply through a new corpus version"
+  },
+  "execution_scope": {
+    "model": "gpt-5.6-luna",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "workspace_read_only": true,
+    "subagents_in_subject": false,
+    "srcq_version_both_environments": "0.7.0",
+    "repetitions_per_environment": 1,
+    "only_allowed_difference": "AGENTS.md",
+    "languages": ["typescript", "cpp", "csharp"]
+  },
+  "experiments": [
+    {
+      "name": "typescript-large-page-with-answer-check",
+      "corpus": "2026-09-01.2",
+      "case_id": "opencode-webview-message-boundary",
+      "experiment_identity": "9286cab185d66dc5ed133013d1ba491e0254db50d54ee8f44ddd6b2821639ffc",
+      "capsule_sha256": "d70a51f61d14d644c725b28b4d5feda117c6c3fea434e4a9b6921dadc588fea9",
+      "raw_root": "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\code-search-experiments\\interaction-rounds-v12-luna-m-20260901-01\\ts-first",
+      "quality": {"control_required": "6/6", "candidate_required": "5/6", "candidate_missing": ["statusChange is not session-filtered"]},
+      "metrics": {
+        "control": {"commands": 3, "actual_total_tokens": 128508, "short_price_equivalent": 45470.2, "long_price_equivalent": 84499.4, "elapsed_ms": 54106},
+        "candidate": {"commands": 3, "actual_total_tokens": 85537, "short_price_equivalent": 34949.6, "long_price_equivalent": 64862.2, "elapsed_ms": 47757}
+      },
+      "decision": "reject: lower price and elapsed cannot override one missing required branch"
+    },
+    {
+      "name": "typescript-large-page-with-nonmerging-output-contract",
+      "corpus": "2026-09-01.2",
+      "case_id": "opencode-webview-message-boundary",
+      "experiment_identity": "7681492f7e549bf1d2c6657e8e9135943878eaffbad0209256703007ebf88d8d",
+      "capsule_sha256": "729b47615670e681403d1cd6d8067341b49ba5701b5a5f831db25a504e95b686",
+      "raw_root": "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\code-search-experiments\\interaction-rounds-v12-format-luna-m-20260901-02\\ts-first",
+      "quality": {"control_required": "6/6", "candidate_required": "6/6", "control_lines": 8, "candidate_lines": 9},
+      "metrics": {
+        "control": {"commands": 3, "failed_commands": 0, "input_tokens": 98350, "cached_input_tokens": 66816, "output_tokens": 1826, "actual_total_tokens": 100176, "short_price_equivalent": 49171.6, "long_price_equivalent": 92865.2, "elapsed_ms": 63075},
+        "candidate": {"commands": 4, "failed_commands": 0, "input_tokens": 108452, "cached_input_tokens": 82688, "output_tokens": 1687, "actual_total_tokens": 110139, "short_price_equivalent": 44154.8, "long_price_equivalent": 83248.6, "elapsed_ms": 50840}
+      },
+      "decision": "pass this case: complete required quality and both price scenarios strictly lower; command count is not a sampling count"
+    },
+    {
+      "name": "cpp-same-rules-before-syntax-clarification",
+      "corpus": "2026-09-01.3",
+      "case_id": "facecutting3d-raycast-chain",
+      "experiment_identity": "e758ce6bd481b6b152bc567aa400fbdb82483535cb007f2fcfcd34ae394bdd66",
+      "capsule_sha256": "88f4700424c30b570cdadd82cc42bbf1ab2daee95353fffa02cb71323e6f7380",
+      "raw_root": "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\code-search-experiments\\interaction-rounds-v13-format-cpp-luna-m-20260901-01\\cpp-first",
+      "quality": {"control_required": "7/7", "candidate_required": "7/7", "control_lines": 9, "candidate_lines": 8},
+      "metrics": {
+        "control": {"commands": 15, "failed_commands": 1, "actual_total_tokens": 298817, "short_price_equivalent": 82433.8, "long_price_equivalent": 155351.6, "elapsed_ms": 88822},
+        "candidate": {"commands": 6, "failed_commands": 1, "actual_total_tokens": 154473, "short_price_equivalent": 54935.8, "long_price_equivalent": 101441.6, "elapsed_ms": 70474}
+      },
+      "candidate_failure": "srcq rg -- rg --files repeated the backend name and required a corrected command",
+      "decision": "reject as a production entrance despite quality and price pass because candidate relied on failed-command recovery"
+    },
+    {
+      "name": "cpp-same-rules-with-syntax-clarification",
+      "corpus": "2026-09-01.3",
+      "case_id": "facecutting3d-raycast-chain",
+      "experiment_identity": "b75f4dce775a7d45106018261f8904ad501fb5a8cd637386a6bd9de2cf2a05e1",
+      "capsule_sha256": "bd669be2ebcbb02a7a435ed87a8f0575648c436185f4b5441966898b05c7e9cb",
+      "raw_root": "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\code-search-experiments\\interaction-rounds-v13-syntax-cpp-luna-m-20260901-02\\cpp-first",
+      "quality": {"control_required": "7/7", "candidate_required": "7/7", "control_lines": 10, "candidate_lines": 6},
+      "metrics": {
+        "control": {"commands": 6, "failed_commands": 0, "input_tokens": 200858, "cached_input_tokens": 168192, "output_tokens": 2880, "actual_total_tokens": 203738, "short_price_equivalent": 66765.2, "long_price_equivalent": 124890.4, "elapsed_ms": 73831},
+        "candidate": {"commands": 8, "failed_commands": 0, "input_tokens": 200189, "cached_input_tokens": 173824, "output_tokens": 3269, "actual_total_tokens": 203458, "short_price_equivalent": 63361.4, "long_price_equivalent": 116915.8, "elapsed_ms": 83471}
+      },
+      "decision": "pass this case: complete required quality, no failed command, and both price scenarios strictly lower; speed regression is allowed"
+    },
+    {
+      "name": "csharp-cross-language-stop-case",
+      "corpus": "2026-09-01.4",
+      "case_id": "vmt-temperature-collector-sampling-chain",
+      "experiment_identity": "9fe4bf9ba28ff90760321a9e7091f86395c52ee8bfa41dad4cda154627ded6b8",
+      "capsule_sha256": "d31675fb338ebb12c6ad49f7a2f1d90ad1547d707f2ea92b7667a63a1bb53df7",
+      "raw_root": "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\code-search-experiments\\interaction-rounds-v14-syntax-csharp-luna-m-20260901-01\\csharp-first",
+      "quality": {"control_required": "incomplete: SlotIndex ordering was not explicit; preliminary audit also found no unified completeness statement", "candidate_required": "8/8", "control_lines": 10, "candidate_lines": 10},
+      "metrics": {
+        "control": {"commands": 6, "failed_commands": 1, "input_tokens": 99694, "cached_input_tokens": 80640, "output_tokens": 2204, "actual_total_tokens": 101898, "short_price_equivalent": 40342.0, "long_price_equivalent": 74072.0, "elapsed_ms": 64707},
+        "candidate": {"commands": 7, "failed_commands": 0, "input_tokens": 192224, "cached_input_tokens": 165888, "output_tokens": 2370, "actual_total_tokens": 194594, "short_price_equivalent": 57144.8, "long_price_equivalent": 107179.6, "elapsed_ms": 69246}
+      },
+      "decision": "reject-and-stop: candidate quality is complete and no failed command occurs, but both price scenarios and elapsed increase"
+    }
+  ],
+  "tool_decision": {
+    "srcq_large_page_probe": "srcq 0.7.0 returned the complete 473-line, 21157-character TypeScript multi-anchor page with no @more, @next, or @cut when limit 1000 and model token budget 12000 were explicit",
+    "redundant_backend_observation": ["srcq query rg exec ... -- rg -n ...", "srcq rg -- rg --files ..."],
+    "owner_analysis": "srcq deliberately preserves native argv. A leading rg after the explicit boundary can also be a legitimate ripgrep pattern, so silently stripping it would corrupt valid native semantics and contradict forwarding tests.",
+    "decision": "do not modify srcq; the experiment-only syntax clarification removed the observed candidate failure without changing the tool contract"
+  },
+  "conclusions": [
+    {
+      "claim": "the explicit large-page query is a missing srcq product capability",
+      "status": "falsified for the tested argv",
+      "evidence": "the direct srcq 0.7.0 probe returned the complete page without continuation markers"
+    },
+    {
+      "claim": "a generic non-merging output contract can preserve required answer completeness",
+      "status": "supported in the tested TypeScript, C++, and C# cases",
+      "evidence": "candidate required scores were 6/6, 7/7, and 8/8 after prompt-oracle calibration"
+    },
+    {
+      "claim": "the shared candidate core plus syntax clarification strictly lowers price across every expanded project",
+      "status": "falsified",
+      "evidence": "the C# candidate raised short price from 40342.0 to 57144.8 and long price from 74072.0 to 107179.6"
+    },
+    {
+      "claim": "fewer raw commands are necessary for lower price",
+      "status": "falsified within the declared identities",
+      "evidence": "the accepted TypeScript and C++ case-level candidates used one and two more commands respectively while both price scenarios decreased"
+    },
+    {
+      "claim": "command syntax recovery should be implemented by normalizing repeated backend tokens in srcq",
+      "status": "rejected",
+      "evidence": "the repeated token is ambiguous with a valid native search pattern; normalization would break the native argv preservation contract"
+    }
+  ],
+  "repository_decision": {
+    "status": "keep-current-production-source-reading-strategy",
+    "production_global_rule_change": false,
+    "production_skill_change": false,
+    "srcq_source_change": false,
+    "benchmark_corpus_change": "retain v12-v14 and this audit as forward-only evidence",
+    "further_matrix_expansion": "stopped on the first cross-language price counterexample",
+    "agentbase_publish": false
+  },
+  "limitations": [
+    "Each identity contains one control and one candidate run, so no repeat variance is estimated.",
+    "The runner exposes aggregate subject usage, not per-request usage or request context class.",
+    "Command counts are structural observations and are not exact sampling counts.",
+    "The evidence covers only the bound TypeScript, C++, and C# snapshots with gpt-5.6-luna medium/default.",
+    "The C# control had one recovered skill-path command failure; candidate price was still higher even though it had no failed command and better required coverage."
+  ]
+}

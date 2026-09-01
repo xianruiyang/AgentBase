@@ -135,9 +135,11 @@ candidate-only 全量运行的 11 次完整 usage、一次 TLS 超时和关系 c
 
 后续候选先裁决能否减少完整模型决策链：已知文件、锚点和有界范围可实验一次批取；skill、symbol、AST 或 LSP 只有能替代后续查询、正文读取、失败或回退时才可能取得净收益；任务内 `--help` 应由稳定的最小语法或正式模板消除。一次性 stdout、command 数和 skill 字节只解释机制，采纳仍逐 case 先过完整质量，再比较 aggregate usage 的 ordinary/cached/output 分项与短、长价格场景，最后才看速度。本节不重开已关闭阶段，也不授权新增 runner 或工具入口。
 
-后续三次单 case 配对进一步限定该原则，结构化结果见 [audit-result-interaction-rounds-v1.json](evidence/audit-result-interaction-rounds-v1.json)。静态单阶段规则没有减少 command；静态两阶段规则在 `srcq` 默认 80 单元页上扩成 6 次续页与其他补查，工具正文更少但价格近乎翻倍；显式 `--limit 1000` 与 `--model-token-budget 12000` 能机械消除分页，最终 candidate 工具正文和两种价格均下降，但一次 argv 错形使 command 没有减少，答案仍缺 required。故当前把“交互轮次”保留为强成本机制而非单指标，把“目标正文量、ordinary/cache/output、失败恢复”纳入同一决策链；不把显式预算配方写入正式规则，也不扩量。
+前三次单 case 配对进一步限定该原则，结构化结果见 [第一轮交互审计](evidence/audit-result-interaction-rounds-v1.json)：静态单阶段规则没有减少 command；静态两阶段规则在 `srcq` 默认 80 单元页上扩成 6 次续页与其他补查，工具正文更少但价格近乎翻倍；显式 `--limit 1000` 与 `--model-token-budget 12000` 能机械消除分页，但 candidate 仍有 argv 错形和 required 缺项。这些结果把“交互轮次”保留为强成本机制而非单指标，并把目标正文量、ordinary/cache/output、失败恢复纳入同一决策链。
 
-若重开，首个消费者必须同时证明：非项目特定的正式入口能无失败地形成完整大页或等价批取；observed command/采样结构相对可比 control 真实下降，或 runner 已取得逐请求 usage；全部 required 与源码/运行时边界通过 detached audit；短、长价格场景均严格下降。只有该纵向切片成立后才进入 C++/C#，否则继续保持当前策略。
+按停止条件重开后，先通过 `v12`/`v13` 向前校准题面与 required，再加入不合并明确枚举项的通用回答闭环和 srcq 最小语法澄清；完整身份与 detached 结果见 [第二轮交互审计](evidence/audit-result-interaction-rounds-v2.json)。TypeScript、C++ candidate 分别达到 6/6、7/7 required 且短长价格均下降，C++ 速度变慢但合同允许；扩到 `v14` C# 后 candidate 达到 8/8 且无失败命令，短/长价格却由 `40342.0/74072.0` 升至 `57144.8/107179.6`，成为停止反例。raw command 在三个 candidate 中都增加，进一步证明它不能替代 sampling 或价格证据。
+
+`srcq 0.7.0` 对相同 TypeScript 大页 argv 的无模型探针已完整返回且无续页标记；自动删除重复 backend 又会与合法原生搜索 pattern 歧义，因此本轮不改工具。当前继续保持正式 `global/AGENTS.md`、`source-query` skill 与生产读取策略不变，只保留新 corpus 和审计证据。只有出现能解释并消除 C# 价格反例的新机制或 runner 取得逐请求 usage 时才以新 identity 重开，不重采样现有输入期待不同结果。
 
 ## 4. 阶段与任务
 

@@ -2,7 +2,7 @@
 
 本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule，并消费 `development/common/codex_runtime.py` 的共享脱敏 launcher 环境与 `development/common/codex_shell_environment_policy.json` 的模型 shell 合同。两者不实现查询语义，也不进入 srcq 或 Codex 发布 payload。
 
-正式语料在 `corpus/`；`v11.json` 是当前候选，在 `v10.json` 的六类语料上增加独立 C++ 与 TypeScript 项目快照，分别检验限定 typed 调用/实现链和事件闭包/状态边界；`v1.json` 至 `v10.json` 只服务引用它们的已完成历史结果复核。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
+正式语料在 `corpus/`；`v14.json` 是当前候选，沿用 `v11.json` 加入的独立 C++ 与 TypeScript 项目快照，并新增中型 C# 项目快照；`v12.json`、`v13.json` 依次校准 TypeScript、C++ 题面与 required，`v14.json` 冻结 C# 限定成员、分支链和静态/运行时边界；`v1.json` 至 `v13.json` 只服务引用它们的已完成历史结果复核。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
 
 ```powershell
 python -X utf8 development\code-search-benchmark\experiment.py prepare --config <config.json> --output <new-output-dir>

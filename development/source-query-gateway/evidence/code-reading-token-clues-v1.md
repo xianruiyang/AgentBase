@@ -135,4 +135,25 @@ candidate 的前两条命令符合索引与批取形状，但第二条默认 mod
 
 candidate 第一条索引成功，第二条把 `--` 后的原生 argv 错写为再次包含 `rg`，exit 1；第三条用正确边界恢复并取得有界大页。因此它没有把 command 降到 2，但相对 control 的全文式读取显著减少了可见证据、ordinary input 和两种价格。独立审计确认答案仍缺初始化 `getSessions`、`sessionSelected=null` 清理和“不证明 VS Code 传输/运行时交付”的源码边界，且合并了 `agentsList`/`agentDetected` 的行号范围；质量失败阻断采纳和跨语言扩量。
 
-三次实验把原线索收敛为：交互轮次是强放大器，但 raw command 数不是充分成本指标；一次性工具正文、每轮重复上下文、ordinary/cache 构成、输出和失败恢复共同决定价格。探针 B 在工具正文少 15.902% 时因 command `5→11` 使价格近乎翻倍，直接支持额外交互可以吞没局部压缩；探针 C 在 command 同为 3 时仍因目标正文少 39.727% 而显著降价，直接否定“只看调用数”。静态规则层连续三种形状都没有同时取得更少 command、完整质量和更低价格，当前不修改正式 `global/AGENTS.md` 或 `source-query` skill。下一次只有工具或 runner 能可靠消除 argv 错形与模型逐页动作，并以非项目特定的答案完整性入口闭合首个 case 时才重开。
+三次实验把原线索收敛为：交互轮次是强放大器，但 raw command 数不是充分成本指标；一次性工具正文、每轮重复上下文、ordinary/cache 构成、输出和失败恢复共同决定价格。探针 B 在工具正文少 15.902% 时因 command `5→11` 使价格近乎翻倍，直接支持额外交互可以吞没局部压缩；探针 C 在 command 同为 3 时仍因目标正文少 39.727% 而显著降价，直接否定“只看调用数”。截至探针 C，静态规则层连续三种形状都没有同时取得完整质量、无失败入口和更低价格，因而未修改正式 `global/AGENTS.md` 或 `source-query` skill；后续按该停止条件重新校准 oracle、增加通用输出闭环并做跨语言验证，结果见下一节。
+
+## 9. 2026-09-01 oracle 校准与跨语言停止反例
+
+[第二轮结构化审计](audit-result-interaction-rounds-v2.json)先修正了会把题面未要求事实升级为 required 的 oracle：TypeScript 的 `getSessions` 与 `sessionSelected=null`、C++ 的编译器绑定与数值正确性否定都转为 supporting；题面明确要求限定身份和源码/运行时边界。历史 corpus 不原位修改，`v12.json`、`v13.json`、`v14.json` 只向前冻结新身份。
+
+通用 candidate 主体由“两阶段显式大页、题目明确枚举项不得合并”组成；TypeScript 用该主体完成首个闭环，C++ 和 C# 扩量再加入“srcq argv 不重复 backend”的语法澄清，以修正已经两次观察到的错形而不改变工具。三种语言的独立审计结果为：
+
+| Case | required control / candidate | command control → candidate | 短价格 control → candidate | 长价格 control → candidate | elapsed control → candidate | 裁决 |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| TypeScript | 6/6 / 6/6 | 3 → 4 | 49,171.6 → 44,154.8 | 92,865.2 → 83,248.6 | 63,075 → 50,840 ms | 本 case 通过 |
+| C++ | 7/7 / 7/7 | 6 → 8 | 66,765.2 → 63,361.4 | 124,890.4 → 116,915.8 | 73,831 → 83,471 ms | 本 case 通过；速度回退获合同允许 |
+| C# | control 未完整 / 8/8 | 6 → 7 | 40,342.0 → 57,144.8 | 74,072.0 → 107,179.6 | 64,707 → 69,246 ms | 两种价格失败，熔断 |
+
+这组结果证明两点，又否定两点：
+
+- 逐个显式枚举题面实体并禁止合并，能在三个已测 case 中保持 candidate required 完整；它是答案合成质量线索，不是通用降价证明。
+- raw command 数仍不是 sampling 数或充分成本指标：TS/C++ candidate 分别多 1/2 条命令却降价，C# 多 1 条命令则显著涨价。现有 aggregate usage 不能把差异精确归因到某一次请求。
+- 共享 candidate 主体加语法澄清后跨项目必然降价的假设被 C# 反例推翻；即使 candidate 没有失败命令、质量还优于 control，短/长价格分别上涨约 41.6%/44.7%，仍必须拒绝。
+- `srcq 0.7.0` 无模型探针已经能用 `--limit 1000 --model-token-budget 12000` 返回完整 TypeScript 大页，无 `@more/@cut`；工具不是当前分页能力缺口。自动吞掉 `--` 后重复的 `rg` 也不可取，因为首个 `rg` 可能是合法搜索 pattern，会破坏现有原生 argv 保真合同。
+
+因此当前生产策略继续保持不变：不把实验 candidate 写入 `global/AGENTS.md` 或 `source-query`，不修改 `srcq`，不继续扩量。可复用结果只保留为 corpus、identity、capsule 与本审计；若将来取得逐请求 usage，或出现能解释并消除 C# 价格反例的新机制，再以新 identity 重开，不能重采样当前输入期待不同结果。

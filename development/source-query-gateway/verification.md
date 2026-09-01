@@ -145,5 +145,9 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 | 两阶段索引→批取 | `198016c2…`；command `5→11`，工具正文 `10332→8689` Token，实际总 Token `93439→263266`，短/长价格 `43504.4/82547.8→84935.6/162683.2` | 默认 80 单元页造成 6 次续页并有一次失败命令；质量与价格失败，停止 |
 | 两阶段显式大页 | `081059d7…`；command `3→3` 且 candidate 一次失败，工具正文 `16067→9684` Token，实际总 Token `93755→85640`，短/长价格 `47921.8/91133.6→35854.2/66743.4` | 成本改善但 required 质量失败，不能采纳或扩量 |
 | srcq 无模型定向探针 | 同一第二阶段 argv；只设 12000 Token 预算返回 `@more shown=80 omitted=389`，再设 `--limit 1000` 后完整且无 `@more/@cut` | 单次大页能力已存在；分页不是缺失能力，问题位于默认策略、命令选择与消费者动作链 |
+| oracle 向前校准 | `v12` 明确 TS 限定身份与运行时边界，`v13` 明确 C++ 限定身份与运行时边界，`v14` 新增 C# 采样/缓存链 | required 只保留题面明确要求或结构必需事实；历史 corpus 不原位修改 |
+| TS 通用回答闭环 | `7681492f…`；required `6/6→6/6`，command `3→4`，短/长价格 `49171.6/92865.2→44154.8/83248.6`，无失败命令 | 单 case 通过；command 数不作 sampling 数 |
+| C++ 语法澄清闭环 | `b75f4dce…`；required `7/7→7/7`，command `6→8`，短/长价格 `66765.2/124890.4→63361.4/116915.8`，无失败命令 | 单 case 通过；耗时 `73831→83471 ms`，按合同允许变慢 |
+| C# 跨语言停止反例 | `9fe4bf9b…`；candidate required `8/8` 且无失败命令，command `6→7`，短/长价格 `40342.0/74072.0→57144.8/107179.6` | 两种价格均失败，熔断规则/skill 采纳与后续扩量 |
 
-三个 experiment 均为单 case、两环境各一次，preflight/postflight、usage 与网络有效，detached capsule 分别为 `0ef6b83…`、`9327638e…`、`8c8d47be…`；完整字段和限制见 [结构化审计](evidence/audit-result-interaction-rounds-v1.json)。这些证据支持“额外交互可以吞没局部输出压缩”，同时否定“raw command 数单独决定成本”。因所有 candidate 都有 required 质量失败，本轮没有修改正式规则/skill，没有运行 C++/C# 扩量、完整九项评测或 AgentBase Publish。
+第一轮三个 experiment 均为单 case、两环境各一次，preflight/postflight、usage 与网络有效，detached capsule 分别为 `0ef6b83…`、`9327638e…`、`8c8d47be…`；完整字段和限制见 [第一轮结构化审计](evidence/audit-result-interaction-rounds-v1.json)。第二轮按同样单次配对边界完成 TS/C++/C#，完整 identity、capsule、required、价格、失败命令和工具裁决见 [第二轮结构化审计](evidence/audit-result-interaction-rounds-v2.json)。证据继续否定“raw command 数单独决定成本”，并以 C# 反例否定同一通用规则必然跨项目降价。正式规则、skill、srcq、Release 与 Codex payload 均未修改；未运行完整九项评测或 AgentBase Publish。
