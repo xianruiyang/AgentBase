@@ -116,6 +116,7 @@
     "ordinary-hyperfine-benchmark",
     "source-query-rule-review",
     "source-query-capability-diagnosis",
+    "qualified-single-file-incoming-fast-path",
     "complete-known-name-position-list",
     "known-small-definition-range",
     "known-implementation-reading",
@@ -715,6 +716,26 @@
       "expected_source_query_references": [
         "symbol-relations.md"
       ],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "qualified-single-file-incoming-fast-path",
+      "kind": "positive",
+      "request": "已给出一个权威源码文件、适配器语言和两个同名成员各自的 Type::member 限定身份；请按源码静态类型分别完整列出该文件内的 incoming 直接调用、调用者和边界，不启动 LSP。只读处理。",
+      "expected_skills": [
+        "source-query"
+      ],
+      "forbidden_skills": [
+        "symbol-structure-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_source_query_references": [],
       "expected_behavior_tags": [
         "read_only"
       ],
