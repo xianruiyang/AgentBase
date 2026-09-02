@@ -3,10 +3,10 @@
   "evaluation_kind": "skill-routing",
   "fingerprint_schema": "phase-visible-lf-v2",
   "evaluator": {
-    "id": "agentbase-routing-ccc51c8fe1fb46caa5e7458728c6ddb2",
+    "id": "agentbase-routing-100b777cc7d74f44b47ed06febfa7782",
     "model": "gpt-5.6-sol",
     "runtime": "codex-cli 0.151.0/windows/read-only/ephemeral/cases-only-v4/catalog-75F0D1B35D49A3AF/shell-38fed52b24194b4f",
-    "evaluated_at_utc": "2026-09-02T02:25:39.2918619+00:00",
+    "evaluated_at_utc": "2026-09-02T04:58:02.6687545+00:00",
     "isolation_mode": "detached-capsule",
     "repository_accessed": false,
     "hidden_expectations_accessed": false,
@@ -38,9 +38,9 @@
       "workspace_dependencies"
     ]
   },
-  "evaluation_capsule_sha256": "01444B33D91F30B7A4A54B03A22CDDD36AAE00E65566B4AE1CF008810B6ADC11",
-  "candidate_bundle_sha256": "834BC8D83F1062BFA6AA41B8EBAC0FE07351084E0F87D8D5D773DEDBFB763CFE",
-  "evaluation_input_sha256": "AC6AEFDECFDC8CA14A2D833CD90078CEFC28E9DA011F5B349DC46E6801C2C306",
+  "evaluation_capsule_sha256": "52B1C3C57C39B97E9C1899D6E0132B5C158FC8CA63F6CDCCA0821777D737A559",
+  "candidate_bundle_sha256": "208F2AACA01EBFBE460CB91F2F6ADBF5F9B74CD1DEDF629CEE4835CD8BC0D30B",
+  "evaluation_input_sha256": "D47CB6182CC3E11898D33C4430BFAB5533C1F2067326AF1615C1D376DE56B8B4",
   "cases": [
     {
       "id": "mechanical-document-edit",
@@ -90,6 +90,16 @@
     },
     {
       "id": "model-interaction-tool-read",
+      "selected_skills": [],
+      "selected_peer_skills": []
+    },
+    {
+      "id": "model-interaction-opaque-identity-projection",
+      "selected_skills": [],
+      "selected_peer_skills": []
+    },
+    {
+      "id": "model-interaction-token-minimal-projection",
       "selected_skills": [],
       "selected_peer_skills": []
     },
@@ -878,17 +888,17 @@
       "selected_peer_skills": []
     }
   ],
-  "receipt_id": "b1b7a72d573e4bd6af3cfd997252aa71",
-  "evaluation_generation_sha256": "075FE4A4A5A25425D8427406E4198F13CF771FD41076B5590FA772B4F787B9F8",
+  "receipt_id": "46059d14c91740b8932f6167343e4607",
+  "evaluation_generation_sha256": "0E6A985D0E1477B150A122C9AA72C0F285BAC4BF40570EC9560A9C9A64CDA3BA",
   "policy_evaluation": {
     "schema_version": 4,
     "evaluation_kind": "behavior-policy",
     "fingerprint_schema": "phase-visible-lf-v2",
     "evaluator": {
-      "id": "agentbase-policy-b3d04d5f7820412e85c3e81a7d0f08d8",
+      "id": "agentbase-policy-0d91a6e964a44842a126f2cf8821f6dc",
       "model": "gpt-5.6-sol",
       "runtime": "codex-cli 0.151.0/windows/read-only/ephemeral/cases-only-v4/catalog-75F0D1B35D49A3AF/shell-38fed52b24194b4f",
-      "evaluated_at_utc": "2026-09-02T02:25:35.4142620+00:00",
+      "evaluated_at_utc": "2026-09-02T04:58:35.9543583+00:00",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false,
@@ -920,15 +930,16 @@
         "workspace_dependencies"
       ]
     },
-    "evaluation_capsule_sha256": "9992C073C17DFDDAC73C511047D66D5C62270DAA571EFC015F2A3E35CA5FACD5",
-    "candidate_bundle_sha256": "E75AE5C10DBAB3852229F29C220757110F46D69FE5397F5720E394D5DA7E8253",
-    "evaluation_input_sha256": "7C8476DF531CD0422C87EC8F2F03DAEAB274424D201399661F53B4D9952379C0",
+    "evaluation_capsule_sha256": "0ABC4D966E579C331C9A3C19D0607A02D546774FB45162E49154AFA5F9D27E15",
+    "candidate_bundle_sha256": "9C2F9AC5D2D5D325055B3BC392D08D59E7030403A2C9E90B711E4E4627773E39",
+    "evaluation_input_sha256": "AF8671EC65C1576009994EFD8684FA55A5482DE5E6C0E98CD3FE88B34CDD0431",
     "cases": [
       {
         "id": "mechanical-document-edit",
         "behavior_tags": [
           "modify_authorized_scope",
-          "local_task_fast_path"
+          "local_task_fast_path",
+          "stable_candidate_validation"
         ]
       },
       {
@@ -946,7 +957,8 @@
           "fact_first",
           "challenge_false_premise",
           "no_alternative_execution",
-          "collaborative_requirement_insight"
+          "collaborative_requirement_insight",
+          "long_term_total_cost"
         ]
       },
       {
@@ -954,7 +966,8 @@
         "behavior_tags": [
           "read_only",
           "no_alternative_execution",
-          "quality_token_speed_order"
+          "quality_token_speed_order",
+          "impact_closure"
         ]
       },
       {
@@ -962,7 +975,8 @@
         "behavior_tags": [
           "read_only",
           "observable_behavior_accountability",
-          "rule_execution_failure_localization"
+          "rule_execution_failure_localization",
+          "no_alternative_execution"
         ]
       },
       {
@@ -971,7 +985,8 @@
           "read_only",
           "fact_first",
           "observable_behavior_accountability",
-          "rule_execution_failure_localization"
+          "rule_execution_failure_localization",
+          "long_term_total_cost"
         ]
       },
       {
@@ -980,19 +995,37 @@
           "read_only",
           "expensive_action_preflight",
           "vertical_validation_closure",
-          "no_scope_expansion"
+          "evidence_checkpoint_before_continue",
+          "no_alternative_execution"
         ]
       },
       {
         "id": "stable-candidate-validation-boundary",
         "behavior_tags": [
           "modify_authorized_scope",
-          "protected_user_baseline",
-          "stable_candidate_validation"
+          "stable_candidate_validation",
+          "protected_user_baseline"
         ]
       },
       {
         "id": "model-interaction-tool-read",
+        "behavior_tags": [
+          "read_only",
+          "model_interaction_surface",
+          "minimal_evidence_closure",
+          "quality_token_speed_order"
+        ]
+      },
+      {
+        "id": "model-interaction-opaque-identity-projection",
+        "behavior_tags": [
+          "read_only",
+          "model_interaction_surface",
+          "minimal_evidence_closure"
+        ]
+      },
+      {
+        "id": "model-interaction-token-minimal-projection",
         "behavior_tags": [
           "read_only",
           "model_interaction_surface",
@@ -1011,10 +1044,11 @@
         "id": "model-interaction-source-edit-boundary",
         "behavior_tags": [
           "read_only",
-          "no_alternative_execution",
+          "model_interaction_surface",
           "document_authority",
           "cli_assistive_only",
-          "model_interaction_surface"
+          "authority_lifecycle",
+          "stable_candidate_validation"
         ]
       },
       {
@@ -1023,7 +1057,8 @@
           "modify_authorized_scope",
           "fact_first",
           "architecture_integrated",
-          "authority_lifecycle"
+          "authority_lifecycle",
+          "adaptive_execution_plan"
         ]
       },
       {
@@ -1031,9 +1066,10 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "long_term_total_cost",
           "architecture_integrated",
-          "authority_lifecycle"
+          "authority_lifecycle",
+          "long_term_total_cost",
+          "no_alternative_execution"
         ]
       },
       {
@@ -1041,9 +1077,10 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
-          "challenge_false_premise",
           "architecture_integrated",
-          "authority_lifecycle"
+          "authority_lifecycle",
+          "impact_closure",
+          "evidence_checkpoint_before_continue"
         ]
       },
       {
@@ -1062,7 +1099,8 @@
           "fact_first",
           "architecture_integrated",
           "authority_lifecycle",
-          "impact_closure"
+          "impact_closure",
+          "long_term_total_cost"
         ]
       },
       {
@@ -1070,18 +1108,19 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
-          "architecture_integrated",
+          "protected_user_baseline",
           "authority_lifecycle",
           "impact_closure",
-          "protected_user_baseline",
           "vertical_validation_closure",
-          "evidence_checkpoint_before_continue"
+          "evidence_checkpoint_before_continue",
+          "final_user_scope_only"
         ]
       },
       {
         "id": "surface-similarity-no-shared-owner",
         "behavior_tags": [
           "modify_authorized_scope",
+          "no_scope_expansion",
           "local_task_fast_path",
           "stable_candidate_validation"
         ]
@@ -1090,14 +1129,16 @@
         "id": "one-off-generated-artifact",
         "behavior_tags": [
           "modify_authorized_scope",
-          "local_task_fast_path"
+          "local_task_fast_path",
+          "no_scope_expansion"
         ]
       },
       {
         "id": "specified-synthesis-artifact",
         "behavior_tags": [
           "modify_authorized_scope",
-          "collaborative_requirement_insight"
+          "collaborative_requirement_insight",
+          "stable_candidate_validation"
         ]
       },
       {
@@ -1105,7 +1146,8 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "local_task_fast_path",
-          "impact_closure"
+          "impact_closure",
+          "stable_candidate_validation"
         ]
       },
       {
@@ -1115,14 +1157,16 @@
           "fact_first",
           "architecture_integrated",
           "authority_lifecycle",
-          "impact_closure"
+          "impact_closure",
+          "adaptive_execution_plan"
         ]
       },
       {
         "id": "ast-structural-call-search",
         "behavior_tags": [
           "read_only",
-          "minimal_evidence_closure"
+          "minimal_evidence_closure",
+          "no_alternative_execution"
         ]
       },
       {
@@ -1136,6 +1180,7 @@
         "id": "fast-symbol-relation-candidates",
         "behavior_tags": [
           "read_only",
+          "fact_first",
           "minimal_evidence_closure"
         ]
       },
@@ -1144,7 +1189,8 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "minimal_evidence_closure"
+          "minimal_evidence_closure",
+          "tool_defect_reproduction"
         ]
       },
       {
@@ -1152,7 +1198,8 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "minimal_evidence_closure"
+          "minimal_evidence_closure",
+          "evidence_checkpoint_before_continue"
         ]
       },
       {
@@ -1167,6 +1214,7 @@
         "id": "workspace-symbols-conditional-search",
         "behavior_tags": [
           "read_only",
+          "fact_first",
           "minimal_evidence_closure"
         ]
       },
@@ -1181,7 +1229,8 @@
         "id": "ordinary-scc-summary",
         "behavior_tags": [
           "read_only",
-          "minimal_evidence_closure"
+          "minimal_evidence_closure",
+          "quality_token_speed_order"
         ]
       },
       {
@@ -1195,6 +1244,7 @@
         "id": "ordinary-hyperfine-benchmark",
         "behavior_tags": [
           "read_only",
+          "fact_first",
           "quality_token_speed_order"
         ]
       },
@@ -1211,35 +1261,40 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "tool_defect_reproduction"
+          "tool_defect_reproduction",
+          "minimal_evidence_closure"
         ]
       },
       {
         "id": "complete-known-name-position-list",
         "behavior_tags": [
           "read_only",
-          "minimal_evidence_closure"
+          "minimal_evidence_closure",
+          "local_task_fast_path"
         ]
       },
       {
         "id": "known-small-definition-range",
         "behavior_tags": [
           "read_only",
-          "minimal_evidence_closure"
+          "minimal_evidence_closure",
+          "local_task_fast_path"
         ]
       },
       {
         "id": "known-implementation-reading",
         "behavior_tags": [
           "read_only",
-          "minimal_evidence_closure"
+          "minimal_evidence_closure",
+          "local_task_fast_path"
         ]
       },
       {
         "id": "independent-bounded-source-evidence",
         "behavior_tags": [
           "read_only",
-          "minimal_evidence_closure"
+          "minimal_evidence_closure",
+          "local_task_fast_path"
         ]
       },
       {
@@ -1247,7 +1302,8 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "minimal_evidence_closure"
+          "minimal_evidence_closure",
+          "authority_lifecycle"
         ]
       },
       {
@@ -1268,7 +1324,6 @@
         "id": "powershell-native-regex-argv",
         "behavior_tags": [
           "read_only",
-          "fact_first",
           "tool_defect_reproduction",
           "local_task_fast_path"
         ]
@@ -1288,20 +1343,21 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "minimal_evidence_closure"
+          "adaptive_execution_plan"
         ]
       },
       {
         "id": "qq-hook-explicit-enable",
         "behavior_tags": [
           "modify_authorized_scope",
-          "local_task_fast_path"
+          "no_scope_expansion"
         ]
       },
       {
         "id": "qq-hook-status-read-only",
         "behavior_tags": [
           "read_only",
+          "fact_first",
           "no_scope_expansion"
         ]
       },
@@ -1317,28 +1373,29 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "no_alternative_execution"
+          "minimal_evidence_closure"
         ]
       },
       {
         "id": "cross-turn-dependent-plan",
         "behavior_tags": [
           "modify_authorized_scope",
+          "adaptive_execution_plan",
           "document_authority",
-          "cli_assistive_only",
-          "adaptive_execution_plan"
+          "cli_assistive_only"
         ]
       },
       {
         "id": "full-delivery-chain",
         "behavior_tags": [
           "modify_authorized_scope",
+          "collaborative_requirement_insight",
           "protected_user_baseline",
           "final_user_scope_only",
           "document_authority",
           "cli_assistive_only",
-          "collaborative_requirement_insight",
-          "adaptive_execution_plan"
+          "adaptive_execution_plan",
+          "architecture_integrated"
         ]
       },
       {
@@ -1346,10 +1403,11 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "document_authority",
-          "cli_assistive_only",
           "vertical_validation_closure",
-          "expensive_action_preflight"
+          "evidence_checkpoint_before_continue",
+          "expensive_action_preflight",
+          "document_authority",
+          "cli_assistive_only"
         ]
       },
       {
@@ -1360,17 +1418,19 @@
           "architecture_integrated",
           "impact_closure",
           "vertical_validation_closure",
-          "evidence_checkpoint_before_continue"
+          "evidence_checkpoint_before_continue",
+          "document_authority"
         ]
       },
       {
         "id": "dimension-bounded-validation-plan",
         "behavior_tags": [
           "modify_authorized_scope",
+          "dimension_bounded_validation",
+          "vertical_validation_closure",
           "document_authority",
           "cli_assistive_only",
-          "vertical_validation_closure",
-          "dimension_bounded_validation"
+          "local_mechanical_gates"
         ]
       },
       {
@@ -1378,15 +1438,17 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "vertical_validation_closure",
-          "dimension_bounded_validation"
+          "dimension_bounded_validation",
+          "protected_user_baseline",
+          "adaptive_execution_plan"
         ]
       },
       {
         "id": "higher-order-interaction-coverage",
         "behavior_tags": [
           "read_only",
-          "no_alternative_execution",
-          "dimension_bounded_validation"
+          "dimension_bounded_validation",
+          "no_alternative_execution"
         ]
       },
       {
@@ -1401,21 +1463,22 @@
         "id": "protected-baseline-change-discovered",
         "behavior_tags": [
           "modify_authorized_scope",
-          "no_scope_expansion",
           "protected_user_baseline",
-          "final_user_scope_only"
+          "no_scope_expansion",
+          "adaptive_execution_plan"
         ]
       },
       {
         "id": "active-goal-reasoning-shift",
         "behavior_tags": [
-          "fact_first",
+          "modify_authorized_scope",
           "reasoning_effort_economy"
         ]
       },
       {
         "id": "no-goal-reasoning-shift",
         "behavior_tags": [
+          "modify_authorized_scope",
           "reasoning_effort_economy"
         ]
       },
@@ -1426,7 +1489,8 @@
           "architecture_integrated",
           "authority_lifecycle",
           "impact_closure",
-          "reasoning_effort_economy"
+          "reasoning_effort_economy",
+          "adaptive_execution_plan"
         ]
       },
       {
@@ -1440,12 +1504,14 @@
       {
         "id": "reasoning-current-effort-sufficient",
         "behavior_tags": [
+          "read_only",
           "reasoning_effort_economy"
         ]
       },
       {
         "id": "reasoning-isolated-hard-item-no-transition",
         "behavior_tags": [
+          "read_only",
           "reasoning_effort_economy"
         ]
       },
@@ -1462,124 +1528,127 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "minimal_evidence_closure",
-          "bounded_subagent_delegation"
+          "bounded_subagent_delegation",
+          "minimal_evidence_closure"
         ]
       },
       {
         "id": "subagent-fixed-profile-context-isolation",
         "behavior_tags": [
           "read_only",
-          "minimal_evidence_closure",
-          "bounded_subagent_delegation"
+          "bounded_subagent_delegation",
+          "minimal_evidence_closure"
         ]
       },
       {
         "id": "subagent-path-experiment",
         "behavior_tags": [
           "modify_authorized_scope",
-          "fact_first",
-          "no_scope_expansion",
-          "bounded_subagent_delegation"
+          "bounded_subagent_delegation",
+          "evidence_checkpoint_before_continue"
         ]
       },
       {
         "id": "subagent-serial-masked-implementation-experiment",
         "behavior_tags": [
           "modify_authorized_scope",
-          "fact_first",
-          "no_scope_expansion",
+          "bounded_subagent_delegation",
           "vertical_validation_closure",
-          "bounded_subagent_delegation"
+          "evidence_checkpoint_before_continue"
         ]
       },
       {
         "id": "subagent-known-direction-operation-experiment",
         "behavior_tags": [
           "modify_authorized_scope",
-          "fact_first",
-          "bounded_subagent_delegation"
+          "bounded_subagent_delegation",
+          "evidence_checkpoint_before_continue"
         ]
       },
       {
         "id": "subagent-implicit-evidence-benefit",
         "behavior_tags": [
+          "modify_authorized_scope",
           "fact_first",
+          "bounded_subagent_delegation",
           "minimal_evidence_closure",
-          "bounded_subagent_delegation"
+          "impact_closure"
         ]
       },
       {
         "id": "subagent-implicit-experiment-benefit",
         "behavior_tags": [
           "modify_authorized_scope",
-          "fact_first",
-          "bounded_subagent_delegation"
+          "bounded_subagent_delegation",
+          "evidence_checkpoint_before_continue"
         ]
       },
       {
         "id": "subagent-existing-execution-monitor",
         "behavior_tags": [
           "read_only",
-          "fact_first",
-          "bounded_subagent_delegation"
+          "bounded_subagent_delegation",
+          "fact_first"
         ]
       },
       {
         "id": "subagent-bounded-operator-execution",
         "behavior_tags": [
           "modify_authorized_scope",
+          "bounded_subagent_delegation",
           "vertical_validation_closure",
-          "bounded_subagent_delegation"
+          "evidence_checkpoint_before_continue"
         ]
       },
       {
         "id": "subagent-known-build-operator",
         "behavior_tags": [
-          "fact_first",
+          "modify_authorized_scope",
+          "bounded_subagent_delegation",
           "expensive_action_preflight",
           "stable_candidate_validation",
-          "bounded_subagent_delegation"
+          "evidence_checkpoint_before_continue"
         ]
       },
       {
         "id": "subagent-scriptable-batch-no-benefit",
         "behavior_tags": [
           "modify_authorized_scope",
+          "bounded_subagent_delegation",
           "local_task_fast_path",
-          "bounded_subagent_delegation"
+          "stable_candidate_validation"
         ]
       },
       {
         "id": "subagent-user-forbids",
         "behavior_tags": [
           "read_only",
-          "user_reasoning_override",
-          "bounded_subagent_delegation"
+          "bounded_subagent_delegation",
+          "minimal_evidence_closure"
         ]
       },
       {
         "id": "subagent-short-local-no-benefit",
         "behavior_tags": [
           "read_only",
+          "bounded_subagent_delegation",
           "local_task_fast_path",
-          "minimal_evidence_closure",
-          "bounded_subagent_delegation"
+          "minimal_evidence_closure"
         ]
       },
       {
         "id": "subagent-cheap-direct-operation-no-benefit",
         "behavior_tags": [
           "modify_authorized_scope",
+          "bounded_subagent_delegation",
           "local_task_fast_path",
-          "bounded_subagent_delegation"
+          "stable_candidate_validation"
         ]
       },
       {
         "id": "subagent-child-explicit-nesting",
         "behavior_tags": [
           "read_only",
-          "minimal_evidence_closure",
           "bounded_subagent_delegation"
         ]
       },
@@ -1587,8 +1656,8 @@
         "id": "subagent-child-no-default-nesting",
         "behavior_tags": [
           "read_only",
-          "minimal_evidence_closure",
-          "bounded_subagent_delegation"
+          "bounded_subagent_delegation",
+          "minimal_evidence_closure"
         ]
       },
       {
@@ -1603,21 +1672,23 @@
         "id": "explicit-thread-reasoning-status",
         "behavior_tags": [
           "read_only",
-          "user_reasoning_override"
+          "fact_first"
         ]
       },
       {
         "id": "explicit-thread-reasoning-setting",
         "behavior_tags": [
           "modify_authorized_scope",
-          "user_reasoning_override"
+          "user_reasoning_override",
+          "fact_first"
         ]
       },
       {
         "id": "fixed-thread-reasoning-scope",
         "behavior_tags": [
           "modify_authorized_scope",
-          "user_reasoning_override"
+          "user_reasoning_override",
+          "fact_first"
         ]
       },
       {
@@ -1631,23 +1702,23 @@
         "id": "reasoning-depth-discussion-only",
         "behavior_tags": [
           "read_only",
-          "no_alternative_execution",
-          "user_reasoning_override"
+          "no_alternative_execution"
         ]
       },
       {
         "id": "coordinate-frame-conversion",
         "behavior_tags": [
           "read_only",
-          "collaborative_requirement_insight"
+          "collaborative_requirement_insight",
+          "vertical_validation_closure"
         ]
       },
       {
         "id": "transform-formula-convention",
         "behavior_tags": [
           "read_only",
-          "fact_first",
-          "collaborative_requirement_insight"
+          "collaborative_requirement_insight",
+          "vertical_validation_closure"
         ]
       },
       {
@@ -1655,6 +1726,7 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
+          "vertical_validation_closure",
           "stable_candidate_validation"
         ]
       },
@@ -1665,7 +1737,8 @@
           "architecture_integrated",
           "authority_lifecycle",
           "impact_closure",
-          "long_term_total_cost"
+          "long_term_total_cost",
+          "adaptive_execution_plan"
         ]
       },
       {
@@ -1674,18 +1747,18 @@
           "modify_authorized_scope",
           "fact_first",
           "document_authority",
-          "impact_closure"
+          "impact_closure",
+          "stable_candidate_validation"
         ]
       },
       {
         "id": "shared-blocking-gate",
         "behavior_tags": [
-          "modify_authorized_scope",
+          "read_only",
           "fact_first",
           "long_term_total_cost",
           "architecture_integrated",
-          "impact_closure",
-          "stable_candidate_validation"
+          "vertical_validation_closure"
         ]
       },
       {
@@ -1694,8 +1767,8 @@
           "modify_authorized_scope",
           "challenge_false_premise",
           "long_term_total_cost",
-          "no_scope_expansion",
-          "local_task_fast_path"
+          "local_task_fast_path",
+          "no_scope_expansion"
         ]
       },
       {
@@ -1703,8 +1776,8 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "impact_closure",
-          "stable_candidate_validation",
-          "adaptive_execution_plan"
+          "adaptive_execution_plan",
+          "stable_candidate_validation"
         ]
       },
       {
@@ -1712,7 +1785,8 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "local_task_fast_path",
-          "adaptive_execution_plan"
+          "adaptive_execution_plan",
+          "stable_candidate_validation"
         ]
       },
       {
@@ -1747,7 +1821,6 @@
       {
         "id": "current-context-is-sufficient",
         "behavior_tags": [
-          "modify_authorized_scope",
           "local_task_fast_path",
           "skill_context_lifecycle"
         ]
@@ -1757,15 +1830,16 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "no_scope_expansion"
+          "final_user_scope_only"
         ]
       },
       {
         "id": "cpp-word-in-document",
         "behavior_tags": [
           "modify_authorized_scope",
+          "no_scope_expansion",
           "local_task_fast_path",
-          "no_scope_expansion"
+          "stable_candidate_validation"
         ]
       },
       {
@@ -1780,15 +1854,15 @@
         "id": "mechanical-coordinate-field-edit",
         "behavior_tags": [
           "modify_authorized_scope",
-          "local_task_fast_path"
+          "local_task_fast_path",
+          "stable_candidate_validation"
         ]
       },
       {
         "id": "single-turn-checklist",
         "behavior_tags": [
           "read_only",
-          "local_task_fast_path",
-          "adaptive_execution_plan"
+          "local_task_fast_path"
         ]
       },
       {
@@ -1803,8 +1877,7 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "challenge_false_premise",
-          "no_alternative_execution"
+          "challenge_false_premise"
         ]
       },
       {
@@ -1841,16 +1914,16 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "cli_assistive_only",
-          "local_mechanical_gates",
-          "local_task_fast_path"
+          "local_task_fast_path",
+          "no_scope_expansion"
         ]
       },
       {
         "id": "ast-rewrite-preview",
         "behavior_tags": [
           "read_only",
-          "no_alternative_execution",
-          "minimal_evidence_closure"
+          "minimal_evidence_closure",
+          "no_alternative_execution"
         ]
       },
       {
@@ -1879,9 +1952,8 @@
         "id": "mixed-cpp-powershell-review",
         "behavior_tags": [
           "read_only",
-          "no_alternative_execution",
           "minimal_evidence_closure",
-          "local_task_fast_path"
+          "no_alternative_execution"
         ]
       },
       {
@@ -1891,22 +1963,22 @@
           "no_scope_expansion",
           "local_task_fast_path",
           "adaptive_execution_plan",
-          "skill_context_lifecycle"
+          "stable_candidate_validation"
         ]
       },
       {
         "id": "ui-spatial-layout-with-peer",
         "behavior_tags": [
           "read_only",
-          "fact_first"
+          "fact_first",
+          "vertical_validation_closure"
         ]
       },
       {
         "id": "ui-copy-review-with-peer",
         "behavior_tags": [
           "read_only",
-          "no_alternative_execution",
-          "local_task_fast_path"
+          "no_alternative_execution"
         ]
       },
       {
@@ -1914,6 +1986,7 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
+          "vertical_validation_closure",
           "stable_candidate_validation"
         ]
       },
@@ -1921,7 +1994,8 @@
         "id": "ue-mechanical-field-with-peer",
         "behavior_tags": [
           "modify_authorized_scope",
-          "local_task_fast_path"
+          "local_task_fast_path",
+          "stable_candidate_validation"
         ]
       },
       {
@@ -1929,30 +2003,29 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
-          "no_scope_expansion",
+          "collaborative_requirement_insight",
           "protected_user_baseline",
-          "document_authority",
-          "collaborative_requirement_insight"
+          "no_scope_expansion",
+          "document_authority"
         ]
       },
       {
         "id": "delivery-planning-contract",
         "behavior_tags": [
           "modify_authorized_scope",
-          "no_scope_expansion",
           "protected_user_baseline",
+          "no_scope_expansion",
           "document_authority",
-          "collaborative_requirement_insight"
+          "architecture_integrated"
         ]
       },
       {
         "id": "delivery-task-contract",
         "behavior_tags": [
           "modify_authorized_scope",
-          "no_scope_expansion",
           "document_authority",
-          "cli_assistive_only",
-          "adaptive_execution_plan"
+          "adaptive_execution_plan",
+          "no_scope_expansion"
         ]
       },
       {
@@ -1960,33 +2033,32 @@
         "behavior_tags": [
           "modify_authorized_scope",
           "fact_first",
-          "architecture_integrated",
-          "impact_closure",
           "protected_user_baseline",
           "document_authority",
           "cli_assistive_only",
-          "evidence_checkpoint_before_continue"
+          "local_mechanical_gates",
+          "evidence_checkpoint_before_continue",
+          "architecture_integrated"
         ]
       },
       {
         "id": "task-cli-authoring-references",
         "behavior_tags": [
           "modify_authorized_scope",
-          "no_scope_expansion",
           "document_authority",
           "cli_assistive_only",
           "local_mechanical_gates",
-          "adaptive_execution_plan"
+          "no_scope_expansion"
         ]
       },
       {
         "id": "task-cli-execution-references",
         "behavior_tags": [
           "modify_authorized_scope",
-          "no_scope_expansion",
           "document_authority",
           "cli_assistive_only",
           "local_mechanical_gates",
+          "no_scope_expansion",
           "stable_candidate_validation"
         ]
       },
@@ -1994,11 +2066,10 @@
         "id": "task-cli-completion-references",
         "behavior_tags": [
           "read_only",
-          "no_alternative_execution",
-          "final_user_scope_only",
+          "fact_first",
           "document_authority",
           "cli_assistive_only",
-          "local_mechanical_gates",
+          "final_user_scope_only",
           "minimal_evidence_closure"
         ]
       },
@@ -2007,22 +2078,22 @@
         "behavior_tags": [
           "read_only",
           "fact_first",
-          "no_alternative_execution",
-          "minimal_evidence_closure"
+          "minimal_evidence_closure",
+          "no_scope_expansion"
         ]
       }
     ],
-    "receipt_id": "4c3da76589bc41c993595e0a455e046a"
+    "receipt_id": "8f6889b7ec434288b23855213427a9c8"
   },
   "reference_evaluation": {
     "schema_version": 4,
     "evaluation_kind": "routing-reference-policy",
     "fingerprint_schema": "phase-visible-lf-v2",
     "evaluator": {
-      "id": "agentbase-references-81f9ad360728441d8b66b87cbcacdc40",
+      "id": "agentbase-references-e557fea1e8774e38b3c1fb3b97c4234c",
       "model": "gpt-5.6-sol",
       "runtime": "codex-cli 0.151.0/windows/read-only/ephemeral/cases-only-v4/catalog-75F0D1B35D49A3AF/shell-38fed52b24194b4f",
-      "evaluated_at_utc": "2026-09-02T02:27:14.6559628+00:00",
+      "evaluated_at_utc": "2026-09-02T05:05:10.7944991+00:00",
       "isolation_mode": "detached-capsule",
       "repository_accessed": false,
       "hidden_expectations_accessed": false,
@@ -2054,10 +2125,10 @@
         "workspace_dependencies"
       ]
     },
-    "evaluation_capsule_sha256": "A9862A050D6826A71975ED30CEED0F909E27541E929E9577B27C46D9B3AF7B7B",
-    "candidate_bundle_sha256": "12721739F42ABB2A7379A41523DB8671A8E237C342C881BAC8C8838DBFA01849",
+    "evaluation_capsule_sha256": "EFAD2407DB9CE3C3B7800FF092F78927E18BA6970EE0C4B2057FB51DEDE1BA49",
+    "candidate_bundle_sha256": "206B2AD2CC152FF206F2C9EEEFF672CB7DD7180133FAECBF37AD65BD61F83C61",
     "evaluation_input_sha256": "A3D8D79B95E418970EA118FCA22E262C355364026DF3481FA50118848F5C95B2",
-    "routing_reference_selection_sha256": "267F1CE80847B310715094E39FBCD23B361550521813B53748561BCDC221C598",
+    "routing_reference_selection_sha256": "3CD9C76662EF349449EF2DE3E8FC5BBB8BC922903B01394E711BF90B8A0E4E6B",
     "cases": [
       {
         "id": "observable-model-error-review",
@@ -2167,7 +2238,8 @@
           {
             "skill": "execution-governor",
             "references": [
-              "decision-frontier.md"
+              "decision-frontier.md",
+              "failure-and-cost.md"
             ]
           },
           {
@@ -2306,6 +2378,7 @@
               "authoring-tooling.md",
               "execution-tooling.md",
               "execution.md",
+              "query-tooling.md",
               "task-contracts.md",
               "tooling.md"
             ]
@@ -2456,6 +2529,8 @@
             "references": [
               "execution-tooling.md",
               "execution.md",
+              "query-tooling.md",
+              "task-contracts.md",
               "tooling.md"
             ]
           }
@@ -2691,6 +2766,7 @@
           {
             "skill": "change-governance",
             "references": [
+              "lifecycle-and-entry.md",
               "verification-and-gates.md"
             ]
           },
@@ -2699,13 +2775,17 @@
             "references": [
               "artifact-contracts.md",
               "execution-contracts.md",
-              "target-contracts.md"
+              "iteration.md",
+              "planning-contracts.md",
+              "target-contracts.md",
+              "tooling.md"
             ]
           },
           {
             "skill": "task-table-manager",
             "references": [
               "authoring-tooling.md",
+              "query-tooling.md",
               "task-contracts.md",
               "tooling.md"
             ]
@@ -2847,6 +2927,6 @@
         ]
       }
     ],
-    "receipt_id": "3362175107c943ef867927c65774eb90"
+    "receipt_id": "d8217de1fe584334ac1b648e850947e2"
   }
 }
