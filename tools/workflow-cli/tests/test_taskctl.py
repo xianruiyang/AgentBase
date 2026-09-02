@@ -3613,6 +3613,10 @@ class TaskctlTests(unittest.TestCase):
         self.assertIn("分页取得最终复核证据，不裁决整体完成", helped.stdout)
         self.assertIn("用 task/state CAS 和来源收据提交结果", helped.stdout)
 
+        draft_help = self.run_cli(TASKCTL, "draft", "--help")
+        self.assertEqual(draft_help.returncode, 0)
+        self.assertIn("TASK_ID:type[:consumed-output]", draft_help.stdout)
+
         context_help = self.run_cli(TASKCTL, "context", "--help")
         self.assertEqual(context_help.returncode, 0)
         self.assertIn("model 视图的保守 Token 上限", context_help.stdout)

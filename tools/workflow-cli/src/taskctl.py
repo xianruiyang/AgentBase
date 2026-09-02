@@ -5356,7 +5356,12 @@ def build_parser() -> argparse.ArgumentParser:
     draft_parser.add_argument("--title", required=True, help="候选任务标题")
     draft_parser.add_argument("--outcome", required=True, help="任务完成后必须成立的可验收结果")
     draft_parser.add_argument("--source-id", action="append", default=[], help="关联的上游方案或目标 ID；可重复")
-    draft_parser.add_argument("--dependency", action="append", default=[], help="依赖任务 ID；可重复")
+    draft_parser.add_argument(
+        "--dependency",
+        action="append",
+        default=[],
+        help="依赖，格式 TASK_ID:type[:consumed-output]；可重复",
+    )
     draft_parser.add_argument("--mutation-scope", action="append", default=[], help="允许修改的路径或职责范围；可重复")
     draft_parser.add_argument("--output", action="append", default=[], help="必须交付的产物；可重复")
     draft_parser.add_argument("--verification", action="append", default=[], help="直接验收方式；可重复")

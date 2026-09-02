@@ -10,7 +10,11 @@ draft       输出最小候选任务，不写文件
 add/update  从含稳定 ID 的模型语义正文生成完整永久任务合同
 ```
 
+`taskctl init` 只在 `task-table.json` 尚不存在且固定目录没有任务数据时使用；现有 Delivery Workflow 中恢复缺失任务表还要求 `--id` 与 workflow ID 一致。`workctl init` 成功后任务表已经存在，不要紧接着再次初始化。
+
 `draft` 的 model 视图保留稳定任务 ID 与非空语义字段，省略 schema/revision；显式 machine draft 返回完整 canonical `task.record`，供程序和永久格式检查。CLI 不自动把文档变成任务。
+
+`draft --dependency` 每项使用 `TASK_ID:type[:consumed-output]`，可重复；例如 `--dependency T001:hard:公开接口合同`。`type` 的语义取值继承任务合同，省略 consumed-output 只表示该次没有登记消费内容，不得用它掩盖真实消费关系。
 
 `add/update --file` 的模型输入包含任务 `id` 和语义字段，不包含 schema/revision。`add` 注入初始 revision；`update` 必须传调用方刚读到的 `--expected-task-revision` 并注入下一 revision。上一版完整 task envelope 仍由相同入口单向规范化并返回兼容诊断，不能要求模型长期同步机器字段。
 
