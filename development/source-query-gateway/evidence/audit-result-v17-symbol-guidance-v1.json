@@ -1,0 +1,221 @@
+{
+  "schema": "agentbase.code-reading-symbol-guidance-audit/v1",
+  "created_date": "2026-09-02",
+  "purpose": "produce the first true v17 current-Control baseline, then test whether a candidate-only source-query skill can make symbol calls replace text-search rounds without leaking experiment content into production",
+  "experiment_boundary": {
+    "corpus": "development/code-search-benchmark/corpus/v17.json",
+    "cases": [
+      "vmt-temperature-collector-sampling-chain",
+      "facecutting3d-raycast-chain",
+      "opencode-webview-message-boundary"
+    ],
+    "repetitions_per_case": 2,
+    "subject": "gpt-5.6-luna medium, standard service tier, read-only, multi-agent disabled",
+    "control": "fresh clone of the complete currently installed AGENTS.md and skill/plugin environment",
+    "candidate_difference": "candidate-home skills/source-query/SKILL.md only",
+    "raw_location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/code-reading-v17-control-r1",
+    "production_effect": "none; repository and installed AGENTS.md, skills, srcq, deployment payload, and release state were unchanged"
+  },
+  "control": {
+    "required_by_case_and_run": {
+      "csharp": ["28/31", "29/31"],
+      "cpp": ["13/13", "13/13"],
+      "typescript": ["22/23", "23/23"]
+    },
+    "required_total": "128/134",
+    "quality_complete_runs": "3/6",
+    "usage": {
+      "input_tokens": 870785,
+      "cached_input_tokens": 645632,
+      "ordinary_input_tokens": 225153,
+      "output_tokens": 12205,
+      "reasoning_tokens": 5451,
+      "actual_total_tokens": 882990,
+      "requests": 35,
+      "observed_price_usd": 0.07258924,
+      "subject_elapsed_seconds": 360.306
+    },
+    "per_run": [
+      {"case": "csharp", "ordinal": 1, "score": "28/31", "tokens": 129821, "price_usd": 0.01404752, "seconds": 48.606, "requests": 5, "commands": 6},
+      {"case": "csharp", "ordinal": 2, "score": "29/31", "tokens": 133908, "price_usd": 0.01063768, "seconds": 66.218, "requests": 5, "commands": 4},
+      {"case": "cpp", "ordinal": 1, "score": "13/13", "tokens": 149127, "price_usd": 0.01466364, "seconds": 56.139, "requests": 6, "commands": 5},
+      {"case": "cpp", "ordinal": 2, "score": "13/13", "tokens": 193306, "price_usd": 0.01239196, "seconds": 79.523, "requests": 8, "commands": 7},
+      {"case": "typescript", "ordinal": 1, "score": "22/23", "tokens": 207985, "price_usd": 0.01318348, "seconds": 76.040, "requests": 8, "commands": 10},
+      {"case": "typescript", "ordinal": 2, "score": "23/23", "tokens": 68843, "price_usd": 0.00766496, "seconds": 33.780, "requests": 3, "commands": 2}
+    ]
+  },
+  "candidate": {
+    "guidance": [
+      "trigger on definition-location plus direct or cross-function relation tasks",
+      "locate an identifier once with bounded srcq rg",
+      "convert 1-based text coordinates to 0-based symbol coordinates",
+      "always pass an explicit matching language",
+      "make one depth-1 or depth-2 symbol calls query that replaces the next relation search",
+      "fall back without retry or widening when symbol is incomplete or fails"
+    ],
+    "required_by_case_and_run": {
+      "csharp": ["31/31", "31/31"],
+      "cpp": ["13/13", "13/13"],
+      "typescript": ["19/23", "20/23"]
+    },
+    "required_total": "127/134",
+    "quality_complete_runs": "4/6",
+    "usage": {
+      "input_tokens": 1066363,
+      "cached_input_tokens": 884224,
+      "ordinary_input_tokens": 182139,
+      "output_tokens": 12755,
+      "reasoning_tokens": 5974,
+      "actual_total_tokens": 1079118,
+      "requests": 40,
+      "observed_price_usd": 0.06941828,
+      "subject_elapsed_seconds": 377.470
+    },
+    "per_run": [
+      {"case": "csharp", "ordinal": 1, "score": "31/31", "tokens": 279852, "price_usd": 0.01386948, "seconds": 84.344, "requests": 10, "commands": 9},
+      {"case": "csharp", "ordinal": 2, "score": "31/31", "tokens": 105487, "price_usd": 0.00935872, "seconds": 49.760, "requests": 4, "commands": 3},
+      {"case": "cpp", "ordinal": 1, "score": "13/13", "tokens": 251713, "price_usd": 0.01554500, "seconds": 88.656, "requests": 9, "commands": 8},
+      {"case": "cpp", "ordinal": 2, "score": "13/13", "tokens": 192325, "price_usd": 0.01435540, "seconds": 65.512, "requests": 7, "commands": 6},
+      {"case": "typescript", "ordinal": 1, "score": "19/23", "tokens": 111035, "price_usd": 0.00799112, "seconds": 36.947, "requests": 4, "commands": 3},
+      {"case": "typescript", "ordinal": 2, "score": "20/23", "tokens": 138706, "price_usd": 0.00829856, "seconds": 52.251, "requests": 6, "commands": 5}
+    ],
+    "observed_symbol_behavior": {
+      "csharp_run_1": "three failed calls omitted explicit language and retried guessed coordinates",
+      "csharp_run_2": "source-query skill not read; no symbol call",
+      "cpp_run_1": "one failed call used a wrong relative path; language worked only because cpp is the tool default",
+      "cpp_run_2": "no symbol call",
+      "typescript_runs": "source-query skill not read; no symbol call",
+      "successful_symbol_calls": 0
+    }
+  },
+  "no_model_probes": {
+    "root_cause": "srcq symbol calls defaults language to cpp; omitting language makes C# and TypeScript positions parse under the wrong grammar",
+    "corrected_results": [
+      "C# ValidateUidsUnsafe succeeds with explicit csharp and exposes ordering plus the typed ValidateUid edge",
+      "C# ExecuteAsync depth 2 reaches SampleOnceAsync, sorting, validation, Read, and the configured node budget",
+      "C++ RayCastTest depth 2 reaches BvhTree::rayCast and rayCastInteral",
+      "TypeScript handleWebviewMessage succeeds with explicit typescript and exposes typed service calls"
+    ],
+    "inference": "symbol relations can answer these relation chains, but the current model-facing coordinate and language contract is too error-prone for prose guidance alone"
+  },
+  "isolated_tool_probe_v1": {
+    "boundary": "external detached worktree and binary only; no repository, installed runtime, payload, Deploy, or Release change",
+    "raw_worktree": "%LOCALAPPDATA%/AgentBase/experiments/srcq-symbol-language-auto-v1",
+    "change": "when --at is present and language was not explicitly supplied, infer a supported language from the source extension while preserving explicit-language priority and cpp fallback",
+    "targeted_test": "passed",
+    "release_build": "passed",
+    "three_language_equivalence": {
+      "csharp": "implicit language output exactly matched explicit csharp output",
+      "typescript": "implicit language output exactly matched explicit typescript output",
+      "cpp": "implicit language output exactly matched explicit cpp output",
+      "explicit_wrong_language": "remained authoritative and produced the existing semantic-unknown failure"
+    },
+    "counterfactual_replay": {
+      "source": "the three C# coordinates actually attempted by the rejected candidate",
+      "results": ["position failure", "position failure", "success"],
+      "conclusion": "automatic language inference fixes the legal position but cannot repair guessed line or column values, so it is not sufficient for a six-run model experiment"
+    },
+    "next_probe": "test a name plus source-file hint that preserves automatic project scope and removes both language and column assembly from the model"
+  },
+  "isolated_tool_probe_v2": {
+    "change": "infer language for name queries from a consistent source-file extension supplied through existing root hints",
+    "three_language_result": {
+      "typescript": "unqualified name plus source-file hint succeeded and exactly matched explicit-language output",
+      "cpp": "qualified name plus source-file hint succeeded and exactly matched explicit-language output",
+      "csharp": "unqualified ExecuteAsync remained ambiguous across four definitions; a qualified name returned a useful partial tree but reached the time budget"
+    },
+    "decision": "do not run the full model experiment; the interface still requires language-specific qualification knowledge and does not provide one stable cross-language path",
+    "next_probe": "a 1-based definition-line query that uses AST evidence to select a unique callable definition without a guessed column"
+  },
+  "isolated_tool_probe_v3": {
+    "candidate": "resolve a unique callable definition from a copied 1-based source line",
+    "status": "stopped before implementation",
+    "reason": "strict resolution requires AST outline initialization before the current target-resolution stage; reordering that path would affect existing position, name, scope, and engine-error contracts and was not a low-cost probe"
+  },
+  "isolated_tool_probe_v4": {
+    "change": "add --at-vimgrep so a 1-based PATH:LINE:COLUMN returned by srcq rg --vimgrep is mechanically converted to the existing zero-based position path; source extension infers language and explicit language remains authoritative",
+    "targeted_tests": "passed, including Windows drive paths, spaces, one-based conversion, zero rejection, option conflicts, and language inference",
+    "release_build": "passed",
+    "three_language_equivalence": {
+      "csharp": "bridge output exactly matched explicit csharp plus manually converted --at",
+      "typescript": "bridge output exactly matched explicit typescript plus manually converted --at",
+      "cpp": "bridge output exactly matched explicit cpp plus manually converted --at"
+    },
+    "decision": "sufficient for one formal model candidate because both observed language omission and coordinate assembly are removed without AST heuristics"
+  },
+  "formal_bridge_candidate": {
+    "raw_location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/code-reading-v17-symbol-bridge-r1/symbol-bridge-r2",
+    "allowed_differences": ["candidate bin/srcq.exe", "candidate skills/source-query/SKILL.md"],
+    "skill_treatment": "trigger definition-location plus direct or cross-function relation tasks; use one bounded srcq rg --vimgrep result as one --at-vimgrep calls query; the symbol call must replace the next relation search and must not be retried",
+    "required_by_case_and_run": {
+      "csharp": ["29/31", "30/31"],
+      "cpp": ["13/13", "13/13"],
+      "typescript": ["22/23", "23/23"]
+    },
+    "required_total": "130/134",
+    "quality_complete_runs": "3/6",
+    "per_run": [
+      {"case": "csharp", "ordinal": 1, "score": "29/31", "tokens": 101857, "price_usd": 0.00784376, "seconds": 46.404, "requests": 4, "commands": 3},
+      {"case": "csharp", "ordinal": 2, "score": "30/31", "tokens": 210444, "price_usd": 0.01357628, "seconds": 74.443, "requests": 8, "commands": 7},
+      {"case": "cpp", "ordinal": 1, "score": "13/13", "tokens": 463659, "price_usd": 0.02741644, "seconds": 134.486, "requests": 16, "commands": 15},
+      {"case": "cpp", "ordinal": 2, "score": "13/13", "tokens": 306572, "price_usd": 0.01605784, "seconds": 120.197, "requests": 11, "commands": 10},
+      {"case": "typescript", "ordinal": 1, "score": "22/23", "tokens": 103725, "price_usd": 0.00660512, "seconds": 40.959, "requests": 4, "commands": 3},
+      {"case": "typescript", "ordinal": 2, "score": "23/23", "tokens": 98414, "price_usd": 0.00740412, "seconds": 43.046, "requests": 4, "commands": 3}
+    ],
+    "usage": {
+      "input_tokens": 1269949,
+      "cached_input_tokens": 1070848,
+      "ordinary_input_tokens": 199101,
+      "output_tokens": 14722,
+      "reasoning_tokens": 6586,
+      "actual_total_tokens": 1284671,
+      "requests": 47,
+      "observed_price_usd": 0.07890356,
+      "subject_elapsed_seconds": 459.535
+    },
+    "relative_to_control_percent": {
+      "required_items": 1.563,
+      "actual_total_tokens": 45.491,
+      "observed_price_usd": 8.699,
+      "subject_elapsed_seconds": 27.540,
+      "requests": 34.286,
+      "ordinary_input_tokens": -11.571,
+      "cached_input_tokens": 65.860
+    },
+    "by_language": {
+      "csharp": {"required": "59/62 versus 57/62", "price_percent": -13.227, "tokens_percent": 18.417, "seconds_percent": 5.245, "requests_percent": 20.000},
+      "cpp": {"required": "26/26 versus 26/26", "price_percent": 60.685, "tokens_percent": 124.929, "seconds_percent": 87.733, "requests_percent": 92.857},
+      "typescript": {"required": "45/46 versus 45/46", "price_percent": -32.804, "tokens_percent": -26.980, "seconds_percent": -23.507, "requests_percent": -27.273}
+    },
+    "mechanism_observation": {
+      "skill_reads": {"csharp": "one of two", "cpp": "two of two", "typescript": "zero of two"},
+      "successful_bridge_pairs": 3,
+      "symbol_failures_or_retries": 0,
+      "csharp": "the bridge succeeded once but was followed by another relation text search, so it did not fully replace work",
+      "cpp": "the bridge succeeded in both runs and no later relation search occurred, but the two runs expanded to 27 requests, 25 commands, and three unrelated failed commands",
+      "typescript": "the skill and bridge were never used; the lower cost cannot be attributed to symbol"
+    },
+    "postflight_failures": 0,
+    "ideal_cache_price": "unavailable because cache-write accounting is inconsistent with later hits",
+    "decision": "reject; quality improved by two C# atoms but the actual observed price, requests, tokens, and time regressed overall, with a decisive C++ price counterexample"
+  },
+  "relative_to_control_percent": {
+    "required_items": -0.746,
+    "actual_total_tokens": 22.212,
+    "observed_price_usd": -4.368,
+    "subject_elapsed_seconds": 4.764,
+    "requests": 14.286,
+    "ordinary_input_tokens": -19.104,
+    "cached_input_tokens": 36.955
+  },
+  "decision": {
+    "status": "reject",
+    "reasons": [
+      "TypeScript regressed on both repetitions and aggregate required quality fell from 128/134 to 127/134",
+      "C++ price regressed in both repetitions and TypeScript price regressed in its second repetition",
+      "the target symbol mechanism never succeeded and the candidate violated its own explicit-language and no-retry constraints",
+      "aggregate observed price improvement therefore cannot be attributed to successful symbol use"
+    ],
+    "next_evidence_frontier": "the position bridge is technically valid but does not control skill triggering or downstream search expansion; do not rerun either tested guidance. A future candidate must mechanically replace a complete relation-search/read round, especially in C++, before another six-run model experiment"
+  }
+}
