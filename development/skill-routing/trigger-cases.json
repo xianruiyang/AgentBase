@@ -88,7 +88,7 @@
     "evidence_checkpoint_before_continue": "反例改变失效范围、当前消费者或下一动作时，先停止依赖工作并把反例、失效来源、当前验证 case 和下一动作写回已有 owner，再重新裁决和继续。",
     "dimension_bounded_validation": "本标签不适用于 owner、契约、oracle 均明确、无共享未知且可低成本穷举的小闭集；此类直接走局部快速路径，不建立 coverage basis。其他声明随多种组件、载体、模式、状态、版本或持久化边界变化，且存在实质组合扩量或共享未知时，在批量实现或测试编写前形成 claim、有效 dimensions、equivalence、interactions、代表 cases 与 promotion 组成的 coverage basis；每个 case 必须新增判别信息，pairwise 不外推高阶交互，穷举只用于明确逐组合认证或无充分等价证据的高后果交互，结论限制在实际覆盖或有可复核依据的等价类。",
     "tool_defect_reproduction": "声称当前工具缺少能力或存在缺陷前，核对实际身份与对应帮助并重放原输入，区分输入错误、范围重叠、正常协议、预期降级、截断和产品故障。",
-    "model_interaction_surface": "当前请求要求设计、选择或改变模型直接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面最小充分且可局部修改，机器面保持稳定完整，生成物不作为语义修改入口。",
+    "model_interaction_surface": "当前请求要求设计、选择或改变模型直接或间接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面只投影当前动作所需语义，不用 Base64、完整哈希、UUID 等长不透明码承担身份，在不损失必要语义下按实测或已验证保守估算选择最低 Token 格式；机器面保持稳定完整，生成物不作为语义修改入口。",
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
     "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值，线程设置入口只在配置证据会改变动作时查询，并只为可预期长期阶段且剩余收益足以覆盖切换和恢复成本时设置；孤立难题和短机械收尾沿用当前档位。",
@@ -403,6 +403,42 @@
       "id": "model-interaction-tool-read",
       "kind": "behavior",
       "request": "一个查询工具同时提供 model 和 machine 两种视图：model 只含本次阻塞判断、直接依据与续查游标，machine 是包含完整身份、空值和审计字段的稳定 JSON。当前只需要判断是否继续下一步，请选择输出面并说明原则，不执行修改。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "model_interaction_surface"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "model-interaction-opaque-identity-projection",
+      "kind": "behavior",
+      "request": "正在设计一个会被模型直接读取的部署 Status 视图。完整机器 JSON 含 Base64 数据、完整 SHA-256、UUID、receipt/capsule/run ID 和几十个审计字段；模型当前只需判断 deployed、阻塞原因和恢复动作。请只读说明 model 视图应保留什么、这些长不透明身份如何留在机器面并通过短语义别名按需解析，不修改实现。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "model_interaction_surface"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "model-interaction-token-minimal-projection",
+      "kind": "behavior",
+      "request": "同一 owner 能从完整 machine 结果生成三种语义等价的 model 投影；它们都只含当前决定需要的三个事实，当前 tokenizer 实测紧凑键值文本 Token 最少且仍可准确定位，JSON 和表格更高。请选择模型读取格式并说明为何必须先删掉空字段、默认值、重复身份和无关历史，而不能只把完整 JSON 换一种格式；只分析，不修改。",
       "expected_skills": [],
       "forbidden_skills": [
         "change-governance",
