@@ -222,7 +222,8 @@ fd model renderer 使用可逆紧凑基数树并合并单子链；rg 按正文�
 ## SOL-SQG-017 以共享 typed relation 骨架扩展五种常用语言
 
 - 状态: resolved
-- 解决: GAP-SQG-010, GAP-SQG-011
+- 部分解决: GAP-SQG-010
+- 解决: GAP-SQG-011
 - 满足: REQ-SQG-002, AC-SQG-010, AC-SQG-011, AC-SQG-012, AC-SQG-013, AC-SQG-014, AC-SQG-015, AC-SQG-016, DES-SQG-016, DES-SQG-017, DES-SQG-018, DES-SQG-019, DES-SQG-020, DES-SQG-021, UDES-SQG-020
 - 依赖: TSQG-109, TSQG-112
 
@@ -233,3 +234,16 @@ fd model renderer 使用可逆紧凑基数树并合并单子链；rg 按正文�
 验证按“共享 typed 正反例 → 每语言一个类型/模块收窄正例与一个动态/冲突反例 → 项目 resolver 正例与 incomplete 反例 → 现有 C++/C# 回归 → srcq 受影响组件门禁”扩展。组件候选稳定前不运行发布门禁、完整独立模型评测或九题评测；本方案不包含 Release、安装或 Codex Publish，任何 Publish 仍需用户针对当次操作另行明确同意。
 
 当前源码候选已按该方案实现：共享 `CallScan`/typed relation 持有显式与未解析绑定、类型和 callable scope；五个语言 adapter 只声明语言 AST 与静态证据；Go 方法 receiver 进入限定定义身份且同名大写参数会遮蔽类型声明。Node、Cargo、Go、Python 本地项目 resolver 接入 `SourceUniverse`，配置错误、缺失、不支持的 glob 和 256 项上限均产生 issue。定向符号关系测试 21/21、scope 定向测试 23/23、完整 `cargo ci-test`、`cargo ci-build`、`cargo lint`、`cargo fmt-check` 与 skill routing contract 均通过；独立只读复核未发现残留高优先级问题。真实 ast-grep 专用测试仍按既有环境变量合同 ignored；本轮未制作 Release、安装或 Codex Publish。
+
+## SOL-SQG-018 在既有 calls owner 内实现双向 bundle 与清单 adapter
+
+- 状态: proposed
+- 解决: GAP-SQG-012
+- 满足: AC-SQG-011, DES-SQG-019, DES-SQG-021, DES-SQG-022
+- 依赖: TSQG-108, TSQG-112
+
+先在现有 `symbol_query` 内把 query 解析、`SourceUniverse`、定义解析、不可变扫描证据和 deadline 提升为单次共享上下文，再让 incoming/outgoing 两个方向各自产生可独立投影的分支状态。保留单方向 `srcq.symbol.calls/v1` 的 help、schema、退出和渲染；只有显式 `both` 进入 `srcq.symbol.calls/bundle/v1`，machine/model 均只投影一次共享 root，不复制两份完整信封。定向测试须逐分支证明与两次旧 v1 等价，并覆盖单边截断、单边失败、共享超时和不同 depth/limit 预算。
+
+在 `SourceUniverse` 增加 `--source-manifest PATH` 与 adapter 注册，不把 build-system 语法写进公共查询层。首个 vcxproj adapter 只恢复直接源码项，报告格式身份、规范化路径、项数、未解析输入和 `bounded` 完整性；用户提供的限定名与清单共同消除工程范围和同名定义歧义。后续 adapter 只有真实消费者与可证明静态语义时才增加，不把自动最近文件、完整 MSBuild 或语言服务包装成兜底。
+
+实现先通过 schema 兼容、跨语言关系等价、范围边界、Token 投影和受影响 srcq 组件验证。随后才允许在隔离环境运行模型 candidate：一个限定名 bundle 必须替代全部关系搜索，只保留一次有界行为读取；每个冻结代表 case 都须质量不退且实际价格下降。任一 case 反例即拒绝 skill 晋级，不部署、不发行，也不重跑已经失败且输入未变的三组措辞。

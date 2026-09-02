@@ -195,6 +195,12 @@ C++ 命令链进一步证明，候选误把题目要求的 incoming 直接调用
 
 `--direction both` 的隔离设计审查在实现前停止：现有结果、树展开、model/machine 渲染、节点/时间预算、截断和退出码均以单方向为合同，正确合并需要新的双树公共结果与共享预算语义；简单拼接会丢方向边界，执行两次完整扫描又不能降低成本。后续只有先形成共享 scope 的多关系结果合同并证明能机械替代完整搜索/读取轮，才重开实现与六次模型实验；不再用 skill 文案要求两次独立 symbol 调用。
 
+### 3.17 2026-09-02 共享双向关系与显式清单范围研究
+
+本轮先在外部隔离 srcq worktree 验证工具机制，不修改仓库产品或安装环境。初版 bundle 虽比两次独立调用快约 `7.9%`，却因三次复制 root 让 machine/model Token 分别增加 `7.2%`/`8.9%`，因此拒绝该投影。改为单一共享 root 后，C++、C#、TypeScript 的 machine/model Token 均下降且关系与分支 partial 状态等价。再加入通用 `--source-manifest` 和 `vcxproj-direct-items/v1` 后，FaceCutting3D 限定名双向查询相对两次独立调用的 machine/model Token 为 `854/1018`、`260/271`，耗时 `4.401/4.970 s`。
+
+模型侧三轮候选没有晋级：body-only A/B 保持 `26/26` 但候选价格增加 `1.4%`，且 skill 与 bundle 均未触发；加强 trigger 后虽两次读取 skill，却只有一次 bundle 成功并产生 8 次错误命令；限定名候选达到 `2/2` bundle 成功和 `26/26`，仍继续关系 rg、重复 symbol 与 manifest/source 读取，相对邻近 Control 增加 `47.2%` Token、`22.5%` 价格、`29.4%` 时间和 `50%` 请求。结论是工具结构与静态投影值得进入正式实现任务，现有三种 skill 引导均应拒绝且不得原样重跑。结构化证据见 [共享双向调用审计](evidence/audit-result-shared-calls-bundle-v1.json)。
+
 ## 4. 阶段与任务
 
 ### P0 固定分支合同和 AST 基线
@@ -459,6 +465,8 @@ TSQG-103—TSQG-105 已闭环。0.4.3 候选与完整组件门禁覆盖六位环
 | TSQG-116 | 完成 Go 语言与 module/workspace 适配 | TSQG-113 | 参数/局部/字段/receiver/复合字面量 adapter、go.mod/go.work 本地 resolver | 直接与 typed member 候选按 package/type 收窄；interface、build tag、generate 和未解析依赖保持 unknown/incomplete |
 | TSQG-117 | 完成 Rust 语言与 workspace/module 适配 | TSQG-113 | 参数/局部/self/impl/路径调用 adapter、Cargo workspace/path dependency resolver | inherent impl 与显式类型候选收窄；trait object、宏、closure/function value 和生成源码保持 unknown/incomplete |
 | TSQG-118 | 收口五语言 capability、组件回归与候选文档 | TSQG-114, TSQG-115, TSQG-116, TSQG-117 | capability/source scope 状态、语言正反例、C++/C# 回归、组件门禁和正式状态说明 | 定向行为与受影响组件验证通过，输出不越过证据边界；不运行无关完整评测，不制作 Release、安装或 Codex Publish |
+| TSQG-119 | 在正式 srcq 实现共享双向 calls bundle 与显式 source manifest | TSQG-108, TSQG-112, DES-SQG-022, SOL-SQG-018 | 保持 v1 的 bundle/v1、共享查询/范围/deadline、独立分支状态、manifest adapter 与 vcxproj direct-items 首个消费者 | 两分支可机械还原旧 v1；跨语言关系、单边 partial、bounded 范围、Token 投影和受影响组件验证通过；不自动执行或冒充完整 MSBuild |
+| TSQG-120 | 只在 TSQG-119 稳定后验证模型集成并裁决 skill 是否晋级 | TSQG-119 | 限定名 bundle 替代关系发现的一次配对实验、逐 case 质量/实际价格表与晋级裁决 | 每个冻结代表 case 均质量不退且实际价格下降；只保留一次有界行为读取；首个反例熔断，不部署、不发行、不原样重跑已拒绝候选 |
 
 0.5.0 已经闭合 TSQG-106、TSQG-107、TSQG-108 与 TSQG-109：`srcq symbol` 公开 definition/references/calls/capabilities，位置与名称身份分离，model/machine 分面和有界调用树已实现；26 种 ast-grep 语言均有显式 capability，实际适配语言按结构机制验证，未适配与不适用不会返回伪空集合。用户于 2026-08-31 重开 TSQG-109 的常用语言范围后，C 与 C# 已和 Go、Python、Rust、JavaScript、TypeScript、TSX、Java 一样接入语言节点表驱动的 generic relation engine；扩展只增加 grammar 描述、fixture 与能力/关系边界测试，不复制搜索、图展开或输出算法。TSQG-112 已实现 anchor/cwd、workspace、C++ compile database/MSVC response file 及 add/only/exclude 组合，并在 GptProjectTest 恢复 UE 外部定义；0.6.0 进一步实现 C# `.sln`/`.csproj` 静态 Compile resolver，以及 TypeScript/TSX/JavaScript、Rust、Go、Python 的本地项目元数据 resolver。Java 等其余非 C++ 语言仍保持 `explicit-or-project` 边界。TSQG-110 已接入紧凑 model/machine 输出与 source-query 渐进路由，但关系大结果仍以明确截断和重跑预算恢复，尚未接入同快照短句柄。TSQG-111 的完整组件门禁、真实 UAI 可靠性、release 性能、静态 Token、ast-grep 0.44.1 单一活动矩阵、可复现归档、安装生命周期与 GitHub Release 均已完成；`srcq-v0.5.0` 指向 `ae465953a838b168fe9485ca9e9e6546ad14ba74`，后继 `srcq-v0.6.0` 指向 `9bee175a1005485f6591fffa9ea3bdf0862d0c84`。用户默认安装仍为 0.5.0，Codex Publish 未执行；这些状态不影响 0.6.0 正式 Release，但不得把已发布候选外推为全部语言依赖全集或 LSP 精确语义。
 
@@ -467,6 +475,8 @@ TSQG-103—TSQG-105 已闭环。0.4.3 候选与完整组件门禁覆盖六位环
 用户于 2026-09-01 进一步要求 Go、Python、Rust、JavaScript、TypeScript 尽量达到 C++ 的解析效果，现由 UDES-SQG-020、AC-SQG-016、DES-SQG-021 与 SOL-SQG-017 重开并闭合 TSQG-113—118：TypeScript 首个纵向消费者先证明共享 typed relation 骨架，随后 JavaScript、Python、Go、Rust 接入各自 grammar；`SourceUniverse` 同时接入 Node、Cargo、Go 与 Python 的本地项目元数据 resolver。定向集成覆盖限定定义、outgoing、incoming、callable owner、词法越界和动态 unknown，既有 C++/C# 用例同跑；完整 srcq test/build/lint/fmt、skill routing contract 和独立只读复核均通过。“对齐 C++”只表示语言等价的项目范围、显式类型或限定候选、唯一调用递归和 callable owner，不包含编译器重载、动态分派、宏/生成代码或运行时绑定。用户随后明确授权本次 srcq GitHub Release，0.6.0 已发布并完成真实认证下载回验；用户默认安装与 AgentBase Codex Publish 未执行。
 
 后续代码读取 skill 策略实验未达到用户确认的逐 case 晋级门槛，裁决与恢复身份见 [OBS-SQG-032](current-state.md#obs-sqg-032-代码读取-skill-候选未满足逐实验质量与价格门槛) 和 [审计证据](evidence/audit-result-code-reading-strategy-v1.json)。仓库 skill 已回到 `aafefc62187dae845944649a68750f16fe67073e` 的已用策略，`tools/srcq` 的 P16/P17 产品能力与 Release 保持不变。该策略工作不保留开放实施项；只有未来同身份配对 A/B 在每个冻结代表 case 上完整通过质量合同且短、长价格等价场景均严格下降时才重开，首个反例继续熔断余下矩阵。
+
+OBS-SQG-040 随后重新确认 AC-SQG-011 的 `both` 部分并未由两个独立方向调用完整闭合。TSQG-119/120 因此只重开共享双向调用、显式 bounded manifest 与其模型接入，不推翻 TSQG-108 已完成的单方向 definition/references/calls，也不重开已拒绝的旧 skill 措辞。当前正式 srcq、仓库 skill、安装态和部署 payload 均未改变。
 
 ## 5. 停止与重开条件
 

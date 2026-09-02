@@ -367,6 +367,17 @@ Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次
 
 `v17.json` 不改写已绑定历史语料，向前把三个外部项目拆为 C# 31、C++ 13、TypeScript 23 个 required。C# 的 ExpectedUid 行为与 C++ 的 root/完整参数转发降为 supporting；`Test -> Read` 成为显式 required；TypeScript 题面改问“是否以及如何清理”，并补入宿主未保存 Disposable、没有显式清理及完整消息边界。三个项目源码快照校验通过。现有 v16 Control 答案只作追溯投影：C# `29/31、30/31`，C++ `13/13、13/13`，TypeScript `23/23、23/23`，合计 `131/134`、完整 `4/6`。两个真实失败分别是 C# 第一次漏 `Test -> Read` 及整体调用完整性、第二次把未知型号行号 `125` 写成 `124`。Token、价格和耗时未变；该投影不是 v17 模型运行。结构化证据见 [v17 合同校准与追溯重评分](evidence/audit-result-repaired-control-rescore-v17.json)。
 
+## OBS-SQG-040 共享双向调用与显式清单范围已完成隔离验证
+
+- 状态: verified in isolated prototype
+- 关联: AC-SQG-011, DES-SQG-016, DES-SQG-018, DES-SQG-019, DES-SQG-021
+
+外部隔离 worktree 已证明单次 `calls --direction both` 可以复用同一查询、`SourceUniverse` 与 deadline，并用一个共享 root 加两个独立方向分支保持节点、边、截断和时间限制状态；既有 `srcq.symbol.calls/v1` 可从各分支机械还原。优化投影相对两次独立调用在 C++、C#、TypeScript 的 machine/model 面均下降，同时保持关系等价；TypeScript outgoing 的截断状态也未丢失。
+
+同一隔离实现增加通用 `--source-manifest PATH` 入口及首个 `vcxproj-direct-items/v1` adapter，只把直接 `ItemGroup` 源码项解释为 `bounded` 范围，不冒充完整 MSBuild。FaceCutting3D 的 93 个直接项配合限定名查询时，双向关系与两次独立调用等价，machine Token 从 `1018` 降至 `854`、model Token 从 `271` 降至 `260`，耗时从 `4.970 s` 降至 `4.401 s`。
+
+三轮只读模型实验均保持 C++ 质量 `26/26`，但 body-only A/B 的候选价格从 `$0.02516840` 升至 `$0.02551624`；加强触发后出现 8 次错误命令；限定名候选虽实现 `2/2` bundle 成功，仍相对邻近 Control 增加 `47.2%` Token、`22.5%` 价格、`29.4%` 时间和 `50%` 请求。工具架构因此只在隔离层成立，skill 候选全部拒绝，仓库 srcq、已安装环境与部署 payload 均未改变。完整证据见 [共享双向调用审计](evidence/audit-result-shared-calls-bundle-v1.json)。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open
@@ -382,6 +393,13 @@ Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次
 0.6.0 已在既有查询、缓存、图遍历和输出 owner 内增加共享 typed relation 中间层，并由 Go、Python、Rust、JavaScript、TypeScript/TSX 适配器声明自身调用、绑定、词法范围、当前类型与 callable AST。五种语言可以从显式类型、构造或复合字面量、当前接收者、字段和静态限定生成 `typed-member-candidate`；Go 方法 receiver 会进入限定定义身份，适用的 function/method、arrow/function expression、lambda 和 closure 不再借外层参数类型。incoming 保留观察到的调用形式，并排除已证明属于其他接收者类型的同名调用。
 
 语言项目 resolver 已接入 `SourceUniverse` 唯一入口，只读解析本地静态元数据，不读取 dependency cache、不下载或启动语言工具。当前没有证据支持重载、trait/interface 或动态分派、函数值、复杂泛型/union、宏/生成代码和运行时属性的精确绑定；这些机制不属于本差距的候选精度承诺，仍由 `semantic-unknown` 与按需 LSP/领域工具承担。该能力已随 0.6.0 发布；用户默认安装仍为 0.5.0，AgentBase Codex Publish 未执行。
+
+## GAP-SQG-012 双向 bundle 与显式 source manifest 尚未进入正式 srcq
+
+- 状态: open
+- 关联: AC-SQG-011, DES-SQG-019, DES-SQG-021, OBS-SQG-040
+
+当前正式 srcq 0.7.0 的 `symbol calls` 仍只接受 `incoming` 或 `outgoing`，每次输出一个 `srcq.symbol.calls/v1` 方向树；它没有共享查询、范围与 deadline 的双向 bundle，也没有显式 source manifest 入口。AC-SQG-011 已要求支持双向调用，因此 TSQG-108 过去闭合的是两个独立方向，不足以覆盖该合同的组合方向。隔离原型已证明工具机制和投影收益，但尚未进入仓库实现、兼容验证或正式组件门禁；模型实验又证明仅修改 skill 文案不能让该能力替代后续关系搜索与重复正文读取，不能据此晋级或部署。
 
 ## GAP-SQG-009 query model 续页动作已经闭环
 

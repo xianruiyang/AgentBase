@@ -240,6 +240,17 @@ model renderer 在普通单根、完整且无歧义时省略范围信封。多�
 
 TypeScript 作为首个纵向消费者验证共享 typed relation 中间契约，因为显式类型和 `new` 初始化能直接区分适配器缺口与公共图算法；该闭环成立后，JavaScript 只复用其无类型语法与构造推断部分，Python、Go、Rust 分别接入自身 grammar 和项目 resolver。共享层反例会熔断全部横向扩展；单语言差异失败只回到该适配器，不借其他语言通过降低其证据边界。
 
+## DES-SQG-022 共享双向调用与显式清单范围合同
+
+- 状态: confirmed by isolated prototype
+- 满足: AC-SQG-011, DES-SQG-016, DES-SQG-018, DES-SQG-019, DES-SQG-021
+
+`symbol calls` 的单方向公开合同继续使用 `srcq.symbol.calls/v1`；`--direction both` 使用独立的 `srcq.symbol.calls/bundle/v1`，不得改变或包裹既有 v1。bundle 只保存一次规范化 query、语言、source scope、root 与共享 deadline，incoming/outgoing 分支分别保存 children、nodes、truncated、time-limited、scan、exit 和 evidence，使任一分支都能机械还原为旧 v1，并允许两方向具有不同的 partial 状态。共享执行只复用解析、范围发现和不可变扫描证据，方向遍历、预算消耗与失败边界仍独立可见。
+
+显式项目文件范围通过通用 `--source-manifest PATH` 进入现有 `SourceUniverse`，格式解释由具名 adapter 持有。首个 `vcxproj-direct-items/v1` 只读取直接 `ItemGroup` 下的 `ClCompile`/`ClInclude` 项及可静态应用的最小排除，不执行 import、属性求值、条件矩阵或完整 MSBuild；其完整扫描只表示覆盖该次 `bounded` 直接项集合，不提升为工程完整性。不得自动猜测最近项目文件，也不得把 manifest 参数复用到 `rg`/`fd` 命令域。
+
+关系输出只证明范围、定义候选、节点、边和各分支完整性；guard、effect、fallback、数值与其他行为语义继续由一次有界源码读取承担。skill 只有在一次限定名 bundle 已能替代后续关系发现、且只保留一次行为读取的配对实验中同时保持质量并降低实际价格时才可更新；工具合同成立不自动证明模型策略成立。
+
 ## 4. 版本与迁移边界
 
 当前以 ripgrep 15.1.0、Codex PATH 中的 ripgrep 15.2.0、fd 10.4.2 和迁移前已验证的 ast-grep 0.41.1、0.42.0、0.44.1 标记 Windows 行为证据；这些身份限定各项测试结论，不定义允许运行的连续或离散版本范围。完整兼容表示可启动后端的公开命令都能通过相应命令域调用并保持原生语义，不表示所有模式都能结构化压缩；未验证版本的质量声明只覆盖本次实际输出和退出，不能外推未执行模式。`tools/srcq/Cargo.toml` 的 workspace package version 是当前 srcq 候选版本的唯一默认来源；构建参数只允许显式制作另一个已声明的 srcq 版本，不能长期用覆盖值掩盖源码、README、SBOM、release helper 与运行时版本不一致。
