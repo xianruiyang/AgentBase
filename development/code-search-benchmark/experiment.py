@@ -529,8 +529,8 @@ def ideal_cache_projection(
     aggregate_usage_value: dict[str, Any],
 ) -> dict[str, Any]:
     base = {
-        "schema": "agentbase.ideal-cache-projection/v1",
-        "scope": "per-subject-cold-start-perfect-prefix-retention",
+        "schema": "agentbase.ideal-cache-projection/v2",
+        "scope": "observed-subject-start-no-future-prefix-eviction",
         "evidence": "app-server-v2 thread/tokenUsage/updated last/total",
     }
     if not request_usages:
@@ -591,9 +591,23 @@ def ideal_cache_projection(
                 "previous_eligible_prefix_tokens": previous_eligible,
                 "eligible_prefix_tokens": eligible,
             }
-        retained = retained_by_epoch.get(epoch, 0)
-        ideal_read = min(retained, eligible)
-        ideal_write = eligible - ideal_read
+        retained = retained_by_epoch.get(epoch)
+        if retained is None:
+            ideal_read = breakdown["cache_read_input_tokens"]
+            ideal_write = breakdown["cache_write_input_tokens"]
+        else:
+            if breakdown["cache_read_input_tokens"] > retained:
+                return {
+                    **base,
+                    "status": "unavailable",
+                    "reason": "cache_write_accounting_inconsistent_with_later_hits",
+                    "request_index": index,
+                    "prefix_epoch": epoch,
+                    "previous_observed_retained_prefix_tokens": retained,
+                    "observed_cache_read_input_tokens": breakdown["cache_read_input_tokens"],
+                }
+            ideal_read = min(retained, eligible)
+            ideal_write = eligible - ideal_read
         ideal_ordinary = breakdown["input_tokens"] - eligible
         projected.append({
             "request_index": index,
@@ -608,7 +622,7 @@ def ideal_cache_projection(
             "output_tokens": breakdown["output_tokens"],
             "reasoning_output_tokens": breakdown["reasoning_output_tokens"],
         })
-        retained_by_epoch[epoch] = max(retained, eligible)
+        retained_by_epoch[epoch] = max(retained or 0, eligible)
         last_eligible_by_epoch[epoch] = eligible
 
     totals = {
@@ -657,6 +671,75 @@ def ideal_cache_price(projection: dict[str, Any], pricing: dict[str, Any]) -> di
         "long_context_request_count": context_counts["long_context"],
         "short_context_uncached_input_equivalent_tokens": equivalent_units,
         "usd": equivalent_units * float(input_price) / 1_000_000,
+    }
+
+
+def observed_request_price(request_usages: list[dict[str, Any]], pricing: dict[str, Any]) -> dict[str, Any]:
+    if not request_usages:
+        return {"available": False, "reason": "per_request_usage_unavailable"}
+    input_price = pricing.get("short_context_uncached_input_usd_per_million")
+    if pricing.get("applicable") is False or not isinstance(input_price, (int, float)):
+        return {"available": False, "reason": "pricing_not_applicable_to_experiment_model"}
+    threshold = int(pricing["long_context_threshold_input_tokens_exclusive"])
+    equivalent_units = 0.0
+    context_counts = {"short_context": 0, "long_context": 0}
+    for index, usage in enumerate(request_usages, 1):
+        breakdown = normalize_usage(usage)
+        if not breakdown.get("complete") or not breakdown.get("pricing_exact"):
+            return {"available": False, "reason": "request_usage_incomplete", "request_index": index}
+        context = "long_context" if breakdown["input_tokens"] > threshold else "short_context"
+        context_counts[context] += 1
+        coefficients = pricing[context]
+        equivalent_units += (
+            breakdown["ordinary_input_tokens"] * coefficients["ordinary_input"]
+            + breakdown["cache_read_input_tokens"] * coefficients["cached_input"]
+            + breakdown["cache_write_input_tokens"] * coefficients["cache_write_input"]
+            + breakdown["output_tokens"] * coefficients["output_including_reasoning"]
+        )
+    return {
+        "available": True,
+        "context_classification": "exact_per_request",
+        "short_context_request_count": context_counts["short_context"],
+        "long_context_request_count": context_counts["long_context"],
+        "short_context_uncached_input_equivalent_tokens": equivalent_units,
+        "usd": equivalent_units * float(input_price) / 1_000_000,
+    }
+
+
+def aggregate_observed_request_price(records: list[dict[str, Any]]) -> dict[str, Any]:
+    environments = sorted({str(record.get("environment", "unknown")) for record in records})
+
+    def aggregate(selected: list[dict[str, Any]]) -> dict[str, Any]:
+        unavailable = [record for record in selected if not record.get("observed_request_price", {}).get("available")]
+        if unavailable:
+            return {
+                "status": "unavailable",
+                "run_count": len(selected),
+                "unavailable_run_ids": [record["run_id"] for record in unavailable],
+                "reasons": {
+                    record["run_id"]: record.get("observed_request_price", {}).get("reason", "missing")
+                    for record in unavailable
+                },
+            }
+        return {
+            "status": "available",
+            "run_count": len(selected),
+            "request_count": sum(len(record.get("request_usages", [])) for record in selected),
+            "context_classification": "exact_per_request",
+            "short_context_uncached_input_equivalent_tokens": sum(
+                record["observed_request_price"]["short_context_uncached_input_equivalent_tokens"]
+                for record in selected
+            ),
+            "usd": sum(record["observed_request_price"]["usd"] for record in selected),
+        }
+
+    return {
+        "schema": "agentbase.observed-request-price-report/v1",
+        "all": aggregate(records),
+        "by_environment": {
+            name: aggregate([record for record in records if str(record.get("environment", "unknown")) == name])
+            for name in environments
+        },
     }
 
 
@@ -713,12 +796,13 @@ def aggregate_ideal_cache(records: list[dict[str, Any]], pricing: dict[str, Any]
         }
 
     return {
-        "schema": "agentbase.ideal-cache-report/v1",
+        "schema": "agentbase.ideal-cache-report/v2",
         "semantics": {
-            "scope": "each subject starts cold; all eligible prefix tokens remain cached within a prefix epoch",
+            "scope": "preserve the observed cache state at subject start; no observed retained prefix is evicted within an epoch",
             "source": "distinct app-server-v2 per-request last usage reconciled with cumulative total",
             "compaction": "contextCompaction starts a new cold prefix epoch",
             "legacy": "aggregate exec-json usage is unavailable and is never retroactively inferred",
+            "missing_write_accounting": "later hits exceeding observed retained prefixes make the projection unavailable",
         },
         "all": aggregate(records),
         "by_environment": {
@@ -1053,6 +1137,7 @@ def run_preflights(
             "network_transport": network_transport_observation(stdout_path, stderr_path),
             "actual_total_tokens": parsed["usage_breakdown"]["actual_total_tokens"],
             "price_equivalent": price_equivalent(parsed["usage_breakdown"], token_pricing_contract(codex)),
+            "observed_request_price": observed_request_price(parsed["request_usages"], token_pricing_contract(codex)),
             "ideal_cache_price": ideal_cache_price(parsed["ideal_cache_projection"], token_pricing_contract(codex)),
             "stdout": str(stdout_path.relative_to(output)),
             "stderr": str(stderr_path.relative_to(output)),
@@ -1066,6 +1151,7 @@ def run_preflights(
         ),
         "timeout_seconds": timeout_seconds,
         "usage_report": aggregate_usage(records, token_pricing_contract(codex)),
+        "observed_request_price_report": aggregate_observed_request_price(records),
         "ideal_cache_report": aggregate_ideal_cache(records, token_pricing_contract(codex)),
         "records": records,
     }
@@ -1575,6 +1661,7 @@ def run_experiment(experiment_path: Path) -> dict[str, Any]:
             "network_transport": network_transport,
             "actual_total_tokens": parsed["usage_breakdown"]["actual_total_tokens"],
             "price_equivalent": price_equivalent(parsed["usage_breakdown"], pricing),
+            "observed_request_price": observed_request_price(parsed["request_usages"], pricing),
             "ideal_cache_price": ideal_cache_price(parsed["ideal_cache_projection"], pricing),
             "stdout": str(stdout_path.relative_to(root)), "stderr": str(stderr_path.relative_to(root)),
         })
@@ -1589,10 +1676,18 @@ def run_experiment(experiment_path: Path) -> dict[str, Any]:
         "experiment_identity": experiment["experiment_identity"],
         "postflight_failures": postflight,
         "usage_report": aggregate_usage(records, experiment.get("token_pricing", TOKEN_PRICING)),
+        "observed_request_price_report": aggregate_observed_request_price(records),
+        "setup_observed_request_price_report": experiment["preflight"].get("observed_request_price_report", {
+            "schema": "agentbase.observed-request-price-report/v1",
+            "all": {"status": "unavailable", "reason": "legacy_preflight_without_per_request_usage"},
+        }),
+        "observed_request_price_report_including_setup": aggregate_observed_request_price(
+            [*experiment["preflight"]["records"], *records]
+        ),
         "setup_usage_report": experiment["preflight"]["usage_report"],
         "ideal_cache_report": aggregate_ideal_cache(records, experiment.get("token_pricing", TOKEN_PRICING)),
         "setup_ideal_cache_report": experiment["preflight"].get("ideal_cache_report", {
-            "schema": "agentbase.ideal-cache-report/v1",
+            "schema": "agentbase.ideal-cache-report/v2",
             "all": {"status": "unavailable", "reason": "legacy_preflight_without_per_request_usage"},
         }),
         "ideal_cache_report_including_setup": aggregate_ideal_cache(

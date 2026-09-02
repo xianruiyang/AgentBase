@@ -35,11 +35,13 @@ control/candidate home 的 `config.toml` 不得再定义 `shell_environment_poli
 
 monitor 捕获 App Server stdout JSONL、stderr、退出、wall time、工具项、`thread/tokenUsage/updated` 的逐请求 `last` 与累计 `total`，并以累计值去重；逐请求之和无法与最终累计量严格对齐时，理想缓存指标标记不可用。`exec-json` 旧档只保留最后一个 `turn.completed.usage`。超时会终止该次进程树并保留失败，不静默重试。run 还会核对 runner 源码 SHA-256 与 Python 完整版本，防止 prepare 后用另一套实现消费旧 manifest。运行前后都重算 corpus、声明范围内的工作区 Git 快照和最小 Codex home 环境树身份。`workspaces.<role>.identity_paths` 可把大型工作区限定到语料与规则实际依赖的相对路径；未指定时仍冻结整个仓库，任何范围都保留该范围内 tracked patch 与全部 untracked 内容哈希。凭据和 `.env` 不得复制进实验目录或环境树，只能通过既有安全环境提供。
 
-`summary.json` 同时保留原始 usage、逐请求 usage、逐 run 规范化分项和按环境汇总：普通输入、缓存读取、缓存写入（事件提供时）、输入、可见输出、推理输出、输出与 `input + output` 总量。推理输出是 output 子集，缓存读取/写入是 input 分类，均不得重复相加。若事件没有缓存写入量，报告保留可计量总 Token，但普通输入和价格只给上下界，不把缺失字段静默当成零。
+`summary.json` 同时保留原始 usage、逐请求 usage、逐 run 规范化分项和按环境汇总：普通输入、缓存读取、缓存写入（事件提供时）、输入、可见输出、推理输出、输出与 `input + output` 总量。推理输出是 output 子集，缓存读取/写入是 input 分类，均不得重复相加。逐请求字段完整时，`observed_request_price_report` 按每个请求自己的上下文长度计算实际精确价格；只有聚合 usage 时仍保留全短/全长边界，不把请求阈值或缺失字段静默猜成确定值。
 
-`ideal_cache_report` 的范围固定为“每个 subject 冷启动；同一上下文前缀 epoch 内，服务端从不丢弃已经写入的可缓存前缀”。每次请求以 `cachedInputTokens + cacheWriteInputTokens` 作为该请求已经由服务端分类的 eligible prefix；理想读取为此前该 epoch 已保留前缀与本次 eligible prefix 的较小值，剩余 eligible prefix 只写入一次。`contextCompaction` 开启新的冷 epoch。逐请求 eligible prefix 在没有 compaction 时回退、字段不完整或逐请求和累计量不一致，都不能证明前缀身份，报告必须标记 `unavailable`。旧 `exec-json` 档案只有聚合 usage，不能在不重跑的情况下补算，也不得从聚合缓存率反推逐请求结果。
+`ideal_cache_report` 只能表达更窄的可证反事实：“保留 subject 启动时已经观察到的缓存状态，并在同一前缀 epoch 内不再驱逐已由 usage 证明写入的前缀”。首次请求沿用实际 cache read/write，后续请求只能消费此前已观察到的 retained prefix；`contextCompaction` 开启新 epoch。如果后续 cache hit 超过此前 usage 可证明保留的前缀，说明 App Server 没有给出完整写入历史，投影必须标记 `cache_write_accounting_inconsistent_with_later_hits`，不得把 `cacheWriteInputTokens = 0` 解释为没有发生有效写入。逐请求和累计量不一致、字段不完整或前缀无 compaction 回退也同样不可用。
 
-当前 GPT-5.6 价格系数与实验模型的标准处理单价随 experiment identity 冻结。以“短上下文普通输入 Token = 1”为基准，短上下文为 `普通输入 1 / 缓存读取 0.1 / 缓存写入 1.25 / 输出（含推理）6`；单次请求输入超过 272K 时，整次请求对应 `2 / 0.2 / 2.5 / 9`。聚合 actual usage 仍分别给出全短、全长和总边界；逐请求证据可用时，ideal cache price 按每个请求自己的输入长度选择价格区间，给出精确等价量与美元值，不再用整轮全短/全长假设。2026-09-01 的 Luna standard 单价为 `$0.20 / 1M` 普通输入、`$0.02 / 1M` 缓存输入和 `$1.20 / 1M` 输出。Fast 不属于正式基准。
+“服务器在 subject 启动前也从未丢弃任何历史前缀”的全局最理想缓存量不能只由逐请求 Token 计数确定：协议未提供跨 subject 的 prefix identity、实际 breakpoint 或完整写入来源。旧 `exec-json` 档案连逐请求 usage 也没有，更不能在不重跑的情况下补算。报告在证据不足时保留 `unavailable`，不从聚合缓存率、输入增长或全输入上限反推一个伪精确值。
+
+当前 GPT-5.6 价格系数与实验模型的标准处理单价随 experiment identity 冻结。以“短上下文普通输入 Token = 1”为基准，短上下文为 `普通输入 1 / 缓存读取 0.1 / 缓存写入 1.25 / 输出（含推理）6`；单次请求输入超过 272K 时，整次请求对应 `2 / 0.2 / 2.5 / 9`。聚合 actual usage 仍分别给出全短、全长和总边界；逐请求证据可用时，observed price 按每个请求自己的输入长度给出精确美元值。只有 cache-retention 投影本身可用时才计算对应反事实价格。2026-09-01 的 Luna standard 单价为 `$0.20 / 1M` 普通输入、`$0.02 / 1M` 缓存输入和 `$1.20 / 1M` 输出。Fast 不属于正式基准。
 
 每个 manifest 使用 `agentbase.code-search-benchmark/v1`，`runs` 中每项记录：
 

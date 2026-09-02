@@ -161,6 +161,12 @@ symbol 正文两版均未触发目标工具；frontmatter 可达版才在 C# 产
 
 普通搜索常驻规则已从含混的 backend argv 占位改为精确的 `srcq rg`/`srcq fd` 参数边界，并明确 Windows glob 不能作为路径、fd 只有一个 positional pattern；普通查询仍不触发 `source-query`。修复基础环境、工具前立即调用和精炼书面推理继续各自保持独立 identity，固定三题各两次。基础环境为 `36/42`；立即调用虽升到 `37/42`，但 Token、两种价格和耗时全部回退，六次可见首条也没有消失；精炼推理保持 `36/42` 且降低 Token/价格/耗时，但完整答案由 `4/6` 降到 `3/6`，reasoning output 上升，并发生一次 literal-glob 规则违例。两类提示均不进入正式规则，搜索 argv 澄清保留在仓库真源但未部署或发布；同措辞不再重采样，只有新的可观察机制或工具层能力才重开。
 
+### 3.13 2026-09-02 修复后 Control 的逐请求重算
+
+App Server v2 已在不改变 Control 的情况下提供 45 次独立请求 usage。固定三题各两次重算为 `38/42`、完整 `3/6`，正式运行 `1,144,729` Token、`389.363 s`，按逐请求上下文档位计算的观察价格为 `$0.06089496`。相对上一修复后样本，required 上升但完整 run、Token、价格和耗时均退化，因此只更新 Control 的波动证据，不建立新候选或改变生产策略。
+
+逐请求计数能够关闭实际观察价格，却不能关闭“服务器从不丢弃任何前缀”的全局理想缓存。六次 cache write 均为 0，而后续 cache hit 增长，证明当前协议没有暴露完整写入历史；旧 v1 投影由此产生了高于实际观察价格的反例。runner 改为只在账目闭合时计算 subject 内 no-future-eviction 投影，否则明确 unavailable。后续若要研究全局理想缓存，必须先取得稳定 prefix identity、breakpoint 与 write provenance，而不是继续重采样同一题或从聚合命中量反推。
+
 ## 4. 阶段与任务
 
 ### P0 固定分支合同和 AST 基线

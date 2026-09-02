@@ -592,6 +592,31 @@ class ExperimentTests(unittest.TestCase):
         self.assertEqual("available", projection["status"])
         self.assertEqual(2, projection["prefix_epoch_count"])
 
+        first_observed = MODULE.ideal_cache_projection([
+            {"input_tokens": 10, "cached_input_tokens": 4, "cache_write_input_tokens": 2,
+             "output_tokens": 1, "reasoning_output_tokens": 0, "prefix_epoch": 0},
+        ], {
+            "input_tokens": 10, "cached_input_tokens": 4, "cache_write_input_tokens": 2,
+            "output_tokens": 1, "reasoning_output_tokens": 0,
+        })
+        self.assertEqual("available", first_observed["status"])
+        self.assertEqual(4, first_observed["totals"]["ideal_cache_read_input_tokens"])
+        self.assertEqual(2, first_observed["totals"]["ideal_cache_write_input_tokens"])
+
+        incomplete_writes = MODULE.ideal_cache_projection([
+            {"input_tokens": 10, "cached_input_tokens": 5, "cache_write_input_tokens": 0,
+             "output_tokens": 1, "reasoning_output_tokens": 0, "prefix_epoch": 0},
+            {"input_tokens": 20, "cached_input_tokens": 15, "cache_write_input_tokens": 0,
+             "output_tokens": 1, "reasoning_output_tokens": 0, "prefix_epoch": 0},
+        ], {
+            "input_tokens": 30, "cached_input_tokens": 20, "cache_write_input_tokens": 0,
+            "output_tokens": 2, "reasoning_output_tokens": 0,
+        })
+        self.assertEqual(
+            "cache_write_accounting_inconsistent_with_later_hits",
+            incomplete_writes["reason"],
+        )
+
     def test_app_server_monitor_completes_public_json_rpc_flow(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -652,6 +677,15 @@ class ExperimentTests(unittest.TestCase):
         self.assertEqual(1, price["short_context_request_count"])
         self.assertEqual(1, price["long_context_request_count"])
         self.assertAlmostEqual((12.5 + 6 + 20_000 + 500_000 + 18) * 0.20 / 1_000_000, price["usd"])
+
+        observed = MODULE.observed_request_price([
+            {"input_tokens": 10, "cached_input_tokens": 0, "cache_write_input_tokens": 10,
+             "output_tokens": 1, "reasoning_output_tokens": 0},
+            {"input_tokens": 300_000, "cached_input_tokens": 100_000, "cache_write_input_tokens": 200_000,
+             "output_tokens": 2, "reasoning_output_tokens": 0},
+        ], pricing)
+        self.assertTrue(observed["available"])
+        self.assertAlmostEqual(price["usd"], observed["usd"])
 
     def test_usage_breakdown_does_not_double_count_reasoning(self) -> None:
         breakdown = MODULE.normalize_usage({

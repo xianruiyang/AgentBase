@@ -336,6 +336,17 @@ workspace test/build/lint/fmt、15 个 ast-grep 0.44.1 真实 ignored 测试、W
 
 在该基础环境上，“工具明确后立即调用”得到 `37/42`，但完整答案从 `4/6` 降至 `3/6`，六次仍全部先发可见说明，平均首条从 63 增至 68.333 字符；Token、短/长价格、耗时分别 `+9.853%`、`+14.944%/+14.932%`、`+11.434%`，不采纳。“精炼书面推理”得到 `36/42` 且完整答案降至 `3/6`，Token、价格、耗时分别 `-12.999%`、`-2.836%/-2.850%`、`-2.977%`，但 reasoning output `+1.666%`，并再次出现一次规则已禁止的 Windows literal-glob 路径，因此也不采纳。原始数据与评分见 [搜索 argv](evidence/audit-result-search-command-grammar-v1.json)、[工具前推理 v2](evidence/audit-result-pretool-reasoning-prompt-v2.json)和[精炼推理 v2](evidence/audit-result-concise-reasoning-prompt-v2.json)。仓库规则尚未部署或发布。
 
+## OBS-SQG-037 修复后 Control 已用逐请求 usage 重算
+
+- 状态: verified within experiment `0aa3c7b…3660`
+- 关联: OBS-SQG-034, OBS-SQG-036
+
+修复搜索 argv 后的基础 Control 使用 App Server v2 重新运行固定 C#、C++、TypeScript 三题各两次。C# 为 `7/8`、`6/8`，C++ 为 `6/7`、`7/7`，TypeScript 为 `6/6`、`6/6`；六次合计 `38/42`，3/6 次单次完整。正式运行共 `1,144,729` Token、`389.363 s`、45 次请求和 43 个 command，其中只有 C++ 首次猜错根目录 vcxproj 路径后恢复；没有 `srcq rg rg` 或 `srcq fd fd`。
+
+逐请求 usage 完整，45 次请求均在短上下文档位；按 experiment identity 冻结的 Luna standard 单价，观察用量对应 `$0.06089496`。相对上一份修复后 Control 样本，required `+2`，但完整答案 `-1`、Token `+19.072%`、价格 `+8.114%`、耗时 `+15.952%`，再次证明 Control 输出存在重复波动，不能把重算结果解释为策略改善。
+
+本轮还否定了 runner 的旧 `ideal_cache_report/v1`：六次均报告 cache write 为 0，但后续 cache hit 超过此前事件可证明的 retained prefix，旧算法却把增长误记为合成写入，并得到高于观察价格的 `$0.09893144`。当前 runner 保留可直接计算的逐请求观察价格；只有 cache-write 账目闭合时才给更窄的“不再驱逐已观察前缀”反事实，否则返回 `unavailable`。跨 subject 的全局理想缓存仍缺 prefix identity、breakpoint 和完整写入来源，不能由当前计数推定。完整证据见 [逐请求 Control 审计](evidence/audit-result-repaired-control-appserver-v1.json)。未运行 Candidate、完整验证、九项评测、Deploy 或 Release。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open

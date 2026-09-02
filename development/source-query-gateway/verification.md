@@ -31,8 +31,8 @@
 | 原生 LSP 渐进路径 | `evidence/lsp-progressive-v1.json` | no-LSP、单项与多阶段三案均按预期只调用 0/2/3 个 MCP 能力，质量通过、usage 完整；独立审计结论为 `pass_with_execution_caveat` |
 | 当前正式部署合同 | `manage_agentbase.ps1 -Action Validate` | 当前候选、11 个 Skill、`source-query`、portable settings、MCP、69-case 路由证据与直接兼容 payload 通过只读发布前验证；未执行 Publish |
 | 插件 payload 边界 | 隔离 `build_plugin.ps1 -SkipOfficialValidation` 与当前静态合同 | 11 个 Skill；`source-query` 恰为 5 文件且无 `.exe`；正式发布构建仍须在获得本次发布授权后执行 |
-| benchmark owner 定向回归 | `development/code-search-benchmark/tests` 与 `source-query-gateway/tests` | 27 项 benchmark owner 和 11 项环境准备/路由测试通过；受影响 case、调度、回答合同、identity、capsule 与外部文件哈希、正常速度门禁、超时保留及 Token 分项/价格边界可重复 |
-| Token 与价格报告合同 | `experiment.py` usage v2、GPT-5.6 当前官方系数 | 原始 usage、普通/缓存读/缓存写、可见/推理输出、实际总量和环境汇总已分离；短上下文 `1/0.1/1.25/6`、长上下文 `2/0.2/2.5/9` 随 experiment identity 冻结，缺失缓存写入或请求级上下文档位时只报边界，不伪造精确账单 |
+| benchmark owner 定向回归 | `development/code-search-benchmark/tests` 与 `source-query-gateway/tests` | 当前 39 项 benchmark owner 定向测试通过；受影响 case、调度、回答合同、identity、capsule、App Server 逐请求 usage、观察价格和缓存投影拒绝边界可重复 |
+| Token 与价格报告合同 | `experiment.py` usage v2、GPT-5.6 当前官方系数 | 原始 usage、普通/缓存读/缓存写、可见/推理输出、实际总量和环境汇总已分离；逐请求 usage 完整时按每次请求的上下文档位计算观察价格，只有聚合 usage 时保留边界；后续 cache hit 超出可证写入历史时理想缓存投影返回 unavailable，不伪造前缀身份或写入量 |
 | 当前 corpus | `corpus/v10.json`、`validate_corpus.py` | 6 项 oracle 与 AgentBase/GptProjectTest 绑定源码逐项验证通过；当前版本同时冻结同预算闭环、权威范围、续页和仅审查规则时的高级 skill 非触发边界 |
 | 当前 candidate-only 全量审计 | `evidence/audit-result-v12.json` | 12 次中 11 次 usage 完整，完整 run 合计 1,004,033 Token；1 次 TLS 超时原样保留，无 control |
 | 上一冻结身份 Codex 对照 | `evidence/audit-result-v13.json` | 24/24 运行正常退出且 usage 完整；两边质量 12/12；candidate 相对 control 总 Token `6,115,095 → 4,208,028`（`-31.186%`），耗时 `1,174,966 → 938,489 ms`（`-20.126%`）；不覆盖本轮直接入口和自适应输出 identity |
@@ -191,3 +191,19 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 | 精炼书面推理 | `36/42`，完整 `3/6` | `836,411`（`-12.999%`） | `-2.836%/-2.850%` | `-2.977%` | `2/39` | reasoning output `+1.666%` 且有一次 literal-glob 违例；不采纳 |
 
 三个环境使用同一完整 Control、Codex `0.151.0-alpha.7.2`、Luna medium/default、srcq 0.7.0、固定三题各两次、只读且禁用 subject 子代理。三次正式运行均无 postflight failure。并行 `prepare` 曾因共享基础 home 的惰性 skill/cache 写入使首个 pretool 候选出现环境差异，runner 已拒绝该身份；随后从稳定基础 home 重建为 `pretool2-r2` 并串行预检，失败身份未进入结果。证据见 [搜索 argv](evidence/audit-result-search-command-grammar-v1.json)、[工具前推理 v2](evidence/audit-result-pretool-reasoning-prompt-v2.json)和[精炼推理 v2](evidence/audit-result-concise-reasoning-prompt-v2.json)。本轮未 Deploy、Release、运行完整验证或九项评测。
+
+## 15. 修复后 Control 的逐请求重算
+
+| 语言/重复 | required | Token | 请求 | 观察价格 | 耗时 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| C# 1 | `7/8` | `157,449` | 6 | `$0.00888008` | `56.971 s` |
+| C# 2 | `6/8` | `104,841` | 4 | `$0.00848892` | `53.973 s` |
+| C++ 1 | `6/7` | `262,211` | 10 | `$0.01343304` | `77.280 s` |
+| C++ 2 | `7/7` | `114,320` | 5 | `$0.00826364` | `59.683 s` |
+| TypeScript 1 | `6/6` | `315,337` | 12 | `$0.01323280` | `74.816 s` |
+| TypeScript 2 | `6/6` | `190,571` | 8 | `$0.00859648` | `66.640 s` |
+| 合计 | `38/42`，完整 `3/6` | `1,144,729` | 45 | `$0.06089496` | `389.363 s` |
+
+全部 subject 正常退出、usage 完整、网络 clean 且 postflight 无失败；capsule `76994af4…d627` 验证 14 个 raw 和 2 个 environment 文件。43 个 command 中只有 C++ 第一次猜错根目录 vcxproj 路径，随后恢复；重复 selector 为 0。相对 [上一修复后样本](evidence/audit-result-search-command-grammar-v1.json)，required `36/42→38/42`，完整 run `4→3`，Token `+19.072%`，观察价格相对同为短上下文的旧场景 `+8.114%`，耗时 `+15.952%`；这不是可采纳改进。
+
+原始 summary 中 `ideal_cache_report/v1` 的 `$0.09893144` 已判无效：事件显示 cache write 合计为 0，但每个 subject 的后续 cache hit 都超过此前可证明的 retained prefix。修正后的 v2 对六次全部返回 `cache_write_accounting_inconsistent_with_later_hits`；逐请求观察价格仍可由 45 个 usage 事件精确计算，无需重跑模型。跨 subject 的全局最理想缓存量因缺少 prefix identity、breakpoint 与完整写入来源而不可识别。结构化证据见 [audit-result-repaired-control-appserver-v1.json](evidence/audit-result-repaired-control-appserver-v1.json)。本轮没有运行 Candidate、完整验证、九项评测、Deploy 或 Release。
