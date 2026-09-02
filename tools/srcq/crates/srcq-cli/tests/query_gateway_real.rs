@@ -1,11 +1,14 @@
 use std::{
     collections::BTreeSet,
-    env, fs,
+    env,
+    fmt::Write as _,
+    fs,
     path::Path,
     process::{Command, Stdio},
 };
 
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use srcq_core::codec::parse_yaml_documents;
 
 fn yaml(bytes: &[u8]) -> Value {
@@ -435,6 +438,119 @@ fn internal_model_budget_pages_complete_evidence_units_with_exact_cursor() {
         String::from_utf8_lossy(&second.stderr)
     );
     assert!(!second.stdout.is_empty());
+}
+
+#[test]
+fn default_model_continuations_grow_from_80_to_160_to_320_units() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let source = (0..700).fold(String::new(), |mut source, index| {
+        writeln!(source, "needle {index}").expect("append adaptive source");
+        source
+    });
+    fs::write(directory.path().join("adaptive.txt"), source).expect("adaptive source");
+
+    let first = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "rg",
+            "exec",
+            "--view",
+            "locations",
+            "--",
+            "--sort",
+            "path",
+            "-F",
+            "needle",
+            "adaptive.txt",
+        ])
+        .output()
+        .expect("adaptive first page");
+    assert!(first.status.success());
+    let first = String::from_utf8(first.stdout).expect("UTF-8 adaptive first page");
+    assert!(first.contains("@more shown=80 omitted=620"), "{first}");
+
+    let mut page = first;
+    for (shown, omitted) in [(160, 460), (320, 140)] {
+        let handle = page
+            .lines()
+            .find_map(|line| line.strip_prefix("@next srcq more "))
+            .expect("adaptive continuation handle");
+        let next = srcq(directory.path(), local.path())
+            .args(["more", handle])
+            .output()
+            .expect("adaptive continuation page");
+        assert!(next.status.success());
+        page = String::from_utf8(next.stdout).expect("UTF-8 adaptive continuation page");
+        assert!(
+            page.contains(&format!("@more shown={shown} omitted={omitted}")),
+            "{page}"
+        );
+    }
+}
+
+#[test]
+fn legacy_continuation_records_without_adaptive_fields_keep_fixed_pages() {
+    let directory = fixture();
+    let local = tempfile::tempdir().expect("local app data");
+    let source = (0..240).fold(String::new(), |mut source, index| {
+        writeln!(source, "needle {index}").expect("append legacy source");
+        source
+    });
+    fs::write(directory.path().join("legacy.txt"), source).expect("legacy source");
+
+    let first = srcq(directory.path(), local.path())
+        .args([
+            "query",
+            "rg",
+            "exec",
+            "--view",
+            "locations",
+            "--",
+            "--sort",
+            "path",
+            "-F",
+            "needle",
+            "legacy.txt",
+        ])
+        .output()
+        .expect("legacy first page");
+    assert!(first.status.success());
+    let first = String::from_utf8(first.stdout).expect("UTF-8 legacy first page");
+    let handle = first
+        .lines()
+        .find_map(|line| line.strip_prefix("@next srcq more "))
+        .expect("legacy continuation handle");
+    assert!(first.contains("@more shown=80 omitted=160"), "{first}");
+
+    let record_path = local
+        .path()
+        .join("srcq/query-spool-v1/continuations")
+        .join(format!("{handle}.json"));
+    let mut record: Value =
+        serde_json::from_slice(&fs::read(&record_path).expect("continuation record"))
+            .expect("continuation JSON");
+    let payload = record["payload"]
+        .as_object_mut()
+        .expect("continuation payload");
+    payload.remove("adaptive_limit");
+    payload.remove("adaptive_model_token_budget");
+    payload.remove("continuation_depth");
+    let payload_bytes = serde_json::to_vec(&record["payload"]).expect("legacy payload JSON");
+    record["payload_sha256"] = Value::String(format!("{:x}", Sha256::digest(payload_bytes)));
+    fs::write(
+        &record_path,
+        serde_json::to_vec(&record).expect("legacy record JSON"),
+    )
+    .expect("write legacy continuation record");
+
+    let second = srcq(directory.path(), local.path())
+        .args(["more", handle])
+        .output()
+        .expect("legacy continuation page");
+    assert!(second.status.success());
+    let second = String::from_utf8(second.stdout).expect("UTF-8 legacy continuation page");
+    assert!(second.contains("@more shown=80 omitted=80"), "{second}");
 }
 
 #[test]

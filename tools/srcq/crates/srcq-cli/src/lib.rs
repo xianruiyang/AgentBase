@@ -15,6 +15,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use clap::builder::{OsStringValueParser, PossibleValuesParser};
+use clap::parser::ValueSource;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use srcq_core::invocation::{
     ExplicitOptions, NativeInvocation, OutputFormat, Profile, WrapperCommand,
@@ -763,6 +764,9 @@ pub struct GatewayCommand {
     pub limit: usize,
     pub max_text_chars: usize,
     pub model_token_budget: usize,
+    pub adaptive_limit: bool,
+    pub adaptive_model_token_budget: bool,
+    pub continuation_depth: usize,
     pub auto_complete: bool,
     pub output: OutputFormat,
     pub receipt: String,
@@ -1275,6 +1279,9 @@ fn parse_direct_gateway_command(backend: GatewayBackend, values: &ArgMatches) ->
         limit: 80,
         max_text_chars: 240,
         model_token_budget: 2048,
+        adaptive_limit: true,
+        adaptive_model_token_budget: true,
+        continuation_depth: 0,
         auto_complete: true,
         output: OutputFormat::Model,
         receipt: "auto".to_owned(),
@@ -1303,6 +1310,10 @@ fn parse_gateway_command(
         "doctor" => GatewayOperation::Doctor,
         _ => return Err(CliParseError::MissingDelimiter),
     };
+    let adaptive_limit = operation != GatewayOperation::Doctor
+        && values.value_source("limit") == Some(ValueSource::DefaultValue);
+    let adaptive_model_token_budget = operation != GatewayOperation::Doctor
+        && values.value_source("model-token-budget") == Some(ValueSource::DefaultValue);
     let native_argv = values
         .try_get_many::<OsString>("native")
         .ok()
@@ -1342,6 +1353,9 @@ fn parse_gateway_command(
             .flatten()
             .and_then(|value| usize::try_from(*value).ok())
             .unwrap_or(2048),
+        adaptive_limit,
+        adaptive_model_token_budget,
+        continuation_depth: 0,
         auto_complete: false,
         output: parse_output(values),
         receipt: values
@@ -1902,6 +1916,8 @@ mod tests {
         };
         assert_eq!(7, command.limit);
         assert_eq!(120, command.max_text_chars);
+        assert!(!command.adaptive_limit);
+        assert!(command.adaptive_model_token_budget);
         assert_eq!(os_args(&["needle", "."]), command.native_argv);
     }
 
@@ -1943,10 +1959,44 @@ mod tests {
         assert_eq!("auto", command.view);
         assert_eq!(80, command.limit);
         assert_eq!(2048, command.model_token_budget);
+        assert!(command.adaptive_limit);
+        assert!(command.adaptive_model_token_budget);
+        assert_eq!(0, command.continuation_depth);
         assert_eq!(
             os_args(&["exec", "--view", "grouped", "--help", "", "--", "tail"]),
             command.native_argv
         );
+    }
+
+    #[test]
+    fn explicit_gateway_tracks_each_paging_override_independently() {
+        let action = parse_cli_from(os_args(&[
+            "srcq", "query", "rg", "exec", "--limit", "80", "--", "needle", ".",
+        ]))
+        .expect("explicit page limit");
+        let CliAction::Gateway(command) = action else {
+            panic!("expected gateway")
+        };
+        assert!(!command.adaptive_limit);
+        assert!(command.adaptive_model_token_budget);
+
+        let action = parse_cli_from(os_args(&[
+            "srcq",
+            "query",
+            "rg",
+            "exec",
+            "--model-token-budget",
+            "2048",
+            "--",
+            "needle",
+            ".",
+        ]))
+        .expect("explicit model token budget");
+        let CliAction::Gateway(command) = action else {
+            panic!("expected gateway")
+        };
+        assert!(command.adaptive_limit);
+        assert!(!command.adaptive_model_token_budget);
     }
 
     #[test]

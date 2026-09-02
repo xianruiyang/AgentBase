@@ -17,7 +17,7 @@ srcq query <rg|fd|scc> doctor [--engine PATH] [--cwd PATH]
 
 普通文件发现只需 `srcq fd <fd argv...>`，普通文本查询只需 `srcq rg <rg argv...>`，普通语言和代码量统计只需 `srcq scc <scc argv...>`；backend 后的 `exec`、`--view`、`--help`、`--files` 等同名 token 全部属于原生 argv。根级 `srcq files` / `srcq --files` 只返回 `srcq fd` 的一行修正，根级 AST 子命令或遗漏分隔符只返回 `srcq exec -- <ast-grep argv...>`；这些修正不执行查询、不猜 backend，也不建立兼容别名。
 
-默认 model 只写 planner 选择的证据文本；正常成功和完整不写 schema、统计或完成回执。显式控制面的缺省页严格使用 80 个当前视图证据单元、每个正文 240 字符和 2048 个估算 Token 软预算，单个不可拆证据单元可以越过软预算。普通直接入口先用同一总预算评估；若完整结果不超过 512 个证据单元且完整渲染仍落在 2048 预算内，则越过初始 80 项上限一次返回。rg 的完整结果只有一个来源文件时，可把单行正文提高到 1024 字符重新评估，但只有整个结果仍落在同一 2048 总预算内才采用；多文件或更大结果保持原预算分页。调用方确有需要时才通过显式控制面覆盖，显式值不被上述直接入口策略改写。`--output machine` 使用单行紧凑 JSON，仍可由现有安全 YAML 读取器解析。`--receipt full` 和 `lossless` 隐含 machine。特殊模式的原生透传、产物或有界文本合同不改变。
+默认 model 只写 planner 选择的证据文本；正常成功和完整不写 schema、统计或完成回执。缺省首页面严格使用 80 个当前视图证据单元、每个正文 240 字符和 2048 个估算 Token 软预算，单个不可拆证据单元可以越过软预算。普通直接入口先用同一总预算评估；若完整结果不超过 512 个证据单元且完整渲染仍落在 2048 预算内，则越过初始 80 项上限一次返回。rg 的完整结果只有一个来源文件时，可把单行正文提高到 1024 字符重新评估，但只有整个结果仍落在同一 2048 总预算内才采用；多文件或更大结果保持原预算分页。调用方确有需要时才通过显式控制面覆盖，显式值不被上述直接入口策略改写。`--output machine` 使用单行紧凑 JSON，仍可由现有安全 YAML 读取器解析。`--receipt full` 和 `lossless` 隐含 machine。特殊模式的原生透传、产物或有界文本合同不改变。
 
 ## 处理类别
 
@@ -34,13 +34,13 @@ srcq query <rg|fd|scc> doctor [--engine PATH] [--cwd PATH]
 
 结构化执行对 stdout 设置 256 MiB、stderr 设置 16 MiB 的硬捕获上限；超过上限会终止整个原生进程组并返回 wrapper 错误。成功捕获先保留在当前进程内；只有需要续页、machine full 或显式 full receipt 时才计算快照身份并持久化，最多保存 32 份。model 正常完整结果只写证据；query 分页追加 `@more shown=<N> omitted=<N>` 与 `@next srcq more q<number>`。短句柄记录最多保存 128 份；新编号从不补零的 `q1` 至 `q999999` 环形分配，只复用已经不在现存 registry 中的编号。模型只传递当前输出的临时句柄；句柄记录淘汰后不再承诺旧命令可用，也不为其保存永久 tombstone 或无限计数。正文或不可续读的结果/行省略追加 `@cut text|results|lines=<N>`。machine auto 保留 `sgy.query.result/v2`，full 保留 `sgy.query.result/v1`。rg 无匹配继续返回原生 exit 1 和空 stdout，原生错误不能伪装成完整空结果。raw、artifact 与 passthrough 保持原生或清单合同。
 
-model 首个可续页结果在 `@next` 后返回短命令；machine 继续返回 `query_snapshot` 与 `next_cursor`。model 直接执行 `@next` 后的命令，例如：
+model 首个可续页结果在 `@next` 后返回短命令；使用默认分页参数时，第一次 `srcq more` 把证据单元和 Token 软预算增至 160/4096，第二次及以后固定为 320/8192。调用方显式传入的 `--limit` 或 `--model-token-budget` 各自保持原值；旧 continuation 记录没有自适应字段时也保持原有固定页大小。machine 继续返回 `query_snapshot` 与 `next_cursor`，不采用 model continuation 的自适应策略。model 直接执行 `@next` 后的命令，例如：
 
 ```powershell
 srcq more q17
 ```
 
-同一 query owner 的不可变句柄记录保存完整 cursor、backend、已解析 engine/cwd、分页参数和原生 argv；每个后继页分配新句柄，因此并发读取不会共享可变的“最后一页”状态。句柄目录和 snapshot 目录共用进程间 spool lock，分配原子且不会覆盖现存记录；写入后以最新编号为原点按环形年龄淘汰最旧记录，保证回卷后的新 `q1` 不会因数值较小而被误删。0.4.2 可能生成的七位以上记录在仍存在时保持可读，新记录写入后优先自然淘汰。记录损坏、过期或引用的 snapshot 已淘汰时以 wrapper code 125 明确拒绝，并要求重跑原查询，不重扫或猜测恢复。`auto` 的首个实际 view 仍写入 cursor，后续页固定复用，避免页形状变化导致表示切换。snapshot 身份绑定 backend、引擎路径与版本、cwd、原生 argv、退出、stdout、stderr 和 backend 所需的稳定补充状态；fd 另绑定类型快照，目录、文件、reparse point、大小与哈希均读回校验。machine 消费者仍可显式使用长 cursor；其未知、损坏、跨查询或跨 view 续点继续局部拒绝。
+同一 query owner 的不可变句柄记录保存完整 cursor、backend、已解析 engine/cwd、分页参数、自适应深度和原生 argv；每个后继页分配新句柄，因此并发读取不会共享可变的“最后一页”状态。句柄目录和 snapshot 目录共用进程间 spool lock，分配原子且不会覆盖现存记录；写入后以最新编号为原点按环形年龄淘汰最旧记录，保证回卷后的新 `q1` 不会因数值较小而被误删。0.4.2 可能生成的七位以上记录在仍存在时保持可读，新记录写入后优先自然淘汰。记录损坏、过期或引用的 snapshot 已淘汰时以 wrapper code 125 明确拒绝，并要求重跑原查询，不重扫或猜测恢复。`auto` 的首个实际 view 仍写入 cursor，后续页固定复用，避免页形状变化导致表示切换。snapshot 身份绑定 backend、引擎路径与版本、cwd、原生 argv、退出、stdout、stderr 和 backend 所需的稳定补充状态；fd 另绑定类型快照，目录、文件、reparse point、大小与哈希均读回校验。machine 消费者仍可显式使用长 cursor；其未知、损坏、跨查询或跨 view 续点继续局部拒绝。
 
 ## 失败与安全
 

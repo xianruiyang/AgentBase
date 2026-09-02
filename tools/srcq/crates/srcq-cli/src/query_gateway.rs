@@ -29,6 +29,12 @@ const MAX_SPOOL_ENTRIES: usize = 32;
 const MAX_CONTINUATION_ENTRIES: usize = 128;
 const MAX_CONTINUATION_NUMBER: u64 = 999_999;
 const CONTINUATION_SCHEMA: &str = "sgy.query.continuation/v1";
+const DEFAULT_MODEL_PAGE_LIMIT: usize = 80;
+const FIRST_CONTINUATION_PAGE_LIMIT: usize = 160;
+const MAX_CONTINUATION_PAGE_LIMIT: usize = 320;
+const DEFAULT_MODEL_TOKEN_BUDGET: usize = 2048;
+const FIRST_CONTINUATION_TOKEN_BUDGET: usize = 4096;
+const MAX_CONTINUATION_TOKEN_BUDGET: usize = 8192;
 pub(super) const DIRECT_COMPLETE_MAX_UNITS: usize = 512;
 const DIRECT_SINGLE_PATH_MAX_TEXT_CHARS: usize = 1024;
 const SCC_SHORT_VALUE_OPTIONS: &[char] = &['x', 'n', 'i', 'M', 'f', 'o', 's'];
@@ -1688,6 +1694,9 @@ fn persist_continuation(
         "limit": command.limit,
         "max_text_chars": command.max_text_chars,
         "model_token_budget": command.model_token_budget,
+        "adaptive_limit": command.adaptive_limit,
+        "adaptive_model_token_budget": command.adaptive_model_token_budget,
+        "continuation_depth": command.continuation_depth,
         "native_argv": continuation_args_json(&command.native_argv)?,
     });
     let payload_bytes = serde_json::to_vec(&payload).map_err(|error| {
@@ -1791,6 +1800,13 @@ fn load_continuation(handle: &str) -> Result<GatewayCommand, GatewayError> {
             .and_then(|value| usize::try_from(value).ok())
             .ok_or_else(|| expired_continuation(handle))
     };
+    let optional_number = |name: &str| {
+        payload
+            .get(name)
+            .and_then(Value::as_u64)
+            .and_then(|value| usize::try_from(value).ok())
+    };
+    let optional_bool = |name: &str| payload.get(name).and_then(Value::as_bool);
     let backend = match string("backend")?.as_str() {
         "rg" => GatewayBackend::Rg,
         "fd" => GatewayBackend::Fd,
@@ -1816,15 +1832,33 @@ fn load_continuation(handle: &str) -> Result<GatewayCommand, GatewayError> {
                 .ok_or_else(|| expired_continuation(handle))
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let continuation_depth = optional_number("continuation_depth")
+        .unwrap_or(0)
+        .saturating_add(1);
+    let adaptive_limit = optional_bool("adaptive_limit").unwrap_or(false);
+    let adaptive_model_token_budget = optional_bool("adaptive_model_token_budget").unwrap_or(false);
+    let stored_limit = number("limit")?;
+    let stored_model_token_budget = number("model_token_budget")?;
     Ok(GatewayCommand {
         backend,
         operation: GatewayOperation::Exec,
         engine: Some(PathBuf::from(string("engine")?)),
         cwd: Some(PathBuf::from(string("cwd")?)),
         view: string("view")?,
-        limit: number("limit")?,
+        limit: if adaptive_limit {
+            adaptive_page_limit(continuation_depth)
+        } else {
+            stored_limit
+        },
         max_text_chars: number("max_text_chars")?,
-        model_token_budget: number("model_token_budget")?,
+        model_token_budget: if adaptive_model_token_budget {
+            adaptive_token_budget(continuation_depth)
+        } else {
+            stored_model_token_budget
+        },
+        adaptive_limit,
+        adaptive_model_token_budget,
+        continuation_depth,
         auto_complete: false,
         output: OutputFormat::Model,
         receipt: "auto".to_owned(),
@@ -1833,6 +1867,22 @@ fn load_continuation(handle: &str) -> Result<GatewayCommand, GatewayError> {
         after: Some(cursor),
         native_argv,
     })
+}
+
+fn adaptive_page_limit(depth: usize) -> usize {
+    match depth {
+        0 => DEFAULT_MODEL_PAGE_LIMIT,
+        1 => FIRST_CONTINUATION_PAGE_LIMIT,
+        _ => MAX_CONTINUATION_PAGE_LIMIT,
+    }
+}
+
+fn adaptive_token_budget(depth: usize) -> usize {
+    match depth {
+        0 => DEFAULT_MODEL_TOKEN_BUDGET,
+        1 => FIRST_CONTINUATION_TOKEN_BUDGET,
+        _ => MAX_CONTINUATION_TOKEN_BUDGET,
+    }
 }
 
 fn prune_continuations(root: &Path, newest: u64) -> Result<(), GatewayError> {
@@ -4081,6 +4131,18 @@ mod tests {
         assert_eq!(parse_continuation_number("q01"), None);
         assert_eq!(parse_continuation_number("Q1"), None);
         assert_eq!(parse_continuation_number("q1a"), None);
+    }
+
+    #[test]
+    fn adaptive_continuation_pages_double_once_then_cap() {
+        assert_eq!(80, adaptive_page_limit(0));
+        assert_eq!(160, adaptive_page_limit(1));
+        assert_eq!(320, adaptive_page_limit(2));
+        assert_eq!(320, adaptive_page_limit(99));
+        assert_eq!(2048, adaptive_token_budget(0));
+        assert_eq!(4096, adaptive_token_budget(1));
+        assert_eq!(8192, adaptive_token_budget(2));
+        assert_eq!(8192, adaptive_token_budget(99));
     }
 
     #[test]
