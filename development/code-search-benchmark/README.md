@@ -2,7 +2,7 @@
 
 本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule，并消费 `development/common/codex_runtime.py` 的共享脱敏 launcher 环境与 `development/common/codex_shell_environment_policy.json` 的模型 shell 合同。两者不实现查询语义，也不进入 srcq 或 Codex 发布 payload。
 
-正式语料在 `corpus/`；`v16.json` 是当前候选，沿用 `v11.json` 加入的独立 C++ 与 TypeScript 项目快照以及 `v14.json` 的中型 C# 项目快照、`v15.json` 补齐的 `TemperatureCollectorSensorReader.Test:58 -> Read` 调用 oracle，并把题面未明确要求的 Enabled/SlotIndex 细节从 C# required 降为 supporting；旧版本只服务引用它们的历史结果复核。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
+正式语料在 `corpus/`；`v17.json` 是当前候选，沿用 `v11.json` 加入的独立 C++ 与 TypeScript 项目快照以及 `v14.json` 的中型 C# 项目快照，并在 `v16.json` 初次移除隐藏 required 的基础上，把三个外部项目题面的定义、调用、分支、清理、消息边界、位置准确性和静态边界拆为可独立裁决的 required。C# 的 ExpectedUid 内部行为与 C++ 的 root/完整参数转发只保留为 supporting；TypeScript 明确询问“是否以及如何清理”，并把宿主未保存 Disposable、没有显式清理及全部不同消息边界纳入 required。旧版本只服务引用它们的历史结果复核。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
 
 ```powershell
 python -X utf8 development\code-search-benchmark\experiment.py prepare --config <config.json> --output <new-output-dir>

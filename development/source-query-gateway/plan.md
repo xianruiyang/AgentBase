@@ -173,11 +173,11 @@ App Server v2 已在不改变 Control 的情况下提供 45 次独立请求 usag
 
 该结果否定“在 AGENTS.md 中提示合理控制思考量即可稳定降低实际总价”的当前候选。Token 总量不能代替价格；后续实验必须继续直接比较逐请求观察价格、逐项质量和规则遵守。只有出现能直接控制 ordinary input、减少失败/回退且不牺牲每次 required 的新机制时才重开，不再对同一句提示重采样。Candidate-only 与前次 Control 的运行器后处理 identity 不同，因此本轮保留相邻样本边界，不外推为精确配对因果系数。
 
-### 3.15 2026-09-02 v16 oracle 校准与基线重评分
+### 3.15 2026-09-02 v17 题面与原子评分校准
 
-C# R3 把题面明确要求的 `ValidateUidsUnsafe` 定义/两个调用，与题面未要求的 Enabled/SlotIndex 细节合并，造成最新六次答案在已覆盖主要目标时仍全部失分。v16 保留前者为 required，把后者降为 supporting；源码行为事实不变，历史 v15 不原位修改。零模型重评分把修复后 Control 从 `38/42`、完整 `3/6` 校准为 `40/42`、完整 `4/6`。
+v16 复核后仍存在隐藏 required、题面漏覆盖和合并评分项：C# 要求题面未问的 ExpectedUid 内部分支，C++ 强制展开题面未问的 `root` 与全部参数，TypeScript 未评分宿主清理状态和完整不同消息边界。v17 不改写历史身份，向前把三个 case 分别拆为 31、13、23 个 required，把隐藏事实降为 supporting，并补齐题面已经要求的事实。
 
-用户已确认搜索 argv 修复进入基线。未来实验使用 v16 和该修复后 Control；旧 v15 候选分数只按原 identity 保留，若需跨版本比较必须显式重评分，不能把 oracle 差异归因给规则、skill 或工具。当前剩余两个基线质量失败分别是 ExpectedUid 成功分支未拆分和 BvhTree 定义位置缺失。
+用户已确认搜索 argv 修复进入 Control 基线。现有 v16 答案对 v17 的零模型追溯投影为 `131/134`、完整 `4/6`：C# 两次分别漏 `Test -> Read`/整体完整性和给错未知型号行号，C++、TypeScript 两次均完整。Token、实际价格和耗时不变。未来实验使用 v17；下一次真实 v17 Control 必须创建新 experiment identity，追溯投影只校准旧答案质量，不能替代 subject 运行或把 oracle 差异归因给规则、skill 或工具。
 
 ## 4. 阶段与任务
 

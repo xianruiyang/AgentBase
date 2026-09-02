@@ -224,14 +224,15 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 
 实验 identity、逐项评分、实际价格、命令失败和比较限制见 [audit-result-thought-budget-prompt-v1.json](evidence/audit-result-thought-budget-prompt-v1.json)。六个 subject 均 exit 0，usage 完整、网络 clean、无超时或 postflight failure；capsule `ff3b569a…ec1ef` 已生成。Candidate-only 比较复用了相同 Control tree、corpus、Codex 和 runtime projection，但 runner 后处理源码 identity 与前次 Control 不同，故只作相邻样本证据；该规则不采纳，也未进入正式规则、Deploy 或 Release。
 
-## 17. v16 oracle 与当前 Control 重评分
+## 17. v17 题面、oracle 与原子评分校准
 
-| 对象 | v15 | v16 | 变化 |
+| 对象 | v17 required/次 | 现有答案追溯评分 | 结论 |
 | --- | ---: | ---: | --- |
-| C# 第一次 | `7/8` | `8/8` | R3 按题面定义/两个调用通过 |
-| C# 第二次 | `6/8` | `7/8` | R3 通过；仍漏 ExpectedUid 两个成功分支 |
-| C++ 两次 | `6/7、7/7` | `6/7、7/7` | 无变化 |
-| TypeScript 两次 | `6/6、6/6` | `6/6、6/6` | 无变化 |
-| Control 总计 | `38/42`，完整 `3/6` | `40/42`，完整 `4/6` | 当前基线分数 |
+| C# | 31 | `29/31、30/31` | 第一次漏 `Test -> Read` 与完整性；第二次未知型号行号错误 |
+| C++ | 13 | `13/13、13/13` | 第一次原答案已给出三个定义，转发描述满足题面 |
+| TypeScript | 23 | `23/23、23/23` | 两次答案都覆盖新补入的宿主清理与完整消息边界 |
+| 合计 | 67 | `131/134`，完整 `4/6` | 只表示旧答案对新合同的追溯投影 |
 
-`v16.json` 只把题面未要求的 Enabled/SlotIndex 行为从 required 移到 supporting；源码 oracle 的 behavior 事实和 `TemperatureCollectorEngine.cs:248` 证据保持不变。三个选定 case 的 corpus 校验通过，`validated_case_count=3`、无 failure；重评分直接消费已有 final answer，没有调用模型。旧 v15、原始 summary、capsule、Token `1,144,729`、实际价格 `$0.06089496` 和耗时 `389.363 s` 均保持历史身份。证据见 [audit-result-repaired-control-rescore-v16.json](evidence/audit-result-repaired-control-rescore-v16.json)。
+`v17.json` 以新版本向前生效，不原位修改 v16 或其 experiment identity。它把 C# ExpectedUid 内部分支与 C++ root/完整参数转发移到 supporting，补齐 TypeScript 宿主没有显式清理和全部不同消息边界，并把可独立漏答的定义、调用、分支、清理、位置准确性及静态边界拆开。三个选定 case 的 corpus 校验通过，`validated_case_count=3`、无 failure。
+
+旧 42 项按题面对齐后的判断仍为 `40/42`、完整 `4/6`，但该总数由 C# 第一次新增失败与 C++ 第一次纠正为通过相互抵消，不能证明旧失败原因正确。原始 summary、capsule、Token `1,144,729`、实际价格 `$0.06089496` 和耗时 `389.363 s` 均保持历史身份；本次没有调用模型。下一次真实 v17 Control 必须产生新的 experiment identity，不能把追溯投影冒充为 v17 subject 结果。证据见 [audit-result-repaired-control-rescore-v17.json](evidence/audit-result-repaired-control-rescore-v17.json)。

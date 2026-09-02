@@ -358,14 +358,14 @@ Candidate reasoning output `5,339→5,234`（`-1.967%`）、请求 `45→35`、�
 
 Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次猜错 vcxproj 路径；Control 对照样本为 2 次裸 `rg` 和一次路径失败。该提示只在隔离 benchmark home 中存在，不进入仓库或安装态。对照复用紧邻的修复后 Control：Control tree、corpus、Codex 与 runtime projection 相同，但 runner 因逐请求价格/缓存后处理修正而具有不同源码 identity，因此这是 candidate-only 相邻样本比较，不冒充同 experiment 的精确配对因果 A/B。完整证据见 [思考量提示审计](evidence/audit-result-thought-budget-prompt-v1.json)。
 
-## OBS-SQG-039 修复后 Control 已按 v16 oracle 重评分
+## OBS-SQG-039 三项 Control 题面与评分合同已按 v17 校准
 
 - 状态: verified without model rerun
 - 关联: OBS-SQG-034, OBS-SQG-037, OBS-SQG-038
 
-用户确认搜索 argv 修复后的环境进入当前 Control 基线。C# R3 原先把题面要求的 `ValidateUidsUnsafe` 定义和两个直接调用，与题面未要求的 Enabled/SlotIndex 实现细节合并为单个 required；最近六次相关答案全部因此失分，多数实际只漏排序描述。`v16.json` 向前把定义与两个调用保留为 required，把正确但隐藏的筛选/排序事实降为 supporting；v15 和已绑定历史结果不原位改写。
+用户确认搜索 argv 修复后的环境进入当前 Control 基线。逐项复核发现，v16 除 Enabled/SlotIndex 外仍有三类合同缺陷：C# 把题面未要求的 `ValidateUid` ExpectedUid 内部分支升级为 required，C++ 要求题面未要求的 `root` 与全部参数展开，TypeScript 则漏掉题面要求的宿主清理状态和多个不同消息边界；三个 case 还把可独立漏答的事实合并为单项，导致失败原因不稳定。
 
-使用现有 App Server Control 答案重评分后，C# 两次由 `7/8、6/8` 变为 `8/8、7/8`；C++ 保持 `6/7、7/7`，TypeScript 保持 `6/6、6/6`。当前基线为 `40/42`、完整 `4/6`；仍失败的是 C# 第二次未拆分 ExpectedUid 为空/匹配两个成功分支，以及 C++ 第一次遗漏两个 BvhTree 定义位置。Token、逐请求实际价格和耗时均未重算或改变。结构化证据见 [v16 Control 重评分](evidence/audit-result-repaired-control-rescore-v16.json)。
+`v17.json` 不改写已绑定历史语料，向前把三个外部项目拆为 C# 31、C++ 13、TypeScript 23 个 required。C# 的 ExpectedUid 行为与 C++ 的 root/完整参数转发降为 supporting；`Test -> Read` 成为显式 required；TypeScript 题面改问“是否以及如何清理”，并补入宿主未保存 Disposable、没有显式清理及完整消息边界。三个项目源码快照校验通过。现有 v16 Control 答案只作追溯投影：C# `29/31、30/31`，C++ `13/13、13/13`，TypeScript `23/23、23/23`，合计 `131/134`、完整 `4/6`。两个真实失败分别是 C# 第一次漏 `Test -> Read` 及整体调用完整性、第二次把未知型号行号 `125` 写成 `124`。Token、价格和耗时未变；该投影不是 v17 模型运行。结构化证据见 [v17 合同校准与追溯重评分](evidence/audit-result-repaired-control-rescore-v17.json)。
 
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
