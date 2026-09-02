@@ -199,6 +199,32 @@
     "ideal_cache_price": "unavailable because cache-write accounting is inconsistent with later hits",
     "decision": "reject; quality improved by two C# atoms but the actual observed price, requests, tokens, and time regressed overall, with a decisive C++ price counterexample"
   },
+  "cpp_command_chain_diagnosis": {
+    "control_runs": [
+      {"requests": 6, "commands": 5, "tokens": 149127, "price_usd": 0.01466364, "seconds": 56.139, "visible_output_characters": 31976},
+      {"requests": 8, "commands": 7, "tokens": 193306, "price_usd": 0.01239196, "seconds": 79.523, "visible_output_characters": 24297}
+    ],
+    "candidate_runs": [
+      {"requests": 16, "commands": 15, "tokens": 463659, "price_usd": 0.02741644, "seconds": 134.486, "visible_output_characters": 39598},
+      {"requests": 11, "commands": 10, "tokens": 306572, "price_usd": 0.01605784, "seconds": 120.197, "visible_output_characters": 42530}
+    ],
+    "added_work": [
+      "source-query skill reads, including one failed attempt at a nonexistent project-local path",
+      "project-file discovery and complete project manifest reads",
+      "additional project-wide or per-manifest-file searches",
+      "larger source reads and an expansion into AABB implementation files",
+      "three unrelated failed commands and repeated file-list searches"
+    ],
+    "relation_mismatch": "the candidate guidance hard-coded outgoing, which proves RayCastTest to rayCast to rayCastInteral but not the requested incoming direct call locations; completeness work therefore remained",
+    "incoming_probe": "one isolated incoming depth-1 call returned Camera_Script::selectLogic and Conductor::mouse_button_callback with exact source locations",
+    "inference": "incoming plus outgoing symbol evidence can cover the C++ relation requirements, but the current one-direction command needs two queries and neither query proves the project-manifest completeness boundary by itself"
+  },
+  "isolated_tool_probe_v5": {
+    "candidate": "one calls query with direction both",
+    "status": "stopped before implementation",
+    "reason": "the current result, expansion, model renderer, machine schema, node budget, time budget, cut marker, and exit status all assume one direction; a correct combined query requires a dual-tree public contract rather than concatenating children or duplicating scans",
+    "next_condition": "design a shared-scope multi-relation result and budget contract before implementation; do not add another skill instruction that merely requests two independent calls"
+  },
   "relative_to_control_percent": {
     "required_items": -0.746,
     "actual_total_tokens": 22.212,
