@@ -396,6 +396,15 @@ Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次
 
 外部隔离的重复位置批量 definition 原型可覆盖 C++ `3/3`、C# `6/6`、TypeScript `2/3`，但 effect 内局部箭头函数仍不能解析。首个有效 C++ 资格样本中，Control 与 Candidate 均为 `13/13`，Candidate 的价格、Token、请求、耗时和工具项却分别增加 `39.565%`、`64.933%`、`50%`、`23.470%`、`57.143%`；缩减路线仍有不支持参数、help 恢复、重复读取，并因网络退化不具晋级效力。按全指标先资格后扩量的合同，三题各两次没有执行；仓库 srcq、正式 skill、规则、部署与发行均未改变。完整证据见 [v18 完整实现范围审计](evidence/audit-result-v18-definition-range-v1.json)。
 
+## OBS-SQG-043 同请求批量工具提示已触发并取得单次收益，稳定性仍未成立
+
+- 状态: mechanism verified; benefit observed once; stability blocked by transport degradation
+- 关联: OBS-SQG-032, OBS-SQG-033, OBS-SQG-042
+
+隔离 Candidate 只增加通用同请求工具批量提示，不修改题面、skill、工具或正式环境。三个 C++ 尝试中 Candidate 都产生了真实的同请求多 tool item，最大批量分别为 4、3、3；复合 PowerShell 命令始终只计一个 item，因此没有把 shell 拼接误报为批量。事件只能证明同次模型请求输出多个工具项，不能证明 harness 并发执行。
+
+唯一有效配对保持 `13/13→13/13`，请求 `6→5`、价格下降 `17.491%`、总 Token 下降 `12.903%`、耗时下降 `3.895%`，尽管工具项增加 `40%`。两个恢复配对分别因 Control、Candidate 网络传输退化而失效；答案均为 `13/13` 且机制仍触发，但不能用于收益稳定性判断。达到有界恢复次数后未扩量到 C#、TypeScript，Candidate 未晋级，正式规则、skill、工具、部署与发行均未改变。完整证据见 [同请求工具批量审计](evidence/audit-result-v18-tool-call-batching-v1.json)。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open

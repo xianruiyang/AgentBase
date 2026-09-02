@@ -1,0 +1,112 @@
+{
+  "schema": "agentbase.code-reading-tool-call-batching-audit/v1",
+  "created_utc": "2026-09-02T14:33:54Z",
+  "objective": "test whether asking the model to emit multiple necessary independent tool calls in one model response reduces interaction cost without lowering answer quality",
+  "candidate": {
+    "only_environment_difference": "AGENTS.md",
+    "rule": "when two or more necessary read-only tool calls have known independent inputs, emit the actual tool calls in one model response and wait for the batch; keep dependent, speculative, conflicting or risky calls serial",
+    "anti_pattern": "a compound shell command does not count as multiple tool calls",
+    "production_effect": "none"
+  },
+  "measurement": {
+    "model_request": "one thread/tokenUsage/updated request usage record",
+    "same_request_tool_count": "independent completed tool items observed between consecutive request usage updates",
+    "multi_tool_request": "same_request_tool_count >= 2",
+    "concurrency_claim": "not made; the event stream proves one model request emitted multiple tool items but does not expose concurrent scheduling"
+  },
+  "scope": {
+    "corpus": "development/code-search-benchmark/corpus/v18.json",
+    "case_id": "facecutting3d-raycast-chain",
+    "model": "gpt-5.6-luna",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "transport": "websocket",
+    "workspace_read_only": true,
+    "subagents_in_subject": false,
+    "repetitions_attempted": 3
+  },
+  "runs": [
+    {
+      "alias": "qualification-1",
+      "result_path": "%LOCALAPPDATA%/AgentBase/benchmark-runs/code-reading-v18-tool-batching-v1/qualification/summary.json",
+      "comparison_valid": true,
+      "quality": {"control": "13/13", "candidate": "13/13"},
+      "control": {
+        "observed_price_usd": 0.01048448,
+        "actual_total_tokens": 139545,
+        "ordinary_input_tokens": 30398,
+        "cache_read_input_tokens": 107264,
+        "output_tokens": 1883,
+        "reasoning_output_tokens": 718,
+        "request_count": 6,
+        "tool_items": 5,
+        "failed_tool_items": 1,
+        "elapsed_ms": 62545,
+        "tools_per_request": [1, 1, 1, 1, 1, 0],
+        "multi_tool_requests": 0
+      },
+      "candidate": {
+        "observed_price_usd": 0.00865068,
+        "actual_total_tokens": 121540,
+        "ordinary_input_tokens": 22709,
+        "cache_read_input_tokens": 97024,
+        "output_tokens": 1807,
+        "reasoning_output_tokens": 873,
+        "request_count": 5,
+        "tool_items": 7,
+        "failed_tool_items": 0,
+        "elapsed_ms": 60109,
+        "tools_per_request": [1, 1, 1, 4, 0],
+        "multi_tool_requests": 1,
+        "max_tools_in_one_request": 4
+      },
+      "candidate_delta_percent": {
+        "observed_price": -17.491,
+        "actual_total_tokens": -12.903,
+        "ordinary_input_tokens": -25.294,
+        "cache_read_input_tokens": -9.547,
+        "output_tokens": -4.036,
+        "reasoning_output_tokens": 21.588,
+        "request_count": -16.667,
+        "tool_items": 40.0,
+        "elapsed": -3.895
+      }
+    },
+    {
+      "alias": "qualification-2",
+      "result_path": "%LOCALAPPDATA%/AgentBase/benchmark-runs/code-reading-v18-tool-batching-v1/qualification-r2/summary.json",
+      "comparison_valid": false,
+      "invalid_reason": "control network transport degraded",
+      "quality": {"control": "13/13", "candidate": "13/13"},
+      "candidate_tools_per_request": [1, 1, 1, 1, 1, 2, 3, 0],
+      "candidate_multi_tool_requests": 2,
+      "candidate_max_tools_in_one_request": 3,
+      "candidate_request_count": 8,
+      "candidate_tool_items": 10,
+      "candidate_failed_tool_items": 1
+    },
+    {
+      "alias": "qualification-3",
+      "result_path": "%LOCALAPPDATA%/AgentBase/benchmark-runs/code-reading-v18-tool-batching-v1/qualification-r3/summary.json",
+      "comparison_valid": false,
+      "invalid_reason": "candidate network transport degraded",
+      "quality": {"control": "13/13", "candidate": "13/13"},
+      "candidate_tools_per_request": [2, 3, 3, 2, 0],
+      "candidate_multi_tool_requests": 4,
+      "candidate_max_tools_in_one_request": 3,
+      "candidate_request_count": 5,
+      "candidate_tool_items": 10,
+      "candidate_failed_tool_items": 0
+    }
+  ],
+  "decision": {
+    "mechanism_activation": "verified in all three candidate attempts",
+    "valid_benefit": "one valid paired run improved quality-neutral observed price, total tokens, request count and elapsed time",
+    "stability": "not established because both recovery pairs were invalidated by alternating network transport degradation",
+    "cross_language_expansion": "not run after the bounded recovery limit",
+    "candidate_promotion": "not promoted",
+    "production_rule_or_skill_change": "none",
+    "deployment_or_release": "none",
+    "reopen_condition": "obtain two clean paired samples before cross-language expansion; preserve the actual multi-tool-item measurement and do not count compound shell commands"
+  }
+}
