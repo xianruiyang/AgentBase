@@ -347,6 +347,17 @@ workspace test/build/lint/fmt、15 个 ast-grep 0.44.1 真实 ignored 测试、W
 
 本轮还否定了 runner 的旧 `ideal_cache_report/v1`：六次均报告 cache write 为 0，但后续 cache hit 超过此前事件可证明的 retained prefix，旧算法却把增长误记为合成写入，并得到高于观察价格的 `$0.09893144`。当前 runner 保留可直接计算的逐请求观察价格；只有 cache-write 账目闭合时才给更窄的“不再驱逐已观察前缀”反事实，否则返回 `unavailable`。跨 subject 的全局理想缓存仍缺 prefix identity、breakpoint 和完整写入来源，不能由当前计数推定。完整证据见 [逐请求 Control 审计](evidence/audit-result-repaired-control-appserver-v1.json)。未运行 Candidate、完整验证、九项评测、Deploy 或 Release。
 
+## OBS-SQG-038 控制思考量提示没有降低实际总价
+
+- 状态: verified within candidate-only experiment `a33a9945…0720`
+- 关联: OBS-SQG-035, OBS-SQG-036, OBS-SQG-037
+
+独立 Candidate 只增加一条“内部推理应合理控制思考量并与当前决策难度匹配”的规则，不混入精炼书面句式要求。固定三题各两次得到 C# `6/8、7/8`、C++ `6/7、7/7`、TypeScript `6/6、6/6`，合计仍为 `38/42`、完整 `3/6`；单次缺项与 Control 发生交换，没有形成稳定质量改善。
+
+Candidate reasoning output `5,339→5,234`（`-1.967%`）、请求 `45→35`、实际总 Token `-23.907%`、耗时 `-8.859%`，但逐请求观察价格 `$0.06089496→$0.06219432`（`+2.134%`）。价格反向来自普通输入增加 42,464 Token：减少的 315,392 个廉价 cached input 和 738 个 output Token 不足以抵消。六次只有 C++ 第一次和 TypeScript 第一次降价，其余四次上涨。
+
+Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次猜错 vcxproj 路径；Control 对照样本为 2 次裸 `rg` 和一次路径失败。该提示只在隔离 benchmark home 中存在，不进入仓库或安装态。对照复用紧邻的修复后 Control：Control tree、corpus、Codex 与 runtime projection 相同，但 runner 因逐请求价格/缓存后处理修正而具有不同源码 identity，因此这是 candidate-only 相邻样本比较，不冒充同 experiment 的精确配对因果 A/B。完整证据见 [思考量提示审计](evidence/audit-result-thought-budget-prompt-v1.json)。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open

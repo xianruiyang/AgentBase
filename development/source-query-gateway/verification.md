@@ -207,3 +207,19 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 全部 subject 正常退出、usage 完整、网络 clean 且 postflight 无失败；capsule `76994af4…d627` 验证 14 个 raw 和 2 个 environment 文件。43 个 command 中只有 C++ 第一次猜错根目录 vcxproj 路径，随后恢复；重复 selector 为 0。相对 [上一修复后样本](evidence/audit-result-search-command-grammar-v1.json)，required `36/42→38/42`，完整 run `4→3`，Token `+19.072%`，观察价格相对同为短上下文的旧场景 `+8.114%`，耗时 `+15.952%`；这不是可采纳改进。
 
 原始 summary 中 `ideal_cache_report/v1` 的 `$0.09893144` 已判无效：事件显示 cache write 合计为 0，但每个 subject 的后续 cache hit 都超过此前可证明的 retained prefix。修正后的 v2 对六次全部返回 `cache_write_accounting_inconsistent_with_later_hits`；逐请求观察价格仍可由 45 个 usage 事件精确计算，无需重跑模型。跨 subject 的全局最理想缓存量因缺少 prefix identity、breakpoint 与完整写入来源而不可识别。结构化证据见 [audit-result-repaired-control-appserver-v1.json](evidence/audit-result-repaired-control-appserver-v1.json)。本轮没有运行 Candidate、完整验证、九项评测、Deploy 或 Release。
+
+## 16. 控制思考量提示实验
+
+| 运行 | required | Reasoning Token | 实际总 Token | 逐请求观察价格 | 请求/命令/失败 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| C# 1 | `6/8` | 643 | `140,946` | `$0.00962808` | `5/4/1` |
+| C# 2 | `7/8` | 865 | `137,103` | `$0.01137736` | `5/10/0` |
+| C++ 1 | `6/7` | 1,003 | `181,813` | `$0.01199844` | `8/7/1` |
+| C++ 2 | `7/7` | 1,302 | `185,782` | `$0.01234028` | `8/8/1` |
+| TypeScript 1 | `6/6` | 827 | `120,251` | `$0.00816456` | `5/4/0` |
+| TypeScript 2 | `6/6` | 594 | `105,168` | `$0.00868560` | `4/3/0` |
+| 合计 | `38/42`，完整 `3/6` | 5,234 | `871,063` | `$0.06219432` | `35/36/3` |
+
+相邻修复后 Control 为 `38/42`、完整 `3/6`、reasoning 5,339、`1,144,729` Token、`$0.06089496`、389.363 s；Candidate reasoning `-1.967%`、Token `-23.907%`、耗时 `-8.859%`，实际价格却 `+2.134%`。逐请求价格分解为 ordinary input `+$0.00849280`、cached input `-$0.00630784`、output `-$0.00088560`，净增 `$0.00129936`。四次单 run 涨价，且裸 `rg` 从 2 次增至 10 次并出现一次 literal glob、两次错误 vcxproj 路径。
+
+实验 identity、逐项评分、实际价格、命令失败和比较限制见 [audit-result-thought-budget-prompt-v1.json](evidence/audit-result-thought-budget-prompt-v1.json)。六个 subject 均 exit 0，usage 完整、网络 clean、无超时或 postflight failure；capsule `ff3b569a…ec1ef` 已生成。Candidate-only 比较复用了相同 Control tree、corpus、Codex 和 runtime projection，但 runner 后处理源码 identity 与前次 Control 不同，故只作相邻样本证据；该规则不采纳，也未进入正式规则、Deploy 或 Release。

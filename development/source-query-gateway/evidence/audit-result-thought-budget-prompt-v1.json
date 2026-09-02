@@ -1,0 +1,268 @@
+{
+  "schema": "agentbase.thought-budget-prompt-audit/v1",
+  "created_utc": "2026-09-02T01:42:02Z",
+  "test_item": "control the amount of internal reasoning according to current decision difficulty rather than requiring a concise prose style",
+  "candidate_rule": "must: 内部推理应合理控制思考量并与当前决策难度匹配；简单、证据充分或机械动作只完成最少必要判断后立即执行，只有复杂、高风险或证据冲突会改变动作时才展开分析；不得为保持固定深度而延长思考，也不得省略影响正确性、授权或验证的必要判断",
+  "allowed_difference": "candidate AGENTS.md one rule over the repaired search-argv Control",
+  "subject_contract": {
+    "model": "gpt-5.6-luna",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "codex_version": "codex-cli 0.151.0-alpha.7.2",
+    "srcq_version": "srcq 0.7.0",
+    "client_protocol": "app-server-v2",
+    "read_only": true,
+    "multi_agent": false,
+    "case_count": 3,
+    "repetitions_per_case": 2
+  },
+  "candidate": {
+    "cases": [
+      {
+        "id": "vmt-temperature-collector-sampling-chain",
+        "language": "C#",
+        "runs": [
+          {
+            "ordinal": 1,
+            "required_passed": 6,
+            "required_total": 8,
+            "quality_complete": false,
+            "failed_required": [
+              "ValidateUidsUnsafe did not state SlotIndex ordering",
+              "the answer did not explicitly close direct-call completeness for every required qualified member"
+            ],
+            "elapsed_ms": 52260,
+            "request_count": 5,
+            "command_count": 4,
+            "failed_command_count": 1,
+            "input_tokens": 139278,
+            "cached_input_tokens": 112384,
+            "ordinary_input_tokens": 26894,
+            "output_tokens": 1668,
+            "reasoning_output_tokens": 643,
+            "actual_total_tokens": 140946,
+            "observed_price_usd": 0.00962808
+          },
+          {
+            "ordinal": 2,
+            "required_passed": 7,
+            "required_total": 8,
+            "quality_complete": false,
+            "failed_required": [
+              "ValidateUidsUnsafe did not state that it visits only enabled sensors ordered by SlotIndex"
+            ],
+            "elapsed_ms": 67047,
+            "request_count": 5,
+            "command_count": 10,
+            "failed_command_count": 0,
+            "input_tokens": 134576,
+            "cached_input_tokens": 103168,
+            "ordinary_input_tokens": 31408,
+            "output_tokens": 2527,
+            "reasoning_output_tokens": 865,
+            "actual_total_tokens": 137103,
+            "observed_price_usd": 0.01137736
+          }
+        ]
+      },
+      {
+        "id": "facecutting3d-raycast-chain",
+        "language": "C++",
+        "runs": [
+          {
+            "ordinal": 1,
+            "required_passed": 6,
+            "required_total": 7,
+            "quality_complete": false,
+            "failed_required": [
+              "the answer omitted definition paths and lines for BvhTree::rayCastInteral and BvhTree::rayCast"
+            ],
+            "elapsed_ms": 72753,
+            "request_count": 8,
+            "command_count": 7,
+            "failed_command_count": 1,
+            "input_tokens": 179589,
+            "cached_input_tokens": 147712,
+            "ordinary_input_tokens": 31877,
+            "output_tokens": 2224,
+            "reasoning_output_tokens": 1003,
+            "actual_total_tokens": 181813,
+            "observed_price_usd": 0.01199844
+          },
+          {
+            "ordinal": 2,
+            "required_passed": 7,
+            "required_total": 7,
+            "quality_complete": true,
+            "failed_required": [],
+            "elapsed_ms": 70420,
+            "request_count": 8,
+            "command_count": 8,
+            "failed_command_count": 1,
+            "input_tokens": 183457,
+            "cached_input_tokens": 150784,
+            "ordinary_input_tokens": 32673,
+            "output_tokens": 2325,
+            "reasoning_output_tokens": 1302,
+            "actual_total_tokens": 185782,
+            "observed_price_usd": 0.01234028
+          }
+        ]
+      },
+      {
+        "id": "opencode-webview-message-boundary",
+        "language": "TypeScript",
+        "runs": [
+          {
+            "ordinal": 1,
+            "required_passed": 6,
+            "required_total": 6,
+            "quality_complete": true,
+            "failed_required": [],
+            "elapsed_ms": 51819,
+            "request_count": 5,
+            "command_count": 4,
+            "failed_command_count": 0,
+            "input_tokens": 118488,
+            "cached_input_tokens": 98048,
+            "ordinary_input_tokens": 20440,
+            "output_tokens": 1763,
+            "reasoning_output_tokens": 827,
+            "actual_total_tokens": 120251,
+            "observed_price_usd": 0.00816456
+          },
+          {
+            "ordinal": 2,
+            "required_passed": 6,
+            "required_total": 6,
+            "quality_complete": true,
+            "failed_required": [],
+            "elapsed_ms": 40571,
+            "request_count": 4,
+            "command_count": 3,
+            "failed_command_count": 0,
+            "input_tokens": 103692,
+            "cached_input_tokens": 76800,
+            "ordinary_input_tokens": 26892,
+            "output_tokens": 1476,
+            "reasoning_output_tokens": 594,
+            "actual_total_tokens": 105168,
+            "observed_price_usd": 0.0086856
+          }
+        ]
+      }
+    ],
+    "totals": {
+      "required_passed": 38,
+      "required_total": 42,
+      "quality_complete_runs": 3,
+      "elapsed_ms": 354870,
+      "request_count": 35,
+      "command_count": 36,
+      "failed_command_count": 3,
+      "input_tokens": 859080,
+      "cached_input_tokens": 688896,
+      "ordinary_input_tokens": 170184,
+      "output_tokens": 11983,
+      "reasoning_output_tokens": 5234,
+      "visible_output_tokens": 6749,
+      "actual_total_tokens": 871063,
+      "observed_price_usd": 0.06219432
+    }
+  },
+  "comparison_to_repaired_control": {
+    "control_audit": "development/source-query-gateway/evidence/audit-result-repaired-control-appserver-v1.json",
+    "control_tree_sha256": "c752cb297acf7c85d8f0eb6fe401469502275699e845ed2bd5967419cb870902",
+    "new_experiment_control_tree_sha256": "c752cb297acf7c85d8f0eb6fe401469502275699e845ed2bd5967419cb870902",
+    "required": {
+      "control": "38/42",
+      "candidate": "38/42"
+    },
+    "quality_complete_runs": {
+      "control": 3,
+      "candidate": 3
+    },
+    "reasoning_output_tokens": {
+      "control": 5339,
+      "candidate": 5234,
+      "delta": -105,
+      "delta_percent": -1.96666
+    },
+    "actual_total_tokens": {
+      "control": 1144729,
+      "candidate": 871063,
+      "delta": -273666,
+      "delta_percent": -23.906619
+    },
+    "observed_price_usd": {
+      "control": 0.06089496,
+      "candidate": 0.06219432,
+      "delta": 0.00129936,
+      "delta_percent": 2.133773
+    },
+    "elapsed_ms": {
+      "control": 389363,
+      "candidate": 354870,
+      "delta": -34493,
+      "delta_percent": -8.858828
+    },
+    "requests": {
+      "control": 45,
+      "candidate": 35
+    },
+    "price_mechanism": {
+      "ordinary_input_tokens_delta": 42464,
+      "cached_input_tokens_delta": -315392,
+      "output_tokens_delta": -738,
+      "ordinary_input_price_delta_usd": 0.0084928,
+      "cached_input_price_delta_usd": -0.00630784,
+      "output_price_delta_usd": -0.0008856,
+      "net_price_delta_usd": 0.00129936
+    },
+    "per_run_price_direction": {
+      "improved": ["C++ ordinal 1", "TypeScript ordinal 1"],
+      "regressed": ["C# ordinal 1", "C# ordinal 2", "C++ ordinal 2", "TypeScript ordinal 2"]
+    },
+    "comparison_limit": "candidate-only comparison against the immediately preceding repaired Control sample; the complete Control tree, corpus, Codex executable and runtime projection are identical, but the runner source identity changed for request-price and cache-report postprocessing, so this is not a same-experiment paired causal A/B"
+  },
+  "command_audit": {
+    "candidate_bare_rg_commands": 10,
+    "control_bare_rg_commands": 2,
+    "candidate_literal_windows_glob_failures": 1,
+    "candidate_wrong_vcxproj_path_failures": 2,
+    "duplicate_srcq_rg_rg": 0,
+    "duplicate_srcq_fd_fd": 0,
+    "interpretation": "the thought-budget hint reduced requests and commands in aggregate but coincided with more bypasses of the required srcq search route and three recoverable command failures"
+  },
+  "raw_evidence": {
+    "location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/control-v16-thought-budget-appserver-20260902-r1/thought-budget",
+    "experiment_identity": "a33a9945fb168ab7b32c939b6765a7e5a088ffca27a10dae00f0808cf4040720",
+    "experiment_sha256": "e59bb8a5ff1ab3bb220ffa72a6c15290829c554fe42bb841d1e50ec26474fc21",
+    "summary_sha256": "08dffdfef3b261e67c9696a2102cbd6d322b4533df01aa43cf2d8cc329df4902",
+    "capsule_sha256": "ff3b569a75ee9155683b312b786a3c1be7f9be1c11fd4f39a39b128d112ec1ef",
+    "runner_source_sha256": "8d89b8f50ab31631e66e09c2abd3f27deeaca5c9f5180972b795dcd4c84eb332",
+    "environment_diff_sha256": "86fc2cae5b715896fda12853c78b5014eea1cb54992530f6a99562c620cd1a60",
+    "environment_trees_sha256": "c888be5beb25cab613ee9fbb5d58c98e76f3f4748fad189f4a8ea50ee971ab92",
+    "corpus_sha256": "2901b59c174042dc82ca8974a2615b927ad21558dc532d57a2310b5d0268bd4d",
+    "preflight": {
+      "exit_code": 0,
+      "network_clean": true,
+      "usage_complete": true,
+      "actual_total_tokens": 39889,
+      "observed_price_usd": 0.0047628
+    },
+    "formal_run": {
+      "exit_code_count": {"0": 6},
+      "timed_out": 0,
+      "usage_incomplete": 0,
+      "network_dirty": 0,
+      "postflight_failures": 0
+    }
+  },
+  "decision": {
+    "adopt": false,
+    "reason": "reasoning tokens fell only 1.967 percent while actual price rose 2.134 percent, four of six per-run prices regressed, per-run quality omissions changed rather than stabilized, and command-route compliance worsened",
+    "production_effect": "none; the candidate rule exists only in the isolated benchmark home and is not in repository or installed AGENTS.md",
+    "rerun": "not justified without a new mechanism or a new exact paired A/B design"
+  }
+}

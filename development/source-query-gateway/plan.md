@@ -167,6 +167,12 @@ App Server v2 已在不改变 Control 的情况下提供 45 次独立请求 usag
 
 逐请求计数能够关闭实际观察价格，却不能关闭“服务器从不丢弃任何前缀”的全局理想缓存。六次 cache write 均为 0，而后续 cache hit 增长，证明当前协议没有暴露完整写入历史；旧 v1 投影由此产生了高于实际观察价格的反例。runner 改为只在账目闭合时计算 subject 内 no-future-eviction 投影，否则明确 unavailable。后续若要研究全局理想缓存，必须先取得稳定 prefix identity、breakpoint 与 write provenance，而不是继续重采样同一题或从聚合命中量反推。
 
+### 3.14 2026-09-02 控制思考量提示实验
+
+新的独立 Candidate 不再要求内部推理采用精炼书面短句，只要求思考量与当前决策难度匹配。六次结果保持 `38/42`、完整 `3/6`，reasoning Token 仅下降 `1.967%`，实际总 Token 和耗时分别下降 `23.907%`、`8.859%`；但逐请求实际价格上涨 `2.134%`，因为 ordinary input 增加而 cached input 大幅减少。四次单 run 涨价，命令路径还增加裸 `rg`、literal glob 和错误项目路径。
+
+该结果否定“在 AGENTS.md 中提示合理控制思考量即可稳定降低实际总价”的当前候选。Token 总量不能代替价格；后续实验必须继续直接比较逐请求观察价格、逐项质量和规则遵守。只有出现能直接控制 ordinary input、减少失败/回退且不牺牲每次 required 的新机制时才重开，不再对同一句提示重采样。Candidate-only 与前次 Control 的运行器后处理 identity 不同，因此本轮保留相邻样本边界，不外推为精确配对因果系数。
+
 ## 4. 阶段与任务
 
 ### P0 固定分支合同和 AST 基线
