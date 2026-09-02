@@ -223,3 +223,15 @@ P11 的源码、唯一 owner、直接与间接消费者、确定性验证、真�
 相邻修复后 Control 为 `38/42`、完整 `3/6`、reasoning 5,339、`1,144,729` Token、`$0.06089496`、389.363 s；Candidate reasoning `-1.967%`、Token `-23.907%`、耗时 `-8.859%`，实际价格却 `+2.134%`。逐请求价格分解为 ordinary input `+$0.00849280`、cached input `-$0.00630784`、output `-$0.00088560`，净增 `$0.00129936`。四次单 run 涨价，且裸 `rg` 从 2 次增至 10 次并出现一次 literal glob、两次错误 vcxproj 路径。
 
 实验 identity、逐项评分、实际价格、命令失败和比较限制见 [audit-result-thought-budget-prompt-v1.json](evidence/audit-result-thought-budget-prompt-v1.json)。六个 subject 均 exit 0，usage 完整、网络 clean、无超时或 postflight failure；capsule `ff3b569a…ec1ef` 已生成。Candidate-only 比较复用了相同 Control tree、corpus、Codex 和 runtime projection，但 runner 后处理源码 identity 与前次 Control 不同，故只作相邻样本证据；该规则不采纳，也未进入正式规则、Deploy 或 Release。
+
+## 17. v16 oracle 与当前 Control 重评分
+
+| 对象 | v15 | v16 | 变化 |
+| --- | ---: | ---: | --- |
+| C# 第一次 | `7/8` | `8/8` | R3 按题面定义/两个调用通过 |
+| C# 第二次 | `6/8` | `7/8` | R3 通过；仍漏 ExpectedUid 两个成功分支 |
+| C++ 两次 | `6/7、7/7` | `6/7、7/7` | 无变化 |
+| TypeScript 两次 | `6/6、6/6` | `6/6、6/6` | 无变化 |
+| Control 总计 | `38/42`，完整 `3/6` | `40/42`，完整 `4/6` | 当前基线分数 |
+
+`v16.json` 只把题面未要求的 Enabled/SlotIndex 行为从 required 移到 supporting；源码 oracle 的 behavior 事实和 `TemperatureCollectorEngine.cs:248` 证据保持不变。三个选定 case 的 corpus 校验通过，`validated_case_count=3`、无 failure；重评分直接消费已有 final answer，没有调用模型。旧 v15、原始 summary、capsule、Token `1,144,729`、实际价格 `$0.06089496` 和耗时 `389.363 s` 均保持历史身份。证据见 [audit-result-repaired-control-rescore-v16.json](evidence/audit-result-repaired-control-rescore-v16.json)。

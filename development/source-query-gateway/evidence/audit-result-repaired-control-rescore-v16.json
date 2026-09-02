@@ -1,0 +1,105 @@
+{
+  "schema": "agentbase.repaired-control-rescore/v1",
+  "created_utc": "2026-09-02T01:53:09Z",
+  "purpose": "rescore the accepted repaired search-argv Control against the forward-only v16 answer contract without rerunning Codex",
+  "baseline": {
+    "name": "repaired search-argv Control",
+    "user_accepted_as_baseline": true,
+    "raw_audit": "development/source-query-gateway/evidence/audit-result-repaired-control-appserver-v1.json",
+    "raw_location": "%LOCALAPPDATA%/AgentBase/benchmark-runs/control-v16-grammar-recompute-appserver-20260902-r1/grammar-control",
+    "experiment_identity": "0aa3c7b39123cc068ce8fcb56c8914c8eaffab40f1554e2c4e8e86f4ecff3660",
+    "summary_sha256": "1f9d59107a2b969441288c4f95bcba3a59bee5e4e589902e3dc88215bdf5d276",
+    "capsule_sha256": "76994af4d27857170b23262b3e5959fa5927a779933562f487af0aa329b5d627"
+  },
+  "oracle_change": {
+    "previous": {
+      "path": "development/code-search-benchmark/corpus/v15.json",
+      "version": "2026-09-02.1",
+      "sha256": "2901b59c174042dc82ca8974a2615b927ad21558dc532d57a2310b5d0268bd4d",
+      "required_item": "ValidateUidsUnsafe 的定义、两个直接调用位置，以及只遍历启用并按 SlotIndex 排序的传感器"
+    },
+    "current": {
+      "path": "development/code-search-benchmark/corpus/v16.json",
+      "version": "2026-09-02.2",
+      "sha256": "4dd65bf6ebc26a60ddd477a08b0f514c97bf7884e48a5a184a29f6942cd62be6",
+      "required_item": "ValidateUidsUnsafe 的定义和两个直接调用位置",
+      "supporting_item": "ValidateUidsUnsafe 只遍历启用并按 SlotIndex 排序的传感器"
+    },
+    "reason": "the prompt explicitly requests definitions and direct call locations but does not request the enabled filter or SlotIndex ordering; the source fact remains correct and useful but is not a valid hidden required answer field",
+    "history_policy": "v15 and all experiment identities bound to it remain unchanged; v16 is the current oracle for future experiments"
+  },
+  "rescore": {
+    "cases": [
+      {
+        "id": "vmt-temperature-collector-sampling-chain",
+        "language": "C#",
+        "runs": [
+          {
+            "ordinal": 1,
+            "previous": "7/8",
+            "current": "8/8",
+            "quality_complete": true,
+            "new_r3_evidence": "the answer gives ValidateUidsUnsafe at line 243 and both direct callers at lines 180 and 209"
+          },
+          {
+            "ordinal": 2,
+            "previous": "6/8",
+            "current": "7/8",
+            "quality_complete": false,
+            "new_r3_evidence": "the answer gives ValidateUidsUnsafe at line 243 and both direct callers at lines 180 and 209",
+            "remaining_failure": "ValidateUid does not explicitly distinguish empty ExpectedUid from matching ExpectedUid"
+          }
+        ],
+        "current_total": "15/16"
+      },
+      {
+        "id": "facecutting3d-raycast-chain",
+        "language": "C++",
+        "runs": ["6/7", "7/7"],
+        "current_total": "13/14",
+        "changed": false
+      },
+      {
+        "id": "opencode-webview-message-boundary",
+        "language": "TypeScript",
+        "runs": ["6/6", "6/6"],
+        "current_total": "12/12",
+        "changed": false
+      }
+    ],
+    "previous_total": {
+      "required": "38/42",
+      "quality_complete_runs": 3
+    },
+    "current_total": {
+      "required": "40/42",
+      "quality_complete_runs": 4
+    },
+    "unchanged_usage": {
+      "actual_total_tokens": 1144729,
+      "reasoning_output_tokens": 5339,
+      "observed_price_usd": 0.06089496,
+      "elapsed_ms": 389363
+    }
+  },
+  "validation": {
+    "command": "python -X utf8 development/code-search-benchmark/corpus/validate_corpus.py development/code-search-benchmark/corpus/v16.json --workspace facecutting3d-cpp=D:/program/FaceCutting3D --workspace opencode-vs-plugin-ts=D:/program/OpencodeVsPlugin --workspace vmtsinglemachine-csharp=D:/program/AIFile/VMTSingleMachine --case-id facecutting3d-raycast-chain --case-id opencode-webview-message-boundary --case-id vmt-temperature-collector-sampling-chain",
+    "result": {
+      "ok": true,
+      "case_count": 9,
+      "validated_case_count": 3,
+      "failures": []
+    },
+    "model_rerun": false
+  },
+  "decision": {
+    "current_baseline_score": "40/42",
+    "current_baseline_quality_complete_runs": "4/6",
+    "remaining_control_failures": [
+      "C# ordinal 2 omits the separate empty and matching ExpectedUid success branches",
+      "C++ ordinal 1 omits definition locations for BvhTree::rayCastInteral and BvhTree::rayCast"
+    ],
+    "future_experiments": "use corpus v16 and the repaired search-argv Control as the baseline; do not compare future v16 scores directly to historical v15 scores without this rescore boundary",
+    "production_effect": "benchmark corpus and development evidence only; no AGENTS.md, skill, srcq, Deploy or Release change"
+  }
+}
