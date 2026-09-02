@@ -117,7 +117,7 @@ fn symbol_subcommand() -> Command {
                         .long("direction")
                         .value_name("DIRECTION")
                         .default_value("outgoing")
-                        .value_parser(PossibleValuesParser::new(["outgoing", "incoming"]))
+                        .value_parser(PossibleValuesParser::new(["outgoing", "incoming", "both"]))
                         .help("Call-tree direction"),
                 )
                 .arg(
@@ -175,6 +175,14 @@ fn symbol_relation_subcommand(
                 .action(ArgAction::Append)
                 .value_parser(clap::value_parser!(PathBuf))
                 .help("Exclude one root or subtree from the selected scope"),
+        )
+        .arg(
+            Arg::new("source-manifest")
+                .long("source-manifest")
+                .value_name("PATH")
+                .value_parser(clap::value_parser!(PathBuf))
+                .conflicts_with_all(["add-root", "only-root", "exclude"])
+                .help("Use the source files declared directly by a supported manifest"),
         )
         .arg(
             Arg::new("cwd")
@@ -716,6 +724,7 @@ pub struct SymbolCommand {
     pub add_roots: Vec<PathBuf>,
     pub only_roots: Vec<PathBuf>,
     pub excludes: Vec<PathBuf>,
+    pub source_manifest: Option<PathBuf>,
     pub cwd: Option<PathBuf>,
     pub language: String,
     pub body: SymbolBodyMode,
@@ -1143,6 +1152,7 @@ fn parse_symbol_command(matches: &ArgMatches) -> Result<SymbolCommand, CliParseE
             add_roots: Vec::new(),
             only_roots: Vec::new(),
             excludes: Vec::new(),
+            source_manifest: None,
             cwd: None,
             language: "cpp".to_owned(),
             body: SymbolBodyMode::None,
@@ -1182,6 +1192,7 @@ fn parse_symbol_command(matches: &ArgMatches) -> Result<SymbolCommand, CliParseE
         add_roots: paths("add-root"),
         only_roots: paths("only-root"),
         excludes: paths("exclude"),
+        source_manifest: values.get_one::<PathBuf>("source-manifest").cloned(),
         cwd: values.get_one::<PathBuf>("cwd").cloned(),
         language: values
             .get_one::<String>("language")

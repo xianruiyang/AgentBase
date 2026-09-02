@@ -378,6 +378,15 @@ Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次
 
 三轮只读模型实验均保持 C++ 质量 `26/26`，但 body-only A/B 的候选价格从 `$0.02516840` 升至 `$0.02551624`；加强触发后出现 8 次错误命令；限定名候选虽实现 `2/2` bundle 成功，仍相对邻近 Control 增加 `47.2%` Token、`22.5%` 价格、`29.4%` 时间和 `50%` 请求。工具架构因此只在隔离层成立，skill 候选全部拒绝，仓库 srcq、已安装环境与部署 payload 均未改变。完整证据见 [共享双向调用审计](evidence/audit-result-shared-calls-bundle-v1.json)。
 
+## OBS-SQG-041 正式仓库候选闭合工具合同但模型 skill 再次被价格反例拒绝
+
+- 状态: verified in repository candidate and isolated model experiments
+- 关联: AC-SQG-011, DES-SQG-022, SOL-SQG-018, TSQG-119, TSQG-120
+
+仓库 `srcq-cli` 候选现已增加 `--source-manifest PATH` 与 `--direction both`。单方向 incoming/outgoing 的冻结 v1 JSON 在改动前后字节相同；bundle/v1 可在 C++、C#、TypeScript 机械还原 root、nodes、truncation、timeout、scan 与 evidence。FaceCutting3D 的 93 个直接项为 `bounded`，machine Token `821→651`、model Token `217→187`；3000 ms 时两支完整，1500 ms 时退出 124 并分别保留 partial 状态。格式、check、全 target clippy、25 项符号集成测试和 16 项 scope 单元测试通过。
+
+模型侧先证明只改引用不会被读取：Candidate 为 `12/13、13/13`，Control 为 `13/13、13/13`，且 Candidate 两次价格都更高。强化 description 的单次 preflight 曾以 4 个命令达到 `13/13`，但正式配对中四条答案虽均为 `13/13`，Candidate 价格为 `$0.01385928/$0.01572924`，Control 为 `$0.01075160/$0.01066468`；Candidate ordinary input 为 `37,014/39,869`，Control 为 `24,360/24,063`，并且两次都猜错 manifest 路径、在行为大页后补查。该结果拒绝正式 skill 晋级，不部署、不安装、不发行；完整数据见 [共享 bundle 审计](evidence/audit-result-shared-calls-bundle-v1.json)。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open
@@ -394,12 +403,12 @@ Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次
 
 语言项目 resolver 已接入 `SourceUniverse` 唯一入口，只读解析本地静态元数据，不读取 dependency cache、不下载或启动语言工具。当前没有证据支持重载、trait/interface 或动态分派、函数值、复杂泛型/union、宏/生成代码和运行时属性的精确绑定；这些机制不属于本差距的候选精度承诺，仍由 `semantic-unknown` 与按需 LSP/领域工具承担。该能力已随 0.6.0 发布；用户默认安装仍为 0.5.0，AgentBase Codex Publish 未执行。
 
-## GAP-SQG-012 双向 bundle 与显式 source manifest 尚未进入正式 srcq
+## GAP-SQG-012 双向 bundle 与显式 source manifest 已进入正式仓库候选
 
-- 状态: open
-- 关联: AC-SQG-011, DES-SQG-019, DES-SQG-021, OBS-SQG-040
+- 状态: resolved
+- 关联: AC-SQG-011, DES-SQG-019, DES-SQG-021, OBS-SQG-040, OBS-SQG-041
 
-当前正式 srcq 0.7.0 的 `symbol calls` 仍只接受 `incoming` 或 `outgoing`，每次输出一个 `srcq.symbol.calls/v1` 方向树；它没有共享查询、范围与 deadline 的双向 bundle，也没有显式 source manifest 入口。AC-SQG-011 已要求支持双向调用，因此 TSQG-108 过去闭合的是两个独立方向，不足以覆盖该合同的组合方向。隔离原型已证明工具机制和投影收益，但尚未进入仓库实现、兼容验证或正式组件门禁；模型实验又证明仅修改 skill 文案不能让该能力替代后续关系搜索与重复正文读取，不能据此晋级或部署。
+当前仓库 srcq 0.7.0 候选保留单方向 `srcq.symbol.calls/v1`，并以独立 `srcq.symbol.calls/bundle/v1` 共享 query、范围、root 与 deadline，incoming/outgoing 分支分别持有完整性和预算状态；`--source-manifest` 的首个 `vcxproj-direct-items/v1` adapter 只承诺直接项集合的 bounded 完整性。TSQG-119 的 schema、跨语言等价、范围边界、Token 与受影响组件验证已覆盖，差距在仓库候选层闭合。该状态不表示已部署、安装或发行；TSQG-120 的 skill 候选因实际价格反例被拒绝。
 
 ## GAP-SQG-009 query model 续页动作已经闭环
 

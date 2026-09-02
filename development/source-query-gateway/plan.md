@@ -478,6 +478,8 @@ TSQG-103—TSQG-105 已闭环。0.4.3 候选与完整组件门禁覆盖六位环
 
 OBS-SQG-040 随后重新确认 AC-SQG-011 的 `both` 部分并未由两个独立方向调用完整闭合。TSQG-119/120 因此只重开共享双向调用、显式 bounded manifest 与其模型接入，不推翻 TSQG-108 已完成的单方向 definition/references/calls，也不重开已拒绝的旧 skill 措辞。当前正式 srcq、仓库 skill、安装态和部署 payload 均未改变。
 
+TSQG-119 已在正式仓库 owner 中闭合：单方向 v1 保持字节兼容，bundle/v1 跨 C++、C#、TypeScript 可机械还原，FaceCutting3D manifest、共享 deadline、分支预算和 Token 投影通过定向验证。TSQG-120 随后按完整 Control 运行两轮配对；引用-only 候选没有触发，强化触发候选虽保持质量，实际价格两次均上升且四步链不稳定，因此 skill 晋级被拒绝。实验内容只保留在开发证据与外部隔离 home，不进入正式 skill、安装态或部署 payload；没有新的部署、安装或发行授权。
+
 ## 5. 停止与重开条件
 
 - AST 现有 CLI、profile、cache、fingerprint、process、rewrite、TTY/LSP、诊断或 release gate 任一发生非必要变化时，停止并回到设计裁决。

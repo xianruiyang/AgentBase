@@ -195,6 +195,13 @@ struct CallsOutcome {
     scan_complete: bool,
 }
 
+struct CallsBundleOutcome {
+    target: String,
+    universe: SourceUniverse,
+    incoming: CallsOutcome,
+    outgoing: CallsOutcome,
+}
+
 #[derive(Clone)]
 struct CalleeResolution {
     total: usize,
@@ -280,6 +287,33 @@ fn execute_references(command: &SymbolCommand) -> i32 {
 
 fn execute_calls(command: &SymbolCommand) -> i32 {
     let deadline = QueryDeadline::new(command.time_budget_ms);
+    if command.direction == "both" {
+        return match execute_calls_bundle_inner(command, deadline) {
+            Ok(outcome) => {
+                let rendered = match command.output {
+                    OutputFormat::Model => render_calls_bundle_model(command, &outcome),
+                    OutputFormat::Machine => render_calls_bundle_machine(command, &outcome),
+                };
+                match rendered.and_then(write_stdout) {
+                    Ok(()) if outcome.incoming.time_limited || outcome.outgoing.time_limited => 124,
+                    Ok(())
+                        if outcome.incoming.root.is_some() || outcome.outgoing.root.is_some() =>
+                    {
+                        0
+                    }
+                    Ok(()) => 1,
+                    Err(error) => {
+                        eprintln!("srcq: {}", error.message);
+                        error.code
+                    }
+                }
+            }
+            Err(error) => {
+                eprintln!("srcq: {}", error.message);
+                error.code
+            }
+        };
+    }
     match execute_calls_inner(command, deadline) {
         Ok(outcome) => {
             let rendered = match command.output {
@@ -307,13 +341,40 @@ fn execute_calls_inner(
     command: &SymbolCommand,
     deadline: QueryDeadline,
 ) -> Result<CallsOutcome, SymbolFailure> {
-    let definitions = execute_inner(command, deadline)?;
+    let query = resolve_query(command)?;
+    let definitions = execute_inner_resolved(command, &query, deadline)?;
+    execute_calls_branch(command, &query, &definitions, &command.direction, deadline)
+}
+
+fn execute_calls_bundle_inner(
+    command: &SymbolCommand,
+    deadline: QueryDeadline,
+) -> Result<CallsBundleOutcome, SymbolFailure> {
+    let query = resolve_query(command)?;
+    let definitions = execute_inner_resolved(command, &query, deadline)?;
+    let incoming = execute_calls_branch(command, &query, &definitions, "incoming", deadline)?;
+    let outgoing = execute_calls_branch(command, &query, &definitions, "outgoing", deadline)?;
+    Ok(CallsBundleOutcome {
+        target: definitions.target.clone(),
+        universe: definitions.universe.clone(),
+        incoming,
+        outgoing,
+    })
+}
+
+fn execute_calls_branch(
+    command: &SymbolCommand,
+    query: &ResolvedQuery,
+    definitions: &QueryOutcome,
+    direction: &str,
+    deadline: QueryDeadline,
+) -> Result<CallsOutcome, SymbolFailure> {
     let root_definition_total = definitions.definition_total;
     if root_definition_total != 1 {
         return Ok(CallsOutcome {
-            target: definitions.target,
-            direction: command.direction.clone(),
-            universe: definitions.universe,
+            target: definitions.target.clone(),
+            direction: direction.to_owned(),
+            universe: definitions.universe.clone(),
             root: None,
             root_definition_total,
             nodes: 0,
@@ -331,7 +392,6 @@ fn execute_calls_inner(
         })
     });
     let root_definition = definitions.definitions[0].clone();
-    let query = resolve_query(command)?;
     let mut resolution_cache = BTreeMap::new();
     let mut call_cache = BTreeMap::new();
     let mut active = BTreeSet::new();
@@ -356,13 +416,13 @@ fn execute_calls_inner(
         definition: Some(root_definition.clone()),
         children: Vec::new(),
     };
-    if command.direction == "incoming" {
+    if direction == "incoming" {
         expand_incoming_node(
             &mut root,
             &root_definition,
             0,
             command,
-            &query,
+            query,
             deadline,
             &mut resolution_cache,
             &mut call_cache,
@@ -397,7 +457,7 @@ fn execute_calls_inner(
             &root_definition,
             0,
             command,
-            &query,
+            query,
             deadline,
             &mut resolution_cache,
             &mut call_cache,
@@ -408,9 +468,9 @@ fn execute_calls_inner(
         )?;
     }
     Ok(CallsOutcome {
-        target: definitions.target,
-        direction: command.direction.clone(),
-        universe: definitions.universe,
+        target: definitions.target.clone(),
+        direction: direction.to_owned(),
+        universe: definitions.universe.clone(),
         root: Some(root),
         root_definition_total,
         nodes,
@@ -790,8 +850,9 @@ fn references_for_known_definition(
         })
         .map(|root| normalized_key(&root.path))
         .collect::<BTreeSet<_>>();
-    if query.language.key == "csharp"
-        && query.universe.has_complete_csharp_compile_scope()
+    if query
+        .universe
+        .has_complete_compile_scope(query.language.key)
         && path_set_contains_all(&roots, &query.universe.compile_files)
     {
         scanned_roots.extend(
@@ -895,7 +956,7 @@ fn resolve_callee(
     child_command.at = None;
     child_command.body = SymbolBodyMode::None;
     child_command.add_roots.clear();
-    child_command.only_roots = bounded_relation_roots(universe, local_file);
+    child_command.only_roots = bounded_relation_roots(universe, &command.language, local_file);
     let outcome = execute_inner(&child_command, deadline)?;
     let local_definitions = outcome
         .definitions
@@ -916,7 +977,11 @@ fn resolve_callee(
     Ok(resolution)
 }
 
-fn bounded_relation_roots(universe: &SourceUniverse, local_file: &Path) -> Vec<PathBuf> {
+fn bounded_relation_roots(
+    universe: &SourceUniverse,
+    language: &str,
+    local_file: &Path,
+) -> Vec<PathBuf> {
     let explicit_only = universe.roots.iter().all(|root| root.source == "explicit");
     let mut roots = if explicit_only {
         universe
@@ -924,7 +989,7 @@ fn bounded_relation_roots(universe: &SourceUniverse, local_file: &Path) -> Vec<P
             .iter()
             .map(|root| root.path.clone())
             .collect()
-    } else if universe.has_complete_csharp_compile_scope() {
+    } else if universe.has_complete_compile_scope(language) {
         universe.compile_files.clone()
     } else {
         relation_source_roots(universe, local_file)
@@ -1008,8 +1073,9 @@ fn execute_references_inner(
         })
         .map(|root| normalized_key(&root.path))
         .collect::<BTreeSet<_>>();
-    if query.language.key == "csharp"
-        && query.universe.has_complete_csharp_compile_scope()
+    if query
+        .universe
+        .has_complete_compile_scope(query.language.key)
         && path_set_contains_all(&roots, &query.universe.compile_files)
     {
         scanned_roots.extend(
@@ -1122,7 +1188,10 @@ fn reference_scan_inputs(
             .map(|root| root.path.clone())
             .collect();
     }
-    if query.language.key == "csharp" && query.universe.has_complete_csharp_compile_scope() {
+    if query
+        .universe
+        .has_complete_compile_scope(query.language.key)
+    {
         let mut inputs = query.universe.compile_files.clone();
         inputs.extend(query.anchor_file.iter().cloned());
         inputs.extend(definitions.iter().map(|definition| definition.file.clone()));
@@ -1154,6 +1223,14 @@ fn execute_inner(
     deadline: QueryDeadline,
 ) -> Result<QueryOutcome, SymbolFailure> {
     let query = resolve_query(command)?;
+    execute_inner_resolved(command, &query, deadline)
+}
+
+fn execute_inner_resolved(
+    command: &SymbolCommand,
+    query: &ResolvedQuery,
+    deadline: QueryDeadline,
+) -> Result<QueryOutcome, SymbolFailure> {
     let ResolvedQuery {
         target,
         anchor_file,
@@ -1163,20 +1240,20 @@ fn execute_inner(
         ast_grep,
         language,
     } = query;
-    let phases = scan_phases(command, anchor_file.as_deref(), &universe);
+    let phases = scan_phases(command, anchor_file.as_deref(), universe);
     let mut candidate_file_keys = BTreeSet::new();
     let mut scanned_roots = BTreeSet::new();
     let mut candidates = Vec::new();
     for phase in phases {
         let candidate_files =
-            find_candidate_files(&rg, &target, &phase, &universe, language, deadline)?;
+            find_candidate_files(rg, target, &phase, universe, *language, deadline)?;
         candidate_file_keys.extend(candidate_files.iter().map(|path| normalized_key(path)));
         candidates.extend(scan_candidates(
-            &ast_grep,
-            &target,
+            ast_grep,
+            target,
             &candidate_files,
-            &universe,
-            language,
+            universe,
+            *language,
             deadline,
         )?);
         for root in &universe.roots {
@@ -1187,8 +1264,7 @@ fn execute_inner(
                 scanned_roots.insert(normalized_key(&root.path));
             }
         }
-        if command.language == "csharp"
-            && universe.has_complete_csharp_compile_scope()
+        if universe.has_complete_compile_scope(&command.language)
             && same_path_set(&phase, &universe.compile_files)
         {
             scanned_roots.extend(universe.roots.iter().map(|root| normalized_key(&root.path)));
@@ -1203,10 +1279,10 @@ fn execute_inner(
     }
     finish_definition_outcome(
         command,
-        target,
-        universe,
+        target.clone(),
+        universe.clone(),
         anchor_file.as_deref(),
-        anchor_position,
+        *anchor_position,
         candidate_file_keys,
         scanned_roots,
         candidates,
@@ -1344,12 +1420,14 @@ fn scan_phases(
             .collect()];
     }
     let mut phases = Vec::new();
+    if universe.source_manifest.is_some() {
+        return vec![universe.compile_files.clone()];
+    }
     if let Some(anchor_file) = anchor_file {
         phases.push(vec![anchor_file.to_path_buf()]);
     }
-    let complete_csharp_scope =
-        command.language == "csharp" && universe.has_complete_csharp_compile_scope();
-    if complete_csharp_scope {
+    let complete_compile_scope = universe.has_complete_compile_scope(&command.language);
+    if complete_compile_scope {
         phases.push(universe.compile_files.clone());
     } else {
         let primary = universe
@@ -1368,7 +1446,7 @@ fn scan_phases(
         .filter(|path| !path.starts_with(&universe.project_root))
         .cloned()
         .collect::<Vec<_>>();
-    if !complete_csharp_scope && !external_compile_files.is_empty() {
+    if !complete_compile_scope && !external_compile_files.is_empty() {
         phases.push(external_compile_files);
     }
     let external_compile_directories = universe
@@ -1411,6 +1489,56 @@ fn same_path_set(left: &[PathBuf], right: &[PathBuf]) -> bool {
                 .iter()
                 .map(|path| normalized_key(path))
                 .collect::<BTreeSet<_>>()
+}
+
+fn source_manifest_model_line(universe: &SourceUniverse) -> String {
+    universe
+        .source_manifest
+        .as_ref()
+        .map_or_else(String::new, |manifest| {
+            format!(
+                "manifest {} adapter={} entries={}\n",
+                universe.render_path(&manifest.path),
+                manifest.adapter,
+                manifest.entry_count,
+            )
+        })
+}
+
+fn with_source_manifest_scope(mut scope: Value, universe: &SourceUniverse) -> Value {
+    let Some(manifest) = universe.source_manifest.as_ref() else {
+        return scope;
+    };
+    let Some(fields) = scope.as_object_mut() else {
+        return scope;
+    };
+    fields.insert(
+        "source_manifest".to_owned(),
+        json!({
+            "path": slash_path(&manifest.path),
+            "adapter": manifest.adapter,
+            "entry_count": manifest.entry_count,
+        }),
+    );
+    if !universe.issues.is_empty() && !fields.contains_key("issues") {
+        fields.insert(
+            "issues".to_owned(),
+            Value::Array(
+                universe
+                    .issues
+                    .iter()
+                    .map(|issue| {
+                        json!({
+                            "code": issue.code,
+                            "path": issue.path.as_deref().map(slash_path),
+                            "detail": issue.detail,
+                        })
+                    })
+                    .collect(),
+            ),
+        );
+    }
+    scope
 }
 
 fn path_set_contains_all(superset: &[PathBuf], subset: &[PathBuf]) -> bool {
@@ -2813,6 +2941,7 @@ fn render_references_model(
             remaining,
             outcome.candidate_files
         ));
+        output.push_str(&source_manifest_model_line(&outcome.universe));
         for issue in &outcome.universe.issues {
             let path = issue
                 .path
@@ -2828,6 +2957,136 @@ fn render_references_model(
     Ok(output.into_bytes())
 }
 
+fn render_calls_bundle_model(
+    command: &SymbolCommand,
+    outcome: &CallsBundleOutcome,
+) -> Result<Vec<u8>, SymbolFailure> {
+    let shared_root = outcome
+        .incoming
+        .root
+        .as_ref()
+        .or(outcome.outgoing.root.as_ref());
+    let Some(root) = shared_root else {
+        let identity = if outcome.incoming.root_definition_total == 0 {
+            "semantic-unknown"
+        } else {
+            "ambiguous"
+        };
+        let mut output = format!(
+            "calls both unavailable target={} identity={} definitions={}\n",
+            outcome.target, identity, outcome.incoming.root_definition_total
+        );
+        append_calls_bundle_scope(outcome, &mut output);
+        return Ok(output.into_bytes());
+    };
+    let root_definition = root
+        .definition
+        .as_ref()
+        .ok_or_else(|| SymbolFailure::conversion("call-tree root lost its definition"))?;
+    let mut output = format!(
+        "calls both depth={} max_nodes={}/branch\n{} {}\n",
+        command.depth,
+        command.max_nodes,
+        root.name,
+        locator(&outcome.universe, root_definition)
+    );
+    render_calls_bundle_branch(command, &outcome.incoming, &mut output)?;
+    render_calls_bundle_branch(command, &outcome.outgoing, &mut output)?;
+    append_calls_bundle_scope(outcome, &mut output);
+    Ok(output.into_bytes())
+}
+
+fn render_calls_bundle_branch(
+    command: &SymbolCommand,
+    outcome: &CallsOutcome,
+    output: &mut String,
+) -> Result<(), SymbolFailure> {
+    let root = outcome
+        .root
+        .as_ref()
+        .ok_or_else(|| SymbolFailure::conversion("call-tree branch lost its root"))?;
+    let evidence = if outcome.direction == "incoming" {
+        "lexical-candidate"
+    } else {
+        root.status.as_str()
+    };
+    output.push_str(&format!(
+        "{} nodes={} scan={} evidence={}\n",
+        outcome.direction,
+        outcome.nodes,
+        if outcome.scan_complete {
+            "complete"
+        } else {
+            "prioritized"
+        },
+        evidence
+    ));
+    let mut budget_truncated = false;
+    render_call_children(
+        root,
+        "",
+        root.definition
+            .as_ref()
+            .map(|definition| definition.file.as_path()),
+        output,
+        command.model_token_budget,
+        &outcome.universe,
+        &mut budget_truncated,
+    );
+    if outcome.time_limited {
+        output.push_str(&format!(
+            "@cut direction={} reason=time-budget result=partial recovery=use-depth-1-or-query-a-returned-child-position\n",
+            outcome.direction
+        ));
+    } else if outcome.truncated {
+        output.push_str(&format!(
+            "... {} node budget reached (raise --max-nodes)\n",
+            outcome.direction
+        ));
+    } else if budget_truncated {
+        output.push_str(&format!(
+            "... {} output budget reached (raise --model-token-budget)\n",
+            outcome.direction
+        ));
+    }
+    Ok(())
+}
+
+fn append_calls_bundle_scope(outcome: &CallsBundleOutcome, output: &mut String) {
+    if outcome.universe.status == scope::ScopeStatus::Resolved
+        && outcome.incoming.scan_complete
+        && outcome.outgoing.scan_complete
+    {
+        return;
+    }
+    output.push_str(&format!(
+        "scope {} incoming={} outgoing={}\n",
+        outcome.universe.status.as_str(),
+        if outcome.incoming.scan_complete {
+            "complete"
+        } else {
+            "prioritized"
+        },
+        if outcome.outgoing.scan_complete {
+            "complete"
+        } else {
+            "prioritized"
+        }
+    ));
+    output.push_str(&source_manifest_model_line(&outcome.universe));
+    for issue in &outcome.universe.issues {
+        let path = issue
+            .path
+            .as_deref()
+            .map(|path| outcome.universe.render_path(path))
+            .unwrap_or_else(|| "-".to_owned());
+        output.push_str(&format!(
+            "!scope {} {} {}\n",
+            issue.code, path, issue.detail
+        ));
+    }
+}
+
 fn render_calls_model(
     command: &SymbolCommand,
     outcome: &CallsOutcome,
@@ -2838,11 +3097,34 @@ fn render_calls_model(
         } else {
             "ambiguous"
         };
-        return Ok(format!(
+        let mut output = format!(
             "calls unavailable target={} identity={} definitions={}\n",
             outcome.target, identity, outcome.root_definition_total
-        )
-        .into_bytes());
+        );
+        if outcome.universe.source_manifest.is_some() {
+            output.push_str(&format!(
+                "scope {} scan={}\n",
+                outcome.universe.status.as_str(),
+                if outcome.scan_complete {
+                    "complete"
+                } else {
+                    "prioritized"
+                }
+            ));
+            output.push_str(&source_manifest_model_line(&outcome.universe));
+            for issue in &outcome.universe.issues {
+                let path = issue
+                    .path
+                    .as_deref()
+                    .map(|path| outcome.universe.render_path(path))
+                    .unwrap_or_else(|| "-".to_owned());
+                output.push_str(&format!(
+                    "!scope {} {} {}\n",
+                    issue.code, path, issue.detail
+                ));
+            }
+        }
+        return Ok(output.into_bytes());
     };
     let root_definition = root
         .definition
@@ -2890,6 +3172,20 @@ fn render_calls_model(
                 "prioritized"
             }
         ));
+        if outcome.universe.source_manifest.is_some() {
+            output.push_str(&source_manifest_model_line(&outcome.universe));
+            for issue in &outcome.universe.issues {
+                let path = issue
+                    .path
+                    .as_deref()
+                    .map(|path| outcome.universe.render_path(path))
+                    .unwrap_or_else(|| "-".to_owned());
+                output.push_str(&format!(
+                    "!scope {} {} {}\n",
+                    issue.code, path, issue.detail
+                ));
+            }
+        }
     }
     Ok(output.into_bytes())
 }
@@ -2993,10 +3289,8 @@ fn render_calls_machine(
             .as_ref()
             .map_or("semantic-unknown", |root| root.status.as_str())
     };
-    let document = json!({
-        "schema": "srcq.symbol.calls/v1",
-        "query": {"target": outcome.target, "language": command.language, "direction": outcome.direction},
-        "scope": {
+    let scope = with_source_manifest_scope(
+        json!({
             "status": outcome.universe.status.as_str(),
             "candidate_scan": if outcome.scan_complete { "complete" } else { "prioritized" },
             "roots": outcome.universe.roots.iter().map(|root| json!({
@@ -3004,13 +3298,105 @@ fn render_calls_machine(
                 "path": slash_path(&root.path),
                 "source": root.source,
             })).collect::<Vec<_>>(),
-        },
+        }),
+        &outcome.universe,
+    );
+    let document = json!({
+        "schema": "srcq.symbol.calls/v1",
+        "query": {"target": outcome.target, "language": command.language, "direction": outcome.direction},
+        "scope": scope,
         "root_definition_total": outcome.root_definition_total,
         "nodes": outcome.nodes,
         "truncated": outcome.truncated,
         "time_limited": outcome.time_limited,
         "root": outcome.root.as_ref().map(|root| machine_call_node(root, &outcome.universe)),
         "evidence": evidence,
+    });
+    serde_json::to_vec(&document)
+        .map(|mut bytes| {
+            bytes.push(b'\n');
+            bytes
+        })
+        .map_err(|error| {
+            SymbolFailure::conversion(format!("cannot encode machine output: {error}"))
+        })
+}
+
+fn calls_branch_document(outcome: &CallsOutcome) -> Value {
+    let evidence = if outcome.direction == "incoming" {
+        "lexical-candidate"
+    } else {
+        outcome
+            .root
+            .as_ref()
+            .map_or("semantic-unknown", |root| root.status.as_str())
+    };
+    let exit_code = if outcome.time_limited {
+        124
+    } else if outcome.root.is_some() {
+        0
+    } else {
+        1
+    };
+    json!({
+        "direction": outcome.direction,
+        "nodes": outcome.nodes,
+        "truncated": outcome.truncated,
+        "time_limited": outcome.time_limited,
+        "scan": if outcome.scan_complete { "complete" } else { "prioritized" },
+        "exit_code": exit_code,
+        "evidence": evidence,
+        "children": outcome.root.as_ref().map(|root| root.children.iter()
+            .map(|child| machine_call_node(child, &outcome.universe))
+            .collect::<Vec<_>>()),
+    })
+}
+
+fn render_calls_bundle_machine(
+    command: &SymbolCommand,
+    outcome: &CallsBundleOutcome,
+) -> Result<Vec<u8>, SymbolFailure> {
+    let shared_root = outcome
+        .incoming
+        .root
+        .as_ref()
+        .or(outcome.outgoing.root.as_ref());
+    let mut root = shared_root.map(|root| machine_call_node(root, &outcome.universe));
+    if let Some(fields) = root.as_mut().and_then(Value::as_object_mut) {
+        fields.remove("children");
+    }
+    let scope = with_source_manifest_scope(
+        json!({
+            "status": outcome.universe.status.as_str(),
+            "roots": outcome.universe.roots.iter().map(|root| json!({
+                "alias": root.alias,
+                "path": slash_path(&root.path),
+                "source": root.source,
+            })).collect::<Vec<_>>(),
+        }),
+        &outcome.universe,
+    );
+    let document = json!({
+        "schema": "srcq.symbol.calls/bundle/v1",
+        "query": {
+            "target": outcome.target,
+            "language": command.language,
+            "direction": "both",
+            "depth": command.depth,
+            "max_nodes": command.max_nodes,
+            "max_nodes_scope": "per-branch",
+            "model_token_budget": command.model_token_budget,
+            "model_token_budget_scope": "bundle",
+            "time_budget_ms": command.time_budget_ms,
+            "time_budget_scope": "bundle",
+        },
+        "scope": scope,
+        "root_definition_total": outcome.incoming.root_definition_total,
+        "root": root,
+        "branches": {
+            "incoming": calls_branch_document(&outcome.incoming),
+            "outgoing": calls_branch_document(&outcome.outgoing),
+        },
     });
     serde_json::to_vec(&document)
         .map(|mut bytes| {
@@ -3110,15 +3496,19 @@ fn render_references_machine(
             })
         })
         .collect::<Vec<_>>();
-    let document = json!({
-        "schema": "srcq.symbol.references/v1",
-        "query": {"target": outcome.target, "language": command.language},
-        "scope": {
+    let scope = with_source_manifest_scope(
+        json!({
             "status": outcome.universe.status.as_str(),
             "candidate_scan": if outcome.scan_complete { "complete" } else { "prioritized" },
             "roots": roots,
             "issues": issues,
-        },
+        }),
+        &outcome.universe,
+    );
+    let document = json!({
+        "schema": "srcq.symbol.references/v1",
+        "query": {"target": outcome.target, "language": command.language},
+        "scope": scope,
         "candidate_files": outcome.candidate_files,
         "definition_total": outcome.definition_total,
         "reference_total": outcome.reference_total,
@@ -3288,6 +3678,7 @@ fn render_model(command: &SymbolCommand, outcome: &QueryOutcome) -> Result<Vec<u
             outcome.candidate_files,
             definition_evidence(command)
         ));
+        output.push_str(&source_manifest_model_line(&outcome.universe));
         for issue in &outcome.universe.issues {
             let path = issue
                 .path
@@ -3363,13 +3754,8 @@ fn render_machine(
             machine_candidate(&outcome.universe, candidate, definition_evidence(command))
         })
         .collect::<Vec<_>>();
-    let document = json!({
-        "schema": "srcq.symbol.definition/v1",
-        "query": {
-            "target": outcome.target,
-            "language": command.language,
-        },
-        "scope": {
+    let scope = with_source_manifest_scope(
+        json!({
             "status": outcome.universe.status.as_str(),
             "project_root": slash_path(&outcome.universe.project_root),
             "roots": roots,
@@ -3377,7 +3763,16 @@ fn render_machine(
             "issues": issues,
             "compile_file_hints": outcome.universe.compile_files.len(),
             "compile_directory_hints": outcome.universe.compile_directories.len(),
+        }),
+        &outcome.universe,
+    );
+    let document = json!({
+        "schema": "srcq.symbol.definition/v1",
+        "query": {
+            "target": outcome.target,
+            "language": command.language,
         },
+        "scope": scope,
         "candidate_files": outcome.candidate_files,
         "candidate_scan": if outcome.scan_complete { "complete" } else { "prioritized" },
         "definition_total": outcome.definition_total,

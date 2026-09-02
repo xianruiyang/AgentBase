@@ -2,6 +2,8 @@ use std::collections::{BTreeSet, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::{Reader, XmlVersion};
 use serde_json::Value;
 
 use crate::SymbolCommand;
@@ -12,6 +14,8 @@ mod language_project;
 const MAX_METADATA_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_RESPONSE_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_RESPONSE_DEPTH: usize = 16;
+const MAX_MANIFEST_SOURCE_FILES: usize = 100_000;
+const VCXPROJ_DIRECT_ADAPTER: &str = "vcxproj-direct-items/v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ScopeStatus {
@@ -33,6 +37,7 @@ impl ScopeStatus {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum RootSource {
     Explicit,
+    Manifest,
     Project,
     CompileDirectory,
     CompileInclude,
@@ -43,6 +48,7 @@ impl RootSource {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Explicit => "explicit",
+            Self::Manifest => "manifest",
             Self::Project => "project",
             Self::CompileDirectory => "compile_directory",
             Self::CompileInclude => "compile_include",
@@ -52,7 +58,7 @@ impl RootSource {
 
     const fn priority(self) -> u8 {
         match self {
-            Self::Explicit => 0,
+            Self::Explicit | Self::Manifest => 0,
             Self::Project => 1,
             Self::Workspace => 2,
             Self::CompileDirectory => 3,
@@ -83,6 +89,25 @@ pub(crate) struct ScopeIssue {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct SourceManifestInfo {
+    pub(crate) path: PathBuf,
+    pub(crate) adapter: &'static str,
+    pub(crate) entry_count: usize,
+}
+
+struct DirectSourceItem {
+    depth: usize,
+    path: Option<PathBuf>,
+    excluded: bool,
+}
+
+struct ExcludedFromBuildValue {
+    depth: usize,
+    conditional: bool,
+    text: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SourceUniverse {
     pub(crate) cwd: PathBuf,
     pub(crate) project_root: PathBuf,
@@ -93,6 +118,7 @@ pub(crate) struct SourceUniverse {
     pub(crate) excludes: Vec<PathBuf>,
     pub(crate) issues: Vec<ScopeIssue>,
     pub(crate) status: ScopeStatus,
+    pub(crate) source_manifest: Option<SourceManifestInfo>,
 }
 
 impl SourceUniverse {
@@ -124,6 +150,19 @@ impl SourceUniverse {
                 .iter()
                 .all(|path| lower_extension(path).as_deref() == Some("cs"))
     }
+
+    pub(crate) fn has_complete_compile_scope(&self, language: &str) -> bool {
+        if language == "csharp" {
+            return self.has_complete_csharp_compile_scope();
+        }
+        language == "cpp"
+            && self.status == ScopeStatus::Bounded
+            && self
+                .source_manifest
+                .as_ref()
+                .is_some_and(|manifest| manifest.adapter == VCXPROJ_DIRECT_ADAPTER)
+            && !self.compile_files.is_empty()
+    }
 }
 
 pub(crate) fn resolve(
@@ -131,6 +170,9 @@ pub(crate) fn resolve(
     cwd: &Path,
     anchor_file: Option<&Path>,
 ) -> Result<SourceUniverse, String> {
+    if let Some(manifest) = command.source_manifest.as_deref() {
+        return resolve_source_manifest(manifest, cwd);
+    }
     let discovery_start = anchor_file.and_then(Path::parent).unwrap_or(cwd);
     let cwd_project = anchor_file
         .filter(|anchor| anchor.starts_with(cwd))
@@ -228,7 +270,347 @@ pub(crate) fn resolve(
         excludes,
         issues,
         status,
+        source_manifest: None,
     })
+}
+
+fn resolve_source_manifest(manifest: &Path, cwd: &Path) -> Result<SourceUniverse, String> {
+    let manifest = canonical_existing(manifest, cwd, "source manifest")?;
+    if lower_extension(&manifest).as_deref() != Some("vcxproj") {
+        return Err(format!(
+            "unsupported source manifest {}; expected a .vcxproj",
+            manifest.display()
+        ));
+    }
+    let project_root = manifest.parent().unwrap_or(cwd).to_path_buf();
+    let bytes = fs::read(&manifest).map_err(|error| {
+        format!(
+            "cannot read source manifest {}: {error}",
+            manifest.display()
+        )
+    })?;
+    if bytes.len() as u64 > MAX_METADATA_BYTES {
+        return Err(format!(
+            "source manifest exceeds {MAX_METADATA_BYTES} bytes"
+        ));
+    }
+
+    let mut reader = Reader::from_reader(bytes.as_slice());
+    reader.config_mut().trim_text(true);
+    let mut files = Vec::new();
+    let mut issues = Vec::new();
+    let mut depth = 0_usize;
+    let mut item_group_depth = None;
+    let mut item_group_supported = true;
+    let mut direct_item = None::<DirectSourceItem>;
+    let mut excluded_from_build = None::<ExcludedFromBuildValue>;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(event)) => {
+                depth += 1;
+                if event.local_name().as_ref() == b"ItemGroup" {
+                    item_group_depth = Some(depth);
+                    item_group_supported = item_group_is_supported(&event);
+                    if !item_group_supported {
+                        push_manifest_issue(
+                            &mut issues,
+                            &manifest,
+                            "manifest-item-group-conditional",
+                            "conditional or unreadable ItemGroup requires MSBuild evaluation",
+                        );
+                    }
+                } else if is_direct_source_item(&event, depth, item_group_depth)
+                    && item_group_supported
+                {
+                    direct_item = Some(DirectSourceItem {
+                        depth,
+                        path: resolve_direct_item_path(
+                            &event,
+                            &project_root,
+                            &manifest,
+                            &mut issues,
+                        ),
+                        excluded: false,
+                    });
+                } else if event.local_name().as_ref() == b"ExcludedFromBuild"
+                    && direct_item
+                        .as_ref()
+                        .is_some_and(|item| depth == item.depth + 1)
+                {
+                    match exclusion_condition(&event) {
+                        Ok(conditional) => {
+                            excluded_from_build = Some(ExcludedFromBuildValue {
+                                depth,
+                                conditional,
+                                text: String::new(),
+                            });
+                        }
+                        Err(()) => push_manifest_issue(
+                            &mut issues,
+                            &manifest,
+                            "manifest-exclusion-unresolved",
+                            "ExcludedFromBuild attributes are not statically readable",
+                        ),
+                    }
+                }
+            }
+            Ok(Event::Text(event)) => {
+                if let Some(exclusion) = excluded_from_build.as_mut() {
+                    match event.xml_content(XmlVersion::Implicit1_0) {
+                        Ok(text) => exclusion.text.push_str(&text),
+                        Err(error) => push_manifest_issue(
+                            &mut issues,
+                            &manifest,
+                            "manifest-exclusion-unresolved",
+                            error.to_string(),
+                        ),
+                    }
+                }
+            }
+            Ok(Event::Empty(event)) => {
+                depth += 1;
+                if is_direct_source_item(&event, depth, item_group_depth) && item_group_supported {
+                    if let Some(path) =
+                        resolve_direct_item_path(&event, &project_root, &manifest, &mut issues)
+                    {
+                        files.push(path);
+                    }
+                } else if event.local_name().as_ref() == b"ExcludedFromBuild"
+                    && direct_item
+                        .as_ref()
+                        .is_some_and(|item| depth == item.depth + 1)
+                {
+                    push_manifest_issue(
+                        &mut issues,
+                        &manifest,
+                        "manifest-exclusion-unresolved",
+                        "empty ExcludedFromBuild metadata has no static boolean value",
+                    );
+                }
+                depth = depth.saturating_sub(1);
+            }
+            Ok(Event::End(event)) => {
+                if event.local_name().as_ref() == b"ExcludedFromBuild"
+                    && excluded_from_build
+                        .as_ref()
+                        .is_some_and(|value| value.depth == depth)
+                {
+                    if let Some(value) = excluded_from_build.take() {
+                        apply_excluded_from_build(
+                            value,
+                            direct_item.as_mut(),
+                            &manifest,
+                            &mut issues,
+                        );
+                    }
+                }
+                if matches!(event.local_name().as_ref(), b"ClCompile" | b"ClInclude")
+                    && direct_item.as_ref().is_some_and(|item| item.depth == depth)
+                {
+                    if let Some(item) = direct_item.take() {
+                        if !item.excluded {
+                            if let Some(path) = item.path {
+                                files.push(path);
+                            }
+                        }
+                    }
+                }
+                if event.local_name().as_ref() == b"ItemGroup" && item_group_depth == Some(depth) {
+                    item_group_depth = None;
+                    item_group_supported = true;
+                }
+                depth = depth.saturating_sub(1);
+            }
+            Ok(Event::Eof) => break,
+            Err(error) => {
+                push_manifest_issue(
+                    &mut issues,
+                    &manifest,
+                    "manifest-xml-error",
+                    error.to_string(),
+                );
+                break;
+            }
+            _ => {}
+        }
+    }
+    if files.len() > MAX_MANIFEST_SOURCE_FILES {
+        push_manifest_issue(
+            &mut issues,
+            &manifest,
+            "manifest-source-limit",
+            format!("source manifest exceeds {MAX_MANIFEST_SOURCE_FILES} direct items"),
+        );
+        files.truncate(MAX_MANIFEST_SOURCE_FILES);
+    }
+    files.sort_by_key(|path| normalized_key(path));
+    files.dedup_by(|left, right| normalized_key(left) == normalized_key(right));
+    if files.is_empty() {
+        push_manifest_issue(
+            &mut issues,
+            &manifest,
+            "manifest-source-empty",
+            "source manifest contains no usable direct source items",
+        );
+    }
+    let roots = assign_aliases(
+        vec![RootCandidate {
+            path: project_root.clone(),
+            source: RootSource::Manifest,
+            alias_hint: Some("manifest".to_owned()),
+        }],
+        &project_root,
+    );
+    let status = if issues.is_empty() {
+        ScopeStatus::Bounded
+    } else {
+        ScopeStatus::Incomplete
+    };
+    let entry_count = files.len();
+    Ok(SourceUniverse {
+        cwd: cwd.to_path_buf(),
+        project_root,
+        roots,
+        compile_files: files,
+        csharp_compile_scope_resolved: false,
+        compile_directories: Vec::new(),
+        excludes: Vec::new(),
+        issues,
+        status,
+        source_manifest: Some(SourceManifestInfo {
+            path: manifest,
+            adapter: VCXPROJ_DIRECT_ADAPTER,
+            entry_count,
+        }),
+    })
+}
+
+fn item_group_is_supported(event: &BytesStart<'_>) -> bool {
+    event.attributes().all(|attribute| match attribute {
+        Ok(attribute) => attribute.key.local_name().as_ref() != b"Condition",
+        Err(_) => false,
+    })
+}
+
+fn is_direct_source_item(
+    event: &BytesStart<'_>,
+    depth: usize,
+    item_group_depth: Option<usize>,
+) -> bool {
+    matches!(event.local_name().as_ref(), b"ClCompile" | b"ClInclude")
+        && item_group_depth.is_some_and(|group| depth == group + 1)
+}
+
+fn resolve_direct_item_path(
+    event: &BytesStart<'_>,
+    base: &Path,
+    manifest: &Path,
+    issues: &mut Vec<ScopeIssue>,
+) -> Option<PathBuf> {
+    let attributes = event.attributes().collect::<Result<Vec<_>, _>>();
+    let Ok(attributes) = attributes else {
+        push_manifest_issue(
+            issues,
+            manifest,
+            "manifest-direct-item-unsupported",
+            "source item attributes are not readable",
+        );
+        return None;
+    };
+    if attributes.len() != 1 || attributes[0].key.local_name().as_ref() != b"Include" {
+        push_manifest_issue(
+            issues,
+            manifest,
+            "manifest-direct-item-unsupported",
+            "direct source item must have exactly one literal Include attribute",
+        );
+        return None;
+    }
+    let raw = attributes[0].decoded_and_normalized_value(XmlVersion::Implicit1_0, event.decoder());
+    let Ok(raw) = raw else {
+        push_manifest_issue(
+            issues,
+            manifest,
+            "manifest-direct-item-unsupported",
+            "source item Include is not readable",
+        );
+        return None;
+    };
+    if raw.is_empty() || raw.contains(['*', '?', '$', '%']) {
+        push_manifest_issue(
+            issues,
+            manifest,
+            "manifest-direct-item-unresolved",
+            format!("non-literal source item {raw:?}"),
+        );
+        return None;
+    }
+    let candidate = base.join(raw.replace('/', "\\"));
+    match fs::canonicalize(&candidate) {
+        Ok(path) if path.is_file() => Some(path),
+        _ => {
+            push_manifest_issue(
+                issues,
+                &candidate,
+                "manifest-source-missing",
+                "direct source item does not name an existing file",
+            );
+            None
+        }
+    }
+}
+
+fn exclusion_condition(event: &BytesStart<'_>) -> Result<bool, ()> {
+    let mut conditional = false;
+    for attribute in event.attributes() {
+        let attribute = attribute.map_err(|_| ())?;
+        if attribute.key.local_name().as_ref() != b"Condition" {
+            return Err(());
+        }
+        conditional = true;
+    }
+    Ok(conditional)
+}
+
+fn apply_excluded_from_build(
+    value: ExcludedFromBuildValue,
+    item: Option<&mut DirectSourceItem>,
+    manifest: &Path,
+    issues: &mut Vec<ScopeIssue>,
+) {
+    match value.text.trim().to_ascii_lowercase().as_str() {
+        "false" => {}
+        "true" if value.conditional => push_manifest_issue(
+            issues,
+            manifest,
+            "manifest-exclusion-conditional",
+            "conditional ExcludedFromBuild=true requires MSBuild evaluation",
+        ),
+        "true" => {
+            if let Some(item) = item {
+                item.excluded = true;
+            }
+        }
+        _ => push_manifest_issue(
+            issues,
+            manifest,
+            "manifest-exclusion-unresolved",
+            "ExcludedFromBuild must be a static boolean",
+        ),
+    }
+}
+
+fn push_manifest_issue(
+    issues: &mut Vec<ScopeIssue>,
+    path: &Path,
+    code: &'static str,
+    detail: impl Into<String>,
+) {
+    issues.push(ScopeIssue {
+        code,
+        path: Some(path.to_path_buf()),
+        detail: detail.into(),
+    });
 }
 
 fn find_project_root(start: &Path) -> Option<PathBuf> {
@@ -804,6 +1186,7 @@ mod tests {
             add_roots: Vec::new(),
             only_roots: Vec::new(),
             excludes: Vec::new(),
+            source_manifest: None,
             cwd: None,
             language: "cpp".to_owned(),
             body: SymbolBodyMode::Auto,

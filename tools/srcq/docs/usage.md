@@ -58,14 +58,17 @@ srcq query rg defaults --output machine --view grouped -- -n -e $Pattern -- $Tar
 
 优先从 0-based 源码位置调用，目录默认由工具解析：
 
+`--source-manifest` 与 `--direction both` 仅存在于当前仓库未发行候选，正式 0.7.0 Release 和已安装 0.7.0 不包含这两项能力。
+
 ```powershell
 srcq symbol definition --at 'Source/Module/File.cpp:41:9'
 srcq symbol references --at 'Source/Module/File.cpp:41:9'
 srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction outgoing --depth 2
 srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction incoming --depth 2
+srcq symbol calls 'Namespace::Type::Method' --source-manifest '.\Project.vcxproj' --direction both --depth 1
 ```
 
-名称输入只建立候选身份。`--add-root` 追加自动范围，`--only-root` 完全替换，`--exclude` 排除根或子树；三者都可重复。普通 model 输出在唯一小定义时直接给正文，多候选给紧凑清单，调用树对重载、虚调用和动态关系保留 unknown 叶子。只有 `scan=complete` 才覆盖全部选中根，范围完整也不等于符号身份精确。语言适配、外部源码恢复、model/machine schema 与 LSP 升级边界见[快速源码关系](symbol-relations.md)。
+名称输入只建立候选身份。`--add-root` 追加自动范围，`--only-root` 完全替换，`--exclude` 排除根或子树；三者都可重复。`--source-manifest` 使用受支持 adapter 声明的显式源码项，并与这三种目录范围控制互斥。`--direction both` 共享一次范围与根解析，incoming/outgoing 仍分别报告扫描、截断和超时状态。普通 model 输出在唯一小定义时直接给正文，多候选给紧凑清单，调用树对重载、虚调用和动态关系保留 unknown 叶子。只有 `scan=complete` 才覆盖全部选中根，范围完整也不等于符号身份精确。语言适配、外部源码恢复、model/machine schema 与 LSP 升级边界见[快速源码关系](symbol-relations.md)。
 
 ## 搜索、扫描与改写
 

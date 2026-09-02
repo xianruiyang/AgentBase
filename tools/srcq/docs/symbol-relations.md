@@ -2,6 +2,8 @@
 
 `srcq symbol` 在一个只读入口内组合 ripgrep 候选生成与 ast-grep 结构分类，用于低延迟取得定义候选、引用候选和有界调用树。它不实现编译器或 Language Provider，输出中的 `candidate`、`ambiguous` 与 `semantic-unknown` 是证据边界，不是精确语义的弱化文案。
 
+本页的 `--source-manifest`、`--direction both` 和 `srcq.symbol.calls/bundle/v1` 只描述当前仓库未发行候选；正式 0.7.0 Release 和已安装 0.7.0 不包含这些能力。
+
 每次调用都是独立进程，不依赖 VS Code、cpptools 或跨调用索引。默认一次查询共享 7500 ms 后端扫描预算，为范围解析、进程启动和输出保留到端到端 10 秒目标的余量；操作系统调度和存储状态不作绝对时延承诺。预算耗尽会终止当前后端进程树、退出 124，并明确报告结果不完整，不返回伪造的“未找到”；调用树已经取得根和部分节点时会保留它们并输出 `@cut reason=time-budget`。
 
 ## 命令
@@ -13,6 +15,7 @@ srcq symbol definition --at 'Source/Module/File.cpp:41:9'
 srcq symbol references --at 'Source/Module/File.cpp:41:9'
 srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction outgoing --depth 2
 srcq symbol calls --at 'Source/Module/File.cpp:41:9' --direction incoming --depth 2
+srcq symbol calls 'Namespace::Type::Method' --source-manifest '.\Project.vcxproj' --direction both --depth 1
 ```
 
 位置上的 `A::B` 静态限定名会直接保留为查询目标。C++ 成员调用会保留接收者；当当前函数内恰有一个在调用前声明的显式参数或局部变量类型时，输出 `Type::method [typed-member-candidate receiver=object:Type]` 并允许继续解析该候选。C# 还会使用当前词法块或 Lambda/local function 内有效的显式参数/局部变量、`var x = new Type(...)`、当前类型的字段/属性、跨 partial 文件的唯一字段/属性、短属性链及源码内唯一静态类型形成同等级的类型候选。
@@ -28,7 +31,7 @@ srcq symbol definition 'Namespace::Type::Method'
 srcq symbol references Method
 ```
 
-`definition` 的 `--body auto` 在唯一小定义可落入当前模型预算时直接返回完整正文；大定义返回可直接执行的 `@body` 命令；多个定义只列紧凑候选。`references` 排除已识别的声明/定义位置，并按语言能力标记 `call`、`write` 或普通 `reference`。`calls` 只把函数、方法和其他可调用目标作为树节点；类、结构体和变量通过 `definition`/`references` 查询，显式接收者类型和变量名作为调用节点上下文返回，不伪装成调用边。调用树只递归展开唯一的直接或显式类型成员候选；重载、未解析成员分派、虚调用、函数值和其他动态关系保留为带原因的叶子。`--depth` 取 1–8，`--max-nodes` 与 `--model-token-budget` 分别限制遍历和模型输出，达到预算不表示不存在更多关系。
+`definition` 的 `--body auto` 在唯一小定义可落入当前模型预算时直接返回完整正文；大定义返回可直接执行的 `@body` 命令；多个定义只列紧凑候选。`references` 排除已识别的声明/定义位置，并按语言能力标记 `call`、`write` 或普通 `reference`。`calls` 只把函数、方法和其他可调用目标作为树节点；类、结构体和变量通过 `definition`/`references` 查询，显式接收者类型和变量名作为调用节点上下文返回，不伪装成调用边。调用树只递归展开唯一的直接或显式类型成员候选；重载、未解析成员分派、虚调用、函数值和其他动态关系保留为带原因的叶子。`--direction both` 共享一次 query、范围、根定义与总时间预算，再分别生成 incoming/outgoing 分支；`--max-nodes` 是每分支上限，模型 Token 预算覆盖整个 bundle。`--depth` 取 1–8，达到节点、Token 或时间预算不表示不存在更多关系。
 
 ## 范围
 
@@ -43,6 +46,8 @@ TypeScript/TSX/JavaScript 只读消费 `tsconfig.json`/`jsconfig.json` reference
 --only-root PATH   # 只用这些文件或目录，可重复
 --exclude PATH     # 排除根或子树，可重复
 ```
+
+需要直接采用项目文件列出的源码项时，可改用与上述三类目录控制互斥的 `--source-manifest PATH`。首个 `vcxproj-direct-items/v1` adapter 只读取项目文件内直接 `ItemGroup` 下的 `ClCompile`/`ClInclude Include` 和可静态应用的 `ExcludedFromBuild`；不执行 import、属性展开或完整 MSBuild 配置矩阵。通配符、条件 ItemGroup、条件值为 `true` 的排除、缺失、空集、不能直接解析或超过上限都会报告 `scope=incomplete`。静态值 `false` 不会排除该项，条件命中与否都不改变这个结果。`scope=bounded` 只证明完整扫描该 adapter 得到的直接项集合，不证明完整工程编译输入。
 
 范围应匹配符号的实际可见性：`.cpp` 内 helper、匿名命名空间或 `static` 定义优先限定到文件，公开符号才扩大到持有它的模块或源码根。扩大范围会增加同名词法候选和解析成本，不会自动提高身份精度。
 
@@ -98,7 +103,10 @@ model 调用树会压缩同一父节点下完全相同的调用点路径：若�
 - `srcq.symbol.definition/v1`
 - `srcq.symbol.references/v1`
 - `srcq.symbol.calls/v1`
+- `srcq.symbol.calls/bundle/v1`
 - `srcq.symbol.capabilities/v1`
+
+单方向调用继续使用 `srcq.symbol.calls/v1`。bundle 顶层只保存一次共享 query、scope 和 root；`branches.incoming` / `branches.outgoing` 各自保存 `children`、`nodes`、`truncated`、`time_limited`、`scan`、`exit_code` 与 evidence。共享根尚未解析完成前的超时沿用关系查询整体退出 124；共享根成立后的任一分支超时会保留两支各自状态，bundle 整体退出 124。顶层 scope 表示共享选中范围，扫描完整性由各 branch 的 `scan` 判断。
 
 调用节点的 `qualified_name`、`receiver` 与 `receiver_type` 是可空字段：`name` 保持调用者短名，`qualified_name` 只在 AST 外层类型或已解析定义直接证明限定身份时出现，model 树优先显示该限定名；`receiver` 保存源码中的成员接收者，`receiver_type` 只在上述显式源码类型链唯一时出现。它们不证明别名展开、模板实例化、重载选择、扩展方法、继承分派或运行时类型。
 

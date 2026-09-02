@@ -237,7 +237,7 @@ fd model renderer 使用可逆紧凑基数树并合并单子链；rg 按正文�
 
 ## SOL-SQG-018 在既有 calls owner 内实现双向 bundle 与清单 adapter
 
-- 状态: proposed
+- 状态: resolved
 - 解决: GAP-SQG-012
 - 满足: AC-SQG-011, DES-SQG-019, DES-SQG-021, DES-SQG-022
 - 依赖: TSQG-108, TSQG-112
@@ -247,3 +247,5 @@ fd model renderer 使用可逆紧凑基数树并合并单子链；rg 按正文�
 在 `SourceUniverse` 增加 `--source-manifest PATH` 与 adapter 注册，不把 build-system 语法写进公共查询层。首个 vcxproj adapter 只恢复直接源码项，报告格式身份、规范化路径、项数、未解析输入和 `bounded` 完整性；用户提供的限定名与清单共同消除工程范围和同名定义歧义。后续 adapter 只有真实消费者与可证明静态语义时才增加，不把自动最近文件、完整 MSBuild 或语言服务包装成兜底。
 
 实现先通过 schema 兼容、跨语言关系等价、范围边界、Token 投影和受影响 srcq 组件验证。随后才允许在隔离环境运行模型 candidate：一个限定名 bundle 必须替代全部关系搜索，只保留一次有界行为读取；每个冻结代表 case 都须质量不退且实际价格下降。任一 case 反例即拒绝 skill 晋级，不部署、不发行，也不重跑已经失败且输入未变的三组措辞。
+
+正式仓库候选已保持单方向 v1 字节等价，并以独立 bundle/v1 完成 C++、C#、TypeScript 分支还原、FaceCutting3D 93 个直接项的 bounded manifest、共享超时和每分支节点预算验证；FaceCutting3D 的 machine/model 投影相对两次调用分别降低 20.7%/13.8%。后续完整 Control 配对中，触发候选虽保持四次 `13/13` 质量，Candidate 两次实际价格均高于 Control，且两次都发生 manifest 路径失败和行为补查。因此工具方案闭合，skill 晋级按既定门槛拒绝；仓库正式 skill、安装态与部署 payload 不变。

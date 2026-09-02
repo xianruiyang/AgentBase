@@ -56,6 +56,143 @@ fn machine_calls(language: &str, target: &str, file: &str, incoming: bool) -> Va
     serde_json::from_slice(&output.stdout).expect("machine calls JSON")
 }
 
+fn manifest_machine(operation: &str, target: &str, manifest: &Path) -> (Output, Value) {
+    let output = run(&[
+        "symbol",
+        operation,
+        target,
+        "--source-manifest",
+        manifest.to_str().expect("UTF-8 manifest path"),
+        "--output",
+        "machine",
+    ]);
+    let document = serde_json::from_slice(&output.stdout).expect("manifest machine output");
+    (output, document)
+}
+
+fn manifest_issue_codes(document: &Value) -> Vec<&str> {
+    document["scope"]["issues"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|issue| issue["code"].as_str())
+        .collect()
+}
+
+#[test]
+fn explicit_vcxproj_manifest_is_bounded_across_symbol_outputs() {
+    let fixture = tempfile::tempdir().expect("temporary manifest scope");
+    let source = fixture.path().join("source.cpp");
+    fs::write(
+        &source,
+        "struct PointCloudCollider { void RayCastTest() {} };\nvoid Caller() { PointCloudCollider collider; collider.RayCastTest(); }\n",
+    )
+    .expect("source fixture");
+    let manifest = fixture.path().join("sample.vcxproj");
+    fs::write(
+        &manifest,
+        "<Project><ItemGroup Label=\"Sources\"><ClCompile Include=\"source.cpp\" /><ClInclude Include=\"source.cpp\"><ExcludedFromBuild Condition=\"'$(Configuration)' == 'Debug'\">false</ExcludedFromBuild></ClInclude></ItemGroup></Project>",
+    )
+    .expect("manifest fixture");
+
+    for (operation, target) in [
+        ("definition", "PointCloudCollider::RayCastTest"),
+        ("references", "RayCastTest"),
+        ("calls", "PointCloudCollider::RayCastTest"),
+    ] {
+        let (output, document) = manifest_machine(operation, target, &manifest);
+        assert!(
+            output.status.success(),
+            "{operation}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(document["scope"]["status"], "bounded");
+        assert_eq!(
+            document["scope"]["source_manifest"]["adapter"],
+            "vcxproj-direct-items/v1"
+        );
+        assert_eq!(document["scope"]["source_manifest"]["entry_count"], 1);
+        let scan = if operation == "definition" {
+            &document["candidate_scan"]
+        } else {
+            &document["scope"]["candidate_scan"]
+        };
+        assert_eq!(scan, "complete");
+    }
+
+    let bundle = run(&[
+        "symbol",
+        "calls",
+        "PointCloudCollider::RayCastTest",
+        "--source-manifest",
+        manifest.to_str().expect("UTF-8 manifest path"),
+        "--direction",
+        "both",
+        "--output",
+        "machine",
+    ]);
+    assert!(bundle.status.success());
+    let bundle: Value = serde_json::from_slice(&bundle.stdout).expect("manifest bundle output");
+    assert_eq!(bundle["schema"], "srcq.symbol.calls/bundle/v1");
+    assert_eq!(bundle["scope"]["status"], "bounded");
+    assert_eq!(bundle["scope"]["source_manifest"]["entry_count"], 1);
+    assert_eq!(bundle["branches"]["incoming"]["scan"], "complete");
+    assert_eq!(bundle["branches"]["outgoing"]["scan"], "complete");
+}
+
+#[test]
+fn explicit_vcxproj_manifest_rejects_unresolved_direct_items() {
+    let fixture = tempfile::tempdir().expect("temporary manifest failures");
+    fs::write(fixture.path().join("source.cpp"), "void Present() {}\n").expect("source fixture");
+    let manifest = fixture.path().join("sample.vcxproj");
+    let cases = [
+        (
+            "<Project><ItemGroup /></Project>",
+            "manifest-source-empty",
+            0,
+        ),
+        (
+            "<Project><ItemGroup Condition=\"'$(Configuration)' == 'Debug'\"><ClCompile Include=\"source.cpp\" /></ItemGroup></Project>",
+            "manifest-item-group-conditional",
+            0,
+        ),
+        (
+            "<Project><ItemGroup><ClCompile Include=\"*.cpp\" /></ItemGroup></Project>",
+            "manifest-direct-item-unresolved",
+            0,
+        ),
+        (
+            "<Project><ItemGroup><ClCompile Include=\"missing.cpp\" /></ItemGroup></Project>",
+            "manifest-source-missing",
+            0,
+        ),
+        (
+            "<Project><ItemGroup><ClCompile Include=\"source.cpp\"><ExcludedFromBuild>true</ExcludedFromBuild></ClCompile></ItemGroup></Project>",
+            "manifest-source-empty",
+            0,
+        ),
+        (
+            "<Project><ItemGroup><ClCompile Include=\"source.cpp\"><ExcludedFromBuild Condition=\"'$(Configuration)' == 'Debug'\">true</ExcludedFromBuild></ClCompile></ItemGroup></Project>",
+            "manifest-exclusion-conditional",
+            1,
+        ),
+    ];
+
+    for (xml, expected_issue, entry_count) in cases {
+        fs::write(&manifest, xml).expect("manifest variant");
+        let (_, document) = manifest_machine("definition", "Missing", &manifest);
+        assert_eq!(document["scope"]["status"], "incomplete", "{xml}");
+        assert_eq!(
+            document["scope"]["source_manifest"]["entry_count"], entry_count,
+            "{xml}"
+        );
+        assert!(
+            manifest_issue_codes(&document).contains(&expected_issue),
+            "{xml}: {document}"
+        );
+    }
+}
+
 #[test]
 fn cpp_definition_distinguishes_definitions_calls_declarations_and_lexical_owners() {
     let root = fixture_source();
@@ -386,6 +523,8 @@ fn cpp_outgoing_calls_expand_unique_nodes_and_stop_on_cycles_and_ambiguity() {
     assert!(cycle.status.success());
     let cycle: Value = serde_json::from_slice(&cycle.stdout).expect("machine call tree");
     assert_eq!(cycle["schema"], "srcq.symbol.calls/v1");
+    assert!(cycle["scope"].get("source_manifest").is_none());
+    assert!(cycle["scope"].get("issues").is_none());
     assert_eq!(cycle["root"]["children"][0]["status"], "cycle");
 
     let ambiguous = run(&["symbol", "calls", "BuildTool", "--only-root", root]);
@@ -463,6 +602,100 @@ fn cpp_incoming_calls_find_callers_and_stop_on_cycles() {
     let virtual_dispatch =
         String::from_utf8(virtual_dispatch.stdout).expect("UTF-8 virtual incoming tree");
     assert!(virtual_dispatch.contains("dynamic callers [semantic-unknown:virtual-dispatch]"));
+}
+
+#[test]
+fn cpp_bidirectional_calls_bundle_reconstructs_both_v1_roots_and_branch_state() {
+    let root = fixture_source();
+    let root = root.to_str().expect("UTF-8 fixture path");
+    let separate = |direction: &str| {
+        let output = run(&[
+            "symbol",
+            "calls",
+            "Recursive",
+            "--only-root",
+            root,
+            "--direction",
+            direction,
+            "--depth",
+            "3",
+            "--output",
+            "machine",
+        ]);
+        assert!(output.status.success(), "{direction}");
+        serde_json::from_slice::<Value>(&output.stdout).expect("v1 call tree")
+    };
+    let incoming = separate("incoming");
+    let outgoing = separate("outgoing");
+    let bundle = run(&[
+        "symbol",
+        "calls",
+        "Recursive",
+        "--only-root",
+        root,
+        "--direction",
+        "both",
+        "--depth",
+        "3",
+        "--output",
+        "machine",
+    ]);
+    assert!(
+        bundle.status.success(),
+        "{}",
+        String::from_utf8_lossy(&bundle.stderr)
+    );
+    let bundle: Value = serde_json::from_slice(&bundle.stdout).expect("bundle call tree");
+    assert_eq!(bundle["schema"], "srcq.symbol.calls/bundle/v1");
+    assert_eq!(bundle["query"]["direction"], "both");
+    assert_eq!(bundle["query"]["max_nodes_scope"], "per-branch");
+    assert_eq!(bundle["query"]["time_budget_scope"], "bundle");
+
+    for (direction, expected) in [("incoming", incoming), ("outgoing", outgoing)] {
+        let branch = &bundle["branches"][direction];
+        let mut reconstructed = bundle["root"].clone();
+        reconstructed["children"] = branch["children"].clone();
+        assert_eq!(reconstructed, expected["root"], "{direction} root");
+        assert_eq!(branch["nodes"], expected["nodes"], "{direction} nodes");
+        assert_eq!(
+            branch["truncated"], expected["truncated"],
+            "{direction} truncation"
+        );
+        assert_eq!(
+            branch["time_limited"], expected["time_limited"],
+            "{direction} timeout"
+        );
+        assert_eq!(
+            branch["scan"], expected["scope"]["candidate_scan"],
+            "{direction} scan"
+        );
+        assert_eq!(
+            branch["evidence"], expected["evidence"],
+            "{direction} evidence"
+        );
+        assert_eq!(branch["exit_code"], 0, "{direction} exit");
+    }
+
+    let truncated = run(&[
+        "symbol",
+        "calls",
+        "Recursive",
+        "--only-root",
+        root,
+        "--direction",
+        "both",
+        "--depth",
+        "3",
+        "--max-nodes",
+        "1",
+        "--output",
+        "machine",
+    ]);
+    assert!(truncated.status.success());
+    let truncated: Value =
+        serde_json::from_slice(&truncated.stdout).expect("truncated bundle call tree");
+    assert_eq!(truncated["branches"]["incoming"]["truncated"], true);
+    assert_eq!(truncated["branches"]["outgoing"]["truncated"], true);
 }
 
 #[test]
