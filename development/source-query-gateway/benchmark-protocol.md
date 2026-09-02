@@ -17,7 +17,7 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 
 ## 3. 版本化测试内容
 
-既有测试形成以下六个种子 case，原始 prompt 和历史 oracle 已去除机器绝对路径后固化在 [benchmark-corpus-seed.json](benchmark-corpus-seed.json)。`v11.json` 另增两个代表 case，当前共八项。正式 corpus 为每个 case 保存 prompt、工作区角色、答案长度、最小回答合同、结构化事实关系 oracle 和适用源码快照；源码事实或回答合同变化时创建新 corpus 版本，不改写旧结果。
+既有测试形成以下六个种子 case，原始 prompt 和历史 oracle 已去除机器绝对路径后固化在 [benchmark-corpus-seed.json](benchmark-corpus-seed.json)。`v11.json` 增加 C++ 与 TypeScript 两个代表 case，`v14.json` 增加 C# 代表 case；当前 `v18.json` 共九项。正式 corpus 为每个 case 保存 prompt、工作区角色、答案长度、最小回答合同、结构化事实关系 oracle 和适用源码快照；源码事实或回答合同变化时创建新 corpus 版本，不改写旧结果。
 
 | Case ID | 工作区角色 | 查找目标 | 质量重点 |
 | --- | --- | --- | --- |
@@ -30,7 +30,7 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 
 这六项覆盖文件、文本、结构和语义关系，短答案与完整范围，单目标与全集，以及小型/大型项目。正式扩展优先补充 0/1/N/N+1、同文件多目标、重载/嵌套、工具失败回退和 LSP 快/慢/空/失败，不为增加数量复制等价任务。
 
-`v11.json` 在上述种子上增加两个不同项目与机制的代表 case：FaceCutting3D 的 C++ 限定成员、typed receiver、非注释直接调用和公共/私有实现链，以及 OpencodeVsPlugin 的 TypeScript 类方法/局部闭包身份、事件注册/清理与状态过滤。它们用于检验共享查询决策能否跨语言和项目成立，不把某种语法或业务名称写入 skill；扩量只有在代表 case 暴露新的失效机制时进行。
+`v11.json` 在上述种子上增加两个不同项目与机制的代表 case：FaceCutting3D 的 C++ 限定成员、typed receiver、非注释直接调用和公共/私有实现链，以及 OpencodeVsPlugin 的 TypeScript 类方法/局部闭包身份、事件注册/清理与状态过滤；`v14.json` 再加入 VMTSingleMachine 的 C# 采样、校验、缓存与分派链。`v18.json` 不新增业务事实，只把三个代表 case 已要求定位的可调用实体升级为完整实现文件与 1-based inclusive 起止行。它们用于检验共享查询决策能否跨语言和项目成立，不把某种语法或业务名称写入 skill；扩量只有在代表 case 暴露新的失效机制时进行。
 
 历史 runner 的正则 `required` 只作为旧结果的原始 oracle，不进入新正式 corpus。新 oracle 以结构化事实和关系表达，例如“字段属于哪一 DTO”“哪些行是定义、哪些是调用”；`answer_contract.required` 单独定义 prompt 必须显式回答的最小内容，`supporting` 只证明正确性或记录更强表达，不得被 auditor 静默升级为必答字段。语言同义表达由 auditor 裁决，避免把 `[start,end)` 误判为不满足 `end-exclusive`。
 

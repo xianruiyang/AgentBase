@@ -387,6 +387,15 @@ Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次
 
 模型侧先证明只改引用不会被读取：Candidate 为 `12/13、13/13`，Control 为 `13/13、13/13`，且 Candidate 两次价格都更高。强化 description 的单次 preflight 曾以 4 个命令达到 `13/13`，但正式配对中四条答案虽均为 `13/13`，Candidate 价格为 `$0.01385928/$0.01572924`，Control 为 `$0.01075160/$0.01066468`；Candidate ordinary input 为 `37,014/39,869`，Control 为 `24,360/24,063`，并且两次都猜错 manifest 路径、在行为大页后补查。该结果拒绝正式 skill 晋级，不部署、不安装、不发行；完整数据见 [共享 bundle 审计](evidence/audit-result-shared-calls-bundle-v1.json)。
 
+## OBS-SQG-042 v18 已加入工具中立的完整实现范围，位置批量 symbol 未通过资格门槛
+
+- 状态: corpus verified; symbol candidate rejected in qualification
+- 关联: OBS-SQG-039, OBS-SQG-041
+
+`v18.json` 把 C++、C#、TypeScript 三个既有代表题中已要求定位的可调用实体升级为相对文件与 1-based inclusive 完整实现范围，题面不提 `rg`、`symbol`、skill 或其他工具。标准答案先由冻结源码独立审计并写入 oracle；三个工作区快照的语料校验通过。
+
+外部隔离的重复位置批量 definition 原型可覆盖 C++ `3/3`、C# `6/6`、TypeScript `2/3`，但 effect 内局部箭头函数仍不能解析。首个有效 C++ 资格样本中，Control 与 Candidate 均为 `13/13`，Candidate 的价格、Token、请求、耗时和工具项却分别增加 `39.565%`、`64.933%`、`50%`、`23.470%`、`57.143%`；缩减路线仍有不支持参数、help 恢复、重复读取，并因网络退化不具晋级效力。按全指标先资格后扩量的合同，三题各两次没有执行；仓库 srcq、正式 skill、规则、部署与发行均未改变。完整证据见 [v18 完整实现范围审计](evidence/audit-result-v18-definition-range-v1.json)。
+
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
 - 状态: open
