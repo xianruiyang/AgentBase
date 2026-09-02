@@ -495,6 +495,164 @@ class ExperimentTests(unittest.TestCase):
             self.assertEqual(2, len(parsed["tool_items"]))
             self.assertEqual({"command_execution": 1, "mcp_tool_call": 1, "agent_message": 1}, parsed["completed_item_type_counts"])
 
+    def test_app_server_parser_projects_per_request_perfect_retention(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "events.jsonl"
+            first = {
+                "inputTokens": 12_000,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 12_000,
+                "outputTokens": 100,
+                "reasoningOutputTokens": 20,
+                "totalTokens": 12_100,
+            }
+            second = {
+                "inputTokens": 15_000,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 15_000,
+                "outputTokens": 80,
+                "reasoningOutputTokens": 10,
+                "totalTokens": 15_080,
+            }
+            total = {
+                "inputTokens": 27_000,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 27_000,
+                "outputTokens": 180,
+                "reasoningOutputTokens": 30,
+                "totalTokens": 27_180,
+            }
+            events = [
+                {"method": "item/completed", "params": {"item": {
+                    "type": "commandExecution", "command": "srcq rg target", "aggregatedOutput": "hit", "exitCode": 0,
+                }}},
+                {"method": "thread/tokenUsage/updated", "params": {"tokenUsage": {"last": first, "total": first}}},
+                {"method": "thread/tokenUsage/updated", "params": {"tokenUsage": {"last": first, "total": first}}},
+                {"method": "item/completed", "params": {"item": {"type": "agentMessage", "text": "done"}}},
+                {"method": "thread/tokenUsage/updated", "params": {"tokenUsage": {"last": second, "total": total}}},
+                {"method": "turn/completed", "params": {"threadId": "thread-1", "turn": {
+                    "id": "turn-1", "status": "completed",
+                }}},
+            ]
+            path.write_text("\n".join(json.dumps(event) for event in events) + "\n", encoding="utf-8")
+            parsed = MODULE.parse_events(path)
+            self.assertTrue(parsed["usage_complete"])
+            self.assertEqual(2, len(parsed["request_usages"]))
+            self.assertEqual(27_000, parsed["usage_breakdown"]["input_tokens"])
+            self.assertEqual("done", parsed["final_answer"])
+            self.assertEqual("hit", parsed["tool_items"][0]["aggregated_output"])
+            projection = parsed["ideal_cache_projection"]
+            self.assertEqual("available", projection["status"])
+            self.assertEqual(12_000, projection["totals"]["ideal_cache_read_input_tokens"])
+            self.assertEqual(15_000, projection["totals"]["ideal_cache_write_input_tokens"])
+            self.assertEqual(
+                0,
+                MODULE.app_server_usage({
+                    "inputTokens": 1,
+                    "cachedInputTokens": 0,
+                    "outputTokens": 1,
+                    "reasoningOutputTokens": 0,
+                }, 0)["cache_write_input_tokens"],
+            )
+
+    def test_ideal_cache_projection_is_unavailable_for_legacy_or_unproven_prefix(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "legacy.jsonl"
+            path.write_text(json.dumps({"type": "turn.completed", "usage": {
+                "input_tokens": 10,
+                "cached_input_tokens": 4,
+                "cache_write_input_tokens": 2,
+                "output_tokens": 3,
+                "reasoning_output_tokens": 1,
+            }}) + "\n", encoding="utf-8")
+            self.assertEqual(
+                "per_request_usage_unavailable",
+                MODULE.parse_events(path)["ideal_cache_projection"]["reason"],
+            )
+        aggregate = {
+            "input_tokens": 18,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 18,
+            "output_tokens": 2,
+            "reasoning_output_tokens": 0,
+        }
+        projection = MODULE.ideal_cache_projection([
+            {"input_tokens": 10, "cached_input_tokens": 0, "cache_write_input_tokens": 10,
+             "output_tokens": 1, "reasoning_output_tokens": 0, "prefix_epoch": 0},
+            {"input_tokens": 8, "cached_input_tokens": 0, "cache_write_input_tokens": 8,
+             "output_tokens": 1, "reasoning_output_tokens": 0, "prefix_epoch": 0},
+        ], aggregate)
+        self.assertEqual("eligible_prefix_regressed_without_compaction", projection["reason"])
+        projection = MODULE.ideal_cache_projection([
+            {"input_tokens": 10, "cached_input_tokens": 0, "cache_write_input_tokens": 10,
+             "output_tokens": 1, "reasoning_output_tokens": 0, "prefix_epoch": 0},
+            {"input_tokens": 8, "cached_input_tokens": 0, "cache_write_input_tokens": 8,
+             "output_tokens": 1, "reasoning_output_tokens": 0, "prefix_epoch": 1},
+        ], aggregate)
+        self.assertEqual("available", projection["status"])
+        self.assertEqual(2, projection["prefix_epoch_count"])
+
+    def test_app_server_monitor_completes_public_json_rpc_flow(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            script = root / "fake_app_server.py"
+            script.write_text(
+                "import json,sys\n"
+                "usage={'inputTokens':10,'cachedInputTokens':0,'cacheWriteInputTokens':10,'outputTokens':3,'reasoningOutputTokens':1,'totalTokens':13}\n"
+                "for line in sys.stdin:\n"
+                " m=json.loads(line); method=m.get('method')\n"
+                " if method=='initialize': print(json.dumps({'id':m['id'],'result':{}}),flush=True)\n"
+                " elif method=='thread/start': print(json.dumps({'id':m['id'],'result':{'thread':{'id':'thread-1'}}}),flush=True)\n"
+                " elif method=='turn/start':\n"
+                "  print(json.dumps({'id':m['id'],'result':{'turn':{'id':'turn-1'}}}),flush=True)\n"
+                "  print(json.dumps({'method':'item/completed','params':{'item':{'type':'agentMessage','text':'answer'}}}),flush=True)\n"
+                "  print(json.dumps({'method':'thread/tokenUsage/updated','params':{'tokenUsage':{'last':usage,'total':usage}}}),flush=True)\n"
+                "  print(json.dumps({'method':'turn/completed','params':{'threadId':'thread-1','turn':{'id':'turn-1','status':'completed'}}}),flush=True)\n",
+                encoding="utf-8",
+            )
+            stdout = root / "events.jsonl"
+            stderr = root / "stderr.txt"
+            result = MODULE.monitor_app_server(
+                [sys.executable, str(script)],
+                root,
+                os.environ.copy(),
+                stdout,
+                stderr,
+                5,
+                {
+                    "model": "gpt-5.6-luna",
+                    "reasoning_effort": "medium",
+                    "service_tier": "default",
+                    "sandbox": "danger-full-access",
+                },
+                "prompt",
+            )
+            parsed = MODULE.parse_events(stdout)
+            self.assertEqual(0, result["exit_code"])
+            self.assertFalse(result["timed_out"])
+            self.assertTrue(parsed["usage_complete"])
+            self.assertEqual("answer", parsed["final_answer"])
+            self.assertEqual("available", parsed["ideal_cache_projection"]["status"])
+
+    def test_ideal_cache_price_classifies_each_request_threshold(self) -> None:
+        projection = {
+            "status": "available",
+            "requests": [
+                {"input_tokens": 10, "ideal_ordinary_input_tokens": 0,
+                 "ideal_cache_read_input_tokens": 0, "ideal_cache_write_input_tokens": 10,
+                 "output_tokens": 1},
+                {"input_tokens": 300_000, "ideal_ordinary_input_tokens": 0,
+                 "ideal_cache_read_input_tokens": 100_000, "ideal_cache_write_input_tokens": 200_000,
+                 "output_tokens": 2},
+            ],
+        }
+        pricing = MODULE.token_pricing_contract({"model": "gpt-5.6-luna", "service_tier": "default"})
+        price = MODULE.ideal_cache_price(projection, pricing)
+        self.assertTrue(price["available"])
+        self.assertEqual(1, price["short_context_request_count"])
+        self.assertEqual(1, price["long_context_request_count"])
+        self.assertAlmostEqual((12.5 + 6 + 20_000 + 500_000 + 18) * 0.20 / 1_000_000, price["usd"])
+
     def test_usage_breakdown_does_not_double_count_reasoning(self) -> None:
         breakdown = MODULE.normalize_usage({
             "input_tokens": 10,
@@ -551,24 +709,33 @@ class ExperimentTests(unittest.TestCase):
     def test_independent_benchmark_rejects_fast_service_tier(self) -> None:
         MODULE.validate_benchmark_codex({
             "service_tier": "default", "sandbox": "danger-full-access", "transport": "http-only",
+            "client_protocol": "app-server-v2",
         })
         with self.assertRaisesRegex(MODULE.ExperimentError, "service_tier=default"):
             MODULE.validate_benchmark_codex({
                 "service_tier": "fast", "sandbox": "danger-full-access", "transport": "http-only",
+                "client_protocol": "app-server-v2",
             })
         with self.assertRaisesRegex(MODULE.ExperimentError, "sandbox=danger-full-access"):
             MODULE.validate_benchmark_codex({
                 "service_tier": "default", "sandbox": "read-only", "transport": "http-only",
+                "client_protocol": "app-server-v2",
             })
         with self.assertRaisesRegex(MODULE.ExperimentError, "explicit websocket or http-only"):
             MODULE.validate_benchmark_codex({
                 "service_tier": "default", "sandbox": "danger-full-access", "transport": "auto",
+                "client_protocol": "app-server-v2",
+            })
+        with self.assertRaisesRegex(MODULE.ExperimentError, "client_protocol"):
+            MODULE.validate_benchmark_codex({
+                "service_tier": "default", "sandbox": "danger-full-access", "transport": "http-only",
             })
         with self.assertRaisesRegex(MODULE.ExperimentError, "execution identity"):
             MODULE.validate_benchmark_codex({
                 "service_tier": "default",
                 "sandbox": "danger-full-access",
                 "transport": "http-only",
+                "client_protocol": "app-server-v2",
                 "extra_config": ['service_tier="fast"'],
             })
         with self.assertRaisesRegex(MODULE.ExperimentError, "execution identity"):
@@ -576,6 +743,7 @@ class ExperimentTests(unittest.TestCase):
                 "service_tier": "default",
                 "sandbox": "danger-full-access",
                 "transport": "http-only",
+                "client_protocol": "app-server-v2",
                 "extra_config": ['shell_environment_policy.inherit="none"'],
             })
 
@@ -589,6 +757,7 @@ class ExperimentTests(unittest.TestCase):
                 "service_tier": "default",
                 "sandbox": "danger-full-access",
                 "transport": "http-only",
+                "client_protocol": "app-server-v2",
                 "shell_environment_policy": shell_policy_descriptor,
             },
             Path("D:/workspace"),
@@ -659,6 +828,7 @@ class ExperimentTests(unittest.TestCase):
                 "service_tier": "default",
                 "sandbox": "danger-full-access",
                 "transport": "http-only",
+                "client_protocol": "app-server-v2",
             }
             with mock.patch.object(MODULE, "run_capture", return_value=b"codex-cli 1.2.3\n"):
                 identity = MODULE.resolve_codex_identity(raw)
@@ -670,6 +840,8 @@ class ExperimentTests(unittest.TestCase):
                 )
                 with self.assertRaisesRegex(MODULE.ExperimentError, "sha256"):
                     MODULE.resolve_codex_identity({**raw, "executable_sha256": "0" * 64})
+                with self.assertRaisesRegex(MODULE.ExperimentError, "new benchmark preparation"):
+                    MODULE.resolve_codex_identity({**raw, "client_protocol": "exec-json"})
 
     def test_prepare_freezes_initialized_homes_and_declared_workspace_scope(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -722,7 +894,7 @@ class ExperimentTests(unittest.TestCase):
                 "codex": {
                     "executable": str(executable), "model": "gpt-5.6-sol", "reasoning_effort": "medium",
                     "service_tier": "default", "sandbox": "danger-full-access",
-                    "transport": "http-only",
+                    "transport": "http-only", "client_protocol": "app-server-v2",
                 },
                 "repetitions": 1,
                 "seed": 1,
@@ -738,7 +910,7 @@ class ExperimentTests(unittest.TestCase):
                 "executable": str(executable.resolve()), "executable_sha256": MODULE.sha256_file(executable),
                 "executable_size_bytes": executable.stat().st_size, "observed_version": "codex-cli test",
                 "model": "gpt-5.6-sol", "reasoning_effort": "medium", "service_tier": "default",
-                "sandbox": "danger-full-access", "transport": "http-only",
+                "sandbox": "danger-full-access", "transport": "http-only", "client_protocol": "app-server-v2",
                 "shell_environment_policy": MODULE.resolve_shell_environment_policy()[0],
             }
             preflight = {"records": [], "usage_report": {"all": {"run_count": 0}}}

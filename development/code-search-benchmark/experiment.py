@@ -8,9 +8,11 @@ import fnmatch
 import hashlib
 import json
 import os
+import queue
 import random
 import subprocess
 import sys
+import threading
 import time
 import tomllib
 from pathlib import Path
@@ -436,6 +438,8 @@ def validate_benchmark_codex(codex: dict[str, Any]) -> None:
         raise ExperimentError("independent benchmark requires sandbox=danger-full-access")
     if codex.get("transport") not in {"websocket", "http-only"}:
         raise ExperimentError("independent benchmark requires an explicit websocket or http-only transport")
+    if codex.get("client_protocol") not in {"exec-json", "app-server-v2"}:
+        raise ExperimentError("independent benchmark requires client_protocol=exec-json or app-server-v2")
     protected = {
         "approval_policy", "model", "model_provider", "model_reasoning_effort", "sandbox_mode",
         "service_tier", "shell_environment_policy",
@@ -453,6 +457,8 @@ def validate_benchmark_codex(codex: dict[str, Any]) -> None:
 def resolve_codex_identity(raw: dict[str, Any]) -> dict[str, Any]:
     codex = dict(raw)
     validate_benchmark_codex(codex)
+    if codex["client_protocol"] != "app-server-v2":
+        raise ExperimentError("new benchmark preparation requires client_protocol=app-server-v2")
     executable = Path(str(codex.get("executable", ""))).resolve()
     if not executable.is_file():
         raise ExperimentError(f"Codex executable does not exist: {executable}")
@@ -514,6 +520,210 @@ def price_equivalent(breakdown: dict[str, Any], pricing: dict[str, Any]) -> dict
             "lower": scenarios["short_context"]["lower"],
             "upper": scenarios["long_context"]["upper"],
             "exact": None,
+        },
+    }
+
+
+def ideal_cache_projection(
+    request_usages: list[dict[str, Any]],
+    aggregate_usage_value: dict[str, Any],
+) -> dict[str, Any]:
+    base = {
+        "schema": "agentbase.ideal-cache-projection/v1",
+        "scope": "per-subject-cold-start-perfect-prefix-retention",
+        "evidence": "app-server-v2 thread/tokenUsage/updated last/total",
+    }
+    if not request_usages:
+        return {**base, "status": "unavailable", "reason": "per_request_usage_unavailable"}
+
+    aggregate = normalize_usage(aggregate_usage_value)
+    if not aggregate.get("complete") or not aggregate.get("pricing_exact"):
+        return {**base, "status": "unavailable", "reason": "aggregate_usage_incomplete"}
+
+    normalized_requests: list[dict[str, Any]] = []
+    for index, raw in enumerate(request_usages, 1):
+        breakdown = normalize_usage(raw)
+        if not breakdown.get("complete") or not breakdown.get("pricing_exact"):
+            return {
+                **base,
+                "status": "unavailable",
+                "reason": "request_usage_incomplete",
+                "request_index": index,
+            }
+        normalized_requests.append({**raw, "breakdown": breakdown})
+
+    comparable_fields = (
+        "input_tokens",
+        "cache_read_input_tokens",
+        "cache_write_input_tokens",
+        "output_tokens",
+        "reasoning_output_tokens",
+    )
+    request_totals = {
+        field: sum(item["breakdown"][field] for item in normalized_requests)
+        for field in comparable_fields
+    }
+    aggregate_totals = {field: aggregate[field] for field in comparable_fields}
+    if request_totals != aggregate_totals:
+        return {
+            **base,
+            "status": "unavailable",
+            "reason": "request_usage_does_not_reconcile_with_total",
+            "request_totals": request_totals,
+            "aggregate_totals": aggregate_totals,
+        }
+
+    retained_by_epoch: dict[int, int] = {}
+    last_eligible_by_epoch: dict[int, int] = {}
+    projected: list[dict[str, Any]] = []
+    for index, item in enumerate(normalized_requests, 1):
+        breakdown = item["breakdown"]
+        epoch = int(item.get("prefix_epoch", 0))
+        eligible = breakdown["cache_read_input_tokens"] + breakdown["cache_write_input_tokens"]
+        previous_eligible = last_eligible_by_epoch.get(epoch)
+        if previous_eligible is not None and eligible < previous_eligible:
+            return {
+                **base,
+                "status": "unavailable",
+                "reason": "eligible_prefix_regressed_without_compaction",
+                "request_index": index,
+                "prefix_epoch": epoch,
+                "previous_eligible_prefix_tokens": previous_eligible,
+                "eligible_prefix_tokens": eligible,
+            }
+        retained = retained_by_epoch.get(epoch, 0)
+        ideal_read = min(retained, eligible)
+        ideal_write = eligible - ideal_read
+        ideal_ordinary = breakdown["input_tokens"] - eligible
+        projected.append({
+            "request_index": index,
+            "prefix_epoch": epoch,
+            "input_tokens": breakdown["input_tokens"],
+            "observed_cache_read_input_tokens": breakdown["cache_read_input_tokens"],
+            "observed_cache_write_input_tokens": breakdown["cache_write_input_tokens"],
+            "eligible_prefix_tokens": eligible,
+            "ideal_cache_read_input_tokens": ideal_read,
+            "ideal_cache_write_input_tokens": ideal_write,
+            "ideal_ordinary_input_tokens": ideal_ordinary,
+            "output_tokens": breakdown["output_tokens"],
+            "reasoning_output_tokens": breakdown["reasoning_output_tokens"],
+        })
+        retained_by_epoch[epoch] = max(retained, eligible)
+        last_eligible_by_epoch[epoch] = eligible
+
+    totals = {
+        "input_tokens": sum(item["input_tokens"] for item in projected),
+        "observed_cache_read_input_tokens": sum(item["observed_cache_read_input_tokens"] for item in projected),
+        "observed_cache_write_input_tokens": sum(item["observed_cache_write_input_tokens"] for item in projected),
+        "ideal_cache_read_input_tokens": sum(item["ideal_cache_read_input_tokens"] for item in projected),
+        "ideal_cache_write_input_tokens": sum(item["ideal_cache_write_input_tokens"] for item in projected),
+        "ideal_ordinary_input_tokens": sum(item["ideal_ordinary_input_tokens"] for item in projected),
+        "output_tokens": sum(item["output_tokens"] for item in projected),
+        "reasoning_output_tokens": sum(item["reasoning_output_tokens"] for item in projected),
+    }
+    return {
+        **base,
+        "status": "available",
+        "request_count": len(projected),
+        "prefix_epoch_count": len(retained_by_epoch),
+        "requests": projected,
+        "totals": totals,
+    }
+
+
+def ideal_cache_price(projection: dict[str, Any], pricing: dict[str, Any]) -> dict[str, Any]:
+    if projection.get("status") != "available":
+        return {"available": False, "reason": projection.get("reason", "projection_unavailable")}
+    input_price = pricing.get("short_context_uncached_input_usd_per_million")
+    if pricing.get("applicable") is False or not isinstance(input_price, (int, float)):
+        return {"available": False, "reason": "pricing_not_applicable_to_experiment_model"}
+    threshold = int(pricing["long_context_threshold_input_tokens_exclusive"])
+    equivalent_units = 0.0
+    context_counts = {"short_context": 0, "long_context": 0}
+    for request in projection["requests"]:
+        context = "long_context" if request["input_tokens"] > threshold else "short_context"
+        context_counts[context] += 1
+        coefficients = pricing[context]
+        equivalent_units += (
+            request["ideal_ordinary_input_tokens"] * coefficients["ordinary_input"]
+            + request["ideal_cache_read_input_tokens"] * coefficients["cached_input"]
+            + request["ideal_cache_write_input_tokens"] * coefficients["cache_write_input"]
+            + request["output_tokens"] * coefficients["output_including_reasoning"]
+        )
+    return {
+        "available": True,
+        "context_classification": "exact_per_request",
+        "short_context_request_count": context_counts["short_context"],
+        "long_context_request_count": context_counts["long_context"],
+        "short_context_uncached_input_equivalent_tokens": equivalent_units,
+        "usd": equivalent_units * float(input_price) / 1_000_000,
+    }
+
+
+def aggregate_ideal_cache(records: list[dict[str, Any]], pricing: dict[str, Any]) -> dict[str, Any]:
+    environments = sorted({str(record.get("environment", "unknown")) for record in records})
+
+    def aggregate(selected: list[dict[str, Any]]) -> dict[str, Any]:
+        unavailable = [
+            record for record in selected
+            if record.get("ideal_cache_projection", {}).get("status") != "available"
+        ]
+        if unavailable:
+            return {
+                "status": "unavailable",
+                "run_count": len(selected),
+                "unavailable_run_ids": [record["run_id"] for record in unavailable],
+                "reasons": {
+                    record["run_id"]: record.get("ideal_cache_projection", {}).get("reason", "missing")
+                    for record in unavailable
+                },
+            }
+        token_fields = (
+            "input_tokens",
+            "observed_cache_read_input_tokens",
+            "observed_cache_write_input_tokens",
+            "ideal_cache_read_input_tokens",
+            "ideal_cache_write_input_tokens",
+            "ideal_ordinary_input_tokens",
+            "output_tokens",
+            "reasoning_output_tokens",
+        )
+        prices = [record["ideal_cache_price"] for record in selected]
+        price_available = all(price.get("available") for price in prices)
+        return {
+            "status": "available",
+            "run_count": len(selected),
+            "request_count": sum(record["ideal_cache_projection"]["request_count"] for record in selected),
+            "totals": {
+                field: sum(record["ideal_cache_projection"]["totals"][field] for record in selected)
+                for field in token_fields
+            },
+            "price": (
+                {
+                    "available": True,
+                    "context_classification": "exact_per_request",
+                    "short_context_uncached_input_equivalent_tokens": sum(
+                        price["short_context_uncached_input_equivalent_tokens"] for price in prices
+                    ),
+                    "usd": sum(price["usd"] for price in prices),
+                }
+                if price_available
+                else {"available": False, "reason": "pricing_unavailable_for_one_or_more_runs"}
+            ),
+        }
+
+    return {
+        "schema": "agentbase.ideal-cache-report/v1",
+        "semantics": {
+            "scope": "each subject starts cold; all eligible prefix tokens remain cached within a prefix epoch",
+            "source": "distinct app-server-v2 per-request last usage reconciled with cumulative total",
+            "compaction": "contextCompaction starts a new cold prefix epoch",
+            "legacy": "aggregate exec-json usage is unavailable and is never retroactively inferred",
+        },
+        "all": aggregate(records),
+        "by_environment": {
+            name: aggregate([record for record in records if str(record.get("environment", "unknown")) == name])
+            for name in environments
         },
     }
 
@@ -654,7 +864,15 @@ def network_transport_observation(jsonl_path: Path, stderr_path: Path) -> dict[s
         except json.JSONDecodeError:
             continue
         item = event.get("item", {})
-        if event.get("type") in {"error", "turn.failed"} or item.get("type") == "error":
+        params = event.get("params", {})
+        app_item = params.get("item", {}) if isinstance(params, dict) else {}
+        if (
+            event.get("type") in {"error", "turn.failed"}
+            or item.get("type") == "error"
+            or event.get("method") in {"error", "turn/failed"}
+            or "error" in event
+            or app_item.get("type") == "error"
+        ):
             diagnostic_text.append(json.dumps(event, ensure_ascii=False))
     text = "\n".join(diagnostic_text).lower()
     counts = {
@@ -713,6 +931,40 @@ def codex_exec_argv(
     if skip_git_repo_check:
         argv.append("--skip-git-repo-check")
     argv.extend(["--cd", str(workspace), "--color", "never", prompt])
+    return argv
+
+
+def codex_app_server_argv(codex: dict[str, Any]) -> list[str]:
+    argv = [
+        codex["executable"], "app-server", "--listen", "stdio://",
+        "-c", 'approval_policy="never"',
+        "-c", f'model="{codex["model"]}"',
+        "-c", f'model_reasoning_effort="{codex["reasoning_effort"]}"',
+        "-c", f'service_tier="{codex["service_tier"]}"',
+        "-c", f'sandbox_mode="{codex["sandbox"]}"',
+    ]
+    shell_policy_identity = codex.get("shell_environment_policy")
+    if not isinstance(shell_policy_identity, dict) or not isinstance(
+        shell_policy_identity.get("sha256"), str
+    ):
+        raise ExperimentError("Codex shell environment policy identity is missing")
+    for override in codex_shell_environment_overrides(
+        expected_sha256=str(shell_policy_identity["sha256"])
+    ):
+        argv.extend(["-c", override])
+    if codex["transport"] == "http-only":
+        argv.extend([
+            "-c", 'model_provider="agentbase_eval_http"',
+            "-c", 'model_providers.agentbase_eval_http.name="AgentBase ChatGPT HTTP"',
+            "-c", 'model_providers.agentbase_eval_http.base_url="https://chatgpt.com/backend-api/codex"',
+            "-c", 'model_providers.agentbase_eval_http.wire_api="responses"',
+            "-c", "model_providers.agentbase_eval_http.requires_openai_auth=true",
+            "-c", "model_providers.agentbase_eval_http.supports_websockets=false",
+        ])
+    for override in codex.get("extra_config", []):
+        argv.extend(["-c", str(override)])
+    if "project_doc_max_bytes" in codex:
+        argv.extend(["-c", f'project_doc_max_bytes={int(codex["project_doc_max_bytes"])}'])
     return argv
 
 
@@ -781,14 +1033,11 @@ def run_preflights(
         commands = [requirement["command"] for requirement in requirements]
         stdout_path = root / f"{name}.jsonl"
         stderr_path = root / f"{name}.stderr.txt"
-        argv = codex_exec_argv(
+        prompt = PREFLIGHT_PROMPT.format(commands="\n".join(f"- {command}" for command in commands))
+        monitored = monitor_subject(
             codex,
             workspace,
-            PREFLIGHT_PROMPT.format(commands="\n".join(f"- {command}" for command in commands)),
-        )
-        monitored = monitor_command(
-            argv,
-            workspace,
+            prompt,
             codex_environment(environment, runtime_environment),
             stdout_path,
             stderr_path,
@@ -804,6 +1053,7 @@ def run_preflights(
             "network_transport": network_transport_observation(stdout_path, stderr_path),
             "actual_total_tokens": parsed["usage_breakdown"]["actual_total_tokens"],
             "price_equivalent": price_equivalent(parsed["usage_breakdown"], token_pricing_contract(codex)),
+            "ideal_cache_price": ideal_cache_price(parsed["ideal_cache_projection"], token_pricing_contract(codex)),
             "stdout": str(stdout_path.relative_to(output)),
             "stderr": str(stderr_path.relative_to(output)),
         }
@@ -816,6 +1066,7 @@ def run_preflights(
         ),
         "timeout_seconds": timeout_seconds,
         "usage_report": aggregate_usage(records, token_pricing_contract(codex)),
+        "ideal_cache_report": aggregate_ideal_cache(records, token_pricing_contract(codex)),
         "records": records,
     }
 
@@ -951,6 +1202,230 @@ def monitor_command(argv: list[str], cwd: Path, env: dict[str, str], stdout_path
     return {"exit_code": exit_code, "timed_out": timed_out, "elapsed_ms": round((time.perf_counter() - started) * 1000)}
 
 
+def monitor_app_server(
+    argv: list[str],
+    cwd: Path,
+    env: dict[str, str],
+    stdout_path: Path,
+    stderr_path: Path,
+    timeout_seconds: int,
+    codex: dict[str, Any],
+    prompt: str,
+) -> dict[str, Any]:
+    started = time.perf_counter()
+    deadline = started + timeout_seconds
+    timed_out = False
+    completed = False
+    error_text = ""
+    creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    with stderr_path.open("w", encoding="utf-8", newline="\n") as stderr:
+        process = subprocess.Popen(
+            argv,
+            cwd=cwd,
+            env=env,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=stderr,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+            creationflags=creationflags,
+        )
+        assert process.stdin is not None and process.stdout is not None
+        lines: queue.Queue[str | None] = queue.Queue()
+
+        def read_stdout() -> None:
+            assert process.stdout is not None
+            for line in process.stdout:
+                lines.put(line)
+            lines.put(None)
+
+        reader = threading.Thread(target=read_stdout, daemon=True)
+        reader.start()
+
+        def send(payload: dict[str, Any]) -> None:
+            assert process.stdin is not None
+            process.stdin.write(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n")
+            process.stdin.flush()
+
+        with stdout_path.open("w", encoding="utf-8", newline="\n") as stdout:
+            def receive() -> dict[str, Any]:
+                remaining = deadline - time.perf_counter()
+                if remaining <= 0:
+                    raise TimeoutError("app-server request timed out")
+                try:
+                    line = lines.get(timeout=remaining)
+                except queue.Empty as error:
+                    raise TimeoutError("app-server request timed out") from error
+                if line is None:
+                    raise ExperimentError("app-server stdout closed before turn completion")
+                stdout.write(line if line.endswith("\n") else line + "\n")
+                stdout.flush()
+                try:
+                    return json.loads(line)
+                except json.JSONDecodeError as error:
+                    raise ExperimentError("app-server emitted invalid JSON") from error
+
+            def wait_response(request_id: int) -> dict[str, Any]:
+                while True:
+                    message = receive()
+                    if message.get("id") != request_id:
+                        continue
+                    if "error" in message:
+                        raise ExperimentError(
+                            f"app-server request {request_id} failed: "
+                            f"{json.dumps(message['error'], ensure_ascii=False)}"
+                        )
+                    result = message.get("result")
+                    if not isinstance(result, dict):
+                        raise ExperimentError(f"app-server request {request_id} returned no result")
+                    return result
+
+            try:
+                send({
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {"clientInfo": {"name": "agentbase-code-search-benchmark", "version": "1"}},
+                })
+                wait_response(1)
+                send({"method": "initialized"})
+                send({
+                    "id": 2,
+                    "method": "thread/start",
+                    "params": {
+                        "cwd": str(cwd),
+                        "model": codex["model"],
+                        "approvalPolicy": "never",
+                        "sandbox": codex["sandbox"],
+                        "serviceTier": codex["service_tier"],
+                        "ephemeral": True,
+                    },
+                })
+                thread_result = wait_response(2)
+                thread = thread_result.get("thread", {})
+                thread_id = thread.get("id") if isinstance(thread, dict) else None
+                if not isinstance(thread_id, str) or not thread_id:
+                    raise ExperimentError("app-server thread/start returned no thread id")
+                send({
+                    "id": 3,
+                    "method": "turn/start",
+                    "params": {
+                        "threadId": thread_id,
+                        "input": [{"type": "text", "text": prompt}],
+                        "cwd": str(cwd),
+                        "model": codex["model"],
+                        "effort": codex["reasoning_effort"],
+                        "serviceTier": codex["service_tier"],
+                        "approvalPolicy": "never",
+                        "sandboxPolicy": {"type": "dangerFullAccess"},
+                    },
+                })
+                turn_result = wait_response(3)
+                turn = turn_result.get("turn", {})
+                turn_id = turn.get("id") if isinstance(turn, dict) else None
+                if not isinstance(turn_id, str) or not turn_id:
+                    raise ExperimentError("app-server turn/start returned no turn id")
+                while True:
+                    message = receive()
+                    if message.get("method") != "turn/completed":
+                        continue
+                    params = message.get("params", {})
+                    observed_turn = params.get("turn", {}) if isinstance(params, dict) else {}
+                    if params.get("threadId") == thread_id and observed_turn.get("id") == turn_id:
+                        completed = observed_turn.get("status") == "completed"
+                        if not completed:
+                            error_text = f"app-server turn ended with status {observed_turn.get('status')}"
+                        break
+            except TimeoutError as error:
+                timed_out = True
+                error_text = str(error)
+            except (BrokenPipeError, OSError, ExperimentError) as error:
+                error_text = str(error)
+
+        terminate_process_tree(process)
+        reader.join(timeout=2)
+        if process.stdin is not None:
+            process.stdin.close()
+        if process.stdout is not None:
+            process.stdout.close()
+    if error_text:
+        with stderr_path.open("a", encoding="utf-8", newline="\n") as stderr:
+            stderr.write(f"\nagentbase app-server runner: {error_text}\n")
+    return {
+        "exit_code": 0 if completed else (process.returncode if process.returncode not in {None, 0} else 1),
+        "timed_out": timed_out,
+        "elapsed_ms": round((time.perf_counter() - started) * 1000),
+    }
+
+
+def monitor_subject(
+    codex: dict[str, Any],
+    workspace: Path,
+    prompt: str,
+    env: dict[str, str],
+    stdout_path: Path,
+    stderr_path: Path,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    if codex["client_protocol"] == "app-server-v2":
+        return monitor_app_server(
+            codex_app_server_argv(codex),
+            workspace,
+            env,
+            stdout_path,
+            stderr_path,
+            timeout_seconds,
+            codex,
+            prompt,
+        )
+    return monitor_command(
+        codex_exec_argv(codex, workspace, prompt),
+        workspace,
+        env,
+        stdout_path,
+        stderr_path,
+        timeout_seconds,
+    )
+
+
+def app_server_usage(usage: dict[str, Any], prefix_epoch: int) -> dict[str, Any]:
+    mapping = {
+        "inputTokens": "input_tokens",
+        "cachedInputTokens": "cached_input_tokens",
+        "cacheWriteInputTokens": "cache_write_input_tokens",
+        "outputTokens": "output_tokens",
+        "reasoningOutputTokens": "reasoning_output_tokens",
+    }
+    normalized = {target: usage[source] for source, target in mapping.items() if source in usage}
+    normalized.setdefault("cache_write_input_tokens", 0)
+    normalized["prefix_epoch"] = prefix_epoch
+    return normalized
+
+
+def normalize_app_server_item(item: dict[str, Any]) -> dict[str, Any]:
+    type_mapping = {
+        "agentMessage": "agent_message",
+        "commandExecution": "command_execution",
+        "mcpToolCall": "mcp_tool_call",
+        "webSearch": "web_search",
+        "toolSearch": "tool_search",
+        "contextCompaction": "context_compaction",
+    }
+    key_mapping = {
+        "aggregatedOutput": "aggregated_output",
+        "exitCode": "exit_code",
+        "server": "server",
+        "tool": "tool",
+    }
+    normalized = dict(item)
+    normalized["type"] = type_mapping.get(str(item.get("type", "unknown")), str(item.get("type", "unknown")))
+    for source, target in key_mapping.items():
+        if source in item:
+            normalized[target] = item[source]
+    return normalized
+
+
 def parse_events(path: Path) -> dict[str, Any]:
     events = []
     invalid_lines = []
@@ -961,13 +1436,45 @@ def parse_events(path: Path) -> dict[str, Any]:
             events.append(json.loads(line))
         except json.JSONDecodeError:
             invalid_lines.append(number)
-    turns = [event for event in events if event.get("type") == "turn.completed"]
-    messages = [
-        event.get("item", {}).get("text", "")
-        for event in events
-        if event.get("type") == "item.completed" and event.get("item", {}).get("type") == "agent_message"
-    ]
+    legacy_turns = [event for event in events if event.get("type") == "turn.completed"]
+    app_turns = []
     completed_items = [event.get("item", {}) for event in events if event.get("type") == "item.completed"]
+    request_usages: list[dict[str, Any]] = []
+    latest_app_total: dict[str, Any] = {}
+    seen_app_totals: set[tuple[tuple[str, int], ...]] = set()
+    prefix_epoch = 0
+    for event in events:
+        method = event.get("method")
+        params = event.get("params", {})
+        if method == "item/completed" and isinstance(params, dict) and isinstance(params.get("item"), dict):
+            item = normalize_app_server_item(params["item"])
+            completed_items.append(item)
+            if item.get("type") == "context_compaction":
+                prefix_epoch += 1
+        elif method == "thread/tokenUsage/updated" and isinstance(params, dict):
+            token_usage = params.get("tokenUsage", {})
+            if not isinstance(token_usage, dict):
+                continue
+            last = token_usage.get("last", {})
+            total = token_usage.get("total", {})
+            if not isinstance(last, dict) or not isinstance(total, dict):
+                continue
+            normalized_total = app_server_usage(total, prefix_epoch)
+            normalized_last = app_server_usage(last, prefix_epoch)
+            total_identity = tuple(sorted(
+                (key, value) for key, value in normalized_total.items()
+                if key != "prefix_epoch" and isinstance(value, int) and not isinstance(value, bool)
+            ))
+            latest_app_total = normalized_total
+            if total_identity not in seen_app_totals and any(
+                value for key, value in normalized_last.items()
+                if key != "prefix_epoch" and isinstance(value, int) and not isinstance(value, bool)
+            ):
+                seen_app_totals.add(total_identity)
+                request_usages.append(normalized_last)
+        elif method == "turn/completed" and isinstance(params, dict):
+            app_turns.append(params)
+    messages = [item.get("text", "") for item in completed_items if item.get("type") == "agent_message"]
     item_type_counts: dict[str, int] = {}
     for item in completed_items:
         item_type = str(item.get("type", "unknown"))
@@ -978,12 +1485,20 @@ def parse_events(path: Path) -> dict[str, Any]:
         if item.get("type") in {"command_execution", "mcp_tool_call", "web_search", "tool_search"}
         or str(item.get("type", "")).endswith("_tool_call")
     ]
-    usage = turns[-1].get("usage", {}) if turns else {}
+    usage = latest_app_total or (legacy_turns[-1].get("usage", {}) if legacy_turns else {})
+    usage.pop("prefix_epoch", None)
     usage_breakdown = normalize_usage(usage)
-    complete = not invalid_lines and bool(turns) and usage_breakdown["complete"]
+    app_completed = any(
+        isinstance(turn.get("turn"), dict) and turn["turn"].get("status") == "completed"
+        for turn in app_turns
+    )
+    complete = not invalid_lines and (bool(legacy_turns) or app_completed) and usage_breakdown["complete"]
+    projection = ideal_cache_projection(request_usages, usage)
     return {
         "event_count": len(events), "invalid_json_lines": invalid_lines, "usage_complete": complete,
         "usage": usage, "usage_breakdown": usage_breakdown,
+        "request_usages": request_usages,
+        "ideal_cache_projection": projection,
         "final_answer": messages[-1] if messages else "", "tool_items": tools,
         "completed_item_type_counts": item_type_counts,
     }
@@ -1041,9 +1556,16 @@ def run_experiment(experiment_path: Path) -> dict[str, Any]:
         stdout_path = runs_root / f"{run_id}.jsonl"
         stderr_path = runs_root / f"{run_id}.stderr.txt"
         codex = experiment["codex"]
-        argv = codex_exec_argv(codex, workspace, READ_ONLY_PREFIX + case["prompt"])
         env = codex_environment(environment, runtime_environment)
-        monitored = monitor_command(argv, workspace, env, stdout_path, stderr_path, experiment["timeout_seconds"])
+        monitored = monitor_subject(
+            codex,
+            workspace,
+            READ_ONLY_PREFIX + case["prompt"],
+            env,
+            stdout_path,
+            stderr_path,
+            experiment["timeout_seconds"],
+        )
         parsed = parse_events(stdout_path)
         network_transport = network_transport_observation(stdout_path, stderr_path)
         pricing = experiment.get("token_pricing", TOKEN_PRICING)
@@ -1053,6 +1575,7 @@ def run_experiment(experiment_path: Path) -> dict[str, Any]:
             "network_transport": network_transport,
             "actual_total_tokens": parsed["usage_breakdown"]["actual_total_tokens"],
             "price_equivalent": price_equivalent(parsed["usage_breakdown"], pricing),
+            "ideal_cache_price": ideal_cache_price(parsed["ideal_cache_projection"], pricing),
             "stdout": str(stdout_path.relative_to(root)), "stderr": str(stderr_path.relative_to(root)),
         })
     postflight = verify_experiment_identity(experiment)
@@ -1067,6 +1590,15 @@ def run_experiment(experiment_path: Path) -> dict[str, Any]:
         "postflight_failures": postflight,
         "usage_report": aggregate_usage(records, experiment.get("token_pricing", TOKEN_PRICING)),
         "setup_usage_report": experiment["preflight"]["usage_report"],
+        "ideal_cache_report": aggregate_ideal_cache(records, experiment.get("token_pricing", TOKEN_PRICING)),
+        "setup_ideal_cache_report": experiment["preflight"].get("ideal_cache_report", {
+            "schema": "agentbase.ideal-cache-report/v1",
+            "all": {"status": "unavailable", "reason": "legacy_preflight_without_per_request_usage"},
+        }),
+        "ideal_cache_report_including_setup": aggregate_ideal_cache(
+            [*experiment["preflight"]["records"], *records],
+            experiment.get("token_pricing", TOKEN_PRICING),
+        ),
         "usage_report_including_setup": aggregate_usage(
             [*experiment["preflight"]["records"], *records],
             experiment.get("token_pricing", TOKEN_PRICING),
