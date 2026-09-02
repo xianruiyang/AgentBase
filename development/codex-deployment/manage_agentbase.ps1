@@ -957,6 +957,73 @@ function Get-SrcqRuntimePreflight {
     }
 }
 
+function Get-WorkflowCliRuntimePreflight {
+    param(
+        [string]$Root,
+        [bool]$Required
+    )
+    try {
+        $installer = Join-Path $Root 'tools\workflow-cli\scripts\install-workflow-cli.ps1'
+        if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "workflow-cli installer status entry is missing: $installer"
+        }
+        $versionPath = Join-Path $Root 'tools\workflow-cli\VERSION'
+        if (-not (Test-Path -LiteralPath $versionPath -PathType Leaf)) {
+            throw "workflow-cli version source is missing: $versionPath"
+        }
+        $expectedVersion = (Get-Content -LiteralPath $versionPath -Raw -Encoding UTF8).Trim()
+        if ([string]::IsNullOrWhiteSpace($expectedVersion)) { throw 'Cannot read the expected workflow-cli version' }
+
+        $statusText = @(& $installer Status -View Machine 2>&1)
+        $statusExit = $LASTEXITCODE
+        $status = $null
+        try { $status = ($statusText -join [Environment]::NewLine) | ConvertFrom-Json } catch { }
+        if ($statusExit -ne 0 -or $null -eq $status -or -not [bool]$status.ready) {
+            $detail = if ($null -ne $status -and -not [string]::IsNullOrWhiteSpace([string]$status.error)) { [string]$status.error } else { $statusText -join ' ' }
+            throw "workflow-cli runtime is not ready: $detail. Run tools\workflow-cli\scripts\install-workflow-cli.ps1 Install with a validated archive, then retry."
+        }
+        if ([string]$status.version -ne $expectedVersion) { throw "workflow-cli runtime version does not match project version $expectedVersion" }
+        $pathBackend = [string]$status.path.backend
+        $pathReady = $pathBackend -eq 'User' -and [bool]$status.path.entry
+        $pathEntryCount = [int]$status.health.pathCount
+        if (-not $pathReady -or $pathEntryCount -ne 1) { throw 'workflow-cli runtime must have exactly one installer-managed user PATH entry' }
+        $current = [IO.Path]::GetFullPath([string]$status.health.current)
+        foreach ($command in @('workctl', 'taskctl')) {
+            $commandPath = Join-Path $current "$command.cmd"
+            $versionText = @(& $commandPath --version 2>&1)
+            if ($LASTEXITCODE -ne 0 -or @($versionText).Count -ne 1 -or [string]$versionText[0] -ne "$command $expectedVersion") {
+                throw "workflow-cli $command version check failed: $($versionText -join ' ')"
+            }
+        }
+        return [pscustomobject]@{
+            in_scope = $true
+            ready = $true
+            version = $expectedVersion
+            install_root = [string]$status.installRoot
+            current = $current
+            path_backend = $pathBackend
+            path_entry_count = $pathEntryCount
+            workctl_ok = $true
+            taskctl_ok = $true
+        }
+    }
+    catch {
+        if ($Required) { throw }
+        return [pscustomobject]@{
+            in_scope = $true
+            ready = $false
+            version = $null
+            install_root = $null
+            current = $null
+            path_backend = $null
+            path_entry_count = 0
+            workctl_ok = $false
+            taskctl_ok = $false
+            error = $_.Exception.Message
+        }
+    }
+}
+
 if ($Action -eq "Validate") {
     $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $null -IncludePortableSettings $false -DeliveryMode $SkillDeliveryMode
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
@@ -997,6 +1064,11 @@ if ($Action -eq "Status") {
         [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null; scc_doctor_ok = $null; scc_version = $null }
     } else {
         Get-SrcqRuntimePreflight -Root $ProjectRoot -Required $false
+    }
+    $workflowCliRuntime = if (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot) {
+        [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; install_root = $null; current = $null; path_backend = $null; path_entry_count = 0; workctl_ok = $null; taskctl_ok = $null }
+    } else {
+        Get-WorkflowCliRuntimePreflight -Root $ProjectRoot -Required $false
     }
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
     $installedFingerprint = Get-BundleFingerprint -Targets $source.targets -Side installed
@@ -1082,6 +1154,16 @@ if ($Action -eq "Status") {
         srcq_scc_doctor_ok = $srcqRuntime.scc_doctor_ok
         scc_version = $srcqRuntime.scc_version
         srcq_runtime_error = if ($srcqRuntime.PSObject.Properties.Name -contains 'error') { $srcqRuntime.error } else { $null }
+        workflow_cli_runtime_in_scope = [bool]$workflowCliRuntime.in_scope
+        workflow_cli_runtime_ready = $workflowCliRuntime.ready
+        workflow_cli_version = $workflowCliRuntime.version
+        workflow_cli_install_root = $workflowCliRuntime.install_root
+        workflow_cli_current = $workflowCliRuntime.current
+        workflow_cli_path_backend = $workflowCliRuntime.path_backend
+        workflow_cli_path_entry_count = $workflowCliRuntime.path_entry_count
+        workflow_cli_workctl_ok = $workflowCliRuntime.workctl_ok
+        workflow_cli_taskctl_ok = $workflowCliRuntime.taskctl_ok
+        workflow_cli_runtime_error = if ($workflowCliRuntime.PSObject.Properties.Name -contains 'error') { $workflowCliRuntime.error } else { $null }
     }
     Set-AgentBaseResultType -Result $result -Kind Status
     return
@@ -1092,6 +1174,11 @@ if ($Action -eq "Deploy") {
         [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null; scc_doctor_ok = $null; scc_version = $null }
     } else {
         Get-SrcqRuntimePreflight -Root $ProjectRoot -Required $true
+    }
+    $workflowCliRuntime = if (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot) {
+        [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; install_root = $null; current = $null; path_backend = $null; path_entry_count = 0; workctl_ok = $null; taskctl_ok = $null }
+    } else {
+        Get-WorkflowCliRuntimePreflight -Root $ProjectRoot -Required $true
     }
     $previousLifecycleRecord = Get-LatestDeploymentManifest -InstallRoot $CodexRoot -IgnoreDeploymentScope -MinimumSchemaVersion 7
     $previousLifecycleManifest = if ($null -eq $previousLifecycleRecord) { $null } else { $previousLifecycleRecord.document }
@@ -1307,6 +1394,15 @@ if ($Action -eq "Deploy") {
         srcq_doctor_ok = $srcqRuntime.doctor_ok
         srcq_scc_doctor_ok = $srcqRuntime.scc_doctor_ok
         scc_version = $srcqRuntime.scc_version
+        workflow_cli_runtime_preflight_in_scope = [bool]$workflowCliRuntime.in_scope
+        workflow_cli_runtime_ready = $workflowCliRuntime.ready
+        workflow_cli_version = $workflowCliRuntime.version
+        workflow_cli_install_root = $workflowCliRuntime.install_root
+        workflow_cli_current = $workflowCliRuntime.current
+        workflow_cli_path_backend = $workflowCliRuntime.path_backend
+        workflow_cli_path_entry_count = $workflowCliRuntime.path_entry_count
+        workflow_cli_workctl_ok = $workflowCliRuntime.workctl_ok
+        workflow_cli_taskctl_ok = $workflowCliRuntime.taskctl_ok
     }
     Set-AgentBaseResultType -Result $result -Kind Deploy
     return

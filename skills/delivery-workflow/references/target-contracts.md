@@ -20,7 +20,7 @@
 
 ## 确认来源与目标保护
 
-在文档中保留用户确认来源。需要跨轮核对时，可用 `workctl protect` 记录 `confirmed_by=user`、非空 `confirmation_ref`、`cycle_id`、文档指纹和当时 ID。`protected-baseline.json` 只是确认来源的快照元数据；哈希、ID 数量和确认字段不能反向证明目标内容正确或用户已经确认。
+在文档中保留用户确认来源。需要跨轮核对时，可用 `workctl protect` 记录 `confirmed_by=user`、非空 `confirmation_ref`、`cycle_id`、文档指纹和当时 ID。模型提供的 `confirmation_ref` 使用短语义来源（如 `current-user-request`），不复制对话 UUID、哈希或其他机器身份；完整字段只进入 machine 资产，不在 model 回执重复。`protected-baseline.json` 只是确认来源的快照元数据；哈希、ID 数量和确认字段不能反向证明目标内容正确或用户已经确认。
 
 快照与当前 Markdown 不一致时，模型回到用户确认记录裁决当前周期目标。新执行周期可保留旧快照历史；CLI 不签发执行许可，也不因缺少快照替代文档判断。
 

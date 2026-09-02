@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import importlib.util
 import os
@@ -7,11 +8,18 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import uuid
 from argparse import Namespace
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "workctl.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "src" / "workctl.py"
+
+
+def opaque_confirmation_ref() -> str:
+    digest = hashlib.sha256(b"model-surface-canary").hexdigest()
+    marker = uuid.uuid5(uuid.NAMESPACE_URL, "agentbase:model-surface-canary")
+    return f"conversation:{digest}:{marker}"
 
 
 def load_workctl_module():
@@ -202,13 +210,16 @@ class WorkctlTests(unittest.TestCase):
             "--confirmed-by",
             "user",
             "--confirmation-ref",
-            "conversation:confirmed",
+            opaque_confirmation_ref(),
         )
         self.assertEqual(model.returncode, 0, model.stderr)
         self.assertIn("baseline:{status:protected", model.stdout)
         self.assertIn("cycle_id:cycle-001", model.stdout)
         self.assertIn("confirmed_by:user", model.stdout)
-        self.assertIn('confirmation_ref:"conversation:confirmed"', model.stdout)
+        self.assertFalse(
+            "confirmation_ref" in model.stdout,
+            "model output leaked confirmation_ref",
+        )
         self.assertNotIn("path:", model.stdout)
         self.assertNotIn("history_count", model.stdout)
         self.assertNotIn("schema", model.stdout)
@@ -219,6 +230,13 @@ class WorkctlTests(unittest.TestCase):
         )
         self.assertEqual(stored["schema"], "delivery.protected-baseline")
         self.assertIn("documents", stored)
+        machine = self.run_cli("status", "--work-dir", str(self.root))
+        self.assertEqual(machine.returncode, 0, machine.stderr)
+        self.assertTrue(
+            self.payload(machine)["protected_baseline"]["confirmation_ref"]
+            == stored["confirmation_ref"],
+            "machine confirmation_ref did not preserve stored value",
+        )
 
     def test_baseline_issue_model_uses_status_and_deduplicates_status_diagnostics(
         self,
@@ -229,7 +247,7 @@ class WorkctlTests(unittest.TestCase):
             "status": "drifted",
             "cycle_id": "cycle-001",
             "confirmed_by": "user",
-            "confirmation_ref": "conversation:confirmed",
+            "confirmation_ref": opaque_confirmation_ref(),
             "diagnostics": [diagnostic],
         }
         status = module.work_model_projection(
@@ -244,9 +262,9 @@ class WorkctlTests(unittest.TestCase):
             }
         )
         self.assertEqual(status["protected_baseline"]["status"], "drifted")
-        self.assertEqual(
-            status["protected_baseline"]["confirmation_ref"],
-            "conversation:confirmed",
+        self.assertFalse(
+            "confirmation_ref" in status["protected_baseline"],
+            "model baseline projection leaked confirmation_ref",
         )
         self.assertNotIn("aligned", status["protected_baseline"])
         self.assertNotIn("diagnostics", status["protected_baseline"])
@@ -329,6 +347,8 @@ class WorkctlTests(unittest.TestCase):
         self.assertEqual(constrained.returncode, 0, constrained.stderr)
         self.assertIn("more:", constrained.stdout)
         self.assertIn("REQ-001", constrained.stdout)
+        self.assertNotIn("machine", constrained.stdout)
+        self.assertIn("larger --model-token-budget", constrained.stdout)
         self.assertLessEqual(
             module.model_text_cost(constrained.stdout.rstrip()), 256
         )
@@ -409,7 +429,7 @@ class WorkctlTests(unittest.TestCase):
         self.assertEqual(payload["tasks"]["result_diagnostic_count"], 0)
         view = Path(payload["output"]).read_text(encoding="utf-8")
         self.assertIn("确认者：user", view)
-        self.assertIn("确认引用：conversation:confirmed", view)
+        self.assertNotIn("确认引用：", view)
         self.assertIn("## 可修订语义闭合", view)
         self.assertIn("## 任务执行状态", view)
         self.assertIn("无任务", view)

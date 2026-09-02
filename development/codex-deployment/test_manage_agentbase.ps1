@@ -97,10 +97,10 @@ try {
             & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $externalCodexRoot | Out-Null
         }
         catch {
-            $externalPreflightRejected = $_.Exception.Message -match 'srcq runtime is not ready'
+            $externalPreflightRejected = $_.Exception.Message -match '(srcq|workflow-cli) runtime is not ready'
         }
         if (-not $externalPreflightRejected -or (Test-Path -LiteralPath (Join-Path $externalCodexRoot 'AGENTS.md'))) {
-            throw "Deploy did not reject a missing srcq runtime before writing the payload"
+            throw "Deploy did not reject missing host runtimes before writing the payload"
         }
     }
     finally {
@@ -230,6 +230,9 @@ try {
     }
     if ([bool]$defaultDeploy.runtime_prerequisite_in_scope) {
         throw "Deployment sandbox unexpectedly consumed the host srcq installation"
+    }
+    if ([bool]$defaultDeploy.workflow_cli_runtime_preflight_in_scope) {
+        throw "Deployment sandbox unexpectedly consumed the host workflow-cli installation"
     }
     if ([int]$defaultDeploy.retired_managed_path_removed_count -ne $retiredDefaultPaths.Count) {
         throw "Default deploy did not report all retired managed paths"

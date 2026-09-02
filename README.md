@@ -19,6 +19,7 @@ AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、ski
 | [`skills/`](skills/) | 各 skill 的唯一开发真源；触发边界由各 `SKILL.md` frontmatter 定义 |
 | [`mcp/vscode-lsp-mcp/`](mcp/vscode-lsp-mcp/README.md) | VS Code LSP MCP server、companion、协议、安全边界和独立 Windows release |
 | [`tools/srcq/`](tools/srcq/README.md) | Source Query Gateway 源码、测试、Windows 安装器和独立 release |
+| [`tools/workflow-cli/`](tools/workflow-cli/README.md) | `workctl`/`taskctl` 源码、测试、Windows 安装器和独立主机运行时 |
 | [`development/codex-event-logger/`](development/codex-event-logger/) | 对话事件记录 hook 的开发资料；运行脚本仍由对应 skill 所有 |
 | [`development/codex-qq-hook/`](development/codex-qq-hook/) | QQ Webhook 辅助程序与开发资料；运行脚本仍由对应 skill 所有 |
 | [`development/source-query-gateway/`](development/source-query-gateway/plan.md) | 源码查询专项需求、设计、计划和实践证据 |
@@ -42,6 +43,8 @@ AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、ski
 - 运行协作：`codex-event-logger`、`codex-qq-hook`。
 
 `source-query` 统一消费 PATH 中独立安装的 `srcq.exe`：普通文本、文件和源码统计分别直接使用 `srcq rg`、`srcq fd` 与 `srcq scc`；定义、引用和有界调用候选由 `srcq symbol` 内部组合 rg 与 AST，高级投影、续页和语义查询才按需加载 skill；可重复命令基准直接使用独立安装的 `hyperfine`。快速候选仍有会改变结论的真实符号身份、类型、精确引用或层级歧义时，再渐进使用 `vscode-lsp-mcp`。插件包不复制 MCP、`srcq.exe`、scc 或 hyperfine，也不建立第二套安装入口。
+
+`delivery-workflow` 与 `task-table-manager` 统一消费 PATH 中独立安装的 `workctl` 与 `taskctl`；源码、模板和安装状态仍由 `tools/workflow-cli` 维护。主机安装、Codex 部署和组件发行是三个独立生命周期。
 
 组件许可证独立生效：`mcp/vscode-lsp-mcp` 使用 Apache-2.0，`tools/srcq` 使用 MIT OR Apache-2.0。仓库根目前没有统一 `LICENSE`，不能把组件许可证外推为整个 AgentBase 的授权。
 

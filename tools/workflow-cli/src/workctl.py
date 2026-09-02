@@ -29,6 +29,9 @@ MAX_DOCUMENT_BYTES = 4 * 1024 * 1024
 MAX_RECORDS = 20_000
 DEFAULT_MAX_ITEMS = 50
 DEFAULT_MODEL_TOKEN_BUDGET = 2_048
+WORKFLOW_CLI_VERSION = (
+    Path(__file__).resolve().parents[1] / "VERSION"
+).read_text(encoding="utf-8").strip()
 MAX_MANIFEST_TEXT = 2_000
 ID_PATTERN = r"(?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-[A-Za-z0-9][A-Za-z0-9._-]*"
 ID_RE = re.compile(rf"\b({ID_PATTERN})\b")
@@ -286,7 +289,6 @@ def protected_baseline_issue(
             "status": status,
             "cycle_id": value.get("cycle_id"),
             "confirmed_by": value.get("confirmed_by"),
-            "confirmation_ref": value.get("confirmation_ref"),
             "diagnostics": diagnostics if include_diagnostics else None,
         }
     )
@@ -393,7 +395,6 @@ def work_protect_model(payload: dict[str, Any]) -> dict[str, Any]:
                 "status",
                 "cycle_id",
                 "confirmed_by",
-                "confirmation_ref",
                 "protected_ids",
                 "current_target_count",
             )
@@ -489,16 +490,26 @@ def fit_work_model(payload: dict[str, Any], budget: int) -> str:
             for key in ("id", "title", "stage", "document", "line", "status")
             if section.get(key) not in (None, "", [], {})
         }
+    command = payload.get("command")
+    if command in {"context", "impact"}:
+        recovery = "read the returned document and line, narrow the query, or rerun with a larger --model-token-budget"
+    elif isinstance(command, str) and command:
+        recovery = f"rerun {command} with a larger --model-token-budget"
+    else:
+        recovery = "rerun this command with a larger --model-token-budget"
     core["more"] = {
         "reason": "model_token_budget",
-        "recovery": "read the returned document and line, narrow the query, or use --view machine",
+        "recovery": recovery,
     }
     text = render_model(sparse_model_value(core))
     if model_text_cost(text) <= budget:
         return text
     minimal = {
         "id": payload.get("id"),
-        "more": {"reason": "model_token_budget", "view": "machine"},
+        "more": {
+            "reason": "model_token_budget",
+            "recovery": recovery,
+        },
     }
     text = render_model(sparse_model_value(minimal))
     if model_text_cost(text) > budget:
@@ -1172,12 +1183,7 @@ def limit_items(items: list[Any], maximum: int) -> tuple[list[Any], bool]:
 
 
 def task_status_summary(root: Path) -> dict[str, Any]:
-    script_path = (
-        Path(__file__).resolve().parents[2]
-        / "task-table-manager"
-        / "scripts"
-        / "taskctl.py"
-    )
+    script_path = Path(__file__).resolve().with_name("taskctl.py")
     if not script_path.is_file():
         return unavailable_task_summary(
             "task_table_manager_missing", f"task table manager is unavailable: {script_path}"
@@ -1696,7 +1702,6 @@ def render_workspace(args: argparse.Namespace) -> dict[str, Any]:
         f"- 状态：{index['protected_baseline']['status']}",
         f"- 受保护 ID：{index['protected_baseline']['protected_ids']}",
         f"- 确认者：{index['protected_baseline'].get('confirmed_by') or '未记录'}",
-        f"- 确认引用：{index['protected_baseline'].get('confirmation_ref') or '未记录'}",
         "",
         "## 可修订语义闭合",
         "",
@@ -1789,6 +1794,9 @@ def add_common(subparser: argparse.ArgumentParser, *, include_work_dir: bool = T
 
 def build_parser() -> argparse.ArgumentParser:
     parser = JsonArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--version", action="version", version=f"workctl {WORKFLOW_CLI_VERSION}"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="create a delivery workspace")

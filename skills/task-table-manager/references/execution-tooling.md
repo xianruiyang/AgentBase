@@ -6,7 +6,7 @@
 
 `context` 从任务 `source_ids` 沿当前语义引用读取传递祖先，并加入显式引用该闭包、且未在上游中重复出现的 DCR。model 视图保留当前任务合同、结构化执行检查点、直接依赖、必要上游与相关 DCR 正文、异常、恢复信息和 `{ref,count,complete}` 来源收据，不输出完整指纹映射；无 `--capture` 时只提示捕获入口。
 
-`context --capture` 在最终模型 Token 预算确定实际返回正文后保存完整 ID—指纹映射。预算移除正文时同步移除快照成员并标记不完整；输出截断或来源无法唯一定位时先补齐输入并重新捕获，或明确限定结果边界。machine 视图返回完整映射。
+`context --capture` 在最终模型 Token 预算确定实际返回正文后保存完整 ID—指纹映射。预算移除正文时同步移除快照成员并标记不完整；输出截断或来源无法唯一定位时先补齐输入并重新捕获，或明确限定结果边界。model 收据的 `ref` 是按任务递增的持久短句柄（如 `source-T001-1`）；taskctl 在 `snapshots/source-receipts.json` 唯一解析到不可变内容身份，重复捕获相同任务与内容复用句柄，映射缺失或冲突时阻断。machine 视图继续返回完整映射和 `sha256:` 引用。
 
 ## 状态命令
 
@@ -39,9 +39,10 @@ release     清除领取意图并回到 todo
 
 - `evidence_for`：本结果声称支持的 `REQ/AC/UDES/DES/SOL` 等上游 ID。
 - `evidence_refs`：可直接查看的测试、日志、文件、页面或其他证据引用；至少包含 `ref`，可附 `kind` 和 `note`。
-- `source_snapshot_ref`：指向 `context --capture` 生成的内容寻址执行来源映射；模型通过 `complete` 参数传入。
+- `source_snapshot_ref`：永久结果中指向内容寻址执行来源映射的完整机器引用；模型不直接维护。
+- `source_receipt`：model `context --capture` 返回的持久短句柄；模型通过 `complete --source-receipt` 原样传入，CLI 解析后仍只把完整 `source_snapshot_ref` 写入永久结果。
 
-`complete --expected-task-revision <REV> --source-snapshot-ref <REF>` 还必须携带当前 state revision。task/state 两项 CAS 分别证明没有把结果绑定到更新后的任务合同、没有覆盖更新后的执行状态；任一缺少或冲突都在创建结果或新状态前阻断。
+model 使用 `complete --expected-task-revision <REV> --source-receipt <HANDLE>`，machine 消费者可继续使用 `--source-snapshot-ref <REF>`；两者都还必须携带当前 state revision。task/state 两项 CAS 分别证明没有把结果绑定到更新后的任务合同、没有覆盖更新后的执行状态；任一缺少或冲突都在创建结果或新状态前阻断。两种收据同时提供时必须解析为同一快照，否则阻断。
 
 显式收据在写入前必须存在、结构可读且内容身份一致；否则使用 `TASK-INPUT-UNREADABLE` 阻断且不改变结果或状态。未提供收据、覆盖不足和逐来源陈旧只诊断。历史结果后来出现资产异常仍只在读取时诊断并保留历史。
 
@@ -51,7 +52,7 @@ release     清除领取意图并回到 todo
 
 - `TASK-PATH` / `TASK-OVERWRITE`：路径越界、错误目标或破坏性覆盖。
 - `TASK-LOCK` / `TASK-REVISION`：工作区并发写入，或 task/state 的调用方已读 revision 缺失、过期。
-- `TASK-LIMIT` / `TASK-INPUT-UNREADABLE`：输入无法有界解释，或显式 completion 收据不存在、不可读、身份不一致。
+- `TASK-LIMIT` / `TASK-INPUT-UNREADABLE`：输入无法有界解释，或显式 completion 收据不存在、不可读、任务不匹配、身份不一致。
 - `TASK-AMBIGUOUS-TARGET`：状态写入需要唯一 ID，但当前匹配不唯一。
 - `TASK-SNAPSHOT-CONFLICT`：一次捕获或完成输入指定两个不同来源快照，无法证明实际使用版本。
 

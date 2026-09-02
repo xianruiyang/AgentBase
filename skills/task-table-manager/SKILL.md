@@ -18,7 +18,7 @@ description: 低 Token 管理长期任务合同、依赖、状态、结果摘要
 ## 真源与工具
 
 - 创建/修改任务或决定待写真实依赖读 [task-contracts.md](references/task-contracts.md)。[execution.md](references/execution.md) 仅用于推进、恢复或并行领取；查询任务/上下游、裁决下一动作或记录待写依赖，即使涉及失败/阻塞也不读。只设计语义且不查询/写回时不读工具引用；实际查询/写回且 `taskctl` 有净收益时，无需用户点名 CLI，读 [tooling.md](references/tooling.md) 和一项动作族：多任务上下游查询用 [query-tooling.md](references/query-tooling.md)，`init/draft/add/update` 用 [authoring-tooling.md](references/authoring-tooling.md)，判断待写依赖不读；`context`、状态命令和 `complete` 用 [execution-tooling.md](references/execution-tooling.md)，`completion-context` 用 [completion-tooling.md](references/completion-tooling.md)。明确回写任务状态、证据前沿或 `next_action` 即选状态命令，跨族才组合。
-- 工具入口是 `<SkillDir>/scripts/taskctl.py`。只在它能降低编辑、查询或恢复成本时使用，并显式传绝对 `--task-dir`；CLI 不可用时仍按同一文档合同继续。默认 `--view model` 返回当前动作所需的稀疏证据，程序、测试或确需完整身份与字段时显式使用 `--view machine`；两种视图来自同一次任务事实计算，具体字段与恢复入口由当前命令族引用维护。
+- 工具入口是 PATH 中独立安装的 `taskctl`，使用时显式传绝对 `--task-dir`；不可用时按文档合同继续，不从 skill 寻找脚本。默认 `--view model` 返回当前动作的稀疏证据；程序、测试或确需完整身份时才用 `--view machine`。两种视图共享任务事实，字段与恢复入口由命令族引用维护。
 - `task-table.json` 登记目录；`tasks/<ID>.json` 持有任务合同，`state/<ID>.json` 持有执行状态和 CLI 维护的 UTC 起止时间，`results/<ID>.r<state-revision>.json` 持有可追溯的结果摘要，`snapshots/<sha256>.json` 持有内容寻址的不可变执行来源映射，状态文件只指向当前结果。
 - `TASK_TABLE.md` 与 `.work-cache/index.json` 均非真源；生成语义见 [query-tooling.md](references/query-tooling.md)。
 - `add/update` 和全部状态写命令在真源提交后、释放同一工作区锁前刷新 `TASK_TABLE.md`；生成视图失败不得回滚或掩盖已经提交的任务、状态或结果，命令必须返回视图陈旧诊断和显式 `render` 恢复入口。

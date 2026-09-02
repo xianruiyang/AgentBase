@@ -35,11 +35,17 @@ MAX_STRING = 8_000
 DEFAULT_LIMIT = 50
 DEFAULT_BUDGET = 16_000
 DEFAULT_MODEL_TOKEN_BUDGET = 2_048
+WORKFLOW_CLI_VERSION = (
+    Path(__file__).resolve().parents[1] / "VERSION"
+).read_text(encoding="utf-8").strip()
 TASK_ID_RE = re.compile(r"^T[A-Za-z0-9][A-Za-z0-9._-]*$")
 SOURCE_ID_RE = re.compile(
     r"^(?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-[A-Za-z0-9][A-Za-z0-9._-]*$"
 )
 SOURCE_SNAPSHOT_REF_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+SOURCE_RECEIPT_RE = re.compile(r"^source-(T[A-Za-z0-9][A-Za-z0-9._-]*)-([1-9][0-9]*)$")
+REVIEW_RECEIPT_RE = re.compile(r"^review-([1-9][0-9]*)$")
+MAX_REVIEW_RECEIPTS = 32
 STATE_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 STATUSES = ("todo", "claimed", "in_progress", "review", "blocked", "done", "retired")
 ACTIVE_STATUSES = {"claimed", "in_progress", "review", "blocked"}
@@ -309,8 +315,20 @@ def task_status_model(payload: dict[str, Any]) -> dict[str, Any]:
         projected["results"] = results
     for key in ("index_diagnostics", "storage_diagnostics"):
         if payload.get(key):
-            projected[key] = payload[key]
+            projected[key] = model_task_diagnostics(payload[key])
     return projected
+
+
+def model_task_diagnostics(value: Any) -> Any:
+    if isinstance(value, list):
+        return [model_task_diagnostics(item) for item in value]
+    if not isinstance(value, dict):
+        return copy.deepcopy(value)
+    return {
+        key: model_task_diagnostics(item)
+        for key, item in value.items()
+        if key not in {"snapshot_id", "source_snapshot_ref"}
+    }
 
 
 def task_context_model(payload: dict[str, Any]) -> dict[str, Any]:
@@ -327,11 +345,18 @@ def task_context_model(payload: dict[str, Any]) -> dict[str, Any]:
     }
     for key in ("diagnostics", "upstream", "deferred_changes", "source_snapshot"):
         if payload.get(key):
-            projected[key] = sparse_model_value(copy.deepcopy(payload[key]))
+            value = copy.deepcopy(payload[key])
+            if key == "diagnostics":
+                value = model_task_diagnostics(value)
+            projected[key] = sparse_model_value(value)
     dependencies: list[dict[str, Any]] = []
     for dependency in payload.get("dependencies", []):
         row = {
-            key: copy.deepcopy(dependency.get(key))
+            key: (
+                model_task_diagnostics(dependency.get(key))
+                if key == "diagnostics"
+                else copy.deepcopy(dependency.get(key))
+            )
             for key in ("id", "type", "status", "consumes", "diagnostics")
         }
         result = dependency.get("result")
@@ -373,8 +398,8 @@ def task_context_model(payload: dict[str, Any]) -> dict[str, Any]:
 
 def task_completion_model(payload: dict[str, Any]) -> dict[str, Any]:
     projected: dict[str, Any] = {}
-    if payload.get("snapshot_id"):
-        projected["snapshot_id"] = payload["snapshot_id"]
+    if payload.get("review_receipt"):
+        projected["review_receipt"] = payload["review_receipt"]
     counts = {
         "targets": payload.get("target_count", 0),
         "returned_targets": payload.get("returned_target_count", 0),
@@ -395,7 +420,9 @@ def task_completion_model(payload: dict[str, Any]) -> dict[str, Any]:
         if summary:
             projected["diagnostics"] = summary
     if payload.get("query_diagnostics"):
-        projected["query_diagnostics"] = payload["query_diagnostics"]
+        projected["query_diagnostics"] = model_task_diagnostics(
+            payload["query_diagnostics"]
+        )
     if payload.get("targets"):
         projected["targets"] = sparse_model_value(copy.deepcopy(payload["targets"]))
     candidates: dict[str, Any] = {}
@@ -416,6 +443,10 @@ def task_completion_model(payload: dict[str, Any]) -> dict[str, Any]:
             )
         }
         compacted = sparse_model_value(row)
+        if isinstance(compacted, dict) and compacted.get("result_diagnostics"):
+            compacted["result_diagnostics"] = model_task_diagnostics(
+                compacted["result_diagnostics"]
+            )
         if compacted:
             candidates[task_id] = compacted
     if candidates:
@@ -434,7 +465,10 @@ def task_completion_model(payload: dict[str, Any]) -> dict[str, Any]:
             if value not in (None, {}, [])
         }
     if pagination:
-        projected["more"] = {"snapshot_id": payload.get("snapshot_id"), **pagination}
+        projected["more"] = {
+            "review_receipt": payload.get("review_receipt"),
+            **pagination,
+        }
     return sparse_model_value(projected)
 
 
@@ -444,7 +478,7 @@ def add_bounded_issues(
     items_key: str,
     count_key: str,
 ) -> None:
-    items = payload.get(items_key)
+    items = model_task_diagnostics(payload.get(items_key))
     if items:
         projected[items_key] = sparse_model_value(copy.deepcopy(items))
     visible_count = len(items) if isinstance(items, list) else 0
@@ -541,13 +575,15 @@ def task_show_model(payload: dict[str, Any]) -> dict[str, Any]:
         if result.get("source_snapshot"):
             result["source_snapshot_count"] = len(result["source_snapshot"])
             result.pop("source_snapshot", None)
+        if result.pop("source_snapshot_ref", None):
+            result["source_snapshot"] = "captured"
     return sparse_model_value(
         {
             "id": payload.get("id"),
             "task": task,
             "state": state,
             "result": result,
-            "diagnostics": copy.deepcopy(payload.get("diagnostics", [])),
+            "diagnostics": model_task_diagnostics(payload.get("diagnostics", [])),
         }
     )
 
@@ -765,7 +801,7 @@ def compact_active_frontier(
     if omitted_fields:
         projected["more"] = {
             "omitted_or_shortened": sorted(set(omitted_fields)),
-            "recovery": "query this task with context or use --view machine",
+            "recovery": "query this task with context",
         }
     return projected
 
@@ -815,7 +851,7 @@ def task_model_variants(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
             candidate["more"] = {
                 **candidate.get("more", {}),
                 "target_next_after_id": last_id,
-                "snapshot_id": payload.get("snapshot_id"),
+                "review_receipt": payload.get("review_receipt"),
             }
             yield copy.deepcopy(candidate)
     elif command in {"status", "render"}:
@@ -883,7 +919,7 @@ def context_model_receipt_candidate(
         "complete": complete,
     }
     if capture:
-        receipt["ref"] = source_snapshot_record(visible_snapshot)["ref"]
+        receipt["ref"] = f"source-{candidate.get('id', 'T001')}-1"
     else:
         receipt["capture"] = "context --capture"
     projected["source_snapshot"] = receipt
@@ -892,7 +928,7 @@ def context_model_receipt_candidate(
 
 def fit_task_model_with_snapshot(
     payload: dict[str, Any], budget: int, *, capture: bool = False
-) -> tuple[str, dict[str, str] | None]:
+) -> tuple[str, dict[str, str] | None, dict[str, Any] | None]:
     for candidate in task_model_variants(payload):
         snapshot = None
         rendered_candidate = candidate
@@ -902,9 +938,9 @@ def fit_task_model_with_snapshot(
             )
         text = render_model(rendered_candidate)
         if model_text_cost(text) <= budget:
-            return text, snapshot if capture else None
+            return text, snapshot if capture else None, rendered_candidate
     core: dict[str, Any] = {}
-    for key in ("id", "task_id", "snapshot_id", "error", "gate"):
+    for key in ("id", "task_id", "review_receipt", "error", "gate"):
         if payload.get(key) not in (None, "", [], {}):
             core[key] = payload[key]
     task = payload.get("task")
@@ -936,19 +972,19 @@ def fit_task_model_with_snapshot(
         }
     core["more"] = {
         "reason": "model_token_budget",
-        "recovery": "narrow the query, continue with returned cursors, or use --view machine",
+        "recovery": "narrow the query or continue with returned cursors",
     }
     text = render_model(sparse_model_value(core))
     if model_text_cost(text) <= budget:
-        return text, None
+        return text, None, None
     minimal = {
         "id": payload.get("id") or payload.get("task_id"),
-        "more": {"reason": "model_token_budget", "view": "machine"},
+        "more": {"reason": "model_token_budget", "recovery": "narrow the query"},
     }
     text = render_model(sparse_model_value(minimal))
     if model_text_cost(text) > budget:
         raise TaskctlError("--model-token-budget is too small for a recoverable response")
-    return text, None
+    return text, None, None
 
 
 def fit_task_model(payload: dict[str, Any], budget: int) -> str:
@@ -970,22 +1006,19 @@ def emit(
         else:
             text = compact_json(value)
     else:
-        text, snapshot = fit_task_model_with_snapshot(
+        text, snapshot, rendered_candidate = fit_task_model_with_snapshot(
             value,
             model_token_budget,
             capture=capture_snapshot is not None,
         )
         if snapshot is not None and capture_snapshot is not None:
-            expected_ref = source_snapshot_record(snapshot)["ref"]
             actual_ref = capture_snapshot(snapshot)
-            if actual_ref != expected_ref:
-                raise TaskctlError(
-                    "captured source snapshot identity changed during model rendering",
-                    gate_id="TASK-SNAPSHOT-CONFLICT",
-                    risk="the model receipt would identify different evidence from the stored snapshot",
-                    recovery="rerun context --capture from a stable task workspace",
-                    retryable=True,
-                )
+            if rendered_candidate is None:
+                raise TaskctlError("captured model response has no receipt projection")
+            rendered_candidate["source_snapshot"]["ref"] = actual_ref
+            text = render_model(rendered_candidate)
+            if model_text_cost(text) > model_token_budget:
+                raise TaskctlError("--model-token-budget is too small for a recoverable capture receipt")
     stream.write(text + "\n")
 
 
@@ -1244,7 +1277,7 @@ def store_source_snapshot(
         existing = read_json(path)
         if existing != record:
             raise TaskctlError(
-                f"conflicting source snapshot asset: {path}",
+                "conflicting immutable source snapshot asset",
                 gate_id="TASK-OVERWRITE",
                 risk="the same content identity would resolve to different snapshot evidence",
                 recovery="inspect the existing snapshot asset before retrying",
@@ -1252,6 +1285,183 @@ def store_source_snapshot(
     else:
         atomic_write_json(path, record)
     return reference
+
+
+def source_receipt_index_path(root: Path, table: dict[str, Any]) -> Path:
+    return snapshot_directory(root, table) / "source-receipts.json"
+
+
+def load_source_receipt_index(root: Path, table: dict[str, Any]) -> dict[str, Any]:
+    path = source_receipt_index_path(root, table)
+    if not path.exists():
+        return {"schema": "task.source-receipts", "handles": {}, "next_by_task": {}}
+    raw = read_json(path)
+    if (
+        not isinstance(raw, dict)
+        or raw.get("schema") != "task.source-receipts"
+        or not isinstance(raw.get("handles"), dict)
+        or not isinstance(raw.get("next_by_task"), dict)
+    ):
+        raise TaskctlError(
+            "source receipt index is invalid",
+            gate_id="TASK-SNAPSHOT-CONFLICT",
+            risk="a readable receipt could resolve to missing or competing provenance",
+            recovery="inspect and repair the persistent source receipt index before retrying",
+        )
+    seen: dict[tuple[str, str], str] = {}
+    maximum_by_task: dict[str, int] = {}
+    if len(raw["handles"]) > MAX_RECORDS or len(raw["next_by_task"]) > MAX_RECORDS:
+        raise TaskctlError("source receipt index exceeds the supported record limit", gate_id="TASK-LIMIT")
+    for handle, reference in raw["handles"].items():
+        match = SOURCE_RECEIPT_RE.fullmatch(str(handle))
+        if match is None:
+            raise TaskctlError("source receipt index contains an invalid handle", gate_id="TASK-SNAPSHOT-CONFLICT")
+        normalized = normalize_source_snapshot_ref(reference, "source receipt reference")
+        key = (match.group(1), normalized)
+        if key in seen and seen[key] != handle:
+            raise TaskctlError("source receipt index contains competing handles", gate_id="TASK-SNAPSHOT-CONFLICT")
+        seen[key] = str(handle)
+        maximum_by_task[match.group(1)] = max(
+            maximum_by_task.get(match.group(1), 0), int(match.group(2))
+        )
+    for task_id, next_value in raw["next_by_task"].items():
+        if (
+            TASK_ID_RE.fullmatch(str(task_id)) is None
+            or not isinstance(next_value, int)
+            or isinstance(next_value, bool)
+            or next_value < 1
+            or next_value != maximum_by_task.get(str(task_id), 0) + 1
+        ):
+            raise TaskctlError(
+                "source receipt index contains an invalid task sequence",
+                gate_id="TASK-SNAPSHOT-CONFLICT",
+                risk="a new readable receipt could reuse or skip a persistent identity",
+                recovery="inspect and repair the persistent source receipt index before retrying",
+            )
+    if set(maximum_by_task) != set(raw["next_by_task"]):
+        raise TaskctlError("source receipt index is missing a task sequence", gate_id="TASK-SNAPSHOT-CONFLICT")
+    return raw
+
+
+def store_source_receipt(
+    root: Path, table: dict[str, Any], task_id: str, sources: dict[str, str]
+) -> str:
+    reference = store_source_snapshot(root, table, sources)
+    index = load_source_receipt_index(root, table)
+    for handle, existing_ref in index["handles"].items():
+        match = SOURCE_RECEIPT_RE.fullmatch(handle)
+        if match is not None and match.group(1) == task_id and existing_ref == reference:
+            return handle
+    next_value = index["next_by_task"].get(task_id, 1)
+    if not isinstance(next_value, int) or next_value < 1:
+        raise TaskctlError("source receipt sequence is invalid", gate_id="TASK-SNAPSHOT-CONFLICT")
+    handle = f"source-{task_id}-{next_value}"
+    if handle in index["handles"]:
+        raise TaskctlError(
+            "source receipt sequence conflicts with an existing handle",
+            gate_id="TASK-SNAPSHOT-CONFLICT",
+            risk="the new receipt would silently change an existing provenance identity",
+            recovery="inspect and repair the persistent source receipt index before retrying",
+        )
+    index["handles"][handle] = reference
+    index["next_by_task"][task_id] = next_value + 1
+    atomic_write_json(source_receipt_index_path(root, table), index)
+    return handle
+
+
+def resolve_source_receipt(
+    root: Path, table: dict[str, Any], handle: str, task_id: str
+) -> str:
+    match = SOURCE_RECEIPT_RE.fullmatch(require_identity_string(handle, "--source-receipt"))
+    if match is None or match.group(1) != task_id:
+        raise TaskctlError(
+            "source receipt does not identify the completion task",
+            gate_id="TASK-INPUT-UNREADABLE",
+            risk="the completion could bind evidence captured for another task",
+            recovery="use the source receipt returned by context --capture for this task",
+        )
+    index = load_source_receipt_index(root, table)
+    reference = index["handles"].get(handle)
+    if reference is None:
+        raise TaskctlError(
+            f"source receipt is unavailable: {handle}",
+            gate_id="TASK-INPUT-UNREADABLE",
+            risk="the completion provenance cannot be resolved",
+            recovery="recapture this task context and retry with the returned source receipt",
+            retryable=True,
+        )
+    return normalize_source_snapshot_ref(reference, "source receipt reference")
+
+
+def review_receipt_path(root: Path) -> Path:
+    return resolve_inside(root, ".work-cache/taskctl-review-receipts.json")
+
+
+def load_review_receipts(root: Path) -> dict[str, Any]:
+    path = review_receipt_path(root)
+    if not path.exists():
+        return {"schema": "task.review-receipts", "next": 1, "handles": {}}
+    raw = read_json(path)
+    if (
+        not isinstance(raw, dict)
+        or raw.get("schema") != "task.review-receipts"
+        or not isinstance(raw.get("next"), int)
+        or raw["next"] < 1
+        or not isinstance(raw.get("handles"), dict)
+    ):
+        raise TaskctlError(
+            "review receipt cache is invalid",
+            gate_id="TASK-SNAPSHOT-CONFLICT",
+            risk="a review continuation could resolve to competing snapshots",
+            recovery="remove the rebuildable review receipt cache and restart from the first page",
+        )
+    if len(raw["handles"]) > MAX_REVIEW_RECEIPTS:
+        raise TaskctlError("review receipt cache exceeds its retention bound", gate_id="TASK-LIMIT")
+    maximum = 0
+    for handle, reference in raw["handles"].items():
+        match = REVIEW_RECEIPT_RE.fullmatch(str(handle))
+        if match is None:
+            raise TaskctlError("review receipt cache contains an invalid handle", gate_id="TASK-SNAPSHOT-CONFLICT")
+        maximum = max(maximum, int(match.group(1)))
+        normalize_source_snapshot_ref(reference, "review receipt snapshot")
+    if raw["next"] != maximum + 1:
+        raise TaskctlError("review receipt cache sequence is invalid", gate_id="TASK-SNAPSHOT-CONFLICT")
+    return raw
+
+
+def store_review_receipt(root: Path, snapshot_id: str) -> str:
+    cache = load_review_receipts(root)
+    for handle, existing in cache["handles"].items():
+        if existing == snapshot_id:
+            return handle
+    handle = f"review-{cache['next']}"
+    if handle in cache["handles"]:
+        raise TaskctlError("review receipt sequence conflicts with an existing handle", gate_id="TASK-SNAPSHOT-CONFLICT")
+    cache["handles"][handle] = snapshot_id
+    cache["next"] += 1
+    ordered = sorted(
+        cache["handles"].items(),
+        key=lambda item: int(REVIEW_RECEIPT_RE.fullmatch(item[0]).group(1)),
+    )
+    cache["handles"] = dict(ordered[-MAX_REVIEW_RECEIPTS:])
+    atomic_write_json(review_receipt_path(root), cache)
+    return handle
+
+
+def resolve_review_receipt(root: Path, handle: str) -> str:
+    normalized = require_identity_string(handle, "--review-receipt")
+    if REVIEW_RECEIPT_RE.fullmatch(normalized) is None:
+        raise TaskctlError("--review-receipt must be a readable review sequence")
+    reference = load_review_receipts(root)["handles"].get(normalized)
+    if reference is None:
+        raise TaskctlError(
+            f"review receipt is unavailable: {normalized}",
+            gate_id="TASK-PAGINATION-SNAPSHOT",
+            risk="the continuation cannot prove that its cursors belong to the current review snapshot",
+            recovery="restart completion-context from the first page without old cursors",
+            retryable=True,
+        )
+    return normalize_source_snapshot_ref(reference, "review receipt snapshot")
 
 
 def read_source_snapshot(
@@ -1287,7 +1497,7 @@ def read_source_snapshot(
                 "kind": "result_source_snapshot_asset_invalid",
                 "task_id": task_id,
                 "source_snapshot_ref": reference,
-                "message": str(exc),
+                "message": "source snapshot asset is unreadable or invalid",
             }
         ]
 
@@ -1300,8 +1510,7 @@ def require_completion_source_snapshot(
         return
     issue = diagnostics[0]
     raise TaskctlError(
-        "completion source snapshot cannot be resolved: "
-        f"{issue['kind']} ({reference})",
+        f"completion source snapshot cannot be resolved: {issue['kind']}",
         gate_id="TASK-INPUT-UNREADABLE",
         risk="the completion would persist a result with a missing, unreadable, or identity-mismatched provenance asset",
         scope="current completion write",
@@ -2057,12 +2266,7 @@ def ensure_acyclic(tasks: dict[str, dict[str, Any]]) -> list[str]:
 
 
 def rebuild_delivery_index(root: Path) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    script_path = (
-        Path(__file__).resolve().parents[2]
-        / "delivery-workflow"
-        / "scripts"
-        / "workctl.py"
-    )
+    script_path = Path(__file__).resolve().with_name("workctl.py")
     if not script_path.is_file():
         return None, {
             "kind": "delivery_index_builder_missing",
@@ -3643,7 +3847,7 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
     index, index_diagnostics = maybe_load_index(root, table)
     if index is None:
         diagnostics = [*storage_diagnostics, *index_diagnostics]
-        if args.snapshot_id is not None:
+        if args.snapshot_id is not None or args.review_receipt is not None:
             rebuild_message = next(
                 (
                     diagnostic.get("message")
@@ -3706,7 +3910,10 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
             }
         ).encode("utf-8")
     ).hexdigest()
-    if args.snapshot_id is not None and args.snapshot_id != snapshot_id:
+    expected_snapshot_id = args.snapshot_id
+    if args.review_receipt is not None:
+        expected_snapshot_id = resolve_review_receipt(root, args.review_receipt)
+    if expected_snapshot_id is not None and expected_snapshot_id != snapshot_id:
         raise TaskctlError(
             "completion snapshot changed; restart final review from the first page",
             gate_id="TASK-PAGINATION-SNAPSHOT",
@@ -3989,6 +4196,10 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
             "current Markdown targets and candidate evidence are inputs to model review; no final pass or fail is produced"
         ),
     }
+    if args.view == "model":
+        payload["review_receipt"] = (
+            args.review_receipt or store_review_receipt(root, snapshot_id)
+        )
     if args.view == "machine":
         while (
             len(compact_json(shrink_value(payload, 500))) > args.budget
@@ -4508,6 +4719,23 @@ def command_complete(args: argparse.Namespace) -> dict[str, Any]:
             argument_snapshot_ref = normalize_source_snapshot_ref(
                 args.source_snapshot_ref, "--source-snapshot-ref"
             )
+        receipt_snapshot_ref = None
+        if args.source_receipt is not None:
+            receipt_snapshot_ref = resolve_source_receipt(
+                root, table, args.source_receipt, args.id
+            )
+        if (
+            argument_snapshot_ref is not None
+            and receipt_snapshot_ref is not None
+            and argument_snapshot_ref != receipt_snapshot_ref
+        ):
+            raise TaskctlError(
+                "--source-receipt and --source-snapshot-ref resolve to different snapshots",
+                gate_id="TASK-SNAPSHOT-CONFLICT",
+                risk="the completion would mix two competing execution snapshots",
+                recovery="pass one captured source receipt or the matching machine snapshot reference",
+            )
+        argument_snapshot_ref = argument_snapshot_ref or receipt_snapshot_ref
         if inline_snapshot is not None and argument_snapshot_ref is not None:
             raise TaskctlError(
                 "legacy inline source_snapshot cannot be combined with --source-snapshot-ref",
@@ -5111,6 +5339,9 @@ def add_command_parser(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = JsonArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--version", action="version", version=f"taskctl {WORKFLOW_CLI_VERSION}"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = add_command_parser(subparsers, "init", "初始化任务表固定目录和登记文件")
@@ -5193,7 +5424,7 @@ def build_parser() -> argparse.ArgumentParser:
         subparsers,
         "context",
         "取得执行上下文并可捕获来源收据",
-        epilog="示例：taskctl.py context --task-dir <工作目录> --id T001 --capture",
+        epilog="示例：taskctl context --task-dir <工作目录> --id T001 --capture",
     )
     add_common(context_parser)
     context_parser.add_argument("--id", required=True, help="要执行的任务 ID")
@@ -5208,7 +5439,7 @@ def build_parser() -> argparse.ArgumentParser:
         subparsers,
         "completion-context",
         "分页取得最终复核证据，不裁决整体完成",
-        epilog="示例：taskctl.py completion-context --task-dir <工作目录> --target-id T001",
+        epilog="示例：taskctl completion-context --task-dir <工作目录> --target-id T001",
     )
     add_common(completion_parser)
     add_limit(completion_parser)
@@ -5218,6 +5449,7 @@ def build_parser() -> argparse.ArgumentParser:
     completion_parser.add_argument("--constraint-after-id", help="继续约束目录分页")
     completion_parser.add_argument("--deferred-after-id", help="继续延后项目录分页")
     completion_parser.add_argument("--snapshot-id", help="首屏返回的复核快照 ID；后续页必须原样传回")
+    completion_parser.add_argument("--review-receipt", help="model 首屏返回的短复核收据；model 续页必须原样传回")
     completion_parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help="machine JSON 最大字符数（1000—100000）")
     completion_parser.add_argument("--max-items", type=int, default=DEFAULT_LIMIT, help="每类证据最多返回的完整条目数（1—1000）")
     completion_parser.set_defaults(
@@ -5290,14 +5522,15 @@ def build_parser() -> argparse.ArgumentParser:
         subparsers,
         "complete",
         "用 task/state CAS 和来源收据提交结果",
-        epilog="示例：taskctl.py complete --task-dir <工作目录> --id T001 --owner agent-a --result-file result.json --expected-task-revision 3 --expected-state-revision 5",
+        epilog="示例：taskctl complete --task-dir <工作目录> --id T001 --owner agent-a --result-file result.json --expected-task-revision 3 --expected-state-revision 5",
     )
     add_common(complete_parser)
     complete_parser.add_argument("--id", required=True, help="要提交结果的任务 ID")
     complete_parser.add_argument("--owner", required=True, help="必须与当前执行 owner 一致的稳定身份")
     complete_parser.add_argument("--result-file", required=True, help="只含结果语义的 JSON 输入文件；机器身份由 CLI 注入")
     complete_parser.add_argument("--expected-task-revision", type=int, help="执行所依据的 task revision；不匹配时拒绝提交")
-    complete_parser.add_argument("--source-snapshot-ref", help="context --capture 返回的内容寻址来源收据；与结果文件内收据不可并用")
+    complete_parser.add_argument("--source-snapshot-ref", help="machine context --capture 返回的完整内容寻址引用；与结果文件内收据不可并用")
+    complete_parser.add_argument("--source-receipt", help="model context --capture 返回的可读来源收据")
     complete_parser.add_argument("--diagnostic-limit", type=int, default=20, help="最多返回的结果诊断条数（1—1000）")
     add_state_revision(complete_parser)
     complete_parser.set_defaults(handler=command_complete)
@@ -5368,12 +5601,21 @@ def validate_args(args: argparse.Namespace) -> None:
                 args.deferred_after_id,
             )
         )
-        if has_cursor and not args.snapshot_id:
-            raise TaskctlError("completion pagination requires --snapshot-id")
+        continuation_receipt = (
+            args.review_receipt if args.view == "model" else args.snapshot_id
+        )
+        if has_cursor and not continuation_receipt:
+            required = "--review-receipt" if args.view == "model" else "--snapshot-id"
+            raise TaskctlError(f"completion pagination requires {required}")
+        if args.review_receipt is not None and args.snapshot_id is not None:
+            raise TaskctlError("--review-receipt and --snapshot-id cannot be combined")
         target_stream = bool(
             args.after_id is not None
             or args.candidate_after_id is not None
-            or (args.target_id is not None and args.snapshot_id)
+            or (
+                args.target_id is not None
+                and (args.snapshot_id or args.review_receipt)
+            )
         )
         continued_streams = sum(
             (
@@ -5410,7 +5652,9 @@ def main() -> int:
 
             def capture_snapshot(sources: dict[str, str]) -> str:
                 with workspace_lock(root):
-                    return store_source_snapshot(root, load_table(root), sources)
+                    return store_source_receipt(
+                        root, load_table(root), args.id, sources
+                    )
 
         emit(
             result,

@@ -23,7 +23,7 @@ description: 组织跨阶段需求、设计、现状、方案、反馈与最终�
 - 创建或修改交付产物（阶段 Markdown、任务/结果合同或结构）时先读 [artifact-contracts.md](references/artifact-contracts.md)；只读消费不加载。
 - 再按修改职责读：[target-contracts.md](references/target-contracts.md) 管需求、用户设计、目标保护与 DCR，[planning-contracts.md](references/planning-contracts.md) 管设计、现状与方案，[execution-contracts.md](references/execution-contracts.md) 管任务、结果、状态、证据回流与完成。同次修改方案以及任务/结果/状态/证据时双读 planning/execution；只把已确认方案投影为任务时读 execution。没有目标漂移、DCR 或最终复核时不读 target。
 - 判断阶段推进、回退、新证据影响、执行上下文、证据回流或最终复核时读取 [iteration.md](references/iteration.md)；最终复核同时读取公共产物、目标与执行合同。实际使用 `workctl` 时读取 [tooling.md](references/tooling.md)。完整链在进入相应动作时逐步加载，不预读尚未需要的细则。
-- 工具入口是 `<SkillDir>/scripts/workctl.py`。只在它能降低编辑或查询成本时使用，并显式传绝对 `--work-dir`；默认 `--view model` 返回当前阶段动作的稀疏证据，protect/render 等写入回执只保留当前状态、来源、输出位置与实际问题，影响列表只在截断时额外返回总数。程序、测试或完整结构检查显式使用 `--view machine`。两种视图来自同一次文档索引事实计算；不得因 CLI 缺失或诊断而改变文档已确定的目标或实施授权。
+- 工具入口是 PATH 中独立安装的 `workctl`，使用时显式传绝对 `--work-dir`，不可用时不从 skill 寻找脚本。默认 `--view model` 只返回当前动作的稀疏证据，写入回执只保留状态、来源、输出与实际问题，列表仅在截断时附总数。程序、测试或完整结构检查才显式用 `--view machine`，模型预算不足时不以其恢复。两种视图来自同一次文档索引；CLI 缺失或诊断不得改变文档确定的目标或授权。
 - `requirements.md` 保存与用户商议确认的需求，`user-design.md` 保存用户明确给出的设计，`design.md` 只保存模型形成的设计。需要跨轮保留确认来源时，可用 `workctl protect` 记录内容指纹与条目清单。
 - `workflow.json` 只登记工作区文件与索引位置；Markdown 阶段文档是语义真源，`protected-baseline.json` 只是用户确认来源的快照元数据，`.work-cache/index.json` 和生成视图可随时重建。快照与当前文档不一致时报告诊断，由模型根据用户确认记录裁决当前执行周期的目标。
 - 阶段 Markdown 是模型与用户直接读取、由模型按稳定 ID 局部维护的正式交互面；修改时更新条目所属职责并删除失效重复，不把逐轮日志、派生计数或同一事实的同步摘要写入其他阶段。`workflow.json`、保护快照、缓存和生成视图只承担各自结构化职责，模型不通过编辑生成物改变阶段语义。

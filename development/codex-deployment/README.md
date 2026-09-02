@@ -42,7 +42,7 @@ The files under `global/agents/` follow the [official Codex custom-agent schema]
 
 ## Prepare a Windows host
 
-PowerShell 7, `fd`, `scc`, `hyperfine`, Python 3, Node.js LTS, ast-grep, a user-level Codex CLI and the independently installed `srcq.exe` are host prerequisites, not part of the AgentBase payload. Codex on Windows prefers `pwsh.exe` when it is available, but the desktop package does not install it. Its WindowsApps `codex.exe` is also protected by package-identity execute ACLs and is not a valid ordinary child-process entry. AgentBase therefore standardizes on PowerShell 7, requires an `fd` build that supports `--max-results`, an `scc` build that supports `--by-file`, JSON and json2 output, a `hyperfine` build that supports warmup and JSON export, Python 3.11+, Node.js `>=22.9 <27`, ast-grep 0.44.1 and user npm `@openai/codex@0.151.0` with the isolated `exec` flags used by routing evaluation。`srcq` 必须从 `tools/srcq` 的受验证 Windows release 通过 `scripts/install-srcq.ps1` 安装到用户 PATH；skill、插件和 Codex 部署不会复制或回退到私有二进制。
+PowerShell 7, `fd`, `scc`, `hyperfine`, Python 3, Node.js LTS, ast-grep, a user-level Codex CLI, the independently installed `srcq.exe`, and the independently installed `workctl`/`taskctl` workflow CLI are host prerequisites, not part of the AgentBase payload. Codex on Windows prefers `pwsh.exe` when it is available, but the desktop package does not install it. Its WindowsApps `codex.exe` is also protected by package-identity execute ACLs and is not a valid ordinary child-process entry. AgentBase therefore standardizes on PowerShell 7, requires an `fd` build that supports `--max-results`, an `scc` build that supports `--by-file`, JSON and json2 output, a `hyperfine` build that supports warmup and JSON export, Python 3.11+, Node.js `>=22.9 <27`, ast-grep 0.44.1 and user npm `@openai/codex@0.151.0` with the isolated `exec` flags used by routing evaluation。`srcq` 必须从 `tools/srcq` 的受验证 Windows release 通过 `scripts/install-srcq.ps1` 安装到用户 PATH；workflow-cli 必须从 `tools/workflow-cli` 的受验证 Windows package 通过 `scripts/install-workflow-cli.ps1` 安装到用户 PATH；skill、插件和 Codex 部署不会复制或回退到私有二进制。
 
 When the user asks Codex to prepare, reproduce, or deploy AgentBase on a new Windows machine, that request authorizes installation of these prerequisites through the project entry point. Run it before Validate or Deploy:
 
@@ -58,6 +58,14 @@ Before deploying a payload that contains `source-query`, run the independent run
 & '.\tools\srcq\scripts\install-srcq.ps1' Status
 srcq doctor
 srcq query scc doctor
+```
+
+`workctl` and `taskctl` are installed separately from the workflow-cli package. Use its entry point for `Install`, `Upgrade`, and read-only `Status`; it verifies the package manifest, both command versions, and the single installer-managed user PATH entry. This host installation is distinct from Codex `Deploy` and component `Release`:
+
+```powershell
+& '.\tools\workflow-cli\scripts\build-workflow-cli.ps1'
+& '.\tools\workflow-cli\scripts\install-workflow-cli.ps1' -Action Install -Archive '.\tools\workflow-cli\dist\workflow-cli-0.1.0.zip'
+& '.\tools\workflow-cli\scripts\install-workflow-cli.ps1' -Action Status -View Machine
 ```
 
 The installer also defaults to a compact model receipt. Ready `Status` retains only `ready`, `version` and the exact `binary`; failures retain the reason, direct diagnosis and recovery. Install and upgrade add the binary only when a PATH change requires an immediate explicit doctor call. Use `-View Machine` for the stable complete JSON consumed by deployment validation and other programs.
@@ -154,6 +162,8 @@ MCP launcher or configuration changes require a full desktop-host restart before
 ## Read deployment status
 
 `Status` is read-only. It derives state from the selected source payload, installed managed contract, latest matching deployment manifest, latest schema 7+ lifecycle receipt across deployment scopes, and current routing-policy evidence instead of trusting a README claim. For `config.toml`, only AgentBase-owned portable keys and declared retirements participate in deployment identity; host-owned MCP, trust, plugin, marketplace, and runtime changes do not create false managed drift. Rollback still fingerprints the complete installed file and refuses to overwrite post-deployment host changes unless drift is explicitly accepted:
+
+For a real (non-sandbox) Codex root, `Status` also reports the independently installed workflow-cli preflight (`workflow_cli_runtime_ready`, version, install root/current directory, User PATH entry count, and individual `workctl`/`taskctl` checks). `Deploy` requires this preflight and the existing `srcq` preflight before writing any Codex payload. Deployment test sandboxes intentionally set both runtime checks out of scope, so tests do not depend on host installations.
 
 ```powershell
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action Status -ProjectRoot (Get-Location).Path -CodexRoot (Join-Path $env:USERPROFILE '.codex') -SkillDeliveryMode DirectCompatibility -InstallPortableSettings

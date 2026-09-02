@@ -11,9 +11,9 @@ import unittest
 from pathlib import Path
 
 
-SKILLS_ROOT = Path(__file__).resolve().parents[2]
-TASKCTL = Path(__file__).resolve().parents[1] / "scripts" / "taskctl.py"
-WORKCTL = SKILLS_ROOT / "delivery-workflow" / "scripts" / "workctl.py"
+TOOL_ROOT = Path(__file__).resolve().parents[1]
+TASKCTL = TOOL_ROOT / "src" / "taskctl.py"
+WORKCTL = TOOL_ROOT / "src" / "workctl.py"
 
 
 def load_taskctl_module():
@@ -292,6 +292,14 @@ class TaskctlTests(unittest.TestCase):
         return json.loads(
             (self.root / "snapshots" / f"{digest}.json").read_text(encoding="utf-8")
         )
+
+    def resolve_source_receipt(self, handle: str) -> str:
+        index = json.loads(
+            (self.root / "snapshots" / "source-receipts.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        return index["handles"][handle]
 
     def assert_completion_snapshot_gate(
         self, result_file: Path, reference: str, issue_kind: str
@@ -803,9 +811,10 @@ class TaskctlTests(unittest.TestCase):
             "2048",
         )
         self.assertEqual(captured.returncode, 0, captured.stderr)
-        match = re.search(r'ref:"(sha256:[0-9a-f]{64})"', captured.stdout)
+        match = re.search(r'ref:"?(source-T001-[1-9][0-9]*)"?', captured.stdout)
         self.assertIsNotNone(match, captured.stdout)
-        snapshot = self.read_snapshot(match.group(1))
+        self.assertNotIn("sha256:", captured.stdout)
+        snapshot = self.read_snapshot(self.resolve_source_receipt(match.group(1)))
         self.assertEqual(len(snapshot["sources"]), 7)
 
         constrained = self.run_default_cli(
@@ -885,13 +894,13 @@ class TaskctlTests(unittest.TestCase):
                 str(budget),
             )
             self.assertEqual(candidate.returncode, 0, candidate.stderr)
-            if "complete:false" in candidate.stdout and 'ref:"sha256:' in candidate.stdout:
+            if "complete:false" in candidate.stdout and "ref:source-T001-" in candidate.stdout:
                 captured = candidate
                 break
         self.assertIsNotNone(captured, "no budget produced a recoverable partial context")
-        match = re.search(r'ref:"(sha256:[0-9a-f]{64})"', captured.stdout)
+        match = re.search(r'ref:"?(source-T001-[1-9][0-9]*)"?', captured.stdout)
         self.assertIsNotNone(match, captured.stdout)
-        snapshot = self.read_snapshot(match.group(1))
+        snapshot = self.read_snapshot(self.resolve_source_receipt(match.group(1)))
         visible_ids = set(
             re.findall(
                 r'- \{id:((?:REQ|AC|CON|UDES|DEC|DES|OBS|GAP|SOL|DCR)-[A-Za-z0-9._-]+)',
@@ -911,7 +920,89 @@ class TaskctlTests(unittest.TestCase):
             "context", "--id", "T001", "--budget", "12000", "--capture"
         )
         self.assertEqual(first["source_snapshot_ref"], second["source_snapshot_ref"])
-        self.assertEqual(len(list((self.root / "snapshots").glob("*.json"))), 1)
+        assets = [
+            path
+            for path in (self.root / "snapshots").glob("*.json")
+            if re.fullmatch(r"[0-9a-f]{64}\.json", path.name)
+        ]
+        self.assertEqual(len(assets), 1)
+
+    def test_model_source_receipt_resolves_to_full_completion_provenance(self) -> None:
+        captured = self.run_default_cli(
+            TASKCTL,
+            "context",
+            "--id",
+            "T001",
+            "--task-dir",
+            str(self.root),
+            "--capture",
+        )
+        self.assertEqual(captured.returncode, 0, captured.stderr)
+        match = re.search(r'ref:"?(source-T001-[1-9][0-9]*)"?', captured.stdout)
+        self.assertIsNotNone(match, captured.stdout)
+        handle = match.group(1)
+        full_reference = self.resolve_source_receipt(handle)
+
+        result_file = Path(self.temp.name) / "model-result.json"
+        result_file.write_text(
+            json.dumps(self.result_payload(), ensure_ascii=False), encoding="utf-8"
+        )
+        completed = self.run_task(
+            "complete",
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--source-receipt",
+            handle,
+        )
+        stored = json.loads(
+            (self.root / completed["result_ref"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(stored["source_snapshot_ref"], full_reference)
+
+    def test_model_source_receipt_missing_and_conflict_are_gates(self) -> None:
+        result_file = Path(self.temp.name) / "missing-receipt-result.json"
+        result_file.write_text(
+            json.dumps(self.result_payload(), ensure_ascii=False), encoding="utf-8"
+        )
+        missing = self.run_cli(
+            TASKCTL,
+            "complete",
+            "--task-dir",
+            str(self.root),
+            "--id",
+            "T001",
+            "--owner",
+            "agent-a",
+            "--result-file",
+            str(result_file),
+            "--expected-task-revision",
+            "1",
+            "--expected-state-revision",
+            "1",
+            "--source-receipt",
+            "source-T001-1",
+        )
+        self.assertEqual(missing.returncode, 2)
+        self.assertEqual(json.loads(missing.stderr)["gate"]["id"], "TASK-INPUT-UNREADABLE")
+
+        captured = self.run_default_cli(
+            TASKCTL, "context", "--task-dir", str(self.root), "--id", "T001", "--capture"
+        )
+        self.assertEqual(captured.returncode, 0, captured.stderr)
+        index_path = self.root / "snapshots" / "source-receipts.json"
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+        index["handles"]["source-T001-2"] = index["handles"]["source-T001-1"]
+        index_path.write_text(json.dumps(index), encoding="utf-8")
+        conflict = self.run_default_cli(
+            TASKCTL, "context", "--task-dir", str(self.root), "--id", "T001", "--capture",
+            "--model-token-budget", "512",
+        )
+        self.assertEqual(conflict.returncode, 2)
+        self.assertIn("TASK-SNAPSHOT-CONFLICT", conflict.stderr)
 
     def test_capture_upgrades_legacy_workspace_without_snapshot_manifest(self) -> None:
         table_path = self.root / "task-table.json"
@@ -956,6 +1047,33 @@ class TaskctlTests(unittest.TestCase):
         self.assertIn("candidates:", model.stdout)
         self.assertNotIn("source_snapshot:", model.stdout)
         self.assertIn("verification:", model.stdout)
+
+    def test_model_result_views_keep_provenance_semantics_without_machine_identity(self) -> None:
+        self.complete_t001()
+        machine_show = self.run_task("show", "--id", "T001")
+        reference = machine_show["result"]["source_snapshot_ref"]
+        self.assertRegex(reference, r"^sha256:[0-9a-f]{64}$")
+
+        model_show = self.run_default_cli(
+            TASKCTL, "show", "--id", "T001", "--task-dir", str(self.root)
+        )
+        self.assertEqual(model_show.returncode, 0, model_show.stderr)
+        self.assertIn("source_snapshot:captured", model_show.stdout)
+        self.assertNotIn("sha256:", model_show.stdout)
+
+        snapshot_path = self.root / "snapshots" / f"{reference.removeprefix('sha256:')}.json"
+        snapshot_path.unlink()
+        review = self.run_default_cli(
+            TASKCTL,
+            "completion-context",
+            "--target-id",
+            "REQ-001",
+            "--task-dir",
+            str(self.root),
+        )
+        self.assertEqual(review.returncode, 0, review.stderr)
+        self.assertIn("result_source_snapshot_asset_missing", review.stdout)
+        self.assertNotIn("sha256:", review.stdout)
 
     def test_model_error_keeps_gate_and_recovery(self) -> None:
         result = self.run_default_cli(
@@ -2931,6 +3049,82 @@ class TaskctlTests(unittest.TestCase):
             "one result stream", json.loads(mixed_page.stderr)["error"]
         )
 
+    def test_model_completion_context_uses_short_review_receipt(self) -> None:
+        first = self.run_default_cli(
+            TASKCTL,
+            "completion-context",
+            "--task-dir",
+            str(self.root),
+            "--limit",
+            "1",
+        )
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertNotIn("sha256:", first.stdout)
+        handle_match = re.search(
+            r'review_receipt:"?(review-[1-9][0-9]*)"?', first.stdout
+        )
+        cursor_match = re.search(
+            r'target_next_after_id:"?([A-Z]+-[A-Za-z0-9._-]+)"?', first.stdout
+        )
+        self.assertIsNotNone(handle_match, first.stdout)
+        self.assertIsNotNone(cursor_match, first.stdout)
+        continued = self.run_default_cli(
+            TASKCTL,
+            "completion-context",
+            "--task-dir",
+            str(self.root),
+            "--after-id",
+            cursor_match.group(1),
+            "--review-receipt",
+            handle_match.group(1),
+            "--limit",
+            "1",
+        )
+        self.assertEqual(continued.returncode, 0, continued.stderr)
+        self.assertIn(handle_match.group(1), continued.stdout)
+        self.assertNotIn("sha256:", continued.stdout)
+
+        machine = self.run_task("completion-context", "--limit", "1")
+        self.assertRegex(machine["snapshot_id"], r"^sha256:[0-9a-f]{64}$")
+        self.assertNotIn("review_receipt", machine)
+
+    def test_model_review_receipt_missing_stale_and_conflict_are_gates(self) -> None:
+        first = self.run_default_cli(
+            TASKCTL, "completion-context", "--task-dir", str(self.root), "--limit", "1"
+        )
+        self.assertEqual(first.returncode, 0, first.stderr)
+        handle = re.search(r'review_receipt:"?(review-[1-9][0-9]*)"?', first.stdout).group(1)
+        cursor = re.search(
+            r'target_next_after_id:"?([A-Z]+-[A-Za-z0-9._-]+)"?', first.stdout
+        ).group(1)
+        cache_path = self.root / ".work-cache" / "taskctl-review-receipts.json"
+        cache_before = cache_path.read_text(encoding="utf-8")
+        cache_path.unlink()
+        missing = self.run_default_cli(
+            TASKCTL, "completion-context", "--task-dir", str(self.root),
+            "--after-id", cursor, "--review-receipt", handle, "--limit", "1",
+        )
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn("TASK-PAGINATION-SNAPSHOT", missing.stderr)
+
+        cache_path.write_text(cache_before, encoding="utf-8")
+        self.run_task("claim", "--id", "T001", "--owner", "agent-a")
+        stale = self.run_default_cli(
+            TASKCTL, "completion-context", "--task-dir", str(self.root),
+            "--after-id", cursor, "--review-receipt", handle, "--limit", "1",
+        )
+        self.assertEqual(stale.returncode, 2)
+        self.assertIn("TASK-PAGINATION-SNAPSHOT", stale.stderr)
+
+        cache = json.loads(cache_before)
+        cache["handles"]["bad-handle"] = next(iter(cache["handles"].values()))
+        cache_path.write_text(json.dumps(cache), encoding="utf-8")
+        conflict = self.run_default_cli(
+            TASKCTL, "completion-context", "--task-dir", str(self.root), "--limit", "1"
+        )
+        self.assertEqual(conflict.returncode, 2)
+        self.assertIn("TASK-SNAPSHOT-CONFLICT", conflict.stderr)
+
     def test_completion_context_rejects_unknown_stream_cursors(self) -> None:
         (self.root / "deferred-changes.md").write_text(
             """# 延后讨论项
@@ -3423,12 +3617,13 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(context_help.returncode, 0)
         self.assertIn("model 视图的保守 Token 上限", context_help.stdout)
         self.assertIn("内容寻址来源快照并返回收据", context_help.stdout)
-        self.assertIn("taskctl.py context --task-dir", context_help.stdout)
+        self.assertIn("taskctl context --task-dir", context_help.stdout)
 
         complete_help = self.run_cli(TASKCTL, "complete", "--help")
         self.assertEqual(complete_help.returncode, 0)
         self.assertIn("执行所依据的 task revision", complete_help.stdout)
-        self.assertIn("context --capture 返回的内容寻址来源收据", complete_help.stdout)
+        self.assertIn("machine context --capture 返回的完整内容寻址引用", complete_help.stdout)
+        self.assertIn("model context --capture 返回的可读来源收据", complete_help.stdout)
         self.assertIn("预期 state revision", complete_help.stdout)
 
         module = load_taskctl_module()
