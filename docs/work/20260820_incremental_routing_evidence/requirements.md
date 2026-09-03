@@ -86,7 +86,7 @@ Policy 不依赖 Routing 的 evaluator 身份或选择结果；两者都需刷�
 - 来源: 用户 2026-08-20 要求“完成一个评估测试基础架构，彻底解决以后的测试还有评估问题”
 - 关联: AC-009, AC-010
 
-评估机制自身应有一个可重复、低成本、不会意外启动模型的统一回归入口；正式部署门禁消费该入口和当前独立 evidence，使以后修改不再依赖人工拼接测试命令或每次全量模型评估。
+评估机制自身应有一个可重复、低成本、不会意外启动模型的统一回归入口；部署只消费能机械证明 payload 结构、身份和可恢复性的确定性合同。模型路由评估保留为显式研究入口，不得因部署而刷新，也不得把采样选择等同于运行时合同。
 
 ## AC-009 统一确定性入口覆盖评估机制
 
@@ -95,16 +95,16 @@ Policy 不依赖 Routing 的 evaluator 身份或选择结果；两者都需刷�
 
 单一入口检查全部评估 PowerShell 语法并并行覆盖指纹、capsule、planner、隔离 runtime、attempt ledger、并发、合并、同代恢复、跨代搬运和中断续传；对子进程机械设置禁止 evaluator 的单向测试边界，并提供有界 model/machine 结果。
 
-## AC-010 正式门禁分层消费测试与 evidence
+## AC-010 部署与模型路由研究分层
 
 - 状态: confirmed
 - 关联: REQ-004
 
-正式 Validate 与真实 Publish 自动运行确定性基础设施套件并验证当前 evidence/receipt；Status 和沙箱内重复 Publish 不为形式完整反复执行套件。模型 evidence 只由显式 refresh 按 planner 增量产生，Validate、Publish 和测试不得静默触发模型。
+正式 Validate 与 Deploy 只运行部署 payload 的确定性结构合同并验证受管资产生命周期，不读取、要求或记录 `current.json`、attempt ledger 或模型语义选择。路由基础设施改变时单独运行其零模型回归；模型 evidence 只在明确研究路由行为或诊断已发生的路由失败时由显式 refresh 按 planner 增量产生，任何部署、Status 或测试不得静默触发模型。
 
-## CON-001 本轮不执行 Codex Publish
+## CON-001 原实施周期不部署到真实 Codex 根
 
-- 状态: confirmed
+- 状态: superseded
 - 来源: 项目逐次发布授权合同；当前用户只要求完善与验证
 
-允许安装并验证独立 Codex CLI、修改仓库真源、运行独立评估、Validate、提交并同步私有远端；不向真实 Codex 根目录执行 Publish。
+原实施周期允许安装并验证独立 Codex CLI、修改仓库真源、运行独立评估、Validate、提交并同步私有远端，但不向真实 Codex 根目录部署。后续用户已经分别授权真实部署；本条只保留历史边界，不定义当前授权，也不涉及 Release。

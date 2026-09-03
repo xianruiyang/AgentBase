@@ -332,46 +332,6 @@ function Write-JsonFile {
     Write-Utf8NoBomFile -Path $Path -Text ($json + [Environment]::NewLine)
 }
 
-function Get-ValidatedRoutingEvidence {
-    param(
-        [string]$Root
-    )
-
-    $evidencePath = Join-Path $Root "development\skill-routing\evidence\current.json"
-    if (-not (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
-        throw "Current staged routing evidence is missing: $evidencePath"
-    }
-    $evidenceItem = Get-Item -LiteralPath $evidencePath -Force
-    if (($evidenceItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-        throw "Current staged routing evidence must be a real file: $evidencePath"
-    }
-
-    & (Join-Path $Root "development\skill-routing\validate_routing_results.ps1") -ProjectRoot $Root -ResultsPath $evidencePath | Out-Null
-    & (Join-Path $Root "development\skill-routing\validate_routing_attempt_history.ps1") -ProjectRoot $Root -AttemptHistoryPath (Join-Path $Root "development\skill-routing\evidence\attempts.json") -CurrentEvidencePath $evidencePath | Out-Null
-    $evidence = Get-Content -LiteralPath $evidencePath -Raw -Encoding UTF8 | ConvertFrom-Json -DateKind String
-    if ([string]::IsNullOrWhiteSpace([string]$evidence.evaluator.id)) {
-        throw "Current staged routing evidence does not identify its routing evaluator run"
-    }
-    return [pscustomobject]@{
-        path = $evidenceItem.FullName
-        sha256 = (Get-FileHash -LiteralPath $evidenceItem.FullName -Algorithm SHA256).Hash
-        evaluator_id = [string]$evidence.evaluator.id
-        evaluator_model = [string]$evidence.evaluator.model
-        evaluator_runtime = [string]$evidence.evaluator.runtime
-        evaluated_at_utc = [string]$evidence.evaluator.evaluated_at_utc
-        repository_accessed = [bool]$evidence.evaluator.repository_accessed
-        hidden_expectations_accessed = [bool]$evidence.evaluator.hidden_expectations_accessed
-        evaluation_capsule_sha256 = [string]$evidence.evaluation_capsule_sha256
-        candidate_bundle_sha256 = [string]$evidence.candidate_bundle_sha256
-        evaluation_input_sha256 = [string]$evidence.evaluation_input_sha256
-        evaluation_generation_sha256 = [string]$evidence.evaluation_generation_sha256
-        routing_receipt_id = [string]$evidence.receipt_id
-        policy_receipt_id = [string]$evidence.policy_evaluation.receipt_id
-        reference_receipt_id = [string]$evidence.reference_evaluation.receipt_id
-        case_count = @($evidence.cases).Count
-    }
-}
-
 function Get-LatestDeploymentManifest {
     param(
         [string]$InstallRoot,
@@ -408,7 +368,7 @@ function Get-LatestDeploymentManifest {
         $schemaVersion = [int]$manifest.schema_version
         $manifestState = [string]$manifest.state
         $isLegacyPublishedManifest = @(1, 2, 3, 4, 5, 6, 7) -contains $schemaVersion -and $manifestState -eq 'published'
-        $isDeploymentManifest = $schemaVersion -eq 8 -and $manifestState -eq 'deployed'
+        $isDeploymentManifest = @(8, 9) -contains $schemaVersion -and $manifestState -eq 'deployed'
         if (-not $isLegacyPublishedManifest -and -not $isDeploymentManifest) {
             continue
         }
@@ -687,7 +647,6 @@ function Get-ValidatedSource {
     )
 
     & (Join-Path $Root "development\skill-routing\validate_contract.ps1") -ProjectRoot $Root | Out-Null
-    $routingEvidence = Get-ValidatedRoutingEvidence -Root $Root
     $portableConfigPath = Join-Path $Root "global\config.toml"
     $hooksTemplatePath = Join-Path $Root "global\hooks.template.json"
     $portableAgentsPath = Join-Path $Root "global\agents"
@@ -835,7 +794,6 @@ function Get-ValidatedSource {
         retired_path_targets = @($retiredPathTargets)
         retired_config_units = @($retiredConfigUnits)
         retired_config_diagnostics = @($retiredConfigDiagnostics)
-        routing_evidence = $routingEvidence
         skill_delivery_mode = $DeliveryMode
         skills_managed = $DeliveryMode -eq "DirectCompatibility"
         hooks_managed = $IncludePortableSettings -and $DeliveryMode -eq "DirectCompatibility"
@@ -1044,9 +1002,6 @@ if ($Action -eq "Validate") {
         managed_asset_present_count = @($source.managed_asset_lifecycle.units | Where-Object { [string]$_.state -eq 'present' }).Count
         managed_asset_retired_count = @($source.managed_asset_lifecycle.units | Where-Object { [string]$_.state -eq 'retired' }).Count
         managed_asset_transferred_count = @($source.managed_asset_lifecycle.units | Where-Object { [string]$_.state -eq 'transferred' }).Count
-        routing_evidence = $source.routing_evidence.path
-        routing_evidence_sha256 = $source.routing_evidence.sha256
-        routing_case_count = $source.routing_evidence.case_count
     }
     Set-AgentBaseResultType -Result $result -Kind Validate
     return
@@ -1095,9 +1050,6 @@ if ($Action -eq "Status") {
         $null
     }
     $manifestMatchesInstalled = $null -ne $manifest -and $manifestInstalledContractFingerprint -eq $installedFingerprint
-    $manifestEvidenceMatches = $null -ne $manifest -and
-        $manifest.PSObject.Properties.Name -contains "routing_evidence_sha256" -and
-        [string]$manifest.routing_evidence_sha256 -eq [string]$source.routing_evidence.sha256
     $manifestLifecycleMatches = $null -ne $manifest -and
         $manifest.PSObject.Properties.Name -contains 'managed_asset_lifecycle_sha256' -and
         [string]$manifest.managed_asset_lifecycle_sha256 -eq [string]$source.managed_asset_lifecycle.sha256
@@ -1107,7 +1059,6 @@ if ($Action -eq "Status") {
     if ($null -eq $manifest) { $deploymentGaps.Add("deployment_manifest_missing") }
     elseif (-not $manifestMatchesSource) { $deploymentGaps.Add("deployment_manifest_source_is_stale") }
     if ($null -ne $manifest -and -not $manifestMatchesInstalled) { $deploymentGaps.Add("installed_payload_differs_from_manifest") }
-    if ($null -ne $manifest -and -not $manifestEvidenceMatches) { $deploymentGaps.Add("deployment_manifest_routing_evidence_is_stale") }
     if ($null -ne $manifest -and -not $manifestLifecycleMatches) { $deploymentGaps.Add("deployment_manifest_managed_asset_lifecycle_is_stale") }
     if ($retiredManagedTargets.Count -gt 0) { $deploymentGaps.Add("retired_managed_paths_present") }
     if ($retiredConfigDiagnostics.Count -gt 0) { $deploymentGaps.Add('retired_managed_config_keys_present') }
@@ -1127,7 +1078,6 @@ if ($Action -eq "Status") {
         latest_deployment_manifest = if ($null -eq $deployRecord) { $null } else { $deployRecord.path }
         manifest_matches_source = $manifestMatchesSource
         manifest_matches_installed = $manifestMatchesInstalled
-        manifest_matches_routing_evidence = $manifestEvidenceMatches
         manifest_matches_managed_asset_lifecycle = $manifestLifecycleMatches
         managed_asset_lifecycle_sha256 = $source.managed_asset_lifecycle.sha256
         managed_asset_unit_count = @($source.managed_asset_lifecycle.units).Count
@@ -1136,7 +1086,7 @@ if ($Action -eq "Status") {
         retired_managed_config_key_present_count = $retiredConfigDiagnostics.Count
         retired_managed_config_key_conflict_count = $retiredConfigModified.Count + $retiredConfigUnverifiable.Count
         retired_managed_config_key_conflicts = @($retiredConfigDiagnostics | Where-Object { [string]$_.status -ne 'removable' } | ForEach-Object { "$($_.id):$($_.status)" })
-        managed_payload_formally_deployed = $installedMatchesSource -and $manifestMatchesSource -and $manifestMatchesInstalled -and $manifestEvidenceMatches -and $manifestLifecycleMatches -and $retiredManagedTargets.Count -eq 0 -and $retiredConfigDiagnostics.Count -eq 0 -and $pluginModeReady
+        managed_payload_formally_deployed = $installedMatchesSource -and $manifestMatchesSource -and $manifestMatchesInstalled -and $manifestLifecycleMatches -and $retiredManagedTargets.Count -eq 0 -and $retiredConfigDiagnostics.Count -eq 0 -and $pluginModeReady
         formal_deployment_gap_count = $deploymentGaps.Count
         formal_deployment_gaps = @($deploymentGaps)
         plugin_installation_in_scope = $SkillDeliveryMode -eq "Plugin"
@@ -1241,7 +1191,7 @@ if ($Action -eq "Deploy") {
             }
         })
         $manifest = [ordered]@{
-            schema_version = 8
+            schema_version = 9
             state = "prepared"
             created_at_utc = [DateTime]::UtcNow.ToString("o")
             project_root = $ProjectRoot
@@ -1257,18 +1207,6 @@ if ($Action -eq "Deploy") {
             managed_asset_units = @($source.managed_asset_lifecycle_receipt_units)
             retired_managed_paths_removed = @($retiredManagedTargets.relative_path)
             retired_managed_config_keys_removed = @($retiredConfigRemoved.id)
-            routing_evidence_path = $source.routing_evidence.path.Substring($ProjectRoot.Length + 1).Replace('\', '/')
-            routing_evidence_sha256 = $source.routing_evidence.sha256
-            routing_evaluator_id = $source.routing_evidence.evaluator_id
-            routing_evaluator_model = $source.routing_evidence.evaluator_model
-            routing_evaluator_runtime = $source.routing_evidence.evaluator_runtime
-            routing_evaluated_at_utc = $source.routing_evidence.evaluated_at_utc
-            routing_repository_accessed = $source.routing_evidence.repository_accessed
-            routing_hidden_expectations_accessed = $source.routing_evidence.hidden_expectations_accessed
-            routing_evaluation_capsule_sha256 = $source.routing_evidence.evaluation_capsule_sha256
-            routing_candidate_bundle_sha256 = $source.routing_evidence.candidate_bundle_sha256
-            routing_evaluation_input_sha256 = $source.routing_evidence.evaluation_input_sha256
-            routing_case_count = $source.routing_evidence.case_count
             srcq_runtime_preflight_in_scope = [bool]$srcqRuntime.in_scope
             srcq_runtime_ready = $srcqRuntime.ready
             srcq_version = $srcqRuntime.version
@@ -1384,7 +1322,6 @@ if ($Action -eq "Deploy") {
         retired_managed_paths_removed = @($retiredManagedTargets.relative_path)
         retired_managed_config_key_removed_count = $retiredConfigRemoved.Count
         retired_managed_config_keys_removed = @($retiredConfigRemoved.id)
-        routing_evidence_sha256 = $source.routing_evidence.sha256
         runtime_prerequisite_in_scope = [bool]$srcqRuntime.in_scope
         srcq_runtime_ready = $srcqRuntime.ready
         srcq_version = $srcqRuntime.version
@@ -1422,7 +1359,7 @@ $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | Convert
 $manifestSchemaVersion = [int]$manifest.schema_version
 $activeDeploymentState = [string]$manifest.state
 $isLegacyPublishedManifest = @(1, 2, 3, 4, 5, 6, 7) -contains $manifestSchemaVersion -and $activeDeploymentState -eq 'published'
-$isDeploymentManifest = $manifestSchemaVersion -eq 8 -and $activeDeploymentState -eq 'deployed'
+$isDeploymentManifest = @(8, 9) -contains $manifestSchemaVersion -and $activeDeploymentState -eq 'deployed'
 if (-not $isLegacyPublishedManifest -and -not $isDeploymentManifest) {
     throw "Backup is not in an active deployment state that can be rolled back: $($manifest.state)"
 }

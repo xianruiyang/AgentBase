@@ -1,6 +1,6 @@
 # Skill routing validation
 
-本目录维护 AgentBase 全局规则与关键 skill 的静态触发合同，以及只读取脱离仓库 capsule、不读取隐藏期望的分阶段独立评估。它证明候选在给定请求下应选择哪些 skill、适用哪些粗粒度行为和应读取哪些条件引用；不证明 skill 内步骤或具体任务执行已经正确完成。
+本目录维护 AgentBase 全局规则与关键 skill 的静态触发合同，以及只读取脱离仓库 capsule、不读取隐藏期望的分阶段独立研究。它可观察候选在给定请求下选择哪些 skill、粗粒度行为和条件引用，但模型结果不是部署门禁，也不证明 skill 内步骤或具体任务执行已经正确完成。
 
 ## 正式产物
 
@@ -11,12 +11,14 @@
 - [`build_routing_evaluation.ps1`](build_routing_evaluation.ps1)：只构建指定阶段 capsule，供审计或外部受控运行使用。
 - [`development/common/codex_cli_runtime.ps1`](../common/codex_cli_runtime.ps1)、[`development/common/codex_shell_environment_policy.json`](../common/codex_shell_environment_policy.json) 与 [`routing_evaluator_runtime.ps1`](routing_evaluator_runtime.ps1)：前两者唯一维护多个本地 evaluator 共享的 npm 原生可执行布局、版本身份、单模型 catalog 投影、JSONL 用量/工具事件解析与哈希固定的模型 shell 过滤，后者只维护路由 evaluator 专属的 sandbox 后备、禁用能力参数和有界诊断。服务环境与模型 shell 分离；cases-only 成功路径禁止任何 tool event，因此策略加强不改变 capsule 可见语义或要求重采样。
 - [`invoke_routing_evaluation.ps1`](invoke_routing_evaluation.ps1)：单阶段隔离 Codex CLI runner。
-- [`refresh_routing_evidence.ps1`](refresh_routing_evidence.ps1)：正式刷新入口；先计划，只启动必需阶段，Routing 与 Policy 可并行，最后原子合并。
+- [`refresh_routing_evidence.ps1`](refresh_routing_evidence.ps1)：显式研究刷新入口；先计划，只启动必需阶段，Routing 与 Policy 可并行，最后原子合并。
 - [`test_routing_infrastructure.ps1`](test_routing_infrastructure.ps1)：零模型 Token 的统一确定性测试入口；解析全部 PowerShell 脚本并并行验证指纹、capsule、planner、隔离 runtime、attempt ledger 与崩溃恢复。
 - [`record_routing_attempt.ps1`](record_routing_attempt.ps1)：正式尝试生命周期的唯一 owner；真实评估使用 `Begin`/`Finish`，证明复用使用 `Reuse`。
 - [`merge_routing_evidence.ps1`](merge_routing_evidence.ps1)：唯一正式证据合并入口；只接受当前 generation 内三份已通过收据及语义一致的阶段结果。
-- [`evidence/current.json`](evidence/current.json)：本地 Validate 与 Publish 使用的唯一当前路由策略证据。
-- [`evidence/attempts.json`](evidence/attempts.json)：当前 generation 的有界收据账本；只证明运行或复用来源、失败和重试边界，不反推 skill 正确性。
+- [`evidence/current.json`](evidence/current.json)：最近一次完成的路由研究快照；Validate、Deploy 与 Status 不消费它。
+- [`evidence/attempts.json`](evidence/attempts.json)：当前研究 generation 的有界收据账本；只证明运行或复用来源、失败和重试边界，不反推 skill 正确性。
+
+新 generation 尚未三阶段合并时，`current.json` 可以继续指向上一份已完成快照，而 `attempts.json` 指向当前失败或进行中的研究周期；二者此时不得假定同代。账本可单独验证 schema、限额和收据关系；只有 merge 已完成、两者同代时才用 `-CurrentEvidencePath` 追加验证三阶段通过收据绑定。
 
 ## 静态合同
 
@@ -34,7 +36,7 @@
 & '.\development\skill-routing\test_routing_infrastructure.ps1' -ProjectRoot (Get-Location).Path
 ```
 
-该脚本是测试结果投影 owner：维护者与模型消费默认一行摘要，部署自动化可显式消费 machine JSON；两种视图来自同一次套件结果。输出只存在于当前进程 stdout，不缓存、不写回 evidence，也不作为模型行为正确性的第二证明来源；失败时只返回有界套件诊断和可重跑的确定性入口。
+该脚本是测试结果投影 owner：维护者与研究自动化消费默认一行摘要或显式 machine JSON，两种视图来自同一次套件结果。输出只存在于当前进程 stdout，不缓存、不写回 evidence，也不作为模型行为正确性的第二证明来源；失败时只返回有界套件诊断和可重跑的确定性入口。
 
 ## 阶段身份与影响计划
 
@@ -55,9 +57,9 @@
 
 计划区分 `evaluate`、`reuse`、`pending-routing` 和 `blocked`。Routing 需要新结果时，References 先为 `pending-routing`；正式入口取得新 Routing 结果后用同一 planner 重新计算，而不是预先假设 References 必须运行。
 
-## 正式刷新与隔离 runner
+## 显式研究刷新与隔离 runner
 
-正常维护只调用一个入口：
+只有明确研究路由行为或诊断已发生的路由失败时才调用：
 
 ```powershell
 & '.\development\skill-routing\refresh_routing_evidence.ps1' -ProjectRoot (Get-Location).Path
@@ -85,9 +87,9 @@ runner 在 Codex 进程前先 `Begin`，所有已取得 attempt ID 的退出路�
 
 ## 收据、复用与恢复
 
-`record_routing_attempt.ps1` 是正式尝试生命周期的唯一 owner。每次真实 evaluator 执行必须先 `Begin`，使 `started` 收据先于外部运行持久化；随后必须用同一 attempt ID `Finish`。未完成的 `started` 收据会阻断正式 Validate 和 Publish，不能通过重新执行掩盖。
+`record_routing_attempt.ps1` 是研究尝试生命周期的唯一 owner。每次真实 evaluator 执行必须先 `Begin`，使 `started` 收据先于外部运行持久化；随后必须用同一 attempt ID `Finish`。未完成的 `started` 收据会阻断该 generation 的合并和后续正式研究刷新，不能通过重新执行掩盖。
 
-`Reuse` 不把旧文件存在当作正确性证明。它重新构造当前阶段 capsule、运行当前 oracle，并记录来源 evidence SHA-256、来源 receipt ID、当前阶段身份、语义结果 SHA-256、既有 evaluator 身份和零运行 Token。merge 把新的 receipt ID 写回相应阶段；部署门禁从当前阶段沿 receipt、语义结果和 source link 验证，不从 evaluator 时间或文件变短推断可复用。
+`Reuse` 不把旧文件存在当作正确性证明。它重新构造当前阶段 capsule、运行当前 oracle，并记录来源 evidence SHA-256、来源 receipt ID、当前阶段身份、语义结果 SHA-256、既有 evaluator 身份和零运行 Token。merge 从当前阶段沿 receipt、语义结果和 source link 验证并写回新的 receipt ID，不从 evaluator 时间或文件变短推断可复用。
 
 每份收据只保存 phase、generation、候选/输入/capsule/语义结果哈希、evaluator 身份、开始与完成 UTC 时间、来源关系、耗时与 Token 计数、结果、最多 500 字符失败摘要、变化字段和可选重试理由，不保存原始模型日志。相同 phase、candidate、input 与 capsule 的后续正式收据必须显式说明理由；每个不变输入最多两次真实 evaluator 尝试和两次启动前编排失败，达到相应上限后必须改变原因或可见输入，不能原样刷到成功。
 

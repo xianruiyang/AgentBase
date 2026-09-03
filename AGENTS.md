@@ -52,7 +52,7 @@ must: 全局规则或 skill 变更至少运行：
 & (Join-Path (Get-Location).Path 'development\skill-routing\validate_contract.ps1') -ProjectRoot (Get-Location).Path
 ```
 
-must: 路由基础设施变化后运行 `test_routing_infrastructure.ps1`；规则、skill 或触发合同变化后，`Validate`/`Deploy` 前按 `get_routing_evaluation_plan.ps1` 刷新 evidence：只执行 `evaluate`，`reuse` 经 oracle 与来源链证明，`pending-routing` 待 Routing 后重算；同输入 oracle 失败不重采样，身份或来源异常须阻断。部署只验证 payload、evidence 与可恢复写入；组件回归仅在受影响且稳定后运行一次
+must: 路由基础设施变化后运行 `test_routing_infrastructure.ps1`；模型路由 evidence 只在明确研究路由行为或诊断已发生的路由失败时按 `get_routing_evaluation_plan.ps1` 显式刷新，同输入 oracle 失败不重采样，身份或来源异常只阻断该研究周期。`Validate`、`Deploy` 与 `Status` 不读取或要求模型 evidence；部署只验证 payload 的确定性结构合同、受管资产生命周期与可恢复写入，组件回归仅在受影响且稳定后运行一次
 
 must: 最终评测合同变更后运行 `development/agent-evaluation/test_agent_evaluation_infrastructure.ps1`；门禁禁用 evaluator，外部 clone 仅由显式 `prepare`/单题 `oracle`，依赖与 Verifier 仅由单题 `oracle`/`run`，qualification 仅由 `oracle`、模型仅由 `run` 触发
 

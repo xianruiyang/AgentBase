@@ -26,7 +26,7 @@
 - 状态: confirmed
 - 关联目标: REQ-003, AC-007
 
-`record_routing_attempt.ps1` 继续是唯一收据 owner，并增加不启动 evaluator 的 `Reuse` 动作。新的 generation 周期内，每个阶段最终由一份 `formal`/`baseline_import` 或 `evidence_reuse` 通过收据支持；reuse 收据绑定来源 evidence 和来源 receipt。进程启动前的失败使用 `orchestration_failed`，不占 evaluator 采样额度但有独立上限；进程启动后才使用 `execution_failed`。稳定、忽略提交的 lock 文件只通过打开句柄互斥，不在 writer 释放时删除。merge 原子组成唯一 `current.json`，当前 evidence 持有各阶段 receipt ID，部署 Validate 沿同一关系校验。
+`record_routing_attempt.ps1` 继续是唯一收据 owner，并增加不启动 evaluator 的 `Reuse` 动作。新的 generation 周期内，每个阶段最终由一份 `formal`/`baseline_import` 或 `evidence_reuse` 通过收据支持；reuse 收据绑定来源 evidence 和来源 receipt。进程启动前的失败使用 `orchestration_failed`，不占 evaluator 采样额度但有独立上限；进程启动后才使用 `execution_failed`。稳定、忽略提交的 lock 文件只通过打开句柄互斥，不在 writer 释放时删除。merge 原子组成唯一 `current.json`，当前 evidence 持有各阶段 receipt ID；这些关系只服务路由研究的验证与恢复，不进入部署合同。
 
 ## DES-005 generation staging 只承担崩溃恢复
 
@@ -40,4 +40,11 @@
 - 状态: confirmed
 - 关联目标: REQ-004, AC-009, AC-010
 
-`test_routing_infrastructure.ps1` 是评估机制确定性回归的唯一入口：解析 `development/skill-routing` 全部 PowerShell 和共享 Codex CLI runtime owner 并校验静态合同，再以独立 `pwsh.exe` 子进程并行运行六组套件，限制单套件时间与输出，最后从同一结果投影一行 model 摘要或 machine JSON。入口对子进程设置 `AGENTBASE_ROUTING_EVALUATOR_DISABLED=1`，正式 invoker 在 Begin 和进程启动前拒绝该值，因此测试回归不能意外转为真实模型调用。部署 Validate 和真实 CodexRoot Publish 调用该入口；沙箱 Publish 依赖已经执行的部署测试上下文，不重复嵌套整套回归。
+`test_routing_infrastructure.ps1` 是评估机制确定性回归的唯一入口：解析 `development/skill-routing` 全部 PowerShell 和共享 Codex CLI runtime owner 并校验静态合同，再以独立 `pwsh.exe` 子进程并行运行六组套件，限制单套件时间与输出，最后从同一结果投影一行 model 摘要或 machine JSON。入口对子进程设置 `AGENTBASE_ROUTING_EVALUATOR_DISABLED=1`，正式 invoker 在 Begin 和进程启动前拒绝该值，因此测试回归不能意外转为真实模型调用。该入口只在评估基础设施变化时运行；部署只调用 payload 的快速结构合同，不把研究回归或模型 evidence 变成安装前置条件。
+
+## DES-007 模型 evidence 只属于显式研究生命周期
+
+- 状态: confirmed
+- 关联目标: REQ-004, AC-010
+
+`trigger-cases.json` 与 `validate_contract.ps1` 保留对规则、skill、引用和 case 集合的确定性检查。隔离 evaluator、planner、`current.json`、attempt ledger 与恢复目录继续承担模型路由研究，但没有任何部署消费者。部署 manifest schema 9 只记录 payload、受管资产生命周期和回滚所需事实；读取 schema 8 历史部署时忽略旧 routing evidence 字段。研究失败保持可诊断且不得自动重试，但不会改变 Validate、Deploy、Status 或 Rollback 的结论。

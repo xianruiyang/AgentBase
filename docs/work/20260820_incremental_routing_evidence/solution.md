@@ -34,8 +34,18 @@
 
 ## SOL-005 建立统一确定性测试与正式门禁消费者
 
-- 状态: completed
+- 状态: superseded
 - 解决: GAP-004
 - 关联: DES-006, REQ-004
 
-增加并行、限时、限输出的统一基础设施测试入口和模型禁用边界，把现有六组回归收口为一个零 Token 命令；部署 Validate 与真实 Publish 自动调用，沙箱重复 Publish 不嵌套重跑。回归新增跨代搬运中途崩溃续传、测试禁用 evaluator 和所有失败路径进程/临时状态清理。
+增加并行、限时、限输出的统一基础设施测试入口和模型禁用边界，把现有六组回归收口为一个零 Token 命令。该研究基础设施及其回归仍保留；把它和模型 evidence 接成部署消费者的部分已由 SOL-006 替代。回归继续覆盖跨代搬运中途崩溃续传、测试禁用 evaluator 和所有失败路径进程/临时状态清理。
+
+## SOL-006 退出模型 evidence 的部署职责
+
+- 状态: completed
+- 解决: GAP-006
+- 关联: DES-007, REQ-004, AC-010
+
+保留确定性触发合同、隔离 evaluator、planner、收据和恢复能力，但把模型 refresh 定位为显式路由研究。删除 Validate、Deploy、Status 和新部署 manifest 对 `current.json` 及 attempt ledger 的读取、匹配和机器身份投影；部署继续以 payload 指纹、managed-asset lifecycle 和回滚目标形成完整闭环。
+
+新 manifest 使用 schema 9；schema 8 历史部署继续可被 Status 与 Rollback 读取，其旧 routing evidence 字段不再参与当前性判断。项目规则和组件说明不再要求规则或 skill 修改后为了部署刷新模型 evidence；只有实际研究路由行为、诊断已发生的路由失败，或修改 evaluator 基础设施时才进入相应研究与确定性回归入口。

@@ -74,3 +74,18 @@ Policy 被迫等待 Routing，模型重复生成 evaluator envelope 与 215 个�
 - 关联: OBS-005, DES-003, AC-006
 
 runner 必须在保持 cases-only/tool-event failure oracle 的同时注入共享 shell policy，并把 policy hash 记入新运行 runtime；因为通过结果从未消费工具且 capsule 未变化，该安全加强不使当前 oracle-valid evidence 失效，也不能作为重新采样理由。
+
+## OBS-006 模型语义证据会把无关采样漂移传入部署
+
+- 状态: confirmed
+- 证据: 2026-09-03 两次真实增量 refresh、`trigger-cases.json`、`manage_agentbase.ps1`
+- 关联: GAP-006
+
+两次 refresh 都由真实候选变化形成新 generation，没有对相同输入重采样。第一轮和修正合同后的第二轮分别在不同用例上出现 skill 或策略标签漏选；第二轮还使一个候选语义未改、且行为标签定义明确排除小型廉价闭集的用例选择了被禁止标签。部署代码不消费这些具体选择来改变 payload、安装行为或 Status，只验证 `current.json` 与 receipt 后把其机器身份再次写入部署清单。
+
+## GAP-006 无运行消费者的模型选择成为自引用部署门禁
+
+- 状态: resolved
+- 关联: OBS-006, AC-010, SOL-006
+
+迁移前的 Validate、Deploy 与 Status 要求模型 evidence 当前有效并在 manifest 中匹配，但其具体 Routing、Policy 与 References 结果没有部署或运行时消费者。于是无关采样漂移能阻止规则安装，维护者只能修改 oracle、候选或再次评估来恢复一个不会改变安装结果的凭据，正好形成高成本、需持续维护且不能可靠证明实际行为的门禁。SOL-006 已删除该部署消费者并由 schema 9 清单完成生命周期退出；模型 evidence 现只保留在显式研究入口。

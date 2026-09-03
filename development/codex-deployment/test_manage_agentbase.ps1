@@ -116,8 +116,8 @@ try {
     $validationMachine = ($baselineValidation | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
     if ([string]$validationMachine.action -ne 'Validate' -or
         [string]$validationMachine.source_bundle_sha256 -ne [string]$baselineValidation.source_bundle_sha256 -or
-        [string]::IsNullOrWhiteSpace([string]$validationMachine.routing_evidence_sha256)) {
-        throw "Validate compact display changed the complete machine-readable object"
+        $validationMachine.PSObject.Properties.Name -contains 'routing_evidence_sha256') {
+        throw "Validate did not retain the deployment identity or still exposed retired routing evidence"
     }
     if (-not (Test-Path -LiteralPath $sourceCacheRoot -PathType Container)) {
         New-Item -ItemType Directory -Path $sourceCacheRoot | Out-Null
@@ -280,9 +280,10 @@ try {
     }
     $defaultManifestPath = Join-Path $defaultDeploy.backup_path "manifest.json"
     $defaultManifest = Get-Content -LiteralPath $defaultManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([int]$defaultManifest.schema_version -ne 8 -or
+    if ([int]$defaultManifest.schema_version -ne 9 -or
         [string]$defaultManifest.managed_asset_lifecycle_sha256 -ne [string]$defaultDeploy.managed_asset_lifecycle_sha256 -or
-        @($defaultManifest.managed_asset_units).Count -ne [int]$defaultDeploy.managed_asset_unit_count) {
+        @($defaultManifest.managed_asset_units).Count -ne [int]$defaultDeploy.managed_asset_unit_count -or
+        $defaultManifest.PSObject.Properties.Name -contains 'routing_evidence_sha256') {
         throw "Default deploy manifest did not record the complete managed-asset lifecycle"
     }
     foreach ($retiredPath in $retiredDefaultPaths) {
@@ -331,6 +332,12 @@ try {
     $defaultManifest.schema_version = 8
     $defaultManifest.state = 'deployed'
     Write-FixtureText -Path $defaultManifestPath -Text ($defaultManifest | ConvertTo-Json -Depth 10)
+    $schema8ManifestStatus = & $manage -Action Status -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
+    if (-not [bool]$schema8ManifestStatus.managed_payload_formally_deployed) {
+        throw 'Status did not read a schema 8 deployed manifest as deployment history'
+    }
+    $defaultManifest.schema_version = 9
+    Write-FixtureText -Path $defaultManifestPath -Text ($defaultManifest | ConvertTo-Json -Depth 10)
 
     $staleProjectTestPath = Join-Path $codexRoot "skills\codex-event-logger\tests\stale_project_test.py"
     New-Item -ItemType Directory -Path (Split-Path -Parent $staleProjectTestPath) -Force | Out-Null
@@ -370,6 +377,8 @@ try {
     if ([IO.File]::GetLastWriteTimeUtc($untouchedSkillPath) -ne $sentinelWriteTime) {
         throw "No-op deploy touched an unchanged managed file"
     }
+    $defaultManifest.schema_version = 8
+    Write-FixtureText -Path $defaultManifestPath -Text ($defaultManifest | ConvertTo-Json -Depth 10)
     $defaultRollback = & $manage -Action Rollback -ProjectRoot $ProjectRoot -CodexRoot $codexRoot -BackupPath $defaultDeploy.backup_path
     $defaultRollbackDisplay = ($defaultRollback | Out-String -Width 4096).Trim()
     if ($defaultRollbackDisplay -notmatch '(?m)^rolled_back\s*:\s*true\r?$' -or
@@ -488,8 +497,8 @@ try {
             throw "Portable custom agent is missing from the rollback manifest: $agentName"
         }
     }
-    if ([int]$manifest.schema_version -ne 8 -or [string]::IsNullOrWhiteSpace([string]$manifest.installed_contract_bundle_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evidence_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.routing_evaluation_capsule_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.managed_asset_lifecycle_sha256) -or @($manifest.managed_asset_units).Count -eq 0) {
-        throw "Deploy manifest is missing the current routing and managed-asset lifecycle receipts"
+    if ([int]$manifest.schema_version -ne 9 -or [string]::IsNullOrWhiteSpace([string]$manifest.installed_contract_bundle_sha256) -or [string]::IsNullOrWhiteSpace([string]$manifest.managed_asset_lifecycle_sha256) -or @($manifest.managed_asset_units).Count -eq 0 -or $manifest.PSObject.Properties.Name -contains 'routing_evidence_sha256') {
+        throw "Deploy manifest is missing the deployment lifecycle receipts or still contains retired routing evidence"
     }
     $scopeBridgeDeploy = & $manage -Action Deploy -ProjectRoot $ProjectRoot -CodexRoot $codexRoot
     $scopeBridgeManifest = Get-Content -LiteralPath (Join-Path $scopeBridgeDeploy.backup_path "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json

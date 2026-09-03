@@ -53,4 +53,14 @@
 
 从暂存候选生成的独立干净 worktree 中，`test_manage_agentbase.ps1` 全部通过，随后正式 `manage_agentbase.ps1 -Action Validate` 返回 `valid=true`，证明长期阶段迟滞、代理角色、路由证据、受管资产与部署合同在同一提交态一致。
 
-用户明确授权后，从提交 `0aba411` 的独立干净 worktree 以 `DirectCompatibility + InstallPortableSettings` 正式 Publish：`published:true`、`changed:16`，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-030345-c7ac8ea8`；发布后同范围 Status 返回 `published:true`。发布只证明安装文件和部署合同，当前已启动任务不会追溯加载新规则。
+用户明确授权后，从当时的独立干净 worktree 以 `DirectCompatibility + InstallPortableSettings` 向真实 Codex 根完成一次部署；旧入口返回 `published:true`、`changed:16`，同范围 Status 也返回旧字段 `published:true`。这些字段是 schema 7 的历史命名，只证明安装文件和部署合同，不表示形成版本或分发资产；当前已启动任务不会追溯加载新规则。
+
+## 2026-09-03 已知后继轮边界复验
+
+- `reasoning-governor` 结构校验通过；`validate_contract.ps1` 通过，共 142 个场景、88 个严格路由场景、28 个严格引用场景，13/13 skill 同时具有正向与非触发覆盖。
+- 新增严格非触发场景明确：一个可在已开始当前轮闭合的中等多文件替换，没有 active Goal 或已知后继轮时，不选择 governor。无 Goal 正例则明确下一次自然用户消息会继续同一长期证明，设置成功后结束当前轮等待。
+- 修改前独立样本 `v8-replacement-assets-candidate` 完成替换并通过 3/3，但额外加载 governor 且一次状态查询失败；修改后同任务新进程样本 `v9-replacement-assets-final` 通过 4/4，没有加载或调用 governor，旧生产路径、旧测试和旧 gate 均退出，独立 audit 合同保留。
+- 后继样本耗时 296.6 秒、30 条命令、15 个工具批次，输入 804697、其中缓存 748160，输出 9276；上一样本为 302.1 秒、31 条命令、9 个工具批次，输入 675069、其中缓存 623104，输出 10627。该对照只证明误查询消失且质量保持，不证明总成本改善；多数独立源码读取和最终静态检查已经合批，一次已知 skill 对仍未合批不足以支持新增同义规则。
+- `test_manage_agentbase.ps1` 通过，正式 `Validate` 返回 `valid:true`。在用户本轮持续 Deploy 授权下，候选已部署到 `DirectCompatibility + InstallPortableSettings`，紧随的 Status 返回 `deployed:true`；没有形成版本、标签或分发资产，也没有执行 Release。
+
+实验原始事件、结果和结构化摘要保留在仓库外的本地主机实验目录，不进入 Codex payload。部署只证明安装内容与确定性合同；当前已启动任务不会追溯加载新规则，行为结论来自上述独立新进程样本。

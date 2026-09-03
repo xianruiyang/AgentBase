@@ -95,7 +95,7 @@
     "model_interaction_surface": "当前请求要求设计、选择或改变模型直接或间接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面只投影当前动作所需语义，不用 Base64、完整哈希、UUID 等长不透明码承担身份，在不损失必要语义下按实测或已验证保守估算选择最低 Token 格式；机器面保持稳定完整，生成物不作为语义修改入口。",
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
-    "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值，线程设置入口只在配置证据会改变动作时查询，并只为可预期长期阶段且剩余收益足以覆盖切换和恢复成本时设置；孤立难题和短机械收尾沿用当前档位。",
+    "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值。只有同一工作的已知后继轮会消费设置且配置证据会改变该轮动作时才查询，并只为可预期长期阶段且剩余收益足以覆盖切换和恢复成本时设置；当前轮可闭合、无明确后继轮、孤立难题和短机械收尾沿用当前档位。",
     "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定且委派净收益成立时，事实未知而只读可得用 evidence，必须操作才能裁决路径、错误或约束未知用 experiment，目标、规则、范围与 oracle 已确认且只剩难脚本化执行用 operator，否则主代理直接完成。等待不是角色依据：观察既有执行属 evidence，启动并分析冻结输入的已知执行属 operator，修改后反复运行以发现路径属 experiment。创建这三种固定角色时必须显式且只用 fork_turns=none，上下文只经有界 capsule 传入，不省略、不用 all 或正整数，也不用通用角色绕过固定配置；子代理不得再创建子代理、新任务或分叉任务。子代理只返回稀疏结果，主代理优先接纳能推翻当前前提的返回并熔断受影响分支；已有返回尚不能在下一决策前消费时不继续创建平级调查。主代理保留目标、设计、正式验收、完成、Git、发布和外部写责任。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。",
@@ -169,6 +169,7 @@
     "reasoning-depth-discussion-only",
     "reasoning-long-domain-work-assessment",
     "reasoning-short-task-no-transition",
+    "reasoning-current-turn-multifile-no-transition",
     "reasoning-current-effort-sufficient",
     "reasoning-isolated-hard-item-no-transition",
     "reasoning-short-tail-no-transition",
@@ -1541,7 +1542,7 @@
     {
       "id": "no-goal-reasoning-shift",
       "kind": "positive",
-      "request": "当前没有 active Goal，用户也没有固定推理深度，当前有效读回为 effort:medium。下一段是较长的高难度形式化证明，需要构造反例并做独立校验，最低充分档位是 high，剩余工作足以摊销 next-turn 切换；请在继续前按需调整。",
+      "request": "当前没有 active Goal，用户也没有固定推理深度，当前有效读回为 effort:medium。我已明确下一次自然用户消息会继续同一项较长的高难度形式化证明，最低充分档位是 high，后继工作足以摊销 next-turn 切换；请按需调整，设置成功后结束当前轮并等待该消息，不要求本轮继续证明。",
       "expected_skills": [
         "reasoning-governor"
       ],
@@ -1557,7 +1558,7 @@
     {
       "id": "reasoning-long-domain-work-assessment",
       "kind": "behavior",
-      "request": "当前没有 active Goal，用户也没有固定推理深度，当前档位没有有效读回。下一段要较长地查清一个反复失效的跨模块共享状态机制，裁决唯一 owner、实际消费者和旧路径退出，并完成因果及跨消费者验证；在第一个实质动作前同时处理领域方法和推理档位。",
+      "request": "当前有 active Goal，用户没有固定推理深度，当前档位没有有效读回。下一段要较长地查清一个反复失效的跨模块共享状态机制，裁决唯一 owner、实际消费者和旧路径退出，并完成因果及跨消费者验证；Goal 会承载后继轮，请在第一个实质动作前同时处理领域方法和推理档位。",
       "expected_skills": [
         "change-governance",
         "reasoning-governor"
@@ -1597,6 +1598,21 @@
       "id": "reasoning-current-effort-sufficient",
       "kind": "boundary",
       "request": "用户没有固定推理深度；当前上下文已有同一线程、此后无配置变化的验证读回 effort:high，下一段长篇纯逻辑证明的最低充分档位也是 high。直接继续，不重复查询或设置。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "reasoning-governor",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "reasoning_effort_economy"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "reasoning-current-turn-multifile-no-transition",
+      "kind": "boundary",
+      "request": "用户没有固定推理深度，当前档位也未读回。当前请求需要在一个小型仓库中读取规范、两个入口和几项测试，完成已确认 owner 内的替换并运行局部验证；全部工作可以在已经开始的当前轮闭合，没有 active Goal，也没有已明确会继续同一工作的后继自然消息。不要查询或切换只影响 next-turn 的档位。",
       "expected_skills": [],
       "forbidden_skills": [
         "reasoning-governor",
