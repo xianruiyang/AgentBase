@@ -60,7 +60,9 @@
     "reasoning_effort_economy",
     "bounded_subagent_delegation",
     "adaptive_execution_plan",
-    "skill_context_lifecycle"
+    "skill_context_lifecycle",
+    "replacement_closure",
+    "decision_relevant_findings"
   ],
   "behavior_tag_definitions": {
     "read_only": "请求只授权分析、解释、审查、查询或无外部写入的观察性执行，不修改文件、持久进程或外部状态。",
@@ -96,7 +98,9 @@
     "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值，线程设置入口只在配置证据会改变动作时查询，并只为可预期长期阶段且剩余收益足以覆盖切换和恢复成本时设置；孤立难题和短机械收尾沿用当前档位。",
     "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定且委派净收益成立时，事实未知而只读可得用 evidence，必须操作才能裁决路径、错误或约束未知用 experiment，目标、规则、范围与 oracle 已确认且只剩难脚本化执行用 operator，否则主代理直接完成。等待不是角色依据：观察既有执行属 evidence，启动并分析冻结输入的已知执行属 operator，修改后反复运行以发现路径属 experiment。创建这三种固定角色时必须显式且只用 fork_turns=none，上下文只经有界 capsule 传入，不省略、不用 all 或正整数，也不用通用角色绕过固定配置；子代理不得再创建子代理、新任务或分叉任务。子代理只返回稀疏结果，主代理优先接纳能推翻当前前提的返回并熔断受影响分支；已有返回尚不能在下一决策前消费时不继续创建平级调查。主代理保留目标、设计、正式验收、完成、Git、发布和外部写责任。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
-    "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。"
+    "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。",
+    "replacement_closure": "修改既有行为且候选会新增长期机制或适配时，写入前区分原 owner 内改写、替换和由不同当前契约支撑的独立并存；替换把旧同责生产路径与只绑定旧实现的验证资产纳入同一完成闭环，临时并存有真实调用方和退出条件，不把退役留作无 owner 的清理。",
+    "decision_relevant_findings": "测试、门禁或评审发现只有直接证明当前目标、契约或完成条件被违反时才进入当前实现；仍保护稳定契约的检查更新，只绑定已退出实现的检查删除或降级，建议和相邻风险分开报告。修正后先重验受影响路径，只有新证据扩大影响范围时才扩大复核。"
   },
   "peer_skills": [
     {
@@ -1422,7 +1426,6 @@
       "expected_behavior_tags": [
         "read_only",
         "fact_first",
-        "vertical_validation_closure",
         "expensive_action_preflight"
       ],
       "forbidden_behavior_tags": [
@@ -2419,6 +2422,96 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "same-responsibility-replacement-closure",
+      "kind": "behavior",
+      "request": "现有缓存读取路径违反已确认契约。新增一个包装层可以修复表象，但会与旧路径共同决定同一语义；旧 fixture、测试和门禁又只断言旧调用顺序。用户已授权根治。请实施，使正式消费者通过，并且不要把旧路径和旧检查留给以后清理。",
+      "expected_skills": [
+        "change-governance",
+        "execution-governor"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "lifecycle-and-entry.md",
+        "verification-and-gates.md"
+      ],
+      "expected_execution_governor_references": [
+        "decision-frontier.md",
+        "failure-and-cost.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "architecture_integrated",
+        "impact_closure",
+        "long_term_total_cost",
+        "replacement_closure",
+        "decision_relevant_findings"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "stale-validation-assets-after-contract-change",
+      "kind": "behavior",
+      "request": "公共契约已经由权威 owner 确认改变。一个端到端测试仍验证新契约，另外几项旧单测和门禁只锁定已退出实现的内部调用顺序；它们现在失败。请继续完成已授权实现和验证，不要为了让旧检查变绿而恢复旧结构，也不要先迁移全部检查再验证真实消费者。",
+      "expected_skills": [
+        "change-governance",
+        "execution-governor"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "verification-and-gates.md"
+      ],
+      "expected_execution_governor_references": [
+        "failure-and-cost.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "decision_relevant_findings"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "review-blocker-with-adjacent-suggestions",
+      "kind": "behavior",
+      "request": "当前实现的 Review 返回一项能直接证明本次契约失败的问题，以及两项与目标无关的重构建议。用户授权修复当前目标。请只接纳阻塞项并验证受影响路径，不实现建议，也不要因修复完成而重新启动无边界全量 Review。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "execution-governor",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_execution_governor_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "no_scope_expansion",
+        "decision_relevant_findings"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "independent-current-consumers-may-coexist",
+      "kind": "boundary",
+      "request": "两个当前消费者有已确认且互不相同的保留与审计契约，共用同一决定路径会违反其中一个。请在已授权范围内完成实现；不要仅因代码相似就把其中一条路径当成旧重复删除，也不要为它们增加第三个共享状态源。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "change-governance",
+        "execution-governor",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "architecture_integrated",
+        "long_term_total_cost"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
       "id": "review-only-no-alternative-execution",
       "kind": "behavior",
       "request": "只评审这个临时方案的长期风险并提出建议，不要修改任何文件，也不要替我实施更好的方案。",
@@ -2760,7 +2853,6 @@
         "iteration.md"
       ],
       "expected_task_table_manager_references": [
-        "execution.md",
         "tooling.md",
         "query-tooling.md",
         "execution-tooling.md"

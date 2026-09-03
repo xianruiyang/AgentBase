@@ -42,7 +42,6 @@ if ($View -eq "machine") {
     return
 }
 
-Write-Output "generation=$($plan.evaluation_generation_sha256)"
 Write-Output "runs=$($plan.evaluation_count) reuse=$($plan.reuse_count) blocked=$($plan.blocked_count) pending=$($plan.pending_count)"
 foreach ($phase in @("Routing", "Policy", "References")) {
     $decision = $plan.phases.$phase

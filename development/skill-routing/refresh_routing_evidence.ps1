@@ -11,7 +11,9 @@ param(
     [int]$TimeoutMinutes = 20,
     [string]$RoutingRetryJustification,
     [string]$PolicyRetryJustification,
-    [string]$ReferencesRetryJustification
+    [string]$ReferencesRetryJustification,
+    [ValidateSet("model", "machine")]
+    [string]$View = "model"
 )
 
 $ErrorActionPreference = "Stop"
@@ -379,13 +381,15 @@ if ([int]$initialPlan.evaluation_count -eq 0 -and [int]$initialPlan.pending_coun
     if (Test-Path -LiteralPath $pendingRoot) {
         Remove-AgentBasePendingGeneration -Path $pendingRoot -PendingBase $pendingBase
     }
-    [pscustomobject][ordered]@{
+    $result = [pscustomobject][ordered]@{
         action = "already-current"
         evaluation_generation_sha256 = [string]$initialPlan.evaluation_generation_sha256
         evaluator_run_count = 0
         reused_phase_count = 0
         current_evidence_path = $CurrentEvidencePath
     }
+    if ($View -eq "machine") { $result }
+    else { Write-Output "action=already-current runs=0 evidence=current" }
     return
 }
 
@@ -543,7 +547,7 @@ try {
     $totalInput = [long](@($runResults | ForEach-Object { [long]$_.input_tokens } | Measure-Object -Sum).Sum)
     $totalCached = [long](@($runResults | ForEach-Object { [long]$_.cached_input_tokens } | Measure-Object -Sum).Sum)
     $totalOutput = [long](@($runResults | ForEach-Object { [long]$_.output_tokens } | Measure-Object -Sum).Sum)
-    [pscustomobject][ordered]@{
+    $result = [pscustomobject][ordered]@{
         action = "refreshed"
         evaluation_generation_sha256 = [string]$merge.evaluation_generation_sha256
         evaluator_run_count = $runResults.Count
@@ -556,6 +560,15 @@ try {
         cached_input_tokens = $totalCached
         output_tokens = $totalOutput
         current_evidence_path = [string]$merge.path
+    }
+    if ($View -eq "machine") {
+        $result
+    }
+    else {
+        Write-Output "action=refreshed runs=$($result.evaluator_run_count) recovered=$($result.recovered_phase_count) revalidated=$($result.oracle_revalidated_phase_count) carried=$($result.carried_forward_phase_count) reused=$($result.reused_phase_count)"
+        Write-Output "tokens input=$($result.input_tokens) cached=$($result.cached_input_tokens) output=$($result.output_tokens)"
+        if (@($result.parallel_first_wave).Count -gt 0) { Write-Output "first_wave=$(@($result.parallel_first_wave) -join ',')" }
+        Write-Output "evidence=current"
     }
     $refreshSucceeded = $true
 }

@@ -128,7 +128,7 @@ try {
     $referenceFailure[0].failure_summary = 'Synthetic prior-oracle rejection of an otherwise unchanged result.'
     Write-TestJson -Path $historyPath -Value $preRefreshHistory
 
-    $refresh = & (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -ProjectRoot $projectRoot -CurrentEvidencePath $currentPath -AttemptHistoryPath $historyPath
+    $refresh = & (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -ProjectRoot $projectRoot -CurrentEvidencePath $currentPath -AttemptHistoryPath $historyPath -View machine
     if ([string]$refresh.action -ne "refreshed" -or [int]$refresh.evaluator_run_count -ne 0 -or
         [int]$refresh.recovered_phase_count -ne 2 -or [int]$refresh.oracle_revalidated_phase_count -ne 1 -or
         [int]$refresh.reused_phase_count -ne 0) {
@@ -172,7 +172,7 @@ try {
     foreach ($carryAttempt in @($carryHistory.attempts)) { $carryAttempt.cycle_id = $priorGeneration }
     Write-TestJson -Path $carryHistoryPath -Value $carryHistory
 
-    $carryRefresh = & (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -ProjectRoot $projectRoot -CurrentEvidencePath $carryCurrentPath -AttemptHistoryPath $carryHistoryPath
+    $carryRefresh = & (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -ProjectRoot $projectRoot -CurrentEvidencePath $carryCurrentPath -AttemptHistoryPath $carryHistoryPath -View machine
     if ([string]$carryRefresh.action -ne "refreshed" -or [int]$carryRefresh.evaluator_run_count -ne 0 -or
         [int]$carryRefresh.recovered_phase_count -ne 0 -or [int]$carryRefresh.carried_forward_phase_count -ne 3 -or
         [int]$carryRefresh.reused_phase_count -ne 0) {
@@ -219,7 +219,7 @@ try {
     Write-TestJson -Path $crossHistoryPath -Value $crossHistory
     & (Join-Path $PSScriptRoot "validate_routing_attempt_history.ps1") -ProjectRoot $projectRoot -AttemptHistoryPath $crossHistoryPath | Out-Null
 
-    $crossRefresh = & (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -ProjectRoot $projectRoot -CurrentEvidencePath $crossCurrentPath -AttemptHistoryPath $crossHistoryPath
+    $crossRefresh = & (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -ProjectRoot $projectRoot -CurrentEvidencePath $crossCurrentPath -AttemptHistoryPath $crossHistoryPath -View machine
     if ([string]$crossRefresh.action -ne "refreshed" -or [int]$crossRefresh.evaluator_run_count -ne 0 -or
         [int]$crossRefresh.oracle_revalidated_phase_count -ne 1 -or [int]$crossRefresh.carried_forward_phase_count -ne 2 -or
         [int]$crossRefresh.reused_phase_count -ne 0) {
@@ -262,7 +262,7 @@ try {
     [IO.File]::Copy((Join-Path $resumePriorRoot 'routing.json'), $resumeRoutingPath)
     & $recorder -Action CarryForward -ProjectRoot $projectRoot -Phase Routing -SourceStagePath $resumeRoutingPath -SourceAttemptHistoryPath $resumeSourceHistoryPath -AttemptHistoryPath $resumeHistoryPath | Out-Null
 
-    $resumeRefresh = & (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -ProjectRoot $projectRoot -CurrentEvidencePath $resumeCurrentPath -AttemptHistoryPath $resumeHistoryPath
+    $resumeRefresh = & (Join-Path $PSScriptRoot "refresh_routing_evidence.ps1") -ProjectRoot $projectRoot -CurrentEvidencePath $resumeCurrentPath -AttemptHistoryPath $resumeHistoryPath -View machine
     if ([string]$resumeRefresh.action -ne "refreshed" -or [int]$resumeRefresh.evaluator_run_count -ne 0 -or
         [int]$resumeRefresh.recovered_phase_count -ne 1 -or [int]$resumeRefresh.carried_forward_phase_count -ne 2 -or
         [int]$resumeRefresh.reused_phase_count -ne 0) {

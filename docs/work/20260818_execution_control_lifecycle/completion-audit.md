@@ -8,11 +8,14 @@
 
 | 目标 | 当前结果与直接证据 | 判定 |
 | --- | --- | --- |
+| AC-014 完成内容不得偏离共同确认的真实需求 | 评审发现只有直接证明当前目标、契约或完成条件失败时进入活动切片；建议与相邻风险不产生实施授权，两项独立行为场景中的评审任务只修复唯一阻塞项 | 仓库合同、安装与代表行为满足；复杂评审待真实任务观察 |
 | AC-007 按端到端成本渐进加载上下文 | skill 选择、正文有效性和引用生命周期仍分离；新增 skill 只按两类控制问题加载引用 | 满足 |
+| AC-022 权威变化必须形成影响闭包 | 替换闭环同时处置旧同责生产路径及只绑定旧实现的 fixture、测试、门禁和说明；代表替换场景删除旧 helper 与调用序列测试，并保留公共合同测试 | 仓库合同、安装与代表行为满足 |
+| AC-023 按长期净收益和系统总成本选择方案 | 写入前区分原位改写、替换与独立并存；没有新增 skill、状态、CLI、影响账本或硬门禁，现有全局规则经压缩仍留有组合预算余量 | 满足 |
 | AC-024 纳入目标成立所需的职责调整 | 架构与长期 owner 仍由 `change-governance`；新执行 owner 明确排除单个领域故障和职责裁决，没有吸收治理职责 | 满足 |
 | AC-036 在既定设计内深度优先形成可用纵向闭环 | 上游设计与职责保持原 owner；执行控制先完成一个跨层正式可用结果，首个结果不取得新设计权威，平级实现、fixture、示例和测试均在其成立前熔断；Delivery、Task 与路由证据已接入 | 仓库合同与安装满足；真实执行待新任务观察 |
 | AC-050 目标档位、状态查询与切换收益分层 | 复杂执行的目标与状态价值归执行控制，稳定工作由模型直接判断，`reasoning-governor` 只承担线程读写与生命周期 | 仓库合同满足；真实自主切换未验证 |
-| AC-066 支持场景以模型行为验收规则系统 | 全局责任边界、四个专项 skill、任务检查点、srcq 现态诊断、领域 runner 升级和五个严格行为场景已接入；旧 oracle 可零 Token 重验原结果 | 仓库合同满足；需发布后新任务验证行为 |
+| AC-066 支持场景以模型行为验收规则系统 | 第六版新增同责替换、失效验证资产、评审收敛与独立并存四类粗粒度场景；三阶段 evidence 当前有效，另有两项独立 Sol/max 行为结果 | 代表行为满足；复杂多消费者任务待观察 |
 | AC-068 语义子代理有界委派 | `evidence` 稀疏可接纳证据与 `experiment` 可回滚连续遮蔽实验已进入代理、skill 和严格 Routing/References；补丁仍须主代理重写、修订接入或拒绝 | 仓库合同与安装满足；真实委派行为待新任务观察 |
 | AC-069 同源当前前沿与结构写回漂移 | task/state/result 与关联 DCR 派生稀疏前沿，`state+1` 未引用结果只形成 advisory；102 项 taskctl 回归覆盖生成、预算、恢复、冲突与非触发边界 | 满足 |
 | AC-070 昂贵动作 preflight | execution-governor 已定义按适用性选择的输入、fixture、权限、runner、oracle、变化依据和 ready/blocked，领域 runner 保留具体实现；严格路由与引用通过 | 仓库合同与安装满足；领域真实运行待消费者验证 |
@@ -29,7 +32,7 @@
 - 多维组合需要跨轮消费时只在既有 `verification`、`validation_dimensions`、state 检查点和 result `validation_coverage` 中保存紧凑 coverage basis；首个结果的执行顺序不改写既定设计、制造平级依赖或建立完整矩阵文件。
 - `source-query` 只在现态能力/错误/降级待裁时加载诊断引用；领域 runner 的具体命令继续由领域 owner 维护。
 - `development/skill-routing` 的 `oracle_revalidation` 只复用精确原结果并链接旧失败收据，不改变模型可见输入或绕过当前 oracle；总收据、历史和 merge 仍受原门禁。
-- 114/114 Routing、114/114 Policy、45/45 References、102 项 taskctl 回归和零模型基础设施均通过；这些只证明仓库合同、粗粒度行为标签与引用选择，不提升为真实任务行为证明。
+- 当前静态合同为 141 cases、87 strict routing、28 strict references，三阶段 evidence 计划为 0 evaluate/3 reuse，零模型基础设施为 6 suites、22 个 PowerShell 文件；本次未改变 workflow CLI 实现，未重跑无新增信息的 102 项历史回归。这些证据只证明各自范围，真实行为由独立场景和后续任务观察承担。
 
 ## 第二版完成判定
 
@@ -43,6 +46,18 @@
 
 ## 第四版完成判定
 
-第四版 SOL-021—SOL-024 已在实现提交 `ce5de0f` 上完成 3 项受影响 skill 结构检查、117-case 静态合同、6-suite 零模型路由基础设施、117/117 Routing、117/117 Policy、46/46 References，以及脱离 dirty 评测候选的 46 项独立提交 Validate。最终 evidence generation 为 `E9A8578617B9FDCED63E0B6B4BDD72220B9717F999BE6DFE4C0293B95FAD25D3`；最终刷新只运行 References，Routing 与 Policy 各 carry-forward 一次，未对不变输入原样重采样。
+第四版 SOL-021—SOL-024 已在实现提交 `ce5de0f` 上完成 3 项受影响 skill 结构检查、117-case 静态合同、6-suite 零模型路由基础设施、117/117 Routing、117/117 Policy、46/46 References，以及脱离 dirty 评测候选的 46 项独立提交 Validate。完整 evidence identity 保留在机器 evidence；最终刷新只运行 References，Routing 与 Policy 各 carry-forward 一次，未对不变输入原样重采样。
 
 用户明确授权的 `DirectCompatibility + InstallPortableSettings` Publish 再次通过 67 项基础设施检查，更新 7 个受管对象并建立正式回滚备份；同范围 Status 为 `published:true`。因此第四版需求、执行 owner、任务投影、路由证据、部署合同和真实安装均已闭合，当前没有本版本开放源码实施项。该判定不把首个结果变成设计来源，也不外推为当前已启动任务已加载新规则；真实项目若仍发生组合铺开、覆盖越界或小闭集过度治理，应按 AC-066 取得 trace 后从定义、路由/引用、动作或写回的最早失效层重开。
+
+## 第五版完成判定
+
+第五版 SOL-025—SOL-027 已把活动切片锁、首错后邻接 preflight、消费者批次解绑和按证据前沿消费子代理结果接入原执行 owner；137-case 静态合同、三阶段 evidence、正式 Validate、DirectCompatibility Deploy 与 Status 均通过。它没有新增状态字段、CLI 门禁、固定子代理数量或领域检查表，但真实任务随后证明“新机制与旧职责如何共同退出”仍缺少动作级完成条件，因此第六版按 GAP-022 重开，而不是否定第五版已直接覆盖的纵向与失败成本边界。
+
+## 第六版完成判定
+
+第六版 SOL-028 已在原 owner 内形成共享替换闭环：写入前区分原位改写、替换与不同当前契约支撑的独立并存；替换把旧同责生产路径和实现绑定验证资产退出纳入当前切片；评审只接纳直接阻塞当前目标或契约的发现。实现没有新增 skill、状态源、CLI、影响账本或硬门禁。
+
+四个受影响 skill 结构检查、141-case 静态合同、6-suite 零模型基础设施、三阶段当前 evidence、正式 Validate、DirectCompatibility Deploy 与部署后 Status 均通过。独立 Codex CLI 使用 Sol/max 完成两项代表行为：替换场景删除旧 helper 与实现绑定测试并通过 4/4 公共合同测试；评审场景只修复唯一阻塞项并通过 1/1 测试，没有实现两个相邻建议。临时 fixture 已删除。
+
+因此第六版仓库真源、路由证据、部署 payload、真实安装和两个代表行为均闭合，当前没有本版本开放源码实施项，也没有执行 Release。该结论不外推复杂多消费者、长构建或子代理任务；真实任务若仍发生同责叠加、失效检查反推生产设计、建议递归扩张，或误删不同当前契约需要的并存路径，应以直接 trace 重开相应 owner。第六版之前的阶段性恢复点仍为 `agentbase-stable-2026-09-03`。

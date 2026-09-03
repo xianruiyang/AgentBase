@@ -17,21 +17,21 @@ description: 低 Token 管理长期任务合同、依赖、状态、结果摘要
 
 ## 真源与工具
 
-- 创建/修改任务或决定新增、删除、调整真实依赖时读 [task-contracts.md](references/task-contracts.md)；即使只查询并形成待写依赖、不写回，也不能省略。
-- 使用 `taskctl` 查询/写回且有净收益时，读 [tooling.md](references/tooling.md) 和一项动作族：多任务上下游查询读 [query-tooling.md](references/query-tooling.md)，`init/draft/add/update` 读 [authoring-tooling.md](references/authoring-tooling.md)，仅决定待写依赖不读 authoring；`context`、状态命令和 `complete` 读 [execution-tooling.md](references/execution-tooling.md)，`completion-context` 读 [completion-tooling.md](references/completion-tooling.md)。只设计语义且不查询/写回时不读工具引用；明确回写状态、证据前沿或 `next_action` 即选状态命令，跨族才组合。
+- 创建/修改任务合同或决定新增、删除、调整真实依赖时读 [task-contracts.md](references/task-contracts.md)，待写依赖即使未写回也须读；仅查询 `impact/context` 或用 `note/reopen` 回写状态而不改合同/依赖时不读。
+- 实际调用 `taskctl` 时读 [tooling.md](references/tooling.md)，再按动作选一族：多任务查询读 [query-tooling.md](references/query-tooling.md)，`init/draft/add/update` 读 [authoring-tooling.md](references/authoring-tooling.md)，`context`、状态命令和 `complete` 读 [execution-tooling.md](references/execution-tooling.md)，`completion-context` 读 [completion-tooling.md](references/completion-tooling.md)。仅设计语义不读工具引用；只形成待写依赖而不执行 `add/update` 时只读 query，不读 authoring；回写状态、证据前沿或 `next_action` 读 execution，跨族才组合。
 - [execution.md](references/execution.md) 仅用于推进、恢复或并行领取；查询上下游、裁决下一动作或形成待写依赖，即使涉及失败/阻塞也不读。
 - 工具入口是 PATH 中独立安装的 `taskctl`，使用时显式传绝对 `--task-dir`；不可用时按文档合同继续，不从 skill 寻找脚本。默认 `--view model` 返回当前动作的稀疏证据；程序、测试或确需完整身份时才用 `--view machine`。两种视图共享任务事实，字段与恢复入口由命令族引用维护。
 - `task-table.json` 登记目录；`tasks/<ID>.json` 持有任务合同，`state/<ID>.json` 持有执行状态和 CLI 维护的 UTC 起止时间，`results/<ID>.r<state-revision>.json` 持有可追溯的结果摘要，`snapshots/<sha256>.json` 持有内容寻址的不可变执行来源映射，状态文件只指向当前结果。
 - `TASK_TABLE.md` 与 `.work-cache/index.json` 均非真源；生成语义见 [query-tooling.md](references/query-tooling.md)。
 - `add/update` 和全部状态写命令在真源提交后、释放同一工作区锁前刷新 `TASK_TABLE.md`；生成视图失败不得回滚或掩盖已经提交的任务、状态或结果，命令必须返回视图陈旧诊断和显式 `render` 恢复入口。
-- 任务合同、状态和结果是程序消费且由模型作出语义决定的结构化真源；CLI 可用时，模型通过 `draft/add/update` 的语义输入和带 revision 的状态命令维护，不直接改永久 JSON 绕过路径、原子写入或并发比较。`add/update` 注入任务 schema/revision，`complete` 注入结果 envelope；模型查询默认使用按当前动作投影的视图，完整结构只供显式机器消费者。生成表格和索引不得作为修改入口。
+- 任务合同、状态和结果是程序消费且由模型决定语义的结构化真源；CLI 可用时通过 `draft/add/update` 和带 revision 的状态命令维护，不直接改永久 JSON。`add/update` 注入 schema/revision，`complete` 注入结果 envelope；查询默认用当前动作的 model 视图，完整结构只供显式机器消费者，生成表格和索引不作修改入口。
 
 ## 使用方式
 
 1. 模型根据上游 `SOL/GAP/DES/AC/REQ` 和真实工作范围编写任务合同语义；公共产出与消费者接入拆分时必须声明真实消费依赖，需要模板时可用默认 model `taskctl draft`，其结果保留稳定 ID 和语义字段但不返回 schema/revision。CLI 不自动把文档变成任务。
 2. 需要结构化存储时用 `add` 或 `update`。模型输入只维护稳定 ID 与任务语义，CLI 注入机器 schema/revision，并用调用方已读 revision 保护并发写入；语义问题只诊断，不把工具变成任务裁判。
 3. 用 `next`、`deps`、`dependents` 和 `context` 取得有界候选、依赖与结果证据；`context` 还投影执行检查点和关联 DCR。稳定上游的单一候选可直接执行；候选共享未证前提、昂贵验证或失效关系时，把证据交给 `$execution-governor` 裁决，不能由 CLI 排序、任务深度或完成数量替代。实际执行前用 `context --capture` 固化最终模型可见来源。
-4. 跨轮跟踪用 `claim/start/note/complete/reopen/release`，先读 state revision 并传 `--expected-state-revision`；停用任务标 `retired`。前沿、消费者、验证 case、已证覆盖、未覆盖维度、证据、失效来源或下一动作改变时，先用 `note` 写回再继续；普通进度不复制。命令只记录模型判断，不决定其许可；成功写入会刷新展示，仅回执报告陈旧时修因后显式 `render`。
+4. 跨轮跟踪用 `claim/start/note/complete/reopen/release`，先读 state revision 并传 `--expected-state-revision`；停用任务标 `retired`。前沿、消费者、case、覆盖、证据、失效来源或下一动作改变时先 `note` 再继续，普通进度不复制。命令只记录判断；写入后刷新展示，仅回执报告陈旧时修因并 `render`。
 5. 模型结果文件只写实际结果、验证、未决问题和证据等语义正文；`complete` 从命令目标、调用方实际执行的 task/state revision 和已捕获来源收据形成完整永久结果。后继验证提交自己的收据和直接证据，不改写或隐藏旧结果诊断。
 6. 上游改变时用 `$delivery-workflow` 的 `impact`、本工具的递归 `impact` 和实际系统依赖逐项判断消费者与结果，按结论更新、重开或退休任务并重新验证；CLI 只返回路径和陈旧诊断，不自动重置状态或宣布结果失效。
 7. 需要最终复核且范围较大时可用 `completion-context` 从当前 Markdown 分页取得目标、约束、全部 DCR 和关联结果。CLI 不筛选完成阻断项、不返回整体通过值；任务或文档改变时从第一页重审。
@@ -40,6 +40,6 @@ description: 低 Token 管理长期任务合同、依赖、状态、结果摘要
 
 只对以下机械风险阻断当前命令：路径越界或写错对象、破坏性覆盖、工作区锁、已有记录写入缺少 CAS revision 或 revision 冲突、显式完成收据在写入时缺失/不可读/身份不一致、输入/输出资源超限，以及最终复核分页中快照改变。精确操作需唯一 ID 时，只就该对象的歧义拒绝操作。
 
-依赖环或自依赖、owner 不一致、状态流转、可解析但非标准的状态/依赖/来源 ID/描述性路径、重复值、已完成合同的后续修订、未完成依赖、上游未决、快照/缓存漂移、任务粒度、mutation scope 重叠、验证或结果为空、引用覆盖不完整，以及未提供结果来源、来源覆盖不完整或陈旧都只报告诊断。已经落盘的历史结果后来出现收据资产异常时同样只诊断并保留历史。诊断不会产生执行许可或产品完成结论。
+依赖环/自依赖、owner 不一致、状态流转、可解析但非标准的状态/依赖/来源 ID/路径、重复值、已完成合同后续修订、未完成依赖、上游未决、快照/缓存漂移、任务粒度、scope 重叠、空验证/结果、引用或结果来源不完整/陈旧都只诊断；历史收据资产异常也只诊断并保留历史。诊断不产生执行许可或产品完成结论。
 
 报告进度时分开给出任务状态、上游未决项、影响传播、结果引用数、任务 revision 陈旧、来源快照问题和结果验证摘要，不把任一计数当成整体完成证明。最终完成标准只来自 `$delivery-workflow` 当前执行周期经用户确认的需求与用户设计；本次方案改变长期 owner 或契约时，其必要影响闭环仍是所选实现成立的证据。

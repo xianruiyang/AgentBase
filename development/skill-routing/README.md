@@ -65,6 +65,8 @@
 
 若全部阶段仍有效，它返回 `already-current`，不启动 evaluator、不新增收据。需要刷新时，它先为不变阶段登记 `evidence_reuse`，再并行启动需要的 Routing/Policy，取得有效 Routing 后判断 References，最后通过 merge 原子更新 `current.json`。首次从旧协议迁移时三阶段都会运行；后续非 reference skill 正文变化为零运行，reference-aware skill 正文变化只运行 References，全局规则变化并行运行 Routing 与 Policy。
 
+默认输出是供模型读取的最小摘要，不包含 generation、receipt 或证据路径等机器身份；程序需要完整结构时显式传 `-View machine`。
+
 阶段结果在 merge 完成前原子保存在被 Git 忽略的 `evidence/pending/<generation>/`。若模型阶段已经通过而外层编排随后失败，下一次刷新重新校验结果，并同时匹配 current generation 的 passed receipt、文件哈希、语义哈希、capsule 与 evaluator 后直接恢复，不重复调用模型。若同一结果仅被旧 oracle 拒绝，当前 oracle 已接受且文件、可见输入、capsule 与 evaluator 仍精确匹配，则在当前 generation 内或通过不可变的上一代账本链追加零 Token `oracle_revalidation` 收据并引用原失败收据，不重新采样。generation 改变时，刷新先把旧账本原样固化到新 staging；阶段可见身份仍有效且旧 stage、旧 passed receipt、账本链和当前 oracle 一致时登记零 Token `staged_carry_forward`，中途重启也沿这份账本快照继续搬运剩余阶段。merge 成功后才删除所有已消费 staging。该目录只是崩溃恢复资产，不是第二证据真源。
 
 runner 只接受可直接执行且不在 WindowsApps 下、不是 reparse point 的用户态 Codex CLI；共享 owner 依次识别用户 npm `@openai/codex` 的嵌套 optional package、提升 optional package 与主包 vendor 回退布局，evaluator 再以 `.codex/.sandbox-bin` 为已验证后备。正式模型默认为 `gpt-5.6-sol`、推理档位默认为 `medium`。每个阶段使用仓库外随机 workdir、临时 `CODEX_HOME`、只读且运行期间禁止写回的现有 `auth.json` 硬链接，并通过共享 owner 把用户级官方 `models_cache.json` 中所选模型投影为只含一个模型的临时目录，避免空 home 的远端目录刷新；缓存时间、etag、其他模型、用户配置和插件状态均不进入投影。runner 使用 `--ignore-user-config`、`--ignore-rules`、`--sandbox read-only`、`--ephemeral`、`--strict-config`、`analytics.enabled=false`、显式禁用插件/应用/hooks/skills/shell 等非评估能力和强制 JSON Schema。schema 只承担结构、枚举和必填字段，数组数量与唯一性由本地 validator 承担，以适配 Responses 的结构化输出子集。每个阶段要求模型在内部逐项检查正向与非触发边界，但不输出理由；模型仍只生成 cases。runner 生成带模型目录 SHA-256 与禁用能力清单的 evaluator envelope，通过共享 JSONL parser 检查不存在工具调用并读取完整用量，再检查真实仓库或用户 skill 根访问痕迹和真实认证文件哈希未变。临时 capsule、模型目录、schema、结果和诊断在结束后删除，不持久化原始模型日志。
