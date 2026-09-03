@@ -104,7 +104,10 @@ function Get-ManagedAssetLifecycleContract {
         [string]$Path,
         [object[]]$CurrentPathUnits,
         [object[]]$CurrentConfigUnits,
-        [object]$PreviousManifest
+        [object]$PreviousManifest,
+        [ValidateSet('', 'DirectCompatibility', 'Plugin')]
+        [string]$DeliveryMode = '',
+        [bool]$IncludePortableSettings = $true
     )
 
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
@@ -239,7 +242,9 @@ function Get-ManagedAssetLifecycleContract {
         Assert-AgentBaseLifecyclePresentDefinitionEqual -Expected $contractUnit -Actual $unit -Context 'Current managed asset'
     }
     foreach ($unit in @($units | Where-Object { [string]$_.state -eq 'present' })) {
-        if (-not $currentById.ContainsKey([string]$unit.id)) {
+        $currentUnitRequired = [string]::IsNullOrWhiteSpace($DeliveryMode) -or
+            (Test-AgentBaseLifecycleUnitInScope -Unit $unit -DeliveryMode $DeliveryMode -IncludePortableSettings $IncludePortableSettings)
+        if ($currentUnitRequired -and -not $currentById.ContainsKey([string]$unit.id)) {
             throw "Lifecycle present unit disappeared without an explicit transition: $($unit.id)"
         }
     }

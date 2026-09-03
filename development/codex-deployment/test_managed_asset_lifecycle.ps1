@@ -93,6 +93,18 @@ try {
         throw 'An out-of-scope deployment did not carry the last managed config provenance forward'
     }
 
+    $null = Get-ManagedAssetLifecycleContract -Path $basePath -CurrentPathUnits @($pathA, $pathB) -CurrentConfigUnits @() -PreviousManifest $baseManifest -DeliveryMode DirectCompatibility -IncludePortableSettings $false
+    $missingInScopePresentRejected = $false
+    try {
+        $null = Get-ManagedAssetLifecycleContract -Path $basePath -CurrentPathUnits @($pathA) -CurrentConfigUnits @() -PreviousManifest $baseManifest -DeliveryMode DirectCompatibility -IncludePortableSettings $false
+    }
+    catch {
+        $missingInScopePresentRejected = $_.Exception.Message -like 'Lifecycle present unit disappeared without an explicit transition*'
+    }
+    if (-not $missingInScopePresentRejected) {
+        throw 'Scoped lifecycle validation ignored a missing in-scope present asset'
+    }
+
     $missingPresentRejected = $false
     try {
         $null = Get-ManagedAssetLifecycleContract -Path $basePath -CurrentPathUnits @($pathA) -CurrentConfigUnits @($managedConfigUnit) -PreviousManifest $null

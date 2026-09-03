@@ -641,6 +641,7 @@ function Get-ValidatedSource {
         [string]$Root,
         [string]$InstallRoot,
         [bool]$IncludePortableSettings,
+        [bool]$ValidatePortableSettings,
         [ValidateSet("DirectCompatibility", "Plugin")]
         [string]$DeliveryMode,
         [object]$PreviousManifest
@@ -650,21 +651,32 @@ function Get-ValidatedSource {
     $portableConfigPath = Join-Path $Root "global\config.toml"
     $hooksTemplatePath = Join-Path $Root "global\hooks.template.json"
     $portableAgentsPath = Join-Path $Root "global\agents"
-    Test-PortableConfigSource -Path $portableConfigPath
-    Test-HooksTemplateSource -Path $hooksTemplatePath
-    $portableAgentFiles = @(Get-ValidatedPortableAgentSources -Path $portableAgentsPath)
-    $portableSettingsRecords = @(
-        "global/config.toml|$(Get-PathFingerprint $portableConfigPath)"
-        "global/hooks.template.json|$(Get-PathFingerprint $hooksTemplatePath)"
-    )
-    foreach ($portableAgentFile in $portableAgentFiles) {
-        $portableSettingsRecords += "global/agents/$($portableAgentFile.Name)|$(Get-PathFingerprint $portableAgentFile.FullName)"
+    $portableSourcesInScope = $IncludePortableSettings -or $ValidatePortableSettings
+    $portableAgentFiles = @()
+    $portableSettingsRecords = @()
+    $currentConfigUnits = @()
+    if ($portableSourcesInScope) {
+        Test-PortableConfigSource -Path $portableConfigPath
+        $portableConfigText = Get-Content -LiteralPath $portableConfigPath -Raw -Encoding UTF8
+        $currentConfigUnits = @(Get-PortableConfigManagedUnits -PortableText $portableConfigText)
+        $portableAgentFiles = @(Get-ValidatedPortableAgentSources -Path $portableAgentsPath)
+        $portableSettingsRecords += "global/config.toml|$(Get-PathFingerprint $portableConfigPath)"
+        foreach ($portableAgentFile in $portableAgentFiles) {
+            $portableSettingsRecords += "global/agents/$($portableAgentFile.Name)|$(Get-PathFingerprint $portableAgentFile.FullName)"
+        }
+        if ($DeliveryMode -eq 'DirectCompatibility') {
+            Test-HooksTemplateSource -Path $hooksTemplatePath
+            $portableSettingsRecords += "global/hooks.template.json|$(Get-PathFingerprint $hooksTemplatePath)"
+        }
     }
-    $portableSettingsFingerprint = Get-TextSha256 ($portableSettingsRecords -join [Environment]::NewLine)
+    $portableSettingsFingerprint = if ($portableSettingsRecords.Count -eq 0) {
+        $null
+    }
+    else {
+        Get-TextSha256 ($portableSettingsRecords -join [Environment]::NewLine)
+    }
 
     $contract = Get-Content -LiteralPath (Join-Path $Root "development\skill-routing\trigger-cases.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-    $portableConfigText = Get-Content -LiteralPath $portableConfigPath -Raw -Encoding UTF8
-    $currentConfigUnits = @(Get-PortableConfigManagedUnits -PortableText $portableConfigText)
     $potentialTargets = New-Object 'System.Collections.Generic.List[object]'
     $potentialTargets.Add([pscustomobject]@{
         lifecycle_id = 'global:agents-md'
@@ -686,34 +698,38 @@ function Get-ValidatedSource {
             role = 'plain'
         })
     }
-    $potentialTargets.Add([pscustomobject]@{
-        lifecycle_id = 'settings:config'
-        relative_path = 'config.toml'
-        source_path = $portableConfigPath
-        target_kind = 'file'
-        delivery_modes = @('DirectCompatibility', 'Plugin')
-        requires_portable_settings = $true
-        role = 'portable_config'
-    })
-    $potentialTargets.Add([pscustomobject]@{
-        lifecycle_id = 'settings:hooks'
-        relative_path = 'hooks.json'
-        source_path = $hooksTemplatePath
-        target_kind = 'file'
-        delivery_modes = @('DirectCompatibility')
-        requires_portable_settings = $true
-        role = 'hooks'
-    })
-    foreach ($portableAgentFile in $portableAgentFiles) {
+    if ($portableSourcesInScope) {
         $potentialTargets.Add([pscustomobject]@{
-            lifecycle_id = "agent:$($portableAgentFile.BaseName)"
-            relative_path = "agents\$($portableAgentFile.Name)"
-            source_path = $portableAgentFile.FullName
+            lifecycle_id = 'settings:config'
+            relative_path = 'config.toml'
+            source_path = $portableConfigPath
             target_kind = 'file'
             delivery_modes = @('DirectCompatibility', 'Plugin')
             requires_portable_settings = $true
-            role = 'plain'
+            role = 'portable_config'
         })
+        if ($DeliveryMode -eq 'DirectCompatibility') {
+            $potentialTargets.Add([pscustomobject]@{
+                lifecycle_id = 'settings:hooks'
+                relative_path = 'hooks.json'
+                source_path = $hooksTemplatePath
+                target_kind = 'file'
+                delivery_modes = @('DirectCompatibility')
+                requires_portable_settings = $true
+                role = 'hooks'
+            })
+        }
+        foreach ($portableAgentFile in $portableAgentFiles) {
+            $potentialTargets.Add([pscustomobject]@{
+                lifecycle_id = "agent:$($portableAgentFile.BaseName)"
+                relative_path = "agents\$($portableAgentFile.Name)"
+                source_path = $portableAgentFile.FullName
+                target_kind = 'file'
+                delivery_modes = @('DirectCompatibility', 'Plugin')
+                requires_portable_settings = $true
+                role = 'plain'
+            })
+        }
     }
 
     $currentPathUnits = @($potentialTargets | ForEach-Object {
@@ -727,7 +743,7 @@ function Get-ValidatedSource {
         }
     })
     $lifecyclePath = Join-Path $Root 'development\codex-deployment\managed_asset_lifecycle.json'
-    $lifecycle = Get-ManagedAssetLifecycleContract -Path $lifecyclePath -CurrentPathUnits $currentPathUnits -CurrentConfigUnits $currentConfigUnits -PreviousManifest $PreviousManifest
+    $lifecycle = Get-ManagedAssetLifecycleContract -Path $lifecyclePath -CurrentPathUnits $currentPathUnits -CurrentConfigUnits $currentConfigUnits -PreviousManifest $PreviousManifest -DeliveryMode $DeliveryMode -IncludePortableSettings $portableSourcesInScope
     $retiredPathUnits = @(Get-SelectedRetiredManagedPathUnits -Contract $lifecycle -DeliveryMode $DeliveryMode -IncludePortableSettings $IncludePortableSettings)
     $retiredConfigUnits = @(Get-SelectedRetiredManagedConfigUnits -Contract $lifecycle -DeliveryMode $DeliveryMode -IncludePortableSettings $IncludePortableSettings)
     $retiredConfigDiagnostics = if (-not [string]::IsNullOrWhiteSpace($InstallRoot) -and $IncludePortableSettings) {
@@ -983,7 +999,7 @@ function Get-WorkflowCliRuntimePreflight {
 }
 
 if ($Action -eq "Validate") {
-    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $null -IncludePortableSettings $false -DeliveryMode $SkillDeliveryMode
+    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $null -IncludePortableSettings $false -ValidatePortableSettings $true -DeliveryMode $SkillDeliveryMode
     $sourceFingerprint = Get-BundleFingerprint -Targets $source.targets -Side source
     $result = [pscustomobject]@{
         action = "Validate"
@@ -1014,7 +1030,7 @@ if ($Action -eq "Status") {
     $manifest = if ($null -eq $deployRecord) { $null } else { $deployRecord.document }
     $lifecycleDeployRecord = Get-LatestDeploymentManifest -InstallRoot $CodexRoot -IgnoreDeploymentScope -MinimumSchemaVersion 7
     $lifecycleManifest = if ($null -eq $lifecycleDeployRecord) { $null } else { $lifecycleDeployRecord.document }
-    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode -PreviousManifest $lifecycleManifest
+    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -ValidatePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode -PreviousManifest $lifecycleManifest
     $srcqRuntime = if (Test-DeploymentSandboxRoot -Root $ProjectRoot -InstallRoot $CodexRoot) {
         [pscustomobject]@{ in_scope = $false; ready = $null; version = $null; binary = $null; integrity = $null; path_entry_count = 0; doctor_ok = $null; scc_doctor_ok = $null; scc_version = $null }
     } else {
@@ -1132,7 +1148,7 @@ if ($Action -eq "Deploy") {
     }
     $previousLifecycleRecord = Get-LatestDeploymentManifest -InstallRoot $CodexRoot -IgnoreDeploymentScope -MinimumSchemaVersion 7
     $previousLifecycleManifest = if ($null -eq $previousLifecycleRecord) { $null } else { $previousLifecycleRecord.document }
-    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode -PreviousManifest $previousLifecycleManifest
+    $source = Get-ValidatedSource -Root $ProjectRoot -InstallRoot $CodexRoot -IncludePortableSettings ([bool]$InstallPortableSettings) -ValidatePortableSettings ([bool]$InstallPortableSettings) -DeliveryMode $SkillDeliveryMode -PreviousManifest $previousLifecycleManifest
     $retiredConfigBlockingDiagnostics = @($source.retired_config_diagnostics | Where-Object { [string]$_.status -ne 'removable' })
     if ($retiredConfigBlockingDiagnostics.Count -gt 0) {
         $details = @($retiredConfigBlockingDiagnostics | ForEach-Object { "$($_.id):$($_.status)" }) -join ', '
