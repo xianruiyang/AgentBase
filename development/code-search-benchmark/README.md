@@ -2,7 +2,7 @@
 
 本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule，并消费 `development/common/codex_runtime.py` 的共享脱敏 launcher 环境与 `development/common/codex_shell_environment_policy.json` 的模型 shell 合同。两者不实现查询语义，也不进入 srcq 或 Codex 发布 payload。
 
-正式语料在 `corpus/`；`v18.json` 是当前候选，沿用 `v17.json` 已校准的原子 required，并把三个外部项目题目中已经要求定位的可调用实体统一升级为“相对文件 + 1-based inclusive 完整实现范围”。范围从实体声明第一行到实现结束行；嵌套实体与包围实体分别计算，不含前置注释、属性或相邻实体。调用、分支、清理、消息边界、位置准确性和静态边界合同不变，旧版本只服务引用它们的历史结果复核。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
+正式语料在 `corpus/`；`v21.json` 是当前候选，沿用 `v20.json` 的完整文件身份与实现范围合同，并把 C++ 题面中已评分的空/非空分支及下游转发关系显式化；同一完整文件身份下可分组列出多个位置，避免重复路径同时保持跨文件边界。完整实现范围包含声明行和适用语言的闭合分隔符所在行；嵌套实体与包围实体分别计算，不含前置注释、属性或相邻实体。调用、分支、清理、消息边界、位置准确性和静态边界合同不变，旧版本只服务引用它们的历史结果复核。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
 
 ```powershell
 python -X utf8 development\code-search-benchmark\experiment.py prepare --config <config.json> --output <new-output-dir>

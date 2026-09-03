@@ -1,0 +1,136 @@
+{
+  "schema": "agentbase.code-reading-path-identity-audit/v1",
+  "created_utc": "2026-09-03T18:32:40Z",
+  "objective": "repair incomplete file identity without changing the established code-search strategy or promoting a quality/cost regression",
+  "scope": {
+    "case_id": "facecutting3d-raycast-chain",
+    "model": "gpt-5.6-luna",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "control": "complete current installed Codex AGENTS, skills, configuration and tools frozen in an isolated home",
+    "candidate_difference": "AGENTS.md only",
+    "workspace_read_only": true,
+    "subagents_in_subject": false,
+    "raw_evidence_root": "%LOCALAPPDATA%/AgentBase/benchmark-runs",
+    "measurement": "observed_request_price.usd, actual_total_tokens, request_count and elapsed_ms from the formal runner; not an invoice",
+    "quality_source": "independent per-required review of final answers in this task; original qualification files do not themselves contain semantic scores"
+  },
+  "oracle_decisions": [
+    {"corpus": "v19", "decision": "not valid for strict path-format comparison", "reason": "forced workspace-relative display conflicts with the desktop's higher-priority absolute local-file link contract"},
+    {"corpus": "v20", "decision": "canonical file identity and inclusive closing line", "reason": "accept absolute or relative display when it uniquely maps to the workspace-root oracle file", "remaining_caveat": "R7 was not explicit enough in the prompt, so its omission alone is not sufficient proof of a product failure; independent price and other location/semantic counterexamples remain valid"},
+    {"corpus": "v21", "decision": "explicit existing non-null forwarding requirement; grouped locations allowed", "reason": "R7 was not sufficiently explicit in the task prompt; required remains 13, source oracle facts unchanged"}
+  ],
+  "historical_comparison": {
+    "corpus": "v18",
+    "control": "historical best batching environment",
+    "candidate": "current installed environment before this repair",
+    "quality_caveat": "initial strict scores predated the explicit workspace-root identity contract; sample 2's current answer had correct code facts but omitted the source-root directory prefix",
+    "runs": [
+      {
+        "path": "current-vs-old-control-v1/qualification",
+        "control": {"initial_quality": "13/13", "usd": 0.01165280, "tokens": 151141, "requests": 6, "seconds": 65.133},
+        "candidate": {"initial_quality": "13/13", "usd": 0.00926408, "tokens": 127645, "requests": 5, "seconds": 54.202}
+      },
+      {
+        "path": "current-vs-old-control-v1/qualification-r2",
+        "control": {"initial_quality": "13/13", "usd": 0.01150508, "tokens": 170635, "requests": 7, "seconds": 76.854},
+        "candidate": {"initial_quality": "7/13", "usd": 0.01239584, "tokens": 181670, "requests": 8, "seconds": 82.004}
+      }
+    ]
+  },
+  "rejected_experiments": [
+    {
+      "alias": "query-route-1", "corpus": "v19", "path": "path-route-fix-v1/pair-1/qualification",
+      "control": {"usd": 0.01216272, "tokens": 172486, "requests": 6, "seconds": 65.858},
+      "candidate": {"usd": 0.00854268, "tokens": 114772, "requests": 5, "seconds": 54.556},
+      "infrastructure_valid": true, "comparison_valid": false,
+      "rejection": "invalid fixed display oracle; candidate also passed wildcard paths as positional Windows inputs"
+    },
+    {
+      "alias": "query-route-2", "corpus": "v19", "path": "path-route-fix-v1/pair-2/qualification",
+      "control": {"usd": 0.01290644, "tokens": 184683, "requests": 8, "seconds": 64.299},
+      "candidate": {"usd": 0.00756252, "tokens": 92023, "requests": 4, "seconds": 46.067},
+      "infrastructure_valid": true, "comparison_valid": false,
+      "rejection": "invalid fixed display oracle; candidate also issued three commands against an unverified nonexistent manifest path"
+    },
+    {
+      "alias": "query-route-3", "corpus": "v19", "path": "path-route-fix-v1/pair-3/qualification",
+      "control": {"usd": 0.01262056, "tokens": 155248, "requests": 6, "seconds": 69.171},
+      "candidate": {"usd": 0.01280564, "tokens": 209390, "requests": 8, "seconds": 74.463},
+      "infrastructure_valid": true, "comparison_valid": false,
+      "rejection": "invalid fixed display oracle; candidate missed the non-null forwarding relation and cost more"
+    },
+    {
+      "alias": "query-route-closure", "corpus": "v19", "path": "path-route-fix-v1/final-1/qualification",
+      "control": {"usd": 0.01165752, "tokens": 149978, "requests": 6, "seconds": 59.692},
+      "candidate": {"usd": 0.00964756, "tokens": 160226, "requests": 7, "seconds": 68.771},
+      "infrastructure_valid": true, "comparison_valid": false,
+      "rejection": "invalid fixed display oracle; candidate ended rayCastInteral at 206 instead of closing line 207"
+    },
+    {
+      "alias": "query-route-display", "corpus": "v19", "path": "path-route-fix-v1/accepted-1/qualification",
+      "control": {"usd": 0.00986252, "tokens": 118321, "requests": 5, "seconds": 76.141},
+      "candidate": {"usd": 0.00935532, "tokens": 117302, "requests": 5, "seconds": 51.508},
+      "infrastructure_valid": true, "comparison_valid": false,
+      "rejection": "historical directory name is not an acceptance decision; absolute links and abbreviated calls exposed the invalid fixed relative-path contract"
+    },
+    {
+      "alias": "canonical-query-1", "corpus": "v20", "path": "path-route-fix-v2/sample-1/qualification",
+      "control": {"quality": "13/13", "usd": 0.01148940, "tokens": 154578, "requests": 6, "seconds": 74.443},
+      "candidate": {"quality": "13/13", "usd": 0.00952548, "tokens": 141514, "requests": 6, "seconds": 55.242},
+      "infrastructure_valid": true, "comparison_valid": true,
+      "rejection": "single improvement did not survive the second planned sample"
+    },
+    {
+      "alias": "canonical-query-2", "corpus": "v20", "path": "path-route-fix-v2/sample-2/qualification",
+      "control": {"quality": "13/13", "usd": 0.00894068, "tokens": 104230, "requests": 4, "seconds": 47.981},
+      "candidate": {"quality": "12/13", "usd": 0.01177344, "tokens": 177718, "requests": 7, "seconds": 69.473},
+      "infrastructure_valid": true, "comparison_valid": true,
+      "rejection": "candidate missed R7 and cost more; pair aggregate price also regressed"
+    },
+    {
+      "alias": "minimal-query-1", "corpus": "v20", "path": "path-identity-minimal-v1/sample-1/qualification",
+      "control": {"quality": "11/13", "usd": 0.00936100, "tokens": 138900, "requests": 6, "seconds": 54.533, "failed_required": [3, 12]},
+      "candidate": {"quality": "8/13", "usd": 0.00923048, "tokens": 140089, "requests": 6, "seconds": 51.152, "failed_required": [4, 5, 7, 11, 12]},
+      "infrastructure_valid": true, "comparison_valid": true,
+      "rejection": "control omitted closing line 207; candidate included comment calls 233/188, missed R7 and falsely claimed completeness"
+    }
+  ],
+  "output_only_candidate": {
+    "corpus": "development/code-search-benchmark/corpus/v21.json",
+    "rule_owner": "global/AGENTS.md final response rule",
+    "change": "preserve canonical file identity, allow grouping under one complete identity and defer display format to higher-priority delivery requirements",
+    "search_rule_change": "none; all attempted query-rule additions reverted",
+    "planned_samples": 2,
+    "promotion": "each valid sample must preserve all 13 required facts and not increase observed total price; run sample 2 only after sample 1 qualifies",
+    "results": [
+      {
+        "alias": "output-only-1",
+        "path": "path-identity-output-v1/sample-1/qualification",
+        "infrastructure_valid": true,
+        "comparison_valid": true,
+        "control": {
+          "quality": "13/13", "observed_price_usd": 0.00813704,
+          "input_tokens": 91828, "cache_read_tokens": 69632, "ordinary_input_tokens": 22196,
+          "output_tokens": 1921, "reasoning_output_tokens": 704, "total_tokens": 93749,
+          "requests": 4, "elapsed_ms": 45199, "tool_items": 7, "path_input_errors": 1,
+          "tools_per_request": [2, 2, 3, 0], "nonempty_answer_lines": 8
+        },
+        "candidate": {
+          "quality": "12/13", "failed_required": [12], "observed_price_usd": 0.00790824,
+          "input_tokens": 107742, "cache_read_tokens": 88832, "ordinary_input_tokens": 18910,
+          "output_tokens": 1958, "reasoning_output_tokens": 637, "total_tokens": 109700,
+          "requests": 5, "elapsed_ms": 45607, "tool_items": 8, "path_input_errors": 2,
+          "tools_per_request": [2, 1, 2, 3, 0], "nonempty_answer_lines": 8
+        },
+        "quality_counterexample": "candidate's three definition ranges and direct calls are correct, but the extra comment references combine bare line numbers 233 and 188 across two files without explicit binding",
+        "tool_error_boundary": "both sides queried a nonexistent manifest path at the initial root; no separate legal zero-match case was observed",
+        "postflight": "no identity drift, transport failure or surviving experiment process"
+      }
+    ],
+    "status": "rejected after sample 1; sample 2 not run",
+    "final_action": "restore global/AGENTS.md and trigger-cases.json exactly to their pre-turn content; retain only corpus clarification and development evidence",
+    "reopen_condition": "a distinct mechanism with a testable reason to improve path identity; do not append another synonymous rule or repeat unchanged samples to obtain a pass"
+  },
+  "production_effect": {"deployment": "not performed", "release": "not authorized or performed"}
+}
