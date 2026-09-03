@@ -63,14 +63,14 @@
     "skill_context_lifecycle"
   ],
   "behavior_tag_definitions": {
-    "read_only": "请求只授权分析、解释、审查或查询，不修改文件、进程或外部状态。",
+    "read_only": "请求只授权分析、解释、审查、查询或无外部写入的观察性执行，不修改文件、持久进程或外部状态。",
     "modify_authorized_scope": "实施用户已授权的修改，并把对象、影响和风险限制在该授权范围内。",
     "fact_first": "请求要求先取证、动作依赖尚未读取的当前状态，或直接证据正在推翻结论、方案、任务与动作时适用：先以直接适用证据确定事实，再判断；它可与 challenge_false_premise 等标签同时适用，不因已指出错误而省略。",
     "challenge_false_premise": "已证明前提错误、不完整或有害时，明确指出并修正，不迎合执行。",
     "no_alternative_execution": "审查、解释或建议请求不得被升级为执行模型自行选择的替代方案。",
     "long_term_total_cost": "先让正式正常路径以最低充分机制成立。新增或保留规则、门禁、校验、状态、分支、包装层、兼容或兜底前，必须证明删除它会使哪个当前契约或消费者结果在已证输入下失效，且 owner、接口或正常路径不能以更低系统成本解决；假想误用、单次错误、未来可能、形式稳健、易于检查或已有实现都不足以产生长期机制。无法证明则不建立，既有机制无消费者或必要性证据则删除，不要求其他组件适配。",
     "architecture_integrated": "把请求行为接入正确的长期职责和正式入口；执行中发现原 owner 或架构判断失效时，在继续依赖旧方案前回退裁决，不先完成孤立补丁再把问题作为残留风险交付。",
-    "authority_lifecycle": "本次动作必须裁决、新建、迁移或改变长期行为的权威 owner、正式入口或生命周期；仅用生命周期差异说明对象不应合并，或在已确认 owner 内新增、更新普通记录时不适用。",
+    "authority_lifecycle": "本次动作必须裁决、新建、迁移或改变长期行为的权威 owner、正式入口或生命周期；决定是否建立领域正式 runner 及其 owner 也适用。仅用生命周期差异说明对象不应合并，或在已确认 owner 内新增、更新普通记录时不适用。",
     "impact_closure": "共享或权威契约改变后，完成前必须覆盖受影响消费者与派生结果的更新、退出或重验。",
     "no_scope_expansion": "当前请求已明确唯一范围或说明旧工作结束时，不延续历史范围；可以指出风险，但不实施未获授权且不影响本次结果的附带改造。",
     "protected_user_baseline": "用户确认的需求或用户设计保持受保护；新证据要求改变时先延后并交由用户裁决。",
@@ -646,10 +646,7 @@
         "task-table-manager"
       ],
       "forbidden_skills": [],
-      "expected_change_governance_references": [
-        "lifecycle-and-entry.md",
-        "verification-and-gates.md"
-      ],
+      "expected_change_governance_references": [],
       "expected_execution_governor_references": [
         "decision-frontier.md"
       ],
@@ -1388,17 +1385,13 @@
       "kind": "behavior",
       "request": "一个公共消费者合同仍有两种会改变实现的解释，现有测试又混有旧结构；PCG 和 Deformer 的生产修改、fixture 与测试已经同时展开，但没有一个真实消费者闭环。用户已授权继续实现。请决定当前下一动作：不得用旧测试反推合同，不得继续两领域横向铺开或把它们绑成构建批次，并说明什么才算进展。",
       "expected_skills": [
-        "execution-governor",
-        "change-governance"
+        "execution-governor"
       ],
       "forbidden_skills": [
         "delivery-workflow",
         "task-table-manager"
       ],
-      "expected_change_governance_references": [
-        "lifecycle-and-entry.md",
-        "verification-and-gates.md"
-      ],
+      "expected_change_governance_references": [],
       "expected_execution_governor_references": [
         "decision-frontier.md",
         "failure-and-cost.md"
@@ -1406,7 +1399,6 @@
       "expected_behavior_tags": [
         "modify_authorized_scope",
         "fact_first",
-        "architecture_integrated",
         "vertical_validation_closure"
       ],
       "forbidden_behavior_tags": []
@@ -1425,7 +1417,6 @@
       ],
       "expected_change_governance_references": [],
       "expected_execution_governor_references": [
-        "decision-frontier.md",
         "failure-and-cost.md"
       ],
       "expected_behavior_tags": [

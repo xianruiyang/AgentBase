@@ -134,4 +134,12 @@ UeAgentInterface15 的真实 trace 证明第四版抽象原则仍未稳定进入
 - `validate_contract.ps1`：137 cases、87 strict routing、28 strict references，13/13 skills 具有正向与非触发覆盖；新增三项场景分别覆盖活动切片锁、首错后邻接 preflight 和子代理结果接纳顺序。
 - `trigger-cases.json` 可解析，`git diff --check` 通过。
 
-这些证据只证明候选结构、引用、行为标签与新增用例合同一致；尚未运行 detached 模型行为评估、完整部署 Validate、真实部署或发行。第五版是否能在复杂 UE 新任务中阻止静默切换消费者和未闭合分支堆积，仍须在候选稳定且用户另行授权相应验证或部署后取得独立行为证据。
+detached 路由刷新首次取得两个失败阶段：新活动切片场景把“只决定下一动作”过度要求为立即选择 `change-governance`，另有两个既有 Policy 标签未被稳定识别；修正隐藏 oracle 与 `read_only`/`authority_lifecycle` 可见定义后，Routing 与 Policy 以改变后的输入通过。References 随后只漏选已有唯一活动消费者场景不需要的 `decision-frontier.md`；移除该过严隐藏要求后，正式刷新恢复两个已通过阶段并以零模型 Token 复核 References，最终没有对未变输入重采样。
+
+正式部署证据：
+
+- `manage_agentbase.ps1 -Action Validate` 返回 `valid:true`。
+- 用户针对本次操作明确授权后，`DirectCompatibility + InstallPortableSettings` Deploy 更新 6 个受管对象；回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260903-165708-41b81ce9`。
+- 同范围 Status 返回 `deployed:true`。
+
+这些证据证明第五版仓库真源、路由证据、部署 payload 与真实安装一致，没有创建版本、标签或发行资产。当前已启动任务不会追溯加载新规则；第五版能否在复杂 UE 新任务中阻止静默切换消费者和未闭合分支堆积，仍须在新任务中取得实际行为证据。
