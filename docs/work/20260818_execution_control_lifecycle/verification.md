@@ -123,3 +123,15 @@ Routing candidate bundle 为 `4EA7F33A284EF18DC593140F96F6BDFB2466DEBE3597C7A295
 最终刷新只运行 References 一次，Routing 与 Policy 通过不可变上一代收据各 carry-forward 一次；刷新后计划为 0 evaluate、3 reuse、0 blocked/pending。形成候选期间的 Policy 反例使小而廉价闭集明确退出 coverage-basis 治理，并删除不改变动作的冗余严格标签；References 反例则区分依赖合同与 authoring 工具、组合决策与失败成本引用。每次重新评估前都改变了相应模型可见定义或引用入口；没有对未变输入原样重采样。
 
 实现提交 `ce5de0f` 的独立临时 worktree 运行 46 项基线基础设施检查并返回 `valid:true`，排除了接手时已有 dirty 评测候选；当前组合工作树的 67 项检查也通过，只补充证明两者兼容。用户针对本次操作明确授权后，`DirectCompatibility + InstallPortableSettings` Publish 再次运行 67 项检查并通过，更新 7 个受管对象，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-190448-db62872f`；同范围只读 Status 返回 `published:true`。这些证据证明仓库候选与真实安装一致，不证明当前已启动任务追溯加载第四版，也不替代新任务中对实际纵向执行和组合覆盖行为的观察。
+
+## 2026-09-03 第五版候选静态验证
+
+UeAgentInterface15 的真实 trace 证明第四版抽象原则仍未稳定进入修改动作：公共合同未稳时横向展开消费者，旧测试与生产迁移交织，多个消费者绑定构建，首错后逐点重跑，子代理返回超过主线即时接纳能力，代码量取代纵向闭环成为进展表达。第五版据此增加活动切片锁、首错后的邻接 preflight、消费者批次解绑和按证据前沿消费子代理结果；不新增状态字段、CLI 门禁、固定子代理数量或领域检查清单。
+
+当前只执行候选形成期的低成本静态检查：
+
+- `quick_validate.py`：`execution-governor` 与 `subagent-orchestration` 均通过；首次默认 GBK 读取失败后，仅以 `PYTHONUTF8=1` 重跑同一内容，确认是宿主解释器编码而非 skill 内容错误。
+- `validate_contract.ps1`：137 cases、87 strict routing、28 strict references，13/13 skills 具有正向与非触发覆盖；新增三项场景分别覆盖活动切片锁、首错后邻接 preflight 和子代理结果接纳顺序。
+- `trigger-cases.json` 可解析，`git diff --check` 通过。
+
+这些证据只证明候选结构、引用、行为标签与新增用例合同一致；尚未运行 detached 模型行为评估、完整部署 Validate、真实部署或发行。第五版是否能在复杂 UE 新任务中阻止静默切换消费者和未闭合分支堆积，仍须在候选稳定且用户另行授权相应验证或部署后取得独立行为证据。

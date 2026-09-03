@@ -81,10 +81,10 @@
     "collaborative_requirement_insight": "不把用户措辞、术语、原因判断或实现建议直接当成目标；从实际场景和期望的可观察结果重组候选意图，区分待验证事实与候选方案，说明依据和不确定性后与用户校准。",
     "quality_token_speed_order": "先选择需求对齐、正确、安全、可维护且有完成证据的方案；质量同等充分时降低 Token，前两者不变差时再提速。",
     "local_task_fast_path": "当前有界动作的 owner、契约和验收明确，没有支配多个动作的共享未知且不改变长期职责时，直接读取、修改、局部验证并停止，不进入完整需求、架构或治理审计。",
-    "vertical_validation_closure": "多个后续动作共享尚未验证或刚被反例推翻的前提时，先熔断依赖它的平级扩量；该边界在扩量前 preflight 与反例写回时同样适用。上游设计与职责已确认后，在既定设计内深度优先完成一个正式可用结果切片和真实消费者；收缩的是同时展开的结果数量与证据成本，不是正式实现。成立前只实现或编写该结果直接需要的 fixture、示例与测试；首个结果不重新设计系统，反例则返回所属层重裁。它可与 evidence_checkpoint_before_continue 或 impact_closure 同时适用。",
+    "vertical_validation_closure": "多个后续动作共享尚未验证或刚被反例推翻的前提时，先熔断依赖它的平级扩量；该边界在扩量前 preflight 与反例写回时同样适用。上游设计与职责已确认后，先锁定适用公共合同与 owner、一个活动消费者、有效 oracle、暂缓范围和解除条件，再在既定设计内深度优先完成该正式可用结果；成立或被推翻前不静默切换消费者，不铺平级实现、fixture、示例与测试，也不把多个未闭环消费者绑定为验证批次。收缩的是同时展开的结果数量与证据成本，不是正式实现；首个结果不重新设计系统。进展按正式消费者闭环和支配未知消除表达，不按代码量、测试量、构建次数或活动分支数表达。它可与 evidence_checkpoint_before_continue 或 impact_closure 同时适用。",
     "observable_behavior_accountability": "适用规则、skill 或工具已正确提供但模型仍产生可预防错误时，把可观察行为作为系统失败证据，定位规则、路由、动作入口、反馈、状态回流或验证缺口；不以正文存在免责，也不按表象堆规则。",
     "rule_execution_failure_localization": "受支持场景出现可预防错误时，按直接 trace 区分规则/能力缺失、skill/引用/入口未触发、规则已读但动作未遵守、动作合规但状态未写回；只修正已证明的最早失效 owner，未到达层保持未知。",
-    "expensive_action_preflight": "昂贵动作第一次完整运行前按适用项一次确认待证判断与反证、输入/schema/fixture、路径权限依赖、runner 生命周期、oracle 产品到达性和重复运行变化依据，并返回 ready 或直接阻塞、遮蔽范围与恢复动作；领域 runner 持有具体实现。",
+    "expensive_action_preflight": "昂贵动作第一次完整运行前按适用项一次确认待证判断与反证、输入/schema/fixture、路径权限依赖、runner 生命周期、oracle 产品到达性和重复运行变化依据，并返回 ready 或直接阻塞、遮蔽范围与恢复动作；首次运行在目标机制前失败后，重跑前把直接失败与同链可低成本观察的邻接前置合并为一次有界 preflight，不声称预知运行时错误；领域 runner 持有具体实现。",
     "stable_candidate_validation": "同一候选内容、目标或验收仍在形成且用户未要求提前验证时，不启动完整回归、独立模型评测或部署校验；候选稳定并准备发布后再按最终影响范围集中验证，开发期只保留能立即改变实现的低成本局部检查。",
     "evidence_checkpoint_before_continue": "反例改变失效范围、当前消费者或下一动作时，先停止依赖工作并把反例、失效来源、当前验证 case 和下一动作写回已有 owner，再重新裁决和继续。",
     "dimension_bounded_validation": "本标签不适用于 owner、契约、oracle 均明确、无共享未知且可低成本穷举的小闭集；此类直接走局部快速路径，不建立 coverage basis。其他声明随多种组件、载体、模式、状态、版本或持久化边界变化，且存在实质组合扩量或共享未知时，在批量实现或测试编写前形成 claim、有效 dimensions、equivalence、interactions、代表 cases 与 promotion 组成的 coverage basis；每个 case 必须新增判别信息，pairwise 不外推高阶交互，穷举只用于明确逐组合认证或无充分等价证据的高后果交互，结论限制在实际覆盖或有可复核依据的等价类。",
@@ -94,7 +94,7 @@
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和权威范围出发，选择最低充分入口；只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
     "reasoning_effort_economy": "用户未固定时，在下一段实质工作前判断目标档位；复杂执行由执行控制先裁决目标与状态价值，线程设置入口只在配置证据会改变动作时查询，并只为可预期长期阶段且剩余收益足以覆盖切换和恢复成本时设置；孤立难题和短机械收尾沿用当前档位。",
-    "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定且委派净收益成立时，事实未知而只读可得用 evidence，必须操作才能裁决路径、错误或约束未知用 experiment，目标、规则、范围与 oracle 已确认且只剩难脚本化执行用 operator，否则主代理直接完成。等待不是角色依据：观察既有执行属 evidence，启动并分析冻结输入的已知执行属 operator，修改后反复运行以发现路径属 experiment。创建这三种固定角色时必须显式且只用 fork_turns=none，上下文只经有界 capsule 传入，不省略、不用 all 或正整数，也不用通用角色绕过固定配置；子代理不得再创建子代理、新任务或分叉任务。子代理只返回稀疏结果，主代理保留目标、设计、正式验收、完成、Git、发布和外部写责任。",
+    "bounded_subagent_delegation": "用户明确指定是否使用子代理时遵守该边界；未指定且委派净收益成立时，事实未知而只读可得用 evidence，必须操作才能裁决路径、错误或约束未知用 experiment，目标、规则、范围与 oracle 已确认且只剩难脚本化执行用 operator，否则主代理直接完成。等待不是角色依据：观察既有执行属 evidence，启动并分析冻结输入的已知执行属 operator，修改后反复运行以发现路径属 experiment。创建这三种固定角色时必须显式且只用 fork_turns=none，上下文只经有界 capsule 传入，不省略、不用 all 或正整数，也不用通用角色绕过固定配置；子代理不得再创建子代理、新任务或分叉任务。子代理只返回稀疏结果，主代理优先接纳能推翻当前前提的返回并熔断受影响分支；已有返回尚不能在下一决策前消费时不继续创建平级调查。主代理保留目标、设计、正式验收、完成、Git、发布和外部写责任。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。"
   },
@@ -1382,6 +1382,91 @@
         "dimension_bounded_validation"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "active-slice-lock-before-cross-consumer-work",
+      "kind": "behavior",
+      "request": "一个公共消费者合同仍有两种会改变实现的解释，现有测试又混有旧结构；PCG 和 Deformer 的生产修改、fixture 与测试已经同时展开，但没有一个真实消费者闭环。用户已授权继续实现。请决定当前下一动作：不得用旧测试反推合同，不得继续两领域横向铺开或把它们绑成构建批次，并说明什么才算进展。",
+      "expected_skills": [
+        "execution-governor",
+        "change-governance"
+      ],
+      "forbidden_skills": [
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "lifecycle-and-entry.md",
+        "verification-and-gates.md"
+      ],
+      "expected_execution_governor_references": [
+        "decision-frontier.md",
+        "failure-and-cost.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "fact_first",
+        "architecture_integrated",
+        "vertical_validation_closure"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "masked-failure-adjacent-preflight",
+      "kind": "behavior",
+      "request": "当前唯一活动消费者第一次完整构建在产品机制启动前因 schema 前置失败；同一调用链还有若干可静态读取的注册、类型、fixture 和 runner 条件尚未核对。只读裁决下一动作，不要修一点就立即重跑，也不要把静态检查夸大为能发现所有运行时问题。",
+      "expected_skills": [
+        "execution-governor"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_execution_governor_references": [
+        "decision-frontier.md",
+        "failure-and-cost.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "fact_first",
+        "vertical_validation_closure",
+        "expensive_action_preflight"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "subagent-result-intake-frontier",
+      "kind": "behavior",
+      "request": "三个并行 evidence 子代理刚返回：第一份直接推翻当前公共合同，后两份继续列出依赖该合同的领域问题；主线尚未接纳任何结果，现有 child 结果也已足够决定下一动作。请只裁决接纳与熔断顺序，不创建更多平级调查，不把所有问题同时送入实现。",
+      "expected_skills": [
+        "execution-governor",
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_execution_governor_references": [
+        "decision-frontier.md"
+      ],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "vertical_validation_closure",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "higher-order-interaction-coverage",

@@ -1,4 +1,4 @@
 interface:
   display_name: "Execution Governor"
   short_description: "控制正式纵向切片、组合覆盖、证据前沿、反例熔断与扩量成本"
-  default_prompt: "使用 $execution-governor 确定当前证据前沿与组合覆盖依据，在已确认设计内先深度优先闭合一个正式可用结果切片；把平级实现、fixture 和测试编写视为扩量，且不让首个结果演化或替代设计，反例出现时熔断下游并写回后再裁决。"
+  default_prompt: "使用 $execution-governor 确定当前证据前沿；先锁定公共合同、一个活动消费者、有效 oracle 和暂缓范围，再深度优先闭合该正式结果。首个结果成立前不切换消费者或铺平级实现与测试；失败先做一次邻接 preflight，反例则熔断并写回。"
