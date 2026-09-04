@@ -24,6 +24,8 @@ AgentBase 自托管题目的工作区不能同时把本基准的历史答案、�
 
 control/candidate home 的 `config.toml` 不得再定义 `shell_environment_policy`；prepare 会在模型前拒绝第二 owner。两侧差异继续由 home tree identity 维护；`environment-dependencies.json` 声明的冻结目录也作为带命名空间的环境树成员在 prepare 与 postflight 重算，模型 shell 过滤只由共享 policy 决定。
 
+单模型实验禁止受测模型使用协作功能。两个 launcher 都显式固定 `features.multi_agent=false`；`extra_config` 不得覆盖该键或整个 `features` 表，但可设置无关 feature。现行 App Server 的 `collabAgentToolCall` 在开始或完成事件中出现即构成执行合同违约：预检停止，答题记录保留原答案与费用并标入 `postflight_failures`，不作为定位零分或有效收益样本。该事件判定依据当前 CLI 的公开 ThreadItem schema；不外推为旧 `exec-json` 档案已有同样观测保障。
+
 ```json
 {
   "network_policy": "configured",

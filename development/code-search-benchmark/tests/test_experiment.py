@@ -804,6 +804,66 @@ class ExperimentTests(unittest.TestCase):
         self.assertIn('shell_environment_policy.filters."ALL_PROXY"="exclude"', joined)
         self.assertIn('shell_environment_policy.filters."GIT_*"="exclude"', joined)
 
+    def test_single_model_contract_is_enforced_by_both_launchers(self) -> None:
+        shell_policy, _ = MODULE.resolve_shell_environment_policy()
+        for protocol in ("exec-json", "app-server-v2"):
+            codex = {
+                "executable": "codex.exe", "model": "gpt-5.6-sol",
+                "reasoning_effort": "medium", "service_tier": "default",
+                "sandbox": "danger-full-access", "transport": "http-only",
+                "client_protocol": protocol, "shell_environment_policy": shell_policy,
+            }
+            launcher = (
+                (lambda config: MODULE.codex_exec_argv(config, Path("D:/workspace"), "prompt"))
+                if protocol == "exec-json" else MODULE.codex_app_server_argv
+            )
+            with self.subTest(protocol=protocol):
+                argv = launcher({**codex, "extra_config": ["features.some_unrelated_feature=true"]})
+                self.assertEqual(1, argv.count("features.multi_agent=false"))
+                self.assertIn("features.some_unrelated_feature=true", argv)
+            for override in (
+                "features.multi_agent=true", "features.multi_agent=false",
+                " features.multi_agent = true", "features={multi_agent=true}",
+                "features={some_unrelated_feature=true}", "features.multi_agent.child=true",
+            ):
+                with self.subTest(protocol=protocol, override=override):
+                    config = {**codex, "extra_config": [override]}
+                    with self.assertRaisesRegex(MODULE.ExperimentError, "execution identity"):
+                        MODULE.validate_benchmark_codex(config)
+                    with self.assertRaisesRegex(MODULE.ExperimentError, "execution identity"):
+                        launcher(config)
+
+    def test_collab_events_invalidate_execution_not_usage_or_answer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "events.jsonl"
+            for method in ("item/started", "item/completed"):
+                with self.subTest(method=method):
+                    events = [
+                        {"method": method, "params": {"item": {
+                            "type": "collabAgentToolCall", "id": "call-1", "tool": "spawnAgent",
+                            "status": "inProgress", "senderThreadId": "root",
+                            "receiverThreadIds": [], "agentsStates": {},
+                        }}},
+                        {"type": "item.completed", "item": {"type": "agent_message", "text": "answer"}},
+                        {"type": "turn.completed", "usage": {
+                            "input_tokens": 10, "cached_input_tokens": 0,
+                            "output_tokens": 2, "reasoning_output_tokens": 0,
+                        }},
+                    ]
+                    path.write_text("\n".join(map(json.dumps, events)), encoding="utf-8")
+                    parsed = MODULE.parse_events(path)
+                    self.assertEqual(1, len(parsed["execution_contract_failures"]))
+                    self.assertTrue(parsed["usage_complete"])
+                    self.assertEqual("answer", parsed["final_answer"])
+                    if method == "item/completed":
+                        self.assertEqual("collab_agent_tool_call", parsed["tool_items"][0]["type"])
+                    with self.assertRaisesRegex(MODULE.ExperimentError, "single-model contract"):
+                        MODULE.validate_preflight_record({"environment": "candidate", **parsed}, [])
+            path.write_text(json.dumps({"method": "item/started", "params": {
+                "item": {"type": "agentMessage", "text": "collabAgentToolCall"},
+            }}), encoding="utf-8")
+            self.assertEqual([], MODULE.parse_events(path)["execution_contract_failures"])
+
     def test_preflight_requires_successful_representative_command(self) -> None:
         requirements = [
             {"command": "srcq.exe --version", "expected_output": "srcq "},
@@ -848,11 +908,49 @@ class ExperimentTests(unittest.TestCase):
         record["tool_items"][1]["aggregated_output"] = "backend is not ok\n"
         with self.assertRaisesRegex(MODULE.ExperimentError, "srcq query scc doctor"):
             MODULE.validate_preflight_record(record, requirements)
+
         record["tool_items"][1]["aggregated_output"] = "ok\n"
         record["tool_items"] = record["tool_items"][:1]
         with self.assertRaisesRegex(MODULE.ExperimentError, "srcq query scc doctor"):
             MODULE.validate_preflight_record(record, requirements)
 
+    def test_run_preserves_collab_violation_in_postflight(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            corpus = root / "corpus.json"
+            corpus.write_text(json.dumps({"cases": [{
+                "id": "case", "workspace_role": "source", "prompt": "find target",
+            }]}), encoding="utf-8")
+            experiment = root / "experiment.json"
+            experiment.write_text(json.dumps({
+                "codex": {"service_tier": "default", "sandbox": "danger-full-access",
+                          "transport": "http-only", "client_protocol": "app-server-v2"},
+                "runtime_environment": {}, "corpus": {"path": str(corpus)},
+                "schedule": [{"case_id": "case", "environment": "candidate", "ordinal": 1}],
+                "environments": {"candidate": {"codex_home": str(root)}},
+                "workspaces": {"source": {"path": str(root)}}, "timeout_seconds": 1,
+                "experiment_identity": "test", "preflight": {"records": [], "usage_report": {}},
+            }), encoding="utf-8")
+
+            def monitor(codex, workspace, prompt, env, stdout, stderr, timeout):
+                stdout.write_text(json.dumps({"method": "item/started", "params": {
+                    "item": {"type": "collabAgentToolCall"},
+                }}) + "\n", encoding="utf-8")
+                stderr.write_text("", encoding="utf-8")
+                return {"exit_code": 0, "timed_out": False}
+
+            with (
+                mock.patch.object(MODULE, "verify_experiment_identity", return_value=[]),
+                mock.patch.object(MODULE, "materialize_runtime_environment", return_value={}),
+                mock.patch.object(MODULE, "monitor_subject", side_effect=monitor),
+            ):
+                result = MODULE.run_experiment(experiment)
+            self.assertEqual([
+                "single-model contract violated: collabAgentToolCall observed: case__candidate__1",
+            ], result["postflight_failures"])
+            self.assertEqual(result["postflight_failures"], json.loads(
+                (root / "summary.json").read_text(encoding="utf-8")
+            )["postflight_failures"])
     def test_codex_identity_is_bound_to_executable_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             executable = Path(temp) / "codex.exe"

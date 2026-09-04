@@ -442,7 +442,7 @@ def validate_benchmark_codex(codex: dict[str, Any]) -> None:
         raise ExperimentError("independent benchmark requires client_protocol=exec-json or app-server-v2")
     protected = {
         "approval_policy", "model", "model_provider", "model_reasoning_effort", "sandbox_mode",
-        "service_tier", "shell_environment_policy",
+        "service_tier", "shell_environment_policy", "features", "features.multi_agent",
     }
     for override in codex.get("extra_config", []):
         key = str(override).split("=", 1)[0].strip()
@@ -450,6 +450,7 @@ def validate_benchmark_codex(codex: dict[str, Any]) -> None:
             key in protected
             or key.startswith("model_providers.")
             or key.startswith("shell_environment_policy.")
+            or key.startswith("features.multi_agent.")
         ):
             raise ExperimentError(f"extra_config must not override benchmark execution identity: {key}")
 
@@ -984,11 +985,13 @@ def codex_exec_argv(
     *,
     skip_git_repo_check: bool = False,
 ) -> list[str]:
+    validate_benchmark_codex(codex)
     argv = [
         codex["executable"], "exec", "--json", "--ephemeral", "--sandbox", codex["sandbox"],
         "-c", 'approval_policy="never"', "-m", codex["model"],
         "-c", f'model_reasoning_effort="{codex["reasoning_effort"]}"',
         "-c", f'service_tier="{codex["service_tier"]}"',
+        "-c", "features.multi_agent=false",
     ]
     shell_policy_identity = codex.get("shell_environment_policy")
     if not isinstance(shell_policy_identity, dict) or not isinstance(
@@ -1019,6 +1022,7 @@ def codex_exec_argv(
 
 
 def codex_app_server_argv(codex: dict[str, Any]) -> list[str]:
+    validate_benchmark_codex(codex)
     argv = [
         codex["executable"], "app-server", "--listen", "stdio://",
         "-c", 'approval_policy="never"',
@@ -1026,6 +1030,7 @@ def codex_app_server_argv(codex: dict[str, Any]) -> list[str]:
         "-c", f'model_reasoning_effort="{codex["reasoning_effort"]}"',
         "-c", f'service_tier="{codex["service_tier"]}"',
         "-c", f'sandbox_mode="{codex["sandbox"]}"',
+        "-c", "features.multi_agent=false",
     ]
     shell_policy_identity = codex.get("shell_environment_policy")
     if not isinstance(shell_policy_identity, dict) or not isinstance(
@@ -1064,6 +1069,8 @@ def preflight_requirements(environment: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def validate_preflight_record(record: dict[str, Any], requirements: list[dict[str, str]]) -> None:
+    if record.get("execution_contract_failures"):
+        raise ExperimentError(f"Codex preflight single-model contract violated: {record['environment']}")
     if record["exit_code"] != 0 or record["timed_out"]:
         raise ExperimentError(f"Codex preflight process failed: {record['environment']}")
     if not record["usage_complete"]:
@@ -1497,6 +1504,7 @@ def normalize_app_server_item(item: dict[str, Any]) -> dict[str, Any]:
         "webSearch": "web_search",
         "toolSearch": "tool_search",
         "contextCompaction": "context_compaction",
+        "collabAgentToolCall": "collab_agent_tool_call",
     }
     key_mapping = {
         "aggregatedOutput": "aggregated_output",
@@ -1529,9 +1537,20 @@ def parse_events(path: Path) -> dict[str, Any]:
     latest_app_total: dict[str, Any] = {}
     seen_app_totals: set[tuple[tuple[str, int], ...]] = set()
     prefix_epoch = 0
+    execution_contract_failures: list[str] = []
     for event in events:
         method = event.get("method")
         params = event.get("params", {})
+        # The App Server ThreadItem schema exposes collab calls at both lifecycle
+        # edges. A started call is sufficient even if it fails or never completes.
+        if (
+            method in {"item/started", "item/completed"}
+            and isinstance(params, dict)
+            and isinstance(params.get("item"), dict)
+            and params["item"].get("type") == "collabAgentToolCall"
+            and not execution_contract_failures
+        ):
+            execution_contract_failures.append("single-model contract violated: collabAgentToolCall observed")
         if method == "item/completed" and isinstance(params, dict) and isinstance(params.get("item"), dict):
             item = normalize_app_server_item(params["item"])
             completed_items.append(item)
@@ -1587,6 +1606,7 @@ def parse_events(path: Path) -> dict[str, Any]:
         "ideal_cache_projection": projection,
         "final_answer": messages[-1] if messages else "", "tool_items": tools,
         "completed_item_type_counts": item_type_counts,
+        "execution_contract_failures": execution_contract_failures,
     }
 
 
@@ -1666,6 +1686,11 @@ def run_experiment(experiment_path: Path) -> dict[str, Any]:
             "stdout": str(stdout_path.relative_to(root)), "stderr": str(stderr_path.relative_to(root)),
         })
     postflight = verify_experiment_identity(experiment)
+    postflight.extend(
+        f"{failure}: {record['run_id']}"
+        for record in records
+        for failure in record["execution_contract_failures"]
+    )
     postflight.extend(
         f"network transport degraded: {record['run_id']}"
         for record in records

@@ -1,0 +1,602 @@
+{
+  "purpose": "Current installed rules single-model code-reading evidence; development-only",
+  "corpus": "development/code-search-benchmark/corpus/v25.json",
+  "model": "gpt-5.6-luna",
+  "reasoning_effort": "medium",
+  "verbosity": "low",
+  "service_tier": "default",
+  "source": "Installed AGENTS.md and AgentBase-owned skills frozen before this round; later than qualified v25 baseline",
+  "historical_comparison": "report-code-reading-qualified-v25.md candidate; historical same-question reference, not randomized same-round A/B",
+  "scoring": "locations-only-v1; each required target passed, no extra incorrect requested locations; subjective prose excluded",
+  "records": [
+    {
+      "group": "csharp",
+      "run_id": "vmt-temperature-collector-sampling-chain__control__1",
+      "price": 0.012153760000000001,
+      "ms": 75051,
+      "requests": 6,
+      "tools": 14,
+      "ordinary": 33920,
+      "cached": 108288,
+      "output": 2670,
+      "reasoning": 1098,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 13,
+      "passed": 13,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-csharp/summary.json"
+    },
+    {
+      "group": "csharp",
+      "run_id": "vmt-temperature-collector-sampling-chain__control__2",
+      "price": 0.010993600000000003,
+      "ms": 97862,
+      "requests": 6,
+      "tools": 13,
+      "ordinary": 30540,
+      "cached": 101120,
+      "output": 2386,
+      "reasoning": 759,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 13,
+      "passed": 13,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-csharp/summary.json"
+    },
+    {
+      "group": "policy",
+      "run_id": "agentbase-rg-policy-sources__control__1",
+      "price": 0.008284240000000002,
+      "ms": 50748,
+      "requests": 4,
+      "tools": 6,
+      "ordinary": 25354,
+      "cached": 55552,
+      "output": 1752,
+      "reasoning": 1055,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 2,
+      "passed": 2,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-policy/summary.json"
+    },
+    {
+      "group": "policy",
+      "run_id": "agentbase-rg-policy-sources__control__2",
+      "price": 0.00723584,
+      "ms": 66991,
+      "requests": 5,
+      "tools": 10,
+      "ordinary": 15172,
+      "cached": 99072,
+      "output": 1850,
+      "reasoning": 880,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 2,
+      "passed": 2,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-policy/summary.json"
+    },
+    {
+      "group": "core",
+      "run_id": "agentbase-file-discovery-control__control__1",
+      "price": 0.00426016,
+      "ms": 13830,
+      "requests": 2,
+      "tools": 1,
+      "ordinary": 18302,
+      "cached": 16128,
+      "output": 231,
+      "reasoning": 98,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 1,
+      "passed": 1,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-core/summary.json"
+    },
+    {
+      "group": "core",
+      "run_id": "agentbase-file-discovery-control__control__2",
+      "price": 0.005054080000000001,
+      "ms": 20488,
+      "requests": 3,
+      "tools": 2,
+      "ordinary": 19638,
+      "cached": 34304,
+      "output": 367,
+      "reasoning": 143,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 1,
+      "passed": 1,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-core/summary.json"
+    },
+    {
+      "group": "core",
+      "run_id": "agentbase-provider-observation__control__1",
+      "price": 0.005799080000000001,
+      "ms": 34442,
+      "requests": 3,
+      "tools": 2,
+      "ordinary": 20945,
+      "cached": 34304,
+      "output": 770,
+      "reasoning": 411,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 2,
+      "passed": 2,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-core/summary.json"
+    },
+    {
+      "group": "core",
+      "run_id": "agentbase-provider-observation__control__2",
+      "price": 0.00328084,
+      "ms": 33320,
+      "requests": 3,
+      "tools": 3,
+      "ordinary": 5913,
+      "cached": 50432,
+      "output": 908,
+      "reasoning": 479,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 2,
+      "passed": 2,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-core/summary.json"
+    },
+    {
+      "group": "core",
+      "run_id": "agentbase-srcq-containing-contract__control__1",
+      "price": 0.016989960000000002,
+      "ms": 68663,
+      "requests": 7,
+      "tools": 10,
+      "ordinary": 64383,
+      "cached": 108288,
+      "output": 1623,
+      "reasoning": 422,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 1,
+      "passed": 1,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-core/summary.json"
+    },
+    {
+      "group": "core",
+      "run_id": "agentbase-srcq-containing-contract__control__2",
+      "price": 0.009406880000000001,
+      "ms": 90692,
+      "requests": 5,
+      "tools": 8,
+      "ordinary": 30210,
+      "cached": 77824,
+      "output": 1507,
+      "reasoning": 604,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 1,
+      "passed": 1,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-core/summary.json"
+    },
+    {
+      "group": "ue",
+      "run_id": "ue-command-dispatch-submit__control__1",
+      "price": 0.00987524,
+      "ms": 60216,
+      "requests": 6,
+      "tools": 7,
+      "ordinary": 29745,
+      "cached": 109312,
+      "output": 1450,
+      "reasoning": 552,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 1,
+      "passed": 1,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-ue/summary.json"
+    },
+    {
+      "group": "ue",
+      "run_id": "ue-command-dispatch-submit__control__2",
+      "price": 0.005000880000000001,
+      "ms": 46344,
+      "requests": 5,
+      "tools": 5,
+      "ordinary": 9190,
+      "cached": 91904,
+      "output": 1104,
+      "reasoning": 441,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 1,
+      "passed": 1,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-ue/summary.json"
+    },
+    {
+      "group": "ue",
+      "run_id": "ue-hjson-isbarekey-occurrences__control__1",
+      "price": 0.00876484,
+      "ms": 72037,
+      "requests": 5,
+      "tools": 7,
+      "ordinary": 21511,
+      "cached": 93952,
+      "output": 2153,
+      "reasoning": 974,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 5,
+      "passed": 5,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-ue/summary.json"
+    },
+    {
+      "group": "ue",
+      "run_id": "ue-hjson-isbarekey-occurrences__control__2",
+      "price": 0.0075048400000000005,
+      "ms": 49728,
+      "requests": 4,
+      "tools": 4,
+      "ordinary": 23161,
+      "cached": 55552,
+      "output": 1468,
+      "reasoning": 643,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 5,
+      "passed": 5,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-ue/summary.json"
+    },
+    {
+      "group": "external",
+      "run_id": "facecutting3d-raycast-chain__control__1",
+      "price": 0.00832676,
+      "ms": 55512,
+      "requests": 5,
+      "tools": 10,
+      "ordinary": 23405,
+      "cached": 63488,
+      "output": 1980,
+      "reasoning": 802,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 5,
+      "passed": 5,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-external/summary.json"
+    },
+    {
+      "group": "external",
+      "run_id": "facecutting3d-raycast-chain__control__2",
+      "price": 0.01051752,
+      "ms": 87540,
+      "requests": 7,
+      "tools": 14,
+      "ordinary": 27448,
+      "cached": 98816,
+      "output": 2543,
+      "reasoning": 1090,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 5,
+      "passed": 5,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-external/summary.json"
+    },
+    {
+      "group": "external",
+      "run_id": "opencode-webview-message-boundary__control__1",
+      "price": 0.01196236,
+      "ms": 134398,
+      "requests": 12,
+      "tools": 13,
+      "ordinary": 17677,
+      "cached": 237568,
+      "output": 3063,
+      "reasoning": 1021,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 7,
+      "passed": 7,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-external/summary.json"
+    },
+    {
+      "group": "external",
+      "run_id": "opencode-webview-message-boundary__control__2",
+      "price": 0.010845200000000001,
+      "ms": 79139,
+      "requests": 5,
+      "tools": 9,
+      "ordinary": 30904,
+      "cached": 76800,
+      "output": 2607,
+      "reasoning": 1247,
+      "postflight": [],
+      "contracts": [],
+      "required_total": 7,
+      "passed": 7,
+      "misses": [],
+      "extra_incorrect_locations": [],
+      "evidence": "D:/AgentBaseBench/reading-current-v26/control-external/summary.json"
+    }
+  ],
+  "case_comparison": [
+    {
+      "id": "agentbase-file-discovery-control",
+      "points": 1,
+      "mean": 0.004657120000000001,
+      "old": 0.00332482,
+      "percent": 40.07134220799924,
+      "prices": [
+        0.00426016,
+        0.005054080000000001
+      ],
+      "seconds": [
+        13.83,
+        20.488
+      ],
+      "requests": [
+        2,
+        3
+      ],
+      "tool_counts": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "agentbase-rg-policy-sources",
+      "points": 2,
+      "mean": 0.007760040000000001,
+      "old": 0.00959768,
+      "percent": -19.14671045502663,
+      "prices": [
+        0.008284240000000002,
+        0.00723584
+      ],
+      "seconds": [
+        50.748,
+        66.991
+      ],
+      "requests": [
+        4,
+        5
+      ],
+      "tool_counts": [
+        6,
+        10
+      ]
+    },
+    {
+      "id": "agentbase-provider-observation",
+      "points": 2,
+      "mean": 0.004539960000000001,
+      "old": 0.00735786,
+      "percent": -38.297820290138695,
+      "prices": [
+        0.005799080000000001,
+        0.00328084
+      ],
+      "seconds": [
+        34.442,
+        33.32
+      ],
+      "requests": [
+        3,
+        3
+      ],
+      "tool_counts": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "agentbase-srcq-containing-contract",
+      "points": 1,
+      "mean": 0.013198420000000002,
+      "old": 0.0131364,
+      "percent": 0.47212326055847686,
+      "prices": [
+        0.016989960000000002,
+        0.009406880000000001
+      ],
+      "seconds": [
+        68.663,
+        90.692
+      ],
+      "requests": [
+        7,
+        5
+      ],
+      "tool_counts": [
+        10,
+        8
+      ]
+    },
+    {
+      "id": "ue-command-dispatch-submit",
+      "points": 1,
+      "mean": 0.007438060000000001,
+      "old": 0.00832972,
+      "percent": -10.704561497865473,
+      "prices": [
+        0.00987524,
+        0.005000880000000001
+      ],
+      "seconds": [
+        60.216,
+        46.344
+      ],
+      "requests": [
+        6,
+        5
+      ],
+      "tool_counts": [
+        7,
+        5
+      ]
+    },
+    {
+      "id": "ue-hjson-isbarekey-occurrences",
+      "points": 5,
+      "mean": 0.00813484,
+      "old": 0.0110977,
+      "percent": -26.6979644430828,
+      "prices": [
+        0.00876484,
+        0.0075048400000000005
+      ],
+      "seconds": [
+        72.037,
+        49.728
+      ],
+      "requests": [
+        5,
+        4
+      ],
+      "tool_counts": [
+        7,
+        4
+      ]
+    },
+    {
+      "id": "facecutting3d-raycast-chain",
+      "points": 5,
+      "mean": 0.00942214,
+      "old": 0.01077256,
+      "percent": -12.535738951558406,
+      "prices": [
+        0.00832676,
+        0.01051752
+      ],
+      "seconds": [
+        55.512,
+        87.54
+      ],
+      "requests": [
+        5,
+        7
+      ],
+      "tool_counts": [
+        10,
+        14
+      ]
+    },
+    {
+      "id": "opencode-webview-message-boundary",
+      "points": 7,
+      "mean": 0.01140378,
+      "old": 0.00939738,
+      "percent": 21.350631771834273,
+      "prices": [
+        0.01196236,
+        0.010845200000000001
+      ],
+      "seconds": [
+        134.398,
+        79.139
+      ],
+      "requests": [
+        12,
+        5
+      ],
+      "tool_counts": [
+        13,
+        9
+      ]
+    },
+    {
+      "id": "vmt-temperature-collector-sampling-chain",
+      "points": 13,
+      "mean": 0.011573680000000003,
+      "old": 0.01001614,
+      "percent": 15.550301812874046,
+      "prices": [
+        0.012153760000000001,
+        0.010993600000000003
+      ],
+      "seconds": [
+        75.051,
+        97.862
+      ],
+      "requests": [
+        6,
+        6
+      ],
+      "tool_counts": [
+        14,
+        13
+      ]
+    }
+  ],
+  "preflight": [
+    {
+      "group": "csharp",
+      "price": 0.0044765199999999995,
+      "ms": 19892
+    },
+    {
+      "group": "policy",
+      "price": 0.0046971999999999995,
+      "ms": 13880
+    },
+    {
+      "group": "core",
+      "price": 0.0048511199999999996,
+      "ms": 22379
+    },
+    {
+      "group": "ue",
+      "price": 0.00485732,
+      "ms": 16979
+    },
+    {
+      "group": "external",
+      "price": 0.0065666000000000006,
+      "ms": 12777
+    }
+  ],
+  "total_required": 74,
+  "total_passed": 74,
+  "task_price_usd": 0.15625608,
+  "preflight_price_usd": 0.02544876,
+  "limitations": [
+    "Two repetitions do not establish long-run reliability.",
+    "No production behavior candidate changed this round.",
+    "File discovery is above the historical per-case +30% reference, although total task price is lower.",
+    "Subagent control is experiment-only and does not test collaboration quality."
+  ],
+  "next_action": "Preserve current all-correct sample; distinguish file-discovery query trajectory from ordinary/cache input costs before choosing any general candidate."
+}
