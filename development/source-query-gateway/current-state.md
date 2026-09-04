@@ -407,7 +407,7 @@ Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次
 
 ## OBS-SQG-044 路径身份 oracle 已校准，规则修复候选未通过资格
 
-- 状态: five local pilots completed; no candidate qualified; production unchanged; overall parity goal unmet
+- 状态: English kernel qualified for full-suite comparison only; production unchanged; overall parity goal unmet
 - 关联: OBS-SQG-042, OBS-SQG-043
 
 当前安装态与当时选取的历史环境复测暴露了工作区根目录前缀省略。后续身份审查确认该历史环境是旧实验中未加批量规则的 `control`，并非用户指定的最佳批量 `candidate`，因此不支持“相对最佳批量版”的结论。`v19.json` 把路径固定为工作区根相对格式后，又与桌面交付面要求完整绝对文件链接的上位合同冲突；`v20.json` 改为验证路径能否唯一映射到 oracle 文件，并显式包含实现闭合行。查询步骤内强化路径、发现顺序或读取策略的候选仍出现漏答、错误纳入注释调用或价格反例，不能因某一次便宜就晋级。
