@@ -1,0 +1,1017 @@
+{
+  "schema": "agentbase.code-reading-manual-audit/v1",
+  "date": "2026-09-04",
+  "experiment": "full-suite-relations-batch-v1",
+  "status": "not-qualified",
+  "corpus": "development/code-search-benchmark/corpus/v23.json",
+  "candidate": "Complete current Chinese rules plus object/relation answer organization and verbatim normative old batching rules; own skills unchanged.",
+  "criteria": {
+    "quality": "Each of nine cases aims for full marks; two-run case score at least same-round old best batch control; disclose criterion regressions.",
+    "cost": "Actual two-run mean per case at most1.5x control; transport-degraded samples not eligible.",
+    "deployment": "Not authorized; production unchanged."
+  },
+  "raw_root": "D:\\AgentBaseBench\\full-suite-relations-batch-v1",
+  "capsules": [
+    {
+      "shard": "core",
+      "path": "D:\\AgentBaseBench\\full-suite-relations-batch-v1\\core-ready\\audit-capsule.json",
+      "verified": true,
+      "raw_files": 36,
+      "environment_files": 2
+    },
+    {
+      "shard": "ue",
+      "path": "D:\\AgentBaseBench\\full-suite-relations-batch-v1\\ue-ready\\audit-capsule.json",
+      "verified": true,
+      "raw_files": 20,
+      "environment_files": 2
+    },
+    {
+      "shard": "external",
+      "path": "D:\\AgentBaseBench\\full-suite-relations-batch-v1\\external-ready\\audit-capsule.json",
+      "verified": true,
+      "raw_files": 28,
+      "environment_files": 2
+    }
+  ],
+  "limitations": [
+    "Three transport-degraded subjects retained; no valid whole-suite price aggregate.",
+    "UE Submit control1 broad query also returned historical conversation/stacktrace material outside frozen identity scope; UE complete-input causal claim withheld.",
+    "Two repetitions measure these samples, not generalization or guaranteed reliability.",
+    "Manual scoring accepts semantic equivalence and bound file/range groups; no exact keyword matching."
+  ],
+  "invalid_transport_runs": [
+    "agentbase-file-discovery-control__control__1",
+    "ue-command-dispatch-submit__candidate__1",
+    "facecutting3d-raycast-chain__candidate__1"
+  ],
+  "scores": {
+    "ue-command-dispatch-submit__candidate__1": {
+      "total": 4,
+      "failed": []
+    },
+    "ue-command-dispatch-submit__control__1": {
+      "total": 4,
+      "failed": []
+    },
+    "facecutting3d-raycast-chain__candidate__1": {
+      "total": 13,
+      "failed": [],
+      "note": "All definitions, two direct callers, branches, traversal and bounded completeness. Shared first file identity binds extra call20."
+    },
+    "ue-command-dispatch-submit__control__2": {
+      "total": 4,
+      "failed": []
+    },
+    "facecutting3d-raycast-chain__control__1": {
+      "total": 13,
+      "failed": [
+        12
+      ],
+      "note": "Extra parenthetical comment lines233/188 follow two different files without explicit file binding. Correct direct calls235/190 still pass their separate criteria."
+    },
+    "facecutting3d-raycast-chain__control__2": {
+      "total": 13,
+      "failed": []
+    },
+    "ue-command-dispatch-submit__candidate__2": {
+      "total": 4,
+      "failed": []
+    },
+    "facecutting3d-raycast-chain__candidate__2": {
+      "total": 13,
+      "failed": [],
+      "note": "All required covered; no ambiguous extra locations."
+    },
+    "ue-hjson-isbarekey-occurrences__control__1": {
+      "total": 4,
+      "failed": [],
+      "note": "Correct path, definition, all calls and scoped completeness."
+    },
+    "ue-hjson-isbarekey-occurrences__control__2": {
+      "total": 4,
+      "failed": [],
+      "note": "Correct path, definition, all calls and scoped completeness."
+    },
+    "ue-hjson-isbarekey-occurrences__candidate__1": {
+      "total": 4,
+      "failed": [],
+      "note": "Correct path, definition, all calls and scoped completeness."
+    },
+    "ue-hjson-isbarekey-occurrences__candidate__2": {
+      "total": 4,
+      "failed": [],
+      "note": "Correct path, definition, all calls and scoped completeness."
+    },
+    "opencode-webview-message-boundary__control__1": {
+      "total": 24,
+      "failed": [
+        24
+      ],
+      "note": "No explicit source-only conclusion; extra host locations checked accurate."
+    },
+    "opencode-webview-message-boundary__candidate__1": {
+      "total": 24,
+      "failed": [],
+      "note": "All required facts and scoped boundary."
+    },
+    "opencode-webview-message-boundary__candidate__2": {
+      "total": 24,
+      "failed": [
+        5
+      ],
+      "note": "Host message.command selector not stated; React command selector is stated."
+    },
+    "opencode-webview-message-boundary__control__2": {
+      "total": 24,
+      "failed": [],
+      "note": "All criteria covered; extra effect range/dependencies checked."
+    },
+    "vmt-temperature-collector-sampling-chain__control__1": {
+      "total": 31,
+      "failed": [
+        9,
+        14
+      ],
+      "note": "Successful insert lacks subsequent success publish; Sample->Read call at Engine220 omitted."
+    },
+    "agentbase-file-discovery-control__control__1": {
+      "total": 1,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-file-discovery-control__control__2": {
+      "total": 1,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-file-discovery-control__candidate__1": {
+      "total": 1,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-file-discovery-control__candidate__2": {
+      "total": 1,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-rg-policy-sources__control__1": {
+      "total": 2,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-rg-policy-sources__control__2": {
+      "total": 2,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-rg-policy-sources__candidate__1": {
+      "total": 2,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-rg-policy-sources__candidate__2": {
+      "total": 2,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-provider-observation__control__1": {
+      "total": 2,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-provider-observation__control__2": {
+      "total": 2,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-provider-observation__candidate__1": {
+      "total": 2,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-provider-observation__candidate__2": {
+      "total": 2,
+      "failed": [
+        2
+      ],
+      "note": "Final substitutes ToolOutputDataMap.document_symbols721 for requested Collection<T>.provider330; tool stdout already contains330."
+    },
+    "agentbase-srcq-containing-contract__control__1": {
+      "total": 4,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-srcq-containing-contract__control__2": {
+      "total": 4,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-srcq-containing-contract__candidate__1": {
+      "total": 4,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "agentbase-srcq-containing-contract__candidate__2": {
+      "total": 4,
+      "failed": [],
+      "note": "Independent evidence-agent review against unchanged v23 required."
+    },
+    "vmt-temperature-collector-sampling-chain__candidate__1": {
+      "total": 31,
+      "failed": [
+        5,
+        8
+      ],
+      "note": "No-enabled branch omits return; failed reads omit failure publication."
+    },
+    "vmt-temperature-collector-sampling-chain__candidate__2": {
+      "total": 31,
+      "failed": [
+        15
+      ],
+      "note": "Test->Read58 omitted. Source-bound writing-history then success publication at229-235 accepted for R9; Sample group reading at220 accepted for R14. No exact method-name keyword requirement."
+    },
+    "vmt-temperature-collector-sampling-chain__control__2": {
+      "total": 31,
+      "failed": [
+        5,
+        7,
+        8,
+        24
+      ],
+      "note": "No-enabled branch only gives range; UID/read-failure publications omitted; unknown-model failure not stated. Insert then publish at229-235 accepted semantically for R9."
+    }
+  },
+  "rows": [
+    {
+      "id": "agentbase-file-discovery-control",
+      "shard": "core",
+      "control": {
+        "scores": [
+          1,
+          1
+        ],
+        "total": 1,
+        "mean_usd": 0.0025664,
+        "mean_seconds": 23.103499999999997
+      },
+      "candidate": {
+        "scores": [
+          1,
+          1
+        ],
+        "total": 1,
+        "mean_usd": 0.0039379,
+        "mean_seconds": 20.1325
+      },
+      "ratio": 1.5344061720698257,
+      "transport_affected": [
+        "network transport degraded: agentbase-file-discovery-control__control__1"
+      ]
+    },
+    {
+      "id": "agentbase-rg-policy-sources",
+      "shard": "core",
+      "control": {
+        "scores": [
+          2,
+          2
+        ],
+        "total": 2,
+        "mean_usd": 0.009401760000000002,
+        "mean_seconds": 68.6375
+      },
+      "candidate": {
+        "scores": [
+          2,
+          2
+        ],
+        "total": 2,
+        "mean_usd": 0.009445160000000001,
+        "mean_seconds": 56.7425
+      },
+      "ratio": 1.0046161569748642,
+      "transport_affected": []
+    },
+    {
+      "id": "agentbase-provider-observation",
+      "shard": "core",
+      "control": {
+        "scores": [
+          2,
+          2
+        ],
+        "total": 2,
+        "mean_usd": 0.004798800000000001,
+        "mean_seconds": 34.022999999999996
+      },
+      "candidate": {
+        "scores": [
+          2,
+          1
+        ],
+        "total": 2,
+        "mean_usd": 0.00466284,
+        "mean_seconds": 41.086
+      },
+      "ratio": 0.9716679169792446,
+      "transport_affected": []
+    },
+    {
+      "id": "agentbase-srcq-containing-contract",
+      "shard": "core",
+      "control": {
+        "scores": [
+          4,
+          4
+        ],
+        "total": 4,
+        "mean_usd": 0.0104951,
+        "mean_seconds": 39.3755
+      },
+      "candidate": {
+        "scores": [
+          4,
+          4
+        ],
+        "total": 4,
+        "mean_usd": 0.012258280000000003,
+        "mean_seconds": 53.0475
+      },
+      "ratio": 1.1680003049041936,
+      "transport_affected": []
+    },
+    {
+      "id": "ue-command-dispatch-submit",
+      "shard": "ue",
+      "control": {
+        "scores": [
+          4,
+          4
+        ],
+        "total": 4,
+        "mean_usd": 0.010188540000000001,
+        "mean_seconds": 58.410000000000004
+      },
+      "candidate": {
+        "scores": [
+          4,
+          4
+        ],
+        "total": 4,
+        "mean_usd": 0.0075859000000000005,
+        "mean_seconds": 48.1
+      },
+      "ratio": 0.7445522125839423,
+      "transport_affected": [
+        "network transport degraded: ue-command-dispatch-submit__candidate__1"
+      ]
+    },
+    {
+      "id": "ue-hjson-isbarekey-occurrences",
+      "shard": "ue",
+      "control": {
+        "scores": [
+          4,
+          4
+        ],
+        "total": 4,
+        "mean_usd": 0.012166880000000001,
+        "mean_seconds": 80.18
+      },
+      "candidate": {
+        "scores": [
+          4,
+          4
+        ],
+        "total": 4,
+        "mean_usd": 0.01186348,
+        "mean_seconds": 69.76599999999999
+      },
+      "ratio": 0.9750634509422299,
+      "transport_affected": []
+    },
+    {
+      "id": "facecutting3d-raycast-chain",
+      "shard": "external",
+      "control": {
+        "scores": [
+          12,
+          13
+        ],
+        "total": 13,
+        "mean_usd": 0.008675620000000002,
+        "mean_seconds": 75.82900000000001
+      },
+      "candidate": {
+        "scores": [
+          13,
+          13
+        ],
+        "total": 13,
+        "mean_usd": 0.010335340000000002,
+        "mean_seconds": 71.833
+      },
+      "ratio": 1.1913085174316072,
+      "transport_affected": [
+        "network transport degraded: facecutting3d-raycast-chain__candidate__1"
+      ]
+    },
+    {
+      "id": "opencode-webview-message-boundary",
+      "shard": "external",
+      "control": {
+        "scores": [
+          23,
+          24
+        ],
+        "total": 24,
+        "mean_usd": 0.006622360000000001,
+        "mean_seconds": 51.899
+      },
+      "candidate": {
+        "scores": [
+          24,
+          23
+        ],
+        "total": 24,
+        "mean_usd": 0.00856834,
+        "mean_seconds": 52.981
+      },
+      "ratio": 1.2938499266122652,
+      "transport_affected": []
+    },
+    {
+      "id": "vmt-temperature-collector-sampling-chain",
+      "shard": "external",
+      "control": {
+        "scores": [
+          29,
+          27
+        ],
+        "total": 31,
+        "mean_usd": 0.010344579999999999,
+        "mean_seconds": 75.85300000000001
+      },
+      "candidate": {
+        "scores": [
+          29,
+          30
+        ],
+        "total": 31,
+        "mean_usd": 0.00892342,
+        "mean_seconds": 58.585499999999996
+      },
+      "ratio": 0.8626179119886936,
+      "transport_affected": []
+    }
+  ],
+  "batching": [
+    {
+      "shard": "core",
+      "run": "agentbase-file-discovery-control__candidate__1",
+      "tool_items_per_request": [
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-file-discovery-control__control__1",
+      "tool_items_per_request": [
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-file-discovery-control__control__2",
+      "tool_items_per_request": [
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-file-discovery-control__candidate__2",
+      "tool_items_per_request": [
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-rg-policy-sources__control__1",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-rg-policy-sources__candidate__1",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 1
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-rg-policy-sources__candidate__2",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-rg-policy-sources__control__2",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-provider-observation__control__1",
+      "tool_items_per_request": [
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-provider-observation__candidate__1",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-provider-observation__candidate__2",
+      "tool_items_per_request": [
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-provider-observation__control__2",
+      "tool_items_per_request": [
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-srcq-containing-contract__control__1",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-srcq-containing-contract__candidate__1",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 1
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-srcq-containing-contract__candidate__2",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 1
+    },
+    {
+      "shard": "core",
+      "run": "agentbase-srcq-containing-contract__control__2",
+      "tool_items_per_request": [
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "ue",
+      "run": "ue-command-dispatch-submit__candidate__1",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "ue",
+      "run": "ue-command-dispatch-submit__control__1",
+      "tool_items_per_request": [
+        2,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 1,
+      "max_tool_batch": 2,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "ue",
+      "run": "ue-command-dispatch-submit__control__2",
+      "tool_items_per_request": [
+        5,
+        1,
+        2,
+        1,
+        0
+      ],
+      "multi_tool_requests": 2,
+      "max_tool_batch": 5,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "ue",
+      "run": "ue-command-dispatch-submit__candidate__2",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "ue",
+      "run": "ue-hjson-isbarekey-occurrences__control__1",
+      "tool_items_per_request": [
+        2,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 1,
+      "max_tool_batch": 2,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "ue",
+      "run": "ue-hjson-isbarekey-occurrences__candidate__1",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "ue",
+      "run": "ue-hjson-isbarekey-occurrences__candidate__2",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "ue",
+      "run": "ue-hjson-isbarekey-occurrences__control__2",
+      "tool_items_per_request": [
+        1,
+        2,
+        1,
+        2,
+        1,
+        0
+      ],
+      "multi_tool_requests": 2,
+      "max_tool_batch": 2,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "external",
+      "run": "facecutting3d-raycast-chain__candidate__1",
+      "tool_items_per_request": [
+        1,
+        3,
+        3,
+        3,
+        0
+      ],
+      "multi_tool_requests": 3,
+      "max_tool_batch": 3,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 1
+    },
+    {
+      "shard": "external",
+      "run": "facecutting3d-raycast-chain__control__1",
+      "tool_items_per_request": [
+        2,
+        2,
+        3,
+        3,
+        0
+      ],
+      "multi_tool_requests": 4,
+      "max_tool_batch": 3,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "external",
+      "run": "facecutting3d-raycast-chain__control__2",
+      "tool_items_per_request": [
+        1,
+        1,
+        3,
+        3,
+        0
+      ],
+      "multi_tool_requests": 2,
+      "max_tool_batch": 3,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "external",
+      "run": "facecutting3d-raycast-chain__candidate__2",
+      "tool_items_per_request": [
+        1,
+        3,
+        3,
+        3,
+        0
+      ],
+      "multi_tool_requests": 3,
+      "max_tool_batch": 3,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 3
+    },
+    {
+      "shard": "external",
+      "run": "opencode-webview-message-boundary__control__1",
+      "tool_items_per_request": [
+        1,
+        2,
+        0
+      ],
+      "multi_tool_requests": 1,
+      "max_tool_batch": 2,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 1
+    },
+    {
+      "shard": "external",
+      "run": "opencode-webview-message-boundary__candidate__1",
+      "tool_items_per_request": [
+        1,
+        2,
+        1,
+        0
+      ],
+      "multi_tool_requests": 1,
+      "max_tool_batch": 2,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "external",
+      "run": "opencode-webview-message-boundary__candidate__2",
+      "tool_items_per_request": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "multi_tool_requests": 0,
+      "max_tool_batch": 1,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 1
+    },
+    {
+      "shard": "external",
+      "run": "opencode-webview-message-boundary__control__2",
+      "tool_items_per_request": [
+        1,
+        2,
+        2,
+        2,
+        0
+      ],
+      "multi_tool_requests": 3,
+      "max_tool_batch": 2,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "external",
+      "run": "vmt-temperature-collector-sampling-chain__control__1",
+      "tool_items_per_request": [
+        1,
+        1,
+        3,
+        7,
+        3,
+        0
+      ],
+      "multi_tool_requests": 3,
+      "max_tool_batch": 7,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "external",
+      "run": "vmt-temperature-collector-sampling-chain__candidate__1",
+      "tool_items_per_request": [
+        2,
+        4,
+        3,
+        0
+      ],
+      "multi_tool_requests": 3,
+      "max_tool_batch": 4,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "external",
+      "run": "vmt-temperature-collector-sampling-chain__candidate__2",
+      "tool_items_per_request": [
+        1,
+        2,
+        3,
+        0
+      ],
+      "multi_tool_requests": 2,
+      "max_tool_batch": 3,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    },
+    {
+      "shard": "external",
+      "run": "vmt-temperature-collector-sampling-chain__control__2",
+      "tool_items_per_request": [
+        1,
+        2,
+        3,
+        1,
+        0
+      ],
+      "multi_tool_requests": 2,
+      "max_tool_batch": 3,
+      "unclosed_tool_items": 0,
+      "nonzero_command_exits": 0
+    }
+  ],
+  "cost_accounting": {
+    "control_subject_usd": 0.15052008,
+    "candidate_subject_usd": 0.15516132,
+    "setup_usd": 0.026178480000000004,
+    "meaning": "Observed spend including invalid transports; not qualification benefit."
+  },
+  "next": "Address output selecting an adjacent DTO field instead of requested field, and incomplete branch/caller retention, within existing answer responsibility. Preserve batching; no unchanged reruns or oracle relaxation."
+}
