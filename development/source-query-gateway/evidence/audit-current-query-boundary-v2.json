@@ -1,0 +1,182 @@
+{
+  "schema": "agentbase.code-reading-manual-audit/v1",
+  "date": "2026-09-04",
+  "experiment": "current-query-boundary-v2",
+  "status": "rejected",
+  "corpus": "development/code-search-benchmark/corpus/v23.json",
+  "root": "D:\\AgentBaseBench\\current-query-boundary-v2",
+  "comparison": "Diagnostic control is complete current Chinese rules plus exact old batching; candidate changes only the compressed query rule to exact old wording. Neither arm is the historical best whole environment.",
+  "fixed": {
+    "model": "gpt-5.6-luna",
+    "reasoning": "medium",
+    "service": "default",
+    "transport": "http-only",
+    "repetitions_per_side": 2,
+    "owned_skills_only": true,
+    "subject_subagents": false
+  },
+  "scores": {
+    "agentbase-rg-policy-sources__candidate__1": {
+      "total": 2,
+      "failed": [
+        1
+      ],
+      "note": "Missing skills/source-query/SKILL.md; joint summary passes."
+    },
+    "agentbase-rg-policy-sources__control__1": {
+      "total": 2,
+      "failed": [],
+      "note": "Both formal paths and joint summary present."
+    },
+    "agentbase-rg-policy-sources__control__2": {
+      "total": 2,
+      "failed": [],
+      "note": "Both formal paths and joint summary present."
+    },
+    "agentbase-rg-policy-sources__candidate__2": {
+      "total": 2,
+      "failed": [
+        1
+      ],
+      "note": "Missing skills/source-query/SKILL.md; joint summary passes."
+    }
+  },
+  "metrics": {
+    "postflight": [],
+    "setup_usd": 0.00796432,
+    "runs": [
+      {
+        "run": "agentbase-rg-policy-sources__candidate__1",
+        "usd": 0.00567752,
+        "seconds": 64.331,
+        "requests": 5,
+        "tools": 4,
+        "usage": {
+          "complete": true,
+          "pricing_exact": true,
+          "diagnostics": [],
+          "input_tokens": 93490,
+          "cache_read_input_tokens": 84736,
+          "cache_write_input_tokens": 0,
+          "ordinary_input_tokens": 8754,
+          "non_cached_input_tokens": 8754,
+          "output_tokens": 1860,
+          "reasoning_output_tokens": 1332,
+          "visible_output_tokens": 528,
+          "actual_total_tokens": 95350,
+          "cache_read_ratio": 0.9063643170392556,
+          "reasoning_output_ratio": 0.7161290322580646
+        }
+      },
+      {
+        "run": "agentbase-rg-policy-sources__control__1",
+        "usd": 0.00817708,
+        "seconds": 54.411,
+        "requests": 5,
+        "tools": 4,
+        "usage": {
+          "complete": true,
+          "pricing_exact": true,
+          "diagnostics": [],
+          "input_tokens": 104297,
+          "cache_read_input_tokens": 81664,
+          "cache_write_input_tokens": 0,
+          "ordinary_input_tokens": 22633,
+          "non_cached_input_tokens": 22633,
+          "output_tokens": 1681,
+          "reasoning_output_tokens": 989,
+          "visible_output_tokens": 692,
+          "actual_total_tokens": 105978,
+          "cache_read_ratio": 0.782994717010077,
+          "reasoning_output_ratio": 0.5883402736466389
+        }
+      },
+      {
+        "run": "agentbase-rg-policy-sources__control__2",
+        "usd": 0.00914032,
+        "seconds": 57.654,
+        "requests": 4,
+        "tools": 5,
+        "usage": {
+          "complete": true,
+          "pricing_exact": true,
+          "diagnostics": [],
+          "input_tokens": 98384,
+          "cache_read_input_tokens": 70656,
+          "cache_write_input_tokens": 0,
+          "ordinary_input_tokens": 27728,
+          "non_cached_input_tokens": 27728,
+          "output_tokens": 1818,
+          "reasoning_output_tokens": 1309,
+          "visible_output_tokens": 509,
+          "actual_total_tokens": 100202,
+          "cache_read_ratio": 0.7181655553748577,
+          "reasoning_output_ratio": 0.7200220022002201
+        }
+      },
+      {
+        "run": "agentbase-rg-policy-sources__candidate__2",
+        "usd": 0.009681440000000001,
+        "seconds": 59.324,
+        "requests": 6,
+        "tools": 5,
+        "usage": {
+          "complete": true,
+          "pricing_exact": true,
+          "diagnostics": [],
+          "input_tokens": 118726,
+          "cache_read_input_tokens": 87552,
+          "cache_write_input_tokens": 0,
+          "ordinary_input_tokens": 31174,
+          "non_cached_input_tokens": 31174,
+          "output_tokens": 1413,
+          "reasoning_output_tokens": 731,
+          "visible_output_tokens": 682,
+          "actual_total_tokens": 120139,
+          "cache_read_ratio": 0.7374290382898439,
+          "reasoning_output_ratio": 0.5173389950460014
+        }
+      }
+    ]
+  },
+  "answers": [
+    {
+      "run": "agentbase-rg-policy-sources__candidate__1",
+      "answer": "[D:\\program\\AgentBase\\global\\AGENTS.md:85](D:/program/AgentBase/global/AGENTS.md:85)\n\n规则：已知符号直接有界读取，文件发现及文本/AST 查询统一使用 `srcq`，证据充分即停止。",
+      "usage_complete": true
+    },
+    {
+      "run": "agentbase-rg-policy-sources__control__1",
+      "answer": "`global/AGENTS.md:85`  \n`skills/source-query/SKILL.md:12,19,25-27`  \n共同规定：已知正文有界直读，发现/文本/AST 查询经 `srcq`，证据充分即停止。",
+      "usage_complete": true
+    },
+    {
+      "run": "agentbase-rg-policy-sources__control__2",
+      "answer": "D:\\program\\AgentBase\\global\\AGENTS.md  \nD:\\program\\AgentBase\\skills\\source-query\\SKILL.md  \n规则：已知文件正文直接有界读取，文件发现、文本和 AST 查询统一经 `srcq`，证据充分即停止。",
+      "usage_complete": true
+    },
+    {
+      "run": "agentbase-rg-policy-sources__candidate__2",
+      "answer": "[D:\\program\\AgentBase\\AGENTS.md](D:/program/AgentBase/AGENTS.md)  \n[D:\\program\\AgentBase\\global\\AGENTS.md](D:/program/AgentBase/global/AGENTS.md)  \n共同规定：根规则继承全局规则，`global/AGENTS.md` 明确要求发现、文本/AST 查询统一经 `srcq`，已知符号直接有界读取，证据充分即停止。",
+      "usage_complete": true
+    }
+  ],
+  "trace": {
+    "candidate1": "Last broad search displayed18 and omitted148, with text cut7. Required skill not in that output; no continuation before final answer.",
+    "candidate2": "Searches restricted to AGENTS.md; missing skill source.",
+    "control": "Expanded search to SKILL.md; both runs include required sources.",
+    "routing": "Candidate searches use srcq; diagnostic control mostly uses bare rg. Better selector compliance did not improve this task's answer.",
+    "leakage": "No corpus/v23, report-full-suite, audit-full-suite, candidate_score or answer_contract matches in four captured stdout files. This is a bounded scan, not exhaustive I/O proof."
+  },
+  "capsule": {
+    "verified": true,
+    "raw_files": 12
+  },
+  "decision": "Reject restoration as a sufficient fix; no whole-suite expansion, promotion or deployment.",
+  "limitations": [
+    "Two repetitions only.",
+    "Observed paging is explicit normal protocol; not proof of srcq defect or sole causal explanation.",
+    "This contrast does not compare against historical best whole environment."
+  ],
+  "next": "Test full current rules with exact old batching and unchanged final-answer rule against historical best whole environment on C# first; this exact candidate has no full-suite result."
+}
