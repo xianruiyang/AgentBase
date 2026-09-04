@@ -1,5 +1,7 @@
 {
-  "status": "rejected_cost_and_residual_errors",
+  "status": "qualified_for_full_suite_under_revised_cost_allowance",
+  "original_decision": "Not promoted under the previous cost criterion; residual answer errors remain recorded.",
+  "revised_acceptance": "User now permits up to 50% observed price increase, with per-task correctness at least equal. This TS pilot qualifies at45/48 versus44/48 and+40.43%; not final acceptance or deployment.",
   "raw_root": "D:\\AgentBaseBench\\current-result-relations-v1\\pilot-ready",
   "candidate": "current Chinese kernel; existing final-reply rule extended with object/relation/conditional-result representation; owned current skills unchanged",
   "control": "historical best code-reading-v18-tool-batching-v1/candidate",
