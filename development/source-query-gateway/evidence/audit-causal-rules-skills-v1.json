@@ -1,0 +1,882 @@
+{
+  "schema": "agentbase.code-reading-manual-audit/v1",
+  "date": "2026-09-04",
+  "experiment": "causal-rules-skills-v1",
+  "status": "diagnostic-complete-no-promotion",
+  "scope": "C# only; factorial diagnosis, not an optimization candidate. No production rules, skills, tool, corpus, deployment or release changes.",
+  "authority": {
+    "readers": "后续研究与人工复核",
+    "scoring": "本审计按冻结v23 required解释；不新增验收项，不回改历史实验分数。",
+    "raw": "D:\\AgentBaseBench\\causal-rules-skills-v1: research-plan.md, prepare.py, old-skills-ready and new-skills-ready experiment/summary/events/capsule",
+    "lifecycle": "开发证据，不进入payload；可从原始记录重核。输入改变后不外推，完整机器身份留capsule。"
+  },
+  "fixed": {
+    "corpus": "development/code-search-benchmark/corpus/v23.json",
+    "case": "vmt-temperature-collector-sampling-chain",
+    "model": "gpt-5.6-luna",
+    "reasoning": "medium",
+    "verbosity": "low",
+    "service": "default",
+    "transport": "http-only",
+    "cli": "0.151.0",
+    "subject_subagents": false,
+    "workspace": "D:\\program\\AIFile\\VMTSingleMachine",
+    "workspace_contract": "read-only; subject sandbox is danger-full-access, not an OS read-only guarantee"
+  },
+  "design": {
+    "factors": [
+      "historical/current full AGENTS",
+      "historical/current AgentBase-owned skills"
+    ],
+    "repetitions_per_cell": 2,
+    "total_subject_runs": 8,
+    "within_pair_order": [
+      "current-1",
+      "old-1",
+      "old-2",
+      "current-2"
+    ],
+    "pairs_parallel": true,
+    "pair_allowed_difference": [
+      "AGENTS.md"
+    ],
+    "preserve": "Each AGENTS original batching and answer rules unchanged; no appended prompt, high output or language/task special case.",
+    "control": "Historical best batch AGENTS+owned skills, with the same current CLI/runtime and explicit low setting as all cells. Mixed cells are diagnostic factors, not the user's whole-environment control."
+  },
+  "identity": {
+    "old_source": "current-exact-batch-v1/control frozen benchmark home",
+    "current_skills_source": "current-exact-batch-v1/candidate frozen benchmark home",
+    "current_agents_source": "repository global/AGENTS.md",
+    "current_agents_equal_original_frozen_current_lines": true,
+    "owned_skills_per_home": 13,
+    "owned_skill_files_per_home": 83,
+    "only_owned_skills_copied": true,
+    "preparer_srcq_ingress_verified": true,
+    "shared_equal_fields": [
+      "corpus",
+      "workspaces",
+      "codex",
+      "runtime_environment",
+      "runner",
+      "token_pricing",
+      "tool_versions"
+    ],
+    "tool_versions_note": "Manifest tool_versions is empty; equality of this field is not an independent srcq binary/version check.",
+    "old_skills_postflight": [],
+    "new_skills_postflight": [],
+    "capsules": [
+      {
+        "group": "old-skills",
+        "verified": true,
+        "raw_files": 12
+      },
+      {
+        "group": "new-skills",
+        "verified": true,
+        "raw_files": 12
+      }
+    ]
+  },
+  "skill_delta": {
+    "changed_files": 12,
+    "changed_main_bodies": 3,
+    "other_changed_files": 9,
+    "changed_descriptions": [
+      "execution-governor",
+      "reasoning-governor"
+    ],
+    "unchanged_relevant_skills": [
+      "powershell-usage",
+      "source-query"
+    ],
+    "changed_body_loads_observed": 0,
+    "note": "Only the unchanged PowerShell skill body was loaded by C,H,F. Descriptions can still influence behavior; unread body changes do not demonstrate direct context influence."
+  },
+  "scoring": {
+    "required": 31,
+    "max_physical_lines": 12,
+    "blind_first_review": true,
+    "authority": "Main agent reviewed actual final text; corrected missed compound requirements and path binding instead of accepting reviewer votes.",
+    "sensitivity": "R17: effective/live-valid wording lacking explicit finite constraint has a wide alternative in A,F,E only. C,H,G also omit adopting/returning the live result, so not a finite-word-only dispute.",
+    "correlated_penalty": "F omits full source-file identities. Six definition criteria and R30 share that defect; five of six numerical ranges are correct. Read18-51 is an additional actual range error. Scores count contract items, not independent bugs."
+  },
+  "cells": [
+    {
+      "skills": "old-skills",
+      "rules": "old",
+      "samples": [
+        "H",
+        "A"
+      ],
+      "scores": [
+        28,
+        23
+      ],
+      "strict": 51,
+      "upper": 52,
+      "mean_usd": 0.00831756,
+      "mean_seconds": 60.981
+    },
+    {
+      "skills": "old-skills",
+      "rules": "current",
+      "samples": [
+        "C",
+        "F"
+      ],
+      "scores": [
+        27,
+        20
+      ],
+      "strict": 47,
+      "upper": 48,
+      "mean_usd": 0.0109291,
+      "mean_seconds": 75.2125
+    },
+    {
+      "skills": "new-skills",
+      "rules": "old",
+      "samples": [
+        "B",
+        "E"
+      ],
+      "scores": [
+        26,
+        29
+      ],
+      "strict": 55,
+      "upper": 56,
+      "mean_usd": 0.01134892,
+      "mean_seconds": 79.885
+    },
+    {
+      "skills": "new-skills",
+      "rules": "current",
+      "samples": [
+        "G",
+        "D"
+      ],
+      "scores": [
+        28,
+        29
+      ],
+      "strict": 57,
+      "upper": 57,
+      "mean_usd": 0.00693302,
+      "mean_seconds": 51.7805
+    }
+  ],
+  "records": [
+    {
+      "sample": "C",
+      "skills": "old",
+      "agents": "current",
+      "run": "vmt-temperature-collector-sampling-chain__candidate__1",
+      "strict_passed": 27,
+      "semantic_upper": 27,
+      "total": 31,
+      "failed": [
+        8,
+        17,
+        30,
+        31
+      ],
+      "disputed": [],
+      "notes": {
+        "8": "失败只说明不入库，未发布。",
+        "17": "先取实时值并缓存，未说明有限值条件和采用/返回实时成功结果。",
+        "30": "额外Program.cs:124未建立完整文件身份。",
+        "31": "未明确静态语义边界。"
+      },
+      "answer": "1. 范围：`VmtTemperatureCollector.csproj` 无显式 `Compile` 项，按 SDK 默认编译 `src/VmtTemperatureCollector/*.cs`。\n2. 文件组：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorEngine.cs`\n3. `ExecuteAsync` 实现：43–89；采集禁用时发布“温度补偿未启用”，启用时调用 `SampleOnceAsync`。\n4. `SampleOnceAsync` 实现：188–241；无启用传感器发布状态并返回；配置版本变化则唤醒并返回。\n5. 同上：UID 校验失败发布暂停采样；任一读取失败则不入库；全部有效才调用 `InsertSampleAsync` 成功入库并发布状态。\n6. `ValidateUidsUnsafe` 实现：243–259；遍历启用传感器，调用 `ValidateUid`，收集非空问题。\n7. 直接调用位置：`SampleOnceAsync`→本文件59；`ValidateUidsUnsafe`→本文件180、209；`Read`→本文件220；`ValidateUid`→本文件251；`ExecuteAsync`无源码直接调用（`Program.cs:124`仅托管注册）。\n8. 文件组：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorSensorReader.cs`\n9. `Read` 实现：18–52；先取实时值并缓存；实时失败时仅在启用回退且缓存未过期（年龄≤配置期限）使用缓存，过期即删除，最终返回失败。\n10. `ReadLive` 实现：112–136；Sulinkito→`TryReadSulinkitoTemperature`（122），LJD→`TryReadLjdTemperature`（124），未知型号返回失败（125）。\n11. `ReadLive` 仅重新抛出取消异常（128–131），其他异常转为失败结果（132–135）；`Read`直接调用 `ReadLive`：22，`Test`调用 `Read`：58。\n12. `ValidateUid` 实现：87–110；读取失败或 UID 不匹配返回问题，期望 UID 为空或匹配则通过；上述限定成员的非注释直接调用已穷尽本 csproj 源码范围。",
+      "line_count": 12,
+      "actual_usd": 0.01202648,
+      "seconds": 81.172,
+      "requests": 6,
+      "tools": 9,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 153784,
+        "cache_read_input_tokens": 121344,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 32440,
+        "non_cached_input_tokens": 32440,
+        "output_tokens": 2593,
+        "reasoning_output_tokens": 1112,
+        "visible_output_tokens": 1481,
+        "actual_total_tokens": 156377,
+        "cache_read_ratio": 0.7890547781303646,
+        "reasoning_output_ratio": 0.42884689548785193
+      },
+      "behavior": {
+        "uses_srcq": false,
+        "loaded_skill_bodies": [
+          "powershell-usage"
+        ],
+        "tool_items_per_request": [
+          1,
+          1,
+          1,
+          3,
+          3,
+          0
+        ],
+        "multi_tool_requests": 2,
+        "unclosed_tool_items": 0,
+        "nonzero_exits": [
+          {
+            "command_index": 5,
+            "exit": 1,
+            "output_tail": "rg: src/VmtTemperatureCollector/*.cs: 文件名、目录名或卷标语法不正确。 (os error 123)\nsrc/VmtTemperatureCollector/VmtTemperatureCollector.csproj:3:    <TargetFramework>net8.0-windows</TargetFramework>\nsrc/VmtTemperatureCollector/VmtTemperatureCollector.csproj:19:    <ProjectReference Include=\"..\\VmtSensorCore\\VmtSensorCore.csproj\" />\nsrc/VmtTemperatureCollector/VmtTemperatureCollector.csproj:20:    <ProjectReference Include=\"..\\VmtTemperatureCollector.Contracts\\VmtTemperatureCollector.Contracts.csproj\" />\n"
+          }
+        ]
+      },
+      "tool_return_evidence": {
+        "read_failure_publication": [
+          {
+            "command_index": 3,
+            "source_line": "src/VmtTemperatureCollector/TemperatureCollectorEngine.cs:225:                await PublishAsync(configuration, true, null, values, $\"温度采样失败，未写入历史：{failure}\", failure, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "uid_failure_publication": [
+          {
+            "command_index": 3,
+            "source_line": "src/VmtTemperatureCollector/TemperatureCollectorEngine.cs:213:                    await PublishAsync(configuration, false, null, [], $\"UID校验失败，暂停采样：{issueText}\", issueText, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "finite_value_check": [
+          {
+            "command_index": 3,
+            "source_line": "src/VmtTemperatureCollector/TemperatureCollectorSensorReader.cs:24:        if (live.ok && live.value is double value && double.IsFinite(value))"
+          }
+        ]
+      }
+    },
+    {
+      "sample": "H",
+      "skills": "old",
+      "agents": "old",
+      "run": "vmt-temperature-collector-sampling-chain__control__1",
+      "strict_passed": 28,
+      "semantic_upper": 28,
+      "total": 31,
+      "failed": [
+        8,
+        17,
+        24
+      ],
+      "disputed": [],
+      "notes": {
+        "8": "失败不入库但未说明发布。",
+        "17": "取实时值并缓存，没有采用/返回实时结果。",
+        "24": "未知型号只给125–126位置，未说明失败。"
+      },
+      "answer": "1. 范围：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\VmtTemperatureCollector.csproj`（SDK 默认编译全部 `.cs`，1–22）。\n2. `D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorEngine.cs`：`ExecuteAsync` 43–89；无源码内直接调用（由宿主生命周期调用）。\n3. `SampleOnceAsync` 188–241；直接调用：同文件 59。禁用采集在 53–56 发布“未启用”并跳过采样。\n4. `SampleOnceAsync` 无启用传感器时 190–195 发布状态并返回；配置版本变化 200–205 唤醒后返回。\n5. `ValidateUidsUnsafe` 243–259；直接调用：同文件 180、209；UID 失败在 210–215 发布失败并暂停，成功则 217 标记版本已校验。\n6. 采样读取 220；任一读取失败/值无效则 221–227 不入库；全部有效后 229–235 插入历史并发布成功状态。\n7. `D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorSensorReader.cs`：`Read` 18–52；直接调用：同文件 58、引擎文件 220。\n8. `Read` 先取实时值并缓存 22–27；实时失败后仅在启用回退且未过期时用缓存 30–45，过期则删除缓存 48，最终失败 51。\n9. `ReadLive` 112–136；直接调用：同文件 22；Sulinkito 121–122、LJD 123–124，未知型号 125–126。\n10. `ReadLive` 捕获普通异常并转为失败结果 132–135，但 `OperationCanceledException` 在 128–131 原样抛出。\n11. `ValidateUid` 87–110；直接调用：引擎文件 251；UID 读取失败返回问题，期望 UID 为空或匹配则成功，否则返回不一致问题。\n12. 上述限定成员的非注释直接调用已穷尽本 csproj 源码范围；结论仅限静态语义，不证明硬件、SQLite、服务托管或运行时行为。",
+      "line_count": 12,
+      "actual_usd": 0.00783024,
+      "seconds": 68.293,
+      "requests": 4,
+      "tools": 7,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 79878,
+        "cache_read_input_tokens": 59392,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 20486,
+        "non_cached_input_tokens": 20486,
+        "output_tokens": 2121,
+        "reasoning_output_tokens": 865,
+        "visible_output_tokens": 1256,
+        "actual_total_tokens": 81999,
+        "cache_read_ratio": 0.743533889181001,
+        "reasoning_output_ratio": 0.40782649693540785
+      },
+      "behavior": {
+        "uses_srcq": false,
+        "loaded_skill_bodies": [
+          "powershell-usage"
+        ],
+        "tool_items_per_request": [
+          3,
+          1,
+          3,
+          0
+        ],
+        "multi_tool_requests": 2,
+        "unclosed_tool_items": 0,
+        "nonzero_exits": []
+      },
+      "tool_return_evidence": {
+        "read_failure_publication": [
+          {
+            "command_index": 6,
+            "source_line": "225:                await PublishAsync(configuration, true, null, values, $\"温度采样失败，未写入历史：{failure}\", failure, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "uid_failure_publication": [
+          {
+            "command_index": 6,
+            "source_line": "213:                    await PublishAsync(configuration, false, null, [], $\"UID校验失败，暂停采样：{issueText}\", issueText, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "finite_value_check": [
+          {
+            "command_index": 5,
+            "source_line": "24:        if (live.ok && live.value is double value && double.IsFinite(value))"
+          }
+        ]
+      }
+    },
+    {
+      "sample": "A",
+      "skills": "old",
+      "agents": "old",
+      "run": "vmt-temperature-collector-sampling-chain__control__2",
+      "strict_passed": 23,
+      "semantic_upper": 24,
+      "total": 31,
+      "failed": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        14,
+        15,
+        17
+      ],
+      "disputed": [
+        17
+      ],
+      "notes": {
+        "5": "只列无启用范围，无发布/返回。",
+        "6": "只列配置版本变化范围，无唤醒/返回。",
+        "7": "只列UID失败范围，无发布/停止。",
+        "8": "只列采集失败范围，无发布/不入库。",
+        "9": "只列成功入库范围，无后继成功发布。",
+        "14": "没有Read的Engine220调用。",
+        "15": "没有Test的Reader58调用。",
+        "17": "有效实时值未明确有限性；宽解释通过。"
+      },
+      "answer": "1. 文件：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorEngine.cs`\n2. `ExecuteAsync`：43–89；直接调用 `SampleOnceAsync`：59。\n3. `SampleOnceAsync`：188–241；禁用由 `ExecuteAsync` 53–56 发布状态；无启用传感器 190–195；配置版本变化 200–205；UID失败 207–218、采集失败 220–227；成功入库 229–235。\n4. `ValidateUidsUnsafe`：243–259；直接调用位置：`ValidateUidsAsync` 180、`SampleOnceAsync` 209；逐启用传感器调用 `ValidateUid` 251，发现问题即汇总返回。\n5. 文件：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorSensorReader.cs`\n6. `Read`：18–52；直接调用 `ReadLive`：22；实时值有效则更新缓存并成功返回。\n7. `Read`：缓存启用、未过期则返回缓存成功值并标记缓存；过期则删除缓存；无可用缓存最终失败返回。\n8. `ValidateUid`：87–110；直接调用位置：`TemperatureCollectorEngine.ValidateUidsUnsafe` 251；读取失败返回问题，期望UID为空或匹配则通过，否则返回不一致问题。\n9. `ReadLive`：112–136；按 Sulinkito 121–122、LJD 123–124 分派，未知型号 125 失败；取消异常 128–131 原样抛出，其他异常 132–135 转为失败结果。\n10. `Read`、`ReadLive`、`ValidateUid` 的上述非注释直接调用均已穷尽本题指定源码范围；`ExecuteAsync`、`SampleOnceAsync`、`ValidateUidsUnsafe`亦同。\n11. 范围依据：该 `.csproj` 使用 SDK 默认编译源码；结论仅限静态语义，不证明硬件读取、SQLite写入、Windows服务托管或运行时行为。",
+      "line_count": 11,
+      "actual_usd": 0.00880488,
+      "seconds": 53.669,
+      "requests": 5,
+      "tools": 4,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 105240,
+        "cache_read_input_tokens": 77824,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 27416,
+        "non_cached_input_tokens": 27416,
+        "output_tokens": 1471,
+        "reasoning_output_tokens": 626,
+        "visible_output_tokens": 845,
+        "actual_total_tokens": 106711,
+        "cache_read_ratio": 0.7394906879513493,
+        "reasoning_output_ratio": 0.42556084296397007
+      },
+      "behavior": {
+        "uses_srcq": true,
+        "loaded_skill_bodies": [],
+        "tool_items_per_request": [
+          1,
+          1,
+          1,
+          1,
+          0
+        ],
+        "multi_tool_requests": 0,
+        "unclosed_tool_items": 0,
+        "nonzero_exits": []
+      },
+      "tool_return_evidence": {
+        "read_failure_publication": [
+          {
+            "command_index": 4,
+            "source_line": "  225:                await PublishAsync(configuration, true, null, values, $\"温度采样失败，未写入历史：{failure}\", failure, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "uid_failure_publication": [
+          {
+            "command_index": 4,
+            "source_line": "  213:                    await PublishAsync(configuration, false, null, [], $\"UID校验失败，暂停采样：{issueText}\", issueText, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "finite_value_check": [
+          {
+            "command_index": 2,
+            "source_line": "    24:        if (live.ok && live.value is double value && double.IsFinite(value))"
+          }
+        ]
+      }
+    },
+    {
+      "sample": "F",
+      "skills": "old",
+      "agents": "current",
+      "run": "vmt-temperature-collector-sampling-chain__candidate__2",
+      "strict_passed": 20,
+      "semantic_upper": 21,
+      "total": 31,
+      "failed": [
+        1,
+        4,
+        5,
+        7,
+        8,
+        10,
+        13,
+        17,
+        21,
+        27,
+        30
+      ],
+      "disputed": [
+        17
+      ],
+      "notes": {
+        "1": "源码文件身份只用...省略路径。",
+        "4": "源码文件身份只用...省略路径。",
+        "5": "无启用只发布，未返回。",
+        "7": "UID失败只暂停，未发布。",
+        "8": "读取失败只不入库，未发布。",
+        "10": "源码文件身份只用...省略路径。",
+        "13": "Read范围18–51漏闭合52，且文件身份省略。",
+        "17": "实时读取成功即返回，未明确有限性；保留宽解释。",
+        "21": "源码文件身份只用...省略路径。",
+        "27": "源码文件身份只用...省略路径。",
+        "30": "新文件未给完整身份，Read范围错误。"
+      },
+      "underlying": "六个定义required同时依赖完整文件身份；这是一个省略路径问题造成多项扣分，不是六个函数都找错。六个数值范围5个正确。ReadLive22与Test58按同上下文的caller位置表达接受，不推断其在声明错误调用。",
+      "answer": "1. 范围：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\VmtTemperatureCollector.csproj` 采用 SDK 默认编译项。  \n2. `TemperatureCollectorEngine.ExecuteAsync`（`...\\TemperatureCollectorEngine.cs`，43–89）：禁用采集则发布“未启用”；启用则调用 `SampleOnceAsync`（59）；异常记录并更新状态，取消则退出。  \n3. `SampleOnceAsync`（同文件，188–241）：无启用传感器发布提示（190–195）；配置版本变化唤醒并返回（200–205）；版本未校验则调用 `ValidateUidsUnsafe`（209），失败暂停采样（210–215）。  \n4. `SampleOnceAsync` 读取启用传感器（220）；任一读取失败、空值或非有限值则不入库（221–227）；全部有效时写入数据库并发布成功状态（229–235）。  \n5. `ValidateUidsUnsafe`（同文件，243–259）：按启用传感器和槽位顺序逐一校验，收集非空问题；直接调用位置：`ValidateUidsAsync` 180、`SampleOnceAsync` 209。  \n6. `TemperatureCollectorSensorReader.Read`（`...\\TemperatureCollectorSensorReader.cs`，18–51）：先实时读取成功即更新缓存并返回实时值（22–27）。  \n7. 实时失败时，若启用且未过期缓存存在则返回缓存值并标记缓存（30–45）；过期缓存删除（46–49）；否则返回最终失败（51）。  \n8. `ValidateUid`（同文件，87–110）：UID 读取失败生成问题；期望 UID 为空或匹配则通过，否则报告与历史记录不一致；直接调用位置：`ValidateUidsUnsafe` 251。  \n9. `ReadLive`（同文件，112–136）：Sulinkito 分派 `TryReadSulinkitoTemperature`（121–122），LJD 分派 `TryReadLjdTemperature`（123–124），未知型号返回不支持错误（125）。  \n10. `ReadLive` 仅重新抛出 `OperationCanceledException`（128–131），其他异常转换为失败结果（132–135）；`Read` 直接调用位置为 22，`Test` 直接调用位置为 58。  \n11. 上述限定成员的非注释直接调用在该源码范围内已穷尽；底层硬件、SQLite、服务托管及运行时行为未被本静态分析证明。",
+      "line_count": 11,
+      "actual_usd": 0.00983172,
+      "seconds": 69.253,
+      "requests": 5,
+      "tools": 7,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 97791,
+        "cache_read_input_tokens": 70656,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 27135,
+        "non_cached_input_tokens": 27135,
+        "output_tokens": 2493,
+        "reasoning_output_tokens": 1026,
+        "visible_output_tokens": 1467,
+        "actual_total_tokens": 100284,
+        "cache_read_ratio": 0.722520477344541,
+        "reasoning_output_ratio": 0.41155234657039713
+      },
+      "behavior": {
+        "uses_srcq": false,
+        "loaded_skill_bodies": [
+          "powershell-usage"
+        ],
+        "tool_items_per_request": [
+          2,
+          1,
+          1,
+          3,
+          0
+        ],
+        "multi_tool_requests": 2,
+        "unclosed_tool_items": 0,
+        "nonzero_exits": [
+          {
+            "command_index": 4,
+            "exit": 1,
+            "output_tail": "ParserError: \r\nLine |\r\n   1 |  … peratureCollector\\VmtTemperatureCollector.csproj'); foreach ( in ) {  …\r\n     |                                                                 ~\r\n     | Missing variable name after foreach. The correct form is: foreach ($a in $b) {...}\r\n"
+          }
+        ]
+      },
+      "tool_return_evidence": {
+        "read_failure_publication": [
+          {
+            "command_index": 5,
+            "source_line": "225:                await PublishAsync(configuration, true, null, values, $\"温度采样失败，未写入历史：{failure}\", failure, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "uid_failure_publication": [
+          {
+            "command_index": 5,
+            "source_line": "213:                    await PublishAsync(configuration, false, null, [], $\"UID校验失败，暂停采样：{issueText}\", issueText, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "finite_value_check": [
+          {
+            "command_index": 6,
+            "source_line": "24:        if (live.ok && live.value is double value && double.IsFinite(value))"
+          }
+        ]
+      }
+    },
+    {
+      "sample": "G",
+      "skills": "current",
+      "agents": "current",
+      "run": "vmt-temperature-collector-sampling-chain__candidate__1",
+      "strict_passed": 28,
+      "semantic_upper": 28,
+      "total": 31,
+      "failed": [
+        5,
+        8,
+        17
+      ],
+      "disputed": [],
+      "notes": {
+        "5": "无启用只发布，未返回。",
+        "8": "失败只不入库，未发布。",
+        "17": "取实时值并缓存，没有说明采用/返回实时成功结果。"
+      },
+      "answer": "1. `ExecuteAsync`：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorEngine.cs:43-89`；无直接源码调用（由宿主生命周期调用）。\n2. `SampleOnceAsync`：同文件 `:188-241`；`ExecuteAsync:59` 直接调用。\n3. `ValidateUidsUnsafe`：同文件 `:243-259`；`ValidateUidsAsync:180`、`SampleOnceAsync:209` 直接调用。\n4. `TemperatureCollectorSensorReader.Read`：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorSensorReader.cs:18-52`；`TemperatureCollectorEngine.cs:220`、本文件 `:58` 直接调用。\n5. `ReadLive`：同文件 `:112-136`；本文件 `:22` 直接调用；取消异常原样抛出，其他异常转为失败结果。\n6. `ValidateUid`：同文件 `:87-110`；`TemperatureCollectorEngine.cs:251` 直接调用；读取异常不在此处捕获。\n7. `.csproj`：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\VmtTemperatureCollector.csproj:1-22`；无显式 Compile，默认编译该项目目录下源码。\n8. 禁用采集发布“温度补偿未启用”；无启用传感器发布“未启用任何温度传感器”；配置版本变化则唤醒并放弃本轮。\n9. UID 校验失败发布暂停采样；读取失败（含非有限值）不入库；全部有效时调用 `InsertSampleAsync`，成功发布已写入历史。\n10. `Read` 先取实时值并缓存；实时失败时按开关和有效期回退缓存；过期缓存删除，最终返回失败。\n11. `ReadLive` 按 Sulinkito（含通道）、LJD、未知型号分别分派；未知型号返回失败，不抛异常。\n12. 上述限定成员及其非注释直接调用已穷尽当前 `.csproj` 源码范围；结论仅限静态语义，不证明硬件、SQLite、服务托管或运行时行为。",
+      "line_count": 12,
+      "actual_usd": 0.00756428,
+      "seconds": 42.302,
+      "requests": 3,
+      "tools": 4,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 59287,
+        "cache_read_input_tokens": 34304,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 24983,
+        "non_cached_input_tokens": 24983,
+        "output_tokens": 1568,
+        "reasoning_output_tokens": 714,
+        "visible_output_tokens": 854,
+        "actual_total_tokens": 60855,
+        "cache_read_ratio": 0.5786091385969943,
+        "reasoning_output_ratio": 0.45535714285714285
+      },
+      "behavior": {
+        "uses_srcq": false,
+        "loaded_skill_bodies": [],
+        "tool_items_per_request": [
+          1,
+          3,
+          0
+        ],
+        "multi_tool_requests": 1,
+        "unclosed_tool_items": 0,
+        "nonzero_exits": []
+      },
+      "tool_return_evidence": {
+        "read_failure_publication": [
+          {
+            "command_index": 2,
+            "source_line": "225:                await PublishAsync(configuration, true, null, values, $\"温度采样失败，未写入历史：{failure}\", failure, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "uid_failure_publication": [
+          {
+            "command_index": 2,
+            "source_line": "213:                    await PublishAsync(configuration, false, null, [], $\"UID校验失败，暂停采样：{issueText}\", issueText, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "finite_value_check": [
+          {
+            "command_index": 3,
+            "source_line": "24:        if (live.ok && live.value is double value && double.IsFinite(value))"
+          }
+        ]
+      }
+    },
+    {
+      "sample": "B",
+      "skills": "current",
+      "agents": "old",
+      "run": "vmt-temperature-collector-sampling-chain__control__1",
+      "strict_passed": 26,
+      "semantic_upper": 26,
+      "total": 31,
+      "failed": [
+        4,
+        5,
+        8,
+        15,
+        30
+      ],
+      "disputed": [],
+      "notes": {
+        "4": "SampleOnceAsync完整范围188–242，应为188–241。",
+        "5": "无启用发布，未返回。",
+        "8": "失败不入库但未发布。",
+        "15": "缺Test调用Read的58，Read调用位置误列22。",
+        "30": "错误完整范围与Read调用位置归属。"
+      },
+      "extra": "ValidateUid的“无 UID 读取成功或期望 UID 为空则通过”表述异常，非required附加事实不据此增加分母。",
+      "answer": "1. 范围：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\VmtTemperatureCollector.csproj` 为 SDK 默认编译项，无排除配置。  \n2. `D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorEngine.cs`：`ExecuteAsync` 实现 43–89 行；无源码直接调用（由 `BackgroundService` 框架入口调用）。  \n3. `SampleOnceAsync` 实现 188–242 行；直接调用：同文件 59 行。  \n4. `ValidateUidsUnsafe` 实现 243–259 行；直接调用：同文件 180、209 行；`ValidateUid` 直接调用：同文件 251 行。  \n5. `ExecuteAsync`：禁用时发布“温度补偿未启用”；启用时调用采样；循环异常记录并更新状态，取消则退出。  \n6. `SampleOnceAsync`：无启用传感器发布提示；配置版本变化唤醒并返回；UID 校验失败发布暂停采样；任一读取失败/值无效则不入库；全部有效后计算时间、入库并发布成功状态。  \n7. `D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorSensorReader.cs`：`Read` 实现 18–52 行；直接调用：同文件 22 行、`TemperatureCollectorEngine.cs` 220 行。  \n8. `Read`：实时读取成功且为有限值即更新缓存并返回实时值；否则在启用回退、缓存未过期时返回缓存值；过期则删除缓存，最终返回失败。  \n9. `ReadLive` 实现 112–136 行；直接调用：同文件 22 行；Sulinkito 调用对应读取器（含通道），LJD 调用对应读取器，未知型号返回失败；取消异常原样抛出，其余异常转为失败结果。  \n10. `ValidateUid` 实现 87–110 行；无 UID 读取成功或期望 UID 为空则通过；读取失败或 UID 不一致则返回问题。上述限定成员的非注释直接调用已穷尽本项目该源码范围；结论仅为静态语义。",
+      "line_count": 10,
+      "actual_usd": 0.01201664,
+      "seconds": 79.769,
+      "requests": 6,
+      "tools": 11,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 138340,
+        "cache_read_input_tokens": 104192,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 34148,
+        "non_cached_input_tokens": 34148,
+        "output_tokens": 2586,
+        "reasoning_output_tokens": 1188,
+        "visible_output_tokens": 1398,
+        "actual_total_tokens": 140926,
+        "cache_read_ratio": 0.7531588839092092,
+        "reasoning_output_ratio": 0.4593967517401392
+      },
+      "behavior": {
+        "uses_srcq": true,
+        "loaded_skill_bodies": [],
+        "tool_items_per_request": [
+          1,
+          3,
+          3,
+          2,
+          2,
+          0
+        ],
+        "multi_tool_requests": 4,
+        "unclosed_tool_items": 0,
+        "nonzero_exits": [
+          {
+            "command_index": 6,
+            "exit": 1,
+            "output_tail": ""
+          }
+        ]
+      },
+      "tool_return_evidence": {
+        "read_failure_publication": [
+          {
+            "command_index": 3,
+            "source_line": "                await PublishAsync(configuration, true, null, values, $\"温度采样失败，未写入历史：{failure}\", failure, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "uid_failure_publication": [
+          {
+            "command_index": 3,
+            "source_line": "                    await PublishAsync(configuration, false, null, [], $\"UID校验失败，暂停采样：{issueText}\", issueText, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "finite_value_check": [
+          {
+            "command_index": 2,
+            "source_line": "        if (live.ok && live.value is double value && double.IsFinite(value))"
+          }
+        ]
+      }
+    },
+    {
+      "sample": "E",
+      "skills": "current",
+      "agents": "old",
+      "run": "vmt-temperature-collector-sampling-chain__control__2",
+      "strict_passed": 29,
+      "semantic_upper": 30,
+      "total": 31,
+      "failed": [
+        7,
+        17
+      ],
+      "disputed": [
+        17
+      ],
+      "notes": {
+        "7": "UID失败只暂停，未发布。",
+        "17": "有效实时值未明确有限性；宽解释通过。"
+      },
+      "answer": "1. 范围：仅分析 `D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\VmtTemperatureCollector.csproj` 默认编译的本目录源码，静态语义不证明硬件、SQLite、服务托管或运行时行为。\n2. 文件：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorEngine.cs`。\n3. `ExecuteAsync`：实现 43–89 行；禁用采集则发布“温度补偿未启用”，启用则直接调用 `SampleOnceAsync`（59 行）；无项目源码非注释直接调用，属后台服务覆写入口。\n4. `SampleOnceAsync`：实现 188–241 行；无启用传感器发布状态并返回（190–195）；配置版本变化唤醒后返回（200–205）；版本未校验则调用 `ValidateUidsUnsafe`（209），失败暂停采样（210–215）。\n5. `SampleOnceAsync` 随后调用 `Read`（220）；任一读取失败/值无效则不入库并发布失败（221–226）；全部有效则调用 `InsertSampleAsync` 入库并发布成功（229–235）。\n6. `ValidateUidsUnsafe`：实现 243–259 行；遍历启用传感器并调用 `TemperatureCollectorSensorReader.ValidateUid`（251），收集全部问题；直接调用位置另有 180 行，已穷尽。\n7. 文件：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorSensorReader.cs`。\n8. `Read`：实现 18–52 行；直接调用 `ReadLive`（22）；实时值有效则更新缓存并成功返回，失败时在启用且未过期缓存存在时返回缓存值，过期即移除，最终返回失败。\n9. `ValidateUid`：实现 87–110 行；UID读取失败返回问题；期望UID为空或大小写不敏感匹配则通过，否则返回不一致问题。`Read` 另被 `Test` 58 行和引擎 220 行调用。\n10. `ReadLive`：实现 112–136 行；Sulinkito 分派 121–122、LJD 分派 123–124、未知型号返回失败；取消异常原样抛出（128–131），其他异常转为失败结果（132–135）；`ReadLive`直接调用仅 22 行，以上限定成员调用已穷尽。",
+      "line_count": 10,
+      "actual_usd": 0.0106812,
+      "seconds": 80.001,
+      "requests": 6,
+      "tools": 11,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 135540,
+        "cache_read_input_tokens": 110080,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 25460,
+        "non_cached_input_tokens": 25460,
+        "output_tokens": 2823,
+        "reasoning_output_tokens": 1373,
+        "visible_output_tokens": 1450,
+        "actual_total_tokens": 138363,
+        "cache_read_ratio": 0.8121587723181348,
+        "reasoning_output_ratio": 0.4863620262132483
+      },
+      "behavior": {
+        "uses_srcq": true,
+        "loaded_skill_bodies": [],
+        "tool_items_per_request": [
+          2,
+          3,
+          3,
+          2,
+          1,
+          0
+        ],
+        "multi_tool_requests": 4,
+        "unclosed_tool_items": 0,
+        "nonzero_exits": []
+      },
+      "tool_return_evidence": {
+        "read_failure_publication": [
+          {
+            "command_index": 7,
+            "source_line": "  225:                await PublishAsync(configuration, true, null, values, $\"温度采样失败，未写入历史：{failure}\", failure, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "uid_failure_publication": [
+          {
+            "command_index": 7,
+            "source_line": "  213:                    await PublishAsync(configuration, false, null, [], $\"UID校验失败，暂停采样：{issueText}\", issueText, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "finite_value_check": [
+          {
+            "command_index": 3,
+            "source_line": "  24:        if (live.ok && live.value is double value && double.IsFinite(value))"
+          }
+        ]
+      }
+    },
+    {
+      "sample": "D",
+      "skills": "current",
+      "agents": "current",
+      "run": "vmt-temperature-collector-sampling-chain__candidate__2",
+      "strict_passed": 29,
+      "semantic_upper": 29,
+      "total": 31,
+      "failed": [
+        8,
+        30
+      ],
+      "disputed": [],
+      "notes": {
+        "8": "读取失败不入库，未发布。",
+        "30": "额外Program.cs:124未给完整文件身份。"
+      },
+      "answer": "1. 项目范围：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\VmtTemperatureCollector.csproj` 默认编译源码。  \n2. 文件：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorEngine.cs`  \n3. `ExecuteAsync`：43–89；禁用采集时发布“未启用”，启用时调用 `SampleOnceAsync`(59)，无其他源码直接调用（由 `Program.cs`:124 注册为 HostedService）。  \n4. `SampleOnceAsync`：188–241；无启用传感器发布并返回(190–195)，配置 Revision 变化唤醒并返回(200–205)。  \n5. `SampleOnceAsync`续：UID 校验失败发布暂停采样(207–215)；读取失败/空值/非有限值不入库(220–227)；全部成功后插入样本并发布成功状态(229–235)。  \n6. `ValidateUidsUnsafe`：243–259；直接调用 `ValidateUid`(251)，被 `ValidateUidsAsync`(180)及 `SampleOnceAsync`(209)调用。  \n7. 文件：`D:\\program\\AIFile\\VMTSingleMachine\\src\\VmtTemperatureCollector\\TemperatureCollectorSensorReader.cs`  \n8. `Read`：18–52；`ReadLive`成功且值有限则缓存并返回实时值(22–27)。  \n9. `Read`续：实时失败时，启用且未过期缓存则返回缓存；过期即移除；无可用缓存则最终失败(30–52)。直接调用：`ReadLive`(22)；另被 `Test`(58)及 Engine `SampleOnceAsync`(220)调用。  \n10. `ReadLive`：112–136；Sulinkito 分派通道读取(121–122)，LJD 分派读取(123–124)，未知型号返回失败(125)。  \n11. `ReadLive`异常边界：取消异常原样抛出(128–131)，其他异常转为失败结果(132–135)。  \n12. `ValidateUid`：87–110；UID 读取失败或不匹配返回问题，否则返回 null；被 Engine `ValidateUidsUnsafe`(251)直接调用。上述限定成员的非注释直接调用已穷尽本源码范围；不证明硬件、SQLite、服务托管或运行时行为。",
+      "line_count": 12,
+      "actual_usd": 0.00630176,
+      "seconds": 61.259,
+      "requests": 4,
+      "tools": 6,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 84664,
+        "cache_read_input_tokens": 73728,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 10936,
+        "non_cached_input_tokens": 10936,
+        "output_tokens": 2200,
+        "reasoning_output_tokens": 858,
+        "visible_output_tokens": 1342,
+        "actual_total_tokens": 86864,
+        "cache_read_ratio": 0.8708305773410187,
+        "reasoning_output_ratio": 0.39
+      },
+      "behavior": {
+        "uses_srcq": false,
+        "loaded_skill_bodies": [],
+        "tool_items_per_request": [
+          1,
+          3,
+          2,
+          0
+        ],
+        "multi_tool_requests": 2,
+        "unclosed_tool_items": 0,
+        "nonzero_exits": []
+      },
+      "tool_return_evidence": {
+        "read_failure_publication": [
+          {
+            "command_index": 4,
+            "source_line": "225:                 await PublishAsync(configuration, true, null, values, $\"温度采样失败，未写入历史：{failure}\", failure, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "uid_failure_publication": [
+          {
+            "command_index": 4,
+            "source_line": "213:                     await PublishAsync(configuration, false, null, [], $\"UID校验失败，暂停采样：{issueText}\", issueText, cancellationToken).ConfigureAwait(false);"
+          }
+        ],
+        "finite_value_check": [
+          {
+            "command_index": 2,
+            "source_line": "24:         if (live.ok && live.value is double value && double.IsFinite(value))"
+          }
+        ]
+      }
+    }
+  ],
+  "cost": {
+    "method": "Sum actual per-request observed usages under the runner's frozen price snapshot (2026-09-01); cached tokens use actual reported cache reads. Not ideal-cache estimates, account-bill reconciliation or a live price claim.",
+    "subject_total_usd": 0.0750572,
+    "setup_usd": 0.01568584,
+    "total_usd": 0.09074304,
+    "scope_excluded": "主代理/人工审计与辅助子代理的成本未计入受测总价。",
+    "cross_pair_cache": "Server cache and stochastic variation were not controlled; cell prices are descriptive.",
+    "old_skills_agents_change_percent": 31.39790996397982,
+    "current_skills_agents_change_percent": -38.91031040839127
+  },
+  "findings": [
+    {
+      "state": "observed",
+      "claim": "Current AGENTS:0/4 srcq. Historical AGENTS:3/4 srcq. Same direction under both skills backgrounds."
+    },
+    {
+      "state": "supported-hypothesis",
+      "claim": "Query wording compression is a plausible controllable contributor to route noncompliance; the prior isolated query-clause experiment has the same route direction. This does not establish the cause of answer omissions.",
+      "prior": "report-current-query-boundary-v2.md"
+    },
+    {
+      "state": "observed",
+      "claim": "All eight tool-return records contain read-failure publication source; seven answers omit publication (all except E). Both old and current rules exhibit this."
+    },
+    {
+      "state": "observed",
+      "claim": "Quality direction when changing AGENTS reverses by skills background: strict -4 under old skills, +2 under current skills. The sign remains reversed under consistent wide R17 interpretation."
+    },
+    {
+      "state": "unknown",
+      "claim": "Why retrieved behavioral facts are not retained in final answers. Rule interference, selection/condensation and stochastic variation remain alternatives; these runs do not expose private internal mechanisms."
+    },
+    {
+      "state": "not-established",
+      "claim": "Neither current overall governance superiority nor universal regression is proven. Two repetitions in one C# task do not qualify all nine tasks."
+    }
+  ],
+  "decision": {
+    "promotion": false,
+    "deploy": false,
+    "additional_runs_this_phase": false,
+    "next": "先隔离固定证据后的答案生成阶段，保持medium/low/题面/oracle相同，只消去自主检索差异；其结果只用于机制定位，不能替代端到端资格。再依据差异缩小原有规则条款消融，不直接追加答案提醒或扩大输出。",
+    "rollback": "允许研究原有改动的删除/替换，不预设新版本必须保留；当前证据不足以授权或裁决整体回退。"
+  }
+}
