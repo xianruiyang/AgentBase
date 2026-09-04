@@ -1,0 +1,785 @@
+{
+  "schema": "agentbase.code-search-comparison-audit/v1",
+  "date": "2026-09-04",
+  "status": "historical_run_quality_invalidated_by_oracle_and_scoring_review",
+  "quality_conclusions_valid": false,
+  "invalidation_reason": "v22 containing range, DTO prompt ambiguity and TS hidden required actions/scoring errors; retained scores are historical only. New comparison uses v23 on both sides.",
+  "scope": "Each side retains its own AGENTS.md and AgentBase-owned skills only. External skills/plugins/caches are excluded; not the former all-installed-skill Control.",
+  "control_source": "code-reading-v18-tool-batching-v1/candidate (actual historical batching candidate)",
+  "candidate_source": "current installed Codex AGENTS.md and AgentBase skills at prepare time",
+  "fixed": {
+    "corpus": "development/code-search-benchmark/corpus/v22.json",
+    "model": "gpt-5.6-luna",
+    "reasoning_effort": "medium",
+    "repetitions_per_case_per_environment": 2,
+    "subject_subagents": false,
+    "service_tier": "default",
+    "srcq": "same currently installed binary on both sides; version text alone was insufficient"
+  },
+  "raw_root": "D:\\AgentBaseBench\\full-suite-agentbase-only-v1",
+  "shards": [
+    {
+      "group": "core",
+      "postflight_failures": [],
+      "setup_usd": 0.0071952000000000006
+    },
+    {
+      "group": "ue",
+      "postflight_failures": [],
+      "setup_usd": 0.008675400000000002
+    },
+    {
+      "group": "external",
+      "postflight_failures": [],
+      "setup_usd": 0.00619412
+    }
+  ],
+  "capsule_verification": {
+    "core-ready": {
+      "ok": true,
+      "raw_files": 36
+    },
+    "ue-ready": {
+      "ok": true,
+      "raw_files": 20
+    },
+    "external-ready": {
+      "ok": true,
+      "raw_files": 28
+    }
+  },
+  "scoring": {
+    "method": "Independent price-blind review followed by main-agent adjudication against unchanged v22 required items.",
+    "path_policy": "Accept positions grouped under an already established unique complete file identity; reject unidentified additional files.",
+    "adjudications": [
+      "C# ExecuteAsync having no explicit caller does not contradict its call to SampleOnceAsync at line 59; R2 passes for all four answers.",
+      "C# required count is mechanically read as 31, not the initial reviewer count of 30. Failure IDs, not handwritten vectors, determine scores.",
+      "C# candidate 1 and control 2 fail R29: no explicit completeness claim for the requested direct-call set.",
+      "C# candidate 2 fails R29 and R30: no completeness claim and additional ...TemperatureCollectorRepository.cs:231 lacks complete identity.",
+      "TS all four answers fail R16-R22 under the frozen required items: filtering groups supplied, individual state actions omitted. No question or oracle was softened."
+    ]
+  },
+  "findings": [
+    "Provider field line 330 was already present in tool output for the three answers that omitted it: final-answer projection failure, not srcq retrieval failure.",
+    "The two policy-source failures respectively omitted the formal source-query skill and selected a development candidate as formal source.",
+    "Overall lower price does not compensate for per-case quality regressions; provider and C# are worse than the old batching side.",
+    "Provider and both UE cases cost over 25% more; the provisional 10% closeness threshold was never confirmed by the user.",
+    "Two repetitions describe this sample; they do not prove a causal rule effect or stable long-run performance."
+  ],
+  "overall": {
+    "control": {
+      "passed": 153,
+      "total": 170,
+      "usd": 0.1470354,
+      "subject_seconds": 749.3100000000001
+    },
+    "candidate": {
+      "passed": 150,
+      "total": 170,
+      "usd": 0.13620544,
+      "subject_seconds": 606.44
+    }
+  },
+  "cases": [
+    {
+      "case": "agentbase-file-discovery-control",
+      "control": {
+        "passed": 2,
+        "total": 2,
+        "usd_mean": 0.00436844,
+        "seconds_mean": 14.655000000000001
+      },
+      "candidate": {
+        "passed": 2,
+        "total": 2,
+        "usd_mean": 0.0030985,
+        "seconds_mean": 10.77
+      },
+      "price_change_percent": -29.07
+    },
+    {
+      "case": "agentbase-rg-policy-sources",
+      "control": {
+        "passed": 3,
+        "total": 4,
+        "usd_mean": 0.010333440000000001,
+        "seconds_mean": 55.545
+      },
+      "candidate": {
+        "passed": 3,
+        "total": 4,
+        "usd_mean": 0.007068940000000001,
+        "seconds_mean": 34.375
+      },
+      "price_change_percent": -31.59
+    },
+    {
+      "case": "agentbase-provider-observation",
+      "control": {
+        "passed": 3,
+        "total": 4,
+        "usd_mean": 0.00313366,
+        "seconds_mean": 23.47
+      },
+      "candidate": {
+        "passed": 2,
+        "total": 4,
+        "usd_mean": 0.00443088,
+        "seconds_mean": 16.740000000000002
+      },
+      "price_change_percent": 41.4
+    },
+    {
+      "case": "agentbase-srcq-containing-contract",
+      "control": {
+        "passed": 8,
+        "total": 8,
+        "usd_mean": 0.00921064,
+        "seconds_mean": 32.385000000000005
+      },
+      "candidate": {
+        "passed": 8,
+        "total": 8,
+        "usd_mean": 0.00992986,
+        "seconds_mean": 33.47
+      },
+      "price_change_percent": 7.81
+    },
+    {
+      "case": "ue-command-dispatch-submit",
+      "control": {
+        "passed": 8,
+        "total": 8,
+        "usd_mean": 0.007857200000000002,
+        "seconds_mean": 33.465
+      },
+      "candidate": {
+        "passed": 8,
+        "total": 8,
+        "usd_mean": 0.0099721,
+        "seconds_mean": 30.46
+      },
+      "price_change_percent": 26.92
+    },
+    {
+      "case": "ue-hjson-isbarekey-occurrences",
+      "control": {
+        "passed": 8,
+        "total": 8,
+        "usd_mean": 0.00649898,
+        "seconds_mean": 35.935
+      },
+      "candidate": {
+        "passed": 8,
+        "total": 8,
+        "usd_mean": 0.00874454,
+        "seconds_mean": 38.67
+      },
+      "price_change_percent": 34.55
+    },
+    {
+      "case": "facecutting3d-raycast-chain",
+      "control": {
+        "passed": 26,
+        "total": 26,
+        "usd_mean": 0.00752652,
+        "seconds_mean": 50.535
+      },
+      "candidate": {
+        "passed": 26,
+        "total": 26,
+        "usd_mean": 0.008159800000000002,
+        "seconds_mean": 58.55
+      },
+      "price_change_percent": 8.41
+    },
+    {
+      "case": "opencode-webview-message-boundary",
+      "control": {
+        "passed": 34,
+        "total": 48,
+        "usd_mean": 0.00849132,
+        "seconds_mean": 49.615
+      },
+      "candidate": {
+        "passed": 34,
+        "total": 48,
+        "usd_mean": 0.008389420000000002,
+        "seconds_mean": 35.32
+      },
+      "price_change_percent": -1.2
+    },
+    {
+      "case": "vmt-temperature-collector-sampling-chain",
+      "control": {
+        "passed": 61,
+        "total": 62,
+        "usd_mean": 0.0160975,
+        "seconds_mean": 79.05
+      },
+      "candidate": {
+        "passed": 59,
+        "total": 62,
+        "usd_mean": 0.00830868,
+        "seconds_mean": 44.864999999999995
+      },
+      "price_change_percent": -48.39
+    }
+  ],
+  "runs": [
+    {
+      "run": "agentbase-file-discovery-control__candidate__1",
+      "case": "agentbase-file-discovery-control",
+      "environment": "candidate",
+      "ordinal": 1,
+      "usd": 0.0030894,
+      "seconds": 12.63,
+      "requests": 2,
+      "tools": 1,
+      "passed": 1,
+      "total": 1,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-file-discovery-control__control__1",
+      "case": "agentbase-file-discovery-control",
+      "environment": "control",
+      "ordinal": 1,
+      "usd": 0.004834280000000001,
+      "seconds": 17.35,
+      "requests": 4,
+      "tools": 3,
+      "passed": 1,
+      "total": 1,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-file-discovery-control__control__2",
+      "case": "agentbase-file-discovery-control",
+      "environment": "control",
+      "ordinal": 2,
+      "usd": 0.0039026000000000004,
+      "seconds": 11.96,
+      "requests": 3,
+      "tools": 2,
+      "passed": 1,
+      "total": 1,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-file-discovery-control__candidate__2",
+      "case": "agentbase-file-discovery-control",
+      "environment": "candidate",
+      "ordinal": 2,
+      "usd": 0.0031076000000000003,
+      "seconds": 8.91,
+      "requests": 2,
+      "tools": 1,
+      "passed": 1,
+      "total": 1,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-rg-policy-sources__control__1",
+      "case": "agentbase-rg-policy-sources",
+      "environment": "control",
+      "ordinal": 1,
+      "usd": 0.009395800000000001,
+      "seconds": 50.05,
+      "requests": 7,
+      "tools": 6,
+      "passed": 2,
+      "total": 2,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-rg-policy-sources__candidate__1",
+      "case": "agentbase-rg-policy-sources",
+      "environment": "candidate",
+      "ordinal": 1,
+      "usd": 0.00448884,
+      "seconds": 22.9,
+      "requests": 4,
+      "tools": 4,
+      "passed": 1,
+      "total": 2,
+      "failed_required": [
+        1
+      ],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-rg-policy-sources__candidate__2",
+      "case": "agentbase-rg-policy-sources",
+      "environment": "candidate",
+      "ordinal": 2,
+      "usd": 0.009649040000000001,
+      "seconds": 45.85,
+      "requests": 4,
+      "tools": 7,
+      "passed": 2,
+      "total": 2,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-rg-policy-sources__control__2",
+      "case": "agentbase-rg-policy-sources",
+      "environment": "control",
+      "ordinal": 2,
+      "usd": 0.011271080000000001,
+      "seconds": 61.04,
+      "requests": 7,
+      "tools": 11,
+      "passed": 1,
+      "total": 2,
+      "failed_required": [
+        1
+      ],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-provider-observation__control__1",
+      "case": "agentbase-provider-observation",
+      "environment": "control",
+      "ordinal": 1,
+      "usd": 0.00347084,
+      "seconds": 24.41,
+      "requests": 4,
+      "tools": 3,
+      "passed": 2,
+      "total": 2,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-provider-observation__candidate__1",
+      "case": "agentbase-provider-observation",
+      "environment": "candidate",
+      "ordinal": 1,
+      "usd": 0.004321080000000001,
+      "seconds": 16.03,
+      "requests": 3,
+      "tools": 2,
+      "passed": 1,
+      "total": 2,
+      "failed_required": [
+        2
+      ],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-provider-observation__candidate__2",
+      "case": "agentbase-provider-observation",
+      "environment": "candidate",
+      "ordinal": 2,
+      "usd": 0.00454068,
+      "seconds": 17.45,
+      "requests": 3,
+      "tools": 2,
+      "passed": 1,
+      "total": 2,
+      "failed_required": [
+        2
+      ],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-provider-observation__control__2",
+      "case": "agentbase-provider-observation",
+      "environment": "control",
+      "ordinal": 2,
+      "usd": 0.00279648,
+      "seconds": 22.53,
+      "requests": 3,
+      "tools": 2,
+      "passed": 1,
+      "total": 2,
+      "failed_required": [
+        2
+      ],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-srcq-containing-contract__control__1",
+      "case": "agentbase-srcq-containing-contract",
+      "environment": "control",
+      "ordinal": 1,
+      "usd": 0.007890920000000001,
+      "seconds": 32.46,
+      "requests": 5,
+      "tools": 4,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-srcq-containing-contract__candidate__1",
+      "case": "agentbase-srcq-containing-contract",
+      "environment": "candidate",
+      "ordinal": 1,
+      "usd": 0.010559879999999999,
+      "seconds": 29.31,
+      "requests": 6,
+      "tools": 6,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-srcq-containing-contract__candidate__2",
+      "case": "agentbase-srcq-containing-contract",
+      "environment": "candidate",
+      "ordinal": 2,
+      "usd": 0.009299840000000002,
+      "seconds": 37.63,
+      "requests": 6,
+      "tools": 5,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "agentbase-srcq-containing-contract__control__2",
+      "case": "agentbase-srcq-containing-contract",
+      "environment": "control",
+      "ordinal": 2,
+      "usd": 0.01053036,
+      "seconds": 32.31,
+      "requests": 5,
+      "tools": 7,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "ue-command-dispatch-submit__candidate__1",
+      "case": "ue-command-dispatch-submit",
+      "environment": "candidate",
+      "ordinal": 1,
+      "usd": 0.00887148,
+      "seconds": 31.43,
+      "requests": 4,
+      "tools": 3,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "ue-command-dispatch-submit__control__1",
+      "case": "ue-command-dispatch-submit",
+      "environment": "control",
+      "ordinal": 1,
+      "usd": 0.005943880000000001,
+      "seconds": 24.3,
+      "requests": 4,
+      "tools": 3,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "ue-command-dispatch-submit__control__2",
+      "case": "ue-command-dispatch-submit",
+      "environment": "control",
+      "ordinal": 2,
+      "usd": 0.009770520000000001,
+      "seconds": 42.63,
+      "requests": 6,
+      "tools": 7,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "ue-command-dispatch-submit__candidate__2",
+      "case": "ue-command-dispatch-submit",
+      "environment": "candidate",
+      "ordinal": 2,
+      "usd": 0.01107272,
+      "seconds": 29.49,
+      "requests": 5,
+      "tools": 5,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "ue-hjson-isbarekey-occurrences__control__1",
+      "case": "ue-hjson-isbarekey-occurrences",
+      "environment": "control",
+      "ordinal": 1,
+      "usd": 0.008237,
+      "seconds": 38.3,
+      "requests": 4,
+      "tools": 3,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "ue-hjson-isbarekey-occurrences__candidate__1",
+      "case": "ue-hjson-isbarekey-occurrences",
+      "environment": "candidate",
+      "ordinal": 1,
+      "usd": 0.0088594,
+      "seconds": 39.18,
+      "requests": 4,
+      "tools": 6,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "ue-hjson-isbarekey-occurrences__candidate__2",
+      "case": "ue-hjson-isbarekey-occurrences",
+      "environment": "candidate",
+      "ordinal": 2,
+      "usd": 0.00862968,
+      "seconds": 38.16,
+      "requests": 4,
+      "tools": 5,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "ue-hjson-isbarekey-occurrences__control__2",
+      "case": "ue-hjson-isbarekey-occurrences",
+      "environment": "control",
+      "ordinal": 2,
+      "usd": 0.004760960000000001,
+      "seconds": 33.57,
+      "requests": 4,
+      "tools": 3,
+      "passed": 4,
+      "total": 4,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "facecutting3d-raycast-chain__candidate__1",
+      "case": "facecutting3d-raycast-chain",
+      "environment": "candidate",
+      "ordinal": 1,
+      "usd": 0.009444160000000002,
+      "seconds": 65.03,
+      "requests": 6,
+      "tools": 10,
+      "passed": 13,
+      "total": 13,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "facecutting3d-raycast-chain__control__1",
+      "case": "facecutting3d-raycast-chain",
+      "environment": "control",
+      "ordinal": 1,
+      "usd": 0.006682400000000001,
+      "seconds": 51.19,
+      "requests": 5,
+      "tools": 9,
+      "passed": 13,
+      "total": 13,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "facecutting3d-raycast-chain__control__2",
+      "case": "facecutting3d-raycast-chain",
+      "environment": "control",
+      "ordinal": 2,
+      "usd": 0.00837064,
+      "seconds": 49.88,
+      "requests": 5,
+      "tools": 8,
+      "passed": 13,
+      "total": 13,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "facecutting3d-raycast-chain__candidate__2",
+      "case": "facecutting3d-raycast-chain",
+      "environment": "candidate",
+      "ordinal": 2,
+      "usd": 0.00687544,
+      "seconds": 52.07,
+      "requests": 5,
+      "tools": 9,
+      "passed": 13,
+      "total": 13,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "opencode-webview-message-boundary__control__1",
+      "case": "opencode-webview-message-boundary",
+      "environment": "control",
+      "ordinal": 1,
+      "usd": 0.009134560000000002,
+      "seconds": 52.71,
+      "requests": 7,
+      "tools": 6,
+      "passed": 17,
+      "total": 24,
+      "failed_required": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22
+      ],
+      "line_limit_passed": true
+    },
+    {
+      "run": "opencode-webview-message-boundary__candidate__1",
+      "case": "opencode-webview-message-boundary",
+      "environment": "candidate",
+      "ordinal": 1,
+      "usd": 0.008711360000000001,
+      "seconds": 37.51,
+      "requests": 3,
+      "tools": 4,
+      "passed": 17,
+      "total": 24,
+      "failed_required": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22
+      ],
+      "line_limit_passed": true
+    },
+    {
+      "run": "opencode-webview-message-boundary__candidate__2",
+      "case": "opencode-webview-message-boundary",
+      "environment": "candidate",
+      "ordinal": 2,
+      "usd": 0.00806748,
+      "seconds": 33.13,
+      "requests": 3,
+      "tools": 2,
+      "passed": 17,
+      "total": 24,
+      "failed_required": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22
+      ],
+      "line_limit_passed": true
+    },
+    {
+      "run": "opencode-webview-message-boundary__control__2",
+      "case": "opencode-webview-message-boundary",
+      "environment": "control",
+      "ordinal": 2,
+      "usd": 0.00784808,
+      "seconds": 46.52,
+      "requests": 4,
+      "tools": 4,
+      "passed": 17,
+      "total": 24,
+      "failed_required": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22
+      ],
+      "line_limit_passed": true
+    },
+    {
+      "run": "vmt-temperature-collector-sampling-chain__control__1",
+      "case": "vmt-temperature-collector-sampling-chain",
+      "environment": "control",
+      "ordinal": 1,
+      "usd": 0.01431608,
+      "seconds": 81.82,
+      "requests": 11,
+      "tools": 14,
+      "passed": 31,
+      "total": 31,
+      "failed_required": [],
+      "line_limit_passed": true
+    },
+    {
+      "run": "vmt-temperature-collector-sampling-chain__candidate__1",
+      "case": "vmt-temperature-collector-sampling-chain",
+      "environment": "candidate",
+      "ordinal": 1,
+      "usd": 0.006719200000000001,
+      "seconds": 36.4,
+      "requests": 3,
+      "tools": 4,
+      "passed": 30,
+      "total": 31,
+      "failed_required": [
+        29
+      ],
+      "line_limit_passed": true
+    },
+    {
+      "run": "vmt-temperature-collector-sampling-chain__candidate__2",
+      "case": "vmt-temperature-collector-sampling-chain",
+      "environment": "candidate",
+      "ordinal": 2,
+      "usd": 0.009898160000000001,
+      "seconds": 53.33,
+      "requests": 5,
+      "tools": 7,
+      "passed": 29,
+      "total": 31,
+      "failed_required": [
+        29,
+        30
+      ],
+      "line_limit_passed": true
+    },
+    {
+      "run": "vmt-temperature-collector-sampling-chain__control__2",
+      "case": "vmt-temperature-collector-sampling-chain",
+      "environment": "control",
+      "ordinal": 2,
+      "usd": 0.01787892,
+      "seconds": 76.28,
+      "requests": 10,
+      "tools": 10,
+      "passed": 30,
+      "total": 31,
+      "failed_required": [
+        29
+      ],
+      "line_limit_passed": true
+    }
+  ],
+  "next_state": "Stopped at user request. Delivery pilot prepared but not changed/run; production AGENTS, skills, srcq and installed environment unchanged. No deployment or release."
+}

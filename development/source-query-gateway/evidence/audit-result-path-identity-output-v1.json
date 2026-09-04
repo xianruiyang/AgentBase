@@ -22,7 +22,9 @@
   ],
   "historical_comparison": {
     "corpus": "v18",
-    "control": "historical best batching environment",
+    "control": "historical unbatched control environment, incorrectly selected as the best batching reference",
+    "reference_identity_valid": false,
+    "reference_identity_correction": "The selected code-reading-v18-tool-batching-v1/control has no batching addition. The user's best batching reference is code-reading-v18-tool-batching-v1/candidate. Raw measurements below remain historical evidence but cannot answer that requested comparison.",
     "candidate": "current installed environment before this repair",
     "quality_caveat": "initial strict scores predated the explicit workspace-root identity contract; sample 2's current answer had correct code facts but omitted the source-root directory prefix",
     "runs": [

@@ -407,14 +407,16 @@ Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次
 
 ## OBS-SQG-044 路径身份 oracle 已校准，规则修复候选未通过资格
 
-- 状态: oracle corrected; rule candidates rejected and reverted; not deployed
+- 状态: v23 same-question rerun completed; per-case correctness parity not achieved
 - 关联: OBS-SQG-042, OBS-SQG-043
 
-当前安装态与历史批量 Control 的复测暴露了工作区根目录前缀省略。`v19.json` 把路径固定为工作区根相对格式后，又与桌面交付面要求完整绝对文件链接的上位合同冲突；`v20.json` 改为验证路径能否唯一映射到 oracle 文件，并显式包含实现闭合行。查询步骤内强化路径、发现顺序或读取策略的候选仍出现漏答、错误纳入注释调用或价格反例，不能因某一次便宜就晋级。
+当前安装态与当时选取的历史环境复测暴露了工作区根目录前缀省略。后续身份审查确认该历史环境是旧实验中未加批量规则的 `control`，并非用户指定的最佳批量 `candidate`，因此不支持“相对最佳批量版”的结论。`v19.json` 把路径固定为工作区根相对格式后，又与桌面交付面要求完整绝对文件链接的上位合同冲突；`v20.json` 改为验证路径能否唯一映射到 oracle 文件，并显式包含实现闭合行。查询步骤内强化路径、发现顺序或读取策略的候选仍出现漏答、错误纳入注释调用或价格反例，不能因某一次便宜就晋级。
 
 最后一个候选撤回全部查询步骤改动，只在最终回复 owner 中要求完整文件身份，允许同文件位置分组并服从上位展示格式。`v21.json` 把原有 R7 非空分支转发关系显式写入题面；独立复核确认 required 仍为 13 项、无新增隐藏必答或答案泄漏。有效配对中 Control 为 `13/13`、候选为 `12/13`：主要实现与直接调用均正确，但附加注释行号 `233、188` 没有分别绑定两个文件。候选价格 `$0.00813704→$0.00790824`，总 Token `93,749→109,700`，请求 `4→5`；价格改善不能抵消路径合同失败。
 
-首对未达标，第二对与跨语言扩量均未执行；全局规则和 trigger cases 已恢复本轮之前的内容，skill、srcq 与真实安装态未改变，没有部署或发行。[路径身份审计](evidence/audit-result-path-identity-output-v1.json) 保存原始比较、各候选数据与淘汰依据；实验题面、结果和审计不进入 payload。当前只完成 oracle 校准，没有证据证明模型路径问题已被修复；新的同义提示或未改输入重采样不是重开依据。
+首对未达标，第二对与跨语言扩量均未执行；全局规则和 trigger cases 已恢复本轮之前的内容，skill、srcq 与真实安装态未改变，没有部署或发行。[路径身份审计](evidence/audit-result-path-identity-output-v1.json) 保存原始比较、各候选数据与淘汰依据；实验题面、结果和审计不进入 payload。当前只完成 oracle 校准，没有证据证明模型路径问题已被修复。
+
+v22 的题面、标准答案与评分缺陷已使[旧表](evidence/report-full-suite-agentbase-only-v1.md)质量结论失效。v23 已修正并核验，双方仅本项目 skills 的全九题各两次重跑已完成；[新报告](evidence/report-full-suite-agentbase-only-v2.md)显示逐题质量目标尚未达成，实际费用与逐次失败均已留证。生产规则、skills、srcq 和安装态未改，未运行交付提示候选、部署或发行；本轮按[计划 3.20](plan.md#320-2026-09-04-路径身份与完整代码查询对照修复)停在报告。
 
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 
