@@ -1,0 +1,1411 @@
+{
+  "schema": "agentbase.code-reading-location-regrade/v1",
+  "date": "2026-09-04",
+  "grading": {
+    "corpus": "development/code-search-benchmark/corpus/v24.json",
+    "mode": "locations-only-v1",
+    "required_per_run": 37,
+    "source_corpus_version": "2026-09-04.5",
+    "subject_prompts_unchanged": true,
+    "location_oracles_unchanged": true,
+    "formal_rule": "按指定目标核路径与行号/完整实现范围；每个目标一分，无语义、话术或输出长度分，无重复扣分。",
+    "line_matching": "单行目标必须给出该行；以标准行开头的定位范围可提供该起始行，但仅被包围范围包含而没有给出的内部行不补算。例如注册58–61提供58，不提供内部委派60；cleanup179–181不提供移除监听180。实现范围要求两端完全对应 oracle。",
+    "subjective": "只保留主观参考评语与旧报告观察，不合入正式分，也不据其阻断位置质量比较。"
+  },
+  "scope": {
+    "primary": "最近完整九题的同轮36份原答案",
+    "supplementary": "后续 srcq 入口规则修复的 C# 与文件发现各两份；HTTP-only，与主对照不同身份，单列而不拼接",
+    "new_subject_runs": 0,
+    "historical_results_overwritten": false,
+    "production_changes": false
+  },
+  "sources": [
+    {
+      "alias": "core",
+      "root": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready",
+      "corpus_version": "2026-09-04.5",
+      "model": "gpt-5.6-luna",
+      "reasoning": "medium",
+      "transport": "websocket",
+      "record_count": 16,
+      "verified_raw_files": 36,
+      "verified_environment_files": 2,
+      "failures": []
+    },
+    {
+      "alias": "ue",
+      "root": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\ue-ready",
+      "corpus_version": "2026-09-04.5",
+      "model": "gpt-5.6-luna",
+      "reasoning": "medium",
+      "transport": "websocket",
+      "record_count": 8,
+      "verified_raw_files": 20,
+      "verified_environment_files": 2,
+      "failures": []
+    },
+    {
+      "alias": "external",
+      "root": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready",
+      "corpus_version": "2026-09-04.5",
+      "model": "gpt-5.6-luna",
+      "reasoning": "medium",
+      "transport": "websocket",
+      "record_count": 12,
+      "verified_raw_files": 28,
+      "verified_environment_files": 2,
+      "failures": []
+    },
+    {
+      "alias": "ingress-csharp",
+      "root": "D:\\AgentBaseBench\\srcq-ingress-rule-v1\\csharp-ready-v2",
+      "corpus_version": "2026-09-04.5",
+      "model": "gpt-5.6-luna",
+      "reasoning": "medium",
+      "transport": "http-only",
+      "record_count": 2,
+      "verified_raw_files": 6,
+      "verified_environment_files": 2,
+      "failures": []
+    },
+    {
+      "alias": "ingress-discovery",
+      "root": "D:\\AgentBaseBench\\srcq-ingress-rule-v1\\discovery-ready",
+      "corpus_version": "2026-09-04.5",
+      "model": "gpt-5.6-luna",
+      "reasoning": "medium",
+      "transport": "http-only",
+      "record_count": 2,
+      "verified_raw_files": 6,
+      "verified_environment_files": 2,
+      "failures": []
+    }
+  ],
+  "verification": {
+    "all_sources_verified": true,
+    "verified_raw_files": 96,
+    "raw_answer_usage_and_price_matches": 40,
+    "no_postflight_failures": true
+  },
+  "case_summary": [
+    {
+      "case_id": "agentbase-file-discovery-control",
+      "label": "文件发现",
+      "required_per_run": 1,
+      "control": {
+        "scores": [
+          1,
+          1
+        ],
+        "passed": 2,
+        "total": 2,
+        "usd_total": 0.0064042000000000005,
+        "usd_mean": 0.0032021000000000003,
+        "seconds_mean": 12.096
+      },
+      "candidate": {
+        "scores": [
+          1,
+          1
+        ],
+        "passed": 2,
+        "total": 2,
+        "usd_total": 0.0092342,
+        "usd_mean": 0.0046171,
+        "seconds_mean": 9.8795
+      },
+      "price_change_percent": 44.189750476249934
+    },
+    {
+      "case_id": "agentbase-rg-policy-sources",
+      "label": "正式规则来源",
+      "required_per_run": 2,
+      "control": {
+        "scores": [
+          2,
+          2
+        ],
+        "passed": 4,
+        "total": 4,
+        "usd_total": 0.015317840000000001,
+        "usd_mean": 0.0076589200000000005,
+        "seconds_mean": 44.359
+      },
+      "candidate": {
+        "scores": [
+          1,
+          0
+        ],
+        "passed": 1,
+        "total": 4,
+        "usd_total": 0.016921000000000002,
+        "usd_mean": 0.008460500000000001,
+        "seconds_mean": 37.032
+      },
+      "price_change_percent": 10.465966480913757
+    },
+    {
+      "case_id": "agentbase-provider-observation",
+      "label": "DTO 字段定位",
+      "required_per_run": 2,
+      "control": {
+        "scores": [
+          2,
+          2
+        ],
+        "passed": 4,
+        "total": 4,
+        "usd_total": 0.0113364,
+        "usd_mean": 0.0056682,
+        "seconds_mean": 37.6195
+      },
+      "candidate": {
+        "scores": [
+          2,
+          2
+        ],
+        "passed": 4,
+        "total": 4,
+        "usd_total": 0.01084096,
+        "usd_mean": 0.00542048,
+        "seconds_mean": 23.5535
+      },
+      "price_change_percent": -4.370346847323658
+    },
+    {
+      "case_id": "agentbase-srcq-containing-contract",
+      "label": "containing 实现文件",
+      "required_per_run": 1,
+      "control": {
+        "scores": [
+          1,
+          1
+        ],
+        "passed": 2,
+        "total": 2,
+        "usd_total": 0.01942352,
+        "usd_mean": 0.00971176,
+        "seconds_mean": 47.312
+      },
+      "candidate": {
+        "scores": [
+          1,
+          1
+        ],
+        "passed": 2,
+        "total": 2,
+        "usd_total": 0.020263800000000002,
+        "usd_mean": 0.010131900000000001,
+        "seconds_mean": 28.8395
+      },
+      "price_change_percent": 4.3260953730323015
+    },
+    {
+      "case_id": "ue-command-dispatch-submit",
+      "label": "UE Submit",
+      "required_per_run": 1,
+      "control": {
+        "scores": [
+          1,
+          1
+        ],
+        "passed": 2,
+        "total": 2,
+        "usd_total": 0.011742040000000002,
+        "usd_mean": 0.005871020000000001,
+        "seconds_mean": 31.2455
+      },
+      "candidate": {
+        "scores": [
+          1,
+          1
+        ],
+        "passed": 2,
+        "total": 2,
+        "usd_total": 0.01728292,
+        "usd_mean": 0.00864146,
+        "seconds_mean": 45.415
+      },
+      "price_change_percent": 47.18839315825867
+    },
+    {
+      "case_id": "ue-hjson-isbarekey-occurrences",
+      "label": "UE IsBareKey",
+      "required_per_run": 5,
+      "control": {
+        "scores": [
+          5,
+          5
+        ],
+        "passed": 10,
+        "total": 10,
+        "usd_total": 0.014357720000000001,
+        "usd_mean": 0.0071788600000000004,
+        "seconds_mean": 33.711
+      },
+      "candidate": {
+        "scores": [
+          5,
+          5
+        ],
+        "passed": 10,
+        "total": 10,
+        "usd_total": 0.019222200000000002,
+        "usd_mean": 0.009611100000000001,
+        "seconds_mean": 50.3535
+      },
+      "price_change_percent": 33.88058828281928
+    },
+    {
+      "case_id": "facecutting3d-raycast-chain",
+      "label": "C++ Raycast",
+      "required_per_run": 5,
+      "control": {
+        "scores": [
+          5,
+          5
+        ],
+        "passed": 10,
+        "total": 10,
+        "usd_total": 0.02144588,
+        "usd_mean": 0.01072294,
+        "seconds_mean": 50.9335
+      },
+      "candidate": {
+        "scores": [
+          5,
+          5
+        ],
+        "passed": 10,
+        "total": 10,
+        "usd_total": 0.022632440000000004,
+        "usd_mean": 0.011316220000000002,
+        "seconds_mean": 60.821
+      },
+      "price_change_percent": 5.532810964157231
+    },
+    {
+      "case_id": "opencode-webview-message-boundary",
+      "label": "TS 消息位置",
+      "required_per_run": 7,
+      "control": {
+        "scores": [
+          5,
+          4
+        ],
+        "passed": 9,
+        "total": 14,
+        "usd_total": 0.014494360000000001,
+        "usd_mean": 0.007247180000000001,
+        "seconds_mean": 37.276
+      },
+      "candidate": {
+        "scores": [
+          5,
+          5
+        ],
+        "passed": 10,
+        "total": 14,
+        "usd_total": 0.018857119999999998,
+        "usd_mean": 0.009428559999999999,
+        "seconds_mean": 44.7505
+      },
+      "price_change_percent": 30.099707748393143
+    },
+    {
+      "case_id": "vmt-temperature-collector-sampling-chain",
+      "label": "C# 采样链",
+      "required_per_run": 13,
+      "control": {
+        "scores": [
+          12,
+          13
+        ],
+        "passed": 25,
+        "total": 26,
+        "usd_total": 0.020977120000000002,
+        "usd_mean": 0.010488560000000001,
+        "seconds_mean": 58.2755
+      },
+      "candidate": {
+        "scores": [
+          11,
+          12
+        ],
+        "passed": 23,
+        "total": 26,
+        "usd_total": 0.0166766,
+        "usd_mean": 0.0083383,
+        "seconds_mean": 52.421
+      },
+      "price_change_percent": -20.50100299755163
+    }
+  ],
+  "totals": {
+    "control": {
+      "runs": 18,
+      "passed": 68,
+      "total": 74,
+      "full_pass_runs": 15,
+      "usd": 0.13549908000000002
+    },
+    "candidate": {
+      "runs": 18,
+      "passed": 64,
+      "total": 74,
+      "full_pass_runs": 12,
+      "usd": 0.15193123999999997
+    },
+    "price_change_percent": 12.127137689790924,
+    "all_case_price_increases_within_50_percent": true
+  },
+  "decision": {
+    "location_quality_noninferiority": false,
+    "lower_cases": [
+      "agentbase-rg-policy-sources",
+      "vmt-temperature-collector-sampling-chain"
+    ],
+    "higher_cases": [
+      "opencode-webview-message-boundary"
+    ],
+    "note": "纯定位重评后，主对照当前版仍在正式来源和 C# 落后，TS 略高。成本处于 +50% 范围，整体目标仍未达成；不据此授权继续实验或部署。"
+  },
+  "records": [
+    {
+      "source": "core",
+      "run_id": "agentbase-file-discovery-control__candidate__1",
+      "case_id": "agentbase-file-discovery-control",
+      "environment": "candidate",
+      "ordinal": 1,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.004569,
+      "elapsed_ms": 10382,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-file-discovery-control__candidate__1.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-file-discovery-control__control__1",
+      "case_id": "agentbase-file-discovery-control",
+      "environment": "control",
+      "ordinal": 1,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.0031184,
+      "elapsed_ms": 9853,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-file-discovery-control__control__1.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-file-discovery-control__control__2",
+      "case_id": "agentbase-file-discovery-control",
+      "environment": "control",
+      "ordinal": 2,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.0032858,
+      "elapsed_ms": 14339,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-file-discovery-control__control__2.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-file-discovery-control__candidate__2",
+      "case_id": "agentbase-file-discovery-control",
+      "environment": "candidate",
+      "ordinal": 2,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.0046651999999999996,
+      "elapsed_ms": 9377,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-file-discovery-control__candidate__2.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-rg-policy-sources__control__1",
+      "case_id": "agentbase-rg-policy-sources",
+      "environment": "control",
+      "ordinal": 1,
+      "total": 2,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2
+      ],
+      "passed": 2,
+      "formal_pass": true,
+      "usd": 0.00763168,
+      "elapsed_ms": 56856,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-rg-policy-sources__control__1.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-rg-policy-sources__candidate__1",
+      "case_id": "agentbase-rg-policy-sources",
+      "environment": "candidate",
+      "ordinal": 1,
+      "total": 2,
+      "failed_required": [
+        2
+      ],
+      "extra_wrong_locations": [],
+      "observations": [
+        {
+          "required": 2,
+          "kind": "wrong_path",
+          "expected": "skills/source-query/SKILL.md",
+          "observed": "AGENTS.md",
+          "evidence": "答案用根 AGENTS.md 替代了 source-query skill；global/AGENTS.md 已命中。"
+        }
+      ],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": false,
+      "usd": 0.006329,
+      "elapsed_ms": 34617,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-rg-policy-sources__candidate__1.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-rg-policy-sources__candidate__2",
+      "case_id": "agentbase-rg-policy-sources",
+      "environment": "candidate",
+      "ordinal": 2,
+      "total": 2,
+      "failed_required": [
+        1,
+        2
+      ],
+      "extra_wrong_locations": [],
+      "observations": [
+        {
+          "required": 1,
+          "kind": "wrong_path",
+          "expected": "global/AGENTS.md",
+          "evidence": "给出隔离 benchmark home 的 AGENTS.md，不是题面仓库文件。"
+        },
+        {
+          "required": 2,
+          "kind": "wrong_path",
+          "expected": "skills/source-query/SKILL.md",
+          "evidence": "给出隔离 benchmark home 的 skill，不是题面仓库文件。"
+        }
+      ],
+      "passed_required": [],
+      "passed": 0,
+      "formal_pass": false,
+      "usd": 0.010592,
+      "elapsed_ms": 39447,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-rg-policy-sources__candidate__2.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-rg-policy-sources__control__2",
+      "case_id": "agentbase-rg-policy-sources",
+      "environment": "control",
+      "ordinal": 2,
+      "total": 2,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2
+      ],
+      "passed": 2,
+      "formal_pass": true,
+      "usd": 0.007686160000000001,
+      "elapsed_ms": 31862,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-rg-policy-sources__control__2.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-provider-observation__control__1",
+      "case_id": "agentbase-provider-observation",
+      "environment": "control",
+      "ordinal": 1,
+      "total": 2,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2
+      ],
+      "passed": 2,
+      "formal_pass": true,
+      "usd": 0.00524956,
+      "elapsed_ms": 30372,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-provider-observation__control__1.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-provider-observation__candidate__1",
+      "case_id": "agentbase-provider-observation",
+      "environment": "candidate",
+      "ordinal": 1,
+      "total": 2,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2
+      ],
+      "passed": 2,
+      "formal_pass": true,
+      "usd": 0.00606568,
+      "elapsed_ms": 19554,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-provider-observation__candidate__1.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-provider-observation__candidate__2",
+      "case_id": "agentbase-provider-observation",
+      "environment": "candidate",
+      "ordinal": 2,
+      "total": 2,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2
+      ],
+      "passed": 2,
+      "formal_pass": true,
+      "usd": 0.004775280000000001,
+      "elapsed_ms": 27553,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-provider-observation__candidate__2.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-provider-observation__control__2",
+      "case_id": "agentbase-provider-observation",
+      "environment": "control",
+      "ordinal": 2,
+      "total": 2,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2
+      ],
+      "passed": 2,
+      "formal_pass": true,
+      "usd": 0.0060868400000000005,
+      "elapsed_ms": 44867,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-provider-observation__control__2.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-srcq-containing-contract__control__1",
+      "case_id": "agentbase-srcq-containing-contract",
+      "environment": "control",
+      "ordinal": 1,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.01279652,
+      "elapsed_ms": 57703,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-srcq-containing-contract__control__1.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-srcq-containing-contract__candidate__1",
+      "case_id": "agentbase-srcq-containing-contract",
+      "environment": "candidate",
+      "ordinal": 1,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.007570520000000001,
+      "elapsed_ms": 25905,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-srcq-containing-contract__candidate__1.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-srcq-containing-contract__candidate__2",
+      "case_id": "agentbase-srcq-containing-contract",
+      "environment": "candidate",
+      "ordinal": 2,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.012693280000000001,
+      "elapsed_ms": 31774,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-srcq-containing-contract__candidate__2.jsonl"
+    },
+    {
+      "source": "core",
+      "run_id": "agentbase-srcq-containing-contract__control__2",
+      "case_id": "agentbase-srcq-containing-contract",
+      "environment": "control",
+      "ordinal": 2,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.006627,
+      "elapsed_ms": 36921,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\core-ready\\runs\\agentbase-srcq-containing-contract__control__2.jsonl"
+    },
+    {
+      "source": "ue",
+      "run_id": "ue-command-dispatch-submit__candidate__1",
+      "case_id": "ue-command-dispatch-submit",
+      "environment": "candidate",
+      "ordinal": 1,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.00865936,
+      "elapsed_ms": 43704,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\ue-ready\\runs\\ue-command-dispatch-submit__candidate__1.jsonl"
+    },
+    {
+      "source": "ue",
+      "run_id": "ue-command-dispatch-submit__control__1",
+      "case_id": "ue-command-dispatch-submit",
+      "environment": "control",
+      "ordinal": 1,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.006300760000000001,
+      "elapsed_ms": 29254,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\ue-ready\\runs\\ue-command-dispatch-submit__control__1.jsonl"
+    },
+    {
+      "source": "ue",
+      "run_id": "ue-command-dispatch-submit__control__2",
+      "case_id": "ue-command-dispatch-submit",
+      "environment": "control",
+      "ordinal": 2,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.005441280000000001,
+      "elapsed_ms": 33237,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\ue-ready\\runs\\ue-command-dispatch-submit__control__2.jsonl"
+    },
+    {
+      "source": "ue",
+      "run_id": "ue-command-dispatch-submit__candidate__2",
+      "case_id": "ue-command-dispatch-submit",
+      "environment": "candidate",
+      "ordinal": 2,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.008623559999999999,
+      "elapsed_ms": 47126,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\ue-ready\\runs\\ue-command-dispatch-submit__candidate__2.jsonl"
+    },
+    {
+      "source": "ue",
+      "run_id": "ue-hjson-isbarekey-occurrences__control__1",
+      "case_id": "ue-hjson-isbarekey-occurrences",
+      "environment": "control",
+      "ordinal": 1,
+      "total": 5,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "passed": 5,
+      "formal_pass": true,
+      "usd": 0.006594760000000001,
+      "elapsed_ms": 38052,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\ue-ready\\runs\\ue-hjson-isbarekey-occurrences__control__1.jsonl"
+    },
+    {
+      "source": "ue",
+      "run_id": "ue-hjson-isbarekey-occurrences__candidate__1",
+      "case_id": "ue-hjson-isbarekey-occurrences",
+      "environment": "candidate",
+      "ordinal": 1,
+      "total": 5,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "passed": 5,
+      "formal_pass": true,
+      "usd": 0.008749680000000001,
+      "elapsed_ms": 46156,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\ue-ready\\runs\\ue-hjson-isbarekey-occurrences__candidate__1.jsonl"
+    },
+    {
+      "source": "ue",
+      "run_id": "ue-hjson-isbarekey-occurrences__candidate__2",
+      "case_id": "ue-hjson-isbarekey-occurrences",
+      "environment": "candidate",
+      "ordinal": 2,
+      "total": 5,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "passed": 5,
+      "formal_pass": true,
+      "usd": 0.01047252,
+      "elapsed_ms": 54551,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\ue-ready\\runs\\ue-hjson-isbarekey-occurrences__candidate__2.jsonl"
+    },
+    {
+      "source": "ue",
+      "run_id": "ue-hjson-isbarekey-occurrences__control__2",
+      "case_id": "ue-hjson-isbarekey-occurrences",
+      "environment": "control",
+      "ordinal": 2,
+      "total": 5,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "passed": 5,
+      "formal_pass": true,
+      "usd": 0.007762959999999999,
+      "elapsed_ms": 29370,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\ue-ready\\runs\\ue-hjson-isbarekey-occurrences__control__2.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "facecutting3d-raycast-chain__candidate__1",
+      "case_id": "facecutting3d-raycast-chain",
+      "environment": "candidate",
+      "ordinal": 1,
+      "total": 5,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "passed": 5,
+      "formal_pass": true,
+      "usd": 0.011718760000000002,
+      "elapsed_ms": 61305,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\facecutting3d-raycast-chain__candidate__1.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "facecutting3d-raycast-chain__control__1",
+      "case_id": "facecutting3d-raycast-chain",
+      "environment": "control",
+      "ordinal": 1,
+      "total": 5,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "passed": 5,
+      "formal_pass": true,
+      "usd": 0.007856680000000001,
+      "elapsed_ms": 49591,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\facecutting3d-raycast-chain__control__1.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "facecutting3d-raycast-chain__control__2",
+      "case_id": "facecutting3d-raycast-chain",
+      "environment": "control",
+      "ordinal": 2,
+      "total": 5,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "passed": 5,
+      "formal_pass": true,
+      "usd": 0.013589200000000001,
+      "elapsed_ms": 52276,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\facecutting3d-raycast-chain__control__2.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "facecutting3d-raycast-chain__candidate__2",
+      "case_id": "facecutting3d-raycast-chain",
+      "environment": "candidate",
+      "ordinal": 2,
+      "total": 5,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "passed": 5,
+      "formal_pass": true,
+      "usd": 0.01091368,
+      "elapsed_ms": 60337,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\facecutting3d-raycast-chain__candidate__2.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "opencode-webview-message-boundary__control__1",
+      "case_id": "opencode-webview-message-boundary",
+      "environment": "control",
+      "ordinal": 1,
+      "total": 7,
+      "failed_required": [
+        3,
+        7
+      ],
+      "extra_wrong_locations": [],
+      "observations": [
+        {
+          "required": 3,
+          "kind": "missing_exact_line",
+          "expected": "src/providers/OpenCodeViewProvider.ts:60",
+          "observed": "onDidReceiveMessage 58–61",
+          "evidence": "说明转派行为但没有单独给出内部调用行 60；不能从包围范围补答案。"
+        },
+        {
+          "required": 7,
+          "kind": "wrong_location_granularity",
+          "expected": "src/webviews/App.tsx:180",
+          "observed": "cleanup 179–181",
+          "evidence": "给出清理闭包范围，而非移除监听语句的定位行。"
+        }
+      ],
+      "passed_required": [
+        1,
+        2,
+        4,
+        5,
+        6
+      ],
+      "passed": 5,
+      "formal_pass": false,
+      "usd": 0.00792972,
+      "elapsed_ms": 34361,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\opencode-webview-message-boundary__control__1.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "opencode-webview-message-boundary__candidate__1",
+      "case_id": "opencode-webview-message-boundary",
+      "environment": "candidate",
+      "ordinal": 1,
+      "total": 7,
+      "failed_required": [
+        3,
+        7
+      ],
+      "extra_wrong_locations": [],
+      "observations": [
+        {
+          "required": 3,
+          "kind": "missing_exact_line",
+          "expected": "src/providers/OpenCodeViewProvider.ts:60",
+          "observed": "onDidReceiveMessage 58–61",
+          "evidence": "说明转派行为但没有单独给出内部调用行 60；不能从包围范围补答案。"
+        },
+        {
+          "required": 7,
+          "kind": "wrong_location_granularity",
+          "expected": "src/webviews/App.tsx:180",
+          "observed": "cleanup 179–181",
+          "evidence": "给出清理闭包范围，而非移除监听语句的定位行。"
+        }
+      ],
+      "passed_required": [
+        1,
+        2,
+        4,
+        5,
+        6
+      ],
+      "passed": 5,
+      "formal_pass": false,
+      "usd": 0.00819164,
+      "elapsed_ms": 43080,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\opencode-webview-message-boundary__candidate__1.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "opencode-webview-message-boundary__candidate__2",
+      "case_id": "opencode-webview-message-boundary",
+      "environment": "candidate",
+      "ordinal": 2,
+      "total": 7,
+      "failed_required": [
+        3,
+        7
+      ],
+      "extra_wrong_locations": [],
+      "observations": [
+        {
+          "required": 3,
+          "kind": "missing_exact_line",
+          "expected": "src/providers/OpenCodeViewProvider.ts:60",
+          "observed": "onDidReceiveMessage 58–61",
+          "evidence": "说明转派行为但没有单独给出内部调用行 60；不能从包围范围补答案。"
+        },
+        {
+          "required": 7,
+          "kind": "wrong_location_granularity",
+          "expected": "src/webviews/App.tsx:180",
+          "observed": "cleanup 179–181",
+          "evidence": "给出清理闭包范围，而非移除监听语句的定位行。"
+        }
+      ],
+      "passed_required": [
+        1,
+        2,
+        4,
+        5,
+        6
+      ],
+      "passed": 5,
+      "formal_pass": false,
+      "usd": 0.01066548,
+      "elapsed_ms": 46421,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\opencode-webview-message-boundary__candidate__2.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "opencode-webview-message-boundary__control__2",
+      "case_id": "opencode-webview-message-boundary",
+      "environment": "control",
+      "ordinal": 2,
+      "total": 7,
+      "failed_required": [
+        2,
+        3,
+        7
+      ],
+      "extra_wrong_locations": [],
+      "observations": [
+        {
+          "required": 2,
+          "kind": "missing_exact_line",
+          "expected": "src/providers/OpenCodeViewProvider.ts:58",
+          "observed": "resolveWebviewView 38–71",
+          "evidence": "仅外层方法范围，没有注册行。"
+        },
+        {
+          "required": 3,
+          "kind": "missing_exact_line",
+          "expected": "src/providers/OpenCodeViewProvider.ts:60",
+          "observed": "resolveWebviewView 38–71",
+          "evidence": "说明转派行为但没有单独给出内部调用行 60；不能从包围范围补答案。"
+        },
+        {
+          "required": 7,
+          "kind": "wrong_location_granularity",
+          "expected": "src/webviews/App.tsx:180",
+          "observed": "cleanup 179–181",
+          "evidence": "给出清理闭包范围，而非移除监听语句的定位行。"
+        }
+      ],
+      "passed_required": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "passed": 4,
+      "formal_pass": false,
+      "usd": 0.006564640000000001,
+      "elapsed_ms": 40191,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\opencode-webview-message-boundary__control__2.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "vmt-temperature-collector-sampling-chain__control__1",
+      "case_id": "vmt-temperature-collector-sampling-chain",
+      "environment": "control",
+      "ordinal": 1,
+      "total": 13,
+      "failed_required": [
+        8
+      ],
+      "extra_wrong_locations": [],
+      "observations": [
+        {
+          "required": 8,
+          "kind": "missing",
+          "expected": "src/VmtTemperatureCollector/TemperatureCollectorEngine.cs:220",
+          "evidence": "Read 相关调用只列 Reader 22、Test 58；没有 Engine 220。"
+        }
+      ],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "passed": 12,
+      "formal_pass": false,
+      "usd": 0.012172480000000003,
+      "elapsed_ms": 64856,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\vmt-temperature-collector-sampling-chain__control__1.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "vmt-temperature-collector-sampling-chain__candidate__1",
+      "case_id": "vmt-temperature-collector-sampling-chain",
+      "environment": "candidate",
+      "ordinal": 1,
+      "total": 13,
+      "failed_required": [
+        8,
+        9
+      ],
+      "extra_wrong_locations": [],
+      "observations": [
+        {
+          "required": 8,
+          "kind": "missing",
+          "expected": "src/VmtTemperatureCollector/TemperatureCollectorEngine.cs:220",
+          "evidence": "未给出 SampleOnceAsync 到 Read 的调用行。"
+        },
+        {
+          "required": 9,
+          "kind": "wrong_line",
+          "expected": "src/VmtTemperatureCollector/TemperatureCollectorSensorReader.cs:58",
+          "observed": "Test 44",
+          "evidence": "答案第 6 行把 Test 到 Read 的调用写为 44；该错误只扣此项。"
+        }
+      ],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        10,
+        11,
+        12,
+        13
+      ],
+      "passed": 11,
+      "formal_pass": false,
+      "usd": 0.00817108,
+      "elapsed_ms": 55256,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\vmt-temperature-collector-sampling-chain__candidate__1.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "vmt-temperature-collector-sampling-chain__candidate__2",
+      "case_id": "vmt-temperature-collector-sampling-chain",
+      "environment": "candidate",
+      "ordinal": 2,
+      "total": 13,
+      "failed_required": [
+        10
+      ],
+      "extra_wrong_locations": [],
+      "observations": [
+        {
+          "required": 10,
+          "kind": "missing",
+          "expected": "src/VmtTemperatureCollector/TemperatureCollectorSensorReader.cs:22",
+          "evidence": "Read/ReadLive 的段落未给出调用行 22；额外 Program.cs 注册说明不属于该正式目标，不另扣。"
+        }
+      ],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        11,
+        12,
+        13
+      ],
+      "passed": 12,
+      "formal_pass": false,
+      "usd": 0.00850552,
+      "elapsed_ms": 49586,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\vmt-temperature-collector-sampling-chain__candidate__2.jsonl"
+    },
+    {
+      "source": "external",
+      "run_id": "vmt-temperature-collector-sampling-chain__control__2",
+      "case_id": "vmt-temperature-collector-sampling-chain",
+      "environment": "control",
+      "ordinal": 2,
+      "total": 13,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "passed": 13,
+      "formal_pass": true,
+      "usd": 0.00880464,
+      "elapsed_ms": 51695,
+      "raw_file": "D:\\AgentBaseBench\\full-suite-agentbase-only-v2\\external-ready\\runs\\vmt-temperature-collector-sampling-chain__control__2.jsonl"
+    },
+    {
+      "source": "ingress-csharp",
+      "run_id": "vmt-temperature-collector-sampling-chain__candidate__1",
+      "case_id": "vmt-temperature-collector-sampling-chain",
+      "environment": "candidate",
+      "ordinal": 1,
+      "total": 13,
+      "failed_required": [
+        10
+      ],
+      "extra_wrong_locations": [],
+      "observations": [
+        {
+          "required": 10,
+          "kind": "missing",
+          "expected": "src/VmtTemperatureCollector/TemperatureCollectorSensorReader.cs:22",
+          "evidence": "ReadLive 给出实现范围及分派行，但未给出 Read 到 ReadLive 的调用行。"
+        }
+      ],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        11,
+        12,
+        13
+      ],
+      "passed": 12,
+      "formal_pass": false,
+      "usd": 0.015152400000000002,
+      "elapsed_ms": 103018,
+      "raw_file": "D:\\AgentBaseBench\\srcq-ingress-rule-v1\\csharp-ready-v2\\runs\\vmt-temperature-collector-sampling-chain__candidate__1.jsonl"
+    },
+    {
+      "source": "ingress-csharp",
+      "run_id": "vmt-temperature-collector-sampling-chain__candidate__2",
+      "case_id": "vmt-temperature-collector-sampling-chain",
+      "environment": "candidate",
+      "ordinal": 2,
+      "total": 13,
+      "failed_required": [
+        9
+      ],
+      "extra_wrong_locations": [],
+      "observations": [
+        {
+          "required": 9,
+          "kind": "missing",
+          "expected": "src/VmtTemperatureCollector/TemperatureCollectorSensorReader.cs:58",
+          "evidence": "Read 只列实现范围和 ReadLive 调用；未列 Test 到 Read 的调用。"
+        }
+      ],
+      "passed_required": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        10,
+        11,
+        12,
+        13
+      ],
+      "passed": 12,
+      "formal_pass": false,
+      "usd": 0.01009528,
+      "elapsed_ms": 93166,
+      "raw_file": "D:\\AgentBaseBench\\srcq-ingress-rule-v1\\csharp-ready-v2\\runs\\vmt-temperature-collector-sampling-chain__candidate__2.jsonl"
+    },
+    {
+      "source": "ingress-discovery",
+      "run_id": "agentbase-file-discovery-control__candidate__1",
+      "case_id": "agentbase-file-discovery-control",
+      "environment": "candidate",
+      "ordinal": 1,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.00346392,
+      "elapsed_ms": 16937,
+      "raw_file": "D:\\AgentBaseBench\\srcq-ingress-rule-v1\\discovery-ready\\runs\\agentbase-file-discovery-control__candidate__1.jsonl"
+    },
+    {
+      "source": "ingress-discovery",
+      "run_id": "agentbase-file-discovery-control__candidate__2",
+      "case_id": "agentbase-file-discovery-control",
+      "environment": "candidate",
+      "ordinal": 2,
+      "total": 1,
+      "failed_required": [],
+      "extra_wrong_locations": [],
+      "observations": [],
+      "passed_required": [
+        1
+      ],
+      "passed": 1,
+      "formal_pass": true,
+      "usd": 0.007887360000000001,
+      "elapsed_ms": 26680,
+      "raw_file": "D:\\AgentBaseBench\\srcq-ingress-rule-v1\\discovery-ready\\runs\\agentbase-file-discovery-control__candidate__2.jsonl"
+    }
+  ]
+}
