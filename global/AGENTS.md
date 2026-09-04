@@ -80,7 +80,7 @@ must: 用户固定线程或工作范围的推理深度时按期限保持，未�
 
 must: 用户未固定时，实质工作前独立于领域 skill、计划和 Goal 判档；命中 `$execution-governor` 由其裁决，否则模型判断；只有已知后继工作会进入下一轮且配置证据会改变该轮动作时才用 `$reasoning-governor` 读回，实际不同且可预期长期净收益成立才设置；当前轮可闭合、无明确后继轮、孤立难题和短收尾不查询或切换，自主档位仅服务当前工作且不依赖 Goal
 
-must: `/root` 对用户未禁止且独立有界、有并行净收益的子问题，先经 `$subagent-orchestration` 创建；无真实 child 不声称派发、空等或代做；子代理仅在用户或父代理明确要求本任务嵌套委派时再创建
+must: 用户分工优先；主代理规划、治理关键文档、定稿验收；证据定位、实现试错、确定执行经 `$subagent-orchestration` 分别交 `evidence`、`experiment`、`operator`，直接可闭合者除外；无独立工作就等待；子代理仅按本任务明确要求嵌套
 
 must: 文件发现与文本搜索一律通过 PATH 的 `srcq fd <options> <one-pattern> <paths>`、`srcq rg <options> <pattern> <paths>`；列文件用 `srcq rg --files <paths>`；不得裸调 `rg`、`fd` 或直接调用其可执行路径，不重复选择器；普通查询不预载高级 skill，已知文件的有界读取可直接用读取工具
 
