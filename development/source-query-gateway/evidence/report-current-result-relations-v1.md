@@ -29,4 +29,4 @@
 
 只读入口检查确认：`experiment.py` 的子进程环境写入目标 `CODEX_HOME`（969–976），App Server 以该环境启动（1291–1315），thread/start 与 turn/start 使用题目工作目录（1381–1406）；没有显式 baseInstructions/developerInstructions 覆盖，两个 home 的 AGENTS 均小于配置的65536字节上限。[官方 AGENTS 文档](https://learn.chatgpt.com/docs/agent-configuration/agents-md)说明默认从 CODEX_HOME 发现全局指令，缺少显式 instruction 参数本身不是故障；官方同时提供日志/会话记录的加载审计方式。该文档与正确配置不能反推历史请求实际消费的完整指令链，但现有证据也不支持“规则没加载”的结论，不据此改造 runner 或废弃旧实验。
 
-下一步若核实原始加载链，优先使用现有诊断而非再跑代码题；若原生加载路径成立，则继续将命令可靠性与答复遗漏分开处理，不把二者都归因于最终回复条款。该核对不创建新门禁或生产修改。
+后续已通过 CLI 自带 `debug prompt-input` 做无模型采样诊断：两侧全局 AGENTS 整篇文本均出现，非空行无缺失，见[加载诊断](audit-native-instruction-ingress-v1.json)。这直接覆盖当前原生发现/渲染路径，不重建历史 App Server 请求；没有据此新增门禁或改造 runner。后续把命令可靠性与答复遗漏分开处理，不把二者都归因于最终回复条款，也不继续以“未加载”解释当前反例。

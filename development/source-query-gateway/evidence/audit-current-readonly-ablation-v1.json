@@ -1,0 +1,163 @@
+{
+  "status": "mechanism_observation_only_not_deployable",
+  "raw_root": "D:\\AgentBaseBench\\current-readonly-ablation-v1\\pilot-ready",
+  "corpus": "v23",
+  "case": "opencode-webview-message-boundary",
+  "model": "gpt-5.6-luna",
+  "reasoning": "medium",
+  "service_tier": "default",
+  "candidate_change": "Only entire global sections4 (analysis/modification) and5 (verification/completion) removed from frozen current Chinese kernel. No query/reply rewrite; own skills unchanged.",
+  "control": "historical best code-reading-v18-tool-batching-v1/candidate",
+  "records": [
+    {
+      "run": "candidate__1",
+      "usd": 0.006534920000000001,
+      "seconds": 41.951,
+      "requests": 3,
+      "tools": 4,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 59983,
+        "cache_read_input_tokens": 41216,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 18767,
+        "non_cached_input_tokens": 18767,
+        "output_tokens": 1631,
+        "reasoning_output_tokens": 804,
+        "visible_output_tokens": 827,
+        "actual_total_tokens": 61614,
+        "cache_read_ratio": 0.6871280196055549,
+        "reasoning_output_ratio": 0.49294911097486205
+      },
+      "passed": 22,
+      "total": 24,
+      "failed_required": [
+        8,
+        24
+      ],
+      "scoring_note": "React command selector and explicit source-only/non-runtime conclusion absent. Host58–61 covers registration/delegation; payload initData.activeSessionId accepted."
+    },
+    {
+      "run": "control__1",
+      "usd": 0.010467840000000003,
+      "seconds": 58.257,
+      "requests": 6,
+      "tools": 6,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 133770,
+        "cache_read_input_tokens": 102912,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 30858,
+        "non_cached_input_tokens": 30858,
+        "output_tokens": 1865,
+        "reasoning_output_tokens": 1012,
+        "visible_output_tokens": 853,
+        "actual_total_tokens": 135635,
+        "cache_read_ratio": 0.7693204754429244,
+        "reasoning_output_ratio": 0.542627345844504
+      },
+      "passed": 20,
+      "total": 24,
+      "failed_required": [
+        2,
+        3,
+        8,
+        16
+      ],
+      "scoring_note": "Only enclosing resolve38–71 without registration/delegate occurrences; React command selector absent; init activeSessionId truthiness not bound to payload rather than current UI ID."
+    },
+    {
+      "run": "control__2",
+      "usd": 0.007374360000000001,
+      "seconds": 50.666,
+      "requests": 4,
+      "tools": 3,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 88881,
+        "cache_read_input_tokens": 68608,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 20273,
+        "non_cached_input_tokens": 20273,
+        "output_tokens": 1623,
+        "reasoning_output_tokens": 916,
+        "visible_output_tokens": 707,
+        "actual_total_tokens": 90504,
+        "cache_read_ratio": 0.7719085068799856,
+        "reasoning_output_ratio": 0.5643869377695625
+      },
+      "passed": 22,
+      "total": 24,
+      "failed_required": [
+        6,
+        8
+      ],
+      "scoring_note": "Cleanup absence stated but Disposable not-retained omitted; React command selector absent. Host58–61 callback range covers delegation; initData and payload session-created/selected wording accepted."
+    },
+    {
+      "run": "candidate__2",
+      "usd": 0.007475880000000001,
+      "seconds": 43.201,
+      "requests": 3,
+      "tools": 5,
+      "usage": {
+        "complete": true,
+        "pricing_exact": true,
+        "diagnostics": [],
+        "input_tokens": 56703,
+        "cache_read_input_tokens": 33024,
+        "cache_write_input_tokens": 0,
+        "ordinary_input_tokens": 23679,
+        "non_cached_input_tokens": 23679,
+        "output_tokens": 1733,
+        "reasoning_output_tokens": 778,
+        "visible_output_tokens": 955,
+        "actual_total_tokens": 58436,
+        "cache_read_ratio": 0.5824030474578065,
+        "reasoning_output_ratio": 0.448932487016734
+      },
+      "passed": 22,
+      "total": 24,
+      "failed_required": [
+        5,
+        24
+      ],
+      "scoring_note": "Host message.command selector omitted; explicit source-only/non-runtime conclusion absent. React event.data.command and same-handler cleanup stated."
+    }
+  ],
+  "aggregate": {
+    "control": {
+      "passed": 42,
+      "total": 48,
+      "mean_usd": 0.008921100000000001,
+      "mean_seconds": 54.4615,
+      "mean_requests": 5
+    },
+    "candidate": {
+      "passed": 44,
+      "total": 48,
+      "mean_usd": 0.007005400000000001,
+      "mean_seconds": 42.576,
+      "mean_requests": 3
+    }
+  },
+  "setup_usd": 0.007568360000000001,
+  "postflight": [],
+  "capsule_verified_raw_files": 12,
+  "decision": "Observed paired cost/aggregate score improve, but both candidate answers omit the requested source-only boundary and the ablated sections still govern other tasks. Not deployable; no full-suite expansion as a production candidate.",
+  "limitations": [
+    "Two samples per side do not establish causal impact of the removed sections or statistical equivalence.",
+    "Removal changes available governance obligations. Production cannot simply adopt this experimental ablation.",
+    "Historical old-batch results vary; current paired scores are not a new benchmark truth or changed oracle."
+  ],
+  "next": "Inspect scope-preserving simplification or conditional placement of truly modification-only obligations; keep query evidence/completion obligations available. Require a complete candidate before final nine-task comparison.",
+  "production_changed": false,
+  "deployed": false
+}
