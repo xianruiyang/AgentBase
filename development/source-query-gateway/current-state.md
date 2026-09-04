@@ -407,7 +407,7 @@ Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次
 
 ## OBS-SQG-044 路径身份 oracle 已校准，规则修复候选未通过资格
 
-- 状态: English kernel qualified for full-suite comparison only; production unchanged; overall parity goal unmet
+- 状态: English kernel rejected after full-suite comparison; production unchanged; overall parity goal unmet
 - 关联: OBS-SQG-042, OBS-SQG-043
 
 当前安装态与当时选取的历史环境复测暴露了工作区根目录前缀省略。后续身份审查确认该历史环境是旧实验中未加批量规则的 `control`，并非用户指定的最佳批量 `candidate`，因此不支持“相对最佳批量版”的结论。`v19.json` 把路径固定为工作区根相对格式后，又与桌面交付面要求完整绝对文件链接的上位合同冲突；`v20.json` 改为验证路径能否唯一映射到 oracle 文件，并显式包含实现闭合行。查询步骤内强化路径、发现顺序或读取策略的候选仍出现漏答、错误纳入注释调用或价格反例，不能因某一次便宜就晋级。
@@ -416,7 +416,7 @@ Candidate 还出现 10 次裸 `rg`、一次 Windows literal glob 失败和两次
 
 首对未达标，第二对与跨语言扩量均未执行；全局规则和 trigger cases 已恢复本轮之前的内容，skill、srcq 与真实安装态未改变，没有部署或发行。[路径身份审计](evidence/audit-result-path-identity-output-v1.json) 保存原始比较、各候选数据与淘汰依据；实验题面、结果和审计不进入 payload。当前只完成 oracle 校准，没有证据证明模型路径问题已被修复。
 
-v22 的题面、标准答案与评分缺陷已使[旧表](evidence/report-full-suite-agentbase-only-v1.md)质量结论失效。v23 已修正并核验，双方仅本项目 skills 的全九题各两次重跑已完成；[新报告](evidence/report-full-suite-agentbase-only-v2.md)显示逐题质量目标尚未达成，实际费用与逐次失败均已留证。生产规则、skills、srcq 和安装态未改，未运行交付提示候选、部署或发行；本轮按[计划 3.20](plan.md#320-2026-09-04-路径身份与完整代码查询对照修复)停在报告。
+v22 的题面、标准答案与评分缺陷已使[旧表](evidence/report-full-suite-agentbase-only-v1.md)质量结论失效。v23 的[当前版对照](evidence/report-full-suite-agentbase-only-v2.md)及后续[英文候选全题对照](evidence/report-full-suite-english-kernel-v1.md)均未满足逐题质量目标。后者总分略升仍有规则来源与 TS 反例，且 UE 未冻结实际消费的 policy，完整输入因果结论受限。候选已拒绝，生产规则、skills、srcq 和安装态未改，未部署或发行；后续按[计划 3.20](plan.md#320-2026-09-04-路径身份与完整代码查询对照修复)先检验不同的答复事实保留机制。
 
 ## GAP-SQG-010 P16 仍缺部分语言依赖 resolver 与关系同快照续页
 

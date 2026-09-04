@@ -1,0 +1,741 @@
+{
+  "status": "rejected_per_task_quality",
+  "corpus": "v23",
+  "model": "gpt-5.6-luna",
+  "reasoning": "medium",
+  "service_tier": "default",
+  "repetitions_per_side": 2,
+  "raw_root": "D:\\AgentBaseBench\\full-suite-english-kernel-v1",
+  "control_source": "code-reading-v18-tool-batching-v1/candidate",
+  "candidate_source": "current-english-kernel-v1/candidate-agents.md; current owned skills",
+  "records": [
+    {
+      "run": "agentbase-file-discovery-control__candidate__1",
+      "usd": 0.0031745200000000006,
+      "seconds": 12.26,
+      "requests": 2,
+      "tools": 1,
+      "task": "agentbase-file-discovery-control",
+      "side": "candidate",
+      "repeat": 1,
+      "passed": 1,
+      "total": 1,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-file-discovery-control__control__1",
+      "usd": 0.0032648,
+      "seconds": 12.567,
+      "requests": 2,
+      "tools": 1,
+      "task": "agentbase-file-discovery-control",
+      "side": "control",
+      "repeat": 1,
+      "passed": 1,
+      "total": 1,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-file-discovery-control__control__2",
+      "usd": 0.0032784,
+      "seconds": 16.975,
+      "requests": 2,
+      "tools": 1,
+      "task": "agentbase-file-discovery-control",
+      "side": "control",
+      "repeat": 2,
+      "passed": 1,
+      "total": 1,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-file-discovery-control__candidate__2",
+      "usd": 0.0048904000000000005,
+      "seconds": 28.132,
+      "requests": 4,
+      "tools": 6,
+      "task": "agentbase-file-discovery-control",
+      "side": "candidate",
+      "repeat": 2,
+      "passed": 1,
+      "total": 1,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-rg-policy-sources__control__1",
+      "usd": 0.0091276,
+      "seconds": 64.954,
+      "requests": 7,
+      "tools": 6,
+      "task": "agentbase-rg-policy-sources",
+      "side": "control",
+      "repeat": 1,
+      "passed": 2,
+      "total": 2,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-rg-policy-sources__candidate__1",
+      "usd": 0.008819039999999998,
+      "seconds": 51.759,
+      "requests": 5,
+      "tools": 4,
+      "task": "agentbase-rg-policy-sources",
+      "side": "candidate",
+      "repeat": 1,
+      "passed": 1,
+      "total": 2,
+      "failed_required": [
+        1
+      ]
+    },
+    {
+      "run": "agentbase-rg-policy-sources__candidate__2",
+      "usd": 0.00823284,
+      "seconds": 36.245,
+      "requests": 3,
+      "tools": 4,
+      "task": "agentbase-rg-policy-sources",
+      "side": "candidate",
+      "repeat": 2,
+      "passed": 2,
+      "total": 2,
+      "failed_required": [],
+      "scoring_note": "Both required sources present; extra existing references are not an unstated exclusivity failure."
+    },
+    {
+      "run": "agentbase-rg-policy-sources__control__2",
+      "usd": 0.01112392,
+      "seconds": 56.135,
+      "requests": 6,
+      "tools": 5,
+      "task": "agentbase-rg-policy-sources",
+      "side": "control",
+      "repeat": 2,
+      "passed": 2,
+      "total": 2,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-provider-observation__control__1",
+      "usd": 0.0030112800000000003,
+      "seconds": 51.945,
+      "requests": 3,
+      "tools": 2,
+      "task": "agentbase-provider-observation",
+      "side": "control",
+      "repeat": 1,
+      "passed": 2,
+      "total": 2,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-provider-observation__candidate__1",
+      "usd": 0.00629388,
+      "seconds": 33.245,
+      "requests": 3,
+      "tools": 4,
+      "task": "agentbase-provider-observation",
+      "side": "candidate",
+      "repeat": 1,
+      "passed": 2,
+      "total": 2,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-provider-observation__candidate__2",
+      "usd": 0.00706184,
+      "seconds": 30.979,
+      "requests": 3,
+      "tools": 4,
+      "task": "agentbase-provider-observation",
+      "side": "candidate",
+      "repeat": 2,
+      "passed": 2,
+      "total": 2,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-provider-observation__control__2",
+      "usd": 0.01046652,
+      "seconds": 49.863,
+      "requests": 7,
+      "tools": 6,
+      "task": "agentbase-provider-observation",
+      "side": "control",
+      "repeat": 2,
+      "passed": 2,
+      "total": 2,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-srcq-containing-contract__control__1",
+      "usd": 0.010803920000000002,
+      "seconds": 58.802,
+      "requests": 8,
+      "tools": 7,
+      "task": "agentbase-srcq-containing-contract",
+      "side": "control",
+      "repeat": 1,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-srcq-containing-contract__candidate__1",
+      "usd": 0.0071956799999999994,
+      "seconds": 33.809,
+      "requests": 3,
+      "tools": 4,
+      "task": "agentbase-srcq-containing-contract",
+      "side": "candidate",
+      "repeat": 1,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-srcq-containing-contract__candidate__2",
+      "usd": 0.00476628,
+      "seconds": 38.834,
+      "requests": 3,
+      "tools": 4,
+      "task": "agentbase-srcq-containing-contract",
+      "side": "candidate",
+      "repeat": 2,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "agentbase-srcq-containing-contract__control__2",
+      "usd": 0.01185356,
+      "seconds": 56.598,
+      "requests": 8,
+      "tools": 7,
+      "task": "agentbase-srcq-containing-contract",
+      "side": "control",
+      "repeat": 2,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "ue-command-dispatch-submit__candidate__1",
+      "usd": 0.008357880000000002,
+      "seconds": 49.373,
+      "requests": 5,
+      "tools": 8,
+      "task": "ue-command-dispatch-submit",
+      "side": "candidate",
+      "repeat": 1,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "ue-command-dispatch-submit__control__1",
+      "usd": 0.005972960000000001,
+      "seconds": 39.108,
+      "requests": 4,
+      "tools": 3,
+      "task": "ue-command-dispatch-submit",
+      "side": "control",
+      "repeat": 1,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "ue-command-dispatch-submit__control__2",
+      "usd": 0.0066307200000000005,
+      "seconds": 38.302,
+      "requests": 5,
+      "tools": 4,
+      "task": "ue-command-dispatch-submit",
+      "side": "control",
+      "repeat": 2,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "ue-command-dispatch-submit__candidate__2",
+      "usd": 0.011435080000000002,
+      "seconds": 58.54,
+      "requests": 6,
+      "tools": 9,
+      "task": "ue-command-dispatch-submit",
+      "side": "candidate",
+      "repeat": 2,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "ue-hjson-isbarekey-occurrences__control__1",
+      "usd": 0.009583160000000002,
+      "seconds": 54.245,
+      "requests": 5,
+      "tools": 4,
+      "task": "ue-hjson-isbarekey-occurrences",
+      "side": "control",
+      "repeat": 1,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "ue-hjson-isbarekey-occurrences__candidate__1",
+      "usd": 0.01125096,
+      "seconds": 80.605,
+      "requests": 7,
+      "tools": 9,
+      "task": "ue-hjson-isbarekey-occurrences",
+      "side": "candidate",
+      "repeat": 1,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "ue-hjson-isbarekey-occurrences__candidate__2",
+      "usd": 0.006028159999999999,
+      "seconds": 42.838,
+      "requests": 3,
+      "tools": 4,
+      "task": "ue-hjson-isbarekey-occurrences",
+      "side": "candidate",
+      "repeat": 2,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "ue-hjson-isbarekey-occurrences__control__2",
+      "usd": 0.00698608,
+      "seconds": 57.61,
+      "requests": 6,
+      "tools": 5,
+      "task": "ue-hjson-isbarekey-occurrences",
+      "side": "control",
+      "repeat": 2,
+      "passed": 4,
+      "total": 4,
+      "failed_required": []
+    },
+    {
+      "run": "facecutting3d-raycast-chain__candidate__1",
+      "usd": 0.00850436,
+      "seconds": 62.585,
+      "requests": 5,
+      "tools": 9,
+      "task": "facecutting3d-raycast-chain",
+      "side": "candidate",
+      "repeat": 1,
+      "passed": 13,
+      "total": 13,
+      "failed_required": [],
+      "scoring_note": "Complete definitions, both direct calls, branch/traversal semantics and static boundary."
+    },
+    {
+      "run": "facecutting3d-raycast-chain__control__1",
+      "usd": 0.011336480000000001,
+      "seconds": 86.554,
+      "requests": 7,
+      "tools": 15,
+      "task": "facecutting3d-raycast-chain",
+      "side": "control",
+      "repeat": 1,
+      "passed": 13,
+      "total": 13,
+      "failed_required": [],
+      "scoring_note": "All required implementation ranges, calls, behavior and source boundary covered."
+    },
+    {
+      "run": "facecutting3d-raycast-chain__control__2",
+      "usd": 0.0124174,
+      "seconds": 58.828,
+      "requests": 5,
+      "tools": 10,
+      "task": "facecutting3d-raycast-chain",
+      "side": "control",
+      "repeat": 2,
+      "passed": 13,
+      "total": 13,
+      "failed_required": [],
+      "scoring_note": "All required implementation ranges, calls, behavior and source boundary covered."
+    },
+    {
+      "run": "facecutting3d-raycast-chain__candidate__2",
+      "usd": 0.008700639999999999,
+      "seconds": 67.813,
+      "requests": 5,
+      "tools": 9,
+      "task": "facecutting3d-raycast-chain",
+      "side": "candidate",
+      "repeat": 2,
+      "passed": 13,
+      "total": 13,
+      "failed_required": [],
+      "scoring_note": "All required items; additional comment locations explicitly bind established file names."
+    },
+    {
+      "run": "opencode-webview-message-boundary__control__1",
+      "usd": 0.011825480000000003,
+      "seconds": 78.785,
+      "requests": 8,
+      "tools": 7,
+      "task": "opencode-webview-message-boundary",
+      "side": "control",
+      "repeat": 1,
+      "passed": 21,
+      "total": 24,
+      "failed_required": [
+        4,
+        6,
+        23
+      ],
+      "scoring_note": "Handler ends at 392, not 393 (R4/R23); explicit lack of cleanup does not state Disposable was not retained (R6). Callback range58–61 covers registration/delegation. initData.activeSessionId is distinguished from current active ID."
+    },
+    {
+      "run": "opencode-webview-message-boundary__candidate__1",
+      "usd": 0.00762368,
+      "seconds": 42.161,
+      "requests": 3,
+      "tools": 4,
+      "task": "opencode-webview-message-boundary",
+      "side": "candidate",
+      "repeat": 1,
+      "passed": 22,
+      "total": 24,
+      "failed_required": [
+        8,
+        16
+      ],
+      "scoring_note": "Mentions React switch location but not its command selector; init truthy condition does not distinguish payload activeSessionId from current activeSessionId. Source-only conclusion accepted as static boundary; cleanup range179–181 contains exact removal180."
+    },
+    {
+      "run": "opencode-webview-message-boundary__candidate__2",
+      "usd": 0.01161632,
+      "seconds": 71.873,
+      "requests": 6,
+      "tools": 8,
+      "task": "opencode-webview-message-boundary",
+      "side": "candidate",
+      "repeat": 2,
+      "passed": 21,
+      "total": 24,
+      "failed_required": [
+        2,
+        3,
+        8
+      ],
+      "scoring_note": "No host registration/delegate occurrence58/60; entity range38–71 cannot substitute for them. React command dispatch absent. Payload init ID and sessionSelected own data condition accepted."
+    },
+    {
+      "run": "opencode-webview-message-boundary__control__2",
+      "usd": 0.005842160000000001,
+      "seconds": 41.84,
+      "requests": 3,
+      "tools": 3,
+      "task": "opencode-webview-message-boundary",
+      "side": "control",
+      "repeat": 2,
+      "passed": 24,
+      "total": 24,
+      "failed_required": [],
+      "scoring_note": "All entity ranges, distinct registrations/dispatch/cleanup, message filters and source-only boundary covered."
+    },
+    {
+      "run": "vmt-temperature-collector-sampling-chain__control__1",
+      "usd": 0.007517079999999999,
+      "seconds": 66.366,
+      "requests": 4,
+      "tools": 5,
+      "task": "vmt-temperature-collector-sampling-chain",
+      "side": "control",
+      "repeat": 1,
+      "passed": 26,
+      "total": 31,
+      "failed_required": [
+        5,
+        7,
+        8,
+        28,
+        30
+      ],
+      "scoring_note": "No-enabled return and UID/read failure publication omitted. ValidateUid caller251 is given after switching to Reader without Engine binding (R28/R30); Read220 explicitly says engine sampling, accepted."
+    },
+    {
+      "run": "vmt-temperature-collector-sampling-chain__candidate__1",
+      "usd": 0.006366280000000001,
+      "seconds": 50.052,
+      "requests": 3,
+      "tools": 5,
+      "task": "vmt-temperature-collector-sampling-chain",
+      "side": "candidate",
+      "repeat": 1,
+      "passed": 31,
+      "total": 31,
+      "failed_required": [],
+      "scoring_note": "Required facts covered. /D:/... retains complete drive-qualified file identity and uniquely maps to oracle D:/...; accepted under identity contract, not certified native-path copy/paste syntax."
+    },
+    {
+      "run": "vmt-temperature-collector-sampling-chain__candidate__2",
+      "usd": 0.01189424,
+      "seconds": 63.114,
+      "requests": 4,
+      "tools": 5,
+      "task": "vmt-temperature-collector-sampling-chain",
+      "side": "candidate",
+      "repeat": 2,
+      "passed": 29,
+      "total": 31,
+      "failed_required": [
+        8,
+        11
+      ],
+      "scoring_note": "Read failure publication and ValidateUidsAsync→ValidateUidsUnsafe caller180 missing. E/R aliases explicit and unambiguous."
+    },
+    {
+      "run": "vmt-temperature-collector-sampling-chain__control__2",
+      "usd": 0.0083324,
+      "seconds": 63.294,
+      "requests": 4,
+      "tools": 7,
+      "task": "vmt-temperature-collector-sampling-chain",
+      "side": "control",
+      "repeat": 2,
+      "passed": 29,
+      "total": 31,
+      "failed_required": [
+        14,
+        30
+      ],
+      "scoring_note": "Engine SampleOnce→Reader.Read caller220 omitted; disabled Publish range47–51 is wrong (actual53–56). Other calls and behavior covered."
+    }
+  ],
+  "table": [
+    {
+      "task": "agentbase-file-discovery-control",
+      "group": "core",
+      "control": {
+        "passed": 2,
+        "total": 2,
+        "usd": 0.0065432,
+        "seconds": 29.542,
+        "requests": 4
+      },
+      "candidate": {
+        "passed": 2,
+        "total": 2,
+        "usd": 0.008064920000000001,
+        "seconds": 40.392,
+        "requests": 6
+      }
+    },
+    {
+      "task": "agentbase-rg-policy-sources",
+      "group": "core",
+      "control": {
+        "passed": 4,
+        "total": 4,
+        "usd": 0.020251520000000002,
+        "seconds": 121.089,
+        "requests": 13
+      },
+      "candidate": {
+        "passed": 3,
+        "total": 4,
+        "usd": 0.01705188,
+        "seconds": 88.00399999999999,
+        "requests": 8
+      }
+    },
+    {
+      "task": "agentbase-provider-observation",
+      "group": "core",
+      "control": {
+        "passed": 4,
+        "total": 4,
+        "usd": 0.0134778,
+        "seconds": 101.80799999999999,
+        "requests": 10
+      },
+      "candidate": {
+        "passed": 4,
+        "total": 4,
+        "usd": 0.01335572,
+        "seconds": 64.22399999999999,
+        "requests": 6
+      }
+    },
+    {
+      "task": "agentbase-srcq-containing-contract",
+      "group": "core",
+      "control": {
+        "passed": 8,
+        "total": 8,
+        "usd": 0.02265748,
+        "seconds": 115.4,
+        "requests": 16
+      },
+      "candidate": {
+        "passed": 8,
+        "total": 8,
+        "usd": 0.01196196,
+        "seconds": 72.643,
+        "requests": 6
+      }
+    },
+    {
+      "task": "ue-command-dispatch-submit",
+      "group": "ue",
+      "control": {
+        "passed": 8,
+        "total": 8,
+        "usd": 0.012603680000000003,
+        "seconds": 77.41,
+        "requests": 9
+      },
+      "candidate": {
+        "passed": 8,
+        "total": 8,
+        "usd": 0.019792960000000005,
+        "seconds": 107.913,
+        "requests": 11
+      }
+    },
+    {
+      "task": "ue-hjson-isbarekey-occurrences",
+      "group": "ue",
+      "control": {
+        "passed": 8,
+        "total": 8,
+        "usd": 0.016569240000000002,
+        "seconds": 111.85499999999999,
+        "requests": 11
+      },
+      "candidate": {
+        "passed": 8,
+        "total": 8,
+        "usd": 0.017279120000000002,
+        "seconds": 123.44300000000001,
+        "requests": 10
+      }
+    },
+    {
+      "task": "facecutting3d-raycast-chain",
+      "group": "external",
+      "control": {
+        "passed": 26,
+        "total": 26,
+        "usd": 0.02375388,
+        "seconds": 145.382,
+        "requests": 12
+      },
+      "candidate": {
+        "passed": 26,
+        "total": 26,
+        "usd": 0.017204999999999998,
+        "seconds": 130.398,
+        "requests": 10
+      }
+    },
+    {
+      "task": "opencode-webview-message-boundary",
+      "group": "external",
+      "control": {
+        "passed": 45,
+        "total": 48,
+        "usd": 0.017667640000000005,
+        "seconds": 120.625,
+        "requests": 11
+      },
+      "candidate": {
+        "passed": 43,
+        "total": 48,
+        "usd": 0.01924,
+        "seconds": 114.034,
+        "requests": 9
+      }
+    },
+    {
+      "task": "vmt-temperature-collector-sampling-chain",
+      "group": "external",
+      "control": {
+        "passed": 55,
+        "total": 62,
+        "usd": 0.01584948,
+        "seconds": 129.66,
+        "requests": 8
+      },
+      "candidate": {
+        "passed": 60,
+        "total": 62,
+        "usd": 0.018260520000000002,
+        "seconds": 113.166,
+        "requests": 7
+      }
+    }
+  ],
+  "aggregate": {
+    "control": {
+      "passed": 160,
+      "total": 170,
+      "usd": 0.14937392000000005,
+      "seconds": 952.771,
+      "requests": 94
+    },
+    "candidate": {
+      "passed": 162,
+      "total": 170,
+      "usd": 0.14221208,
+      "seconds": 854.2170000000002,
+      "requests": 73
+    }
+  },
+  "non_ue": {
+    "control": {
+      "passed": 144,
+      "total": 154,
+      "usd": 0.120201,
+      "seconds": 763.506,
+      "requests": 74
+    },
+    "candidate": {
+      "passed": 146,
+      "total": 154,
+      "usd": 0.10514,
+      "seconds": 622.861,
+      "requests": 52
+    }
+  },
+  "setup_usd": 0.02104276,
+  "groups": {
+    "core": {
+      "setup_usd": 0.00719332,
+      "postflight": [],
+      "capsule_verified_raw_files": 36
+    },
+    "ue": {
+      "setup_usd": 0.0061705200000000005,
+      "postflight": [],
+      "capsule_verified_raw_files": 20
+    },
+    "external": {
+      "setup_usd": 0.0076789200000000005,
+      "postflight": [],
+      "capsule_verified_raw_files": 28
+    }
+  },
+  "limitations": [
+    "UE consumed docs/agent/UE_UAI_PROJECT_POLICY.md outside declared identity_paths. plan was frozen. Source answer scores and observed billing remain descriptive; complete-input causal equivalence is not established.",
+    "UE public_command_edge.md appeared as matched path only; UeAgentInterfaceCMD/Pak appeared as query arguments without returned source bodies. No inference of body consumption.",
+    "Two repetitions are bounded observations, not statistical proof of language causality.",
+    "Actual per-request observed USD, not ideal cache pricing or total-token proxy."
+  ],
+  "decision": "Overall 162/170 versus 160/170 does not compensate policy 3/4<4/4 and TS43/48<45/48. Reject candidate; do not deploy or rerun UE solely to certify rejected candidate.",
+  "next": "Use a distinct, evidence-backed mechanism for preserving requested relations/branch outcomes in final answers, first test the failed TS consumer. Any future full suite must freeze consumed UE policy dependency."
+}
