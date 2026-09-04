@@ -4,7 +4,7 @@
 
 ## 本轮裁决
 
-没有认证新候选达标。新的一因素范围实验中，候选虽回答正确，但工具实际读到了历史研究资料，不能据此认证独立收益。已保存原样本，并生成同源、无研究资料的源码工作区开始重测；全九题目标保持未完成。
+尚未认证全九题达标。原范围实验虽回答正确，但工具实际读到了历史研究资料，不能据此认证独立收益。已保存原样本；同源、无研究资料的源码工作区重测中，范围候选与真正旧最佳批量版均为3/4，均价下降0.39%，满足本题最低要求。来源剪裁消融没有提高正确率；随后[完整九题](report-scope-evidence-full-v1.md)八题最低达标，但TS少1分，故全目标未完成、不晋级。
 
 候选保留 intent-trigger 的通用意图校准改动，只在原查询范围条款内区分“用户或正式来源确认的对象范围”与“临时使用的名称、目录、类型过滤”。后一类不是完整性依据。没有精确行号、题目文件名、语言、符号或答案提示；全局正文从4,887增至4,924 Token，其余skills、批量条款、srcq、Luna medium/low/default保持不变。三份历史报告及其直接候选的有界核对未发现同等机制已被测试；这不是对全部历史的不存在结论。
 
@@ -31,10 +31,13 @@
 
 正式 `validate_corpus_snapshot` 已确认四道AgentBase题目的目标源码指纹一致；题目、路径目标和行号oracle均未修改。排除依据是development的研究/开发资产职责，不是按正确答案筛文件。模型只读合同仍适用；这不是操作系统级访问隔离承诺。
 
-正在进行的干净重测根为 `D:\AgentBaseBench\scope-evidence-clean-v1`，准备和顺序由其中 `prepare.py`、`research-plan.md` 定义：
+干净重测根为 `D:\AgentBaseBench\scope-evidence-clean-v1`，准备和顺序由其中 `prepare.py`、`research-plan.md` 定义：
 
 - control来自已冻结的真正旧最佳批量环境 `full-suite-agentbase-only-v2/external/control`，candidate来自原样scope-evidence候选；各自13个AgentBase-owned skills，双方同srcq0.7.0、CLI、Luna medium/low/default、HTTP-only。
-- 双方同用源码快照，先运行原规则来源题各两次。该题成立后才保留候选继续其余八题；不能把污染样本合入干净对照，也不能把局部成绩当作目标完成。
-- 原始输出在 `policy-ready/runs`，正式完成后由 `summary.json` 和 `audit-capsule.json` 恢复。继续前先核对运行是否仍存活，不能因观察超时重启实验。
+- 双方同用源码快照，已完成原规则来源题各两次；[逐项审计](audit-scope-evidence-clean-v1.json)给出原答案定位判断。旧版2/2、1/2，候选1/2、2/2，均为3/4；均价分别$0.00963500、$0.00959768。候选在这一题达到最低持平和价格要求，但未全对，也未证明新增范围条款的净收益。其余八题尚未验证，不能把局部成绩当作目标完成。
+- 原始输出在 `policy-ready/runs`，`summary.json` 和 `audit-capsule.json` 已完整生成并校验，12份原始文件一致、无postflight失败，原始答案/usage/价格匹配；已检查的工具结果无此前研究材料暴露标记。题目费用$0.03846536、预检$0.00683536，共$0.04530072。两侧各一次都以根AGENTS代替source-query正式文件，未命中R2。
+- 同一干净快照的来源剪裁消融已完成，外部入口 `D:\AgentBaseBench\source-pruning-ablation-v1`。该候选退回intent-trigger基底，仅删除“最小交付来源/下级不并列”条款，不叠加范围提示或题目字段。旧最佳版也有近似条款，整套环境比较不能独立归因。双方均1/2、2/2，合计3/4；旧版均价$0.00582404、候选$0.00641764（+10.19%）。12份原始文件、答案/usage/价格校验一致，无postflight失败。删除条款没有提高正确率；本次不将它加入范围候选。
+- 原消融登记自行把4/4设为扩展硬门槛，运行期间已纠正并写回：用户要求是至少持平、尽量全对，价格涨幅不超过50%。不能用自行加严的满分门槛反复停留在一题。
+- `D:\AgentBaseBench\scope-evidence-full-v1` 已冻结干净范围候选并完成core/ue/external三个独立home分片，其余八题双方各两次。准备脚本沿正式home owner复制各自项目skills，不复制其他skill、认证内容、缓存或源码工程；AgentBase复用干净快照，其他工程按旧实验正式范围读原源码。分片分别保存manifest和capsule，与已有policy结果仅按同候选逐题汇总，不伪装成一个实验身份。TS候选9/14低于旧版10/14，整体不达标；新候选与原始数据入口见完整报告，不用总分覆盖局部退化。
 
 本轮未修改或部署global/AGENTS.md、skill或srcq；仅修改开发研究说明和基准环境职责，目标保持active。
