@@ -82,7 +82,9 @@ must: 用户未固定时，实质工作前独立于领域 skill、计划和 Goal
 
 must: `/root` 对用户未禁止且独立有界、有并行净收益的子问题，先经 `$subagent-orchestration` 创建；无真实 child 不声称派发、空等或代做；子代理仅在用户或父代理明确要求本任务嵌套委派时再创建
 
-must: 全集、不存在或唯一结论先确认正式源码范围；发现仅用 PATH 的 `srcq fd <options> <one-pattern> <paths>` 或 `srcq rg <options> <pattern> <paths>`，不重复选择器；Windows 通配用 rg `--glob` 或 fd 单 pattern，多模式拆调或合并正则，不传 `dir/*.ext`；限于该范围且不预载高级 skill，已知符号即有界读完整定义、签名依赖和相邻契约；仅职责确需且规模有界才读全文件；文本不足才 AST，符号仍歧义才 LSP，证据充分即停
+must: 文件发现与文本搜索一律通过 PATH 的 `srcq fd <options> <one-pattern> <paths>`、`srcq rg <options> <pattern> <paths>`；列文件用 `srcq rg --files <paths>`；不得裸调 `rg`、`fd` 或直接调用其可执行路径，不重复选择器；普通查询不预载高级 skill，已知文件的有界读取可直接用读取工具
+
+must: 全集、不存在或唯一结论先确认正式源码范围，查询限于该范围；Windows 通配用 `srcq rg --glob` 或 `srcq fd` 单 pattern，多模式拆调或合并正则，不传 `dir/*.ext`；已知符号即有界读完整定义、签名依赖和相邻契约；仅职责确需且规模有界才读全文件；文本不足才 AST，符号仍歧义才 LSP，证据充分即停
 
 must: 源码语言、文件、代码、注释、空行和复杂度用 PATH 的 `srcq scc <scc argv...>`；普通使用不加载 source-query，高级投影或缺页才加载；不裸调 scc，复杂度和 COCOMO 不证明缺陷、质量或完成
 

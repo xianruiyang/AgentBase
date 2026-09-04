@@ -889,7 +889,7 @@
     {
       "id": "literal-text-search",
       "kind": "negative",
-      "request": "在源码中通过 `srcq rg <rg-options...> <pattern> <paths...>` 查找字面量 FEATURE_DISABLED；选择器后不要重复写 rg，Windows 文件通配使用 `--glob` 而不是 `dir/*.ext` 路径。不要让我预先选择 heading、view、limit 或预算，工具按真实结果返回最低充分输出。",
+      "request": "在源码中查找字面量 FEATURE_DISABLED，并限定只显示相关位置。",
       "expected_skills": [],
       "forbidden_skills": [
         "source-query",
@@ -1085,7 +1085,7 @@
     {
       "id": "bounded-file-discovery",
       "kind": "negative",
-      "request": "通过 `srcq fd <fd-options...> <one-pattern> <paths...>` 从项目根目录查找名称为 package.json 的文件；选择器后不要重复写 fd，fd 只使用一个 positional pattern。普通查询不加载 source-query skill，也不预先选择树或平铺展示。",
+      "request": "从项目根目录查找名称为 package.json 的文件，只返回路径。",
       "expected_skills": [],
       "forbidden_skills": [
         "source-query",
@@ -2349,6 +2349,36 @@
       ],
       "expected_change_governance_references": [],
       "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "ordinary-file-listing",
+      "kind": "negative",
+      "request": "列出 src 目录中的 TypeScript 文件，只返回路径，不读取正文。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "known-file-bounded-read",
+      "kind": "negative",
+      "request": "已确定 config.toml 的第1至12行就是所需内容，直接读取这些行，不再查找文件或搜索内容。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
       "forbidden_behavior_tags": []
     },
     {
