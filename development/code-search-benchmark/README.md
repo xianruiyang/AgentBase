@@ -2,7 +2,7 @@
 
 本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule，并消费 `development/common/codex_runtime.py` 的共享脱敏 launcher 环境与 `development/common/codex_shell_environment_policy.json` 的模型 shell 合同。两者不实现查询语义，也不进入 srcq 或 Codex 发布 payload。
 
-正式语料在 `corpus/`；`v24.json` 是当前候选，九题题面、定位目标和源码行号继承 `v23`，只把正式评分收敛为路径、定位行号与完整实现起止行，并更新已变化的 AgentBase 规则文件快照。每个指定位置为一个计分项，共 37 项；分支、状态发布、错误 code、关系解释、输出长度及完整性/静态边界措辞全部单列为主观参考，不参与正式得分或通过判定。具体匹配、额外错误位置与历史重评分规则由 [语料说明](corpus/README.md) 定义，并随 corpus 的 `scoring` 冻结进 audit capsule。原始 runner 不自动评答案质量，auditor 依此复核；不另建自动语义评分器。旧版本和旧混合分数只服务历史复核，不冒充当前正式得分。新实验的新旧环境使用同一当前 corpus；仅评分变化且题面、来源快照仍适用时，可以对双方已有原答案重新评分而不运行模型。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
+正式语料在 `corpus/`；`v25.json` 是当前候选；继承 `v24` 的纯定位评分、全部标准答案与源码指纹，只把 TypeScript 题面原有的四个计分调用对象明确写出，避免隐藏 required 比模型可见任务更具体。v24 曾把正式评分收敛为路径、定位行号与完整实现起止行，并更新 AgentBase 规则文件快照。每个指定位置为一个计分项，共 37 项；分支、状态发布、错误 code、关系解释、输出长度及完整性/静态边界措辞全部单列为主观参考，不参与正式得分或通过判定。具体匹配、额外错误位置与历史重评分规则由 [语料说明](corpus/README.md) 定义，并随 corpus 的 `scoring` 冻结进 audit capsule。原始 runner 不自动评答案质量，auditor 依此复核；不另建自动语义评分器。旧版本和旧混合分数只服务历史复核，不冒充当前正式得分。新实验的新旧环境使用同一当前 corpus；仅评分变化且题面、来源快照仍适用时，可以对双方已有原答案重新评分而不运行模型。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
 
 ```powershell
 python -X utf8 development\code-search-benchmark\experiment.py prepare --config <config.json> --output <new-output-dir>

@@ -4,6 +4,8 @@
 
 ## 结论与可比较范围
 
+后续[TS合同复核](report-ts-contract-alignment-v25.md)发现v24题面的“分派/清理”没有唯一指明隐藏评分所选委托/移除调用。本表仍保留v24原分数，不反向放宽；该歧义所涉差额不能单独证明规则退化。v25仅澄清TS题面并重测双方，其他八题及标准答案不变。
+
 **尚未满足用户目标，不晋级、不部署。** 九题各两次，旧最佳批量版和候选均66/74；总分相同不能掩盖TS从10/14降至9/14。其余八题质量至少持平，九题实际均价增幅均未超过50%；C#从23/26升至24/26但仍不是全对。只能认证本轮逐题结果，不能由两次样本声称长期稳定性或某条规则的独立因果效应。
 
 control来自冻结的真正旧最佳批量版AGENTS与其13个AgentBase-owned skills；candidate为scope-evidence-clean-v1原样规则和当前13个项目skills。双方同srcq0.7.0、Codex CLI、Luna medium/low/default、HTTP-only，受测模型禁用子代理。只复制项目owned skills，不复制其他skill、认证内容、缓存或源码工程。AgentBase题目双方复用排除development研究材料及原历史的同源源码快照；其他项目沿既有正式范围。题目与v24纯定位oracle不变，准备时验证源码指纹。
