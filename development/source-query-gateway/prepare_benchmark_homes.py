@@ -5,12 +5,16 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import tempfile
 
 
 ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT.parents[1]
+# A preparation budget, not a limit on production skills. Reject before copying.
+MAX_SKILL_BYTES = 64 * 1024 * 1024
+MAX_SKILL_ENTRIES = 4096
 RETIRED_QUERY_SKILLS = {
     "ast-grep-token-safe",
     "fd-usage",
@@ -112,12 +116,48 @@ def agentbase_skill_names() -> set[str]:
     }
 
 
-def copy_agentbase_skills(source: Path, target: Path) -> None:
-    target.mkdir()
-    for name in sorted(agentbase_skill_names()):
+def copy_agentbase_skills(
+    source: Path, target: Path, *, names: set[str] | None = None,
+    require_manifest: bool = True,
+) -> None:
+    owned = agentbase_skill_names()
+    selected = owned if names is None else owned & names
+    entries: list[tuple[Path, bool]] = []
+    total = 0
+    pending = []
+    for name in sorted(selected):
         skill = source / name
-        if (skill / "SKILL.md").is_file():
-            shutil.copytree(skill, target / name)
+        if skill.exists() and (not require_manifest or (skill / "SKILL.md").is_file()):
+            pending.append(skill)
+    while pending:
+        path = pending.pop()
+        info = path.lstat()
+        if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+            raise SystemExit(f"skill copy must not follow links: {path}; select a physical frozen skill source")
+        directory = stat.S_ISDIR(info.st_mode)
+        entries.append((path, directory))
+        total += 0 if directory else info.st_size
+        if len(entries) > MAX_SKILL_ENTRIES or total > MAX_SKILL_BYTES:
+            raise SystemExit("skill copy exceeds preparation budget (64 MiB / 4096 entries); inspect selected resources before creating more homes")
+        if directory:
+            # Stream directory entries so a huge directory cannot fill pending first.
+            with os.scandir(path) as children:
+                for child in children:
+                    if len(entries) + len(pending) >= MAX_SKILL_ENTRIES:
+                        raise SystemExit("skill copy exceeds preparation budget (4096 entries); inspect selected resources")
+                    pending.append(Path(child.path))
+    ancestor = target.parent
+    while not ancestor.exists():
+        ancestor = ancestor.parent
+    if shutil.disk_usage(ancestor).free < total:
+        raise SystemExit("insufficient space for selected skills; reuse an unchanged home or free space before preparation")
+    target.mkdir()
+    for path, directory in entries:
+        destination = target / path.relative_to(source)
+        if directory:
+            destination.mkdir()
+        else:
+            shutil.copy2(path, destination)
 
 
 def copy_current_control(
@@ -233,17 +273,13 @@ def copy_common(
     (target / "AGENTS.md").write_text(agents, encoding="utf-8")
     (target / "config.toml").write_text(config_text(lsp_server, trusted_projects), encoding="utf-8")
     skills_target = target / "skills"
-    skills_target.mkdir()
-    owned_skills = agentbase_skill_names()
-    for source in sorted((installed / "skills").iterdir(), key=lambda item: item.name.lower()):
-        if not source.is_dir() or source.name not in owned_skills:
-            continue
-        if source.name == "source-query" and baseline_mode == "premigration":
-            raise SystemExit("installed control already contains source-query; select a pre-migration control home")
-        selected_skills = PREMIGRATION_SKILLS if baseline_mode == "premigration" else MIGRATED_SKILLS
-        if not full_installed_skills and source.name not in selected_skills:
-            continue
-        shutil.copytree(source, skills_target / source.name)
+    if baseline_mode == "premigration" and (installed / "skills" / "source-query").is_dir():
+        raise SystemExit("installed control already contains source-query; select a pre-migration control home")
+    selected_skills = PREMIGRATION_SKILLS if baseline_mode == "premigration" else MIGRATED_SKILLS
+    copy_agentbase_skills(
+        installed / "skills", skills_target,
+        names=None if full_installed_skills else selected_skills, require_manifest=False,
+    )
 
 
 def verify_srcq_ingress(srcq_exe: Path) -> str:

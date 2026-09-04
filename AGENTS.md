@@ -20,6 +20,8 @@ must: 任务需要选择、新建、替代或重开子计划，改变跨组件�
 
 must: 不手工创建 `backup`、`copy`、`draft` 等冗余副本；只有正式部署流程生成的可回滚备份或用户明确要求的副本可以保留
 
+must: 实验环境按所属正式准备入口创建，不用临时脚本整树复制真实或历史 `.codex`、`skills`、插件与缓存；只选择本项目维护且本次需要的资产，未变的冻结环境跨题目与重复运行复用，不按运行次数复制。创建前确认所选资源体积、份数与目标盘可用空间；代码查询实验的复制预算与恢复方式见 `development/code-search-benchmark/README.md`。原始结果与必要基线按证据职责保留，可重建环境不默认长期保留；清理限定已确认归属与用途的路径，不触及真实安装或用户正在清理的目录
+
 must: `.codex/`、`codexRuntimeLogFile/`、`node_modules/`、`dist/`、`target/`、运行日志、覆盖率和部署沙箱是本地状态或可重建产物，不得作为项目真源提交
 
 must: 测试、fixture、benchmark 语料、runner、原始结果与审计仅属开发资产，不进 Codex payload；`Plugin`/`DirectCompatibility` 同受 payload 合同且须移除受管旧测试。有消费者的 doctor/自检按运行职责裁决，不得把项目测试当运行能力

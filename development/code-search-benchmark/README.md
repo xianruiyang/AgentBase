@@ -2,6 +2,10 @@
 
 本目录是项目内唯一的源码查询基准 owner。`analyze.py` 保留局部工具路径的模型可见 Token 后处理；`experiment.py` 负责真实 Codex 对照的身份冻结、平衡调度、外部监控、事件归档和 detached audit capsule，并消费 `development/common/codex_runtime.py` 的共享脱敏 launcher 环境与 `development/common/codex_shell_environment_policy.json` 的模型 shell 合同。两者不实现查询语义，也不进入 srcq 或 Codex 发布 payload。
 
+环境创建与复用：所有安装态 skill 复制都使用 `prepare_benchmark_homes.py` 的同一归属筛选与有界复制函数；不按题目、语言或重复次数克隆未变的 home，也不递归复制运行过的 home。复制前只枚举入选 skill，整批最多 64 MiB、4096 个文件/目录，并检查目标盘剩余空间；链接与 Windows reparse point 不跟随。该预算限制实验准备，不定义生产 skill 大小；超限时先确认混入内容和实际需求，不能绕过入口直接复制或自动提高预算。普通配置、skill 与可修改候选保持独立文件，不用硬链接把修改传播到真实安装或基线。新环境所需二进制及计划份数也应计入操作者的总占用判断；单批预算不代表多环境累计占用已受控。
+
+这些检查只在准备时读取实际来源和磁盘，不生成第二份资产清单、不成为部署前置。失败提示面向实验操作者，仅报告原因和恢复动作；来源仍是选定安装态/冻结态，归属仍由部署生命周期定义。原始结果和必要基线保留；未变环境优先复用，弃用环境在用途确认后按其明确路径清理。不得并发清理用户正在处理的历史目录。
+
 正式语料在 `corpus/`；`v25.json` 是当前候选；继承 `v24` 的纯定位评分、全部标准答案与源码指纹，只把 TypeScript 题面原有的四个计分调用对象明确写出，避免隐藏 required 比模型可见任务更具体。v24 曾把正式评分收敛为路径、定位行号与完整实现起止行，并更新 AgentBase 规则文件快照。每个指定位置为一个计分项，共 37 项；分支、状态发布、错误 code、关系解释、输出长度及完整性/静态边界措辞全部单列为主观参考，不参与正式得分或通过判定。具体匹配、额外错误位置与历史重评分规则由 [语料说明](corpus/README.md) 定义，并随 corpus 的 `scoring` 冻结进 audit capsule。原始 runner 不自动评答案质量，auditor 依此复核；不另建自动语义评分器。旧版本和旧混合分数只服务历史复核，不冒充当前正式得分。新实验的新旧环境使用同一当前 corpus；仅评分变化且题面、来源快照仍适用时，可以对双方已有原答案重新评分而不运行模型。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
 
 ```powershell

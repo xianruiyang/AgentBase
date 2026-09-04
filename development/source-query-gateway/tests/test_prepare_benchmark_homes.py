@@ -75,6 +75,53 @@ class PrepareBenchmarkHomesTests(unittest.TestCase):
         self.assertNotIn("ue-kb", names)
         self.assertNotIn(".system", names)
 
+    def test_copy_budget_rejects_before_writing_and_ignores_foreign_resources(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            source = root / "skills"
+            for name in ("source-query", "ue-kb"):
+                (source / name).mkdir(parents=True)
+                (source / name / "SKILL.md").write_bytes(b"owned")
+            (source / "ue-kb" / "large.bin").write_bytes(b"x" * 100)
+            with mock.patch.object(MODULE, "MAX_SKILL_BYTES", 10):
+                MODULE.copy_agentbase_skills(source, root / "allowed")
+                self.assertFalse((root / "allowed" / "ue-kb").exists())
+                (source / "source-query" / "extra.bin").write_bytes(b"x" * 10)
+                with self.assertRaisesRegex(SystemExit, "budget"):
+                    MODULE.copy_agentbase_skills(source, root / "rejected")
+                self.assertFalse((root / "rejected").exists())
+            (root / "allowed" / "source-query" / "SKILL.md").write_bytes(b"candidate")
+            self.assertEqual(b"owned", (source / "source-query" / "SKILL.md").read_bytes())
+
+    def test_copy_entry_budget_and_free_space_are_checked_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            source = root / "skills"
+            (source / "source-query").mkdir(parents=True)
+            (source / "source-query" / "SKILL.md").write_bytes(b"owned")
+            with mock.patch.object(MODULE, "MAX_SKILL_ENTRIES", 1):
+                with self.assertRaisesRegex(SystemExit, "budget"):
+                    MODULE.copy_agentbase_skills(source, root / "entries")
+            with mock.patch.object(MODULE.shutil, "disk_usage", return_value=mock.Mock(free=0)):
+                with self.assertRaisesRegex(SystemExit, "insufficient space"):
+                    MODULE.copy_agentbase_skills(source, root / "space")
+            self.assertFalse((root / "entries").exists())
+            self.assertFalse((root / "space").exists())
+
+    def test_copy_rejects_reparse_points_without_traversing(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            source = root / "skills"
+            (source / "source-query").mkdir(parents=True)
+            (source / "source-query" / "SKILL.md").write_bytes(b"owned")
+            info = mock.Mock(st_mode=MODULE.stat.S_IFDIR,
+                             st_file_attributes=MODULE.stat.FILE_ATTRIBUTE_REPARSE_POINT)
+            with mock.patch.object(Path, "lstat", return_value=info), mock.patch.object(MODULE.os, "scandir") as scan:
+                with self.assertRaisesRegex(SystemExit, "must not follow links"):
+                    MODULE.copy_agentbase_skills(source, root / "target")
+                scan.assert_not_called()
+            self.assertFalse((root / "target").exists())
+
     def test_benchmark_home_rejects_system_temp(self) -> None:
         with self.assertRaisesRegex(SystemExit, "must not be under the system temp"):
             MODULE.validate_benchmark_home_location(Path(tempfile.gettempdir()) / "benchmark-home")
