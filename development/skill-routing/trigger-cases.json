@@ -1776,7 +1776,40 @@
       "forbidden_behavior_tags": []
     },
     {
-      "id": "subagent-implicit-experiment-benefit",
+    "id": "subagent-query-capability-discovery",
+    "kind": "positive",
+    "request": "为已限定需求找出可用的工具命令，目前只知道公开只读 search/usage 入口，需要筛选多个候选并核对适用条件与参数；现有服务已经启动。用户没有指定分工，主代理尚有独立必要的方案整理工作。只采集足以选择命令的证据与可回查来源，不执行候选业务操作，不安装或启动业务服务。",
+    "expected_skills": ["subagent-orchestration"],
+    "forbidden_skills": [],
+    "expected_change_governance_references": [],
+    "expected_subagent_orchestration_references": ["evidence-packet.md", "coordination.md"],
+    "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
+    "forbidden_behavior_tags": ["modify_authorized_scope"]
+  },
+  {
+    "id": "subagent-knowledge-web-evidence",
+    "kind": "positive",
+    "request": "一个已限定技术问题存在几个相互矛盾的候选说法，需要查询已有知识库中的来源，并联网核对官方文档的版本和适用范围。用户没有指定分工；主代理继续整理已确认的需求，调查只读，不建库或安装工具。返回必要原文定位、链接与反例，供主代理判断，不只给无来源摘要。",
+    "expected_skills": ["subagent-orchestration"],
+    "forbidden_skills": [],
+    "expected_change_governance_references": [],
+    "expected_subagent_orchestration_references": ["evidence-packet.md", "coordination.md"],
+    "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
+    "forbidden_behavior_tags": ["modify_authorized_scope"]
+  },
+  {
+    "id": "subagent-simple-help-query-no-benefit",
+    "kind": "negative",
+    "request": "用户没有要求子代理。当前只是用 srcq fd 查找文件，目标范围与命令都已明确，只需确认一个参数的帮助说明；直接读取对应帮助即可继续，没有候选能力需要调查，也无需诊断工具缺陷。",
+    "expected_skills": [],
+    "forbidden_skills": ["subagent-orchestration", "source-query"],
+    "expected_change_governance_references": [],
+    "expected_subagent_orchestration_references": [],
+    "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
+    "forbidden_behavior_tags": ["modify_authorized_scope"]
+  },
+  {
+    "id": "subagent-implicit-experiment-benefit",
       "kind": "positive",
       "request": "两条实现路径都符合已有静态证据，选择仍取决于实际运行约束。实现目标、允许写入范围和验收依据明确，现有工作区能恢复改动；用户没有要求使用哪类代理，主代理也没有独立并行工作。需要实际修改和运行消除不确定性，连续打通本次任务路径并交付可审查实现，不停在只确认第一个探针可运行，也不穷尽无关潜在问题。",
       "expected_skills": [
