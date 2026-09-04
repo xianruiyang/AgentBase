@@ -105,4 +105,4 @@ Verifier 先准备独立依赖，再应用 Windows adapter、候选或 reference
 & (Join-Path (Get-Location).Path 'development\agent-evaluation\test_agent_evaluation_infrastructure.ps1') -ProjectRoot (Get-Location).Path
 ```
 
-该入口设置 `AGENTBASE_AGENT_EVALUATOR_DISABLED=1`，只做 PowerShell 语法、静态 corpus 和单元测试验证；不克隆源码、不安装题目依赖、不运行 oracle/Verifier/model，也不 Publish。
+该入口设置 `AGENTBASE_AGENT_EVALUATOR_DISABLED=1`，只做 PowerShell 语法、静态 corpus 和单元测试验证；不克隆源码、不安装题目依赖、不运行 oracle/Verifier/model，也不部署或发行。
