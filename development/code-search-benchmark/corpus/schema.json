@@ -8,6 +8,19 @@
     "schema": {"const": "agentbase.source-query-corpus/v1"},
     "version": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}\\.[0-9]+$"},
     "created_utc": {"type": "string"},
+    "scoring": {
+      "type": "object",
+      "required": ["mode", "formal", "matching", "pass", "reference_only", "reporting"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"const": "locations-only-v1"},
+        "formal": {"type": "string", "minLength": 1},
+        "matching": {"type": "string", "minLength": 1},
+        "pass": {"type": "string", "minLength": 1},
+        "reference_only": {"type": "string", "minLength": 1},
+        "reporting": {"type": "string", "minLength": 1}
+      }
+    },
     "workspace_roles": {"type": "object", "minProperties": 1},
     "cases": {"type": "array", "minItems": 1}
   }

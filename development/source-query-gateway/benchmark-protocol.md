@@ -11,13 +11,13 @@
 | coordinator | 冻结 corpus、环境模板、候选差异、运行顺序 | 构建隔离环境、启动 monitor、汇总状态 | 运行中修改 subject prompt 或补救答案 |
 | subject | 单个 case、单个隔离环境、带只读任务合同的源码工作区 | 自主选择只读查询工具并回答 | 修改工作区或外部状态，对照输出、聚合结果、历史对话和 hidden oracle |
 | monitor | subject 进程、事件流、超时合同 | 捕获 JSONL/stderr/exit/usage/tool calls，超时终止 | 向 subject 发送中途信息或改变环境 |
-| auditor | detached audit capsule | 复算用量、核对环境差异、按语义 oracle 评质量 | 仓库、候选设计讨论、其他结果和未声明期望 |
+| auditor | detached audit capsule | 复算用量、核对环境差异、按冻结定位合同计正式分，语义仅作主观参考 | 仓库、候选设计讨论、其他结果和未声明期望 |
 
 subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价隔离并返回完整 usage 的正式入口。线程内子 agent 若不能提供独立环境身份和 `turn.completed.usage`，不得用于总 Token 基准。
 
 ## 3. 版本化测试内容
 
-既有测试形成以下六个种子 case，原始 prompt 和历史 oracle 已去除机器绝对路径后固化在 [benchmark-corpus-seed.json](benchmark-corpus-seed.json)。`v11.json` 增加 C++ 与 TypeScript 两个代表 case，`v14.json` 增加 C# 代表 case；当前 `v18.json` 共九项。正式 corpus 为每个 case 保存 prompt、工作区角色、答案长度、最小回答合同、结构化事实关系 oracle 和适用源码快照；源码事实或回答合同变化时创建新 corpus 版本，不改写旧结果。
+既有测试形成以下六个历史种子 case，原始 prompt 和历史 oracle 已去除机器绝对路径后固化在 [benchmark-corpus-seed.json](benchmark-corpus-seed.json)。后续加入 C++、TypeScript、C# 三个代表 case；当前版本、九题与纯定位评分合同以 [corpus 说明](../code-search-benchmark/corpus/README.md) 为准。正式 corpus 为每个 case 保存 prompt、工作区角色、答案长度、最小回答合同、结构化事实关系 oracle 和适用源码快照；源码事实或回答合同变化时创建新 corpus 版本，不改写旧结果。下表的业务语义只描述历史任务覆盖，不是现行正式评分项。
 
 | Case ID | 工作区角色 | 查找目标 | 质量重点 |
 | --- | --- | --- | --- |
@@ -32,7 +32,7 @@ subject 必须是新鲜 `codex exec --json --ephemeral` 进程或能证明等价
 
 `v11.json` 在上述种子上增加两个不同项目与机制的代表 case：FaceCutting3D 的 C++ 限定成员、typed receiver、非注释直接调用和公共/私有实现链，以及 OpencodeVsPlugin 的 TypeScript 类方法/局部闭包身份、事件注册/清理与状态过滤；`v14.json` 再加入 VMTSingleMachine 的 C# 采样、校验、缓存与分派链。`v18.json` 不新增业务事实，只把三个代表 case 已要求定位的可调用实体升级为完整实现文件与 1-based inclusive 起止行。它们用于检验共享查询决策能否跨语言和项目成立，不把某种语法或业务名称写入 skill；扩量只有在代表 case 暴露新的失效机制时进行。
 
-历史 runner 的正则 `required` 只作为旧结果的原始 oracle，不进入新正式 corpus。新 oracle 以结构化事实和关系表达，例如“字段属于哪一 DTO”“哪些行是定义、哪些是调用”；`answer_contract.required` 单独定义 prompt 必须显式回答的最小内容，`supporting` 只证明正确性或记录更强表达，不得被 auditor 静默升级为必答字段。语言同义表达由 auditor 裁决，避免把 `[start,end)` 误判为不满足 `end-exclusive`。
+历史 runner 的正则 required 与后来的语义混合 required 只解释旧结果，不定义现行正式得分。当前 `answer_contract.required` 仅含题面要求的路径、定位行号和完整实现起止行目标，结构化 oracle 保存其标准答案；`supporting` 与其余 oracle 语义只作主观参考，不参与通过判定。auditor 按随 corpus 冻结的 `scoring` 逐位置计分，不因未复述分支、状态发布、错误码、完整性或静态边界措辞而扣正式分，不另建自动语义评分器。
 
 ## 4. Experiment Identity
 
@@ -70,7 +70,7 @@ python -X utf8 development\source-query-gateway\prepare_benchmark_homes.py --ins
 5. monitor 启动一个无历史 subject，持续读取事件流并保存原始 JSONL、stderr、退出状态和 wall time。超时、事件损坏、进程异常、WebSocket 连接失败、sampling retry 或 HTTP fallback 作为该次真实失败保留并使 experiment postflight 无效；不得用静默重试替换记录。
 6. monitor 从最后一个 `turn.completed.usage` 记录 input、cached input、cache write input（事件提供时）、output、reasoning output，并保存完整工具调用顺序、失败和最终答案。它校验非负整数与子集关系，但不判断质量；缺失 cache write 不得静默按零处理。
 7. 全部 subject 结束后生成 detached audit capsule，只包含冻结 manifest、corpus/oracle、环境差异证明、setup 与 subject 原始文件 hash、规范化记录和答案，不包含凭据、候选讨论或既有结论；capsule 同时声明可独立复算的规范化哈希算法及排除字段。
-8. auditor 先核对缺项、重复、配对、事件/summary 一致性和计量恒等式，再按结构化语义 oracle 逐案裁决质量；oracle 缺陷与答案缺陷分别记录。
+8. auditor 先核对缺项、重复、配对、事件/summary 一致性和计量恒等式，再按冻结的定位合同逐项记录命中、漏/错位置和额外错误位置，机械计算正式得分；其他解释单列为主观参考，oracle 缺陷与答案缺陷分别记录。
 9. 汇总器只纳入身份有效、记录完整的 run，依次比较质量、总 Token 和 wall time；报告 subject-only、setup-only、including-setup、配对差、按 case 分布、失败/回退和适用统计范围，不用总均值掩盖异质性。
 
 ## 6. 计量与裁决
@@ -81,15 +81,15 @@ python -X utf8 development\source-query-gateway\prepare_benchmark_homes.py --ins
 - `turn.completed` 只能提供 subject 聚合用量，不能还原每次模型请求的上下文档位；cache write 字段也可能缺失。报告必须分别给出短/长场景、缓存写入已知时的精确值或未知时的上下界，并标明单位是价格等价量而非真实美元账单。
 - wall time 从 subject 进程启动到退出，包含工具、失败、回退和外部服务等待。
 - 工具调用数、失败调用、MCP 调用、stdout/stderr 大小只解释机制，不替代总 Token。
-- raw oracle、回答合同、核心语义和额外观察分开报告；发布裁决只使用预先确认且不超过 prompt 的 `answer_contract.required`，支持事实未在答案复述不得回写为核心失败。
-- 质量任一适用 case 退化时先修正或判失败；质量同等时才比较 Token，Token 不变差时才比较速度。
+- 正式位置得分与主观参考分开报告；本基准的质量比较只使用预先冻结的 `answer_contract.required` 定位项及额外错误位置，语义和格式参考不影响分数、通过或胜者裁决。运行有效性与部署授权仍独立于答案评分。
+- 定位质量任一适用 case 退化时先修正或判失败；按当前用户确认的实际价格预算比较成本，再比较速度，不用主观参考否决客观位置成绩，也不把位置满分称为全部业务理解正确。
 - 样本不足、环境告警、网络漂移或配对方差较大时降低因果与泛化结论，不临时追加有利样本。
 
 ## 7. 历史基线的复用边界
 
 2026-08-14 两轮真实 Codex 数据和独立审计是本分支的现实依据，聚合值写入 [plan.md](plan.md)。它们证明 skill 固定加载、额外工具回合和失败回退能够抵消局部输出压缩，也证明结构定位在部分任务中确有收益。
 
-旧数据没有完整记录工作区 commit/dirty patch，两个 Codex home 也曾存在非目标差异，因此只能固定为历史观察，不能伪装成新协议下可逐字复现的因果基线。新实验可复用其任务种子和已审计总数；只有新的 experiment identity 与历史记录所需字段能够证明相等时才复用对照 run，否则运行新的受影响对照。
+旧数据没有完整记录工作区 commit/dirty patch，两个 Codex home 也曾存在非目标差异，因此只能固定为历史观察，不能伪装成新协议下可逐字复现的因果基线。新实验可复用其任务种子和已审计总数；只有新的 experiment identity 与历史记录所需字段能够证明相等时才复用对照 run，否则运行新的受影响对照。仅评分合同改变时，可按 corpus 说明对身份可比的双方原答案另行重评分；旧混合分数保持原样且不得直接充当新正式分，不以重评分修复原有环境混杂或补造答案。
 
 完全裸 Codex 的 1,082,040 Token 同时移除了大量非搜索规则、skill 和配置，只保留为理论下界。五-skill 消融才是搜索能力固定成本的主要历史对照。
 
