@@ -17,7 +17,7 @@
 
 ## 当前主机读回
 
-- 已从本地受验证包安装 workflow-cli 0.1.0 到 `C:\Users\gzxt\AppData\Local\Programs\AgentBase\workflow-cli\current`。
+- 已从本地受验证包安装 workflow-cli 0.1.0 到 `<LOCALAPPDATA>\Programs\AgentBase\workflow-cli\current`。
 - Machine Status 读回 `ready=true`、User PATH、受管 PATH 条目数 1；从安装目录直接执行得到 `workctl 0.1.0` 与 `taskctl 0.1.0`。
 - 当前 Codex 宿主进程尚未继承新增 PATH，命令名解析需要完整重启 Codex 桌面宿主；当前任务已使用安装目录直接完成读回。
 

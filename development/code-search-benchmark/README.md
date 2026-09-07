@@ -6,9 +6,9 @@
 
 这些检查只在准备时读取实际来源和磁盘，不生成第二份资产清单、不成为部署前置。失败提示面向实验操作者，仅报告原因和恢复动作；来源仍是选定安装态/冻结态，归属仍由部署生命周期定义。原始结果和必要基线保留；未变环境优先复用，弃用环境在用途确认后按其明确路径清理。不得并发清理用户正在处理的历史目录。
 
-2026-09-04 的[环境清理记录与保留节点](../source-query-gateway/evidence/report-experiment-environment-cleanup-v1.md)登记旧最佳批量版、v25已采纳基线及本轮74/74环境；其他历史报告中的home路径可能已退出，不能因原始结果仍在就假定运行环境仍存在。
+真实题面、标准答案、源码指纹和历史语料版本只保存在操作者本机，不进入 Git。仓库中的 `corpus/schema.json`、校验器、合成测试和说明只定义框架合同；它们不是可运行的真实题库，也不得包含真实题目摘要、答案统计或私密工作区路径。新克隆可以直接运行组件单元测试来验证框架；要准备真实实验，config 必须在 `corpus` 字段显式指向本机 JSON 文件，并为其中选择的每个 `workspace_role` 配置本机工作区。语料缺失时 runner 只报告恢复动作，不联网获取、不生成替代题目。现有本机 `corpus\\*.json` 路径仍可直接配置使用。语料的 schema、评分和恢复合同见[语料说明](corpus/README.md)。
 
-正式语料在 `corpus/`；`v25.json` 是当前候选；继承 `v24` 的纯定位评分、全部标准答案与源码指纹，只把 TypeScript 题面原有的四个计分调用对象明确写出，避免隐藏 required 比模型可见任务更具体。v24 曾把正式评分收敛为路径、定位行号与完整实现起止行，并更新 AgentBase 规则文件快照。每个指定位置为一个计分项，共 37 项；分支、状态发布、错误 code、关系解释、输出长度及完整性/静态边界措辞全部单列为主观参考，不参与正式得分或通过判定。具体匹配、额外错误位置与历史重评分规则由 [语料说明](corpus/README.md) 定义，并随 corpus 的 `scoring` 冻结进 audit capsule。原始 runner 不自动评答案质量，auditor 依此复核；不另建自动语义评分器。旧版本和旧混合分数只服务历史复核，不冒充当前正式得分。新实验的新旧环境使用同一当前 corpus；仅评分变化且题面、来源快照仍适用时，可以对双方已有原答案重新评分而不运行模型。真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
+真实对照先由独立配置生成 experiment，预检环境差异只包含 allowlist 后才运行；candidate-only 迭代同样冻结完整环境和 experiment identity，不能与不同身份拼成精确 A/B：
 
 ```powershell
 python -X utf8 development\code-search-benchmark\experiment.py prepare --config <config.json> --output <new-output-dir>

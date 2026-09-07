@@ -1,6 +1,21 @@
 <Configuration>
   <ViewDefinitions>
     <View>
+      <Name>AgentBase.Deployment.RestoreResult</Name>
+      <ViewSelectedBy><TypeName>AgentBase.Deployment.RestoreResult</TypeName></ViewSelectedBy>
+      <ListControl><ListEntries><ListEntry><ListItems>
+        <ListItem><Label>action</Label><PropertyName>action</PropertyName></ListItem>
+        <ListItem><Label>ready</Label><PropertyName>ready</PropertyName></ListItem>
+        <ListItem><Label>restored</Label><PropertyName>restored</PropertyName></ListItem>
+        <ListItem><Label>changes</Label><PropertyName>change_count</PropertyName></ListItem>
+        <ListItem><ItemSelectionCondition><ScriptBlock>$_.change_count -gt 0</ScriptBlock></ItemSelectionCondition><Label>preview</Label><ScriptBlock>@($_.changes | Select-Object -First 8 | ForEach-Object { $_.action + ':' + $_.path }) -join ', '</ScriptBlock></ListItem>
+        <ListItem><ItemSelectionCondition><ScriptBlock>$_.change_count -gt 8</ScriptBlock></ItemSelectionCondition><Label>more</Label><ScriptBlock>'Inspect the returned .changes collection for all ' + $_.change_count + ' paths'</ScriptBlock></ListItem>
+        <ListItem><ItemSelectionCondition><ScriptBlock>$_.conflicts.Count -gt 0</ScriptBlock></ItemSelectionCondition><Label>conflicts</Label><ScriptBlock>$_.conflicts -join ', '</ScriptBlock></ListItem>
+        <ListItem><ItemSelectionCondition><ScriptBlock>$_.external_actions.Count -gt 0</ScriptBlock></ItemSelectionCondition><Label>external_actions</Label><ScriptBlock>$_.external_actions -join '; '</ScriptBlock></ListItem>
+        <ListItem><ItemSelectionCondition><ScriptBlock>$_.recovery_backup</ScriptBlock></ItemSelectionCondition><Label>recovery_backup</Label><PropertyName>recovery_backup</PropertyName></ListItem>
+      </ListItems></ListEntry></ListEntries></ListControl>
+    </View>
+    <View>
       <Name>AgentBase.Deployment.ValidateResult</Name>
       <ViewSelectedBy>
         <TypeName>AgentBase.Deployment.ValidateResult</TypeName>
@@ -30,6 +45,10 @@
               <ListItem>
                 <Label>deployed</Label>
                 <ScriptBlock>if ($_.managed_payload_formally_deployed) { 'true' } else { 'false' }</ScriptBlock>
+              </ListItem>
+              <ListItem>
+                <ItemSelectionCondition><ScriptBlock>$_.original_recovery_state -ne 'not_available'</ScriptBlock></ItemSelectionCondition>
+                <Label>original_recovery</Label><PropertyName>original_recovery_state</PropertyName>
               </ListItem>
               <ListItem>
                 <ItemSelectionCondition><ScriptBlock>$_.formal_deployment_gap_count -gt 0</ScriptBlock></ItemSelectionCondition>
@@ -76,6 +95,10 @@
               <ListItem>
                 <Label>backup</Label>
                 <PropertyName>backup_path</PropertyName>
+              </ListItem>
+              <ListItem>
+                <ItemSelectionCondition><ScriptBlock>$_.original_recovery_available</ScriptBlock></ItemSelectionCondition>
+                <Label>original_recovery</Label><PropertyName>original_recovery_path</PropertyName>
               </ListItem>
               <ListItem>
                 <ItemSelectionCondition><ScriptBlock>$_.retired_managed_path_removed_count -gt 0</ScriptBlock></ItemSelectionCondition>

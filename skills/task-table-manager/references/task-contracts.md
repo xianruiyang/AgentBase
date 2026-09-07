@@ -105,7 +105,7 @@
 }
 ```
 
-模型不在该文件重复 `schema`、`task_id`、`task_revision`、`source_snapshot` 或 `source_snapshot_ref`。`complete` 从 `--id` 取得任务身份，以 `--expected-task-revision` 绑定工作实际依据的任务合同，以 `--source-snapshot-ref` 接收执行时捕获的来源收据，并与 `--expected-state-revision` 一起在锁内校验。
+模型不在该文件重复 `schema`、`task_id`、`task_revision`、`source_snapshot` 或 `source_snapshot_ref`。`complete` 绑定工作实际依据的任务合同、执行来源和调用方已读状态；模型短收据与机器完整引用的参数区别，以及 CAS 写入方式只由 [执行命令合同](execution-tooling.md#完成写入) 定义。
 
 `results/<ID>.r<state-revision>.json` 是工具规范化生成的一次完成提交，不可覆盖；历史由这些文件名派生，不在状态文件维护第二份列表。永久机器结果保持完整格式：
 
@@ -131,6 +131,6 @@
 
 结果正文由模型裁决，机器 envelope 和来源引用由 `complete` 注入，永久文件按下一状态 revision 写入；生成的 `TASK_TABLE.md`、状态摘要或 completion-context 只提供读取面，不能通过编辑它们改写结果、证据或完成状态。
 
-结果内容由模型根据有效证据填写。`validation_coverage` 只列实际验证的维度值或具有可复核等价依据的已证等价类，不因任务声明了某个维度、参数化覆盖或 pairwise 通过而扩大到未覆盖的高阶交互；`evidence_for` 声明证据所支持的上游 ID，`evidence_refs` 指向可直接查看的证据。执行前的 `context --capture` 在最终模型投影后把实际可见直接来源、传递祖先及相关 DCR 指纹写入 `snapshots/<sha256>.json`；模型只把返回引用作为 `complete --source-snapshot-ref` 参数，永久结果由工具附加 `source_snapshot_ref`。完成时不得重新采样当前版本替代实际输入。显式收据在新写入前必须存在、可读且内容身份与引用一致，否则本次结果与状态都不改变；未提供收据、覆盖不足或逐来源陈旧只形成对应诊断。已经落盘的历史结果后来出现资产缺失、损坏或身份不一致时仍隔离并诊断，不改写历史指针。CLI 不判断验证文案是否真实，也不把结果文件存在视为产品完成。
+结果内容由模型根据有效证据填写。`validation_coverage` 只列实际验证的维度值或具有可复核等价依据的已证等价类，不因任务声明了某个维度、参数化覆盖或 pairwise 通过而扩大到未覆盖的高阶交互；`evidence_for` 声明证据所支持的上游 ID，`evidence_refs` 指向可直接查看的证据。执行前的 `context --capture` 在最终模型投影后捕获实际可见来源，按执行命令合同回传收据，永久结果由工具附加 `source_snapshot_ref`。完成时不得重新采样当前版本替代实际输入。显式收据在新写入前必须存在、可读且内容身份与引用一致，否则本次结果与状态都不改变；未提供收据、覆盖不足或逐来源陈旧只形成对应诊断。已经落盘的历史结果后来出现资产缺失、损坏或身份不一致时仍隔离并诊断，不改写历史指针。CLI 不判断验证文案是否真实，也不把结果文件存在视为产品完成。
 
 后继任务重新执行或验证旧结果覆盖的行为时，提交自己的新结果：`evidence_for` 明确列出本次直接支持的目标或合同 ID，`source_snapshot_ref` 指向本次模型实际读取且覆盖这些 ID 的语义闭包，`verification` 和 `evidence_refs` 指向本次直接复测。旧内联 `source_snapshot` 结果作为真实历史格式继续只读；已发布上一版的完整 `task.result` 输入仍由新写入口校验并规范化，旧式内联输入外部化且永久结果只写引用。该兼容只服务迁移，不定义新模型输入或第二种永久格式。新结果不会回写、抑制或把旧记录标为恢复有效；依赖、任务状态或候选关联本身不声明重新验证。最终复核由模型按目标选择直接适用的当前证据，不由 CLI 合并两个结果的有效性。

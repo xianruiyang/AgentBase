@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import argparse
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT.parents[2]
+
+
+def resolve_artifact_path(path_value: str, artifact_root: Path) -> Path:
+    path = Path(path_value)
+    return path if path.is_absolute() else artifact_root / path
 
 
 def sha256(path: Path) -> str:
@@ -82,12 +88,13 @@ def verify_artifact(
     result: dict,
     path_key: str,
     hash_key: str,
+    artifact_root: Path,
     failures: list[str],
 ) -> dict:
     relative_path = result.get(path_key)
     if relative_path is None:
         return {"declared": False}
-    path = PROJECT_ROOT / relative_path
+    path = resolve_artifact_path(relative_path, artifact_root)
     item = {"declared": True, "path": relative_path, "available": path.is_file()}
     if not path.is_file():
         failures.append(f"{experiment_id}: {path_key} missing")
@@ -100,7 +107,21 @@ def verify_artifact(
 
 
 def main() -> int:
-    index = json.loads((ROOT / "index.json").read_text(encoding="utf-8"))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--index", type=Path, default=ROOT / "index.json")
+    parser.add_argument(
+        "--artifact-root",
+        type=Path,
+        default=PROJECT_ROOT,
+        help="root for relative artifact paths in the index (default: project root)",
+    )
+    args = parser.parse_args()
+    if not args.index.is_file():
+        raise SystemExit(
+            f"history index not found: {args.index}. Restore the local private file or pass --index PATH."
+        )
+    artifact_root = args.artifact_root.resolve()
+    index = json.loads(args.index.read_text(encoding="utf-8"))
     failures: list[str] = []
     report: list[dict] = []
     for experiment in index["experiments"]:
@@ -117,6 +138,7 @@ def main() -> int:
                     result,
                     "audit_artifact",
                     "audit_sha256",
+                    artifact_root,
                     failures,
                 ),
                 "capsule_verification": verify_artifact(
@@ -124,12 +146,13 @@ def main() -> int:
                     result,
                     "capsule_verification_artifact",
                     "capsule_verification_sha256",
+                    artifact_root,
                     failures,
                 ),
             }
             report.append(item)
             continue
-        path = Path(observed_location or observed_summary)
+        path = resolve_artifact_path(observed_location or observed_summary, artifact_root)
         item["available"] = path.is_file()
         if not path.is_file():
             report.append(item)
@@ -148,7 +171,7 @@ def main() -> int:
             for environment in experiment["aggregates"]
         }
         if observed_summary and result.get("audit_artifact"):
-            audit_path = PROJECT_ROOT / result["audit_artifact"]
+            audit_path = resolve_artifact_path(result["audit_artifact"], artifact_root)
             if audit_path.is_file():
                 audit = json.loads(audit_path.read_text(encoding="utf-8"))
                 for environment in experiment["aggregates"]:
@@ -169,6 +192,7 @@ def main() -> int:
                 result,
                 "audit_artifact",
                 "audit_sha256",
+                artifact_root,
                 failures,
             )
         }

@@ -1,0 +1,87 @@
+{
+  "$schema": "../../corpus/schema.json",
+  "schema": "agentbase.windows-swe-corpus/v4",
+  "id": "synthetic-windows-swe",
+  "source": {
+    "name": "Synthetic SWE fixture",
+    "version": "1",
+    "repository": "https://example.invalid/synthetic-corpus.git",
+    "commit": "1111111111111111111111111111111111111111",
+    "task_root": "cases"
+  },
+  "adapter": {
+    "name": "synthetic-windows-adapter",
+    "version": "1",
+    "platform": "windows",
+    "workspace_contract": "candidate-patch-verifier",
+    "qualification_repetitions": 2,
+    "upstream_grader_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "codex": {
+    "auth_mode": "existing-codex-auth-json",
+    "transport_overlay": "codex-eval-overlay.toml"
+  },
+  "profiles": {
+    "test": { "model": "gpt-test", "reasoning_effort": "low" }
+  },
+  "suites": {
+    "smoke": ["synthetic-python-case"],
+    "core": ["synthetic-python-case"],
+    "rotation": [],
+    "all": ["synthetic-python-case"]
+  },
+  "tasks": [
+    {
+      "id": "synthetic-python-case",
+      "title": "Synthetic Python contract fixture",
+      "difficulty": "easy",
+      "difficulty_evidence": {
+        "kind": "deepswe-v1-successful-rollouts",
+        "successful_rollouts": 1,
+        "total_rollouts": 2,
+        "source": "https://example.invalid/synthetic-python-case"
+      },
+      "language": "python",
+      "repository": "https://example.invalid/synthetic-repository.git",
+      "upstream_base_commit": "2222222222222222222222222222222222222222",
+      "capabilities": ["editing", "testing"],
+      "allowed_patch_paths": ["src/value.py"],
+      "assets": {
+        "instruction.md": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "task.toml": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "solution/solution.patch": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "tests/test.patch": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "tests/config.json": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "tests/grader.py": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "toolchain": { "kind": "python", "minimum_version": "3.11" },
+      "setup": [
+        { "argv": ["{python}", "-m", "pip", "--version"], "timeout_seconds": 30 }
+      ],
+      "setup_cleanup": { "restore_tracked": [], "remove_untracked": [] },
+      "checks": [
+        {
+          "id": "base",
+          "bucket": "base",
+          "argv": ["{python}", "-m", "pytest", "tests/base.py", "--junitxml={report}"],
+          "timeout_seconds": 30,
+          "report": { "kind": "junit", "path": ".agentbase/reports/base.xml" }
+        },
+        {
+          "id": "new",
+          "bucket": "new",
+          "argv": ["{python}", "-m", "pytest", "tests/new.py", "--junitxml={report}"],
+          "timeout_seconds": 30,
+          "report": { "kind": "junit", "path": ".agentbase/reports/new.xml" }
+        }
+      ]
+    }
+  ],
+  "assessment": {
+    "correctness_owner": "synthetic grader",
+    "reward_range": [0, 1],
+    "dimensions": ["correctness"],
+    "composite_score": null,
+    "leaderboard_comparable": false
+  }
+}

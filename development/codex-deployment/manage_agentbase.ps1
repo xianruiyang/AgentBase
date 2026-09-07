@@ -1,11 +1,14 @@
 param(
-    [ValidateSet("Validate", "Status", "Deploy", "Rollback")]
+    [ValidateSet("Validate", "Status", "Deploy", "Rollback", "PreviewRestore", "RestoreOriginal")]
     [string]$Action = "Validate",
     [string]$ProjectRoot,
     [string]$CodexRoot,
     [string]$BackupPath,
     [switch]$AllowInstalledDrift,
     [switch]$InstallPortableSettings,
+    [ValidateSet('Auto', 'Skip')]
+    [string]$OriginalStatePolicy = 'Auto',
+    [switch]$PluginDisabled,
     [ValidateSet("DirectCompatibility", "Plugin")]
     [string]$SkillDeliveryMode = "DirectCompatibility"
 )
@@ -23,6 +26,8 @@ $managedAssetLifecycleScriptPath = Join-Path $PSScriptRoot "managed_asset_lifecy
 . $managedAssetLifecycleScriptPath
 $portableAgentContractPath = Join-Path $PSScriptRoot "portable_agents.ps1"
 . $portableAgentContractPath
+. (Join-Path $PSScriptRoot 'original_config.ps1')
+. (Join-Path $PSScriptRoot 'original_state.ps1')
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -32,11 +37,17 @@ $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 if ($InstallPortableSettings -and @("Deploy", "Status") -notcontains $Action) {
     throw "InstallPortableSettings is valid only with Action Deploy or Status"
 }
+if ($PSBoundParameters.ContainsKey('OriginalStatePolicy') -and $Action -ne 'Deploy') {
+    throw 'OriginalStatePolicy is valid only with Action Deploy'
+}
+if ($PluginDisabled -and $Action -notin @('PreviewRestore', 'RestoreOriginal')) {
+    throw 'PluginDisabled is valid only for original configuration recovery'
+}
 
 function Set-AgentBaseResultType {
     param(
         [psobject]$Result,
-        [ValidateSet("Validate", "Status", "Deploy", "Rollback")]
+        [ValidateSet("Validate", "Status", "Deploy", "Rollback", "Restore")]
         [string]$Kind
     )
 
@@ -1025,7 +1036,23 @@ if ($Action -eq "Validate") {
 
 $CodexRoot = Resolve-CodexRoot -RequestedRoot $CodexRoot -Create ($Action -eq "Deploy")
 
+$mutationLock = $null
+if ($Action -in @('Deploy', 'Rollback', 'RestoreOriginal')) {
+    $mutationLock = Enter-AgentBaseMutationLock -Root $CodexRoot
+}
+try {
+if ($Action -in @('PreviewRestore', 'RestoreOriginal')) {
+    $restoreResult = Invoke-OriginalRestore -Root $CodexRoot -Preview:($Action -eq 'PreviewRestore') -PluginDisabled:$PluginDisabled
+    Set-AgentBaseResultType -Result $restoreResult -Kind Restore
+    return
+}
+
 if ($Action -eq "Status") {
+    $originalRecoveryState = 'not_available'
+    try {
+        $originalRecovery = Read-OriginalState -Root $CodexRoot
+        if ($null -ne $originalRecovery) { $originalRecoveryState = [string]$originalRecovery.state }
+    } catch { $originalRecoveryState = 'damaged' }
     $deployRecord = Get-LatestDeploymentManifest -InstallRoot $CodexRoot -DeliveryMode $SkillDeliveryMode -PortableSettingsInstalled ([bool]$InstallPortableSettings)
     $manifest = if ($null -eq $deployRecord) { $null } else { $deployRecord.document }
     $lifecycleDeployRecord = Get-LatestDeploymentManifest -InstallRoot $CodexRoot -IgnoreDeploymentScope -MinimumSchemaVersion 7
@@ -1103,6 +1130,7 @@ if ($Action -eq "Status") {
         retired_managed_config_key_conflict_count = $retiredConfigModified.Count + $retiredConfigUnverifiable.Count
         retired_managed_config_key_conflicts = @($retiredConfigDiagnostics | Where-Object { [string]$_.status -ne 'removable' } | ForEach-Object { "$($_.id):$($_.status)" })
         managed_payload_formally_deployed = $installedMatchesSource -and $manifestMatchesSource -and $manifestMatchesInstalled -and $manifestLifecycleMatches -and $retiredManagedTargets.Count -eq 0 -and $retiredConfigDiagnostics.Count -eq 0 -and $pluginModeReady
+        original_recovery_state = $originalRecoveryState
         formal_deployment_gap_count = $deploymentGaps.Count
         formal_deployment_gaps = @($deploymentGaps)
         plugin_installation_in_scope = $SkillDeliveryMode -eq "Plugin"
@@ -1165,6 +1193,7 @@ if ($Action -eq "Deploy") {
     $retiredManagedTargets = @(Get-RetiredManagedChangeTargets -Targets $source.retired_path_targets)
     $retiredConfigRemoved = @($source.retired_config_diagnostics | Where-Object { [string]$_.status -eq 'removable' })
     $changeTargets = @((@($currentChangeTargets) + @($retiredManagedTargets)) | Sort-Object relative_path)
+    $originalState = Start-OriginalStateCapture -Root $CodexRoot -Changes $changeTargets -Source $source -Policy $OriginalStatePolicy
     $stageRoot = Join-Path $CodexRoot (".agentbase-stage-" + [guid]::NewGuid().ToString("N"))
     Assert-ChildPath -Root $CodexRoot -Path $stageRoot -Label "Stage path"
     New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
@@ -1277,6 +1306,7 @@ if ($Action -eq "Deploy") {
         }
         $manifest.installed_bundle_sha256 = Get-FullInstalledBundleFingerprint -Targets $changeTargets
         $manifest.installed_contract_bundle_sha256 = $installedContractFingerprint
+        Complete-OriginalStateCapture -Root $CodexRoot -State $originalState -Source $source -Changes $changeTargets
         $manifest.state = "deployed"
         Set-ObjectProperty -Object $manifest -Name "deployed_at_utc" -Value ([DateTime]::UtcNow.ToString("o"))
         Write-JsonFile -Path $manifestPath -Value $manifest
@@ -1331,6 +1361,8 @@ if ($Action -eq "Deploy") {
         portable_settings_installed = [bool]$InstallPortableSettings
         portable_agent_count = if ($InstallPortableSettings) { @($source.portable_agent_names).Count } else { 0 }
         changed_path_count = $changeTargets.Count
+        original_recovery_available = $null -ne $originalState
+        original_recovery_path = if ($null -ne $originalState) { Get-OriginalStateRoot $CodexRoot } else { $null }
         managed_contract_count = @($source.targets).Count
         managed_asset_lifecycle_sha256 = $source.managed_asset_lifecycle.sha256
         managed_asset_unit_count = @($source.managed_asset_lifecycle.units).Count
@@ -1495,3 +1527,6 @@ $result = [pscustomobject]@{
     mcp_changed = $false
 }
 Set-AgentBaseResultType -Result $result -Kind Rollback
+} finally {
+    if ($null -ne $mutationLock) { $mutationLock.Dispose() }
+}

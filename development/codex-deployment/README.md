@@ -178,6 +178,81 @@ Plugin installation, accounts, and connector authentication are host-managed sta
 
 `vscode-lsp-mcp` also keeps its own release lifecycle. Build and install it through `mcp/vscode-lsp-mcp/docs/installation.md`, register its managed launcher as described in `mcp/vscode-lsp-mcp/docs/configuration.md`, and restart Codex. Unrelated or optional current MCP entries such as Blender, disabled Notion/Figma endpoints, and app-managed `node_repl` are not part of the AgentBase portable payload.
 
+## Original configuration recovery
+
+New installations automatically capture `backups/AgentBase-original` before the
+first changed managed file is written. `-OriginalStatePolicy Auto` is the default;
+any existing deployment receipt keeps legacy installations on ordinary Rollback
+without manufacturing a pre-installation snapshot. `-OriginalStatePolicy Skip`
+is an explicit first-installation opt-out, not permission to stop maintaining an
+existing original recovery point. No username, machine path or developer-host
+identity is hardcoded. Failed first deployments keep their captured original data
+for safe retry.
+
+`original_state.ps1` is the deployment owner's local original-data ledger. Its
+`agentbase.original-state/v1` manifest owns first-change file existence/content,
+original managed TOML assignments and known deployed values; later deployments
+add newly touched objects but never replace their original contents. Files under
+`payload/` are verified local originals, not editable project sources. They may
+contain personal configuration and must remain local, outside Git and release
+assets. Original snapshots and ordinary per-deployment rollback receipts have
+different lifetimes; ordinary backup cleanup must never remove the original
+recovery point. Recovery copies originals, preserving them for repeated use.
+
+Close Codex before restoring. Preview returns one complete object with `changes`,
+`conflicts` and `external_actions`; direct formatting shows counts and the first
+eight paths, and explicitly points to `.changes` when more paths exist. No config
+values or backup contents are included in the model-facing preview. Status adds
+`original_recovery_state` (`active`, `restored`, `damaged`, or `not_available`).
+
+```powershell
+$preview = & '.\development\codex-deployment\manage_agentbase.ps1' -Action PreviewRestore -CodexRoot (Join-Path $env:USERPROFILE '.codex')
+$preview.changes
+$preview.conflicts
+& '.\development\codex-deployment\manage_agentbase.ps1' -Action RestoreOriginal -CodexRoot (Join-Path $env:USERPROFILE '.codex')
+```
+
+`RestoreOriginal` recomputes its preview under the deployment write lock, verifies
+original payloads and current fingerprints, and refuses all writes if any conflict
+exists. TOML restoration changes only captured managed keys; later personal keys,
+tables and comments survive. Unsupported multiline managed values are rejected
+before capture or restoration rather than partially edited. Plain files such as
+AGENTS, hooks, agents and skills are restored only when unchanged from an observed
+deployment (or already original). Newly created files are removed; unrelated
+files and runtime artifacts survive. Empty directories may remain. A restore
+transaction retains the replaced current files under the original recovery root
+and restores already-applied entries on a caught write or verification failure.
+Keep the original root and returned recovery backup until recovery is confirmed.
+
+When Plugin delivery has been used, the preview requires disabling/uninstalling
+`agentbase-core` through the official plugin entry. Only after completing that
+step pass `-PluginDisabled` to preview/restore; the flag acknowledges that action,
+it does not perform it. The restore contract covers AgentBase-managed Codex
+configuration, not plugin installation history, authentication, prerequisite
+software, PATH or an entire host reset. No installed CLI or model is invoked by
+the recovery path. Legacy Rollback and its drift protection remain unchanged.
+
+The release preparation entry below assembles only recovery code and instructions
+into a separate directory; it never copies an installed Codex home or any user's
+backup. Include this directory alongside the release, not inside the plugin.
+Building release assets still requires the corresponding Release authorization.
+
+```powershell
+& '.\development\codex-deployment\build_recovery_bundle.ps1' -OutputDirectory '<new-release-recovery-directory>'
+```
+
+The resulting `restore.ps1` defaults to preview, accepts an explicit `-CodexRoot`,
+and can run from PowerShell 7 without the source checkout, Codex login, Python or
+the host CLIs. It consumes the original data still present at the selected Codex
+root. `-Action Rollback -BackupPath '<exact-backup>'` supports legacy receipts.
+Its bundled implementation is the same deployment owner, not a second restore
+implementation. The isolated synthetic checks are:
+
+```powershell
+& '.\development\codex-deployment\test_original_config.ps1'
+& '.\development\codex-deployment\test_original_state.ps1'
+```
+
 ## Roll back
 
 Use the exact backup path returned by Deploy:

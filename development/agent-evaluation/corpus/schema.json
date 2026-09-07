@@ -8,18 +8,15 @@
   "properties": {
     "$schema": { "type": "string", "minLength": 1 },
     "schema": { "const": "agentbase.windows-swe-corpus/v4" },
-    "id": { "const": "agentbase-windows-swe-v1" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
     "source": { "$ref": "#/$defs/source" },
     "adapter": { "$ref": "#/$defs/adapter" },
     "codex": { "$ref": "#/$defs/codex" },
     "profiles": {
       "type": "object",
-      "required": ["sol", "luna"],
-      "additionalProperties": false,
-      "properties": {
-        "sol": { "$ref": "#/$defs/profile" },
-        "luna": { "$ref": "#/$defs/profile" }
-      }
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]+$" },
+      "additionalProperties": { "$ref": "#/$defs/profile" }
     },
     "suites": {
       "type": "object",
@@ -34,8 +31,7 @@
     },
     "tasks": {
       "type": "array",
-      "minItems": 9,
-      "maxItems": 9,
+      "minItems": 1,
       "items": { "$ref": "#/$defs/task" }
     },
     "assessment": { "$ref": "#/$defs/assessment" }
@@ -48,11 +44,15 @@
       "additionalProperties": false,
       "required": ["name", "version", "repository", "commit", "task_root"],
       "properties": {
-        "name": { "const": "DeepSWE" },
-        "version": { "const": "v1.1" },
-        "repository": { "const": "https://github.com/datacurve-ai/deep-swe.git" },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "repository": { "type": "string", "format": "uri", "pattern": "^https://" },
         "commit": { "$ref": "#/$defs/gitSha" },
-        "task_root": { "const": "tasks" }
+        "task_root": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+        }
       }
     },
     "adapter": {
@@ -60,7 +60,7 @@
       "additionalProperties": false,
       "required": ["name", "version", "platform", "workspace_contract", "qualification_repetitions", "upstream_grader_sha256"],
       "properties": {
-        "name": { "const": "agentbase-windows-swe" },
+        "name": { "type": "string", "minLength": 1 },
         "version": { "type": "string", "minLength": 1 },
         "platform": { "const": "windows" },
         "workspace_contract": { "const": "candidate-patch-verifier" },
@@ -176,7 +176,7 @@
       "properties": {
         "kind": { "const": "deepswe-v1-successful-rollouts" },
         "successful_rollouts": { "type": "integer", "minimum": 0 },
-        "total_rollouts": { "const": 116 },
+        "total_rollouts": { "type": "integer", "minimum": 1 },
         "source": { "type": "string", "format": "uri" }
       }
     },

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI owner for the AgentBase Windows SWE final evaluation set."""
+"""CLI owner for the AgentBase Windows SWE evaluation framework."""
 
 from __future__ import annotations
 
@@ -109,6 +109,11 @@ def resolve_context(
         state_root,
         work_root,
     )
+    if not corpus_path.is_file():
+        raise PreconditionError(
+            f"local evaluation corpus is missing: {corpus_path}. "
+            "Restore the private corpus at the default path or pass --corpus <local-json>."
+        )
     corpus = load_corpus(corpus_path)
     verify_windows_adapter_assets(project_root, corpus)
     return project_root, corpus_path, state_root, work_root, corpus
@@ -240,7 +245,7 @@ def command_validate(args: argparse.Namespace) -> int:
         result,
         view=args.view,
         human=(
-            f"VALID {corpus['id']}: 9 Windows-native tasks; "
+            f"VALID {corpus['id']}: {len(corpus['tasks'])} Windows-native task(s); "
             "no source clone, dependency install, model call, or verifier run was performed."
         ),
     )

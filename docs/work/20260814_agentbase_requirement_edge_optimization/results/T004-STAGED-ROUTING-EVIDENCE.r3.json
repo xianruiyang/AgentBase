@@ -32,7 +32,7 @@
     {
       "kind": "publication-readback",
       "note": "formal publication status matched source, installed payload, manifest and the merged two-stage routing evidence",
-      "ref": "C:/Users/gzxt/.codex/backups/AgentBase-20260814-034817-727c59fb/manifest.json"
+      "ref": "<CODEX_ROOT>/backups/AgentBase-20260814-034817-727c59fb/manifest.json"
     }
   ],
   "invalidated_source_ids": [],

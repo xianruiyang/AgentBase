@@ -99,7 +99,7 @@
 
 验证中每次模型失败都先区分规则/引用边界、oracle 与恢复基础设施，再改变对应输入或 oracle；没有对未变输入原样重采样。最后一份 References 输出只包含一个合理的可选引用差异，移除不成立的严格排他后由同一文件、capsule、evaluator 和失败收据以 0 Token 复核；最终刷新为 evaluator run 0、recovered 2、oracle revalidated 1。
 
-用户随后针对本次操作明确授权发布。`DirectCompatibility + InstallPortableSettings` Publish 再次运行 67 项基础设施测试并通过，写入 20 个受管资产，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-150728-c301230b`；同范围只读 Status 返回 `published:true`。这些证据证明仓库候选和真实安装一致，不证明当前已启动任务追溯加载新规则；子代理选择、局部快速路径、状态写回和 preflight 的真实模型行为仍须在新任务中观察。
+用户随后针对本次操作明确授权发布。`DirectCompatibility + InstallPortableSettings` Publish 再次运行 67 项基础设施测试并通过，写入 20 个受管资产，回滚备份为 `<CODEX_ROOT>\backups\AgentBase-20260823-150728-c301230b`；同范围只读 Status 返回 `published:true`。这些证据证明仓库候选和真实安装一致，不证明当前已启动任务追溯加载新规则；子代理选择、局部快速路径、状态写回和 preflight 的真实模型行为仍须在新任务中观察。
 
 ## 2026-08-23 第四版发布前验证
 
@@ -122,7 +122,7 @@
 
 最终刷新只运行 References 一次，Routing 与 Policy 通过不可变上一代收据各 carry-forward 一次；刷新后计划为 0 evaluate、3 reuse、0 blocked/pending。形成候选期间的 Policy 反例使小而廉价闭集明确退出 coverage-basis 治理，并删除不改变动作的冗余严格标签；References 反例则区分依赖合同与 authoring 工具、组合决策与失败成本引用。每次重新评估前都改变了相应模型可见定义或引用入口；没有对未变输入原样重采样。
 
-实现提交 `ce5de0f` 的独立临时 worktree 运行 46 项基线基础设施检查并返回 `valid:true`，排除了接手时已有 dirty 评测候选；当前组合工作树的 67 项检查也通过，只补充证明两者兼容。用户针对本次操作明确授权后，`DirectCompatibility + InstallPortableSettings` Publish 再次运行 67 项检查并通过，更新 7 个受管对象，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260823-190448-db62872f`；同范围只读 Status 返回 `published:true`。这些证据证明仓库候选与真实安装一致，不证明当前已启动任务追溯加载第四版，也不替代新任务中对实际纵向执行和组合覆盖行为的观察。
+实现提交 `ce5de0f` 的独立临时 worktree 运行 46 项基线基础设施检查并返回 `valid:true`，排除了接手时已有 dirty 评测候选；当前组合工作树的 67 项检查也通过，只补充证明两者兼容。用户针对本次操作明确授权后，`DirectCompatibility + InstallPortableSettings` Publish 再次运行 67 项检查并通过，更新 7 个受管对象，回滚备份为 `<CODEX_ROOT>\backups\AgentBase-20260823-190448-db62872f`；同范围只读 Status 返回 `published:true`。这些证据证明仓库候选与真实安装一致，不证明当前已启动任务追溯加载第四版，也不替代新任务中对实际纵向执行和组合覆盖行为的观察。
 
 ## 2026-09-03 第五版候选静态验证
 
@@ -139,7 +139,7 @@ detached 路由刷新首次取得两个失败阶段：新活动切片场景把�
 正式部署证据：
 
 - `manage_agentbase.ps1 -Action Validate` 返回 `valid:true`。
-- 用户针对本次操作明确授权后，`DirectCompatibility + InstallPortableSettings` Deploy 更新 6 个受管对象；回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260903-165708-41b81ce9`。
+- 用户针对本次操作明确授权后，`DirectCompatibility + InstallPortableSettings` Deploy 更新 6 个受管对象；回滚备份为 `<CODEX_ROOT>\backups\AgentBase-20260903-165708-41b81ce9`。
 - 同范围 Status 返回 `deployed:true`。
 
 这些证据证明第五版仓库真源、路由证据、部署 payload 与真实安装一致，没有创建版本、标签或发行资产。当前已启动任务不会追溯加载新规则；第五版能否在复杂 UE 新任务中阻止静默切换消费者和未闭合分支堆积，仍须在新任务中取得实际行为证据。

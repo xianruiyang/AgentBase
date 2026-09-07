@@ -24,7 +24,7 @@
     {
       "kind": "publication-readback",
       "note": "formal publication status matched source, installed payload and routing evidence",
-      "ref": "C:/Users/gzxt/.codex/backups/AgentBase-20260814-031816-fe51efc5/manifest.json"
+      "ref": "<CODEX_ROOT>/backups/AgentBase-20260814-031816-fe51efc5/manifest.json"
     }
   ],
   "invalidated_source_ids": [],

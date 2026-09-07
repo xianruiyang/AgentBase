@@ -186,7 +186,7 @@ def candidate_capability_contract(
             "task_dependency_identity_recorded": True,
         },
         "mechanical_boundaries": [
-            "fixed corpus and prepared source identity",
+            "selected corpus and prepared source identity",
             "separate candidate and verifier workspaces",
             "patch path, file-count, size, and mode validation",
             "attempt and receipt identity with compare-and-swap updates",

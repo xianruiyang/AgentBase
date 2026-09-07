@@ -36,7 +36,7 @@
     {
       "kind": "publication-readback",
       "note": "formal publication status matched project source, installed payload, manifest and three-stage evidence with zero publication gaps",
-      "ref": "C:/Users/gzxt/.codex/backups/AgentBase-20260814-043551-8b50d428/manifest.json"
+      "ref": "<CODEX_ROOT>/backups/AgentBase-20260814-043551-8b50d428/manifest.json"
     }
   ],
   "invalidated_source_ids": [],

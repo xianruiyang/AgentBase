@@ -34,5 +34,5 @@
 ## 未验证与非目标
 
 - 未执行 custom agent 的真实宿主路由、质量或成本比较，因此没有改变 `global/config.toml` 的 Luna/max 默认值。
-- 2026-08-18 已在用户针对当次操作明确同意后，以 `DirectCompatibility + InstallPortableSettings` 运行正式 `Publish`；入口报告 `published:true`、18 个受管理项改变，回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260818-180544-7f1850ae`，随后同范围 `Status` 再次读回 `published:true`。当前 Codex 运行不会追溯加载本轮候选，行为仍需在新任务或重启后使用。
+- 2026-08-18 已在用户针对当次操作明确同意后，以 `DirectCompatibility + InstallPortableSettings` 运行正式 `Publish`；入口报告 `published:true`、18 个受管理项改变，回滚备份为 `<CODEX_ROOT>\backups\AgentBase-20260818-180544-7f1850ae`，随后同范围 `Status` 再次读回 `published:true`。当前 Codex 运行不会追溯加载本轮候选，行为仍需在新任务或重启后使用。
 - 安装和 srcq 新版本继续按用户要求延后；本轮没有构建、安装或迁移 srcq。

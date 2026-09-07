@@ -17,7 +17,7 @@
 ## 部署结果
 
 - 干净提交 `6e61f0d` 的部署 Validate 通过；46 项 Windows SWE 基础设施检查通过，模型 evaluator 禁用。
-- `DirectCompatibility + InstallPortableSettings` Publish 通过并更新 11 个受管对象；回滚备份为 `C:\Users\gzxt\.codex\backups\AgentBase-20260826-120848-8faaed23`。
+- `DirectCompatibility + InstallPortableSettings` Publish 通过并更新 11 个受管对象；回滚备份为 `<CODEX_ROOT>\backups\AgentBase-20260826-120848-8faaed23`。
 - 同范围发布后 Status 返回 `published:true`，源码、安装、manifest、routing evidence 与 lifecycle 没有剩余 gap。
 
 规则文件和路由 evidence 只能证明候选结构与选择合同，不证明新任务中的真实模型行为；后者出现反例时按完成审计中的重开条件处理。

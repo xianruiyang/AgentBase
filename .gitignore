@@ -46,6 +46,31 @@ tools/srcq/fuzz/artifacts/
 development/skill-routing/evidence/pending/
 development/skill-routing/evidence/*.lock
 
+# Real evaluation data stays on this host; only frameworks and synthetic fixtures are shared.
+development/agent-evaluation/corpus/*.json
+!development/agent-evaluation/corpus/schema.json
+development/agent-evaluation/windows-adapters/*.patch
+development/code-search-benchmark/corpus/*.json
+!development/code-search-benchmark/corpus/schema.json
+development/skill-routing/evidence/*.json
+development/source-query-gateway/benchmark-corpus-seed.json
+development/source-query-gateway/routing-cases.json
+development/source-query-gateway/evidence/
+development/source-query-gateway/history/index.json
+development/source-query-gateway/results/
+development/source-query-gateway/state/
+development/source-query-gateway/tasks/
+development/source-query-gateway/task-table.json
+development/source-query-gateway/workflow.json
+development/source-query-gateway/protected-baseline.json
+development/source-query-gateway/*.md
+!development/source-query-gateway/README.md
+development/code-search-workflow-improvement-plan.md
+docs/work/20260819_source_metrics_and_benchmark_tooling/
+docs/work/20260820_agentbase_final_evaluation_set/
+docs/work/20260820_independent_codex_evaluation_runtime/
+docs/work/20260820_srcq_model_pagination_action/
+
 # Deployment simulations
 development/codex-deployment/sandbox/
 

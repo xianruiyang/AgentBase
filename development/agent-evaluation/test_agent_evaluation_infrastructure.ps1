@@ -11,6 +11,7 @@ $resolvedProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot -ErrorAction Stop
 $evaluationRoot = Join-Path $resolvedProjectRoot 'development\agent-evaluation'
 $entryPoint = Join-Path $evaluationRoot 'agent_eval.py'
 $testRoot = Join-Path $evaluationRoot 'tests'
+$fixtureCorpus = Join-Path $testRoot 'fixtures\synthetic-corpus.json'
 $python = (Get-Command python.exe -ErrorAction Stop).Source
 $syntaxErrors = @()
 foreach ($scriptName in @(
@@ -49,7 +50,7 @@ try {
     Set-Item -LiteralPath $agentFlagPath -Value '1'
     Set-Item -LiteralPath $routingFlagPath -Value '1'
 
-    & $python -X utf8 $entryPoint validate --project-root $resolvedProjectRoot --view machine | Out-Null
+    & $python -X utf8 $entryPoint validate --project-root $resolvedProjectRoot --corpus $fixtureCorpus --view machine | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "Agent evaluation corpus validation failed with exit code $LASTEXITCODE."
     }

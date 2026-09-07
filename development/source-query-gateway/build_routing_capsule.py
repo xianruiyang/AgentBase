@@ -14,9 +14,19 @@ def canonical_sha(value: object) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def load_cases(path: Path) -> list[dict]:
+    if not path.is_file():
+        raise SystemExit(
+            f"routing cases not found: {path}. Restore the local private file or pass --cases PATH."
+        )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return payload["cases"]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--cases", type=Path, default=ROOT / "routing-cases.json")
     args = parser.parse_args()
     skill = ROOT / "candidate-skill" / "source-query"
     skill_text = (skill / "SKILL.md").read_text(encoding="utf-8")
@@ -34,7 +44,7 @@ def main() -> int:
             "references/ast.md": (skill / "references" / "ast.md").read_text(encoding="utf-8"),
         },
     }
-    cases = json.loads((ROOT / "routing-cases.json").read_text(encoding="utf-8"))["cases"]
+    cases = load_cases(args.cases)
     payload = {
         "schema": "agentbase.source-query-routing-capsule/v1",
         "isolation": "detached-capsule",

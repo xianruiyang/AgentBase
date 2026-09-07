@@ -1,4 +1,4 @@
 interface:
   display_name: "Reasoning Governor"
-  short_description: "只为可预期长期阶段读回或切换 next-turn 推理档位"
-  default_prompt: "使用 $reasoning-governor 处理当前线程的 next-turn 档位；用户明确要求时按其范围执行，否则只消费调用前已确认的长期阶段目标，在配置证据会改变动作且收益能摊销转换时读回或设置，孤立难题和短机械收尾沿用当前档位。"
+  short_description: "仅按用户明确要求读取或设置当前线程的 next-turn 推理档位"
+  default_prompt: "使用 $reasoning-governor 处理用户当次明确要求的推理深度操作并读回结果；未明确要求时不查询、选择、改变或恢复档位。"

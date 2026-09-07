@@ -153,6 +153,10 @@ def main() -> int:
         help="validate only this case; repeat to validate a subset",
     )
     args = parser.parse_args()
+    if not args.corpus.is_file():
+        parser.error(
+            f"local corpus is missing: {args.corpus}; restore it on this host or select another local corpus file"
+        )
     try:
         workspaces = parse_workspaces(args.workspace)
         for role, root in (("agentbase", args.agentbase), ("large-cpp", args.large_cpp)):

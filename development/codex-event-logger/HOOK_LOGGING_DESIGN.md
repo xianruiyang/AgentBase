@@ -113,7 +113,7 @@ file-operations.jsonl
 {
   "session_id": "...",
   "turn_id": "...",
-  "cwd": "D:\\program\\RealSimpleChat",
+  "cwd": "C:\\workspace\\example-project",
   "model": "...",
   "permission_mode": "...",
   "transcript_path": "...",
@@ -133,7 +133,7 @@ file-operations.jsonl
 {
   "session_id": "...",
   "turn_id": "...",
-  "cwd": "D:\\program\\RealSimpleChat",
+  "cwd": "C:\\workspace\\example-project",
   "model": "...",
   "permission_mode": "...",
   "transcript_path": "...",
@@ -157,7 +157,7 @@ file-operations.jsonl
   "ts": "2026-07-04T01:20:30+08:00",
   "source": "apply_patch",
   "operation": "modify",
-  "path": "D:\\program\\RealSimpleChat\\src\\a.py",
+  "path": "C:\\workspace\\example-project\\src\\a.py",
   "line_ranges": {
     "added": [
       {
@@ -182,8 +182,8 @@ file-operations.jsonl
   "ts": "2026-07-04T01:20:30+08:00",
   "source": "apply_patch",
   "operation": "move",
-  "path": "D:\\program\\RealSimpleChat\\src\\new.py",
-  "old_path": "D:\\program\\RealSimpleChat\\src\\old.py"
+  "path": "C:\\workspace\\example-project\\src\\new.py",
+  "old_path": "C:\\workspace\\example-project\\src\\old.py"
 }
 ```
 
@@ -261,7 +261,7 @@ YYYYMMDD_HHMMSS_mmm
 {
   "session_id": "...",
   "turn_id": "...",
-  "cwd": "D:\\program\\RealSimpleChat",
+  "cwd": "C:\\workspace\\example-project",
   "model": "...",
   "permission_mode": "...",
   "turn_source": "user_prompt | auto_or_goal_turn | unknown",
@@ -462,8 +462,8 @@ skill 默认配置 -> 项目级覆盖配置
   "enabled": true,
   "mode": "allowlist",
   "workspace_roots": [
-    "D:\\program\\RealSimpleChat",
-    "D:\\program\\UE\\GptProjectTest"
+    "C:\\workspace\\example-project",
+    "C:\\workspace\\another-example-project"
   ],
   "events": [
     "UserPromptSubmit",

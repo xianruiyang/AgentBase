@@ -1171,7 +1171,17 @@ def build_experiment(config_path: Path, output: Path) -> dict[str, Any]:
     runtime_environment, runtime_environment_values = resolve_runtime_environment(
         config.get("runtime_environment")
     )
-    corpus_path = Path(config["corpus"]).resolve()
+    raw_corpus_path = config.get("corpus")
+    if not isinstance(raw_corpus_path, str) or not raw_corpus_path.strip():
+        raise ExperimentError(
+            "benchmark config must set corpus to an existing local corpus JSON file; "
+            "restore the private corpus on this host or select another locally maintained corpus"
+        )
+    corpus_path = Path(raw_corpus_path).resolve()
+    if not corpus_path.is_file():
+        raise ExperimentError(
+            f"local corpus is missing: {corpus_path}; restore it on this host and keep the config corpus path explicit"
+        )
     corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
     corpus_sha256 = sha256_file(corpus_path)
     runner_sha256 = sha256_file(Path(__file__))

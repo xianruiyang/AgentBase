@@ -28,7 +28,7 @@ completion-context                           completion-tooling.md
 - `--view model` 是默认值，面向直接进入 Codex 上下文的结果；使用分行的紧凑 HJSON 风格文本，只保留缺失后会改变当前判断、动作、验证或恢复的字段。该视图服务模型阅读，不承诺机器解析。
 - `--view machine` 面向程序、测试和完整字段检查，保持稳定紧凑 JSON；需要缩进 JSON 时同时使用 `--pretty`，`--pretty` 不适用于 model 视图。
 - 两种视图消费同一个命令 handler 的权威结果；renderer 不重新计算任务状态、诊断、候选关系、分页或证据时效。model 与 machine stdout/stderr 均固定为 UTF-8。
-- 跨进程恢复所需的完整内容身份只保留在 machine 视图和 taskctl 自有索引；model 视图返回 `source-T<ID>-<序号>` 持久来源收据或 `review-<序号>` 有界复核收据。模型只原样回传短收据，不读取其完整身份映射。
+- 跨进程恢复所需的完整内容身份只保留在 machine 视图和 taskctl 自有索引；model 视图返回 `source-T<ID>-<序号>` 持久来源收据或 `review-<代际>-<序号>` 有界复核收据。模型只原样回传短收据，不解析其组成或读取完整身份映射；复核收据升级与缓存恢复见 completion-tooling。
 - 模型预算由 `--model-token-budget` 控制并在选择完整语义单元时生效；机器 `context/show/completion-context` 的既有 `--budget` 仍表示 JSON 字符预算。
 - 若程序此前依赖默认 JSON，迁移为显式 `--view machine`；没有已证实消费者时不保留第二个隐式默认入口。
 

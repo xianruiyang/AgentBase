@@ -4,7 +4,7 @@
 
 ## 正式产物
 
-- [`trigger-cases.json`](trigger-cases.json)：所需 skill、触发用例、严格路由用例、策略标签和条件引用选择的隐藏 oracle。
+- [`trigger-cases.json`](trigger-cases.json)：为规则路由独立构造的合成触发用例、严格路由用例、策略标签和条件引用选择的隐藏 oracle；不收录真实项目题面或答案。
 - [`validate_contract.ps1`](validate_contract.ps1)：规则与 skill 的结构、引用、身份、集合关系和触发集合静态合同；不复制或裁决规则正文语义。
 - [`routing_evaluation_common.ps1`](routing_evaluation_common.ps1) 与 [`routing_fingerprint.ps1`](routing_fingerprint.ps1)：三阶段 capsule、真实模型可见身份、cases-only 输出 schema、当前 oracle 和整体 generation 的唯一 owner。
 - [`get_routing_evaluation_plan.ps1`](get_routing_evaluation_plan.ps1)：只读增量计划；默认返回低 Token model 视图，`-View machine` 返回同一 canonical 计划的完整 JSON。
@@ -15,10 +15,12 @@
 - [`test_routing_infrastructure.ps1`](test_routing_infrastructure.ps1)：零模型 Token 的统一确定性测试入口；解析全部 PowerShell 脚本并并行验证指纹、capsule、planner、隔离 runtime、attempt ledger 与崩溃恢复。
 - [`record_routing_attempt.ps1`](record_routing_attempt.ps1)：正式尝试生命周期的唯一 owner；真实评估使用 `Begin`/`Finish`，证明复用使用 `Reuse`。
 - [`merge_routing_evidence.ps1`](merge_routing_evidence.ps1)：唯一正式证据合并入口；只接受当前 generation 内三份已通过收据及语义一致的阶段结果。
-- [`evidence/current.json`](evidence/current.json)：最近一次完成的路由研究快照；Validate、Deploy 与 Status 不消费它。
-- [`evidence/attempts.json`](evidence/attempts.json)：当前研究 generation 的有界收据账本；只证明运行或复用来源、失败和重试边界，不反推 skill 正确性。
+- 本机 `evidence/current.json`：最近一次完成的路由研究快照；不进入 Git，Validate、Deploy 与 Status 不消费它。
+- 本机 `evidence/attempts.json`：当前研究 generation 的有界收据账本；不进入 Git，只证明运行或复用来源、失败和重试边界，不反推 skill 正确性。
 
 新 generation 尚未三阶段合并时，`current.json` 可以继续指向上一份已完成快照，而 `attempts.json` 指向当前失败或进行中的研究周期；二者此时不得假定同代。账本可单独验证 schema、限额和收据关系；只有 merge 已完成、两者同代时才用 `-CurrentEvidencePath` 追加验证三阶段通过收据绑定。
+
+新克隆不包含真实运行快照和收据；确定性测试在临时目录生成合成结果，不需要复制个人 evidence。缺少研究结果不构成模型验证通过，也不授权自动启动 evaluator。
 
 ## 静态合同
 

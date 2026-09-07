@@ -20,7 +20,6 @@ from typing import Any, Iterable, Mapping, Sequence
 
 
 CORPUS_SCHEMA = "agentbase.windows-swe-corpus/v4"
-CORPUS_ID = "agentbase-windows-swe-v1"
 QUALIFICATION_SCHEMA = "agentbase.windows-swe-qualification/v3"
 WINDOWS_ADAPTER_ROOT = Path("development/agent-evaluation/windows-adapters")
 REQUIRED_ASSETS = (
@@ -379,8 +378,8 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
         errors.append("$schema must be a non-empty string")
     if corpus.get("schema") != CORPUS_SCHEMA:
         errors.append(f"schema must be {CORPUS_SCHEMA}")
-    if corpus.get("id") != CORPUS_ID:
-        errors.append(f"id must be {CORPUS_ID}")
+    if not isinstance(corpus.get("id"), str) or not TASK_ID_PATTERN.fullmatch(corpus["id"]):
+        errors.append("id must be a lowercase corpus identifier")
 
     source = corpus.get("source")
     if not isinstance(source, dict):
@@ -393,14 +392,19 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
             optional=None,
             errors=errors,
         )
-        if source.get("name") != "DeepSWE" or source.get("version") != "v1.1":
-            errors.append("source must identify DeepSWE v1.1")
-        if source.get("repository") != "https://github.com/datacurve-ai/deep-swe.git":
-            errors.append("source repository mismatch")
+        for key in ("name", "version", "repository", "task_root"):
+            if not isinstance(source.get(key), str) or not source.get(key, "").strip():
+                errors.append(f"source.{key} must be a non-empty string")
+        if isinstance(source.get("repository"), str) and not source["repository"].startswith("https://"):
+            errors.append("source.repository must be an HTTPS repository URL")
+        task_root = source.get("task_root")
+        if isinstance(task_root, str) and (
+            not _safe_relative_path(task_root, field="source.task_root")
+            or Path(task_root).anchor
+        ):
+            errors.append("source.task_root must be a relative path within the source repository")
         if not GIT_SHA_PATTERN.fullmatch(str(source.get("commit", ""))):
             errors.append("source.commit must be a 40-character lowercase Git SHA")
-        if source.get("task_root") != "tasks":
-            errors.append("source.task_root must be tasks")
 
     adapter = corpus.get("adapter")
     if not isinstance(adapter, dict):
@@ -420,16 +424,13 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
             optional=None,
             errors=errors,
         )
-        expected = {
-            "name": "agentbase-windows-swe",
-            "platform": "windows",
-            "workspace_contract": "candidate-patch-verifier",
-        }
+        expected = {"platform": "windows", "workspace_contract": "candidate-patch-verifier"}
         for key, value in expected.items():
             if adapter.get(key) != value:
                 errors.append(f"adapter.{key} must be {value}")
-        if not isinstance(adapter.get("version"), str) or not adapter.get("version", "").strip():
-            errors.append("adapter.version must be a non-empty string")
+        for key in ("name", "version"):
+            if not isinstance(adapter.get(key), str) or not adapter.get(key, "").strip():
+                errors.append(f"adapter.{key} must be a non-empty string")
         if not isinstance(adapter.get("qualification_repetitions"), int) or adapter.get(
             "qualification_repetitions", 0
         ) < 2:
@@ -460,26 +461,23 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
                 errors.append(f"codex.{key} must be {value}")
 
     profiles = corpus.get("profiles")
-    expected_profiles = {
-        "sol": ("gpt-5.6-sol", "medium"),
-        "luna": ("gpt-5.6-luna", "max"),
-    }
-    if not isinstance(profiles, dict) or set(profiles) != set(expected_profiles):
-        errors.append("profiles must contain exactly sol and luna")
+    if not isinstance(profiles, dict) or not profiles:
+        errors.append("profiles must be a non-empty object")
     else:
-        for name, expected in expected_profiles.items():
-            profile = profiles.get(name)
-            if not isinstance(profile, dict) or (
-                profile.get("model"),
-                profile.get("reasoning_effort"),
-            ) != expected:
-                errors.append(f"profile {name} must be {expected[0]}/{expected[1]}")
-            elif set(profile) != {"model", "reasoning_effort"}:
+        for name, profile in profiles.items():
+            if not TASK_ID_PATTERN.fullmatch(str(name)):
+                errors.append(f"profile name is invalid: {name}")
+            if not isinstance(profile, dict) or set(profile) != {"model", "reasoning_effort"}:
                 errors.append(f"profile {name} contains unknown or missing keys")
+                continue
+            if not isinstance(profile.get("model"), str) or not profile["model"].startswith("gpt-"):
+                errors.append(f"profile {name}.model must name a GPT model")
+            if profile.get("reasoning_effort") not in {"low", "medium", "high", "xhigh", "max", "ultra"}:
+                errors.append(f"profile {name}.reasoning_effort is invalid")
 
     tasks = corpus.get("tasks")
-    if not isinstance(tasks, list) or len(tasks) != 9:
-        errors.append("tasks must contain exactly nine cases")
+    if not isinstance(tasks, list) or not tasks:
+        errors.append("tasks must contain at least one case")
         tasks = []
     ids: list[str] = []
     difficulties: list[str] = []
@@ -530,20 +528,20 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
                 optional=None,
                 errors=errors,
             )
-            if evidence.get("total_rollouts") != 116:
-                errors.append(f"{where}.difficulty_evidence total must be 116")
+            total = evidence.get("total_rollouts")
+            if not isinstance(total, int) or total < 1:
+                errors.append(f"{where}.difficulty_evidence total must be positive")
             successful = evidence.get("successful_rollouts")
-            if not isinstance(successful, int) or not 0 <= successful <= 116:
+            if not isinstance(successful, int) or not isinstance(total, int) or not 0 <= successful <= total:
                 errors.append(f"{where}.difficulty_evidence successful count is invalid")
-            expected_url = f"https://deepswe.datacurve.ai/data/v1/tasks/{task_id}"
-            if evidence.get("source") != expected_url:
-                errors.append(f"{where}.difficulty_evidence source mismatch")
+            if not isinstance(evidence.get("source"), str) or not evidence.get("source", "").strip():
+                errors.append(f"{where}.difficulty_evidence source must be non-empty")
         if task.get("language") not in {"python", "typescript"}:
             errors.append(f"{where}.language must be python or typescript")
         if not isinstance(task.get("title"), str) or not task.get("title", "").strip():
             errors.append(f"{where}.title must be a non-empty string")
-        if not str(task.get("repository", "")).startswith("https://github.com/"):
-            errors.append(f"{where}.repository must be a GitHub HTTPS URL")
+        if not isinstance(task.get("repository"), str) or not task.get("repository", "").startswith("https://"):
+            errors.append(f"{where}.repository must be an HTTPS URL")
         if not GIT_SHA_PATTERN.fullmatch(str(task.get("upstream_base_commit", ""))):
             errors.append(f"{where}.upstream_base_commit is invalid")
         capabilities = task.get("capabilities")
@@ -801,11 +799,6 @@ def validate_corpus(corpus: Any) -> dict[str, Any]:
 
     if len(set(ids)) != len(ids):
         errors.append("task ids must be unique")
-    expected_difficulties = {"easy": 2, "medium": 3, "hard": 2, "very-hard": 2}
-    actual_difficulties = {name: difficulties.count(name) for name in expected_difficulties}
-    if actual_difficulties != expected_difficulties:
-        errors.append(f"difficulty distribution mismatch: {actual_difficulties}")
-
     suites = corpus.get("suites")
     if not isinstance(suites, dict) or set(suites) != {"smoke", "core", "rotation", "all"}:
         errors.append("suites must contain exactly smoke/core/rotation/all")
@@ -1028,7 +1021,6 @@ def framework_identity(project_root: Path) -> dict[str, Any]:
             "development/agent-evaluation/evaluation_core.py",
             "development/agent-evaluation/invoke_candidate.ps1",
             "development/agent-evaluation/vendor",
-            "development/agent-evaluation/windows-adapters",
             "development/agent-evaluation/windows_verifier.py",
             "development/common/codex_runtime.py",
             "development/common/codex_cli_runtime.ps1",

@@ -4,7 +4,7 @@
 
 ## 目标与候选证据
 
-`completion-context` 从当前 Markdown 分页返回每个 `REQ/AC/UDES`、`CON`、全部 `DCR` 和关联任务结果。model 视图保留目标正文、候选结果摘要、产出、验证、未决项、诊断、证据引用、来源收据摘要、短复核收据和精确游标，省略完整来源映射与 snapshot ID；machine 视图保留完整结构。
+`completion-context` 从当前 Markdown 分页返回每个 `REQ/AC/UDES`、`CON`、全部 `DCR` 和关联任务结果。model 视图保留目标正文、候选结果摘要、产出、验证、未决项、诊断、`evidence_for`、证据引用、短复核收据和精确游标，省略完整来源映射与 snapshot ID；machine 视图保留完整结构。候选关联不代表验证覆盖，结果的明确覆盖范围由 `evidence_for` 与直接证据共同表达。
 
 每页只在顶层 `candidate_tasks` 中返回一次完整候选任务证据。对象以任务 ID 为键，值不重复任务 ID；每个 `targets[]` 只用有序 `candidate_task_ids` 引用当前页候选，并返回该目标的候选总数、返回数、结果数、带验证结果数、截断状态和精确游标。预算移除目标时同步移除无人引用任务，不得产生悬空 ID。
 
@@ -14,9 +14,9 @@
 
 ## 分页与快照
 
-model 首页返回可读的 `review_receipt`（如 `review-1`），续页用 `--review-receipt` 原样传回；machine 首页继续返回完整 `snapshot_id`，续页用 `--snapshot-id`。一次只选择一个结果流，并原样传回该流上一页的 `target_next_after_id`、`constraint_next_after_id`、`deferred_next_after_id` 或 `candidate_next_after_id`。游标必须精确标识同一快照中的一项；未知游标不得按字符串大小猜测。
+model 首页返回 `review_receipt`，格式为 `review-<代际>-<序号>`；续页用 `--review-receipt` 原样传回，不自行生成或解析。machine 首页继续返回完整 `snapshot_id`，续页用 `--snapshot-id`。一次只选择一个结果流，并原样传回该流上一页的 `target_next_after_id`、`constraint_next_after_id`、`deferred_next_after_id` 或 `candidate_next_after_id`。游标必须精确标识同一快照中的一项；未知游标不得按字符串大小猜测。
 
-复核收据只存在于 `.work-cache/taskctl-review-receipts.json` 可重建缓存，最多保留 32 个最近映射。缓存缺失、收据已淘汰或当前快照变化时，从第一页重新取得；缓存内容冲突时先删除该派生缓存再重建，不从短句柄猜测完整身份。
+复核收据只存在于 `.work-cache/taskctl-review-receipts.json` 可重建缓存，最多保留 32 个最近映射；缓存重建生成新代际，旧收据不能绑定新快照。旧版无代际收据（`review-1` 等）拒绝续页并要求从首页重新复核，首次新查询替换旧版复核缓存，不改永久任务、结果或来源收据。缓存缺失、收据已淘汰或当前快照变化时也从第一页重新取得；缓存内容冲突时先删除该派生缓存再重建，不从短句柄猜测完整身份。
 
 首页无法从当前 Markdown 重建索引时仍返回局部诊断，供模型直接检查文档。携带复核收据或 snapshot ID 的续页若无法重建当前 Markdown，就不能证明仍属于首页快照，只阻断该次续页；修复输入后丢弃旧游标与收据，从首页重新取得上下文。
 

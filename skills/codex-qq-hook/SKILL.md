@@ -13,7 +13,7 @@ description: 管理和排查 Codex QQ 通知。用于用户明确要求配置完
 - 开启、关闭、查看或执行主动直发：完整读取 [direct-message.md](references/direct-message.md)；模型不得自行开启或更换目标。
 - 安装、刷新或迁移 hook：完整读取 [setup.md](references/setup.md)。
 - 设置或更换机器人、目标 QQ 用户、OpenID、AppID 或 AppSecret：完整读取 [global-bot.md](references/global-bot.md)。
-- 排查未收到提醒、hook 链路或日志：同时使用 `$change-governance` 并读取其 `causal-analysis.md`，再完整读取 [troubleshooting.md](references/troubleshooting.md)。
+- 排查未收到提醒、hook 链路或日志：完整读取 [troubleshooting.md](references/troubleshooting.md)；未发送原因尚未确认时，同时使用 `$change-governance` 并读取其 `causal-analysis.md`。仅解释已确认原因或核对已知状态时，不因此进入根因分析。
 
 ## 配置文件
 

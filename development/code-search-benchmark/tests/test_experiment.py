@@ -36,6 +36,27 @@ class ExperimentTests(unittest.TestCase):
             with self.assertRaisesRegex(MODULE.ExperimentError, "network_policy=configured"):
                 MODULE.build_experiment(config, Path(temp) / "output")
 
+    def test_prepare_requires_an_explicit_existing_local_corpus(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = root / "config.json"
+            config.write_text(json.dumps({
+                "network_policy": "configured",
+                "runtime_environment": {},
+            }), encoding="utf-8")
+            with mock.patch.object(MODULE, "resolve_runtime_environment", return_value=({}, {})):
+                with self.assertRaisesRegex(MODULE.ExperimentError, "must set corpus"):
+                    MODULE.build_experiment(config, root / "output")
+
+            config.write_text(json.dumps({
+                "network_policy": "configured",
+                "runtime_environment": {},
+                "corpus": str(root / "private-corpus.json"),
+            }), encoding="utf-8")
+            with mock.patch.object(MODULE, "resolve_runtime_environment", return_value=({}, {})):
+                with self.assertRaisesRegex(MODULE.ExperimentError, "restore it on this host"):
+                    MODULE.build_experiment(config, root / "output")
+
     def test_runtime_dotenv_projects_only_network_allowlist_and_redacts_values(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             dotenv = Path(temp) / ".env"

@@ -42,7 +42,7 @@
     {
       "kind": "post-cleanup-readback",
       "note": "旧 sandbox 状态为 0，正式状态根保留",
-      "ref": "C:\\Users\\gzxt\\AppData\\Local\\AgentBase\\agent-evaluation-state"
+      "ref": "<LOCALAPPDATA>\\AgentBase\\agent-evaluation-state"
     }
   ],
   "invalidated_source_ids": [],

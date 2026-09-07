@@ -29,7 +29,7 @@ import evaluation_core
 import windows_verifier
 
 
-CORPUS_PATH = EVALUATION_ROOT / "corpus" / "final-v1.json"
+CORPUS_PATH = EVALUATION_ROOT / "tests" / "fixtures" / "synthetic-corpus.json"
 
 
 def empty_api_cost_summary() -> dict[str, object]:
@@ -174,32 +174,9 @@ class CorpusContractTests(unittest.TestCase):
     def setUp(self) -> None:
         self.corpus = evaluation_core.load_corpus(CORPUS_PATH)
 
-    def test_exact_windows_task_set_and_profiles(self) -> None:
-        self.assertEqual(
-            [task["id"] for task in self.corpus["tasks"]],
-            [
-                "returns-validated-error-accumulation",
-                "sql-formatter-bigquery-pipe-formatting",
-                "httpx-multipart-response-parsing",
-                "awilix-async-container-initialization",
-                "bandit-interprocedural-taint-checks",
-                "fastapi-implicit-head-options",
-                "meriyah-explicit-resource-declarations",
-                "clack-async-autocomplete-options",
-                "superjson-error-stack-serialization",
-            ],
-        )
-        self.assertEqual(
-            [task["difficulty"] for task in self.corpus["tasks"]],
-            ["easy", "easy", "medium", "medium", "medium", "hard", "hard", "very-hard", "very-hard"],
-        )
-        self.assertEqual(
-            self.corpus["profiles"],
-            {
-                "sol": {"model": "gpt-5.6-sol", "reasoning_effort": "medium"},
-                "luna": {"model": "gpt-5.6-luna", "reasoning_effort": "max"},
-            },
-        )
+    def test_synthetic_fixture_is_generic_and_valid(self) -> None:
+        self.assertEqual([task["id"] for task in self.corpus["tasks"]], ["synthetic-python-case"])
+        self.assertEqual(set(self.corpus["profiles"]), {"test"})
         self.assertFalse(self.corpus["assessment"]["leaderboard_comparable"])
 
     def test_codex_contract_uses_trusted_local_execution(self) -> None:
@@ -211,6 +188,23 @@ class CorpusContractTests(unittest.TestCase):
             },
         )
 
+    def test_source_configuration_preserves_repository_boundaries(self) -> None:
+        for task_root in ("../outside", "nested/../../outside", "C:/outside", "C:outside", "/outside", "\\outside", "\\\\server\\share", "nested\\..\\outside"):
+            with self.subTest(task_root=task_root):
+                drifted = copy.deepcopy(self.corpus)
+                drifted["source"]["task_root"] = task_root
+                with self.assertRaisesRegex(evaluation_core.EvaluationError, "source.task_root"):
+                    evaluation_core.validate_corpus(drifted)
+        for repository in ("--upload-pack=unexpected", "file:///local/source", "http://example.invalid/source"):
+            with self.subTest(repository=repository):
+                drifted = copy.deepcopy(self.corpus)
+                drifted["source"]["repository"] = repository
+                with self.assertRaisesRegex(evaluation_core.EvaluationError, "source.repository"):
+                    evaluation_core.validate_corpus(drifted)
+        drifted = copy.deepcopy(self.corpus)
+        drifted["source"]["task_root"] = "private/tasks"
+        evaluation_core.validate_corpus(drifted)
+
     def test_suites_cover_without_rotation_overlap(self) -> None:
         suites = self.corpus["suites"]
         self.assertTrue(set(suites["smoke"]).issubset(suites["core"]))
@@ -218,18 +212,10 @@ class CorpusContractTests(unittest.TestCase):
         self.assertEqual(set(suites["all"]), set(suites["core"]) | set(suites["rotation"]))
 
     def test_rollout_evidence_is_task_local_and_bounded(self) -> None:
-        counts = [76, 70, 48, 44, 42, 29, 25, 18, 17]
-        self.assertEqual(
-            [task["difficulty_evidence"]["successful_rollouts"] for task in self.corpus["tasks"]],
-            counts,
-        )
         for task in self.corpus["tasks"]:
             evidence = task["difficulty_evidence"]
-            self.assertEqual(evidence["total_rollouts"], 116)
-            self.assertEqual(
-                evidence["source"],
-                f"https://deepswe.datacurve.ai/data/v1/tasks/{task['id']}",
-            )
+            self.assertLessEqual(evidence["successful_rollouts"], evidence["total_rollouts"])
+            self.assertTrue(evidence["source"])
 
     def test_no_retired_or_non_windows_runtime_contract(self) -> None:
         text = json.dumps(self.corpus, ensure_ascii=False).lower()
@@ -248,110 +234,12 @@ class CorpusContractTests(unittest.TestCase):
                 self.assertIsInstance(command["argv"], list)
                 self.assertNotIn("&&", " ".join(command["argv"]))
 
-    def test_hash_pinned_windows_fixture_adapters_are_task_local(self) -> None:
-        adapters = {
-            task["id"]: task["windows_adapter"]
-            for task in self.corpus["tasks"]
-            if "windows_adapter" in task
-        }
-        self.assertEqual(
-            set(adapters),
-            {
-                "bandit-interprocedural-taint-checks",
-                "clack-async-autocomplete-options",
-                "httpx-multipart-response-parsing",
-            },
-        )
-        self.assertEqual(
-            adapters["clack-async-autocomplete-options"]["patch_paths"],
-            [
-                "packages/core/src/prompts/prompt.ts",
-                "packages/core/test/mock-readable.ts",
-                "packages/prompts/test/test-utils.ts",
-            ],
-        )
-        self.assertEqual(
-            adapters["httpx-multipart-response-parsing"]["patch_paths"],
-            ["tests/conftest.py", "tests/test_utils.py"],
-        )
-        self.assertEqual(
-            adapters["bandit-interprocedural-taint-checks"]["patch_paths"],
-            [
-                "tests/functional/test_functional.py",
-                "tests/functional/test_runtime.py",
-                "tests/unit/core/test_config.py",
-                "tests/unit/core/test_manager.py",
-                "tests/unit/core/test_util.py",
-                "tests/unit/formatters/test_sarif.py",
-            ],
-        )
-        verified = evaluation_core.verify_windows_adapter_assets(PROJECT_ROOT, self.corpus)
-        self.assertEqual(set(verified), set(adapters))
-        self.assertEqual(
-            verified["httpx-multipart-response-parsing"]["sha256"],
-            adapters["httpx-multipart-response-parsing"]["sha256"],
-        )
-        self.assertEqual(
-            verified["clack-async-autocomplete-options"]["sha256"],
-            adapters["clack-async-autocomplete-options"]["sha256"],
-        )
-
-    def test_task_local_windows_runtime_migrations_are_explicit(self) -> None:
-        tasks = {task["id"]: task for task in self.corpus["tasks"]}
-        bandit = tasks["bandit-interprocedural-taint-checks"]
-        editable_installs = [
-            command
-            for command in [*bandit["setup"], *bandit["checks"]]
-            for command in (
-                [command]
-                if "before" not in command
-                else command["before"]
-            )
-            if command["argv"][-2:] == ["-e", "."]
-        ]
-        self.assertEqual(len(editable_installs), 3)
-        self.assertTrue(
-            all(command.get("env", {}).get("PBR_VERSION") == "0.0.0" for command in editable_installs)
-        )
-
-        fastapi = tasks["fastapi-implicit-head-options"]
-        self.assertEqual(
-            fastapi["windows_oracle"],
-            {"p2p_baseline_policy": "exclude-stable-skips"},
-        )
-
-        meriyah = tasks["meriyah-explicit-resource-declarations"]
-        self.assertEqual(
-            meriyah["setup"][0]["argv"][:3],
-            ["{npm}", "install", "--include=dev"],
-        )
-        self.assertIn("package-lock.json", meriyah["setup_cleanup"]["remove_untracked"])
-        self.assertTrue(
-            all(
-                "--configLoader=runner" in check["argv"]
-                for check in meriyah["checks"]
-            )
-        )
-
-        clack = tasks["clack-async-autocomplete-options"]
-        self.assertEqual(
-            clack["windows_oracle"],
-            {"p2p_baseline_policy": "exclude-stable-nonpassing"},
-        )
-        self.assertIn("--config.node-linker=hoisted", clack["setup"][0]["argv"])
-        self.assertTrue(
-            all(
-                "--configLoader=runner" in check["argv"]
-                and "--no-file-parallelism" in check["argv"]
-                and check.get("env", {}).get("TERM_PROGRAM") == "vscode"
-                for check in clack["checks"]
-                if check["report"]["kind"] != "gate-ctrf"
-            )
-        )
+    def test_fixture_requires_no_private_windows_adapter(self) -> None:
+        self.assertEqual(evaluation_core.verify_windows_adapter_assets(PROJECT_ROOT, self.corpus), {})
 
     def test_validator_rejects_profile_and_shell_drift(self) -> None:
         drifted = copy.deepcopy(self.corpus)
-        drifted["profiles"]["luna"]["reasoning_effort"] = "medium"
+        drifted["profiles"]["test"]["reasoning_effort"] = "invalid"
         with self.assertRaises(evaluation_core.EvaluationError):
             evaluation_core.validate_corpus(drifted)
 
@@ -361,7 +249,7 @@ class CorpusContractTests(unittest.TestCase):
         with self.assertRaisesRegex(evaluation_core.EvaluationError, "unknown keys"):
             evaluation_core.validate_corpus(drifted)
         drifted = copy.deepcopy(self.corpus)
-        del drifted["tasks"][1]["toolchain"]["package_manager"]
+        drifted["tasks"][0]["toolchain"] = {"kind": "node", "minimum_version": "20"}
         with self.assertRaisesRegex(evaluation_core.EvaluationError, "package_manager"):
             evaluation_core.validate_corpus(drifted)
         drifted = copy.deepcopy(self.corpus)
@@ -370,14 +258,14 @@ class CorpusContractTests(unittest.TestCase):
             evaluation_core.validate_corpus(drifted)
 
         drifted = copy.deepcopy(self.corpus)
-        httpx = next(task for task in drifted["tasks"] if task["id"].startswith("httpx-"))
-        httpx["windows_adapter"]["path"] = "../outside.patch"
+        drifted["tasks"][0]["windows_adapter"] = {
+            "path": "../outside.patch", "sha256": "a" * 64, "patch_paths": ["src/value.py"]
+        }
         with self.assertRaisesRegex(evaluation_core.EvaluationError, "windows-adapters"):
             evaluation_core.validate_corpus(drifted)
 
         drifted = copy.deepcopy(self.corpus)
-        fastapi = next(task for task in drifted["tasks"] if task["id"].startswith("fastapi-"))
-        fastapi["windows_oracle"]["p2p_baseline_policy"] = "ignore-all-failures"
+        drifted["tasks"][0]["windows_oracle"] = {"p2p_baseline_policy": "ignore-all-failures"}
         with self.assertRaisesRegex(evaluation_core.EvaluationError, "p2p_baseline_policy"):
             evaluation_core.validate_corpus(drifted)
 
@@ -385,9 +273,9 @@ class CorpusContractTests(unittest.TestCase):
         schema = json.loads((EVALUATION_ROOT / "corpus" / "schema.json").read_text(encoding="utf-8"))
         self.assertEqual(schema["$schema"], "https://json-schema.org/draft/2020-12/schema")
         self.assertEqual(schema["properties"]["schema"]["const"], evaluation_core.CORPUS_SCHEMA)
-        self.assertEqual(schema["properties"]["id"]["const"], evaluation_core.CORPUS_ID)
-        self.assertEqual(schema["properties"]["tasks"]["minItems"], 9)
-        self.assertEqual(schema["properties"]["tasks"]["maxItems"], 9)
+        self.assertEqual(schema["properties"]["id"]["type"], "string")
+        self.assertEqual(schema["properties"]["tasks"]["minItems"], 1)
+        self.assertNotIn("maxItems", schema["properties"]["tasks"])
 
 
 class CandidateRuntimeTests(unittest.TestCase):
@@ -789,8 +677,7 @@ class CandidateRuntimeTests(unittest.TestCase):
             self.assertEqual(len(manifest["files"]), projection["file_count"])
             relative_paths = {item["path"] for item in manifest["files"]}
             self.assertIn("source-query/references/ast.md", relative_paths)
-            self.assertIn("delivery-workflow/scripts/workctl.py", relative_paths)
-            self.assertIn("delivery-workflow/assets/templates/design.md", relative_paths)
+            self.assertIn("delivery-workflow/SKILL.md", relative_paths)
             self.assertEqual(
                 evaluation_core.sha256_file(manifest_path),
                 projection["manifest_sha256"],
@@ -905,30 +792,10 @@ class CandidateRuntimeTests(unittest.TestCase):
         python_task = next(
             task for task in self.corpus["tasks"] if task["toolchain"]["kind"] == "python"
         )
-        node_task = next(
-            task for task in self.corpus["tasks"] if task["toolchain"]["kind"] == "node"
-        )
         python_hint = agentbase_codex.candidate_public_tooling_hint(python_task)
-        node_hint = agentbase_codex.candidate_public_tooling_hint(node_task)
         self.assertIn(".agentbase-venv\\Scripts\\python.exe", python_hint)
         self.assertIn("identity-pinned dependencies", python_hint)
-        self.assertIn(str(node_task["toolchain"]["package_manager"]), node_hint)
-        self.assertIn("node_modules", node_hint)
-        bandit_task = next(
-            task
-            for task in self.corpus["tasks"]
-            if task["id"] == "bandit-interprocedural-taint-checks"
-        )
-        meriyah_task = next(
-            task
-            for task in self.corpus["tasks"]
-            if task["id"] == "meriyah-explicit-resource-declarations"
-        )
-        self.assertIn("setup.cfg", agentbase_codex.candidate_patch_scope_hint(bandit_task))
-        self.assertIn(
-            "test/parser/miscellaneous/__snapshots__/**",
-            agentbase_codex.candidate_patch_scope_hint(meriyah_task),
-        )
+        self.assertIn("src/value.py", agentbase_codex.candidate_patch_scope_hint(python_task))
         self.assertIn(
             "outside this list",
             agentbase_codex.candidate_patch_scope_hint(python_task),
@@ -946,7 +813,7 @@ class CandidateRuntimeTests(unittest.TestCase):
                 values,
                 workspace,
             )
-        self.assertIn("tests/test_result/test_result_bind.py", public_checks)
+        self.assertIn("tests/base.py", public_checks)
         self.assertIn("safe.directory=", public_checks)
         self.assertIn(
             f"safe.directory={workspace.as_posix()}",
@@ -955,28 +822,6 @@ class CandidateRuntimeTests(unittest.TestCase):
         self.assertIn("run each relevant listed regression command once", public_checks)
         self.assertNotIn("{report}", public_checks)
         self.assertNotIn("--junitxml", public_checks)
-        self.assertNotIn("tests/test_validated", public_checks)
-        sql_task = next(
-            task
-            for task in self.corpus["tasks"]
-            if task["id"] == "sql-formatter-bigquery-pipe-formatting"
-        )
-        with tempfile.TemporaryDirectory() as directory:
-            workspace = Path(directory).resolve()
-            node_checks = agentbase_codex.candidate_public_checks_hint(
-                sql_task,
-                {
-                    "python": "python.exe",
-                    "workspace": str(workspace),
-                    "npm": "npm.cmd",
-                    "pnpm": "pnpm.cmd",
-                },
-                workspace,
-            )
-        self.assertIn("node_modules", node_checks)
-        self.assertNotIn("bigquery-pipe.test.ts", node_checks)
-        self.assertNotIn("--json", node_checks)
-        self.assertNotIn("--outputFile", node_checks)
 
     def test_effective_candidate_config_participates_in_run_identity(self) -> None:
         qualification = {"receipt_sha256": "a" * 64}
@@ -986,7 +831,7 @@ class CandidateRuntimeTests(unittest.TestCase):
             "corpus_path": CORPUS_PATH,
             "corpus": self.corpus,
             "task_id": self.corpus["tasks"][0]["id"],
-            "profile_name": "sol",
+            "profile_name": "test",
             "qualification_receipt": qualification,
             "dependency_identity": dependency,
             "runtime_environment": {"dotenv_sha256": "c" * 64},
@@ -1360,7 +1205,7 @@ class ReportAdapterTests(unittest.TestCase):
                         {
                             "schema": "agentbase.windows-swe-attempt/v1",
                             "attempt_id": attempt_id,
-                            "task_id": "returns-validated-error-accumulation",
+                            "task_id": "synthetic-python-case",
                             "profile": "sol",
                             "status": status,
                             "stage": stage,
@@ -1382,7 +1227,7 @@ class ReportAdapterTests(unittest.TestCase):
                 )
             health = agent_eval._attempt_health(
                 state,
-                {"returns-validated-error-accumulation"},
+                {"synthetic-python-case"},
                 recent_limit=20,
                 current_candidate_surface_sha256="a" * 64,
                 current_framework_sha256="b" * 64,
@@ -1418,7 +1263,7 @@ class ReportAdapterTests(unittest.TestCase):
                     [str((Path(directory) / "missing.exe").resolve())]
                 )
 
-    def test_all_nine_tasks_stage_reports_inside_the_verifier_workspace(self) -> None:
+    def test_all_corpus_tasks_stage_reports_inside_the_verifier_workspace(self) -> None:
         corpus = evaluation_core.load_corpus(CORPUS_PATH)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1938,11 +1783,7 @@ class VerifierLifecycleTests(unittest.TestCase):
 
     def test_verifier_setup_precedes_patch_and_hidden_tests(self) -> None:
         corpus = evaluation_core.load_corpus(CORPUS_PATH)
-        task = next(
-            item
-            for item in corpus["tasks"]
-            if item["id"] == "httpx-multipart-response-parsing"
-        )
+        task = corpus["tasks"][0]
         events: list[str] = []
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1967,7 +1808,7 @@ class VerifierLifecycleTests(unittest.TestCase):
                     "apply_windows_adapter_baseline",
                     side_effect=lambda *a, **k: events.append("adapter")
                     or {
-                        "path": "windows-adapters/httpx-ephemeral-loopback.patch",
+                        "path": "windows-adapters/synthetic.patch",
                         "sha256": "f" * 64,
                         "paths": ["tests/conftest.py"],
                     },
@@ -2178,11 +2019,33 @@ class DeterministicEntryTests(unittest.TestCase):
 
     def test_validate_command_performs_no_external_action(self) -> None:
         parser = agent_eval.build_parser()
-        args = parser.parse_args(["validate", "--project-root", str(PROJECT_ROOT), "--view", "machine"])
+        args = parser.parse_args(
+            [
+                "validate",
+                "--project-root",
+                str(PROJECT_ROOT),
+                "--corpus",
+                str(CORPUS_PATH),
+                "--view",
+                "machine",
+            ]
+        )
         with mock.patch("builtins.print") as printer:
             self.assertEqual(agent_eval.command_validate(args), 0)
         document = json.loads(printer.call_args.args[0])
         self.assertFalse(document["external_actions"])
+
+    def test_missing_default_corpus_reports_the_local_recovery_actions(self) -> None:
+        parser = agent_eval.build_parser()
+        with tempfile.TemporaryDirectory() as directory:
+            args = parser.parse_args(
+                ["validate", "--project-root", directory, "--view", "machine"]
+            )
+            with self.assertRaisesRegex(
+                evaluation_core.PreconditionError,
+                r"Restore the private corpus.*--corpus <local-json>",
+            ):
+                agent_eval.command_validate(args)
 
     def test_publish_validation_script_only_calls_static_validation_and_unittest(self) -> None:
         text = (EVALUATION_ROOT / "test_agent_evaluation_infrastructure.ps1").read_text(encoding="utf-8")

@@ -9,11 +9,21 @@ ROOT = Path(__file__).resolve().parent
 BOOLEAN_FIELDS = ("authorization_required", "preview_required", "same_snapshot_required")
 
 
+def load_cases(path: Path) -> list[dict]:
+    if not path.is_file():
+        raise SystemExit(
+            f"routing cases not found: {path}. Restore the local private file or pass --cases PATH."
+        )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return payload["cases"]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("result", type=Path)
+    parser.add_argument("--cases", type=Path, default=ROOT / "routing-cases.json")
     args = parser.parse_args()
-    expected_cases = json.loads((ROOT / "routing-cases.json").read_text(encoding="utf-8"))["cases"]
+    expected_cases = load_cases(args.cases)
     result = json.loads(args.result.read_text(encoding="utf-8"))
     actual_by_id = {case["id"]: case for case in result["cases"]}
     failures: list[str] = []

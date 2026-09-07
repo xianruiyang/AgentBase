@@ -22,7 +22,7 @@ AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、ski
 | [`tools/workflow-cli/`](tools/workflow-cli/README.md) | `workctl`/`taskctl` 源码、测试、Windows 安装器和独立主机运行时 |
 | [`development/codex-event-logger/`](development/codex-event-logger/) | 对话事件记录 hook 的开发资料；运行脚本仍由对应 skill 所有 |
 | [`development/codex-qq-hook/`](development/codex-qq-hook/) | QQ Webhook 辅助程序与开发资料；运行脚本仍由对应 skill 所有 |
-| [`development/source-query-gateway/`](development/source-query-gateway/plan.md) | 源码查询专项需求、设计、计划和实践证据 |
+| [`development/source-query-gateway/`](development/source-query-gateway/README.md) | 源码查询研究框架、合成协议测试与本机私有数据入口 |
 | [`development/skill-routing/`](development/skill-routing/README.md) | 静态触发合同与脱离仓库的分阶段路由评估 |
 | [`development/agent-evaluation/`](development/agent-evaluation/README.md) | 固定 DeepSWE 题目/计分语义、受信任本地 candidate 与独立 Verifier 工作区、逐题资格/恢复/结果组成的派生最终评测集 |
 | [`development/plugin-packaging/`](development/plugin-packaging/README.md) | `agentbase-core` 插件模板、过滤打包和官方校验入口 |
@@ -33,6 +33,8 @@ AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、ski
 `development/` 只承载验证、打包、部署和开发资料。Codex 根目录中的同名文件是安装目标或宿主状态，不反向定义项目，也不与仓库双向同步。构建目录、依赖树、缓存、日志、测试输出和部署沙箱不是项目真源。
 
 项目只维护 Windows 宿主。外部协议或文件格式出现其他平台术语，不代表 AgentBase 承诺相应运行时、安装器或测试矩阵。
+
+评测资产的 Git 边界见 [CON-008](docs/requirements.md#con-008-真实评测数据仅保留在本机)：只分发框架、schema 和合成测试，真实题目、答案、题目特定适配、实际作答及逐题审计保留本机并忽略。既有私有文件原位保留，框架通过本地参数读取；新克隆不包含这些文件，也不依赖它们完成基础检查。历史工程记录中的 `<CODEX_ROOT>`、`<LOCALAPPDATA>`、`<USERPROFILE>` 等是脱敏位置标记，不能作为可直接执行或已读回的宿主路径；指向本机私有研究文档的旧引用只服务原宿主追溯。
 
 ## 能力分层
 
@@ -58,6 +60,10 @@ Windows SWE 使用受信任本地 candidate 与独立 Verifier 工作区，不�
 
 部署合同由 [`manage_agentbase.ps1`](development/codex-deployment/manage_agentbase.ps1) 校验；其余组件沿各自 README 或清单中的正式入口验证。
 
+AgentBase 主包的版本、已提交来源组装、插件/恢复资产及 GitHub Release 操作由[发行入口](development/release/README.md)维护；srcq、workflow-cli 与 MCP 继续各自独立发行。
+
 插件构建、Codex 部署模式、主机前置条件、只读状态和回滚命令分别由[插件打包说明](development/plugin-packaging/README.md)与[部署说明](development/codex-deployment/README.md)维护。每次向真实 Codex 根目录执行 `Deploy` 前都必须取得用户针对当次部署的明确同意；Git 同步、此前部署授权或验证通过均不能替代。
+
+新用户首次部署默认保留[原配置恢复点](development/codex-deployment/README.md#original-configuration-recovery)，后续升级不覆盖最早原内容；`PreviewRestore` 可只读预览，`RestoreOriginal` 在冲突检查后恢复。已有安装不自动补建历史恢复点，继续使用部署回滚。发行时可随包附带独立 PowerShell 恢复入口，用户原配置始终留在本机。
 
 部署状态不在 README 手工维护。使用部署说明中的只读 `Status` 入口按所选部署范围读取当前项目、安装副本、部署清单和受管资产生命周期的关系。部署成功只证明文件已安装；当前 Codex 运行不会追溯加载新规则，需在新任务或重启后的运行中使用。组件发行状态由各组件的 Release 合同独立维护。
