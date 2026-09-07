@@ -364,7 +364,14 @@ def content_text(content: Any) -> str | None:
     return None
 
 
-def transcript_turn_messages(transcript_path: Any, turn_id: str, max_text: int) -> dict[str, Any]:
+def transcript_turn_messages(
+    transcript_path: Any,
+    turn_id: str,
+    max_text: int,
+    *,
+    include_prompt: bool = True,
+    include_final: bool = True,
+) -> dict[str, Any]:
     if not transcript_path:
         return {}
     path = Path(str(transcript_path).replace("\\\\?\\", ""))
@@ -372,8 +379,6 @@ def transcript_turn_messages(transcript_path: Any, turn_id: str, max_text: int) 
         return {}
 
     result: dict[str, Any] = {}
-    last_assistant: str | None = None
-    last_assistant_ts: str | None = None
     try:
         with path.open("r", encoding="utf-8", errors="replace") as fh:
             for line in fh:
@@ -391,21 +396,17 @@ def transcript_turn_messages(transcript_path: Any, turn_id: str, max_text: int) 
                 if not text:
                     continue
                 role = payload.get("role")
-                if role == "user" and "prompt" not in result:
+                if include_prompt and role == "user" and "prompt" not in result:
                     result.update(prompt_fields(text, max_text, "transcript_user_prompt"))
                     result["prompt_ts"] = row.get("timestamp")
-                elif role == "assistant":
-                    last_assistant = str(sanitize(text, max_text))
-                    last_assistant_ts = row.get("timestamp")
-                    if payload.get("phase") == "final":
-                        result["last_assistant_message"] = last_assistant
-                        result["stop_ts"] = last_assistant_ts
+                    if not include_final:
+                        break
+                elif include_final and role == "assistant" and payload.get("phase") == "final":
+                    result["last_assistant_message"] = str(sanitize(text, max_text))
+                    result["stop_ts"] = row.get("timestamp")
     except Exception:
         return result
 
-    if last_assistant and "last_assistant_message" not in result:
-        result["last_assistant_message"] = last_assistant
-        result["assistant_message_ts"] = last_assistant_ts
     return result
 
 
@@ -587,18 +588,25 @@ def update_conversation(
             conversation["stop_ts"] = now_iso()
             if conversation.get("source") not in ("user_prompt", "transcript_user_prompt", "goal"):
                 conversation["source"] = "auto_or_goal_turn"
-            conversation["last_assistant_message"] = sanitize(
+            final_message = (
                 payload.get("last_assistant_message")
                 or payload.get("final_response")
-                or payload.get("assistant_final"),
-                max_text,
+                or payload.get("assistant_final")
             )
+            if final_message:
+                conversation["last_assistant_message"] = sanitize(final_message, max_text)
 
-        if not conversation.get("prompt") or not conversation.get("last_assistant_message"):
+        missing_prompt = not bool(conversation.get("prompt"))
+        missing_final = event == "Stop" and not bool(
+            conversation.get("last_assistant_message")
+        )
+        if missing_prompt or missing_final:
             transcript = transcript_turn_messages(
                 payload.get("transcript_path"),
                 turn_id,
                 max_text,
+                include_prompt=missing_prompt,
+                include_final=missing_final,
             )
             for key, value in transcript.items():
                 if value is not None and (
@@ -619,13 +627,24 @@ def backfill_conversation_from_transcript(
     config: dict[str, Any],
 ) -> None:
     max_text = int(config.get("max_text_chars") or 12000)
-    transcript = transcript_turn_messages(payload.get("transcript_path"), turn_id, max_text)
-
     timeout = float(config.get("lock_timeout_seconds") or 3)
     with file_lock(conversation_file.with_suffix(".lock"), timeout):
         conversation = load_json_file(conversation_file, {})
         if not isinstance(conversation, dict):
             conversation = {}
+        if conversation.get("prompt") or conversation.get("source") in (
+            "tool_operation",
+            "goal",
+            "auto_or_goal_turn",
+        ):
+            return
+
+        transcript = transcript_turn_messages(
+            payload.get("transcript_path"),
+            turn_id,
+            max_text,
+            include_final=False,
+        )
         if transcript:
             for key, value in transcript.items():
                 if value is not None and (

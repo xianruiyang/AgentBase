@@ -1239,6 +1239,36 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "event-log-agent-audit",
+      "kind": "positive",
+      "request": "请从已提供精确路径的 Codex 原生会话记录统计该任务创建过的子代理角色和复用次数，只读历史，不创建或唤醒代理。",
+      "expected_skills": ["codex-event-logger"],
+      "forbidden_skills": ["subagent-orchestration", "reasoning-governor", "task-table-manager"],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": ["read_only"],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "event-log-wait-timeline",
+      "kind": "positive",
+      "request": "按已给原生会话日志路径，列出昨天指定一小时内的等待开始、结束和期间的工具事件；只投影事实，不评价耗时原因，不读取推理内容或改线程设置。",
+      "expected_skills": ["codex-event-logger"],
+      "forbidden_skills": ["reasoning-governor", "subagent-orchestration", "execution-governor"],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": ["read_only"],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "event-log-supplied-counts-no-history",
+      "kind": "negative",
+      "request": "当前消息已给完整统计：创建了 3 个 experiment 和 2 个 evidence。请只计算合计数量，不重新读取历史。",
+      "expected_skills": [],
+      "forbidden_skills": ["codex-event-logger", "subagent-orchestration"],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
       "id": "qq-hook-explicit-enable",
       "kind": "positive",
       "request": "为当前工作区和当前对话开启 Codex QQ 完成提醒。",
