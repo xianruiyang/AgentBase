@@ -84,4 +84,4 @@
 - 根因或职责入口判断由 `$change-governance` 提供方法，结论分别进入 `OBS/DES/SOL`。
 - 代码结构、C++、空间、UE 等判断由对应 skill 产生证据或实现结果，交付链只保存引用和简要结论。
 - `$task-table-manager` 返回的任务上下文应包含精确上游条目和前置结果，不要求执行者读取全部阶段文档。
-- 命中 `$execution-governor` 时由其按用户覆盖与下一段真实判断负担裁决目标档位和状态价值；未命中时按全局内核直接判断。`$reasoning-governor` 只读写当前线程的 next-turn 配置；这些判断不依赖 active Goal，也不进入任务状态或阶段文档。
+- 推理深度不由阶段、active Goal、下一段判断负担或执行控制自动选择；仅在用户明确要求时由 `$reasoning-governor` 读写当前线程的 next-turn 配置，且不进入任务状态或阶段文档。

@@ -1,4 +1,4 @@
 interface:
   display_name: "Subagent Orchestration"
-  short_description: "按默认分工委派证据定位、实现探索和确定操作，由主代理阅读审核、正式定稿"
-  default_prompt: "使用 $subagent-orchestration 按当前缺口委派 evidence、experiment 或 operator；没有独立必要工作时等待，并由主代理阅读关键原文、审核实现和验收。"
+  short_description: "按默认分工委派证据、普通或高级实验和确定操作，由主代理审核定稿"
+  default_prompt: "使用 $subagent-orchestration 按当前缺口委派 evidence、experiment、advanced-experiment 或 operator；没有独立必要工作时等待，并由主代理阅读关键原文、审核实现和验收。"

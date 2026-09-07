@@ -3,7 +3,7 @@
 # This file intentionally contains only reviewed, machine-independent settings.
 # Authentication, project trust, plugin/cache state, MCP paths, hook trust hashes,
 # runtime-generated notify/node_repl settings, and local secrets are excluded.
-# Custom evidence/experiment/operator profiles live in global/agents and share this payload.
+# Custom evidence, ordinary/advanced experiment, and operator profiles live in global/agents.
 # The deployment entry point merges only the settings declared below into the
 # target config.toml and preserves host-owned MCP, trust, plugin, and runtime state.
 

@@ -41,7 +41,7 @@ CLI 对已有合同和状态写入统一使用 CAS：先读取当前记录，再
 
 ## 推理与领域 skill
 
-任务的 `reasoning_hint` 和 `suggested_skills` 只帮助开始工作。执行中先保持用户明确固定的档位；命中 `$execution-governor` 时由其判断目标档位与状态价值，未命中时按全局内核直接判断，再按需使用 `$reasoning-governor`。领域 skill 仍按修改对象触发，不受任务文件固定。
+任务的 `reasoning_hint` 和 `suggested_skills` 只帮助开始工作，不授权查询或改变线程推理深度。仅在用户明确要求时使用 `$reasoning-governor`；领域 skill 仍按修改对象触发，不受任务文件固定。
 
 ## 进度报告
 

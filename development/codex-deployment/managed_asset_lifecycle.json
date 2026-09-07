@@ -18,6 +18,7 @@
       { "id": "skill:understand-space", "path": "skills/understand-space", "kind": "directory", "modes": ["DirectCompatibility"], "requires_portable_settings": false },
       { "id": "settings:config", "path": "config.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
       { "id": "settings:hooks", "path": "hooks.json", "kind": "file", "modes": ["DirectCompatibility"], "requires_portable_settings": true },
+      { "id": "agent:advanced-experiment", "path": "agents/advanced-experiment.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
       { "id": "agent:evidence", "path": "agents/evidence.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
       { "id": "agent:experiment", "path": "agents/experiment.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true },
       { "id": "agent:operator", "path": "agents/operator.toml", "kind": "file", "modes": ["DirectCompatibility", "Plugin"], "requires_portable_settings": true }
