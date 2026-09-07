@@ -642,6 +642,71 @@ class WorkctlTests(unittest.TestCase):
         ]
         self.assertEqual(unknown, ["REQ-MISSING"])
 
+    def test_fenced_code_is_preserved_but_excluded_from_workflow_semantics(self) -> None:
+        requirements = self.root / "requirements.md"
+        requirements.write_text(
+            requirements.read_text(encoding="utf-8")
+            + """
+
+## REQ-002 围栏外的旧格式条目
+
+- 状态: confirmed
+- 关联: AC-001
+
+正文在围栏前。
+
+```markdown
+## REQ-FAKE 代码示例
+- 状态: open
+- 关联: REQ-MISSING
+````
+
+   ~~~~
+## AC-FAKE 波浪线示例
+- 状态: unresolved
+- 关联: CON-MISSING
+   ~~~~~
+
+正文在围栏后。
+
+## REQ-003 只有围栏状态
+
+```
+- 状态: open
+``
+""",
+            encoding="utf-8",
+        )
+
+        module = load_workctl_module()
+        index = module.build_index(self.root)
+        ids = {section["id"] for section in index["sections"]}
+        self.assertIn("REQ-002", ids)
+        self.assertNotIn("REQ-FAKE", ids)
+        self.assertNotIn("AC-FAKE", ids)
+        section = next(row for row in index["sections"] if row["id"] == "REQ-002")
+        self.assertEqual(section["status"], "confirmed")
+        self.assertEqual(section["references"], ["AC-001"])
+        self.assertIn("## REQ-FAKE 代码示例", section["body"])
+        self.assertIn("## AC-FAKE 波浪线示例", section["body"])
+        fenced_status_section = next(
+            row for row in index["sections"] if row["id"] == "REQ-003"
+        )
+        self.assertEqual(fenced_status_section["status"], "unspecified")
+        self.assertIn("- 状态: open", fenced_status_section["body"])
+        full_text = requirements.read_text(encoding="utf-8")
+        self.assertEqual(
+            index["document_hashes"]["requirements"],
+            f"sha256:{hashlib.sha256(full_text.encode('utf-8')).hexdigest()}",
+        )
+        self.assertFalse(
+            any(
+                item["kind"] == "unknown_reference"
+                and item.get("reference") in {"REQ-MISSING", "CON-MISSING"}
+                for item in index["diagnostics"]
+            )
+        )
+
     def test_protect_reports_unconfirmed_entries_without_becoming_a_gate(self) -> None:
         content = (self.root / "requirements.md").read_text(encoding="utf-8")
         (self.root / "requirements.md").write_text(
@@ -1050,6 +1115,57 @@ class WorkctlTests(unittest.TestCase):
             )
         self.assertEqual(caught.exception.gate["id"], "WORK-SNAPSHOT-RACE")
         self.assertFalse((self.root / ".work-cache" / "index.json").exists())
+
+    def test_index_write_rejects_document_change_during_cache_write(self) -> None:
+        module = load_workctl_module()
+        original = module.atomic_write_json
+        changed = False
+
+        def write_then_change_document(path: Path, value: dict) -> None:
+            nonlocal changed
+            original(path, value)
+            if path.name == "index.json" and not changed:
+                changed = True
+                with (self.root / "requirements.md").open("a", encoding="utf-8") as handle:
+                    handle.write("\n缓存写入期间发生改变。\n")
+
+        module.atomic_write_json = write_then_change_document
+        with self.assertRaises(module.WorkctlError) as caught:
+            module.index_workspace(Namespace(work_dir=str(self.root), max_items=50))
+        self.assertEqual(caught.exception.gate["id"], "WORK-SNAPSHOT-RACE")
+        self.assertIn("document changed", str(caught.exception))
+
+    def test_index_write_rejects_document_change_after_build(self) -> None:
+        module = load_workctl_module()
+        original = module.build_index
+
+        def build_then_change_document(root: Path) -> dict:
+            index = original(root)
+            with (root / "requirements.md").open("a", encoding="utf-8") as handle:
+                handle.write("\n索引构建后发生改变。\n")
+            return index
+
+        module.build_index = build_then_change_document
+        with self.assertRaises(module.WorkctlError) as caught:
+            module.index_workspace(Namespace(work_dir=str(self.root), max_items=50))
+        self.assertEqual(caught.exception.gate["id"], "WORK-SNAPSHOT-RACE")
+        self.assertFalse((self.root / ".work-cache" / "index.json").exists())
+
+    def test_index_write_respects_workspace_lock_and_recovers_after_release(self) -> None:
+        module = load_workctl_module()
+        cache_path = self.root / ".work-cache" / "index.json"
+
+        with module.workspace_lock(self.root):
+            with self.assertRaises(module.WorkctlError) as caught:
+                module.index_workspace(
+                    Namespace(work_dir=str(self.root), max_items=50)
+                )
+        self.assertEqual(caught.exception.gate["id"], "WORK-LOCK")
+        self.assertFalse(cache_path.exists())
+
+        result = module.index_workspace(Namespace(work_dir=str(self.root), max_items=50))
+        self.assertTrue(result["ok"])
+        self.assertTrue(cache_path.exists())
 
     def test_concurrent_protect_has_one_winner_and_no_overwrite(self) -> None:
         command = [

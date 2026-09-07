@@ -11,6 +11,7 @@ import importlib.util
 import json
 import os
 import re
+import secrets
 import sys
 import tempfile
 from collections import Counter, deque
@@ -44,7 +45,8 @@ SOURCE_ID_RE = re.compile(
 )
 SOURCE_SNAPSHOT_REF_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 SOURCE_RECEIPT_RE = re.compile(r"^source-(T[A-Za-z0-9][A-Za-z0-9._-]*)-([1-9][0-9]*)$")
-REVIEW_RECEIPT_RE = re.compile(r"^review-([1-9][0-9]*)$")
+REVIEW_RECEIPT_RE = re.compile(r"^review-([0-9a-f]{16})-([1-9][0-9]*)$")
+LEGACY_REVIEW_RECEIPT_RE = re.compile(r"^review-([1-9][0-9]*)$")
 MAX_REVIEW_RECEIPTS = 32
 STATE_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 STATUSES = ("todo", "claimed", "in_progress", "review", "blocked", "done", "retired")
@@ -438,6 +440,7 @@ def task_completion_model(payload: dict[str, Any]) -> dict[str, Any]:
                 "validation_coverage",
                 "unresolved",
                 "invalidated_source_ids",
+                "evidence_for",
                 "evidence_refs",
                 "result_diagnostics",
             )
@@ -828,12 +831,12 @@ def task_model_variants(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
                 }
                 yield copy.deepcopy(candidate)
     elif command == "completion-context":
-        candidate = copy.deepcopy(projected)
-        for row in candidate.get("candidates", {}).values():
+        candidate = copy.deepcopy(payload)
+        for row in candidate.get("candidate_tasks", {}).values():
             for evidence in row.get("evidence_refs", []):
                 if isinstance(evidence, dict):
                     evidence.pop("note", None)
-        yield candidate
+        yield task_completion_model(candidate)
         targets = candidate.get("targets")
         while isinstance(targets, list) and len(targets) > 1:
             targets.pop()
@@ -842,18 +845,26 @@ def task_model_variants(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
                 for target in targets
                 for task_id in target.get("candidate_task_ids", [])
             }
-            candidate["candidates"] = {
+            candidate["candidate_tasks"] = {
                 task_id: row
-                for task_id, row in candidate.get("candidates", {}).items()
+                for task_id, row in candidate.get("candidate_tasks", {}).items()
                 if task_id in referenced
             }
             last_id = targets[-1].get("id") if targets else None
-            candidate["more"] = {
-                **candidate.get("more", {}),
+            candidate["returned_target_count"] = len(targets)
+            candidate["pagination"] = {
+                **candidate.get("pagination", {}),
                 "target_next_after_id": last_id,
-                "review_receipt": payload.get("review_receipt"),
+                "candidate_next_after_ids": {
+                    target["id"]: target.get("candidate_next_after_id")
+                    for target in targets
+                },
             }
-            yield copy.deepcopy(candidate)
+            candidate["diagnostic_summary"] = completion_page_diagnostic_summary(
+                candidate["candidate_tasks"],
+                payload.get("diagnostic_summary", {}).get("query_diagnostic_count", 0),
+            )
+            yield task_completion_model(candidate)
     elif command in {"status", "render"}:
         candidate = copy.deepcopy(projected)
         frontiers = candidate.get("active_frontiers")
@@ -1399,12 +1410,23 @@ def review_receipt_path(root: Path) -> Path:
 
 def load_review_receipts(root: Path) -> dict[str, Any]:
     path = review_receipt_path(root)
-    if not path.exists():
-        return {"schema": "task.review-receipts", "next": 1, "handles": {}}
-    raw = read_json(path)
+    exists = path.exists()
+    raw = read_json(path) if exists else None
+    # Legacy handles have no cache generation and cannot safely survive a rebuild.
+    if not exists or (
+        isinstance(raw, dict) and raw.get("schema") == "task.review-receipts"
+    ):
+        return {
+            "schema": "task.review-receipts.v2",
+            "generation": secrets.token_hex(8),
+            "next": 1,
+            "handles": {},
+        }
     if (
         not isinstance(raw, dict)
-        or raw.get("schema") != "task.review-receipts"
+        or raw.get("schema") != "task.review-receipts.v2"
+        or not isinstance(raw.get("generation"), str)
+        or re.fullmatch(r"[0-9a-f]{16}", raw["generation"]) is None
         or not isinstance(raw.get("next"), int)
         or raw["next"] < 1
         or not isinstance(raw.get("handles"), dict)
@@ -1420,9 +1442,9 @@ def load_review_receipts(root: Path) -> dict[str, Any]:
     maximum = 0
     for handle, reference in raw["handles"].items():
         match = REVIEW_RECEIPT_RE.fullmatch(str(handle))
-        if match is None:
+        if match is None or match.group(1) != raw["generation"]:
             raise TaskctlError("review receipt cache contains an invalid handle", gate_id="TASK-SNAPSHOT-CONFLICT")
-        maximum = max(maximum, int(match.group(1)))
+        maximum = max(maximum, int(match.group(2)))
         normalize_source_snapshot_ref(reference, "review receipt snapshot")
     if raw["next"] != maximum + 1:
         raise TaskctlError("review receipt cache sequence is invalid", gate_id="TASK-SNAPSHOT-CONFLICT")
@@ -1434,14 +1456,14 @@ def store_review_receipt(root: Path, snapshot_id: str) -> str:
     for handle, existing in cache["handles"].items():
         if existing == snapshot_id:
             return handle
-    handle = f"review-{cache['next']}"
+    handle = f"review-{cache['generation']}-{cache['next']}"
     if handle in cache["handles"]:
         raise TaskctlError("review receipt sequence conflicts with an existing handle", gate_id="TASK-SNAPSHOT-CONFLICT")
     cache["handles"][handle] = snapshot_id
     cache["next"] += 1
     ordered = sorted(
         cache["handles"].items(),
-        key=lambda item: int(REVIEW_RECEIPT_RE.fullmatch(item[0]).group(1)),
+        key=lambda item: int(REVIEW_RECEIPT_RE.fullmatch(item[0]).group(2)),
     )
     cache["handles"] = dict(ordered[-MAX_REVIEW_RECEIPTS:])
     atomic_write_json(review_receipt_path(root), cache)
@@ -1450,8 +1472,16 @@ def store_review_receipt(root: Path, snapshot_id: str) -> str:
 
 def resolve_review_receipt(root: Path, handle: str) -> str:
     normalized = require_identity_string(handle, "--review-receipt")
+    if LEGACY_REVIEW_RECEIPT_RE.fullmatch(normalized):
+        raise TaskctlError(
+            "legacy review receipt has no cache generation; restart final review",
+            gate_id="TASK-PAGINATION-SNAPSHOT",
+            risk="a legacy handle cannot identify its original review cache generation",
+            recovery="restart completion-context from the first page without old cursors",
+            retryable=True,
+        )
     if REVIEW_RECEIPT_RE.fullmatch(normalized) is None:
-        raise TaskctlError("--review-receipt must be a readable review sequence")
+        raise TaskctlError("--review-receipt must include its cache generation and sequence")
     reference = load_review_receipts(root)["handles"].get(normalized)
     if reference is None:
         raise TaskctlError(
@@ -3716,9 +3746,10 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
         )
     index, index_diagnostics = maybe_load_index(root, table)
     task = tasks[args.id]
-    _, current_result_diagnostics = safe_current_result(
+    result, current_result_diagnostics = safe_current_result(
         root, table, task, states[args.id]
     )
+    current_result_diagnostics.extend(result_diagnostics(result, task, index))
     dependency_context = []
     for dependency in task["dependencies"]:
         dependency_id = dependency["id"]
@@ -3745,11 +3776,7 @@ def command_context(args: argparse.Namespace) -> dict[str, Any]:
                 "result": public_result(dependency_result),
                 "diagnostics": [
                     *dependency_result_diagnostics,
-                    *(
-                        dependency_result.get("_source_snapshot_diagnostics", [])
-                        if dependency_result
-                        else []
-                    ),
+                    *result_diagnostics(dependency_result, tasks[dependency_id], index),
                 ],
             }
         )
@@ -3833,6 +3860,27 @@ def semantic_downstream_ids(index: dict[str, Any], source_id: str) -> set[str]:
                 seen.add(dependent)
                 queue.append(dependent)
     return seen
+
+
+def completion_page_diagnostic_summary(
+    catalog: dict[str, dict[str, Any]], query_diagnostic_count: int
+) -> dict[str, Any]:
+    summary = summarize_result_diagnostics(
+        {
+            task_id: candidate.get("result_diagnostics", [])
+            for task_id, candidate in catalog.items()
+            if candidate.get("result_ref") is not None
+        }
+    )
+    return {
+        "query_diagnostic_count": query_diagnostic_count,
+        "candidate_result_with_diagnostics_count": summary["result_with_diagnostics_count"],
+        "candidate_task_revision_stale_result_count": summary["task_revision_stale_result_count"],
+        "candidate_source_snapshot_issue_result_count": summary["source_snapshot_issue_result_count"],
+        "candidate_result_diagnostic_count": summary["result_diagnostic_count"],
+        "candidate_result_diagnostic_kind_counts": summary["result_diagnostic_kind_counts"],
+        "total_diagnostic_count": query_diagnostic_count + summary["result_diagnostic_count"],
+    }
 
 
 def command_completion_context(args: argparse.Namespace) -> dict[str, Any]:
@@ -3956,7 +4004,7 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
     target_stream_continuation = bool(
         args.after_id is not None
         or args.candidate_after_id is not None
-        or (args.target_id is not None and args.snapshot_id)
+        or (args.target_id is not None and expected_snapshot_id is not None)
     )
     constraint_stream_continuation = args.constraint_after_id is not None
     deferred_stream_continuation = args.deferred_after_id is not None
@@ -4117,35 +4165,7 @@ def completion_context_locked(args: argparse.Namespace, root: Path) -> dict[str,
         return {task_id: candidate_task_rows[task_id] for task_id in task_ids}
 
     def page_diagnostic_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
-        catalog = candidate_catalog(rows)
-        result_summary = summarize_result_diagnostics(
-            {
-                task_id: candidate["result_diagnostics"]
-                for task_id, candidate in catalog.items()
-                if candidate["result_ref"] is not None
-            }
-        )
-        return {
-            "query_diagnostic_count": len(diagnostics),
-            "candidate_result_with_diagnostics_count": result_summary[
-                "result_with_diagnostics_count"
-            ],
-            "candidate_task_revision_stale_result_count": result_summary[
-                "task_revision_stale_result_count"
-            ],
-            "candidate_source_snapshot_issue_result_count": result_summary[
-                "source_snapshot_issue_result_count"
-            ],
-            "candidate_result_diagnostic_count": result_summary[
-                "result_diagnostic_count"
-            ],
-            "candidate_result_diagnostic_kind_counts": result_summary[
-                "result_diagnostic_kind_counts"
-            ],
-            "total_diagnostic_count": (
-                len(diagnostics) + result_summary["result_diagnostic_count"]
-            ),
-        }
+        return completion_page_diagnostic_summary(candidate_catalog(rows), len(diagnostics))
 
     target_more = len(filtered_target_ids) > len(target_rows)
     pagination = {

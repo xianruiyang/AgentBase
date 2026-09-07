@@ -43,6 +43,7 @@ REFERENCE_FIELD_RE = re.compile(
     r"\s*[:：]\s*(?P<value>.*)$",
     re.IGNORECASE,
 )
+FENCE_OPEN_RE = re.compile(r"^ {0,3}(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
 UNRESOLVED_STATUSES = {"open", "unknown", "unresolved", "deferred", "待决", "未知", "延后"}
 DCR_STATUSES = {"deferred", "discussed", "resolved", "withdrawn"}
 STAGE_PREFIXES = {
@@ -586,6 +587,25 @@ def ensure_workflow_manifest_unchanged(
         )
 
 
+def ensure_workflow_documents_unchanged(
+    root: Path,
+    documents: dict[str, Any],
+    expected_fingerprints: dict[str, str],
+    operation: str,
+) -> None:
+    for stage, expected_fingerprint in expected_fingerprints.items():
+        relative_path = str(documents[stage])
+        path = resolve_inside(root, relative_path)
+        if file_fingerprint(path) != expected_fingerprint:
+            raise WorkctlError(
+                f"workflow document changed while {operation}: {relative_path}",
+                gate_id="WORK-SNAPSHOT-RACE",
+                risk="one semantic index cache would combine content from different document versions",
+                recovery="retry after workflow document edits have stopped",
+                retryable=True,
+            )
+
+
 def atomic_write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
@@ -984,13 +1004,39 @@ def section_prefix(section_id: str) -> str:
     return section_id.split("-", 1)[0]
 
 
+def fenced_code_lines(lines: list[str]) -> set[int]:
+    fenced: set[int] = set()
+    marker_char: str | None = None
+    marker_length = 0
+    for index, line in enumerate(lines):
+        if marker_char is None:
+            match = FENCE_OPEN_RE.match(line)
+            if match is None:
+                continue
+            marker = match.group("marker")
+            if marker[0] == "`" and "`" in match.group("info"):
+                continue
+            marker_char = marker[0]
+            marker_length = len(marker)
+            fenced.add(index)
+            continue
+        fenced.add(index)
+        if re.fullmatch(rf" {{0,3}}{re.escape(marker_char)}{{{marker_length},}}[ \t]*", line):
+            marker_char = None
+            marker_length = 0
+    return fenced
+
+
 def parse_document(
     path: Path, stage: str, document: str
 ) -> tuple[list[dict[str, Any]], str]:
     text = read_text_bounded(path, MAX_DOCUMENT_BYTES)
     lines = text.splitlines()
+    fenced_lines = fenced_code_lines(lines)
     matches: list[tuple[int, re.Match[str]]] = []
     for index, line in enumerate(lines):
+        if index in fenced_lines:
+            continue
         match = HEADING_RE.match(line)
         if match:
             matches.append((index, match))
@@ -1000,7 +1046,9 @@ def parse_document(
         body_lines = lines[line_index + 1 : end_index]
         body = "\n".join(body_lines).strip()
         status = "unspecified"
-        for body_line in body_lines:
+        for body_index, body_line in enumerate(body_lines, start=line_index + 1):
+            if body_index in fenced_lines:
+                continue
             status_match = STATUS_RE.match(body_line)
             if status_match:
                 status = status_match.group("status").strip().casefold()
@@ -1009,7 +1057,8 @@ def parse_document(
         title = (match.group("title") or "").strip()
         relation_values = [
             relation_match.group("value")
-            for body_line in body_lines
+            for body_index, body_line in enumerate(body_lines, start=line_index + 1)
+            if body_index not in fenced_lines
             if (relation_match := REFERENCE_FIELD_RE.match(body_line)) is not None
         ]
         refs = sorted(set(ID_RE.findall("\n".join(relation_values))) - {section_id})
@@ -1062,16 +1111,9 @@ def build_index(
                 )
     baseline = verify_protected_baseline(root, manifest)
     diagnostics.extend(baseline.get("diagnostics", []))
-    for stage, recorded_fingerprint in document_hashes.items():
-        path = resolve_inside(root, str(manifest["documents"][stage]))
-        if file_fingerprint(path) != recorded_fingerprint:
-            raise WorkctlError(
-                f"workflow document changed while building the index: {path.name}",
-                gate_id="WORK-SNAPSHOT-RACE",
-                risk="one index would combine semantic sections from different document versions",
-                recovery="retry after document edits have stopped",
-                retryable=True,
-            )
+    ensure_workflow_documents_unchanged(
+        root, manifest["documents"], document_hashes, "building the index"
+    )
     ensure_workflow_manifest_unchanged(root, manifest_fingerprint, "building the index")
     if len(all_sections) > MAX_RECORDS:
         raise WorkctlError(
@@ -1461,10 +1503,26 @@ def index_workspace(args: argparse.Namespace) -> dict[str, Any]:
     ensure_workflow_manifest_unchanged(
         root, manifest_fingerprint, "preparing the semantic index write"
     )
-    atomic_write_json(cache_path, index)
-    ensure_workflow_manifest_unchanged(
-        root, manifest_fingerprint, "writing the semantic index"
+    ensure_workflow_documents_unchanged(
+        root, index["documents"], index["document_hashes"],
+        "preparing the semantic index write",
     )
+    with workspace_lock(root):
+        ensure_workflow_manifest_unchanged(
+            root, manifest_fingerprint, "writing the semantic index"
+        )
+        ensure_workflow_documents_unchanged(
+            root, index["documents"], index["document_hashes"],
+            "writing the semantic index",
+        )
+        atomic_write_json(cache_path, index)
+        ensure_workflow_manifest_unchanged(
+            root, manifest_fingerprint, "writing the semantic index"
+        )
+        ensure_workflow_documents_unchanged(
+            root, index["documents"], index["document_hashes"],
+            "writing the semantic index",
+        )
     diagnostics, truncated = limit_items(index["diagnostics"], args.max_items)
     return {
         "ok": True,

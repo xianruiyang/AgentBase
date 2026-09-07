@@ -691,7 +691,8 @@ class TaskctlTests(unittest.TestCase):
         self.assertNotIn("schema:", model.stdout)
         self.assertNotIn("task_id:", model.stdout)
         self.assertNotIn("current_for_task_revision:true", model.stdout)
-        self.assertNotIn("source_snapshot:", model.stdout)
+        self.assertNotRegex(model.stdout, r"source_snapshot:\[")
+        self.assertIn("source_snapshot:captured", model.stdout)
 
         machine = self.run_cli(
             TASKCTL, "show", "--task-dir", str(self.root), "--id", "T001"
@@ -3061,7 +3062,7 @@ class TaskctlTests(unittest.TestCase):
         self.assertEqual(first.returncode, 0, first.stderr)
         self.assertNotIn("sha256:", first.stdout)
         handle_match = re.search(
-            r'review_receipt:"?(review-[1-9][0-9]*)"?', first.stdout
+            r'review_receipt:"?(review-[0-9a-f]{16}-[1-9][0-9]*)"?', first.stdout
         )
         cursor_match = re.search(
             r'target_next_after_id:"?([A-Z]+-[A-Za-z0-9._-]+)"?', first.stdout
@@ -3088,12 +3089,113 @@ class TaskctlTests(unittest.TestCase):
         self.assertRegex(machine["snapshot_id"], r"^sha256:[0-9a-f]{64}$")
         self.assertNotIn("review_receipt", machine)
 
+    def test_context_reports_stale_current_and_dependency_results(self) -> None:
+        completed = self.complete_t001()
+        result_path = self.root / completed["result_ref"]
+        result_before = result_path.read_bytes()
+        clean = self.run_task("context", "--id", "T002", "--budget", "24000")
+        self.assertEqual(clean["dependencies"][0]["diagnostics"], [])
+        candidate = self.task("T001", "修订导出职责", ["SOL-001"])
+        candidate_path = Path(self.temp.name) / "updated-task.json"
+        candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+        self.run_task("update", "--file", str(candidate_path))
+        with (self.root / "solution.md").open("a", encoding="utf-8") as stream:
+            stream.write("\n方案要求已改变。\n")
+        expected = {"result_task_revision_stale", "result_source_snapshot_stale"}
+        dependency = self.run_task("context", "--id", "T002", "--budget", "24000")
+        self.assertTrue(expected.issubset({row["kind"] for row in dependency["dependencies"][0]["diagnostics"]}))
+        current = self.run_task("context", "--id", "T001", "--budget", "24000")
+        self.assertTrue(expected.issubset({row["kind"] for row in current["diagnostics"]}))
+        model = self.run_default_cli(TASKCTL, "context", "--id", "T002", "--task-dir", str(self.root), "--model-token-budget", "12000")
+        self.assertEqual(model.returncode, 0, model.stderr)
+        for kind in expected:
+            self.assertIn(kind, model.stdout)
+        self.assertEqual(result_path.read_bytes(), result_before)
+
+    def test_completion_model_keeps_explicit_evidence_scope(self) -> None:
+        result = self.result_payload()
+        result["evidence_for"] = ["AC-001"]
+        self.complete_t001(result)
+        machine = self.run_task("completion-context", "--target-id", "REQ-001", "--budget", "24000")
+        self.assertIn("T001", machine["targets"][0]["candidate_task_ids"])
+        module = load_taskctl_module()
+        model = module.task_completion_model(machine)
+        self.assertEqual(model["candidates"]["T001"]["evidence_for"], ["AC-001"])
+        self.assertNotIn("REQ-001", model["candidates"]["T001"]["evidence_for"])
+
+    def test_completion_model_budget_keeps_page_counts_diagnostics_and_cursors_consistent(self) -> None:
+        module = load_taskctl_module()
+        payload = {
+            "command": "completion-context", "review_receipt": "review-0123456789abcdef-1",
+            "target_count": 2, "returned_target_count": 2,
+            "targets": [
+                {"id": "REQ-001", "body": "first " * 100, "candidate_task_ids": ["T001"]},
+                {"id": "REQ-002", "body": "second " * 100, "candidate_task_ids": ["T002"], "candidate_next_after_id": "T002"},
+            ],
+            "candidate_tasks": {
+                "T001": {"status": "done", "result_ref": "results/T001.r2.json", "evidence_for": ["REQ-001"], "result_diagnostics": []},
+                "T002": {"status": "done", "result_ref": "results/T002.r2.json", "result_diagnostics": [{"kind": "result_task_revision_stale"}]},
+            },
+            "pagination": {"candidate_next_after_ids": {"REQ-001": None, "REQ-002": "T002"}},
+            "query_diagnostics": [{"kind": "upstream_index_missing"}],
+            "diagnostic_summary": {"query_diagnostic_count": 1, "candidate_result_diagnostic_count": 1, "total_diagnostic_count": 2},
+        }
+        last_variant = list(module.task_model_variants(payload))[-1]
+        budget = module.model_text_cost(module.render_model(last_variant))
+        text, _, page = module.fit_task_model_with_snapshot(payload, budget)
+        self.assertIsNotNone(page)
+        self.assertLessEqual(module.model_text_cost(text), budget)
+        self.assertEqual([row["id"] for row in page["targets"]], ["REQ-001"])
+        self.assertEqual(page["review"]["returned_targets"], 1)
+        self.assertEqual(set(page["candidates"]), {"T001"})
+        self.assertEqual(page["diagnostics"].get("candidate_result_diagnostic_count", 0), 0)
+        self.assertEqual(page["diagnostics"]["total_diagnostic_count"], 1)
+        self.assertEqual(page["more"]["target_next_after_id"], "REQ-001")
+        self.assertNotIn("REQ-002", page["more"].get("candidate_next_after_ids", {}))
+
+    def test_review_cache_recreation_does_not_rebind_old_receipt(self) -> None:
+        module = load_taskctl_module()
+        arguments = ["completion-context", "--task-dir", str(self.root), "--view", "model", "--limit", "1"]
+        args = module.build_parser().parse_args(arguments)
+        first = module.command_completion_context(args)
+        cache = self.root / ".work-cache" / "taskctl-review-receipts.json"
+        cache.unlink()
+        self.run_task("claim", "--id", "T001", "--owner", "agent-a")
+        second = module.command_completion_context(args)
+        self.assertNotEqual(first["review_receipt"], second["review_receipt"])
+        cursor = first["pagination"]["target_next_after_id"]
+        old_args = module.build_parser().parse_args([*arguments, "--after-id", cursor, "--review-receipt", first["review_receipt"]])
+        with self.assertRaises(module.TaskctlError) as caught:
+            module.command_completion_context(old_args)
+        self.assertEqual(caught.exception.gate["id"], "TASK-PAGINATION-SNAPSHOT")
+        new_args = module.build_parser().parse_args([*arguments, "--target-id", "REQ-001", "--review-receipt", second["review_receipt"]])
+        continued = module.command_completion_context(new_args)
+        self.assertEqual(continued["returned_streams"], ["targets"])
+
+    def test_legacy_review_cache_restarts_without_migrating_permanent_records(self) -> None:
+        self.complete_t001()
+        module = load_taskctl_module()
+        machine = self.run_task("completion-context", "--limit", "1")
+        permanent = {path: path.read_bytes() for directory in ("tasks", "state", "results", "snapshots") for path in (self.root / directory).glob("*.json")}
+        cache_path = self.root / ".work-cache" / "taskctl-review-receipts.json"
+        cache_path.write_text(json.dumps({"schema": "task.review-receipts", "next": 2, "handles": {"review-1": machine["snapshot_id"]}}), encoding="utf-8")
+        with self.assertRaises(module.TaskctlError) as caught:
+            module.resolve_review_receipt(self.root, "review-1")
+        self.assertEqual(caught.exception.gate["id"], "TASK-PAGINATION-SNAPSHOT")
+        args = module.build_parser().parse_args(["completion-context", "--task-dir", str(self.root), "--view", "model", "--limit", "1"])
+        fresh = module.command_completion_context(args)
+        self.assertRegex(fresh["review_receipt"], r"^review-[0-9a-f]{16}-1$")
+        self.assertEqual(json.loads(cache_path.read_text(encoding="utf-8"))["schema"], "task.review-receipts.v2")
+        continued = self.run_task("completion-context", "--after-id", machine["pagination"]["target_next_after_id"], "--snapshot-id", machine["snapshot_id"], "--limit", "1")
+        self.assertTrue(continued["targets"])
+        self.assertEqual({path: path.read_bytes() for path in permanent}, permanent)
+
     def test_model_review_receipt_missing_stale_and_conflict_are_gates(self) -> None:
         first = self.run_default_cli(
             TASKCTL, "completion-context", "--task-dir", str(self.root), "--limit", "1"
         )
         self.assertEqual(first.returncode, 0, first.stderr)
-        handle = re.search(r'review_receipt:"?(review-[1-9][0-9]*)"?', first.stdout).group(1)
+        handle = re.search(r'review_receipt:"?(review-[0-9a-f]{16}-[1-9][0-9]*)"?', first.stdout).group(1)
         cursor = re.search(
             r'target_next_after_id:"?([A-Z]+-[A-Za-z0-9._-]+)"?', first.stdout
         ).group(1)
