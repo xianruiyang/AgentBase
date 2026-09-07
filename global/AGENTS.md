@@ -78,7 +78,7 @@ must: 用户固定线程或工作范围的推理深度时按期限保持，未�
 
 must: 用户未明确要求查看、设置、固定、改变、重评或解除当前线程推理深度时，不查询或改变该设置
 
-must: 用户分工优先；主代理规划、治理关键文档、定稿验收；证据定位、普通或困难/视觉实现试错、确定执行经 `$subagent-orchestration` 分别交 `evidence`、`experiment`/`advanced-experiment`、`operator`，直接可闭合者除外；无独立工作就等待；子代理仅按本任务明确要求嵌套
+must: 用户分工优先；主代理规划、治理关键文档、定稿验收；证据定位、普通或困难/视觉实现试错、确定执行经 `$subagent-orchestration` 分别交 `evidence`、`experiment`/`advanced-experiment`、`operator`，直接可闭合者除外；无独立工作就等待；两类 experiment 在本实验内按需委派一层 evidence 取证，无需另行授权；evidence 与 operator 不得创建子代理
 
 must: 文件发现与文本搜索一律通过 PATH 的 `srcq fd <options> <one-pattern> <paths>`、`srcq rg <options> <pattern> <paths>`；列文件用 `srcq rg --files <paths>`；不得裸调 `rg`、`fd` 或直接调用其可执行路径，不重复选择器；普通查询不预载高级 skill，已知文件的有界读取可直接用读取工具
 

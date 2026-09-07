@@ -19,7 +19,7 @@
 
 ## 可移植设置边界
 
-`config.toml` 当前管理人格、审批、命令 sandbox 模式、实时网页搜索、低输出详细度、关闭推理摘要、标准服务层、项目指令预算、多代理开关、hooks 和桌面偏好。主线程模型、默认推理深度与 Windows sandbox 后端保持目标宿主所有；portable config 不维护主动委派 mode、tool hint 或递归策略。`global/AGENTS.md` 维护用户优先、主代理定稿与子代理默认分工、允许等待及默认不递归边界；`subagent-orchestration` 维护实际创建、按缺口选择角色、单层取证授权、阅读审核与交接。`[agents].max_concurrent_threads_per_session = 6` 只限制不含 root 的同时打开子代理线程，不参与是否委派的裁决；未显式选择角色时的模型和档位回退也由 `[agents]` 管理。`evidence.toml`、`experiment.toml`、`advanced-experiment.toml` 与 `operator.toml` 分别唯一维护只读取证、普通实现实验、困难或视觉实验和合同已确认的有界执行角色；主代理保留规划、关键文档、正式质量与验收。全局规则和 skill 只按语义角色选择，不复制易变的模型名或档位。
+`config.toml` 当前管理人格、审批、命令 sandbox 模式、实时网页搜索、低输出详细度、关闭推理摘要、标准服务层、项目指令预算、多代理开关、hooks 和桌面偏好。主线程模型、默认推理深度与 Windows sandbox 后端保持目标宿主所有；portable config 不维护主动委派 mode、tool hint 或递归策略。`global/AGENTS.md` 维护用户优先、主代理定稿与子代理默认分工、允许等待及按角色限定的委派边界；`subagent-orchestration` 维护实际创建、按缺口选择角色、实验内按需委派一层 evidence、阅读审核与交接。`[agents].max_concurrent_threads_per_session = 6` 只限制不含 root 的同时打开子代理线程，不参与是否委派的裁决；未显式选择角色时的模型和档位回退也由 `[agents]` 管理。`evidence.toml`、`experiment.toml`、`advanced-experiment.toml` 与 `operator.toml` 分别唯一维护只读取证、普通实现实验、困难或视觉实验和合同已确认的有界执行角色；主代理保留规划、关键文档、正式质量与验收。全局规则和 skill 只按语义角色选择，不复制易变的模型名或档位。
 
 部署只合并实际变化的受管键，并保留目标主机中的认证、项目 trust、MCP、插件/marketplace、Windows sandbox 后端、hook 信任哈希、宿主生成字段、历史、日志、缓存和秘密。`windows.sandbox` 的初始化依赖机器状态和用户批准，已从 AgentBase 受管键移交宿主；最终评测也不再选择、初始化或维护 elevated 后端，而是使用受信任本地 candidate 与独立 Verifier 工作区。可移植设置不包含机器绝对路径，也不伪装成可以复制的 MCP 或插件安装状态。
 
