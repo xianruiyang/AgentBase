@@ -605,6 +605,84 @@ fn cpp_incoming_calls_find_callers_and_stop_on_cycles() {
 }
 
 #[test]
+fn cpp_incoming_node_budget_counts_callers_after_filtering_references() {
+    let fixture = tempfile::tempdir().expect("temporary incoming budget scope");
+    let source = fixture.path().join("calls.cpp");
+    fs::write(
+        &source,
+        "void target() {}\nauto p = target;\nauto q = target;\nvoid first() { target(); }\nvoid second() { target(); }\n",
+    )
+    .expect("source fixture");
+    let source = source.to_str().expect("UTF-8 source path");
+
+    let filtered = run(&[
+        "symbol",
+        "calls",
+        "--at",
+        &format!("{source}:0:5"),
+        "--only-root",
+        source,
+        "--direction",
+        "incoming",
+        "--depth",
+        "1",
+        "--max-nodes",
+        "3",
+        "--output",
+        "machine",
+    ]);
+    assert!(
+        filtered.status.success(),
+        "{}",
+        String::from_utf8_lossy(&filtered.stderr)
+    );
+    let filtered: Value = serde_json::from_slice(&filtered.stdout).expect("filtered incoming tree");
+    assert_eq!(filtered["nodes"], 3);
+    assert_eq!(filtered["truncated"], false);
+    assert_eq!(filtered["scope"]["candidate_scan"], "complete");
+    assert_eq!(
+        filtered["root"]["children"]
+            .as_array()
+            .expect("filtered bundle root children should be an array")
+            .len(),
+        2
+    );
+    assert_eq!(filtered["root"]["children"][0]["name"], "first");
+    assert_eq!(filtered["root"]["children"][1]["name"], "second");
+
+    let truncated = run(&[
+        "symbol",
+        "calls",
+        "--at",
+        &format!("{source}:0:5"),
+        "--only-root",
+        source,
+        "--direction",
+        "incoming",
+        "--depth",
+        "1",
+        "--max-nodes",
+        "2",
+        "--output",
+        "machine",
+    ]);
+    assert!(truncated.status.success());
+    let truncated: Value =
+        serde_json::from_slice(&truncated.stdout).expect("truncated incoming tree");
+    assert_eq!(truncated["nodes"], 2);
+    assert_eq!(truncated["truncated"], true);
+    assert_eq!(truncated["scope"]["candidate_scan"], "complete");
+    assert_eq!(
+        truncated["root"]["children"]
+            .as_array()
+            .expect("truncated bundle root children should be an array")
+            .len(),
+        1
+    );
+    assert_eq!(truncated["root"]["children"][0]["name"], "first");
+}
+
+#[test]
 fn cpp_bidirectional_calls_bundle_reconstructs_both_v1_roots_and_branch_state() {
     let root = fixture_source();
     let root = root.to_str().expect("UTF-8 fixture path");

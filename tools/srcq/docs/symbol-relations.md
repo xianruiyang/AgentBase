@@ -2,7 +2,7 @@
 
 `srcq symbol` 在一个只读入口内组合 ripgrep 候选生成与 ast-grep 结构分类，用于低延迟取得定义候选、引用候选和有界调用树。它不实现编译器或 Language Provider，输出中的 `candidate`、`ambiguous` 与 `semantic-unknown` 是证据边界，不是精确语义的弱化文案。
 
-本页的 `--source-manifest`、`--direction both` 和 `srcq.symbol.calls/bundle/v1` 只描述当前仓库未发行候选；正式 0.7.0 Release 和已安装 0.7.0 不包含这些能力。
+本页的 `--source-manifest`、`--direction both` 和 `srcq.symbol.calls/bundle/v1` 自 0.8.0 起可用。
 
 每次调用都是独立进程，不依赖 VS Code、cpptools 或跨调用索引。默认一次查询共享 7500 ms 后端扫描预算，为范围解析、进程启动和输出保留到端到端 10 秒目标的余量；操作系统调度和存储状态不作绝对时延承诺。预算耗尽会终止当前后端进程树、退出 124，并明确报告结果不完整，不返回伪造的“未找到”；调用树已经取得根和部分节点时会保留它们并输出 `@cut reason=time-budget`。
 
@@ -53,7 +53,7 @@ TypeScript/TSX/JavaScript 只读消费 `tsconfig.json`/`jsconfig.json` reference
 
 自动定义查询按锚点、项目与已解析依赖逐步扩展，找到充分候选后停止；树内递归只在项目/显式根和当前定义文件中继续，避免一个外部库调用把整个 SDK 变成隐式扫描。自动引用和 incoming 查询也优先使用源码树；只有 machine/model 报告 `candidate_scan=complete` 或 `scan=complete` 时，结果才覆盖全部选中根。`prioritized` 表示当前候选有效但仍有已解析根未扫描；需要选定范围全集时使用 `--only-root` 明确边界。
 
-C++ incoming 直接复用 AST 已确认的包含函数定义继续展开，不再只按 caller 短名跨文件重新选择；这消除了其他文件同名函数造成的无谓歧义。调用点仍是所选范围内的词法候选，宏、函数值、重载或动态分派会改变结论时仍需交给 Provider 核验。
+C++ incoming 直接复用 AST 已确认的包含函数定义继续展开，不再只按 caller 短名跨文件重新选择；这消除了其他文件同名函数造成的无谓歧义。incoming 的节点预算在引用被分类、筛选为调用者后应用，普通引用不占调用树节点预算；仍有调用者因节点上限未显示时标记 `truncated`。调用点仍是所选范围内的词法候选，宏、函数值、重载或动态分派会改变结论时仍需交给 Provider 核验。
 
 默认预算内未闭合时按以下顺序恢复：已有位置直接 `--at`；名称未知位置时先用有界 `srcq rg` 在权威项目或模块内取得位置/静态限定名；再用 `--only-root` 选择当前源码树或编译配置确认的外部模块。调用树先取 `--depth 1`，高扇出节点需要更深关系时从已返回的子节点位置继续；只有必须一次取得更宽或更深的整体且无法收窄时才提高 `--time-budget-ms`，并显式放弃 10 秒快速路径。输入、范围和机制未变时不得只为期待不同结果而重跑。
 

@@ -113,6 +113,8 @@ pub(super) fn execute_containing(
     output: &mut impl Write,
 ) -> Result<(), ProcessCommandError> {
     let (cache_id, cache) = location_cache(input, launch_cwd)?;
+    let mut source_cache = BTreeMap::new();
+    verified_source(&cache, file, &mut source_cache)?;
     let target = normalized_file(file);
     let position = Position::new(line, column);
     let mut candidates = Vec::new();
@@ -145,7 +147,6 @@ pub(super) fn execute_containing(
         })
         .cloned()
         .collect();
-    let mut source_cache = BTreeMap::new();
     let mut results = Vec::new();
     let mut model_lines = Vec::new();
     for selected in &selected {
@@ -376,34 +377,7 @@ fn verify_cached_location(
         ))
         .into());
     }
-    let key = normalized_file(native_file);
-    if !source_cache.contains_key(&key) {
-        let expected = cache.source_fingerprint(native_file).ok_or_else(|| {
-            ProcessError::InvalidArgument(format!(
-                "cache has no pre-execution fingerprint for {native_file:?}; rerun srcq exec with --cache on --fingerprint-file"
-            ))
-        })?;
-        let cwd = cache
-            .metadata()
-            .get("cwd")
-            .and_then(Value::as_str)
-            .ok_or_else(|| {
-                ProcessError::InvalidArgument("cache metadata cwd is missing".to_owned())
-            })?;
-        let actual =
-            srcq_core::cache::SourceFingerprint::capture(Path::new(cwd), Path::new(native_file))?;
-        if &actual != expected {
-            return Err(ProcessError::InvalidArgument(format!(
-                "cached source for {native_file:?} changed; rerun ast-grep before reusing locations"
-            ))
-            .into());
-        }
-        let path = resolve_cache_source(cache, native_file)?;
-        source_cache.insert(key.clone(), fs::read(path).map_err(ProcessError::Input)?);
-    }
-    let source = source_cache
-        .get(&key)
-        .ok_or_else(|| ProcessError::InvalidArgument("source cache lookup failed".to_owned()))?;
+    let source = verified_source(cache, native_file, source_cache)?;
     let current = source_slice(source, native_range).map_err(|_| {
         ProcessError::InvalidArgument(format!(
             "cached source for {native_file:?} changed; rerun ast-grep before reusing locations"
@@ -416,6 +390,40 @@ fn verify_cached_location(
         .into());
     }
     Ok(text.to_owned())
+}
+
+fn verified_source<'a>(
+    cache: &VerifiedCache,
+    file: &str,
+    source_cache: &'a mut BTreeMap<String, Vec<u8>>,
+) -> Result<&'a [u8], ProcessCommandError> {
+    let key = normalized_file(file);
+    if !source_cache.contains_key(&key) {
+        let expected = cache.source_fingerprint(file).ok_or_else(|| {
+            ProcessError::InvalidArgument(format!(
+                "cache has no pre-execution fingerprint for {file:?}; rerun srcq exec with --cache on --fingerprint-file"
+            ))
+        })?;
+        let cwd = cache
+            .metadata()
+            .get("cwd")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                ProcessError::InvalidArgument("cache metadata cwd is missing".to_owned())
+            })?;
+        let actual = srcq_core::cache::SourceFingerprint::capture(Path::new(cwd), Path::new(file))?;
+        if &actual != expected {
+            return Err(ProcessError::InvalidArgument(format!(
+                "cached source for {file:?} changed; rerun ast-grep before reusing locations"
+            ))
+            .into());
+        }
+        let path = resolve_cache_source(cache, file)?;
+        source_cache.insert(key.clone(), fs::read(path).map_err(ProcessError::Input)?);
+    }
+    source_cache.get(&key).map(Vec::as_slice).ok_or_else(|| {
+        ProcessError::InvalidArgument("source cache lookup failed".to_owned()).into()
+    })
 }
 
 fn resolve_cache_source(cache: &VerifiedCache, file: &str) -> Result<PathBuf, ProcessCommandError> {

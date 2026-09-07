@@ -520,6 +520,36 @@ fn verified_get_query_touch_and_remove_use_the_committed_source() {
 }
 
 #[test]
+fn verified_read_enforces_expiry_before_renewal() {
+    let ttl = CacheLimits::default().ttl;
+    for (elapsed, expired) in [
+        (ttl - Duration::from_secs(1), false),
+        (ttl, true),
+        (ttl + Duration::from_secs(1), true),
+    ] {
+        let fixture = Fixture::new();
+        let store = fixture.store(CacheLimits::default());
+        let now = fixed_now();
+        let committed = commit_jsonl(&store, b"{\"text\":\"safe\"}\n", now, "expiry");
+        let metadata_path = committed.path.join("metadata.yaml");
+        let before = fs::read(&metadata_path).expect("metadata before");
+        let result = store.open_verified(&committed.cache_id, now + elapsed);
+        if expired {
+            let error = result.expect_err("expired cache must not be renewed");
+            assert!(matches!(error, CacheError::Verification(_)));
+            assert!(error
+                .to_string()
+                .contains("expired; rerun the original query"));
+            assert_eq!(fs::read(&metadata_path).expect("metadata after"), before);
+        } else {
+            let verified = result.expect("cache before expiry remains readable");
+            assert_eq!(verified.result(0).expect("cached result")["text"], "safe");
+            assert_ne!(fs::read(&metadata_path).expect("metadata after"), before);
+        }
+    }
+}
+
+#[test]
 fn verified_read_rejects_corruption_without_touching_metadata() {
     let fixture = Fixture::new();
     let store = fixture.store(CacheLimits::default());

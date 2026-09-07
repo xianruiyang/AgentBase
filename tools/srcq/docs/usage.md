@@ -58,7 +58,7 @@ srcq query rg defaults --output machine --view grouped -- -n -e $Pattern -- $Tar
 
 优先从 0-based 源码位置调用，目录默认由工具解析：
 
-`--source-manifest` 与 `--direction both` 仅存在于当前仓库未发行候选，正式 0.7.0 Release 和已安装 0.7.0 不包含这两项能力。
+`--source-manifest` 与 `--direction both` 自 0.8.0 起可用。
 
 ```powershell
 srcq symbol definition --at 'Source/Module/File.cpp:41:9'

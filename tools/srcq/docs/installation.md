@@ -11,8 +11,8 @@
 私有 Release 的正式下载入口只负责通过 `gh release download` 取得指定 tag 的精确资产；归档校验、安装状态、升级和回滚仍全部由下载到的 `install-srcq.ps1` 负责：
 
 ```powershell
-gh release download srcq-v0.7.0 --repo xianruiyang/AgentBase --pattern install-srcq-release.ps1
-.\install-srcq-release.ps1 Install -Version 0.7.0
+gh release download srcq-v0.8.0 --repo xianruiyang/AgentBase --pattern install-srcq-release.ps1
+.\install-srcq-release.ps1 Install -Version 0.8.0
 ```
 
 `install-srcq-release.ps1` 默认从 `xianruiyang/AgentBase` 的 `srcq-v<version>` 下载 `install-srcq.ps1`、Windows x86_64 ZIP 和对应 `.sha256`。`-Repository` 与 `-Tag` 只用于明确选择其他受信来源；下载失败、权限不足或任一资产缺失时不会进入安装。需要升级时把动作改为 `Upgrade` 并指定新版本。

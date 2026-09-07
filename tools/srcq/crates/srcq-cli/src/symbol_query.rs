@@ -918,7 +918,6 @@ fn references_for_known_definition(
     references.dedup_by(|left, right| {
         normalized_key(&left.file) == normalized_key(&right.file) && left.position == right.position
     });
-    references.truncate(command.max_nodes);
     Ok((references, scan_complete))
 }
 

@@ -365,6 +365,101 @@ fn location_projection_selects_smallest_current_range_and_groups_one_scan() {
 }
 
 #[test]
+fn containing_empty_selection_still_requires_current_source() {
+    for registered in [true, false] {
+        let directory = tempdir().expect("temporary directory");
+        let workspace = directory.path().join("workspace");
+        let cache_root = directory.path().join("cache-root");
+        let source = workspace.join("src/target.ts");
+        fs::create_dir_all(source.parent().expect("source parent")).expect("source directory");
+        let original = b"line-0\nline-1\nline-2\nline-3\nline-4\nline-5\nline-6\n";
+        fs::write(&source, original).expect("source fixture");
+        let mut exec = Command::new(env!("CARGO_BIN_EXE_srcq"));
+        exec.current_dir(&workspace).args([
+            "exec",
+            "--output",
+            "machine",
+            "--engine",
+            env!("CARGO_BIN_EXE_srcq-native-fixture"),
+            "--cache",
+            "on",
+        ]);
+        if registered {
+            exec.args(["--fingerprint-file", "src/target.ts"]);
+        }
+        exec.args([
+            "--",
+            "run",
+            "--fixture-matches=3",
+            "--fixture-source-backed=src/target.ts",
+        ]);
+        configure_cache_environment(&mut exec, &cache_root);
+        let generated = exec.output().expect("generate cache");
+        assert!(
+            generated.status.success(),
+            "{}",
+            String::from_utf8_lossy(&generated.stderr)
+        );
+        let cache_id = yaml(&generated.stdout)[0]["_sgy"]["cache"]
+            .as_str()
+            .expect("cache id")
+            .to_owned();
+        let query = |format: &str| {
+            process(&workspace, &cache_root)
+                .args([
+                    "containing",
+                    "--cache-id",
+                    &cache_id,
+                    "--file",
+                    "src/target.ts",
+                    "--line",
+                    "8",
+                    "--column",
+                    "0",
+                    "--output",
+                    format,
+                ])
+                .env("PATH", "")
+                .output()
+                .expect("containing outside cached ranges")
+        };
+        for format in ["model", "machine"] {
+            let output = query(format);
+            if registered {
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                if format == "model" {
+                    assert!(output.stdout.is_empty());
+                } else {
+                    let report = yaml(&output.stdout);
+                    assert_eq!(report[0]["_sgy"]["selection_complete"], true);
+                    assert_eq!(report[0]["_sgy"]["selected"], 0);
+                    assert_eq!(report[0]["results"], json!([]));
+                }
+            } else {
+                assert_eq!(output.status.code(), Some(125));
+                assert!(output.stdout.is_empty());
+                assert!(String::from_utf8_lossy(&output.stderr)
+                    .contains("no pre-execution fingerprint"));
+            }
+        }
+        if registered {
+            let changed = [original.as_slice(), b"line-7\nline-8\nline-9\n"].concat();
+            fs::write(&source, changed).expect("append source beyond cached ranges");
+            for format in ["model", "machine"] {
+                let output = query(format);
+                assert_eq!(output.status.code(), Some(125));
+                assert!(output.stdout.is_empty());
+                assert!(String::from_utf8_lossy(&output.stderr).contains("changed; rerun ast-grep"));
+            }
+        }
+    }
+}
+
+#[test]
 fn merge_uses_verified_cache_cwd_and_engine_provenance_for_conflicts() {
     let directory = tempdir().expect("temporary directory");
     let workspace = directory.path().join("workspace");

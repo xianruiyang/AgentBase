@@ -28,7 +28,7 @@ srcq cache get 01HXXXXXXXXXXXXXXXXXXXXXXX --result 12 --field /text
 
 - `query` 使用已建 file/rule 索引和分页，不重新运行 ast-grep；默认只输出 `#<result-id> file:range`、有界正文及必要规则字段，续页使用 `@more cache/after`。程序消费时加 `--output machine`。
 - `get --result N` 返回完整原生 result；`--field` 使用 JSON Pointer，并且必须同时指定 result。
-- cache 打开时校验 ID、metadata、hash、大小、TTL 和状态；损坏或过期不会静默返回内容。
+- cache 打开时校验 ID、metadata、hash、大小、TTL 和状态；到达 `expires_at` 即拒绝读取，过期条目不会因访问而续期。只有未过期且通过校验的访问才刷新 TTL；上述校验失败时不修改条目。
 
 也可直接交给安全处理器：
 
@@ -39,7 +39,7 @@ srcq process containing --cache-id 01HXXXXXXXXXXXXXXXXXXXXXXX --file src/app.ts 
 srcq process group-locations --cache-id 01HXXXXXXXXXXXXXXXXXXXXXXX --file src/app.ts --limit 40
 ```
 
-位置投影只接受原生 ast-grep cache，并沿用其 workspace 根和 0-based、end-exclusive range。它在返回正文或位置前复核登记文件的整文件哈希与 cache 记录；未登记 fingerprint、执行期间变化或查询前变化都必须重新执行原扫描，不能把旧 cache 当作当前结构。`containing` 与 `group-locations` 默认输出无 envelope 的定位证据；稳定结构消费者显式使用 `--output machine`。
+位置投影只接受原生 ast-grep cache，并沿用其 workspace 根和 0-based、end-exclusive range。它在返回正文或位置前复核登记文件的整文件哈希与 cache 记录；`containing` 在筛选前校验目标文件，即使没有命中范围也须证明目标源码仍与扫描时一致。未登记 fingerprint、执行期间变化或查询前变化都必须重新执行原扫描，不能把旧 cache 当作当前结构。`containing` 与 `group-locations` 默认输出无 envelope 的定位证据；稳定结构消费者显式使用 `--output machine`。
 
 ## 维护与隐私
 

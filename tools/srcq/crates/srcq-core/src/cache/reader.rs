@@ -85,6 +85,7 @@ impl CacheStore {
             cache_id,
             self.limits().max_entry_bytes,
             self.limits().quota_bytes,
+            now,
         )?;
         self.touch_verified(&verified.lease, &mut verified.metadata, now)?;
         Ok(verified)
@@ -141,6 +142,7 @@ impl VerifiedCache {
         expected_id: &str,
         max_entry_bytes: u64,
         max_index_bytes: u64,
+        now: SystemTime,
     ) -> Result<Self, CacheError> {
         let metadata = read_metadata(&lease.metadata_path())?;
         let metadata_root = object(&metadata, "metadata")?;
@@ -148,6 +150,11 @@ impl VerifiedCache {
         expect_text(metadata_root, "cache_id", expected_id)?;
         expect_text(metadata_root, "state", "committed")?;
         validate_metadata_shape(metadata_root)?;
+        if parse_time(text_field(metadata_root, "expires_at")?)? <= now {
+            return Err(CacheError::Verification(
+                "cache entry expired; rerun the original query".to_owned(),
+            ));
+        }
         let source_fingerprints = parse_source_fingerprints(metadata_root)?;
 
         let source_metadata = object_field(metadata_root, "source")?;
