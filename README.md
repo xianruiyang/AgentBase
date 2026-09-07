@@ -1,71 +1,109 @@
 # AgentBase
 
-AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、skill、插件、MCP、CLI 及其开发与部署合同。仓库内容是项目真源；只有用户针对当次部署明确同意后，正式部署入口才会把选定内容增量安装到 Codex。部署只改变指定环境，发行才形成版本、标签或分发资产。
+**一套面向 Windows 的 Codex 基础配置。**
 
-## 从哪里开始
+AgentBase 将日常使用 Codex 时积累的全局规则、skills、自定义子代理和配套工具集中维护，方便持续调整、迁移到其他电脑，以及按需参考和复用。
 
-- [根本需求](docs/requirements.md)：项目长期用户目标、可验收结果和约束。
-- [项目总计划](docs/plan.md)：总体方向、跨计划决策、子计划关系、实践结论和重开条件。
-- [项目规则](AGENTS.md)：AgentBase 内的职责、维护、验证、部署、发行和 Git 边界。
-- [全局候选与可移植设置](global/README.md)：`global/AGENTS.md`、`config.toml`、hooks 和自定义子代理的职责与边界。
+这套配置偏向长期维护代码项目：让 Codex 先理解目标和现有实现，按需查证、修改和验证；复杂任务能保留必要的进度与依据，简单任务则直接处理。默认采用中文沟通、简洁输出，并对操作授权和修改范围作出明确约定。
 
-普通组件内工作从本页定位 owner 后读取对应说明；只有选择、新建、替代或重开子计划，改变跨组件方向，或需要裁决多个正式 owner 时继续读取总计划。
+[开始使用](#开始使用) · [配置内容](#配置内容) · [下载发行包](https://github.com/xianruiyang/AgentBase/releases) · [安装与恢复](development/codex-deployment/README.md) · [MIT License](LICENSE)
 
-## 真源与职责
+## 设计目标
 
-| 入口 | 职责 |
+- **减少重复交代。** 把跨项目通用的协作习惯放进全局规则，项目自己的架构、风格和命令仍由各项目说明。
+- **让判断有依据。** 区分用户要求、文档约定和源码现状，遇到不确定性时先取得能影响下一步的证据。
+- **让复杂工作可以继续。** 用交付文档和任务工具组织需求、依赖、结果与恢复上下文，避免长任务只依赖对话记忆。
+- **按需使用工具和子代理。** 按任务选择搜索、语义查询、实验或执行角色，主代理负责审核与最终交付。
+- **控制上下文和验证成本。** 工具优先返回当前动作需要的信息，完整数据保留供后续读取；验证按改动影响范围进行。
+
+这些是配置的设计取向。实际效果仍取决于模型、Codex 版本、项目内容和具体任务。
+
+## 配置内容
+
+### 全局规则与可移植设置
+
+[`global/`](global/README.md) 包含全局 `AGENTS.md`、可移植的 `config.toml`、hooks 模板和自定义子代理配置。
+
+全局规则约定如何理解目标、读取证据、控制修改范围、使用工具和交付结果。可移植设置只管理选定的配置项，主线程模型、默认推理深度、认证、项目信任、MCP 和插件安装状态等由目标电脑保留或单独配置。
+
+### 按任务加载的 skills
+
+[`skills/`](skills/) 将具体方法拆成可按需读取的说明，主要覆盖：
+
+| 用途 | 相关 skills |
 | --- | --- |
-| [`global/`](global/README.md) | 候选全局规则、可移植 Codex 设置、hooks 模板和自定义子代理 |
-| [`skills/`](skills/) | 各 skill 的唯一开发真源；触发边界由各 `SKILL.md` frontmatter 定义 |
-| [`mcp/vscode-lsp-mcp/`](mcp/vscode-lsp-mcp/README.md) | VS Code LSP MCP server、companion、协议、安全边界和独立 Windows release |
-| [`tools/srcq/`](tools/srcq/README.md) | Source Query Gateway 源码、测试、Windows 安装器和独立 release |
-| [`tools/workflow-cli/`](tools/workflow-cli/README.md) | `workctl`/`taskctl` 源码、测试、Windows 安装器和独立主机运行时 |
-| [`development/codex-event-logger/`](development/codex-event-logger/) | 对话事件记录 hook 的开发资料；运行脚本仍由对应 skill 所有 |
-| [`development/codex-qq-hook/`](development/codex-qq-hook/) | QQ Webhook 辅助程序与开发资料；运行脚本仍由对应 skill 所有 |
-| [`development/source-query-gateway/`](development/source-query-gateway/README.md) | 源码查询研究框架、合成协议测试与本机私有数据入口 |
-| [`development/skill-routing/`](development/skill-routing/README.md) | 静态触发合同与脱离仓库的分阶段路由评估 |
-| [`development/agent-evaluation/`](development/agent-evaluation/README.md) | 固定 DeepSWE 题目/计分语义、受信任本地 candidate 与独立 Verifier 工作区、逐题资格/恢复/结果组成的派生最终评测集 |
-| [`development/plugin-packaging/`](development/plugin-packaging/README.md) | `agentbase-core` 插件模板、过滤打包和官方校验入口 |
-| [`development/codex-deployment/`](development/codex-deployment/README.md) | Windows 主机准备、校验、增量部署、状态读回与回滚 |
-| [`development/responsibility-lifecycle.md`](development/responsibility-lifecycle.md) | 公共职责形成、消费者接入和穿透式更新的设计分析 |
-| [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) | 仓库级插件发现入口；只指向可重建的本地打包产物 |
+| 复杂变更与执行 | `change-governance`、`execution-governor` |
+| 交付文档与长期任务 | `delivery-workflow`、`task-table-manager` |
+| 源码查询与编辑器操作 | `source-query`、`symbol-structure-workflow` |
+| 工程与空间问题 | `powershell-usage`、`cpp-engineering-rules`、`understand-space` |
+| 子代理协作 | `subagent-orchestration` |
+| 对话记录、通知与线程设置 | `codex-event-logger`、`codex-qq-hook`、`reasoning-governor` |
 
-`development/` 只承载验证、打包、部署和开发资料。Codex 根目录中的同名文件是安装目标或宿主状态，不反向定义项目，也不与仓库双向同步。构建目录、依赖树、缓存、日志、测试输出和部署沙箱不是项目真源。
+QQ 通知默认关闭，按工作区或任务启用；线程推理深度的查询与调整由用户明确提出。各 skill 的具体适用范围见其 `SKILL.md`。
 
-项目只维护 Windows 宿主。外部协议或文件格式出现其他平台术语，不代表 AgentBase 承诺相应运行时、安装器或测试矩阵。
+### 四个自定义子代理
 
-评测资产的 Git 边界见 [CON-008](docs/requirements.md#con-008-真实评测数据仅保留在本机)：只分发框架、schema 和合成测试，真实题目、答案、题目特定适配、实际作答及逐题审计保留本机并忽略。既有私有文件原位保留，框架通过本地参数读取；新克隆不包含这些文件，也不依赖它们完成基础检查。历史工程记录中的 `<CODEX_ROOT>`、`<LOCALAPPDATA>`、`<USERPROFILE>` 等是脱敏位置标记，不能作为可直接执行或已读回的宿主路径；指向本机私有研究文档的旧引用只服务原宿主追溯。
+| 角色 | 用途 |
+| --- | --- |
+| `evidence` | 只读查找源码、文档与当前状态，提供可核查的证据 |
+| `experiment` | 通过修改和运行完成范围明确的实现实验 |
+| `advanced-experiment` | 处理普通实验难以可靠完成的问题，或需要截图、渲染等视觉反馈的实验 |
+| `operator` | 执行步骤与结果判定已经明确的操作 |
 
-## 能力分层
+具体模型和参数在 [`global/agents/`](global/agents/) 中维护。主代理负责规划、审核和验收；子代理的进一步委派受本次任务说明约束。
 
-全局内核只保留跨项目成立的目标、证据、授权、工具路由、修改、验证、记录和交付约束。领域协议按需进入对应 skill：
+### 配套工具
 
-- 执行与交付：`execution-governor` 控制复杂工作的当前证据前沿与下一动作；`delivery-workflow`、`task-table-manager`、`change-governance` 分别维护交付语义、任务存储和深层治理；`reasoning-governor` 仅响应用户明确提出的线程推理深度操作。
-- 源码与工程：`source-query`、`symbol-structure-workflow`、`powershell-usage`、`cpp-engineering-rules`、`understand-space`。
-- 运行协作：[`subagent-orchestration`](skills/subagent-orchestration/SKILL.md)、`codex-event-logger`、`codex-qq-hook`。
+| 工具 | 用途 | 安装说明 |
+| --- | --- | --- |
+| [`srcq`](tools/srcq/README.md) | 统一文本、文件、源码统计和 AST 查询，提供源码位置、符号关系及分页结果 | [srcq 安装](tools/srcq/docs/installation.md) |
+| [`workctl` / `taskctl`](tools/workflow-cli/README.md) | 查询和维护交付文档、任务依赖、状态、结果及来源快照 | [workflow-cli 安装](tools/workflow-cli/docs/installation.md) |
+| [`vscode-lsp-mcp`](mcp/vscode-lsp-mcp/README.md) | 通过 VS Code 语言服务获取语义信息，并支持相应编辑器操作 | [MCP 安装](mcp/vscode-lsp-mcp/docs/installation.md) |
 
-`source-query` 统一消费 PATH 中独立安装的 `srcq.exe`：普通文本、文件和源码统计分别直接使用 `srcq rg`、`srcq fd` 与 `srcq scc`；定义、引用和有界调用候选由 `srcq symbol` 内部组合 rg 与 AST，高级投影、续页和语义查询才按需加载 skill；可重复命令基准直接使用独立安装的 `hyperfine`。快速候选仍有会改变结论的真实符号身份、类型、精确引用或层级歧义时，再渐进使用 `vscode-lsp-mcp`。插件包不复制 MCP、`srcq.exe`、scc 或 hyperfine，也不建立第二套安装入口。
+CLI 和 MCP 各自构建、安装与发行。`agentbase-core` 插件负责分发 skills 与相关 hooks，主机上的工具和 MCP 按对应说明单独准备。
 
-`delivery-workflow` 与 `task-table-manager` 统一消费 PATH 中独立安装的 `workctl` 与 `taskctl`；源码、模板和安装状态仍由 `tools/workflow-cli` 维护。主机安装、Codex 部署和组件发行是三个独立生命周期。
+## 开始使用
+
+项目目前只维护 **Windows**，脚本以 **PowerShell 7** 为基线。完整使用需要可用的 Codex 环境，以及部署说明列出的 Python、Node.js、源码查询等前置工具；具体版本和检查方法见[主机准备](development/codex-deployment/README.md#prepare-a-windows-host)。
+
+1. **取得仓库或发行包。** 从 [Releases](https://github.com/xianruiyang/AgentBase/releases) 下载 AgentBase 主包，或克隆源码。主包包含源码、部署入口、预构建插件和恢复工具；srcq、workflow-cli 另有独立发行资产。
+2. **先阅读并调整配置。** 从 [`global/AGENTS.md`](global/AGENTS.md) 和 [`global/config.toml`](global/config.toml) 开始，确认其中的工作习惯适合自己。当前可移植设置包含 `approval_policy = "never"` 和 `sandbox_mode = "danger-full-access"`，使用前尤其需要确认这两个权限选项。
+3. **准备主机工具。** 按[部署说明](development/codex-deployment/README.md)准备依赖，并分别安装 srcq 与 workflow-cli；需要 VS Code 语义能力时再按 MCP 的说明接入。
+4. **选择安装方式并部署。** 新安装使用 Plugin 模式，按说明安装并启用 `agentbase-core`，再部署全局规则与所选设置。已有直接安装使用 `DirectCompatibility`，完成迁移前保持该模式；同名 skills 和 hooks 不能同时从两种方式加载。
+5. **检查是否生效。** 用部署入口的 `Status` 检查文件状态，并在新任务中确认规则和角色。PATH 或 MCP 发生变更后，需要完整退出并重启 Codex 桌面宿主；若新任务仍显示旧的自定义角色，也应重启宿主后再检查。
+
+完整命令统一放在[部署指南](development/codex-deployment/README.md#deploy-on-another-windows-machine)，插件构建细节见[插件说明](development/plugin-packaging/README.md)。如果让 Codex 代为操作，每次向真实配置目录执行 Deploy 都需要你对当次操作明确同意。
+
+也可以先只阅读、参考其中的规则或 skill。复用单个 skill 时，请一并检查它引用的文件和工具依赖。
+
+## 更新与恢复
+
+部署脚本只更新 AgentBase 管理的内容，并为变更生成回滚记录。新用户首次部署还会默认保存修改前的原配置，后续升级保留最早的原件。
+
+- **回退一次部署：** 使用该次部署返回的备份路径执行 `Rollback`。
+- **恢复首次部署前的配置：** 先用 `PreviewRestore` 查看差异与冲突，再执行 `RestoreOriginal`。有冲突时会拒绝写入，需要先处理冲突。
+- **独立恢复：** 发行包提供 PowerShell 恢复工具，无需启动 Codex 或安装配套 CLI；原始备份仍须保存在本机。使用过插件模式时，先通过插件入口停用或卸载 `agentbase-core`。
+
+已有安装不会补造过去的原配置，继续使用既有回滚记录。恢复覆盖 AgentBase 管理的配置，软件安装、PATH、账号与整个宿主环境的恢复另行处理。具体边界见[原配置恢复说明](development/codex-deployment/README.md#original-configuration-recovery)。
+
+## 仓库结构与维护
+
+| 目录 | 内容 |
+| --- | --- |
+| [`global/`](global/README.md) | 全局规则、可移植设置、hooks 与子代理 |
+| [`skills/`](skills/) | 各项 skill 的说明与运行资源 |
+| [`tools/`](tools/) | srcq、workflow-cli 源码与安装器 |
+| [`mcp/`](mcp/) | VS Code LSP MCP 及相关组件 |
+| [`development/`](development/) | 本地验证、插件打包、部署、发行与评测框架 |
+| [`docs/`](docs/) | 项目需求、计划、设计与维护记录 |
+| [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) | 仓库级插件发现配置 |
+
+修改从仓库源码开始，安装到 Codex 的文件由部署入口管理。配置变更后的验证入口见[部署验证](development/codex-deployment/README.md#validate)，skills 的结构与触发检查见[路由说明](development/skill-routing/README.md)，CLI 和 MCP 则按各组件文档验证。项目采用 Windows 本地验证，不维护远程 CI。
+
+评测部分只分发框架、schema 和合成测试；真实题目、答案、实际作答与逐题记录保留本机，基础框架验证不依赖私有题库。详细边界见[评测说明](development/agent-evaluation/README.md)和[数据约定](docs/requirements.md#con-008-真实评测数据仅保留在本机)。
+
+进一步了解项目的维护思路，可以阅读[根本需求](docs/requirements.md)、[总计划](docs/plan.md)和[项目约定](AGENTS.md)；主包与组件的分发关系见[发行说明](development/release/README.md)。
 
 ## 许可证
 
-除另有声明的组件与第三方内容外，AgentBase 使用 [MIT License](LICENSE)。组件许可证独立生效：[`mcp/vscode-lsp-mcp`](mcp/vscode-lsp-mcp/LICENSE) 使用 Apache-2.0，[`tools/srcq`](tools/srcq/LICENSE) 使用 MIT OR Apache-2.0；第三方内容保留各自的版权声明和许可证。
-
-## 验证、部署与发行导航
-
-本仓库不维护远程 CI，GitHub Actions 也不是项目验证入口；远端只承担源码与历史同步。验证按实际影响范围选择正式本地入口，组件受影响且候选稳定后运行一次，不由日常 Validate 或 Deploy 无条件串联。
-
-全局规则与 skill 的结构、引用和触发集合由 [`validate_contract.ps1`](development/skill-routing/validate_contract.ps1) 检查；规则行为由真实任务或专门行为实验验证，不复制成精确文案门禁。路由基础设施回归使用 [`test_routing_infrastructure.ps1`](development/skill-routing/test_routing_infrastructure.ps1)；实际模型路由研究按[路由说明](development/skill-routing/README.md)选择必要阶段与复用证据，不进入部署合同。
-
-Windows SWE 使用受信任本地 candidate 与独立 Verifier 工作区，不再管理 Windows sandbox 后端或提供旧 setup/status/check 权限探针。其 [`test_agent_evaluation_infrastructure.ps1`](development/agent-evaluation/test_agent_evaluation_infrastructure.ps1) 只在 evaluator 禁用状态下运行确定性组件验证，不克隆题目、安装依赖或运行 oracle、Verifier、模型。逐题准备、资格、候选运行、恢复和报告由 [`agent_eval.py`](development/agent-evaluation/agent_eval.py) 提供，具体动作与证据边界以[最终评测说明](development/agent-evaluation/README.md)为准。
-
-部署合同由 [`manage_agentbase.ps1`](development/codex-deployment/manage_agentbase.ps1) 校验；其余组件沿各自 README 或清单中的正式入口验证。
-
-AgentBase 主包的版本、已提交来源组装、插件/恢复资产及 GitHub Release 操作由[发行入口](development/release/README.md)维护；srcq、workflow-cli 与 MCP 继续各自独立发行。
-
-插件构建、Codex 部署模式、主机前置条件、只读状态和回滚命令分别由[插件打包说明](development/plugin-packaging/README.md)与[部署说明](development/codex-deployment/README.md)维护。每次向真实 Codex 根目录执行 `Deploy` 前都必须取得用户针对当次部署的明确同意；Git 同步、此前部署授权或验证通过均不能替代。
-
-新用户首次部署默认保留[原配置恢复点](development/codex-deployment/README.md#original-configuration-recovery)，后续升级不覆盖最早原内容；`PreviewRestore` 可只读预览，`RestoreOriginal` 在冲突检查后恢复。已有安装不自动补建历史恢复点，继续使用部署回滚。发行时可随包附带独立 PowerShell 恢复入口，用户原配置始终留在本机。
-
-部署状态不在 README 手工维护。使用部署说明中的只读 `Status` 入口按所选部署范围读取当前项目、安装副本、部署清单和受管资产生命周期的关系。部署成功只证明文件已安装；当前 Codex 运行不会追溯加载新规则，需在新任务或重启后的运行中使用。组件发行状态由各组件的 Release 合同独立维护。
+除另有声明的组件与第三方内容外，AgentBase 使用 [MIT License](LICENSE)。[`mcp/vscode-lsp-mcp`](mcp/vscode-lsp-mcp/LICENSE) 使用 Apache-2.0，[`tools/srcq`](tools/srcq/LICENSE) 使用 MIT OR Apache-2.0；第三方内容保留各自的版权声明和许可证。
