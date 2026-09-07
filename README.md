@@ -48,7 +48,9 @@ AgentBase 集中维护 Windows 上可迁移的 Codex 全局规则、设置、ski
 
 `delivery-workflow` 与 `task-table-manager` 统一消费 PATH 中独立安装的 `workctl` 与 `taskctl`；源码、模板和安装状态仍由 `tools/workflow-cli` 维护。主机安装、Codex 部署和组件发行是三个独立生命周期。
 
-组件许可证独立生效：`mcp/vscode-lsp-mcp` 使用 Apache-2.0，`tools/srcq` 使用 MIT OR Apache-2.0。仓库根目前没有统一 `LICENSE`，不能把组件许可证外推为整个 AgentBase 的授权。
+## 许可证
+
+除另有声明的组件与第三方内容外，AgentBase 使用 [MIT License](LICENSE)。组件许可证独立生效：[`mcp/vscode-lsp-mcp`](mcp/vscode-lsp-mcp/LICENSE) 使用 Apache-2.0，[`tools/srcq`](tools/srcq/LICENSE) 使用 MIT OR Apache-2.0；第三方内容保留各自的版权声明和许可证。
 
 ## 验证、部署与发行导航
 
