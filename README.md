@@ -1,22 +1,27 @@
 # AgentBase
 
-**一套面向 Windows 的 Codex 基础配置。**
+**一套针对模型常见痛点、注重节省 Token 的 Windows Codex 基础配置。**
 
-AgentBase 将日常使用 Codex 时积累的全局规则、skills、自定义子代理和配套工具集中维护，方便持续调整、迁移到其他电脑，以及按需参考和复用。
+AgentBase 提供可部署使用的全局规则、skills、自定义子代理和配套工具，针对模型在实际工作中容易出现的重复读取、无依据推断、修改偏离目标、上下文丢失和过度验证等问题，组织从理解需求到修改、验证与交付的工作方式。
 
-这套配置偏向长期维护代码项目：让 Codex 先理解目标和现有实现，按需查证、修改和验证；复杂任务能保留必要的进度与依据，简单任务则直接处理。默认采用中文沟通、简洁输出，并对操作授权和修改范围作出明确约定。
+它通过按需加载 skills、定向查询源码、精简工具返回、复用有效证据和按影响范围验证，减少不必要的上下文与重复工作，在保证任务质量的前提下节省 Token。配置偏向代码开发与长期项目维护，默认采用中文沟通、简洁输出，并明确操作授权和修改范围。
+
+完成依赖准备与部署后即可使用；使用者也可以根据自己的项目、模型和工作习惯，继续维护、调整和改进这套配置。
 
 [开始使用](#开始使用) · [配置内容](#配置内容) · [下载发行包](https://github.com/xianruiyang/AgentBase/releases) · [安装与恢复](development/codex-deployment/README.md) · [MIT License](LICENSE)
 
-## 设计目标
+## 针对哪些痛点
 
-- **减少重复交代。** 把跨项目通用的协作习惯放进全局规则，项目自己的架构、风格和命令仍由各项目说明。
-- **让判断有依据。** 区分用户要求、文档约定和源码现状，遇到不确定性时先取得能影响下一步的证据。
-- **让复杂工作可以继续。** 用交付文档和任务工具组织需求、依赖、结果与恢复上下文，避免长任务只依赖对话记忆。
-- **按需使用工具和子代理。** 按任务选择搜索、语义查询、实验或执行角色，主代理负责审核与最终交付。
-- **控制上下文和验证成本。** 工具优先返回当前动作需要的信息，完整数据保留供后续读取；验证按改动影响范围进行。
+| 模型工作中的常见问题 | 配置采用的做法 |
+| --- | --- |
+| 反复读取大文件、加载无关说明，工具输出挤占上下文 | skills 按需加载；源码定向查询与分页；工具返回当前动作需要的信息，完整数据可继续读取 |
+| 把猜测、旧文档或测试通过当成事实与完成证明 | 区分目标约定和实际证据，结论限定在已验证的范围内 |
+| 只修眼前现象，遗漏根因、相关调用方或用户目标 | 先确认目标和影响范围；涉及职责、迁移或根因时使用对应治理方法，并检查实际使用方 |
+| 长任务中丢失需求、依赖、进度和判断依据 | 用交付文档、任务记录与来源快照保留必要的恢复上下文 |
+| 简单任务流程过重，复杂任务又盲目扩量或重复验证 | 简单任务直接处理；复杂任务先验证关键前提，按影响范围选择后续工作与检查 |
+| 委派后缺少审核，多个代理重复探索或越过任务范围 | 按取证、实验和确定执行划分角色，明确委派边界，由主代理审核并验收 |
 
-这些是配置的设计取向。实际效果仍取决于模型、Codex 版本、项目内容和具体任务。
+Token 优化以保留必要证据和完成质量为前提。具体节省幅度随模型、项目和任务而变化。
 
 ## 配置内容
 
@@ -67,14 +72,14 @@ CLI 和 MCP 各自构建、安装与发行。`agentbase-core` 插件负责分发
 项目目前只维护 **Windows**，脚本以 **PowerShell 7** 为基线。完整使用需要可用的 Codex 环境，以及部署说明列出的 Python、Node.js、源码查询等前置工具；具体版本和检查方法见[主机准备](development/codex-deployment/README.md#prepare-a-windows-host)。
 
 1. **取得仓库或发行包。** 从 [Releases](https://github.com/xianruiyang/AgentBase/releases) 下载 AgentBase 主包，或克隆源码。主包包含源码、部署入口、预构建插件和恢复工具；srcq、workflow-cli 另有独立发行资产。
-2. **先阅读并调整配置。** 从 [`global/AGENTS.md`](global/AGENTS.md) 和 [`global/config.toml`](global/config.toml) 开始，确认其中的工作习惯适合自己。当前可移植设置包含 `approval_policy = "never"` 和 `sandbox_mode = "danger-full-access"`，使用前尤其需要确认这两个权限选项。
+2. **检查配置，按需调整。** 从 [`global/AGENTS.md`](global/AGENTS.md) 和 [`global/config.toml`](global/config.toml) 开始，确认其中的工作习惯适合自己。当前可移植设置包含 `approval_policy = "never"` 和 `sandbox_mode = "danger-full-access"`，使用前尤其需要确认这两个权限选项。
 3. **准备主机工具。** 按[部署说明](development/codex-deployment/README.md)准备依赖，并分别安装 srcq 与 workflow-cli；需要 VS Code 语义能力时再按 MCP 的说明接入。
 4. **选择安装方式并部署。** 新安装使用 Plugin 模式，按说明安装并启用 `agentbase-core`，再部署全局规则与所选设置。已有直接安装使用 `DirectCompatibility`，完成迁移前保持该模式；同名 skills 和 hooks 不能同时从两种方式加载。
 5. **检查是否生效。** 用部署入口的 `Status` 检查文件状态，并在新任务中确认规则和角色。PATH 或 MCP 发生变更后，需要完整退出并重启 Codex 桌面宿主；若新任务仍显示旧的自定义角色，也应重启宿主后再检查。
 
 完整命令统一放在[部署指南](development/codex-deployment/README.md#deploy-on-another-windows-machine)，插件构建细节见[插件说明](development/plugin-packaging/README.md)。如果让 Codex 代为操作，每次向真实配置目录执行 Deploy 都需要你对当次操作明确同意。
 
-也可以先只阅读、参考其中的规则或 skill。复用单个 skill 时，请一并检查它引用的文件和工具依赖。
+可以使用整套配置，也可以按需复用其中的规则或 skill。复用单个 skill 时，请一并检查它引用的文件和工具依赖。
 
 ## 更新与恢复
 
@@ -98,7 +103,7 @@ CLI 和 MCP 各自构建、安装与发行。`agentbase-core` 插件负责分发
 | [`docs/`](docs/) | 项目需求、计划、设计与维护记录 |
 | [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) | 仓库级插件发现配置 |
 
-修改从仓库源码开始，安装到 Codex 的文件由部署入口管理。配置变更后的验证入口见[部署验证](development/codex-deployment/README.md#validate)，skills 的结构与触发检查见[路由说明](development/skill-routing/README.md)，CLI 和 MCP 则按各组件文档验证。项目采用 Windows 本地验证，不维护远程 CI。
+使用者可以在仓库中继续维护规则、改进 skills 或扩展工具，再通过部署入口应用到 Codex。配置变更后的验证入口见[部署验证](development/codex-deployment/README.md#validate)，skills 的结构与触发检查见[路由说明](development/skill-routing/README.md)，CLI 和 MCP 则按各组件文档验证。项目采用 Windows 本地验证，不维护远程 CI。
 
 评测部分只分发框架、schema 和合成测试；真实题目、答案、实际作答与逐题记录保留本机，基础框架验证不依赖私有题库。详细边界见[评测说明](development/agent-evaluation/README.md)和[数据约定](docs/requirements.md#con-008-真实评测数据仅保留在本机)。
 
