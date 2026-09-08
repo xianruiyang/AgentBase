@@ -11,7 +11,7 @@ AgentBase 演进框架，简称 **Evo**。本目录是 [AgentBase 总计划](../
 | [requirements.md](requirements.md) | 用户已确认的目标与范围；用户和实施模型据此判断结果与授权边界 |
 | [user-design.md](user-design.md) | 用户确认的名称和计划层级；不把模型提出的技术路线当作用户指定设计 |
 | [current-state.md](current-state.md) | 现有框架与第三方源码的直接事实、证据边界和差距 |
-| [solution.md](solution.md) | 可修订的技术方案、组合与评分协议、并发监控、代理用量、环境复用、恢复与分阶段接入建议 |
+| [solution.md](solution.md) | 可修订的技术方案、组合与评分协议、并发监控、代理用量、流程动作追溯、环境复用与分阶段接入建议 |
 
 各事实在所属文档维护；本文只导航。外部仓库来源和恢复由[参考目录](../../../development/references/README.md)维护，Evo 不复制来源清单。
 

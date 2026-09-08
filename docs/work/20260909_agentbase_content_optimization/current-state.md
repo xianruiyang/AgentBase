@@ -82,9 +82,20 @@ EvoSkill 和 Anthropic 的目标 skill 附带 Apache-2.0 文本。AutoSkill READ
 
 上述是可借鉴的既有合同和局部实现依据，未证明 Evo 已具备跨研究排队、共享资源调度、环境池或统一进度监控。
 
+## OBS-009 已有动作审计与运行事件，但并非完整行为追踪
+
+- 状态: confirmed
+- 来源: [会话审计合同](../../../skills/codex-event-logger/references/session-audit.md)、[代码读取实验解析](../../../development/code-search-benchmark/experiment.py) 的 `normalize_app_server_item` / 事件汇总、[候选用量解析](../../../development/agent-evaluation/agentbase_codex.py) 的 `_parse_candidate_rollout` / `candidate_agent_usage_receipt`；2026-09-09 查阅 [Codex App Server 官方文档](https://learn.chatgpt.com/docs/app-server#events)
+
+会话审计已支持创建/复用/消息/等待/工具/文件/输入/公开进度/压缩的有界时间线，并明确扫描完整不代表宿主记录了全部行为；下一层代理须读取相应子会话。代码读取实验解析开始/完成事件、命令/MCP 等 item 和用量；SWE 用量解析保留代理关系、来源及继承历史边界，聚合后代请求成本。这些职责可复用，但不是 Evo 全流程追溯的现成实现。
+
+官方文档描述线程、turn、item、命令、文件修改、MCP、协作调用和用量等事件；同步 hook 有开始/完成通知，异步 hook 不发同类通知。文档当前列 `collabToolCall`，本地代码识别 `collabAgentToolCall`，说明必须按实际宿主版本验证解析映射，不能只按一种名称宣称协作事件齐全。文档证明接口设计，不能证明本机每条路径已经发出或采集了这些事件。
+
+模型内部决策、工具内部每次文件读取和外部系统全部副作用不由上述事件单独证明；公开计划、工具结果、执行回执和实际读回各有证据范围。缺失来源不补造历史，也不把本轮静态审查说成完成了真实追溯验证。
+
 ## GAP-001 需要组合级优化，但不需要替换已有逐题评测
 
 - 状态: confirmed
-- 关联: REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008, REQ-009, REQ-010, REQ-011, OBS-001, OBS-002, OBS-003, OBS-004, OBS-005, OBS-006, OBS-008
+- 关联: REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008, REQ-009, REQ-010, REQ-011, REQ-012, OBS-001, OBS-002, OBS-003, OBS-004, OBS-005, OBS-006, OBS-008, OBS-009
 
 已有单次评分与 corpus suite 可作为独立评分和分组选择的基础，但现有投影没有把子 agent/Codex 设置作为独立可选变量，也没有上述七类组合共用的评测目录维护与运行选择合同。仍需显式组合与可变范围、候选构建产物绑定、跨适配器编排、人工待评与裁决、开发/选优/最终验收分层，以及跨候选预算和晋升语义。并发、监控与复用还需在统一研究层定义资源限额、可恢复队列和环境生命周期，将已有用量观察接入共同报告。三个外部项目都未直接覆盖 AgentBase 所需的全部内容与 Windows 宿主生命周期。处理方法见 [solution.md](solution.md)，不据此改动现有生产配置或启动评测。
