@@ -27,6 +27,7 @@
 
 | 入口 | 基准约定 | 必须区分的情况与官方来源 |
 | --- | --- | --- |
+| Windows 桌面 / 客户区 | 屏幕基准与指定窗口客户区分别解释，通常 x 向右、y 向下 | 副屏可有负坐标；DPI 虚拟化、截图缩放和跨屏映射按 [二维屏幕参考](two-dimensional-layout.md#dpi缩放与截图映射) 核对，不能把所有像素视作同单位。 |
 | 浏览器 DOM / CSSOM View | 常用视口坐标 x 向右、y 向下，以 CSS px 计 | `client` 相对视口，`page` 相对初始包含块，`screen` 相对屏幕区域；滚动、缩放和设备像素比不能省略。[CSSOM View](https://www.w3.org/TR/cssom-view/) |
 | SVG 初始视口与用户空间 | 通常原点左上，+x 右、+y 下 | `viewBox`、嵌套视口与 transform 会改变用户空间到视口的映射，不能把用户单位一律当屏幕像素。[SVG 2 坐标系](https://www.w3.org/TR/SVG2/coords.html) |
 | Unity `Camera.WorldToScreenPoint` | 屏幕像素坐标以左下为原点；返回的 z 是距相机的世界单位距离 | 不是左上原点的 UI 坐标，也不是 NDC 深度或纹理 UV；其他 UI API 按自身合同解释。[API](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Camera.WorldToScreenPoint.html) |

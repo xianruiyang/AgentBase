@@ -9,7 +9,7 @@ description: 把空间意图规范化为可比较、可操作、可验收的表�
 
 ## 按需读取
 
-- UI、网页、画布、图像的布局、屏幕定位、锚点或二维裁剪任务，完整读取 [two-dimensional-layout.md](references/two-dimensional-layout.md)；纯 GPU 裁剪空间或 UV 计算不因此加载布局说明。
+- UI、网页、画布、图像的布局、桌面/窗口/视口/截图定位、DPI 映射、锚点或二维裁剪任务，读取 [two-dimensional-layout.md](references/two-dimensional-layout.md) 的适用章节；纯 GPU 裁剪空间或 UV 计算不因此加载布局说明。
 - 世界/局部/父级/组件空间、姿态、相机、导入轴、手性、三维穿插、功能区域净空、遮挡或可见面深度冲突任务，完整读取 [three-dimensional-transform.md](references/three-dimensional-transform.md)。
 - 任务涉及跨坐标系转换、相对 transform、矩阵约定、代理控制对象、数值读回或视觉验收时，完整读取 [frame-transform-verification.md](references/frame-transform-verification.md)。
 - 裁剪空间、NDC（标准化设备坐标）、视口映射、裁剪区域与图像裁切的区别、UV 或纹理像素映射影响结果时，读取 [clip-viewport-uv.md](references/clip-viewport-uv.md) 的适用章节。

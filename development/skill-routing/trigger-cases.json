@@ -150,6 +150,9 @@
     "clip-viewport-numeric-only",
     "uv-texel-numeric-only",
     "uv-wording-only",
+    "screen-crop-scale-numeric-only",
+    "screen-mixed-dpi-contract",
+    "screen-point-needs-depth",
     "single-turn-checklist",
     "windows-prose-without-command",
     "single-task-cli-formatting",
@@ -2368,6 +2371,63 @@
         "modify_authorized_scope"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "screen-crop-scale-numeric-only",
+      "kind": "boundary",
+      "request": "一张原始截图覆盖桌面物理像素矩形，左上 (-1200,100)，宽高 800×600，等比例缩成 400×300，无裁边或留白。图上点 (100,50) 使用像素边缘坐标。只算它对应的桌面位置，不点击也不修改软件。",
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "subagent-orchestration",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "screen-mixed-dpi-contract",
+      "kind": "positive",
+      "request": "当前是两台不同 DPI 的显示器，目标窗口刚从主屏移到左侧副屏。截图 API 与输入 API 的单位尚未确认。只说明如何确定截图点到输入坐标的映射以及哪些旧状态失效，不修改系统设置、不点击。",
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "subagent-orchestration",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "screen-point-needs-depth",
+      "kind": "boundary",
+      "request": "已经知道透视相机和视口，但只给屏幕点 (200,100)，没有深度、目标平面或命中结果。说明能否唯一求出世界点，并区分投影落点、射线与实际命中；只解释，不运行引擎。",
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "subagent-orchestration",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "software-coordinate-defaults",
