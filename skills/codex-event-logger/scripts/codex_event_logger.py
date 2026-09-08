@@ -563,6 +563,17 @@ def prune_runtime_logs(project_root: Path, config: dict[str, Any], current_sessi
         write_json_atomic(state_path, {"last_run_unix": now, "last_run": now_iso()})
 
 
+def merge_transcript_fields(conversation: dict[str, Any], transcript: dict[str, Any]) -> None:
+    # Fallback labels are observations of the hook, not evidence of prompt origin.
+    provisional_sources = (None, "", "unknown", "tool_operation", "auto_or_goal_turn")
+    for key, value in transcript.items():
+        if value is not None and (
+            not conversation.get(key)
+            or (key == "source" and conversation.get(key) in provisional_sources)
+        ):
+            conversation[key] = value
+
+
 def update_conversation(
     conversation_file: Path,
     payload: dict[str, Any],
@@ -608,12 +619,7 @@ def update_conversation(
                 include_prompt=missing_prompt,
                 include_final=missing_final,
             )
-            for key, value in transcript.items():
-                if value is not None and (
-                    not conversation.get(key)
-                    or (key == "source" and conversation.get(key) == "unknown")
-                ):
-                    conversation[key] = value
+            merge_transcript_fields(conversation, transcript)
 
         write_json_atomic(conversation_file, compact_conversation(conversation))
 
@@ -635,7 +641,6 @@ def backfill_conversation_from_transcript(
         if conversation.get("prompt") or conversation.get("source") in (
             "tool_operation",
             "goal",
-            "auto_or_goal_turn",
         ):
             return
 
@@ -646,13 +651,8 @@ def backfill_conversation_from_transcript(
             include_final=False,
         )
         if transcript:
-            for key, value in transcript.items():
-                if value is not None and (
-                    not conversation.get(key)
-                    or (key == "source" and conversation.get(key) == "unknown")
-                ):
-                    conversation[key] = value
-        elif conversation.get("source") in (None, "", "unknown"):
+            merge_transcript_fields(conversation, transcript)
+        elif conversation.get("source") in (None, "", "unknown", "auto_or_goal_turn"):
             conversation["source"] = "tool_operation"
         write_json_atomic(conversation_file, compact_conversation(conversation))
 

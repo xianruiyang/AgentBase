@@ -44,7 +44,7 @@ class SessionAuditTests(unittest.TestCase):
             record({"type": "item_completed", "item": {"type": "SubAgentActivity", "agent_path": "/root/lookup", "agent_thread_id": "87654321-1234-1234-1234-123456789012"}}, kind="event_msg"),
             output("s1", {"task_name": "/root/lookup"}, 1),
             call("spawn_agent", "s2", {"task_name": "failed", "agent_type": "experiment"}, 2),
-            output("s2", {"error": "capacity"}, 3),
+            output("s2", {"error": "capacity", "task_name": "/root/failed"}, 3),
             call("followup_task", "f1", {"target": "lookup", "message": "gAAAAAEncryptedSecret"}, 4),
             call("wait_agent", "w1", {"timeout_ms": 10000}, 5),
             output("w1", {"timed_out": True}, 15),
@@ -66,6 +66,27 @@ class SessionAuditTests(unittest.TestCase):
         self.assertNotIn("EncryptedSecret", json.dumps(result))
         self.assertNotIn("12345678-1234", audit.model_output(result, 2048))
         self.assertNotIn("87654321-1234", audit.model_output(result, 2048))
+
+    def test_explicit_creation_errors_override_all_returned_identity_forms(self):
+        rows = []
+        for index, key in enumerate(("task_name", "agent_id", "thread_id")):
+            rows.extend([
+                call("spawn_agent", str(index), {"task_name": "failed" + str(index), "agent_type": "evidence"}),
+                output(str(index), {key: "returned-name", "error": "capacity"}, 1),
+            ])
+        rows.extend([
+            call("spawn_agent", "unknown", {"task_name": "unknown"}),
+            output("unknown", {}, 1),
+            call("spawn_agent", "ok", {"task_name": "ok", "agent_type": "experiment"}),
+            output("ok", {"task_name": "/root/ok", "error": None}, 1),
+        ])
+        self.write(rows)
+        result = audit.build_output(self.args())
+        self.assertEqual(result["summary"]["creation_outcomes"], {"failed": 3, "unknown": 1, "created": 1})
+        self.assertEqual(result["summary"]["created_roles"], {"experiment": 1})
+        rendered = audit.model_output(result, 2048)
+        self.assertIn("failed:3", rendered)
+        self.assertIn("created:1", rendered)
 
     def test_work_between_waits_and_filtered_start_scope(self):
         self.write([

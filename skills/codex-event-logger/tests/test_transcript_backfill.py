@@ -194,6 +194,55 @@ class TranscriptBackfillTests(unittest.TestCase):
                 legacy,
             )
 
+    def test_stop_replaces_provisional_source_with_observed_prompt_origin(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="AgentBase-source-recovery-") as raw_root:
+            root = Path(raw_root)
+            transcript = root / "transcript.jsonl"
+            conversation = root / "conversation.json"
+            for prompt, expected_source in (
+                ("recovered request", "transcript_user_prompt"),
+                ('<codex_internal_context source="goal">continue', "goal"),
+            ):
+                transcript.write_text(transcript_row("turn-a", "user", prompt) + "\n", encoding="utf-8")
+                for source in (None, "unknown", "tool_operation", "auto_or_goal_turn"):
+                    with self.subTest(source=source, expected=expected_source):
+                        conversation.write_text(json.dumps({"source": source}), encoding="utf-8")
+                        with mock.patch.object(LOGGER, "active_goal_for_thread", return_value=None):
+                            LOGGER.update_conversation(conversation, {"transcript_path": str(transcript)}, "Stop", "thread-a", "turn-a", self.config)
+                        result = json.loads(conversation.read_text(encoding="utf-8"))
+                        self.assertEqual(result["source"], expected_source)
+                        if expected_source == "transcript_user_prompt":
+                            self.assertEqual(result["prompt"], prompt)
+
+    def test_unavailable_stop_source_can_be_recovered_by_later_tool(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="AgentBase-late-source-") as raw_root:
+            root = Path(raw_root)
+            transcript = root / "transcript.jsonl"
+            conversation = root / "conversation.json"
+            payload = {"transcript_path": str(transcript)}
+            with mock.patch.object(LOGGER, "active_goal_for_thread", return_value=None):
+                LOGGER.update_conversation(conversation, payload, "Stop", "thread-a", "turn-a", self.config)
+            transcript.write_text(transcript_row("turn-a", "user", "late request") + "\n", encoding="utf-8")
+            with mock.patch.object(LOGGER, "transcript_turn_messages", wraps=LOGGER.transcript_turn_messages) as scan:
+                for _ in range(3):
+                    LOGGER.backfill_conversation_from_transcript(conversation, payload, "PostToolUse", "thread-a", "turn-a", self.config)
+            self.assertEqual(scan.call_count, 1)
+            recovered = json.loads(conversation.read_text(encoding="utf-8"))
+            self.assertEqual(recovered["source"], "transcript_user_prompt")
+            self.assertEqual(recovered["prompt"], "late request")
+            conversation.write_text('{"source":"auto_or_goal_turn"}', encoding="utf-8")
+            unavailable = {"transcript_path": str(root / "still-missing.jsonl")}
+            with mock.patch.object(LOGGER, "transcript_turn_messages", wraps=LOGGER.transcript_turn_messages) as scan:
+                for _ in range(3):
+                    LOGGER.backfill_conversation_from_transcript(conversation, unavailable, "PostToolUse", "thread-a", "turn-a", self.config)
+            self.assertEqual(scan.call_count, 1)
+            self.assertEqual(json.loads(conversation.read_text(encoding="utf-8"))["source"], "tool_operation")
+
+    def test_transcript_merge_preserves_confirmed_source_and_text(self) -> None:
+        conversation = {"source": "user_prompt", "prompt": "submitted request"}
+        LOGGER.merge_transcript_fields(conversation, {"source": "transcript_user_prompt", "prompt": "fallback request"})
+        self.assertEqual(conversation, {"source": "user_prompt", "prompt": "submitted request"})
+
     def test_goal_prompt_source_does_not_rescan_for_missing_prompt_text(self) -> None:
         with tempfile.TemporaryDirectory(prefix="AgentBase-backfill-goal-") as raw_root:
             conversation_file = Path(raw_root) / "conversation.json"

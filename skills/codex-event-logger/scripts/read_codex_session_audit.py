@@ -161,7 +161,7 @@ def scan(path, max_bytes, max_line_bytes, include_text=False):
                     else:
                         # A call is not a successful child creation without a returned identity.
                         returned = output.get("task_name") or output.get("agent_id") or output.get("thread_id")
-                        event["outcome"] = "created" if isinstance(returned, str) and returned else "failed" if output.get("error") else "unknown"
+                        event["outcome"] = "failed" if output.get("error") else "created" if isinstance(returned, str) and returned else "unknown"
                         if isinstance(output.get("task_name"), str):
                             event["agent_path"] = text(output["task_name"])
                 elif kind == "agent_message":

@@ -15,7 +15,7 @@ python.exe (Join-Path $SkillDir 'scripts\read_codex_session_audit.py') --transcr
 python.exe (Join-Path $SkillDir 'scripts\read_codex_session_audit.py') --transcript $Transcript --mode waits --from-time '2026-09-08T00:00:00+08:00' --to-time '2026-09-08T01:00:00+08:00'
 ```
 
-- `agents`：直接创建调用及其返回结果、角色、源行号和后续派任务次数。创建失败、未知或尚未返回与成功创建分别统计。名称只帮助定位，不能把调用尝试算成真实子代理。
+- `agents`：直接创建调用及其返回结果、角色、源行号和后续派任务次数。创建失败、未知或尚未返回与成功创建分别统计；明确错误优先于返回的任务名称或身份。名称只帮助定位，不能把调用尝试算成真实子代理。
 - `waits`：等待开始、结束、超时/唤醒/未知/尚未返回以及可配对的墙钟时长。
 - `timeline`：创建、复用、发消息、等待、工具调用、命令完成、文件变更、输入、公开进度与压缩等可观察事件。需要审阅公开进度或命令原文时才加 `--include-text`，每项最多投影 400 字符并沿用脱敏；完整内容仍按行号定向取自原始来源。任何模式均不输出推理正文、加密消息或完整工具结果。
 
