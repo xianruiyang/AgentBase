@@ -1,6 +1,6 @@
 ---
 name: understand-space
-description: 把空间意图规范化为可比较、可操作、可验收的表达。用于正确性依赖二维或三维位置、方向、距离、尺寸、区域、布局、对齐、穿插、净空、遮挡、可见面深度冲突、视角、坐标系或转换时；正文偶有空间词不触发，也不用于无需空间推理的机械字段修改。
+description: 把空间意图规范化为可比较、可操作、可验收的表达。用于正确性依赖二维或三维位置、方向、距离、尺寸、区域、布局、对齐、穿插、净空、遮挡、可见面深度冲突、视角、坐标系、裁剪空间、NDC、UV 或其转换时；正文偶有空间词不触发，也不用于无需空间推理的机械字段修改。
 ---
 
 # 空间理解
@@ -9,9 +9,11 @@ description: 把空间意图规范化为可比较、可操作、可验收的表�
 
 ## 按需读取
 
-- UI、网页、画布、图像、屏幕、视口、锚点、裁剪或二维布局任务，完整读取 [two-dimensional-layout.md](references/two-dimensional-layout.md)。
+- UI、网页、画布、图像的布局、屏幕定位、锚点或二维裁剪任务，完整读取 [two-dimensional-layout.md](references/two-dimensional-layout.md)；纯 GPU 裁剪空间或 UV 计算不因此加载布局说明。
 - 世界/局部/父级/组件空间、姿态、相机、导入轴、手性、三维穿插、功能区域净空、遮挡或可见面深度冲突任务，完整读取 [three-dimensional-transform.md](references/three-dimensional-transform.md)。
 - 任务涉及跨坐标系转换、相对 transform、矩阵约定、代理控制对象、数值读回或视觉验收时，完整读取 [frame-transform-verification.md](references/frame-transform-verification.md)。
+- 裁剪空间、NDC（标准化设备坐标）、视口映射、裁剪区域与图像裁切的区别、UV 或纹理像素映射影响结果时，读取 [clip-viewport-uv.md](references/clip-viewport-uv.md) 的适用章节。
+- 需要确认具名软件的默认空间约定且当前契约尚未给足时，读取 [software-coordinate-systems.md](references/software-coordinate-systems.md) 的使用边界和对应条目；跨软件转换只取源与目标条目。软件名本身不触发读取，已明确实际约定时跳过速查。
 - 同一任务跨越多个类别时读取所有对应文件；机械修改已经确认的单一字段和值时退出本 skill。
 
 ## 核心不变量

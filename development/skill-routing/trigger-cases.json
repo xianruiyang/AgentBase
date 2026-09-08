@@ -145,6 +145,11 @@
     "space-intentional-surface-overlap",
     "space-wording-only",
     "ue-spatial-clearance-with-peer",
+    "software-coordinate-defaults",
+    "software-coordinate-explicit-override",
+    "clip-viewport-numeric-only",
+    "uv-texel-numeric-only",
+    "uv-wording-only",
     "single-turn-checklist",
     "windows-prose-without-command",
     "single-task-cli-formatting",
@@ -2362,6 +2367,97 @@
       "expected_behavior_tags": [
         "modify_authorized_scope"
       ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "software-coordinate-defaults",
+      "kind": "positive",
+      "request": "只比较 Unity Transform、Unity 相机空间和 Godot 定向模型的前向约定，说明哪些默认值还不能证明实际导入资产的朝向，不操作软件。",
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "subagent-orchestration",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "software-coordinate-explicit-override",
+      "kind": "boundary",
+      "request": "已提供 Maya 场景实际采用 Z-up、毫米单位，以及导出到目标软件的完整可逆映射矩阵和乘法约定。只用给定事实换算这一个点并检查结果，不用软件默认 Y-up 或厘米覆盖输入，不修改场景。",
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "subagent-orchestration",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "clip-viewport-numeric-only",
+      "kind": "boundary",
+      "request": "给定 D3D11 齐次裁剪坐标 (0,0,0.5,1)，启用默认深度裁剪，视口左上 (100,50)、尺寸 800×600、深度范围 0 到 1。只计算 NDC 与视口位置，并说明这与 UI 裁剪矩形的区别；不调用引擎或修改文件。",
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "subagent-orchestration",
+        "task-table-manager",
+        "execution-governor"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "uv-texel-numeric-only",
+      "kind": "positive",
+      "request": "已知纹理 200×100、左上原点、u 向右 v 向下，UV 为整张纹理的归一化边缘坐标。计算 texel (0,0) 中心 UV，并解释 repeat 寻址下 UV (1.2,-0.4) 的含义；只做给定数据计算，不运行软件。",
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "subagent-orchestration",
+        "task-table-manager",
+        "execution-governor"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "uv-wording-only",
+      "kind": "negative",
+      "request": "把句子中的重复单词去掉，只返回修改后的英文：The UV UV channel is named Detail。无需解释 UV 或处理几何。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "understand-space",
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
       "forbidden_behavior_tags": []
     },
     {
