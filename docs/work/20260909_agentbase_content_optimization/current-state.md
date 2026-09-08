@@ -93,9 +93,18 @@ EvoSkill 和 Anthropic 的目标 skill 附带 Apache-2.0 文本。AutoSkill READ
 
 模型内部决策、工具内部每次文件读取和外部系统全部副作用不由上述事件单独证明；公开计划、工具结果、执行回执和实际读回各有证据范围。缺失来源不补造历史，也不把本轮静态审查说成完成了真实追溯验证。
 
+## OBS-010 原评测结果不允许任意综合分
+
+- 状态: confirmed
+- 来源: [evaluation_core.py](../../../development/agent-evaluation/evaluation_core.py) 的结果校验；[agent_eval.py](../../../development/agent-evaluation/agent_eval.py) 的报告生成
+
+现有结果校验要求 assessment.composite_score 为 null，reward 使用原任务合同的范围；报告同样保持 composite_score=null，并不将结果声明为排行榜可比。Evo 自定义评分需保留为引用原事实的派生结果，不能把新公式填入旧字段而改变既有收据语义。
+
 ## GAP-001 需要组合级优化，但不需要替换已有逐题评测
 
 - 状态: confirmed
-- 关联: REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008, REQ-009, REQ-010, REQ-011, REQ-012, REQ-013, OBS-001, OBS-002, OBS-003, OBS-004, OBS-005, OBS-006, OBS-008, OBS-009
+- 关联: REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008, REQ-009, REQ-010, REQ-011, REQ-012, REQ-013, DES-002, DES-004, DES-005, DES-006, DES-007, DES-008, DES-009, DES-010, OBS-001, OBS-002, OBS-003, OBS-004, OBS-005, OBS-006, OBS-008, OBS-009, OBS-010
 
-已有单次评分与 corpus suite 可作为独立评分和分组选择的基础，但现有投影没有把子 agent/Codex 设置作为独立可选变量，也没有上述七类组合共用的评测目录维护与运行选择合同。仍缺少组合级的候选构建绑定、跨适配器编排、人工评分与候选选择。并发监控、资源复用、全代理用量、流程追溯和自由选择数据计算的新增要求，尚未完成相对现有能力的全面设计。三个外部项目都未直接覆盖 AgentBase 所需的全部内容与 Windows 宿主生命周期。[solution.md](solution.md)保留的是初始方案；当前先整理用户需求，不据此展开新方案、改动生产配置或启动评测。
+已有单次评分与 corpus suite 可作为独立评分和分组选择的基础，但现有投影没有把子 agent/Codex 设置作为独立可选变量，也没有上述七类组合共用的评测目录维护与运行选择能力。仍缺少组合级候选构建绑定、跨适配器编排、人工评分与候选选择，以及统一并发监控、资源池、全代理成本/动作关联和自定义计算。三个外部项目都未直接覆盖 AgentBase 所需的全部内容与 Windows 宿主生命周期。
+
+[基本设计](design.md)和[实施方案](solution.md)已针对这些差距形成提案；这不改变当前缺少 Evo 实现及运行证据的事实。本轮只读取得的宿主资源与账户余量是时点信息，不写入可提交的项目状态；完成成本的假设和重估方式见 [estimates.md](estimates.md)。

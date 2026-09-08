@@ -1,6 +1,6 @@
 # AgentBase Evo 用户设计
 
-本文件只保存用户明确确认的设计约束；技术路线、模块、CLI、评分和阶段顺序仍由 [solution.md](solution.md)维护为模型方案。
+本文件只保存用户明确确认的设计约束；模型形成的职责、接口与行为设计归 [design.md](design.md)，实施动作与阶段顺序归 [solution.md](solution.md)。
 
 ## UDES-001 名称
 
