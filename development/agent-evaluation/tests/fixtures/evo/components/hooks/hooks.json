@@ -1,0 +1,1 @@
+{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"pwsh.exe -NoProfile -NonInteractive -File \"{component_root}\\hook.ps1\" -Workspace \"{workspace}\"","commandWindows":"pwsh.exe -NoProfile -NonInteractive -File \"{component_root}\\hook.ps1\" -Workspace \"{workspace}\"","timeout":10}]}]}}

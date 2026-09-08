@@ -17,7 +17,7 @@ from read_codex_turn_log import bounded_integer, model_text_cost, render_model, 
 MAX_EVENTS = 100_000
 OPAQUE = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,}\b|\bgAAAAA[A-Za-z0-9_=-]+")
 DELEGATION = {"spawn_agent", "followup_task", "send_message", "list_agents"}
-ACTIVITY = {"command", "file_change", "input", "incoming_message", "tool_call", "external_action", *DELEGATION}
+ACTIVITY = {"command", "file_change", "input", "incoming_message", "tool_call", "mcp_tool_call", "external_action", *DELEGATION}
 
 
 def text(value, limit=180):
@@ -189,6 +189,32 @@ def scan(path, max_bytes, max_line_bytes, include_text=False):
                         if isinstance(body, list):
                             body = "\n".join(x.get("text", "") for x in body if isinstance(x, dict)) if item_kind == "AgentMessage" else str(body[-1]) if body else ""
                         event["excerpt"] = text(body, 400)
+                elif item_kind == "McpToolCall":
+                    event = add(
+                        "mcp_tool_call",
+                        row_time,
+                        line_number,
+                        server=text(item.get("server")),
+                        tool=text(item.get("tool")),
+                        status=text(item.get("status")),
+                    )
+                    duration = object_value(item.get("duration"))
+                    secs, nanos = duration.get("secs"), duration.get("nanos")
+                    if isinstance(secs, (int, float)) and not isinstance(secs, bool) and isinstance(nanos, int) and not isinstance(nanos, bool):
+                        event["seconds"] = round(secs + nanos / 1_000_000_000, 9)
+                    if include_text:
+                        try:
+                            arguments = json.dumps(item.get("arguments"), ensure_ascii=False, separators=(",", ":"))
+                        except (TypeError, ValueError, RecursionError):
+                            arguments = None
+                            issues["invalid_mcp_arguments"] += 1
+                        event["arguments"] = text(arguments, 400)
+                        result = object_value(item.get("result"))
+                        content = result.get("content")
+                        if isinstance(content, list):
+                            parts = [part.get("text") for part in content if isinstance(part, dict) and isinstance(part.get("text"), str)]
+                            if parts:
+                                event["result_excerpt"] = text("\n".join(parts), 400)
                 elif item_kind == "SubAgentActivity":
                     if isinstance(item.get("agent_path"), str) and isinstance(item.get("agent_thread_id"), str):
                         child_ids[item["agent_path"]] = item["agent_thread_id"]

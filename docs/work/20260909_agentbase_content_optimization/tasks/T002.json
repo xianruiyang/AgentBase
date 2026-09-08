@@ -1,0 +1,34 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "前置正式消费者与接口证据"
+      ],
+      "id": "T001",
+      "type": "hard"
+    }
+  ],
+  "id": "T002",
+  "mutation_scope": [
+    "development/agent-evaluation/**",
+    "development/common/**"
+  ],
+  "outcome": "用户运行真实组合，受控排队并查看子代理用量和动作",
+  "outputs": [
+    "用户运行真实组合，受控排队并查看子代理用量和动作"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-004",
+    "SOL-009",
+    "SOL-010"
+  ],
+  "suggested_skills": [],
+  "title": "真实运行与可恢复排队",
+  "validation_dimensions": [],
+  "verification": [
+    "并发守限；故障恢复不重复模型；真实子代理用量有来源；环境不污染"
+  ]
+}

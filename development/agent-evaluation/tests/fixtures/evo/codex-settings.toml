@@ -1,0 +1,10 @@
+web_search = "disabled"
+model_verbosity = "low"
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 1
+
+[features]
+multi_agent = true
+hooks = false

@@ -1,0 +1,18 @@
+{
+  "handles": {
+    "source-T001-1": "sha256:a525cd6392c157057fd3641ed2d4df4eb9e6a4af1afb4f40151cd22d854efc91",
+    "source-T001-2": "sha256:e885c07f2516be35b8d45d83b83e3782192ba71039fa06c43dfd3f262a038096",
+    "source-T002-1": "sha256:f0d921129f71fea76eeeca4002b5f85a6234f72934ebedf4a92c33acd261b768",
+    "source-T003-1": "sha256:c997c90c4fed92383f57545d64472df7022974bb093167b1ae9010ffbc0b89f7",
+    "source-T004-1": "sha256:0e6df79fb822bc2f32d10eead33746293de8c51a6b345a4e7883fbfc407a1918",
+    "source-T005-1": "sha256:dd35cdd7ff3146ced7536fac90078086938de10c60a34977422bd5b6ac5cbe9b"
+  },
+  "next_by_task": {
+    "T001": 3,
+    "T002": 2,
+    "T003": 2,
+    "T004": 2,
+    "T005": 2
+  },
+  "schema": "task.source-receipts"
+}

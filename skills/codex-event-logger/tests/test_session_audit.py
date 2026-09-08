@@ -114,6 +114,32 @@ class SessionAuditTests(unittest.TestCase):
         for secret in ("PRIVATE_REASONING", "CIPHER", "RAW_TOOL_OUTPUT"):
             self.assertNotIn(secret, encoded)
 
+    def test_mcp_tool_call_projects_public_bounded_facts(self):
+        self.write([
+            record({
+                "type": "item_completed",
+                "item": {
+                    "type": "McpToolCall",
+                    "server": "evo-fixture",
+                    "tool": "selected_component",
+                    "arguments": {"key": "value"},
+                    "status": "completed",
+                    "result": {"content": [{"type": "text", "text": "EVO_MCP_VALUE=23"}]},
+                    "duration": {"secs": 0, "nanos": 447900},
+                },
+            }, kind="event_msg"),
+        ])
+        result = audit.build_output(self.args("--mode", "timeline", "--include-text"))
+        event = result["events"][0]
+        self.assertEqual(event["kind"], "mcp_tool_call")
+        self.assertEqual(event["server"], "evo-fixture")
+        self.assertEqual(event["tool"], "selected_component")
+        self.assertEqual(event["status"], "completed")
+        self.assertEqual(event["arguments"], '{"key":"value"}')
+        self.assertEqual(event["result_excerpt"], "EVO_MCP_VALUE=23")
+        self.assertEqual(event["seconds"], 0.0004479)
+        self.assertNotIn("unsupported_completed_items", result["coverage"]["issues"])
+
     def test_pagination_budget_and_stale_source(self):
         self.write([call("spawn_agent", f"s{i}", {"task_name": "agent" + str(i), "agent_type": "evidence"}, i) for i in range(30)])
         first = audit.build_output(self.args("--limit", "30"))

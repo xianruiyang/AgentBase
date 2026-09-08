@@ -1,0 +1,40 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "前置正式消费者与接口证据"
+      ],
+      "id": "T003",
+      "type": "hard"
+    },
+    {
+      "consumes": [
+        "前置正式消费者与接口证据"
+      ],
+      "id": "T004",
+      "type": "hard"
+    }
+  ],
+  "id": "T005",
+  "mutation_scope": [
+    "development/agent-evaluation/**",
+    "development/common/**"
+  ],
+  "outcome": "全部需求具备适用证据与使用说明",
+  "outputs": [
+    "全部需求具备适用证据与使用说明"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-011",
+    "SOL-012"
+  ],
+  "suggested_skills": [],
+  "title": "初版兼容验证与交付",
+  "validation_dimensions": [],
+  "verification": [
+    "正式基础设施验证；全部目标复核；私有语料不进Git"
+  ]
+}

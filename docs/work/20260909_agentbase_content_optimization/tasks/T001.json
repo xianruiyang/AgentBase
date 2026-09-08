@@ -1,0 +1,27 @@
+{
+  "dependencies": [],
+  "id": "T001",
+  "mutation_scope": [
+    "development/agent-evaluation/**",
+    "development/common/**"
+  ],
+  "outcome": "用户从已有结果选择分组和代理数据，自定义计算并追溯报告",
+  "outputs": [
+    "用户从已有结果选择分组和代理数据，自定义计算并追溯报告"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-003",
+    "SOL-005",
+    "DES-003",
+    "DES-008"
+  ],
+  "suggested_skills": [],
+  "title": "离线评分正式闭环",
+  "validation_dimensions": [],
+  "verification": [
+    "正式CLI合成结果可人工复核；公式变更不启动模型；旧结果不改写"
+  ]
+}

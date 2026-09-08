@@ -66,6 +66,9 @@ CODEX_USAGE_FIELDS = (
 MAX_ATTEMPT_ROLLOUT_FILES = 128
 MAX_ATTEMPT_ROLLOUT_BYTES = 256 * 1024 * 1024
 MAX_ROLLOUT_LINE_BYTES = 16 * 1024 * 1024
+MAX_ROLLOUT_METADATA_BYTES = 64 * 1024
+MAX_COMPONENT_FILE_BYTES = 8 * 1024 * 1024
+MAX_COMPONENT_PROJECTION_BYTES = 64 * 1024 * 1024
 REQUIRED_CANDIDATE_TOOLS: dict[str, tuple[str, ...]] = {
     "srcq": ("srcq.exe", "srcq"),
     "rg": ("rg.exe", "rg"),
@@ -392,6 +395,54 @@ def _skill_tree_entries(root: Path) -> list[dict[str, Any]]:
     return entries
 
 
+def _regular_tree_entries(root: Path) -> list[dict[str, Any]]:
+    resolved = root.resolve()
+    if not resolved.is_dir() or _is_reparse_point(resolved):
+        raise EvaluationError(f"component source must be a regular directory: {resolved}")
+    entries: list[dict[str, Any]] = []
+    total = 0
+    for path in sorted(resolved.rglob("*"), key=lambda item: item.as_posix().casefold()):
+        if _is_reparse_point(path):
+            raise EvaluationError(f"component tree contains a reparse point: {path}")
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            raise EvaluationError(f"component tree contains an unsupported entry: {path}")
+        size = path.stat().st_size
+        if size > MAX_COMPONENT_FILE_BYTES:
+            raise PreconditionError(f"component file exceeds {MAX_COMPONENT_FILE_BYTES} bytes: {path}")
+        total += size
+        if total > MAX_COMPONENT_PROJECTION_BYTES:
+            raise PreconditionError(
+                f"component projection exceeds {MAX_COMPONENT_PROJECTION_BYTES} bytes"
+            )
+        entries.append({"path": path.relative_to(resolved).as_posix(), "bytes": size})
+    if not entries:
+        raise PreconditionError("selected component tree is empty")
+    return entries
+
+
+def _projection_file_entries(workspace: Path, roots: Sequence[Path]) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for root in roots:
+        if not root.exists():
+            continue
+        if _is_reparse_point(root) or not root.resolve().is_relative_to(workspace.resolve()):
+            raise EvaluationError(f"projected component root is unsafe: {root}")
+        for path in sorted(root.rglob("*"), key=lambda item: item.as_posix().casefold()):
+            if _is_reparse_point(path):
+                raise EvaluationError(f"projected component contains a reparse point: {path}")
+            if path.is_file():
+                entries.append(
+                    {
+                        "path": path.relative_to(workspace).as_posix(),
+                        "sha256": sha256_file(path),
+                        "bytes": path.stat().st_size,
+                    }
+                )
+    return sorted(entries, key=lambda entry: str(entry["path"]).casefold())
+
+
 def stage_candidate_skill_projection(
     project_root: Path,
     workspace: Path,
@@ -517,6 +568,342 @@ def stage_candidate_codex_projection(
         "identity_sha256": sha256_bytes(canonical_bytes(identity)),
         "shell_environment_policy_sha256": shell_policy_descriptor["sha256"],
     }
+
+
+def stage_codex_component_projection(
+    *,
+    project_root: Path,
+    workspace: Path,
+    selected: Mapping[str, Sequence[Mapping[str, Any]]],
+    max_agents: int | None = None,
+    candidate_source_roots: Sequence[Path] = (),
+) -> dict[str, Any]:
+    """Project only the Codex-facing assets selected by an Evo combination."""
+
+    resolved_project = project_root.resolve()
+    resolved_workspace = workspace.resolve()
+    destination = resolved_workspace / ".codex"
+    skill_destination = resolved_workspace / ".agents" / "skills"
+    component_root = resolved_workspace / ".agentbase" / "components"
+    manifest_path = resolved_workspace / ".agentbase" / "evo-codex-projection.json"
+    def source_path(entry: Mapping[str, Any]) -> Path:
+        raw = entry.get("source")
+        if not isinstance(raw, str) or not raw:
+            raise EvaluationError("selected component source is invalid")
+        return resolve_component_source(
+            resolved_project,
+            raw,
+            candidate_source_roots=candidate_source_roots,
+        )
+
+    recipe_entries: list[dict[str, Any]] = []
+    for kind in sorted(selected):
+        for entry in selected[kind]:
+            source = source_path(entry)
+            files = (
+                [{"path": source.name, "sha256": sha256_file(source), "bytes": source.stat().st_size}]
+                if source.is_file()
+                else [
+                    {"path": item["path"], "sha256": sha256_file(source / item["path"]), "bytes": item["bytes"]}
+                    for item in _regular_tree_entries(source)
+                ]
+            )
+            recipe_entries.append({"kind": kind, "id": entry.get("id"), "source": str(source), "files": files})
+    recipe = {"schema": "agentbase.evo-codex-projection-recipe/v1", "max_agents": max_agents, "sources": recipe_entries}
+    recipe_identity = sha256_bytes(canonical_bytes(recipe))
+    managed_roots = [destination, skill_destination, component_root]
+    replaced = False
+    if any(path.exists() or path.is_symlink() for path in managed_roots):
+        if not manifest_path.is_file() or manifest_path.is_symlink():
+            raise PreconditionError("workspace owns projection paths without an Evo managed manifest")
+        previous = read_json(manifest_path)
+        previous_files = previous.get("files")
+        previous_result = previous.get("result")
+        if previous.get("schema") != "agentbase.evo-codex-projection-manifest/v1" or not isinstance(previous_result, Mapping):
+            raise PreconditionError("workspace projection manifest is not owned by this adapter")
+        if previous.get("recipe_identity_sha256") == recipe_identity and isinstance(previous_files, list):
+            actual = _projection_file_entries(resolved_workspace, managed_roots)
+            if actual == previous_files:
+                result = dict(previous_result)
+                result["disposition"] = "reused"
+                return result
+        for path in managed_roots:
+            if not path.exists():
+                continue
+            if path.is_symlink() or _is_reparse_point(path) or not path.resolve().is_relative_to(resolved_workspace):
+                raise PreconditionError("managed projection replacement encountered an unsafe path")
+            shutil.rmtree(path)
+        manifest_path.unlink()
+        replaced = True
+
+    config: dict[str, Any] = {}
+    component_copies: list[tuple[Path, Path]] = []
+    tool_paths: list[str] = []
+    hooks_by_event: dict[str, list[Any]] = {}
+    mcp_servers: dict[str, Any] = {}
+    tool_names: set[str] = set()
+    for kind in ("hooks", "mcp", "tools"):
+        for entry in selected.get(kind, ()):
+            source = source_path(entry)
+            descriptor = _component_descriptor(source, kind)
+            identity = entry.get("id")
+            if not isinstance(identity, str) or not identity:
+                raise EvaluationError(f"selected {kind} component id is invalid")
+            target = component_root / kind / identity
+            component_copies.append((source, target))
+            if kind == "hooks":
+                hooks_path = _component_relative_file(source, descriptor.get("hooks"), "hooks.hooks")
+                hooks = json.loads(hooks_path.read_text(encoding="utf-8"))
+                if not isinstance(hooks, dict) or not isinstance(hooks.get("hooks"), dict):
+                    raise EvaluationError("hooks component payload must contain a hooks object")
+                rendered = _replace_component_placeholders(
+                    hooks["hooks"], component_root=target, workspace=resolved_workspace
+                )
+                for event, bindings in rendered.items():
+                    if not isinstance(event, str) or not isinstance(bindings, list):
+                        raise EvaluationError("hooks component event bindings are invalid")
+                    hooks_by_event.setdefault(event, []).extend(bindings)
+            elif kind == "mcp":
+                servers = descriptor.get("servers")
+                if not isinstance(servers, list):
+                    raise EvaluationError("MCP component servers must be an array")
+                for server in servers:
+                    if not isinstance(server, dict) or not isinstance(server.get("id"), str):
+                        raise EvaluationError("MCP component server entry is invalid")
+                    server_id = server["id"]
+                    if server_id in mcp_servers:
+                        raise EvaluationError(f"selected MCP server id conflicts: {server_id}")
+                    entry_path = _component_relative_file(source, server.get("entry"), "mcp entry")
+                    command = server.get("command")
+                    if not isinstance(command, str) or not command or any(mark in command for mark in ("/", "\\", "{")):
+                        raise EvaluationError("mcp command must name an explicit runtime executable")
+                    value = {key: item for key, item in server.items() if key not in {"id", "entry"}}
+                    value["args"] = [str(target / entry_path.relative_to(source)), *value.get("args", [])]
+                    mcp_servers[server_id] = _replace_component_placeholders(
+                        value, component_root=target, workspace=resolved_workspace
+                    )
+            else:
+                bins = descriptor.get("bins")
+                if not isinstance(bins, list) or not bins:
+                    raise EvaluationError("tools component bins must be a non-empty array")
+                for binary in bins:
+                    if not isinstance(binary, dict) or not isinstance(binary.get("name"), str):
+                        raise EvaluationError("tools component bin entry is invalid")
+                    if binary["name"].casefold() in tool_names:
+                        raise EvaluationError(f"tools component bin name conflicts: {binary['name']}")
+                    tool_names.add(binary["name"].casefold())
+                    path = _component_relative_file(source, binary.get("path"), "tool bin path")
+                    tool_paths.append(str((target / path.relative_to(source)).parent))
+    if mcp_servers:
+        config = _merge_without_overlap(config, {"mcp_servers": mcp_servers})
+    for entry in selected.get("codex_settings", ()):
+        path = source_path(entry)
+        if not path.is_file() or path.suffix.casefold() != ".toml":
+            raise PreconditionError("selected Codex setting must be a regular TOML file")
+        try:
+            value = tomllib.loads(path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            raise EvaluationError(f"cannot read selected Codex setting: {exc}") from exc
+        config = _merge_without_overlap(config, value)
+
+    instructions: list[str] = []
+    for entry in selected.get("agents_md", ()):
+        path = source_path(entry)
+        if not path.is_file():
+            raise PreconditionError("selected AGENTS source must be a regular file")
+        instructions.append(path.read_text(encoding="utf-8"))
+    if instructions:
+        config["developer_instructions"] = "\n\n".join(text.rstrip() for text in instructions) + "\n"
+    config.pop("desktop", None)
+    config["approval_policy"] = "never"
+    config["sandbox_mode"] = "danger-full-access"
+    config.setdefault("agents", {})["enabled"] = True
+    features = config.setdefault("features", {})
+    if hooks_by_event:
+        configured_hooks = config["features"].get("hooks")
+        if configured_hooks is False:
+            raise EvaluationError("selected Codex settings disable selected hooks")
+        config["features"]["hooks"] = True
+    if max_agents is not None:
+        agents = config["agents"]
+        configured = agents.get("max_concurrent_threads_per_session")
+        if max_agents == 1:
+            if configured is not None:
+                raise PreconditionError(
+                    "selected agents.max_concurrent_threads_per_session conflicts with single-root max_agents=1"
+                )
+            if features.get("multi_agent") is True:
+                raise PreconditionError("selected features.multi_agent=true conflicts with single-root max_agents=1")
+            agents["max_concurrent_threads_per_session"] = 1
+            features["multi_agent"] = False
+        else:
+            child_capacity = max_agents - 1
+            if configured is not None and configured != child_capacity:
+                raise PreconditionError(
+                    "selected agents.max_concurrent_threads_per_session="
+                    f"{configured} conflicts with reserved root-plus-descendant max_agents={max_agents}"
+                )
+            if features.get("multi_agent") is False:
+                raise PreconditionError("selected features.multi_agent=false conflicts with max_agents greater than one")
+            agents["max_concurrent_threads_per_session"] = child_capacity
+            features["multi_agent"] = True
+
+    destination.mkdir(parents=True, exist_ok=False)
+    config_path = destination / "config.toml"
+    write_text_atomic(
+        config_path,
+        _serialize_toml(config, ["# Generated by AgentBase Evo; do not edit."]),
+    )
+    projected_files: list[dict[str, Any]] = []
+
+    for entry in selected.get("agents", ()):
+        source = source_path(entry)
+        sources = [source] if source.is_file() else sorted(source.glob("*.toml"))
+        if not sources:
+            raise PreconditionError("selected agents source has no TOML profiles")
+        target_root = destination / "agents"
+        target_root.mkdir(exist_ok=True)
+        for item in sources:
+            if not item.is_file() or _is_reparse_point(item):
+                raise PreconditionError("selected agent profile is not a regular file")
+            target = target_root / item.name
+            if target.exists():
+                raise EvaluationError(f"selected agent profile target conflicts: {item.name}")
+            shutil.copy2(item, target)
+
+    for entry in selected.get("skills", ()):
+        source = source_path(entry)
+        if not source.is_dir():
+            raise PreconditionError("selected skill source must be a regular directory")
+        entries = _regular_tree_entries(source)
+        if not any(item["path"] == "SKILL.md" for item in entries):
+            raise PreconditionError("selected skill source omits SKILL.md")
+        target = skill_destination / source.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            raise EvaluationError(f"selected skill target conflicts: {source.name}")
+        shutil.copytree(source, target)
+
+    for source, target in component_copies:
+        if target.exists():
+            raise EvaluationError(f"selected component target conflicts: {target}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source, target)
+    hooks_path = destination / "hooks.json"
+    if hooks_by_event:
+        write_text_atomic(
+            hooks_path,
+            json.dumps({"hooks": hooks_by_event}, ensure_ascii=False, indent=2) + "\n",
+        )
+
+    projected_files = _projection_file_entries(resolved_workspace, managed_roots)
+    payload = {"schema": "agentbase.evo-codex-projection/v1", "files": projected_files}
+    result = {
+        "root": str(destination),
+        "config_path": str(config_path),
+        "files": projected_files,
+        "identity_sha256": sha256_bytes(canonical_bytes(payload)),
+        "managed_paths": [
+            ".codex",
+            ".agents/skills",
+            ".agentbase/components",
+            ".agentbase/evo-codex-projection.json",
+        ],
+        "hooks_enabled": bool(hooks_by_event),
+        "tool_paths": sorted(set(tool_paths), key=str.casefold),
+        "disposition": "replaced" if replaced else "created",
+    }
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    write_json_atomic(
+        manifest_path,
+        {
+            "schema": "agentbase.evo-codex-projection-manifest/v1",
+            "recipe_identity_sha256": recipe_identity,
+            "files": projected_files,
+            "result": result,
+        },
+    )
+    return result
+
+
+def _path_is_within(root: Path, candidate: Path) -> bool:
+    try:
+        candidate.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def resolve_component_source(
+    project_root: Path,
+    source: str,
+    candidate_source_roots: Sequence[Path] = (),
+) -> Path:
+    """Resolve a selected component under the project or registered candidate roots."""
+
+    if not isinstance(source, str) or not source:
+        raise EvaluationError("selected component source is invalid")
+    resolved_project = project_root.resolve()
+    allowed_roots = [resolved_project, *(path.resolve() for path in candidate_source_roots)]
+    candidate = Path(source)
+    if not candidate.is_absolute():
+        candidate = resolved_project / candidate
+    absolute = candidate.absolute()
+    resolved = candidate.resolve()
+    lexical_roots = [root for root in allowed_roots if _path_is_within(root, absolute)]
+    if not lexical_roots or not any(_path_is_within(root, resolved) for root in lexical_roots):
+        raise PreconditionError(f"selected component source is outside allowed roots: {source}")
+    for root in lexical_roots:
+        cursor = root
+        for part in absolute.relative_to(root).parts:
+            cursor = cursor / part
+            if cursor.exists() and _is_reparse_point(cursor):
+                raise PreconditionError(
+                    f"selected component source traverses a reparse point: {source}"
+                )
+    if not resolved.exists() or _is_reparse_point(resolved):
+        raise PreconditionError(f"selected component source is unavailable: {source}")
+    if resolved.is_file() and resolved.stat().st_size > MAX_COMPONENT_FILE_BYTES:
+        raise PreconditionError(
+            f"component file exceeds {MAX_COMPONENT_FILE_BYTES} bytes: {resolved}"
+        )
+    return resolved
+
+
+def _component_descriptor(source: Path, kind: str) -> dict[str, Any]:
+    if not source.is_dir():
+        raise PreconditionError(f"selected {kind} component must be a directory")
+    _regular_tree_entries(source)
+    path = source / "component.json"
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise EvaluationError(f"cannot read {kind} component descriptor: {exc}") from exc
+    if not isinstance(value, dict) or value.get("schema") != "agentbase-evo-component/v1" or value.get("kind") != kind:
+        raise EvaluationError(f"selected {kind} component descriptor has an invalid schema or kind")
+    return value
+
+
+def _component_relative_file(root: Path, value: Any, where: str) -> Path:
+    if not isinstance(value, str) or not value or Path(value).is_absolute() or ".." in Path(value).parts:
+        raise EvaluationError(f"{where} must be a component-relative path")
+    path = (root / value).resolve()
+    if not path.is_relative_to(root) or not path.is_file() or _is_reparse_point(path):
+        raise EvaluationError(f"{where} is unavailable in the component tree")
+    return path
+
+
+def _replace_component_placeholders(value: Any, *, component_root: Path, workspace: Path) -> Any:
+    if isinstance(value, str):
+        rendered = value.replace("{component_root}", str(component_root)).replace("{workspace}", str(workspace))
+        if "{" in rendered or "}" in rendered:
+            raise EvaluationError("component descriptor contains an unsupported placeholder")
+        return rendered
+    if isinstance(value, list):
+        return [_replace_component_placeholders(item, component_root=component_root, workspace=workspace) for item in value]
+    if isinstance(value, dict):
+        return {key: _replace_component_placeholders(item, component_root=component_root, workspace=workspace) for key, item in value.items()}
+    return value
 
 
 def _controlled_agent_entries(root: Path) -> list[dict[str, Any]]:
@@ -720,41 +1107,166 @@ def stage_candidate_metadata(
     }
 
 
-def candidate_rollout_snapshot(codex_home: Path) -> dict[str, dict[str, Any]]:
-    """Return a bounded identity map for persisted rollouts in the isolated runtime."""
+def candidate_rollout_snapshot(codex_home: Path) -> dict[str, Any]:
+    """Capture a constant-size cursor without enumerating a user's rollout history."""
 
     resolved_home = codex_home.resolve()
+    roots: dict[str, bool] = {}
+    for subdirectory in ("sessions", "archived_sessions"):
+        root = resolved_home / subdirectory
+        roots[subdirectory] = root.exists()
+        if root.exists() and (not root.is_dir() or _is_reparse_point(root)):
+            raise EvaluationError(f"candidate rollout root is not a regular directory: {root}")
+    return {
+        "schema": "agentbase.codex-rollout-cursor/v1",
+        "codex_home": str(resolved_home),
+        "started_ns": time.time_ns(),
+        "roots_existed": roots,
+    }
+
+
+def _candidate_rollouts_after_cursor(
+    codex_home: Path,
+    before: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    resolved_home = codex_home.resolve()
+    if before.get("schema") != "agentbase.codex-rollout-cursor/v1":
+        after = _legacy_candidate_rollout_inventory(resolved_home)
+        return [after[key] for key in sorted(set(after) - set(before))]
+    if before.get("codex_home") != str(resolved_home):
+        raise EvaluationError("candidate rollout cursor belongs to another Codex home")
+    started_ns = before.get("started_ns")
+    roots_existed = before.get("roots_existed")
+    if isinstance(started_ns, bool) or not isinstance(started_ns, int) or not isinstance(roots_existed, Mapping):
+        raise EvaluationError("candidate rollout cursor is invalid")
+    # Filesystems can report timestamps slightly before the Python clock boundary.
+    earliest_ns = started_ns - 2_000_000_000
+    now = time.time()
+    cursor_day = started_ns / 1_000_000_000 - 86400
+    end_value = now + 86400
+    day_keys: set[tuple[int, int, int]] = set()
+    while cursor_day <= end_value and len(day_keys) < 4:
+        value = time.gmtime(cursor_day)
+        day_keys.add((value.tm_year, value.tm_mon, value.tm_mday))
+        cursor_day += 86400
+    files: list[Path] = []
+    for subdirectory in ("sessions", "archived_sessions"):
+        root = resolved_home / subdirectory
+        if not root.exists():
+            continue
+        if not roots_existed.get(subdirectory, False):
+            for current, directories, filenames in os.walk(root, followlinks=False):
+                current_path = Path(current)
+                directories[:] = [name for name in directories if not _is_reparse_point(current_path / name)]
+                files.extend(current_path / name for name in filenames)
+            continue
+        files.extend(root.glob("*.jsonl"))
+        files.extend(root.glob("*.jsonl.zst"))
+        for year, month, day in day_keys:
+            bucket = root / f"{year:04d}" / f"{month:02d}" / f"{day:02d}"
+            if bucket.is_dir() and not _is_reparse_point(bucket):
+                files.extend(bucket.glob("*.jsonl"))
+                files.extend(bucket.glob("*.jsonl.zst"))
+    entries: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for candidate in files:
+        path = candidate.resolve()
+        if not path.is_relative_to(resolved_home) or _is_reparse_point(candidate) or not path.is_file():
+            raise EvaluationError(f"candidate rollout is not a regular file: {candidate}")
+        stat_result = path.stat()
+        if stat_result.st_mtime_ns < earliest_ns:
+            continue
+        relative = path.relative_to(resolved_home).as_posix()
+        key = relative.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        entries.append({"path": str(path), "relative_path": relative, "bytes": stat_result.st_size, "modified_ns": stat_result.st_mtime_ns})
+    return sorted(entries, key=lambda entry: str(entry["relative_path"]).casefold())
+
+
+def _legacy_candidate_rollout_inventory(resolved_home: Path) -> dict[str, dict[str, Any]]:
     observed: dict[str, dict[str, Any]] = {}
     for subdirectory in ("sessions", "archived_sessions"):
         root = resolved_home / subdirectory
         if not root.exists():
             continue
-        if not root.is_dir() or _is_reparse_point(root):
-            raise EvaluationError(f"candidate rollout root is not a regular directory: {root}")
-        for current, directories, filenames in os.walk(root, followlinks=False):
-            current_path = Path(current)
-            directories[:] = [
-                name
-                for name in directories
-                if not _is_reparse_point(current_path / name)
-            ]
-            for filename in filenames:
-                if not (filename.endswith(".jsonl") or filename.endswith(".jsonl.zst")):
-                    continue
-                path = (current_path / filename).resolve()
-                if _is_reparse_point(path) or not path.is_file():
-                    raise EvaluationError(f"candidate rollout is not a regular file: {path}")
-                relative = path.relative_to(resolved_home).as_posix()
-                stat_result = path.stat()
-                observed[relative.casefold()] = {
-                    "path": path,
-                    "relative_path": relative,
-                    "bytes": stat_result.st_size,
-                    "modified_ns": stat_result.st_mtime_ns,
-                }
-                if len(observed) > MAX_ATTEMPT_ROLLOUT_FILES * 8:
-                    raise EvaluationError("evaluation runtime contains too many persisted rollouts")
+        for path in (*root.rglob("*.jsonl"), *root.rglob("*.jsonl.zst")):
+            resolved = path.resolve()
+            relative = resolved.relative_to(resolved_home).as_posix()
+            info = resolved.stat()
+            observed[relative.casefold()] = {"path": str(resolved), "relative_path": relative, "bytes": info.st_size, "modified_ns": info.st_mtime_ns}
     return observed
+
+
+def _candidate_rollout_identity(entry: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Read only a bounded session_meta line for lineage discovery."""
+
+    path = Path(str(entry["path"]))
+    if path.suffix.casefold() == ".zst":
+        return None
+    try:
+        with path.open("rb") as stream:
+            raw = stream.readline(MAX_ROLLOUT_METADATA_BYTES + 1)
+        if not raw.endswith(b"\n") or len(raw) > MAX_ROLLOUT_METADATA_BYTES:
+            return None
+        value = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(value, dict) or value.get("type") != "session_meta":
+        return None
+    payload = value.get("payload")
+    if not isinstance(payload, dict):
+        return None
+    thread_id = payload.get("id")
+    if not isinstance(thread_id, str) or not thread_id:
+        return None
+    return {
+        "thread_id": thread_id,
+        "parent_thread_id": _rollout_parent_thread_id(payload),
+        "forked_from_id": payload.get("forked_from_id"),
+        "entry": entry,
+    }
+
+
+def _rollout_parent_thread_id(metadata: Mapping[str, Any]) -> Any:
+    direct = metadata.get("parent_thread_id")
+    if isinstance(direct, str) and direct:
+        return direct
+    source = metadata.get("source")
+    subagent = source.get("subagent") if isinstance(source, Mapping) else None
+    spawn = subagent.get("thread_spawn") if isinstance(subagent, Mapping) else None
+    return spawn.get("parent_thread_id") if isinstance(spawn, Mapping) else None
+
+
+def _candidate_rollout_lineage_entries(
+    entries: Sequence[Mapping[str, Any]],
+    root_thread_id: str,
+) -> list[Mapping[str, Any]]:
+    indexed = [identity for entry in entries if (identity := _candidate_rollout_identity(entry))]
+    roots = [identity for identity in indexed if identity["thread_id"] == root_thread_id]
+    if not roots:
+        raise EvaluationError("Codex candidate root thread is absent from persisted rollouts")
+    if len(roots) != 1:
+        raise EvaluationError("Codex candidate root thread has ambiguous rollout evidence")
+    selected = {root_thread_id}
+    pending = list(indexed)
+    changed = True
+    while changed:
+        changed = False
+        for identity in pending:
+            if identity["thread_id"] in selected:
+                continue
+            if identity.get("parent_thread_id") in selected or identity.get("forked_from_id") in selected:
+                selected.add(identity["thread_id"])
+                changed = True
+    result: list[Mapping[str, Any]] = [roots[0]["entry"]]
+    for thread_id in sorted(selected - {root_thread_id}):
+        matches = [identity for identity in indexed if identity["thread_id"] == thread_id]
+        if len(matches) != 1:
+            raise EvaluationError(f"Codex candidate persisted duplicate thread rollouts: {thread_id}")
+        result.append(matches[0]["entry"])
+    return result
 
 
 def _nonnegative_token_usage(value: object, *, context: str) -> dict[str, int]:
@@ -945,6 +1457,8 @@ def _parse_candidate_rollout(
     turn_started_count = 0
     turn_terminal_count = 0
     response_count = 0
+    requests: list[dict[str, Any]] = []
+    expected_child_thread_ids: set[str] = set()
     long_context_response_count = 0
     own_start_ordinal = 1
     ordinal = -1
@@ -1004,6 +1518,12 @@ def _parse_candidate_rollout(
                 current_model = str(payload["model"])
             elif item_type == "event_msg" and isinstance(payload, dict):
                 event_type = payload.get("type")
+                if event_type == "item_completed" and isinstance(payload.get("item"), dict):
+                    completed_item = payload["item"]
+                    if completed_item.get("type") == "SubAgentActivity":
+                        child_id = completed_item.get("agent_thread_id")
+                        if isinstance(child_id, str) and child_id:
+                            expected_child_thread_ids.add(child_id)
                 if event_type in {"task_started", "turn_started"}:
                     turn_started_count += 1
                 elif event_type in {"task_complete", "turn_complete", "turn_aborted"}:
@@ -1067,6 +1587,19 @@ def _parse_candidate_rollout(
                     _sum_token_usage(usage, last_usage)
                     priced = _price_response(pricing, current_model, last_usage)
                     response_count += 1
+                    if response_count > 10_000:
+                        raise EvaluationError("candidate rollout contains too many model responses")
+                    requests.append(
+                        {
+                            "ordinal": response_count,
+                            "model": priced["priced_model"],
+                            "requested_model": priced["requested_model"],
+                            "usage": last_usage,
+                            "time": item.get("timestamp"),
+                            "source_line": line_number,
+                            "complete": True,
+                        }
+                    )
                     if priced["long_context"]:
                         long_context_response_count += 1
                     group_key = (str(priced["priced_model"]), bool(priced["long_context"]))
@@ -1109,7 +1642,7 @@ def _parse_candidate_rollout(
         )
     return {
         "thread_id": thread_id,
-        "parent_thread_id": metadata.get("parent_thread_id"),
+        "parent_thread_id": _rollout_parent_thread_id(metadata),
         "forked_from_id": metadata.get("forked_from_id"),
         "agent_role": metadata.get("agent_role"),
         "agent_path": metadata.get("agent_path"),
@@ -1119,12 +1652,14 @@ def _parse_candidate_rollout(
         "usage_complete": usage_complete,
         "usage": usage,
         "request_count": response_count,
+        "requests": requests,
         "long_context_request_count": long_context_response_count,
         "pricing_complete": usage_complete,
         "api_equivalent_cost_usd_nanos": total_cost_usd_nanos,
         "api_equivalent_cost_usd": format_usd_nanos(total_cost_usd_nanos),
         "pricing_groups": groups,
         "subagent_history_start_ordinal": metadata.get("subagent_history_start_ordinal"),
+        "expected_child_thread_ids": sorted(expected_child_thread_ids),
         "rollout": {
             "path": relative_path,
             "sha256": sha256_file(path),
@@ -1143,10 +1678,10 @@ def candidate_agent_usage_receipt(
     """Aggregate exact cumulative usage for the fresh root thread and every descendant."""
 
     pricing = api_pricing_snapshot()
-    after = candidate_rollout_snapshot(codex_home)
-    new_entries = [after[key] for key in sorted(set(after) - set(before))]
-    if not new_entries:
+    candidates = _candidate_rollouts_after_cursor(codex_home, before)
+    if not candidates:
         raise EvaluationError("Codex candidate persisted no rollout usage evidence")
+    new_entries = _candidate_rollout_lineage_entries(candidates, root_thread_id)
     if len(new_entries) > MAX_ATTEMPT_ROLLOUT_FILES:
         raise EvaluationError("Codex candidate created too many rollout files")
     if sum(int(entry["bytes"]) for entry in new_entries) > MAX_ATTEMPT_ROLLOUT_BYTES:
@@ -1191,11 +1726,19 @@ def candidate_agent_usage_receipt(
             break
         descendants.update(discovered)
         pending.difference_update(discovered)
-    if pending:
+    expected_children = {
+        child_id
+        for thread_id in descendants
+        for child_id in by_thread[thread_id].get("expected_child_thread_ids", [])
+    }
+    missing_children = expected_children - set(by_thread)
+    if missing_children:
         raise EvaluationError(
-            "Codex candidate created rollout threads outside the root lineage: "
-            + ", ".join(sorted(pending))
+            "Codex candidate child rollout evidence is missing: "
+            + ", ".join(sorted(missing_children))
         )
+    # Concurrent unrelated sessions may share the authenticated Codex home. They are
+    # ignored after lineage selection and never enter this attempt's usage receipt.
 
     ordered_records = [root] + [by_thread[thread_id] for thread_id in sorted(descendants - {root_thread_id})]
     aggregate = _zero_token_usage()

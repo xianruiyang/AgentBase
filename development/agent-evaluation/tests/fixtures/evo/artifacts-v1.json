@@ -1,0 +1,11 @@
+{
+  "schema": "agentbase-evo-artifacts/v1",
+  "id": "synthetic-existing-artifacts",
+  "version": "1",
+  "rows": [
+    {"id": "a-reuse", "grain": "attempt", "dimensions": {"combination": "combo-a", "item": "reuse", "group": "core", "model": "synthetic", "role": "root", "status": "completed", "replicate": 1}, "values": {"quality.reward": 1, "usage.total_tokens": 100, "timing.subject_seconds": 2, "tools.attempts": 3}, "source": {"kind": "existing-receipt", "location": "receipts/a-reuse.json"}, "completeness": "complete", "reward": 1, "composite_score": null},
+    {"id": "a-direct", "grain": "attempt", "dimensions": {"combination": "combo-a", "item": "direct", "group": "core", "model": "synthetic", "role": "root", "status": "completed", "replicate": 1}, "values": {"quality.reward": 0, "usage.total_tokens": 300, "timing.subject_seconds": 4, "tools.attempts": 5}, "source": {"kind": "existing-receipt", "location": "receipts/a-direct.json"}, "completeness": "complete", "reward": 0, "composite_score": null},
+    {"id": "b-reuse", "grain": "attempt", "dimensions": {"combination": "combo-b", "item": "reuse", "group": "core", "model": "synthetic", "role": "root", "status": "completed", "replicate": 1}, "values": {"quality.reward": 1, "usage.total_tokens": 200, "timing.subject_seconds": 3, "tools.attempts": 4}, "source": {"kind": "existing-receipt", "location": "receipts/b-reuse.json"}, "completeness": "complete", "reward": 1, "composite_score": null},
+    {"id": "b-direct", "grain": "attempt", "dimensions": {"combination": "combo-b", "item": "direct", "group": "core", "model": "synthetic", "role": "root", "status": "completed", "replicate": 1}, "values": {"quality.reward": 1, "usage.total_tokens": 400, "timing.subject_seconds": 5, "tools.attempts": 6}, "source": {"kind": "existing-receipt", "location": "receipts/b-direct.json"}, "completeness": "complete", "reward": 1, "composite_score": null}
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "changed_files": [],
+  "evidence_for": [
+    "REQ-001",
+    "REQ-004",
+    "REQ-010",
+    "REQ-011",
+    "REQ-012",
+    "SOL-004",
+    "DES-004"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "ref": "development/agent-evaluation/tests/test_evo_components.py"
+    },
+    {
+      "kind": "synthetic-runtime",
+      "ref": "development/agent-evaluation/tests/fixtures/evo/components/seven-component-research.json"
+    },
+    {
+      "kind": "test",
+      "ref": "skills/codex-event-logger/tests/test_session_audit.py"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "七类组件可独立选择，真实共同场景验证已加载与实际消费",
+  "outputs": [
+    "共用Codex投影owner、hooks/MCP/tools descriptor、单文件及目录候选来源解析、增量投影、真实MCP审计"
+  ],
+  "schema": "task.result",
+  "source_snapshot_ref": "sha256:c997c90c4fed92383f57545d64472df7022974bb093167b1ae9010ffbc0b89f7",
+  "task_id": "T003",
+  "task_revision": 1,
+  "unresolved": [
+    "桌面专属hook或Provider行为不能从本次CLI/stdio场景外推；编译型组件继续使用各组件正式构建入口；未Deploy或Release"
+  ],
+  "validation_coverage": [
+    "AGENTS+skill+hook+stdio MCP+候选工具+agent profile+Codex settings共同消费",
+    "同身份投影复用与污染后替换；公共source拒绝越界；单root与多代理容量；旧SWE稳定合同回归"
+  ],
+  "verification": [
+    "正式基础设施160项通过；MCP审计及适配器定向21项通过；路由结构178案例合同通过",
+    "真实s3/j3质量1，216528 Token、9请求、81.524秒；公开命令、MCP结果、evidence调用与hook归档一致"
+  ]
+}

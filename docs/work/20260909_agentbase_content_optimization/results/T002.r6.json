@@ -1,0 +1,56 @@
+{
+  "changed_files": [],
+  "evidence_for": [
+    "REQ-003",
+    "REQ-005",
+    "REQ-007",
+    "REQ-008",
+    "REQ-009",
+    "REQ-010",
+    "REQ-011",
+    "REQ-012",
+    "REQ-013",
+    "SOL-004",
+    "SOL-009",
+    "SOL-010"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "ref": "development/agent-evaluation/tests/test_evo_runtime.py"
+    },
+    {
+      "kind": "test",
+      "ref": "development/agent-evaluation/tests/test_evo_recovery.py"
+    },
+    {
+      "kind": "test",
+      "ref": "development/agent-evaluation/tests/test_evo_facts.py"
+    },
+    {
+      "kind": "local-runtime-summary",
+      "ref": "docs/work/20260909_agentbase_content_optimization/current-state.md#obs-011-evo-首个消费者与当前接入边界"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "真实Codex与command运行、受限队列、环境复用及从原始收据重建评分已闭环",
+  "outputs": [
+    "evo init/submit/run/status/watch/recover/results/trace；公开数据提取与分析规格重算"
+  ],
+  "schema": "task.result",
+  "source_snapshot_ref": "sha256:f0d921129f71fea76eeeca4002b5f85a6234f72934ebedf4a92c33acd261b768",
+  "task_id": "T002",
+  "task_revision": 1,
+  "unresolved": [
+    "预算是作业派发预留，不能对内部每个模型请求施加硬限；私有推理与宿主未暴露内容不在追溯范围；最终共享兼容复核归T005"
+  ],
+  "validation_coverage": [
+    "共享并发/模型容量、排队/暂停/取消、收据丢失恢复、启动前确认与同job新attempt、磁盘等待、跨研究复用",
+    "人工等待释放资源、导入与更正不修改原subject收据；字段/代理/真实请求/公开事件渐进读取"
+  ],
+  "verification": [
+    "runtime/recovery/facts定向21项通过；模型投影14项通过",
+    "真实s1主代理与evidence共187872 Token完整结算；原始收据重算为147188与40684，无subject重跑",
+    "单代理模型grader s2经配置前置失败恢复成功，24293 Token；未知启动失败保持未结算"
+  ]
+}

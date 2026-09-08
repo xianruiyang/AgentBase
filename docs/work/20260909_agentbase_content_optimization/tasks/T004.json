@@ -1,0 +1,34 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "前置正式消费者与接口证据"
+      ],
+      "id": "T002",
+      "type": "hard"
+    }
+  ],
+  "id": "T004",
+  "mutation_scope": [
+    "development/agent-evaluation/**",
+    "development/common/**"
+  ],
+  "outcome": "人工评分暂停恢复与一轮候选比较可用",
+  "outputs": [
+    "人工评分暂停恢复与一轮候选比较可用"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-006",
+    "SOL-007",
+    "SOL-008"
+  ],
+  "suggested_skills": [],
+  "title": "人工评分与有限自动演进",
+  "validation_dimensions": [],
+  "verification": [
+    "必需人工缺失不晋升；预算停止；一轮真实循环"
+  ]
+}

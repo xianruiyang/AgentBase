@@ -1,0 +1,60 @@
+{
+  "schema": "agentbase-evo-research/v1",
+  "id": "synthetic-offline",
+  "version": "1.0.0",
+  "components": {
+    "agents_md": [{"id": "rules", "source": "global/AGENTS.md"}],
+    "skills": [{"id": "orchestration", "source": "skills/subagent-orchestration"}],
+    "hooks": [],
+    "mcp": [],
+    "tools": [],
+    "agents": [{"id": "roles", "source": "global/agents"}],
+    "codex_settings": []
+  },
+  "combinations": [
+    {"id": "combo-a", "members": {"agents_md": ["rules"], "skills": ["orchestration"], "agents": ["roles"]}},
+    {"id": "combo-b", "members": {"agents_md": ["rules"], "agents": ["roles"]}}
+  ],
+  "evaluations": {
+    "items": [
+      {"id": "reuse", "input_version": "1", "protocol": "offline-v1", "observations": ["quality", "usage"]},
+      {"id": "direct", "input_version": "1", "protocol": "offline-v1", "observations": ["quality", "usage"]}
+    ],
+    "groups": [
+      {"id": "core", "active": true, "items": ["reuse", "direct"]},
+      {"id": "overlap", "active": true, "items": ["reuse"]},
+      {"id": "inactive", "active": false, "items": ["direct"]}
+    ]
+  },
+  "fields": [
+    {"id": "quality.reward", "type": "number", "unit": "ratio", "grain": "attempt", "source": "existing verifier receipt"},
+    {"id": "usage.total_tokens", "type": "integer", "unit": "token", "grain": "attempt", "source": "existing usage receipt"},
+    {"id": "timing.subject_seconds", "type": "number", "unit": "second", "grain": "attempt", "source": "existing attempt receipt"},
+    {"id": "tools.attempts", "type": "integer", "unit": "call", "grain": "attempt", "source": "existing trace summary"}
+  ],
+  "scoring": [
+    {
+      "id": "quality-cost",
+      "version": "1",
+      "group_by": ["combination"],
+      "metrics": [
+        {"id": "attempts", "unit": "attempt", "expression": {"aggregate": "count", "field": "quality.reward"}},
+        {"id": "successes", "unit": "attempt", "expression": {"aggregate": "count", "field": "quality.reward", "where": {"op": "gt", "args": [{"field": "quality.reward"}, {"literal": 0}]}}},
+        {"id": "pass_rate", "unit": "ratio", "expression": {"op": "divide", "args": [{"metric": "successes"}, {"metric": "attempts"}], "zero_division": "unknown"}},
+        {"id": "total_tokens", "unit": "token", "expression": {"aggregate": "sum", "field": "usage.total_tokens"}},
+        {"id": "tokens_per_success", "unit": "token/attempt", "expression": {"op": "divide", "args": [{"metric": "total_tokens"}, {"metric": "successes"}], "zero_division": "unknown"}},
+        {"id": "efficiency", "unit": "score", "expression": {"op": "if", "condition": {"op": "gte", "args": [{"metric": "pass_rate"}, {"literal": 0.5}]}, "then": {"op": "subtract", "args": [{"literal": 1}, {"op": "divide", "args": [{"metric": "tokens_per_success"}, {"literal": 1000, "unit": "token/attempt"}]}]}, "else": {"literal": 0}}}
+      ]
+    },
+    {
+      "id": "speed-tools",
+      "version": "1",
+      "group_by": ["combination"],
+      "metrics": [
+        {"id": "median_seconds", "unit": "second", "expression": {"aggregate": "median", "field": "timing.subject_seconds"}},
+        {"id": "tool_calls", "unit": "call", "expression": {"aggregate": "sum", "field": "tools.attempts"}}
+      ]
+    }
+  ],
+  "selection": {"combinations": ["combo-a", "combo-b"], "groups": ["core", "overlap"], "replicates": 1}
+}

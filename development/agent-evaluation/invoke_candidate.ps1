@@ -16,10 +16,10 @@ param(
     [string]$ReasoningEffort,
     [Parameter(Mandatory = $true)]
     [string]$CodexExecutablePath,
-    [Parameter(Mandatory = $true)]
-    [string]$TaskRuntimeBinPath,
-    [Parameter(Mandatory = $true)]
-    [string[]]$ConfigOverride,
+    [string]$TaskRuntimeBinPath = '',
+    [string[]]$ConfigOverride = @(),
+    [switch]$EnableHooks,
+    [string]$ResultSchema = 'agentbase.windows-swe-codex-run/v8',
     [ValidateRange(60, 14400)]
     [int]$TimeoutSeconds = 3600
 )
@@ -30,7 +30,12 @@ $resolvedWorkspace = (Resolve-Path -LiteralPath $Workspace).Path
 $resolvedCodexRoot = (Resolve-Path -LiteralPath $InstalledCodexRoot).Path
 $resolvedPrompt = (Resolve-Path -LiteralPath $PromptPath).Path
 $resolvedCodex = (Resolve-Path -LiteralPath $CodexExecutablePath).Path
-$resolvedTaskRuntimeBin = (Resolve-Path -LiteralPath $TaskRuntimeBinPath).Path
+$resolvedTaskRuntimeBin = if ([string]::IsNullOrWhiteSpace($TaskRuntimeBinPath)) {
+    ''
+}
+else {
+    (Resolve-Path -LiteralPath $TaskRuntimeBinPath).Path
+}
 $resolvedResult = [IO.Path]::GetFullPath($ResultPath)
 $commonRuntime = Join-Path $resolvedProject 'development\common\codex_cli_runtime.ps1'
 . $commonRuntime
@@ -64,7 +69,10 @@ function Invoke-AgentBaseBoundedProcess {
         [Parameter(Mandatory = $true)]
         [string]$CodexHome,
         [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
         [string]$RuntimeBin,
+        [Parameter(Mandatory = $true)]
+        [string]$StartedMarkerPath,
         [Parameter(Mandatory = $true)]
         [AllowEmptyString()]
         [string]$StandardInput,
@@ -88,12 +96,14 @@ function Invoke-AgentBaseBoundedProcess {
     $startInfo.StandardErrorEncoding = $utf8NoBom
     $startInfo.Environment['CODEX_HOME'] = $CodexHome
     $startInfo.Environment['CODEX_INTERNAL_APP_SERVER_REMOTE_CONTROL_DISABLED'] = '1'
-    $currentPath = [string]$startInfo.Environment['PATH']
-    $startInfo.Environment['PATH'] = if ([string]::IsNullOrWhiteSpace($currentPath)) {
-        $RuntimeBin
-    }
-    else {
-        $RuntimeBin + [IO.Path]::PathSeparator + $currentPath
+    if (-not [string]::IsNullOrWhiteSpace($RuntimeBin)) {
+        $currentPath = [string]$startInfo.Environment['PATH']
+        $startInfo.Environment['PATH'] = if ([string]::IsNullOrWhiteSpace($currentPath)) {
+            $RuntimeBin
+        }
+        else {
+            $RuntimeBin + [IO.Path]::PathSeparator + $currentPath
+        }
     }
 
     $process = [Diagnostics.Process]::new()
@@ -105,6 +115,7 @@ function Invoke-AgentBaseBoundedProcess {
         if (-not $process.Start()) {
             throw 'Codex candidate process did not start'
         }
+        [IO.File]::WriteAllText($StartedMarkerPath, 'started' + [Environment]::NewLine, $utf8NoBom)
         $stdoutTask = $process.StandardOutput.ReadToEndAsync()
         $stderrTask = $process.StandardError.ReadToEndAsync()
         $process.StandardInput.Write($StandardInput)
@@ -137,7 +148,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $resolvedCodexRoot 'auth.json') -Pat
 if (-not (Test-Path -LiteralPath (Join-Path $resolvedWorkspace '.codex\config.toml') -PathType Leaf)) {
     throw 'Candidate workspace has no projected .codex/config.toml'
 }
-if ((Get-Item -LiteralPath $resolvedTaskRuntimeBin -Force).PSIsContainer -ne $true) {
+if (-not [string]::IsNullOrWhiteSpace($resolvedTaskRuntimeBin) -and
+    (Get-Item -LiteralPath $resolvedTaskRuntimeBin -Force).PSIsContainer -ne $true) {
     throw 'Candidate task runtime bin is not a directory'
 }
 
@@ -151,6 +163,7 @@ $logRoot = Join-Path (Split-Path -Parent $resolvedResult) 'codex-logs'
 $lastMessagePath = Join-Path $logRoot 'last-message.txt'
 $stdoutPath = Join-Path $logRoot 'events.jsonl'
 $stderrPath = Join-Path $logRoot 'stderr.txt'
+$startedMarkerPath = Join-Path $logRoot 'model-process-started.txt'
 $projectTrustKey = ConvertTo-AgentBaseCodexTomlString ($resolvedWorkspace.ToLowerInvariant())
 
 $arguments = New-Object 'System.Collections.Generic.List[string]'
@@ -168,11 +181,16 @@ foreach ($argument in @(
     '-c'
     'analytics.enabled=false'
     '-c'
-    'features.hooks=false'
-    '-c'
     "projects={$projectTrustKey={trust_level=`"trusted`"}}"
 )) {
     $arguments.Add([string]$argument)
+}
+if ($EnableHooks) {
+    $arguments.Add('--dangerously-bypass-hook-trust')
+}
+else {
+    $arguments.Add('-c')
+    $arguments.Add('features.hooks=false')
 }
 foreach ($override in $ConfigOverride) {
     if ([string]::IsNullOrWhiteSpace($override)) {
@@ -202,14 +220,30 @@ if ($promptItem.Length -le 0 -or $promptItem.Length -gt 2097152) {
     throw 'Candidate prompt must be a bounded non-empty file'
 }
 $prompt = [IO.File]::ReadAllText($resolvedPrompt, [Text.Encoding]::UTF8)
-$codexProcess = Invoke-AgentBaseBoundedProcess `
-    -Executable $resolvedCodex `
-    -Arguments $arguments.ToArray() `
-    -WorkingDirectory $resolvedWorkspace `
-    -CodexHome $resolvedCodexRoot `
-    -RuntimeBin $resolvedTaskRuntimeBin `
-    -StandardInput $prompt `
-    -Timeout $TimeoutSeconds
+try {
+    $codexProcess = Invoke-AgentBaseBoundedProcess `
+        -Executable $resolvedCodex `
+        -Arguments $arguments.ToArray() `
+        -WorkingDirectory $resolvedWorkspace `
+        -CodexHome $resolvedCodexRoot `
+        -RuntimeBin $resolvedTaskRuntimeBin `
+        -StartedMarkerPath $startedMarkerPath `
+        -StandardInput $prompt `
+        -Timeout $TimeoutSeconds
+}
+catch {
+    if (-not (Test-Path -LiteralPath $startedMarkerPath -PathType Leaf)) {
+        Write-AgentBaseJson -Path $resolvedResult -Value ([ordered]@{
+            schema = $ResultSchema
+            status = 'precondition_failed'
+            model_invoked = $false
+            execution_environment = 'trusted-local-workspace'
+            diagnostic = ([string]$_.Exception.Message)
+        })
+        exit 2
+    }
+    throw
+}
 if (([string]$codexProcess.stdout).Length -gt 16777216 -or
     ([string]$codexProcess.stderr).Length -gt 2097152) {
     throw 'Codex candidate exceeded the bounded diagnostic output contract'
@@ -223,14 +257,28 @@ if ($diagnosticText.Length -gt 800) {
         ' ... ' +
         $diagnosticText.Substring($diagnosticText.Length - 395)
 }
+$threadObserved = $jsonlSummary.thread_started_count -gt 0 -and
+    -not [string]::IsNullOrWhiteSpace([string]$jsonlSummary.thread_id)
+$knownConfigPrecondition = -not $threadObserved -and
+    $diagnosticText -match 'agents\.max_concurrent_threads_per_session must be at least 1'
+$modelInvoked = if ($threadObserved) { $true } elseif ($knownConfigPrecondition) { $false } else { $null }
 $overrideBytes = [Text.Encoding]::UTF8.GetBytes(($ConfigOverride -join "`n"))
 $overrideHash = [Convert]::ToHexString(
     [Security.Cryptography.SHA256]::HashData($overrideBytes)
 ).ToLowerInvariant()
 $result = [ordered]@{
-    schema = 'agentbase.windows-swe-codex-run/v8'
-    status = if ($codexProcess.exit_code -eq 0) { 'completed' } else { 'failed' }
-    model_invoked = $true
+    schema = $ResultSchema
+    status = if ($codexProcess.exit_code -eq 0) {
+        'completed'
+    }
+    elseif ($knownConfigPrecondition) {
+        'precondition_failed'
+    }
+    else {
+        'failed'
+    }
+    process_started = $true
+    model_invoked = $modelInvoked
     execution_environment = 'trusted-local-workspace'
     exit_code = $codexProcess.exit_code
     duration_seconds = $codexProcess.duration_seconds

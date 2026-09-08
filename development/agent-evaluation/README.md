@@ -1,6 +1,8 @@
-# AgentBase Windows SWE 评测框架
+# AgentBase Windows 评测框架
 
-本目录维护 Windows 主机上的 SWE 评测框架。真实题目、题库配置和题目专用 Windows patch 只保留在本机，不属于 Git 跟踪的框架资产。框架验证候选能否在真实仓库中完成任务，并由独立 Verifier 工作区复核 patch；它不是发布门禁、远程 CI、官方 leaderboard，也不证明未运行的模型行为。
+本目录维护 Windows 主机上的评测框架：[Evo](evo/README.md) 负责指定组件组合、分组评测与自定义评分；原 SWE 入口负责真实仓库任务及独立 Verifier。真实题目、题库配置和题目专用 Windows patch 只保留在本机，不属于 Git 跟踪的框架资产。评测不是发布门禁、远程 CI 或官方 leaderboard，也不证明未运行的模型行为。
+
+Evo 通过 `agent_eval.py evo <action>` 使用，实际接口与数据生命周期见其说明。以下章节维护原 SWE 合同，Evo 不继承其中仅针对 SWE 的全组件默认投影、关闭 hooks 和逐题资格要求；共享投影、启动与用量仍归原 owner。
 
 ## 职责与真源
 
@@ -8,6 +10,7 @@
 - `tests/fixtures/synthetic-corpus.json`：只供框架基础验证的最小合成 corpus，不含真实题目、仓库或答案。
 - `corpus/final-v1.json`：既有本机真实 corpus 的默认路径；文件缺失时可通过 `--corpus <local-json>` 显式选择另一份本地 corpus。
 - `agent_eval.py`：CLI、逐题状态机、资格、尝试、恢复和报告。
+- `evo/`：组合规格、队列、资源与恢复、评分和人工评审；真实数据和状态位于本机独立根目录。
 - `agentbase_codex.py` 与 `invoke_candidate.ps1`：候选工作区投影、Codex CLI 调用、JSONL 使用量和 API 等价成本收据。
 - `windows_verifier.py`：依赖准备、Windows adapter、patch 应用、检查、报告转换和固定 grader。
 - `evaluation_core.py`：路径边界、身份、锁、不可变收据、Git 工作区和通用状态。

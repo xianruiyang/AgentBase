@@ -1,0 +1,145 @@
+{
+  "schema": "agentbase-evo-research/v1",
+  "id": "evo-m4-codex-controller-proof",
+  "version": "1",
+  "components": {
+    "agents_md": [
+      {
+        "id": "rules",
+        "source": "development/agent-evaluation/tests/fixtures/evo/optimization/AGENTS.md"
+      }
+    ],
+    "skills": [],
+    "hooks": [],
+    "mcp": [],
+    "tools": [],
+    "agents": [],
+    "codex_settings": []
+  },
+  "combinations": [
+    {
+      "id": "baseline",
+      "members": {
+        "agents_md": ["rules"]
+      }
+    }
+  ],
+  "evaluations": {
+    "items": [
+      {
+        "id": "selection-marker",
+        "family": "selection-marker-family",
+        "input_version": "1",
+        "protocol": "command-component-source-v1",
+        "observations": ["quality", "component-content"],
+        "runtime": {
+          "adapter": "command",
+          "argv": [
+            "python.exe",
+            "-X",
+            "utf8",
+            "-c",
+            "import json,pathlib,sys; text=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8').strip(); print(json.dumps({'quality.reward':int(text=='MODE=optimized'),'observed.rule':text}))",
+            "{component_source:agents_md/rules}"
+          ],
+          "timeout_seconds": 30
+        }
+      },
+      {
+        "id": "final-marker",
+        "family": "final-marker-family",
+        "input_version": "1",
+        "protocol": "command-component-source-v1",
+        "observations": ["quality", "component-content"],
+        "runtime": {
+          "adapter": "command",
+          "argv": [
+            "python.exe",
+            "-X",
+            "utf8",
+            "-c",
+            "import json,pathlib,sys; text=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8').strip(); print(json.dumps({'quality.reward':int(text=='MODE=optimized'),'observed.rule':text}))",
+            "{component_source:agents_md/rules}"
+          ],
+          "timeout_seconds": 30
+        }
+      }
+    ],
+    "groups": [
+      {"id": "selection", "active": true, "items": ["selection-marker"]},
+      {"id": "final", "active": false, "items": ["final-marker"]}
+    ]
+  },
+  "fields": [
+    {"id": "quality.reward", "type": "number", "unit": "ratio", "grain": "attempt", "source": "command consumer"},
+    {"id": "observed.rule", "type": "string", "unit": "text", "grain": "attempt", "source": "command consumer"},
+    {"id": "model.quality", "type": "number", "unit": "ratio", "grain": "assessment", "source": "independent model grader"}
+  ],
+  "scoring": [
+    {
+      "id": "behavior-quality",
+      "version": "1",
+      "group_by": ["combination", "family"],
+      "metrics": [
+        {"id": "pass", "unit": "ratio", "expression": {"aggregate": "mean", "field": "quality.reward"}}
+      ]
+    },
+    {
+      "id": "independent-quality",
+      "version": "1",
+      "group_by": ["combination", "family"],
+      "metrics": [
+        {"id": "pass", "unit": "ratio", "expression": {"aggregate": "mean", "field": "model.quality"}}
+      ]
+    }
+  ],
+  "grading": [
+    {
+      "id": "marker-grader",
+      "version": "1",
+      "rubric": "Return model.quality=1 exactly when observed.rule is MODE=optimized and quality.reward is 1; otherwise return 0.",
+      "select": {"grains": ["attempt"], "fields": ["quality.reward", "observed.rule"]},
+      "outputs": [{"field": "model.quality", "minimum": 0, "maximum": 1}],
+      "controller": {
+        "adapter": "codex",
+        "model": "gpt-5.6-sol",
+        "reasoning_effort": "low",
+        "token_budget": 50000,
+        "max_agents": 1,
+        "timeout_seconds": 600
+      }
+    }
+  ],
+  "selection": {"combinations": ["baseline"], "groups": ["selection"], "replicates": 1},
+  "budget": {"concurrency": 1, "max_tokens": 500000},
+  "optimization": {
+    "controller": {
+      "adapter": "codex",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "low",
+      "prompt": "Improve the supplied mutable rule so the stated command evaluation passes. Return exactly one JSON object with schema agentbase-evo-proposal/v1, a concise hypothesis string, and edits containing kind, id, path, and complete UTF-8 content. Use only the supplied mutable files. For this bounded proof, set AGENTS.md to MODE=optimized followed by a newline.",
+      "token_reservation": 150000,
+      "max_agents": 1,
+      "timeout_seconds": 600
+    },
+    "mutable": [
+      {"kind": "agents_md", "id": "rules", "paths": ["AGENTS.md"]}
+    ],
+    "rounds": {"max": 1, "patience": 1, "duplicate_hypothesis_limit": 1},
+    "budget": {"max_total_tokens": 500000, "max_controller_tokens": 150000},
+    "grading": ["marker-grader"],
+    "final_acceptance": {
+      "thresholds": [
+        {"scoring": "independent-quality", "metric": "pass", "minimum": 1}
+      ]
+    },
+    "splits": {"development": [], "selection": ["selection"], "final": ["final"]},
+    "promotion": {
+      "quality_metrics": [{"scoring": "independent-quality", "metric": "pass", "direction": "max"}],
+      "objectives": [{"scoring": "behavior-quality", "metric": "pass", "direction": "max"}],
+      "required_families": ["selection-marker-family"],
+      "non_regression_tolerance": 0,
+      "require_complete_cost": true
+    }
+  }
+}

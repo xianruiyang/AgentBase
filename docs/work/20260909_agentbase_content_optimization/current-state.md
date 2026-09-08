@@ -1,6 +1,6 @@
 # AgentBase Evo 现状与源码研究
 
-本文件供方案维护者复核选型与适配依据；只记录会改变方案的源码事实，不保存真实题目、原始对话或逐题答案。研究日期为 2026-09-09。第三方版本与恢复方式由 [sources.json](../../../development/references/sources.json) 和[参考目录说明](../../../development/references/README.md)维护。以下均为静态源码审查，未运行第三方模型、评测、服务或安装器。
+本文件供方案维护者复核选型与适配依据；只记录会改变方案的事实，不保存真实题目、原始对话或逐题答案。研究日期为 2026-09-09。第三方版本与恢复方式由 [sources.json](../../../development/references/sources.json) 和[参考目录说明](../../../development/references/README.md)维护。第三方部分为静态源码审查；Evo 实施证据单独声明观察范围。
 
 ## OBS-001 AgentBase 已有逐题执行与独立验证底座
 
@@ -11,7 +11,7 @@ Windows SWE 入口已有固定 corpus/task/base/依赖身份、独立 candidate/
 
 这些机制适合复用为优化循环的单次执行后端。现有资格与 DeepSWE grader 只适用于原逐题合同，不能要求任意 hook 或主观输出也采用 no-op=0/reference=1 的资格方式。
 
-## OBS-002 当前投影不能表达任意指定组合
+## OBS-002 旧 SWE 默认投影不能表达任意指定组合
 
 - 状态: confirmed
 - 来源: [agentbase_codex.py](../../../development/agent-evaluation/agentbase_codex.py) 的 `candidate_capability_contract`、`stage_candidate_skill_projection`、`stage_candidate_codex_projection`、`candidate_runtime_tools`；[evaluation_core.py](../../../development/agent-evaluation/evaluation_core.py) 的 `candidate_surface_identity`
@@ -100,11 +100,28 @@ EvoSkill 和 Anthropic 的目标 skill 附带 Apache-2.0 文本。AutoSkill READ
 
 现有结果校验要求 assessment.composite_score 为 null，reward 使用原任务合同的范围；报告同样保持 composite_score=null，并不将结果声明为排行榜可比。Evo 自定义评分需保留为引用原事实的派生结果，不能把新公式填入旧字段而改变既有收据语义。
 
+## OBS-011 Evo 首个消费者与当前接入边界
+
+- 状态: confirmed
+- 来源: [离线评分测试](../../../development/agent-evaluation/tests/test_evo_offline.py)、[运行测试](../../../development/agent-evaluation/tests/test_evo_runtime.py)、[适配器](../../../development/agent-evaluation/evo/codex_adapter.py)
+
+离线评分已由实际 artifacts 完成多套公式计算与来源追溯；本地 command 已经过 submit、队列、独占工作区、运行收据、facts 与评分入口，定向验证覆盖暂停取消、收据恢复、跨研究复用和磁盘等待。计算器、人工评分与模型评分共用标准派生 artifacts，原始收据保持原 owner。
+
+首个真实 Codex 消费者采用[合成角色规格](../../../development/agent-evaluation/tests/fixtures/evo/codex-role-research.json)，已实际创建一个 evidence，主代理读取独立输入并等待其回传，答案校验为 1。原始收据分别观察到 Sol 主代理与 Luna evidence，共 187872 Token；原生轨迹包含创建、等待、消息与命令。该场景约 41.5 秒，仅证明此运行链与对应采集能力，不能推导配置优化收益。
+
+用量 owner 已将全历史快照替换为启动时游标与目标谱系筛选，避免无关历史阻断当次统计。启动前失败经明确未调用证据确认、保留 attempt 后恢复，同题没有重复模型调用；未知启动异常不按未调用处理。首场景的实际用量超出作业预留，直接说明预留不是内部请求硬限；后继派发仍受已花总量约束。
+
+人工评审已通过真实 command 作业的等待、部分导入、完整导入、更正及评分接缝，subject 执行次数和原收据不变。独立模型 grader 已实际评分四条合成数据，消耗 24293 Token，合并后可按原 score 入口重算。单 root 的 Codex 配置已通过真实启动；与角色场景分别证明无后代和有后代的配置接入。
+
+[七组件合成场景](../../../development/agent-evaluation/tests/fixtures/evo/components/seven-component-research.json)已同时消费 AGENTS、skill、hook、stdio MCP、候选工具、evidence profile 和 Codex 设置。原生 MCP 结果、公开命令、子代理事件及归档 hook 标记与独立答案一致，共 216528 Token、9 个真实请求，约 81.5 秒。审计 owner 已支持实际 `McpToolCall`，刷新可从已有 rollout 重建，无需重跑模型。
+
+[单轮优化合成场景](../../../development/agent-evaluation/tests/fixtures/evo/optimization/research-codex-controller.json)已由模型修改允许的 AGENTS 文件，经实际 command 消费和独立模型评分晋升；最终集两种判定均为 1，原源码保持不变。controller 与 grader 合计 95316 Token。阶段恢复、patience 即时停止、跨 study 预算与 final 门槛经合成故障测试补齐；已有真实研究 resume/export 后仍为原十个作业和原用量，没有追加调用。该证据证明闭环可运行，不证明真实 AgentBase 内容已提升。
+
 ## GAP-001 需要组合级优化，但不需要替换已有逐题评测
 
 - 状态: confirmed
 - 关联: REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008, REQ-009, REQ-010, REQ-011, REQ-012, REQ-013, DES-002, DES-004, DES-005, DES-006, DES-007, DES-008, DES-009, DES-010, OBS-001, OBS-002, OBS-003, OBS-004, OBS-005, OBS-006, OBS-008, OBS-009, OBS-010
 
-已有单次评分与 corpus suite 可作为独立评分和分组选择的基础，但现有投影没有把子 agent/Codex 设置作为独立可选变量，也没有上述七类组合共用的评测目录维护与运行选择能力。仍缺少组合级候选构建绑定、跨适配器编排、人工评分与候选选择，以及统一并发监控、资源池、全代理成本/动作关联和自定义计算。三个外部项目都未直接覆盖 AgentBase 所需的全部内容与 Windows 宿主生命周期。
+原逐题评测不足以承担七类组合与候选演进；新增 Evo 已接入组合选择、队列、独占可复用环境、全代理成本与公开动作、三类评分和候选生成。三个外部项目只提供机制参考，不成为本机运行依赖。旧逐题评测、原 reward 与资格验证职责保留。
 
-[基本设计](design.md)和[实施方案](solution.md)已针对这些差距形成提案；这不改变当前缺少 Evo 实现及运行证据的事实。本轮只读取得的宿主资源与账户余量是时点信息，不写入可提交的项目状态；完成成本的假设和重估方式见 [estimates.md](estimates.md)。
+OBS-011 的真实消费者已覆盖七类组合与自动循环。正式本地基础设施 160 项测试通过，随后资源与模型读取面定向复核通过；各项需求的完成证据归任务表结果。未声明模型内部请求的 Token 硬限、桌面专属行为全覆盖或内容效果提升，这些边界不由合成成功外推。完成成本的假设和重估方式见 [estimates.md](estimates.md)。

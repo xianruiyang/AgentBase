@@ -1,0 +1,11 @@
+{
+  "id": "agentbase-evo",
+  "result_dir": "results",
+  "schema": "task.table",
+  "snapshot_dir": "snapshots",
+  "source_index": ".work-cache/index.json",
+  "state_dir": "state",
+  "table_view": "TASK_TABLE.md",
+  "task_dir": "tasks",
+  "title": "AgentBase Evo 初版实施"
+}

@@ -1,0 +1,41 @@
+{
+  "schema": "agentbase-evo-research/v1",
+  "id": "synthetic-role-observation",
+  "version": "1",
+  "components": {
+    "agents_md": [{"id": "contract", "source": "development/agent-evaluation/tests/fixtures/evo/role-contract.md"}],
+    "skills": [{"id": "orchestration", "source": "skills/subagent-orchestration"}],
+    "hooks": [], "mcp": [], "tools": [],
+    "agents": [{"id": "evidence", "source": "global/agents/evidence.toml"}],
+    "codex_settings": [{"id": "controlled", "source": "development/agent-evaluation/tests/fixtures/evo/codex-settings.toml"}]
+  },
+  "combinations": [{"id": "role-case", "members": {"agents_md": ["contract"], "skills": ["orchestration"], "agents": ["evidence"], "codex_settings": ["controlled"]}}],
+  "evaluations": {
+    "items": [{
+      "id": "delegate-and-wait", "input_version": "1", "protocol": "codex-role-observation-v1",
+      "observations": ["final-answer", "native-agent-usage", "delegation-events"],
+      "prompt": "This is an authorized bounded framework integration test. Read the selected subagent-orchestration skill. Create exactly one evidence agent with fork_turns=none to read role-input.txt and report its EVO_CHILD_VALUE with a file reference; do not read that file yourself. While it works, read role-main.txt yourself. Wait for the evidence result. Final answer must contain exactly the two observed lines EVO_CHILD_VALUE=<value> and EVO_MAIN_VALUE=<value>. Do not install anything, browse the network or change files."
+    }],
+    "groups": [{"id": "role-observation", "active": true, "items": ["delegate-and-wait"]}]
+  },
+  "fields": [
+    {"id": "quality.reward", "type": "number", "unit": "ratio", "grain": "attempt", "source": "independent answer verifier"},
+    {"id": "usage.total_tokens", "type": "integer", "unit": "token", "grain": "attempt", "source": "native Codex root and descendant usage"},
+    {"id": "timing.subject_seconds", "type": "number", "unit": "second", "grain": "attempt", "source": "subject wall clock"}
+  ],
+  "scoring": [{"id": "quality-and-cost", "version": "1", "metrics": [
+    {"id": "quality", "unit": "ratio", "expression": {"aggregate": "mean", "field": "quality.reward"}},
+    {"id": "tokens", "unit": "token", "expression": {"aggregate": "sum", "field": "usage.total_tokens"}},
+    {"id": "elapsed", "unit": "second", "expression": {"aggregate": "sum", "field": "timing.subject_seconds"}}
+  ]}],
+  "runtime": {
+    "adapter": "codex", "model": "gpt-5.6-sol", "reasoning_effort": "low",
+    "max_agents": 2, "timeout_seconds": 300, "token_reservation": 100000,
+    "files": [
+      {"source": "development/agent-evaluation/tests/fixtures/evo/role-input.txt", "target": "role-input.txt"},
+      {"source": "development/agent-evaluation/tests/fixtures/evo/role-main.txt", "target": "role-main.txt"}
+    ],
+    "answer_contains": ["EVO_CHILD_VALUE=47", "EVO_MAIN_VALUE=19"]
+  },
+  "budget": {"concurrency": 1, "max_tokens": 100000}
+}

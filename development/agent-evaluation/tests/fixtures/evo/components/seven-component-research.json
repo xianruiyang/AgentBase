@@ -1,0 +1,42 @@
+{
+  "schema": "agentbase-evo-research/v1",
+  "id": "synthetic-seven-component",
+  "version": "1",
+  "components": {
+    "agents_md": [{"id": "contract", "source": "development/agent-evaluation/tests/fixtures/evo/role-contract.md"}],
+    "skills": [{"id": "orchestration", "source": "skills/subagent-orchestration"}],
+    "hooks": [{"id": "fixture-hook", "source": "development/agent-evaluation/tests/fixtures/evo/components/hooks"}],
+    "mcp": [{"id": "fixture-mcp", "source": "development/agent-evaluation/tests/fixtures/evo/components/mcp"}],
+    "tools": [{"id": "fixture-tools", "source": "development/agent-evaluation/tests/fixtures/evo/components/tools"}],
+    "agents": [{"id": "evidence", "source": "global/agents/evidence.toml"}],
+    "codex_settings": [{"id": "controlled", "source": "development/agent-evaluation/tests/fixtures/evo/components/codex-settings.toml"}]
+  },
+  "combinations": [{"id": "all-seven", "members": {
+    "agents_md": ["contract"], "skills": ["orchestration"], "hooks": ["fixture-hook"],
+    "mcp": ["fixture-mcp"], "tools": ["fixture-tools"], "agents": ["evidence"],
+    "codex_settings": ["controlled"]
+  }}],
+  "evaluations": {
+    "items": [{
+      "id": "all-seven-observation", "input_version": "1", "protocol": "codex-seven-component-v1",
+      "observations": ["hook", "mcp", "tool", "agent", "usage", "trace"],
+      "prompt": "This is an authorized bounded framework integration test. Read the selected subagent-orchestration skill. Create exactly one evidence agent with fork_turns=none to read role-input.txt and report its EVO_CHILD_VALUE; do not read that file yourself. While it works, read role-main.txt, run evo-fixture-tool.cmd, call the evo-fixture MCP selected_component tool, and read evo-hook-observed.txt. Wait for the evidence result. Final answer must contain exactly five lines using the keys EVO_CHILD_VALUE, EVO_MAIN_VALUE, EVO_HOOK_VALUE, EVO_MCP_VALUE, and EVO_TOOL_VALUE with only the values you actually observed. Do not install, browse, or modify files."
+    }],
+    "groups": [{"id": "all-seven", "active": true, "items": ["all-seven-observation"]}]
+  },
+  "fields": [
+    {"id": "quality.reward", "type": "number", "unit": "ratio", "grain": "attempt", "source": "independent answer verifier"},
+    {"id": "usage.total_tokens", "type": "integer", "unit": "token", "grain": "attempt", "source": "native Codex usage"}
+  ],
+  "scoring": [{"id": "quality", "version": "1", "metrics": [{"id": "quality", "unit": "ratio", "expression": {"aggregate": "mean", "field": "quality.reward"}}]}],
+  "runtime": {
+    "adapter": "codex", "model": "gpt-5.6-sol", "reasoning_effort": "low", "max_agents": 2,
+    "timeout_seconds": 300, "token_reservation": 300000,
+    "files": [
+      {"source": "development/agent-evaluation/tests/fixtures/evo/role-input.txt", "target": "role-input.txt"},
+      {"source": "development/agent-evaluation/tests/fixtures/evo/role-main.txt", "target": "role-main.txt"}
+    ],
+    "answer_contains": ["EVO_CHILD_VALUE=47", "EVO_MAIN_VALUE=19", "EVO_HOOK_VALUE=31", "EVO_MCP_VALUE=23", "EVO_TOOL_VALUE=selected-candidate"]
+  },
+  "budget": {"concurrency": 1, "max_tokens": 300000}
+}

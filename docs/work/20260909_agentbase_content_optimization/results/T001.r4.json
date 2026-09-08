@@ -1,0 +1,48 @@
+{
+  "changed_files": [
+    "development/agent-evaluation/evo/spec.py",
+    "development/agent-evaluation/evo/selection.py",
+    "development/agent-evaluation/evo/expression.py",
+    "development/agent-evaluation/evo/scoring.py",
+    "development/agent-evaluation/evo/report.py",
+    "development/agent-evaluation/evo/cli.py",
+    "development/agent-evaluation/agent_eval.py"
+  ],
+  "evidence_for": [
+    "REQ-005",
+    "REQ-006",
+    "REQ-013",
+    "DES-008",
+    "SOL-003",
+    "SOL-005"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "ref": "development/agent-evaluation/tests/test_evo_offline.py"
+    },
+    {
+      "kind": "synthetic",
+      "ref": "development/agent-evaluation/tests/fixtures/evo"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "离线评分CLI已闭环，支持声明式自定义指标、多评分、来源追溯及输入保护",
+  "outputs": [
+    "evo.cli.main(argv)、selection.build_plan(spec)、scoring.score_artifacts(spec,artifacts,scoring_ids)"
+  ],
+  "schema": "task.result",
+  "source_snapshot_ref": "sha256:e885c07f2516be35b8d45d83b83e3782192ba71039fa06c43dfd3f262a038096",
+  "task_id": "T001",
+  "task_revision": 1,
+  "unresolved": [
+    "真实运行/并发/组件/人工与迭代属于后继任务；局部通过不证明全部Evo完成"
+  ],
+  "validation_coverage": [
+    "独立已有产物评分、多个公式、粒度/类型/单位/缺失检查、输入覆盖保护、重叠分组去重、JSON与作业规模限制"
+  ],
+  "verification": [
+    "test_evo_offline 12/12通过；正式基础设施75/75通过（运行接入之前）",
+    "runtime CLI接入后定向复验offline 12/12通过"
+  ]
+}

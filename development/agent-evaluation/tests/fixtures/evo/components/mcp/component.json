@@ -1,0 +1,1 @@
+{"schema":"agentbase-evo-component/v1","kind":"mcp","servers":[{"id":"evo-fixture","command":"python.exe","entry":"server.py","args":[]}]}

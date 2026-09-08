@@ -105,6 +105,8 @@ CLI 和 MCP 各自构建、安装与发行。`agentbase-core` 插件负责分发
 
 使用者可以在仓库中继续维护规则、改进 skills 或扩展工具，再通过部署入口应用到 Codex。配置变更后的验证入口见[部署验证](development/codex-deployment/README.md#validate)，skills 的结构与触发检查见[路由说明](development/skill-routing/README.md)，CLI 和 MCP 则按各组件文档验证。项目采用 Windows 本地验证，不维护远程 CI。
 
+[AgentBase Evo](development/agent-evaluation/evo/README.md) 用于选择规则、skill、hook、MCP、工具、子代理与 Codex 设置的组合，进行独立评分或有界自动迭代。它提供本地并发队列、用量与动作追溯、自定义计算，以及人工和模型评分；候选导出后仍由使用者决定是否应用。
+
 评测部分只分发框架、schema 和合成测试；真实题目、答案、实际作答与逐题记录保留本机，基础框架验证不依赖私有题库。详细边界见[评测说明](development/agent-evaluation/README.md)和[数据约定](docs/requirements.md#con-008-真实评测数据仅保留在本机)。
 
 进一步了解项目的维护思路，可以阅读[根本需求](docs/requirements.md)、[总计划](docs/plan.md)和[项目约定](AGENTS.md)；主包与组件的分发关系见[发行说明](development/release/README.md)。

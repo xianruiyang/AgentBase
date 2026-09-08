@@ -1892,6 +1892,7 @@ def add_selection_arguments(parser: argparse.ArgumentParser, *, task_required: b
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers.add_parser("evo", help="evaluate compositions and calculate traceable custom scores")
 
     validate = subparsers.add_parser("validate", help="validate static contracts only")
     add_context_arguments(validate)
@@ -1963,8 +1964,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "evo":
+        from evo.cli import main as evo_main
+
+        return evo_main(arguments[1:])
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
     try:
         return int(args.handler(args))
     except EvaluationError as exc:

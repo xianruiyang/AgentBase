@@ -1,0 +1,52 @@
+{
+  "changed_files": [],
+  "evidence_for": [
+    "REQ-002",
+    "REQ-003",
+    "REQ-005",
+    "REQ-009",
+    "REQ-013",
+    "SOL-006",
+    "SOL-007",
+    "SOL-008"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "test",
+      "ref": "development/agent-evaluation/tests/test_evo_optimization.py"
+    },
+    {
+      "kind": "test",
+      "ref": "development/agent-evaluation/tests/test_evo_grading.py"
+    },
+    {
+      "kind": "test",
+      "ref": "development/agent-evaluation/tests/test_evo_runtime_review.py"
+    },
+    {
+      "kind": "synthetic-runtime",
+      "ref": "development/agent-evaluation/tests/fixtures/evo/optimization/research-codex-controller.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "人工评分、独立模型评分与有限模型提案/候选比较/导出可用",
+  "outputs": [
+    "review/grade/optimize命令组；独立且版本冻结的评分、候选和恢复合同"
+  ],
+  "schema": "task.result",
+  "source_snapshot_ref": "sha256:0e6df79fb822bc2f32d10eead33746293de8c51a6b345a4e7883fbfc407a1918",
+  "task_id": "T004",
+  "task_revision": 1,
+  "unresolved": [
+    "合成小场景仅证明执行链，不证明实际AgentBase内容的优化收益；循环completed不等同显式质量accepted，未声明final门槛仅作观察"
+  ],
+  "validation_coverage": [
+    "人工部分/完整导入、幂等、更正与暂停恢复；模型评分严格矩阵、累计研究预算、失败不补0",
+    "实际文件变化导致晋升；质量下降即便成本更低也拒绝；family隔离；候选范围及单文件后缀保留",
+    "controller后崩溃恢复不重复；patience即时停止；两个selection逐次预算；显式final阈值拒绝"
+  ],
+  "verification": [
+    "正式基础设施160项通过，迭代/评分/运行/适配器定向46项通过",
+    "真实一轮controller修改AGENTS，command实际消费，独立grader选优并完成final；质量1，95316 Token；旧研究resume/export没有追加作业或用量"
+  ]
+}

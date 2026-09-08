@@ -1,0 +1,73 @@
+{
+  "changed_files": [],
+  "evidence_for": [
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "REQ-004",
+    "REQ-005",
+    "REQ-006",
+    "REQ-007",
+    "REQ-008",
+    "REQ-009",
+    "REQ-010",
+    "REQ-011",
+    "REQ-012",
+    "REQ-013",
+    "UDES-001",
+    "UDES-002",
+    "SOL-011",
+    "SOL-012"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "verification-entry",
+      "ref": "development/agent-evaluation/test_agent_evaluation_infrastructure.ps1"
+    },
+    {
+      "kind": "interface-contract",
+      "ref": "development/agent-evaluation/evo/README.md"
+    },
+    {
+      "kind": "execution-result",
+      "ref": "docs/work/20260909_agentbase_content_optimization/results/T002.r6.json"
+    },
+    {
+      "kind": "execution-result",
+      "ref": "docs/work/20260909_agentbase_content_optimization/results/T003.r3.json"
+    },
+    {
+      "kind": "execution-result",
+      "ref": "docs/work/20260909_agentbase_content_optimization/results/T004.r4.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "metadata": {
+    "privacy": "仅提交框架、合成fixture及实施结果摘要；真实题目/原始评测记录/账户数据在仓库外。",
+    "review_basis": "直接读取全部REQ/CON/UDES与空DCR，结合当前源码、实际消费者和本地回归逐项复核；工具捕获的稀疏来源不是完整阅读记录。早期GAP/SOL更新是实施状态回流，后继真实与兼容证据仍适用。"
+  },
+  "outcome": "AgentBase Evo初版M1—M5完成，十三项用户需求及名称/子计划约束均有适用证据",
+  "outputs": [
+    "正式入口 agent_eval.py evo；evo/README.md使用、数据职责、预算与恢复合同；根README/总计划/子计划导航"
+  ],
+  "schema": "task.result",
+  "source_snapshot_ref": "sha256:dd35cdd7ff3146ced7536fac90078086938de10c60a34977422bd5b6ac5cbe9b",
+  "task_id": "T005",
+  "task_revision": 1,
+  "unresolved": [
+    "没有开放的初版实施阻塞；作业级预算不承诺内部请求硬限，私有推理与桌面专属行为不作完整追溯承诺；未执行Deploy或Release；真实内容优化效果仍需后续明确研究"
+  ],
+  "validation_coverage": [
+    "REQ-001七类实际组合；REQ-002模型修改与候选晋升；REQ-003人工部分/完整/更正/恢复",
+    "REQ-004复用原投影/用量/审计owner并保持SWE；REQ-005已有产物及运行后独立评分；REQ-006分组选择与重叠去重",
+    "REQ-007并发/容量/排队/恢复；REQ-008状态/资源/有界watch；REQ-009质量和端到端成本分开",
+    "REQ-010增量槽位/实际占用/差异归档；REQ-011主代理及后代模型/请求/用量；REQ-012公开动作与覆盖缺口",
+    "REQ-013声明式公式/字段提取/固定本地计算器/三类评分合并；UDES-001名称和UDES-002独立子计划层级保持"
+  ],
+  "verification": [
+    "test_agent_evaluation_infrastructure.ps1：160 tests通过，evaluator禁用；保留旧SWE资格/Verifier/reward合同",
+    "后续模型读取面定向15 tests通过，正式resources/status/trace/score/grade-merge/optimize-resume/export实际调用通过",
+    "路由结构178案例合同通过；MCP审计定向通过；本轮文档链接与Git差异检查通过",
+    "十个真实功能验证作业全部结算，共524009 Token；未见本次遗留进程；受管state/work约0.47MiB，不含宿主会话账本"
+  ]
+}

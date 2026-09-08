@@ -1,0 +1,33 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "前置正式消费者与接口证据"
+      ],
+      "id": "T002",
+      "type": "hard"
+    }
+  ],
+  "id": "T003",
+  "mutation_scope": [
+    "development/agent-evaluation/**",
+    "development/common/**"
+  ],
+  "outcome": "七类组件可独立选择并有实际加载与使用证据",
+  "outputs": [
+    "七类组件可独立选择并有实际加载与使用证据"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "SOL-004",
+    "DES-004"
+  ],
+  "suggested_skills": [],
+  "title": "七类组件实际接入",
+  "validation_dimensions": [],
+  "verification": [
+    "各类真实消费者；七类共同场景；旧SWE保持"
+  ]
+}

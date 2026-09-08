@@ -1,6 +1,6 @@
 # AgentBase Evo 基本设计
 
-本文件面向用户、方案维护者和实施模型，定义职责、数据关系与行为边界；依据 [用户需求](requirements.md)、[用户设计](user-design.md)和[现状证据](current-state.md)。状态均为 `proposed`，表示已形成可审查设计，尚未实现或经真实评测验证。实施步骤归 [solution.md](solution.md)，额度与工期假设归 [estimates.md](estimates.md)，不在这些文档重复维护同一合同。
+本文件面向用户、方案维护者和实施模型，定义职责、数据关系与行为边界；依据 [用户需求](requirements.md)、[用户设计](user-design.md)和[现状证据](current-state.md)。条目状态 `proposed` 表示模型设计可随直接证据修订，不代表用户指定的实现方式，也不判断实施完成。实施步骤归 [solution.md](solution.md)，实际结果归 [任务表](TASK_TABLE.md)，额度与工期假设归 [estimates.md](estimates.md)。
 
 ## DES-001 产品范围与模式
 
