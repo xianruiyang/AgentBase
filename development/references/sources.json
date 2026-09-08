@@ -1,0 +1,26 @@
+{
+  "schema": "agentbase.research-sources/v1",
+  "acquired_on": "2026-09-09",
+  "repositories": [
+    {
+      "name": "AutoSkill",
+      "repository": "https://github.com/ECNU-ICALK/AutoSkill.git",
+      "commit": "94c47ca488d4ba4117d20272e66d49b9877e68cf",
+      "sparse_paths": []
+    },
+    {
+      "name": "EvoSkill",
+      "repository": "https://github.com/sentient-agi/EvoSkill.git",
+      "commit": "36f6f04952293d7054145550c2b9f0b0411bff1c",
+      "sparse_paths": []
+    },
+    {
+      "name": "anthropic-skills",
+      "repository": "https://github.com/anthropics/skills.git",
+      "commit": "41bbe19d1a1a7eaab5e7bb9050a417e5c6cffc8f",
+      "sparse_paths": [
+        "skills/skill-creator"
+      ]
+    }
+  ]
+}

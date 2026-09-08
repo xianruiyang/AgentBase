@@ -28,6 +28,7 @@ AgentBase 持续把根需求落实为可跨项目复用的 Codex 协作维护能
 
 | 子计划 | 正式入口 | 交付结论与适用边界 | 主要 owner | 跨计划依赖与消费者 | 重开或替代条件 |
 | --- | --- | --- | --- | --- | --- |
+| 指定组合的内容自动迭代 | [源码研究](work/20260909_agentbase_content_optimization/current-state.md)、[方案](work/20260909_agentbase_content_optimization/solution.md) | 方案待用户裁决；已固定外部参考源码，设计 AGENTS/skill/hook/MCP/工具组合的有界候选搜索、分层评分与人工恢复；未实施框架、未运行模型评测 | 拟扩展 `development/agent-evaluation`；来源管理归 `development/references` | 复用 Windows SWE 单题、路由及各组件 runner，保留各自原始收据与部署边界 | 用户确认方案并授权实施；实际宿主能力、组合依赖或评分证据推翻方案时先修订相关条目 |
 | 首次部署原配置恢复 | [合同](requirements.md#ac-034-部署可回滚且生效入口唯一)、[正式入口](../development/codex-deployment/README.md#original-configuration-recovery) | 已实现并通过合成配置、首次/连续部署、冲突、失败回退、旧安装和独立恢复包验证；原有部署回归通过，版本与资产由[发行入口](../development/release/README.md)维护。长期原始恢复点与单次回滚分别维护，旧安装不补造历史；受管键恢复和独立入口由同一 owner 承担，Plugin 停用检查只验证合成协议，未操作真实插件 | `development/codex-deployment` | 消费既有受管资产生命周期与可移植配置；DirectCompatibility/Plugin 部署、恢复包和发行说明使用同一实现；插件停用仍归插件正式入口 | 原内容被后继升级覆盖、恢复丢失个人变更、损坏备份或恢复失败不可安全回退、受管范围扩大或发行集成变更 |
 | 根需求收益边缘持续优化 | [方案](work/20260814_agentbase_requirement_edge_optimization/solution.md)、[现状与证据](work/20260814_agentbase_requirement_edge_optimization/current-state.md) | 已闭环；SOL-001—SOL-006 的长期结论已进入当前总计划 | `global/AGENTS.md`、核心 skill、路由与部署验证 | 其余当前子计划继承根需求；全局规则或 skill 变化由路由与部署合同消费 | 新的根需求差距、适用失败或跨计划共享机制 |
 | Delivery Workflow 自审 | [方案](work/20260812_agentbase_delivery_workflow_self_review/solution.md) | 已闭环；作为后续十二轮审查的基线 | `delivery-workflow`、`task-table-manager` | 十二轮审查承接该基线，当前工作流与任务合同继续消费其稳定结论 | 已修机制复发或任务存储/工作流合同改变 |

@@ -76,3 +76,6 @@ development/codex-deployment/sandbox/
 
 # Development helper binaries
 development/codex-qq-hook/*.exe
+
+# Local third-party source checkouts for research
+/development/references/repos/
