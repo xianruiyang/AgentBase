@@ -141,6 +141,10 @@
     "mechanical-coordinate-field-edit",
     "space-2d-numeric-only",
     "space-3d-numeric-only",
+    "space-contact-clearance",
+    "space-intentional-surface-overlap",
+    "space-wording-only",
+    "ue-spatial-clearance-with-peer",
     "single-turn-checklist",
     "windows-prose-without-command",
     "single-task-cli-formatting",
@@ -2281,6 +2285,84 @@
       "forbidden_behavior_tags": [
         "modify_authorized_scope"
       ]
+    },
+    {
+      "id": "space-contact-clearance",
+      "kind": "positive",
+      "request": "已有同一坐标系下的物体几何、门洞边界、门扇运动范围和明确净空要求。只读判断柜体是否穿墙、是否侵入通行或开门空间，并按给定容差区分正常接触与异常穿插；不修改场景。",
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "task-table-manager",
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "space-intentional-surface-overlap",
+      "kind": "boundary",
+      "request": "这组已提供的几何数据与连续视角截图中，柱脚按设计埋入地面，铭牌也必须贴附墙面。只读审查接触关系和用户可见面是否存在深度闪烁风险，保留必要嵌入，不执行修改。",
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "task-table-manager",
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "space-wording-only",
+      "kind": "negative",
+      "request": "请把这句说明里的拼写 z fright 改成 Z-fighting，只返回修正后的句子：用户可见面应避免 z fright。不要分析场景、坐标或渲染问题。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "understand-space",
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "ue-spatial-clearance-with-peer",
+      "kind": "positive",
+      "request": "通过已知正式 Unreal Editor 接口调整指定柜体位置，使它贴地且不侵入已定义的门洞净空；接口、对象、边界和容差均已提供，无需探索。读回几何关系并核对当前用户视角。",
+      "available_peer_skills": [
+        "peer-ui-design",
+        "peer-ue-authoring"
+      ],
+      "expected_peer_skills": [
+        "peer-ue-authoring"
+      ],
+      "forbidden_peer_skills": [
+        "peer-ui-design"
+      ],
+      "expected_skills": [
+        "understand-space"
+      ],
+      "forbidden_skills": [
+        "task-table-manager",
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
+      "forbidden_behavior_tags": []
     },
     {
       "id": "transform-formula-convention",
