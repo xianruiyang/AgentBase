@@ -6,7 +6,7 @@
 
 - [`sources.json`](sources.json) 是来源仓库、固定提交和稀疏检出范围的唯一机器记录；恢复命令消费它，不保存本机绝对路径或凭据。
 - `repos/<name>/` 是可重新取得的本机副本，由根 `.gitignore` 整体排除；不作为 submodule 或 vendored 代码提交。当前副本使用浅层拉取并停在 detached HEAD。
-- 本文只维护用途和操作边界，不复制提交列表。研究结论由相应方案或现状文档维护，当前消费者为[组合内容优化方案](../../docs/work/20260909_agentbase_content_optimization/solution.md)。
+- 本文只维护用途和操作边界，不复制提交列表。研究结论由相应方案或现状文档维护，当前消费者为 [AgentBase Evo 子计划](../../docs/work/20260909_agentbase_content_optimization/README.md)。
 
 | 名称 | 本轮研究范围 |
 | --- | --- |

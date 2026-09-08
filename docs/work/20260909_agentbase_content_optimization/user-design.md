@@ -1,0 +1,20 @@
+# AgentBase Evo 用户设计
+
+本文件只保存用户明确确认的设计约束；技术路线、模块、CLI、评分和阶段顺序仍由 [solution.md](solution.md)维护为模型方案。
+
+## UDES-001 名称
+
+- 状态: confirmed
+- 来源: 用户沿用“AgentBase Evo”命名讨论计划层级，随后确认“好，先新建子计划”
+
+正式名称为 **AgentBase Evo**，中文为 **AgentBase 演进框架**，简称 **Evo**。在 AgentBase 项目上下文中，Evo 指本子计划及其拟实现的组合内容演进能力。
+
+## UDES-002 计划层级
+
+- 状态: confirmed
+- 来源: 用户确认将 Evo 建立为 AgentBase 总计划下的独立子计划
+- 关联: UDES-001
+
+Evo 是 [AgentBase 总计划](../../plan.md)下的独立子计划，不挂在现有 Windows SWE 评测子计划下面，也暂不建立独立项目。现有评测与组件 runner 作为可复用能力保留各自职责。
+
+Evo 内部实施阶段先按方案和任务组织，不预先拆分更多子计划；将来确有独立目标与生命周期时，再按总计划约定裁决。

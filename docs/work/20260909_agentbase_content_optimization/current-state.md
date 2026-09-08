@@ -1,4 +1,4 @@
-# 组合内容优化框架：源码研究
+# AgentBase Evo 现状与源码研究
 
 本文件供方案维护者复核选型与适配依据；只记录会改变方案的源码事实，不保存真实题目、原始对话或逐题答案。研究日期为 2026-09-09。第三方版本与恢复方式由 [sources.json](../../../development/references/sources.json) 和[参考目录说明](../../../development/references/README.md)维护。以下均为静态源码审查，未运行第三方模型、评测、服务或安装器。
 
@@ -74,6 +74,6 @@ EvoSkill 和 Anthropic 的目标 skill 附带 Apache-2.0 文本。AutoSkill READ
 ## GAP-001 需要组合级优化，但不需要替换已有逐题评测
 
 - 状态: confirmed
-- 关联: OBS-001, OBS-002, OBS-003, OBS-004, OBS-005, OBS-006
+- 关联: REQ-001, REQ-002, REQ-003, REQ-004, OBS-001, OBS-002, OBS-003, OBS-004, OBS-005, OBS-006
 
 已有系统缺少显式组合与可变范围、候选构建产物绑定、跨适配器研究编排、人工待评与裁决、开发/选优/最终验收分层，以及跨候选预算和晋升语义。三个外部项目都未直接覆盖 AgentBase 所需的全部内容与 Windows 宿主生命周期。处理方法见 [solution.md](solution.md)，不据此改动现有生产配置或启动评测。
