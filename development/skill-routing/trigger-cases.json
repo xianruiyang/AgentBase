@@ -94,7 +94,7 @@
     "model_interaction_surface": "当前请求要求设计、选择或改变模型直接或间接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面只投影当前动作所需语义，不用 Base64、完整哈希、UUID 等长不透明码承担身份，在不损失必要语义下按实测或已验证保守估算选择最低 Token 格式；机器面保持稳定完整，生成物不作为语义修改入口。",
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和用户或正式来源确认的范围出发，选择最低充分入口；临时名称、目录或类型过滤不单独证明全集、不存在或唯一。只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
-    "bounded_subagent_delegation": "用户明确分工优先；未指定时主代理保留规划、架构、关键文档治理、正式质量与验收，证据待定位用 evidence，需要操作试错的有界实现用 experiment，普通配置不足以可靠完成的困难推理或视觉反馈实验用 advanced-experiment，步骤和判定明确的执行用 operator。已知位置直接读、明确修改、成熟命令可直接闭合时不绕行委派。委派不以主线程有并行工作为前提，无独立必要工作就等待，不制造任务。固定角色显式 fork_turns=none；普通和高级 experiment 在当前实验范围内按需委派一层 evidence 分担独立搜索，无需主代理另行授权；简单查询自行完成，同一问题优先续用已有 evidence。experiment 不得创建其他角色，evidence 与 operator 不得创建任何子代理。直接委派方读 evidence 的关键原文，根主代理保留正式裁决；experiment 持续打通指定路径，合格实现审查后可直接接纳。生命周期验收交接明确关键观察关系，具体实现细节由 experiment 查明；行为验证失败先核对场景、阶段、身份与时序，后续恢复不倒推先前阶段成立。旧实现不替代当前 API 契约；未获合同支持的强制绕过、恢复边界改变、正式入口替换或验收弱化，在候选修改和运行前交回重裁。普通/高级 experiment 的重要决定在展开依赖工作前简报依据与影响，供主代理及时纠偏；普通进展集中交付，只为解除其他工作的等待或实质影响协作的延期、异常补充通知，不在结束前重复发送完成消息。operator 仍按确定执行合同报告阶段与异常。授权内且可恢复的推进不逐步等批准，需重裁才暂停相关工作；主代理不逐条确认或复述普通进展。",
+    "bounded_subagent_delegation": "用户明确分工优先；未指定时主代理保留规划、架构、关键文档治理、正式质量与验收，证据待定位用 evidence，需要操作试错的有界实现用 experiment，普通配置不足以可靠完成的困难推理或视觉反馈实验用 advanced-experiment，步骤和判定明确的执行用 operator。已知位置直接读、明确修改、成熟命令可直接闭合时不绕行委派。委派不以主线程有并行工作为前提，无独立必要工作就等待，不制造任务。固定角色显式 fork_turns=none；普通和高级 experiment 在当前实验范围内按需委派一层 evidence 分担独立搜索，无需主代理另行授权；简单查询自行完成，同一问题优先续用已有 evidence。experiment 不得创建其他角色，evidence 与 operator 不得创建任何子代理。实际消费者读 evidence 的关键原文，根主代理保留正式裁决；experiment 持续打通指定路径，合格实现审查后可直接接纳。生命周期验收交接明确关键观察关系，具体实现细节由 experiment 查明；行为验证失败先核对场景、阶段、身份与时序，后续恢复不倒推先前阶段成立。旧实现不替代当前 API 契约；未获合同支持的强制绕过、恢复边界改变、正式入口替换或验收弱化，在候选修改和运行前交回重裁。主代理直接交付可开工的必要事实、来源与未决问题；已有证据足够不唤醒代理，仍缺独立取证时比较续用与新建。evidence 同时只有一个当前派发者；跨分支续派先由原派发者明确交接，结果共享或 completed 状态不自动转移派发权。交接不改变宿主父子关系，结果须送达当前派发者；接口不支持时不绕过，不另建代理池或台账。普通/高级 experiment 的重要决定在展开依赖工作前简报依据与影响，供主代理及时纠偏；普通进展集中交付，只为解除其他工作的等待或实质影响协作的延期、异常补充通知，不在结束前重复发送完成消息。operator 仍按确定执行合同报告阶段与异常。授权内且可恢复的推进不逐步等批准，需重裁才暂停相关工作；主代理不逐条确认或复述普通进展。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。",
     "replacement_closure": "修改既有行为且候选会新增长期机制或适配时，写入前区分原 owner 内改写、替换和由不同当前契约支撑的独立并存；替换把旧同责生产路径与只绑定旧实现的验证资产纳入同一完成闭环，临时并存有真实调用方和退出条件，不把退役留作无 owner 的清理。",
@@ -1920,6 +1920,59 @@
       ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-stable-evidence-no-redispatch",
+      "kind": "negative",
+      "request": "你是 experiment。主代理已经交付当前接口的确定结论、适用范围和精确源码位置，关键原文仍在上下文且输入未变，足以继续已明确的局部修改。虽然已有 evidence 调查过它，但现在没有新证据缺口；直接消费现有结果继续，不为确认已知结论查询团队、唤醒或创建代理。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-evidence-dispatch-handoff",
+      "kind": "positive",
+      "request": "你是主代理，准备交给 experiment 一个边界已明确的实现任务。已有 evidence 保存相关接口调查上下文，旧任务已结束，但实现中还需多轮定向取证。请直接给 experiment 已知结论与来源，并把该 evidence 的后续取证派发交给它，明确范围和结果接收。运行时的最终回复仍只会返回创建者；本次交接不能丢失结果，也不能让你和 experiment 同时追加任务，不创建新代理池或记录副本。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "coordination.md",
+        "evidence-packet.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-evidence-busy-no-takeover",
+      "kind": "positive",
+      "request": "你是 experiment，已消费现有证据，但新的跨模块接口候选仍需独立调查。已知团队内的 evidence 正在执行另一个代理的必要任务，对方没有转交派发权；现有结果不能回答当前缺口。当前实验允许创建一层 evidence，且还有容量。请安排本范围取证，不把可列出或可发消息当成有权抢占旧任务，也不为了复用而让主代理转发每次查询。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "coordination.md",
+        "evidence-packet.md"
+      ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
       ],

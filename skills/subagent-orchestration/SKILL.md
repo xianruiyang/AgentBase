@@ -1,6 +1,6 @@
 ---
 name: subagent-orchestration
-description: 编排 evidence、普通/高级 experiment 与 operator 的创建、等待和交接。用于主代理按需委派取证、实现实验或确定执行，以及普通/高级 experiment 在当前实验内按需委派 evidence 分担搜索；不以主线程有并行工作或另行授予嵌套权限为前提。用户明确不使用、仅讨论多代理设计、简短查询、已知位置直接阅读、无需探索的修改或成熟单条命令可闭合时不触发；evidence 与 operator 不得创建子代理。
+description: 编排 evidence、普通/高级 experiment 与 operator 的创建、复用、等待和交接。用于主代理按需委派取证、实现实验或确定执行，以及普通/高级 experiment 在当前实验内按需创建或接手续用 evidence 分担搜索；不以主线程有并行工作或另行授予嵌套权限为前提。用户明确不使用、仅讨论多代理设计、简短查询、已知位置直接阅读、无需探索的修改或成熟单条命令可闭合时不触发；evidence 与 operator 不得创建子代理。
 ---
 
 # Subagent Orchestration
@@ -11,7 +11,7 @@ description: 编排 evidence、普通/高级 experiment 与 operator 的创建�
 
 按当前缺口选择角色，不固定串联全部角色；不要求先证明主线程有其他事可做。
 
-- **证据尚未定位且需要独立探索：`evidence`。** 只读采集证据，包括发现工具能力、命令与用法；按问题选来源，不限于文件检索，也不因执行查询指令就转交 operator 或 experiment。交付简述和可核查的位置；主代理读关键原文、分析和裁决，缺证据再给出具体缺口。读取 [evidence-packet.md](references/evidence-packet.md)。
+- **证据尚未定位且需要独立探索：`evidence`。** 只读采集证据，包括发现工具能力、命令与用法；按问题选来源，不限于文件检索，也不因执行查询指令就转交 operator 或 experiment。交付简述和可核查的位置；实际消费者读关键原文并作职责内判断，根主代理保留正式裁决，缺证据再给出具体缺口。读取 [evidence-packet.md](references/evidence-packet.md)。
 - **需要探索性操作：`experiment`。** 实现方向已知但真实接口、依赖、行为或后继障碍仍须通过修改和运行查明时，让它持续打通指定实现链。不等主代理已大量试错，不要求静态证据穷尽；普通笔误与明确小修不必委派。读取 [experiment-lifecycle.md](references/experiment-lifecycle.md)。
 - **困难或视觉实验：`advanced-experiment`。** 仍执行同一实验职责，但用于普通 experiment 的速度优先配置不足以可靠处理的复杂因果、跨接口推理，或必须直接检查截图、渲染等视觉反馈的实现；不因任务一般性复杂或希望更高质量而默认升级。沿用 [experiment-lifecycle.md](references/experiment-lifecycle.md)。
 - **步骤与判定已确定：`operator`。** 完成有界简单操作、重复执行或已冻结命令的运行与观察；一条成熟命令或已有可靠脚本能直接闭合时，主代理执行即可。读取 [operator-execution.md](references/operator-execution.md)。
@@ -23,6 +23,6 @@ description: 编排 evidence、普通/高级 experiment 与 operator 的创建�
 
 实际委派前读取 [coordination.md](references/coordination.md)。用简短任务说明交代问题、范围、必要输入、预期产物和会改变动作的限制；不为每次委派填写固定字段表或建立额外记录。具体模型和档位只由自定义角色配置维护。
 
-普通和高级 experiment 按当前实验的实际缺口，使用 `evidence` 分担跨文件定位、接口与消费者检索、文档核对等值得独立交接的搜索，无需主代理在任务说明中另行授权。简单帮助、签名读取和局部查询自行完成；同一证据问题优先续用已有 evidence，不为每次查询创建代理。该分工只允许当前实验范围内的 `experiment → evidence` 一层，不能创建其他角色；`evidence` 与 `operator` 不得创建子代理。实现依赖的关键原文仍由 experiment 阅读，需重裁目标、公共职责或验收时返回主代理。
+主代理直接交付可开工的必要事实、来源与未决问题；普通和高级 experiment 按当前实验的实际缺口，使用 `evidence` 分担跨文件定位、接口与消费者检索、文档核对等值得独立交接的搜索，无需主代理另行授予嵌套权限。简单帮助、签名读取和局部查询自行完成。先消费已有相关结果，仍需独立取证时按 [coordination.md](references/coordination.md#证据复用与派发交接) 续用合适的 evidence 或新建；不因存在同名角色就强制复用，不为每次查询创建代理。该分工只允许当前实验范围内的 `experiment → evidence` 一层，不能创建其他角色；`evidence` 与 `operator` 不得创建子代理。实现依赖的关键原文仍由 experiment 阅读，需重裁目标、公共职责或验收时返回主代理。
 
-先真实创建，再继续独立必要工作或等待；不同时代做同一个子问题。结果返回后主代理按来源、适用范围、实际差异和验证证据接纳、修订或拒绝；子代理自称完成不代替验收。符合架构与契约的实验实现可原样接纳，不强制重写；只补最终变化影响的验证，复用仍有效的结果。
+先真实派发，再继续独立必要工作或等待；不同时代做同一个子问题。结果返回后主代理按来源、适用范围、实际差异和验证证据接纳、修订或拒绝；子代理自称完成不代替验收。符合架构与契约的实验实现可原样接纳，不强制重写；只补最终变化影响的验证，复用仍有效的结果。
