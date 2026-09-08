@@ -1,11 +1,54 @@
 param(
     [string]$ProjectRoot,
-    [string]$RetainedTestRootToClean
+    [string]$RetainedTestRootToClean,
+    [switch]$ResultViewOnly
 )
 
 $ErrorActionPreference = "Stop"
 
 Update-FormatData -PrependPath (Join-Path $PSScriptRoot 'manage_agentbase.format.ps1xml') -ErrorAction Stop
+
+function Test-StatusRuntimeDisplay {
+    foreach ($case in @(
+        @{ in_scope = $true; ready = $false; visible = $true },
+        @{ in_scope = $true; ready = $true; visible = $false },
+        @{ in_scope = $false; ready = $false; visible = $false },
+        @{ in_scope = $false; ready = $null; visible = $false }
+    )) {
+        $status = [pscustomobject]@{
+            managed_payload_formally_deployed = $true
+            original_recovery_state = 'not_available'
+            formal_deployment_gap_count = 0
+            plugin_installation_in_scope = $false
+            runtime_prerequisite_in_scope = $true
+            srcq_runtime_ready = $false
+            srcq_runtime_error = 'srcq test error'
+            workflow_cli_runtime_in_scope = $case.in_scope
+            workflow_cli_runtime_ready = $case.ready
+            workflow_cli_runtime_error = 'workflow version mismatch'
+        }
+        $status.PSObject.TypeNames.Insert(0, 'AgentBase.Deployment.StatusResult')
+        $before = $status | ConvertTo-Json -Compress
+        $display = $status | Out-String -Width 4096
+        $visible = $display -match '(?m)^workflow_cli\s*:\s*not_ready:workflow version mismatch'
+        if ($visible -ne $case.visible -or $display -notmatch 'not_ready:srcq test error') {
+            throw 'Status projection omitted an applicable runtime error or exposed an out-of-scope one'
+        }
+        if ($display -notmatch '(?m)^deployed\s*:\s*true' -or ($status | ConvertTo-Json -Compress) -ne $before) {
+            throw 'Status projection altered the payload status or machine result'
+        }
+    }
+}
+
+if ($ResultViewOnly -and -not [string]::IsNullOrWhiteSpace($RetainedTestRootToClean)) {
+    throw 'ResultViewOnly cannot be combined with sandbox cleanup'
+}
+Test-StatusRuntimeDisplay
+if ($ResultViewOnly) {
+    $result = [pscustomobject]@{ status_runtime_diagnostics = $true }
+    $result.PSObject.TypeNames.Insert(0, 'AgentBase.Deployment.TestResult')
+    return $result
+}
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)

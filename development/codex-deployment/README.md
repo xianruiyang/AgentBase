@@ -87,7 +87,7 @@ deployed : false
 gaps      : deployment_manifest_missing,installed_payload_differs_from_source
 ```
 
-Deploy and Rollback additionally show the exact backup or retired-payload path needed for recovery. Plugin installation and an unavailable `srcq` runtime appear only when they require a separate action.
+Deploy and Rollback additionally show the exact backup or retired-payload path needed for recovery. Plugin installation and unavailable `srcq` or workflow-cli runtimes appear only when they require a separate action. `deployed` describes managed payload installation; applicable runtime failures remain visible alongside it and must be resolved before Deploy. The compact display and full object share the same preflight results.
 
 Assign the result when a program or a later model step needs the machine contract, then select the exact field or serialize the complete object explicitly:
 
@@ -126,6 +126,12 @@ The repeatable tests cover lifecycle identity continuity, explicit retirement, s
 ```
 
 A successful direct test invocation renders only `tests : pass`. Assign its returned object before serialization when automation needs the individual check fields.
+
+For changes limited to default result rendering, the existing deployment test entry also supports a synthetic, display-only check without creating a deployment sandbox or accessing the installed host:
+
+```powershell
+& '.\development\codex-deployment\test_manage_agentbase.ps1' -ResultViewOnly
+```
 
 ## Deploy on another Windows machine
 

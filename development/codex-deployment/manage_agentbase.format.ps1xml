@@ -70,6 +70,11 @@
                 <Label>srcq</Label>
                 <ScriptBlock>'not_ready:' + $_.srcq_runtime_error</ScriptBlock>
               </ListItem>
+              <ListItem>
+                <ItemSelectionCondition><ScriptBlock>$_.workflow_cli_runtime_in_scope -and $_.workflow_cli_runtime_ready -eq $false</ScriptBlock></ItemSelectionCondition>
+                <Label>workflow_cli</Label>
+                <ScriptBlock>'not_ready:' + $_.workflow_cli_runtime_error</ScriptBlock>
+              </ListItem>
             </ListItems>
           </ListEntry>
         </ListEntries>
