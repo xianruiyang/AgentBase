@@ -1,6 +1,6 @@
 # AgentBase Evo
 
-AgentBase 演进框架，简称 **Evo**。本目录是 [AgentBase 总计划](../../plan.md)下的独立子计划入口，承接指定 AGENTS、skill、hook、MCP 和工具组合的内容自动迭代。
+AgentBase 演进框架，简称 **Evo**。本目录是 [AgentBase 总计划](../../plan.md)下的独立子计划入口，承接指定 AGENTS、skill、hook、MCP、工具、子 agent 设置和 Codex 设置组合的独立评分与内容自动迭代。评测内容单独分组，支持增删和选择激活。
 
 本目录沿用命名前建立的路径，保留已有引用和源码研究，不另建同责目录。
 

@@ -38,7 +38,7 @@ hooks 模板包含 SessionStart、UserPromptSubmit、Stop、PreToolUse、PostToo
 
 正文执行、grader、A/B comparator 与 analyzer 主要通过 skill 文档组织。viewer 支持保存反馈，但没有与 AgentBase attempt 身份绑定的人工裁决协议。文档把空反馈解释为满意，这不适合必需人工验收。描述循环有轮数/单次超时限制，缺少 AgentBase 所需的全链路 Token 预算和持久执行恢复。
 
-可借鉴：有/无 skill 对照、逐项证据评分、盲比、输出审阅和针对失败的泛化改写。不能直接当作五类组件组合的现成运行时。
+可借鉴：有/无 skill 对照、逐项证据评分、盲比、输出审阅和针对失败的泛化改写。不能直接当作 Evo 多组件组合的现成运行时。
 
 ## OBS-005 EvoSkill 提供实际候选搜索与版本选择
 
@@ -47,7 +47,7 @@ hooks 模板包含 SessionStart、UserPromptSubmit、Stop、PreToolUse、PostToo
 
 实际循环按类别采样训练失败，提出并生成修改，在固定验证集上评分，以 Git 版本维护有限 frontier；有最大轮数、连续无改进停止及采样 checkpoint。checkpoint 保存迭代号与采样偏移，不是完整尝试、用量与进程恢复。主循环的候选可保留为父代，不必每次从原始版本开始。
 
-现有 skill/prompt mutation 范围比五类组件及其构建、宿主生命周期窄。Codex adapter 将 `duration_ms`、`total_cost_usd` 设为 0、`usage` 设为空；这些占位不能用于 AgentBase 的成本比较。其技能发现使用 `.agents/skills` 指向 `.claude/skills` 的符号链接，不等价于项目现有 Windows 受控投影。当前划分函数返回 train 与 validation，主循环反复用 validation 选优；独立最终验收需要另行设计。
+现有 skill/prompt mutation 范围比 Evo 多组件及其构建、宿主生命周期窄。Codex adapter 将 `duration_ms`、`total_cost_usd` 设为 0、`usage` 设为空；这些占位不能用于 AgentBase 的成本比较。其技能发现使用 `.agents/skills` 指向 `.claude/skills` 的符号链接，不等价于项目现有 Windows 受控投影。当前划分函数返回 train 与 validation，主循环反复用 validation 选优；独立最终验收需要另行设计。
 
 可借鉴：失败驱动提案、候选谱系、有限版本保留、恢复采样状态。评分函数、成本字段、Git 工作区切换和宿主适配不能整体接管 AgentBase。
 
@@ -74,6 +74,6 @@ EvoSkill 和 Anthropic 的目标 skill 附带 Apache-2.0 文本。AutoSkill READ
 ## GAP-001 需要组合级优化，但不需要替换已有逐题评测
 
 - 状态: confirmed
-- 关联: REQ-001, REQ-002, REQ-003, REQ-004, OBS-001, OBS-002, OBS-003, OBS-004, OBS-005, OBS-006
+- 关联: REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, OBS-001, OBS-002, OBS-003, OBS-004, OBS-005, OBS-006
 
-已有系统缺少显式组合与可变范围、候选构建产物绑定、跨适配器研究编排、人工待评与裁决、开发/选优/最终验收分层，以及跨候选预算和晋升语义。三个外部项目都未直接覆盖 AgentBase 所需的全部内容与 Windows 宿主生命周期。处理方法见 [solution.md](solution.md)，不据此改动现有生产配置或启动评测。
+已有单次评分与 corpus suite 可作为独立评分和分组选择的基础，但现有投影没有把子 agent/Codex 设置作为独立可选变量，也没有上述七类组合共用的评测目录维护与运行选择合同。仍需显式组合与可变范围、候选构建产物绑定、跨适配器编排、人工待评与裁决、开发/选优/最终验收分层，以及跨候选预算和晋升语义。三个外部项目都未直接覆盖 AgentBase 所需的全部内容与 Windows 宿主生命周期。处理方法见 [solution.md](solution.md)，不据此改动现有生产配置或启动评测。
