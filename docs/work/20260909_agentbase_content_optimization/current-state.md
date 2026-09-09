@@ -117,6 +117,25 @@ EvoSkill 和 Anthropic 的目标 skill 附带 Apache-2.0 文本。AutoSkill READ
 
 [单轮优化合成场景](../../../development/agent-evaluation/tests/fixtures/evo/optimization/research-codex-controller.json)已由模型修改允许的 AGENTS 文件，经实际 command 消费和独立模型评分晋升；最终集两种判定均为 1，原源码保持不变。controller 与 grader 合计 95316 Token。阶段恢复、patience 即时停止、跨 study 预算与 final 门槛经合成故障测试补齐；已有真实研究 resume/export 后仍为原十个作业和原用量，没有追加调用。该证据证明闭环可运行，不证明真实 AgentBase 内容已提升。
 
+## OBS-012 Skill 共享投影与兼容边界
+
+- 状态: confirmed
+- 来源: `agentbase_codex.stage_codex_component_projection`、`evo.skill_cache`、`evo.runtime`、`evo.env_pool`、`development/common/payload_contract.ps1`、[合成生命周期测试](../../../development/agent-evaluation/tests/test_evo_skill_cache.py)及本地 `development/agent-evaluation/local/skill-link-probe/production-probe-result.json`
+- 关联: DES-006, UDES-004
+
+本轮修改前，Evo 将每个选中 skill 整目录复制到槽位，源码清单和槽位清单不消费正式 payload 过滤。相同内容只在同一槽位复用；多个槽位重复保存，目录内开发测试或缓存也进入投影。原环境池、投影和磁盘检查拒绝所有链接。该观察支持替换 Evo 的 skill 物化与引用路径，不证明其他六类组件需要改变，也不要求把独立代码阅读工程改为链接。
+
+当前正式入口按过滤后的所选 skill 集合生成固定共享版本，版本内保留相邻目录，多个槽位以 junction 引用。Codex CLI 0.153.4 的无模型 `skills/list` 在两个工作区均发现两个合成 skill；从返回的真实路径读取正文并解析跨 skill 相对链接，成功读到同版本内的兄弟文件。普通修改、新增、删除与改名被 ACL 拒绝；最后引用解除前版本保留，正式回收后无探针目录或进程残留。
+
+合成验证覆盖换版隔离、过滤范围、受管链接与恢复、SWE 清理、旧投影迁移、锁等待及中断暂存回收；输入污染事实和已知用量在恢复后继续保留。基础设施检查共覆盖 202 项，旧 SWE 调用签名断言修正后相关 15 项复验通过，最后缓存与 Codex 接缝调整的 19 项复验通过；未变检查复用同轮有效结果。本轮未调用模型或运行真实题目，不把发现能力外推为模型使用效果。
+
+## GAP-002 Skill 固定版本跨槽位共享差距已闭合
+
+- 状态: confirmed
+- 关联: REQ-010, UDES-004, DES-006, OBS-012
+
+OBS-012 的正式消费者与生命周期证据已覆盖本次共享投影差距。共享单位为内容固定的所选集合，不承诺不同集合之间的单文件去重；既有跨 skill 相对引用依赖其目标也被选入集合，不自动扩大组件选择。
+
 ## GAP-001 需要组合级优化，但不需要替换已有逐题评测
 
 - 状态: confirmed

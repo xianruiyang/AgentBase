@@ -15,12 +15,14 @@ from unittest import mock
 
 
 EVALUATION_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = EVALUATION_ROOT.parents[1]
 if str(EVALUATION_ROOT) not in sys.path:
     sys.path.insert(0, str(EVALUATION_ROOT))
 
 import agentbase_codex  # noqa: E402
 from evaluation_core import EvaluationError, PreconditionError  # noqa: E402
 from evo.codex_adapter import recover_codex_artifacts, refresh_codex_trace, run_codex_job  # noqa: E402
+from evo.skill_cache import SkillCache  # noqa: E402
 
 
 class EvoCodexAdapterTests(unittest.TestCase):
@@ -57,6 +59,7 @@ class EvoCodexAdapterTests(unittest.TestCase):
                 "timeout_seconds",
                 "cancel_check",
                 "task_runtime_bin",
+                "skill_cache_root",
             ],
         )
 
@@ -75,14 +78,16 @@ class EvoCodexAdapterTests(unittest.TestCase):
             (project / "skills" / "two" / "SKILL.md").write_text("two\n", encoding="utf-8")
             (project / "agents" / "worker.toml").write_text('model = "gpt-test"\n', encoding="utf-8")
             projection = agentbase_codex.stage_codex_component_projection(
-                project_root=project,
+                project_root=PROJECT_ROOT,
                 workspace=workspace,
                 selected={
-                    "agents_md": [{"id": "rules", "source": "rules/AGENTS.md"}],
-                    "skills": [{"id": "one", "source": "skills/one"}],
-                    "agents": [{"id": "roles", "source": "agents"}],
+                    "agents_md": [{"id": "rules", "source": str(project / "rules" / "AGENTS.md")}],
+                    "skills": [{"id": "one", "source": str(project / "skills" / "one")}],
+                    "agents": [{"id": "roles", "source": str(project / "agents")}],
                 },
                 max_agents=3,
+                candidate_source_roots=[project],
+                skill_cache_root=root / "state" / "skill-cache",
             )
             config = tomllib.loads((workspace / ".codex" / "config.toml").read_text(encoding="utf-8"))
             self.assertEqual(config["developer_instructions"], "selected rule\n")
@@ -91,6 +96,10 @@ class EvoCodexAdapterTests(unittest.TestCase):
             self.assertFalse((workspace / ".agents" / "skills" / "two").exists())
             self.assertTrue((workspace / ".codex" / "agents" / "worker.toml").is_file())
             self.assertTrue(projection["identity_sha256"])
+            cache = SkillCache(PROJECT_ROOT, root / "state")
+            for reference in projection["skill_references"]:
+                cache.remove_reference(reference)
+            cache.remove_unreferenced_version(projection["skill_references"][0]["identity_sha256"])
 
     def test_projection_rejects_outside_sources_and_unsupported_kinds(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

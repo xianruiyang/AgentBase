@@ -14,8 +14,8 @@ from .spec import EvoError, load_artifacts, load_spec, read_json
 
 
 def command_modules():
-    from . import calculator_cli, code_reading_cli, evaluate_cli, grading_cli, optimization_cli, review_cli, runtime_cli, swe_cli
-    return (runtime_cli, evaluate_cli, review_cli, calculator_cli, grading_cli, optimization_cli, swe_cli, code_reading_cli)
+    from . import calculator_cli, code_reading_cli, evaluate_cli, grading_cli, optimization_cli, review_cli, runtime_cli, skill_cache_cli, swe_cli
+    return (runtime_cli, evaluate_cli, review_cli, calculator_cli, grading_cli, optimization_cli, swe_cli, code_reading_cli, skill_cache_cli)
 
 
 def _write(value: str, output: Path | None) -> None:

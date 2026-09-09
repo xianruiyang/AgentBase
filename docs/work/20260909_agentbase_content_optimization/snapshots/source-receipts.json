@@ -6,7 +6,10 @@
     "source-T003-1": "sha256:c997c90c4fed92383f57545d64472df7022974bb093167b1ae9010ffbc0b89f7",
     "source-T004-1": "sha256:0e6df79fb822bc2f32d10eead33746293de8c51a6b345a4e7883fbfc407a1918",
     "source-T005-1": "sha256:dd35cdd7ff3146ced7536fac90078086938de10c60a34977422bd5b6ac5cbe9b",
-    "source-T006-1": "sha256:93366c17c187f7c92aac7d1641ba1cba93bf6ff0c978203ec7fa413d1091276d"
+    "source-T006-1": "sha256:93366c17c187f7c92aac7d1641ba1cba93bf6ff0c978203ec7fa413d1091276d",
+    "source-T007-1": "sha256:bbaee2c0775ebbfadb11f499d48ac9921e65ff33da1f607e66689b8cf90bd565",
+    "source-T007-2": "sha256:8e39885a51ccad1306d65578c3f73a2fb3696aa87c26975c5c5c451624bdb0de",
+    "source-T007-3": "sha256:f19856f53aa3b306d5b9c0b06719c444ad51fcecaa8b3ce7630961c89b90a397"
   },
   "next_by_task": {
     "T001": 3,
@@ -14,7 +17,8 @@
     "T003": 2,
     "T004": 2,
     "T005": 2,
-    "T006": 2
+    "T006": 2,
+    "T007": 4
   },
   "schema": "task.source-receipts"
 }

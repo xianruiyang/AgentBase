@@ -55,7 +55,8 @@ class SweLifecycleTests(unittest.TestCase):
         receipt = {'execution_identity': 'frozen', 'job': 2, 'usage': 19, 'usage_complete': True}
         with patch('evo.swe_adapter.cleanup_job') as cleanup:
             settle(self.store, self.job, receipt)
-        cleanup.assert_called_once_with(self.job['runtime'], self.attempt)
+        cleanup.assert_called_once_with(self.job['runtime'], self.attempt,
+                                        project_root=Path(self.study['project']), evo_state_root=self.store.root)
         self.assertEqual(self.store.finish.call_args.args, (2, 'completed'))
         self.assertEqual(self.store.finish.call_args.kwargs['usage'], 19)
 

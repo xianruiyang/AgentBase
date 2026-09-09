@@ -16,6 +16,8 @@ $python = (Get-Command python.exe -ErrorAction Stop).Source
 $syntaxErrors = @()
 foreach ($scriptName in @(
     'invoke_candidate.ps1'
+    'evo\manage_skill_cache.ps1'
+    '..\common\get_payload_manifest.ps1'
 )) {
     $tokens = $null
     $errors = $null

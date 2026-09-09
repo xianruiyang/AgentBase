@@ -1,0 +1,20 @@
+{
+  "active_consumer": "",
+  "blocked_reason": "",
+  "ended_at": "2026-09-09T03:44:10Z",
+  "evidence_frontier": "",
+  "invalidated_source_ids": [],
+  "latest_evidence": "",
+  "next_action": "",
+  "note": "发现解析后路径破坏现有跨 skill 相对引用，已在 DES-006/SOL-014 改为所选集合的相邻目录版本。",
+  "owner": "root",
+  "result_ref": "results/T007.r5.json",
+  "revision": 5,
+  "schema": "task.state",
+  "started_at": "2026-09-09T02:42:52Z",
+  "status": "done",
+  "task_id": "T007",
+  "uncovered_dimensions": [],
+  "validated_coverage": [],
+  "validation_case": []
+}

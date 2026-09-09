@@ -206,6 +206,22 @@ class EvoCodeReadingTests(unittest.TestCase):
         recovered = store.jobs(study)[0]
         self.assertEqual((recovered['usage'], recovered['usage_complete']), (11, True))
 
+        # A valid answer must not erase a separately observed input invalidation.
+        (attempt / 'codex-logs').mkdir()
+        (attempt / 'codex-logs' / 'last-message.txt').write_text(json.dumps({'locations': [
+            {'path': 'src/value.py'}, {'path': 'src/value.py', 'line': 1},
+            {'path': 'src/value.py', 'start_line': 1, 'end_line': 2}]}), encoding='utf-8')
+        (attempt / 'skill-cache-invalid.json').write_text(json.dumps({
+            'schema': 'agentbase-evo-skill-cache-invalid/v1', 'model_invoked': True,
+            'error': 'shared payload changed', 'versions': ['v-0123456789ab']}), encoding='utf-8')
+        with mock.patch('evo.codex_adapter.run_codex_job', side_effect=AssertionError('model rerun')) as launch:
+            result = recover(store, study)
+        launch.assert_not_called()
+        self.assertEqual(result['counts'], {'uncertain': 1})
+        recovered = store.jobs(study)[0]
+        self.assertEqual((recovered['usage'], recovered['usage_complete']), (11, True))
+        self.assertIn('shared payload changed', recovered['error'])
+
     def test_location_grammar_deduplicates_and_rejects_bad_ranges(self) -> None:
         item = {'required_locations': [{'path': 'a.py'}, {'path': 'a.py', 'line': 2}]}
         result = score_answer(item, json.dumps({'locations': [

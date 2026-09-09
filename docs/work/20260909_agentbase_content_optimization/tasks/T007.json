@@ -1,0 +1,44 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "Evo SWE 与代码阅读共用的正式 Codex 组合适配器"
+      ],
+      "id": "T006",
+      "type": "hard"
+    }
+  ],
+  "id": "T007",
+  "mutation_scope": [
+    "development/agent-evaluation/**",
+    "development/common/**",
+    "docs/work/20260909_agentbase_content_optimization/**"
+  ],
+  "outcome": "Evo 多个评测工作区引用同一受保护的固定 skill 运行版本，避免重复复制且保持发现、恢复、清理和预算正确",
+  "outputs": [
+    "共享 skill 运行版本与受管目录引用",
+    "实际发现及写保护证据",
+    "正式装配与恢复合同"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "UDES-004",
+    "REQ-010",
+    "SOL-014",
+    "CON-002"
+  ],
+  "suggested_skills": [],
+  "title": "Skill 固定版本共享与引用装配",
+  "validation_dimensions": [
+    "首次/复用/换版",
+    "复制/受管链接/未知链接",
+    "单槽位/并发槽位",
+    "正常/污染/恢复",
+    "payload 过滤/实际发现/共享权限"
+  ],
+  "verification": [
+    "单个合成 skill 先经过真实 payload 与本机无模型发现入口，再验证跨槽位复用、版本切换、并发、旧投影迁移、错误链接、资源计量和当前用户清理；不运行真实模型或题目"
+  ]
+}

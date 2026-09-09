@@ -1,0 +1,65 @@
+{
+  "changed_files": [],
+  "evidence_for": [
+    "UDES-004",
+    "REQ-010",
+    "DES-006",
+    "SOL-014",
+    "CON-002"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "interface-contract",
+      "ref": "development/agent-evaluation/evo/README.md"
+    },
+    {
+      "kind": "synthetic-verification",
+      "ref": "development/agent-evaluation/tests/test_evo_skill_cache.py"
+    },
+    {
+      "kind": "recovery-verification",
+      "ref": "development/agent-evaluation/tests/test_evo_code_reading.py"
+    },
+    {
+      "kind": "verification-entry",
+      "ref": "development/agent-evaluation/test_agent_evaluation_infrastructure.ps1"
+    },
+    {
+      "kind": "local-only-runtime-evidence",
+      "ref": "development/agent-evaluation/local/skill-link-probe/production-probe-result.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "metadata": {
+    "source_scope": "来源收据覆盖本次直接目标与设计，未声明全 Evo 需求重新验收；SOL-014 在验证完成后仅由 proposed 改为 confirmed，实施正文保持所捕获版本。"
+  },
+  "outcome": "Evo 已将按工作区复制 skill 替换为受保护的固定集合版本与目录引用，并保持跨 skill 相对引用、恢复和资源计量合同。",
+  "outputs": [
+    "复用正式 payload 过滤的固定 skill 集合缓存，版本内保留相邻目录",
+    "Codex、环境池、SWE 与代码阅读消费者接入及旧复制投影迁移",
+    "skill-cache-status/prune 入口、引用登记、原子元数据及中断恢复",
+    "真实 Codex 无模型发现、跨 skill 相对引用与 ACL 写保护证据"
+  ],
+  "schema": "task.result",
+  "source_snapshot_ref": "sha256:f19856f53aa3b306d5b9c0b06719c444ad51fcecaa8b3ce7630961c89b90a397",
+  "task_id": "T007",
+  "task_revision": 1,
+  "unresolved": [
+    "本轮未运行真实模型或题目，不声明模型调用 skill 的行为效果；未执行 Deploy 或 Release。不同 skill 集合各自保存版本，不承诺跨集合单文件去重。"
+  ],
+  "validation_coverage": [
+    "相同 skill 集合跨工作区共享与来源换版隔离；不按模型或其他组件重复缓存",
+    "跨 skill 相对引用、运行 payload 过滤、旧复制投影迁移",
+    "受管引用与未知/错误绑定、写保护、污染后解除引用及无引用回收",
+    "同版本锁等待、部分复制意图恢复及并发清理互斥",
+    "普通槽位与 SWE 清理/磁盘统计；已知输入污染在恢复后仍无效且保留用量"
+  ],
+  "verification": [
+    "正式 test_agent_evaluation_infrastructure.ps1 覆盖 202 项；201 项首次通过，唯一旧 SWE 清理调用断言按新增 owner 参数修正。",
+    "tests.test_evo_swe_lifecycle 与 tests.test_evo_code_reading 共 15 项复验通过，保持缺失作答和已知输入污染两种恢复语义。",
+    "最终 tests.test_evo_skill_cache 与 tests.test_evo_codex 共 19 项复验通过；未变模块复用本轮基础设施检查结果。",
+    "Codex CLI 0.153.4 的 skills/list 在两个工作区发现两个合成 skill；从返回真实路径按正文相对链接读取到同版本兄弟文件。",
+    "修改、新增、删除和改名均被 ACL 拒绝；四条引用全部解除后正式回收版本，探针运行目录及 app-server 无残留。",
+    "Git 忽略覆盖实际题目、配置和本地探针；仅框架、合成测试及正式文档进入提交范围。"
+  ]
+}

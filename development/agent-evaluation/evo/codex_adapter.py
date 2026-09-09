@@ -247,6 +247,7 @@ def run_codex_job(
     timeout_seconds: int = 3600,
     cancel_check: Callable[[], bool] | None = None,
     task_runtime_bin: Path | None = None,
+    skill_cache_root: Path | None = None,
 ) -> dict[str, Any]:
     """Run one frozen Evo job with its selected Codex-facing component projection."""
 
@@ -301,6 +302,8 @@ def run_codex_job(
             selected=selected,
             max_agents=max_agents,
             candidate_source_roots=[Path(value) for value in source_roots],
+            skill_cache_root=skill_cache_root,
+            cache_cancel_check=cancel_check,
         )
     except (EvaluationError, OSError) as exc:
         raise CodexAdapterPrecondition(str(exc)) from exc
@@ -423,6 +426,20 @@ def run_codex_job(
         if process.returncode == 0 and receipt_valid and receipt.get("status") == "completed"
         else "failed"
     )
+    if projection.get("skill_references"):
+        if skill_cache_root is None:
+            raise EvaluationError("managed skill references lost their cache root after model execution")
+        from evo.skill_cache import SkillCache
+        cache = SkillCache(project, skill_cache_root.resolve().parent)
+        try:
+            cache.validate_workspace_references(work, projection["skill_references"])
+        except Exception as exc:
+            write_json_atomic(attempt / 'skill-cache-invalid.json', {
+                'schema': 'agentbase-evo-skill-cache-invalid/v1',
+                'model_invoked': True, 'error': str(exc)[:700],
+                'versions': sorted({reference['version_alias'] for reference in projection['skill_references']}),
+            })
+            raise EvaluationError(f'post-model shared skill payload validation failed: {exc}') from exc
     return {
         "schema": "agentbase.evo-codex-adapter-result/v1",
         "status": status,

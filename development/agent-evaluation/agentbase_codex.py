@@ -577,6 +577,8 @@ def stage_codex_component_projection(
     selected: Mapping[str, Sequence[Mapping[str, Any]]],
     max_agents: int | None = None,
     candidate_source_roots: Sequence[Path] = (),
+    skill_cache_root: Path | None = None,
+    cache_cancel_check=None,
 ) -> dict[str, Any]:
     """Project only the Codex-facing assets selected by an Evo combination."""
 
@@ -586,6 +588,7 @@ def stage_codex_component_projection(
     skill_destination = resolved_workspace / ".agents" / "skills"
     component_root = resolved_workspace / ".agentbase" / "components"
     manifest_path = resolved_workspace / ".agentbase" / "evo-codex-projection.json"
+    pending_path = resolved_workspace / ".agentbase" / "evo-codex-projection.pending.json"
     def source_path(entry: Mapping[str, Any]) -> Path:
         raw = entry.get("source")
         if not isinstance(raw, str) or not raw:
@@ -596,45 +599,97 @@ def stage_codex_component_projection(
             candidate_source_roots=candidate_source_roots,
         )
 
+    skill_cache = None
+    skill_bundle = None
+    if skill_cache_root is not None:
+        from evo.skill_cache import SkillCache
+        lexical_cache = skill_cache_root.absolute()
+        skill_cache = SkillCache(resolved_project, lexical_cache.parent, cancel_check=cache_cancel_check)
+        if skill_cache.root.absolute() != lexical_cache:
+            raise PreconditionError("managed skill cache root must be state-root/skill-cache")
+    if selected.get("skills") and skill_cache is None:
+        raise PreconditionError("selected Evo skills require an explicit managed skill cache root")
+    if selected.get("skills"):
+        named_sources: dict[str, Path] = {}
+        for entry in selected["skills"]:
+            source = source_path(entry)
+            if source.name in named_sources:
+                raise PreconditionError(f"selected skill target conflicts: {source.name}")
+            named_sources[source.name] = source
+        skill_bundle = skill_cache.materialize_bundle(named_sources)
     recipe_entries: list[dict[str, Any]] = []
     for kind in sorted(selected):
         for entry in selected[kind]:
             source = source_path(entry)
-            files = (
+            if kind == "skills":
+                files = skill_bundle["skills"][source.name]["files"]
+            else:
+                files = (
                 [{"path": source.name, "sha256": sha256_file(source), "bytes": source.stat().st_size}]
                 if source.is_file()
                 else [
                     {"path": item["path"], "sha256": sha256_file(source / item["path"]), "bytes": item["bytes"]}
                     for item in _regular_tree_entries(source)
                 ]
-            )
-            recipe_entries.append({"kind": kind, "id": entry.get("id"), "source": str(source), "files": files})
+                )
+            recipe_entries.append({"kind": kind, "id": entry.get("id"), "source": str(source), "files": files,
+                                   **({"payload_identity_sha256": skill_bundle["identity_sha256"]} if kind == "skills" else {})})
     recipe = {"schema": "agentbase.evo-codex-projection-recipe/v1", "max_agents": max_agents, "sources": recipe_entries}
     recipe_identity = sha256_bytes(canonical_bytes(recipe))
     managed_roots = [destination, skill_destination, component_root]
     replaced = False
     if any(path.exists() or path.is_symlink() for path in managed_roots):
         if not manifest_path.is_file() or manifest_path.is_symlink():
-            raise PreconditionError("workspace owns projection paths without an Evo managed manifest")
-        previous = read_json(manifest_path)
-        previous_files = previous.get("files")
-        previous_result = previous.get("result")
-        if previous.get("schema") != "agentbase.evo-codex-projection-manifest/v1" or not isinstance(previous_result, Mapping):
-            raise PreconditionError("workspace projection manifest is not owned by this adapter")
-        if previous.get("recipe_identity_sha256") == recipe_identity and isinstance(previous_files, list):
-            actual = _projection_file_entries(resolved_workspace, managed_roots)
-            if actual == previous_files:
-                result = dict(previous_result)
-                result["disposition"] = "reused"
-                return result
-        for path in managed_roots:
-            if not path.exists():
-                continue
-            if path.is_symlink() or _is_reparse_point(path) or not path.resolve().is_relative_to(resolved_workspace):
-                raise PreconditionError("managed projection replacement encountered an unsafe path")
-            shutil.rmtree(path)
-        manifest_path.unlink()
-        replaced = True
+            if not pending_path.is_file() or skill_cache is None:
+                raise PreconditionError("workspace owns projection paths without an Evo managed manifest")
+            pending = read_json(pending_path)
+            if pending.get("schema") != "agentbase.evo-codex-projection-pending/v1":
+                raise PreconditionError("workspace projection recovery marker is invalid")
+            references = skill_cache.references_for_workspace(resolved_workspace)
+            if references:
+                skill_cache.recover_workspace_references(resolved_workspace)
+            for path in managed_roots:
+                if path.exists():
+                    if _is_reparse_point(path) or any(_is_reparse_point(item) for item in path.rglob("*")):
+                        raise PreconditionError("incomplete projection contains an unmanaged reparse point")
+                    shutil.rmtree(path)
+            pending_path.unlink()
+            replaced = True
+        if not manifest_path.is_file():
+            pass
+        else:
+            previous = read_json(manifest_path)
+            previous_files = previous.get("files")
+            previous_result = previous.get("result")
+            if previous.get("schema") != "agentbase.evo-codex-projection-manifest/v1" or not isinstance(previous_result, Mapping):
+                raise PreconditionError("workspace projection manifest is not owned by this adapter")
+            if previous.get("recipe_identity_sha256") == recipe_identity and isinstance(previous_files, list):
+                if previous_result.get("skill_references"):
+                    skill_cache.validate_workspace_references(resolved_workspace, previous_result["skill_references"])
+                elif skill_destination.exists() and any(skill_destination.iterdir()):
+                    # Legacy copied projections remain valid only through replacement below.
+                    pass
+                actual = _projection_file_entries(resolved_workspace, [destination, component_root])
+                actual.extend(previous_result.get("skill_files", []))
+                actual = sorted(actual, key=lambda row: str(row["path"]).casefold())
+                if actual == previous_files and (previous_result.get("skill_references") or not skill_destination.exists()):
+                    result = dict(previous_result)
+                    result["disposition"] = "reused"
+                    return result
+            if previous_result.get("skill_references"):
+                skill_cache.validate_workspace_references(resolved_workspace, previous_result["skill_references"], content=False)
+            for reference in previous_result.get("skill_references", []):
+                skill_cache.remove_reference(reference)
+            if skill_destination.exists() and any(_is_reparse_point(item) for item in skill_destination.rglob("*")):
+                raise PreconditionError("managed projection replacement encountered an unregistered skill reference")
+            for path in managed_roots:
+                if not path.exists():
+                    continue
+                if path.is_symlink() or _is_reparse_point(path) or not path.resolve().is_relative_to(resolved_workspace):
+                    raise PreconditionError("managed projection replacement encountered an unsafe path")
+                shutil.rmtree(path)
+            manifest_path.unlink()
+            replaced = True
 
     config: dict[str, Any] = {}
     component_copies: list[tuple[Path, Path]] = []
@@ -748,6 +803,9 @@ def stage_codex_component_projection(
             agents["max_concurrent_threads_per_session"] = child_capacity
             features["multi_agent"] = True
 
+    pending_path.parent.mkdir(parents=True, exist_ok=True)
+    write_json_atomic(pending_path, {"schema": "agentbase.evo-codex-projection-pending/v1",
+                                     "recipe_identity_sha256": recipe_identity})
     destination.mkdir(parents=True, exist_ok=False)
     config_path = destination / "config.toml"
     write_text_atomic(
@@ -771,6 +829,8 @@ def stage_codex_component_projection(
                 raise EvaluationError(f"selected agent profile target conflicts: {item.name}")
             shutil.copy2(item, target)
 
+    skill_references: list[dict[str, Any]] = []
+    skill_files: list[dict[str, Any]] = []
     for entry in selected.get("skills", ()):
         source = source_path(entry)
         if not source.is_dir():
@@ -782,7 +842,10 @@ def stage_codex_component_projection(
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.exists():
             raise EvaluationError(f"selected skill target conflicts: {source.name}")
-        shutil.copytree(source, target)
+        reference = skill_cache.create_reference(resolved_workspace, source.name, skill_bundle)
+        skill_references.append(reference)
+        skill_files.extend({**item, "path": (Path(".agents/skills") / source.name / item["path"]).as_posix()}
+                           for item in skill_bundle["skills"][source.name]["files"])
 
     for source, target in component_copies:
         if target.exists():
@@ -796,7 +859,10 @@ def stage_codex_component_projection(
             json.dumps({"hooks": hooks_by_event}, ensure_ascii=False, indent=2) + "\n",
         )
 
-    projected_files = _projection_file_entries(resolved_workspace, managed_roots)
+    projected_files = _projection_file_entries(resolved_workspace, [destination, component_root])
+    projected_files = sorted([*projected_files, *skill_files], key=lambda entry: str(entry["path"]).casefold())
+    if skill_references:
+        skill_cache.validate_workspace_references(resolved_workspace, skill_references)
     payload = {"schema": "agentbase.evo-codex-projection/v1", "files": projected_files}
     result = {
         "root": str(destination),
@@ -811,6 +877,8 @@ def stage_codex_component_projection(
         ],
         "hooks_enabled": bool(hooks_by_event),
         "tool_paths": sorted(set(tool_paths), key=str.casefold),
+        "skill_references": skill_references,
+        "skill_files": skill_files,
         "disposition": "replaced" if replaced else "created",
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -823,6 +891,7 @@ def stage_codex_component_projection(
             "result": result,
         },
     )
+    pending_path.unlink()
     return result
 
 

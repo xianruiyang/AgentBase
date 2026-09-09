@@ -298,7 +298,8 @@ def finalize_job(
         }
 
 
-def cleanup_job(runtime: Mapping[str, Any], attempt_root: Path) -> dict[str, Any]:
+def cleanup_job(runtime: Mapping[str, Any], attempt_root: Path, *, project_root: Path | None = None,
+                evo_state_root: Path | None = None) -> dict[str, Any]:
     state_path = attempt_root / "swe-state.json"
     if not state_path.is_file():
         return {"removed": False}
@@ -307,5 +308,16 @@ def cleanup_job(runtime: Mapping[str, Any], attempt_root: Path) -> dict[str, Any
     workspace = Path(str(state["workspace"])).resolve()
     managed = require_within(work_root, workspace)
     if managed.exists():
+        projection_manifest = managed / '.agentbase' / 'evo-codex-projection.json'
+        if projection_manifest.is_file():
+            references = read_json(projection_manifest).get('result', {}).get('skill_references', [])
+            if references:
+                if project_root is None or evo_state_root is None:
+                    raise EvaluationError('SWE cleanup requires Evo cache ownership for managed skill references')
+                from .skill_cache import SkillCache
+                cache = SkillCache(project_root, evo_state_root)
+                cache.validate_workspace_references(managed, references, content=False)
+                for reference in references:
+                    cache.remove_reference(reference)
         remove_managed_tree(work_root, managed)
     return {"removed": True}

@@ -138,6 +138,29 @@ hook、MCP、工具选择带 `component.json` 的源码或已准备产物目录�
 
 `resources --state-root <state>` 按需查询受管 state/work 实际占用、预留、磁盘预算、卷空闲空间及 job/model 容量，`--study s1` 可限定复用统计。status/watch 只展示数据库可计算的轻量容量摘要，不每轮扫描磁盘。原生 Codex 会话账本由宿主维护，属于外部证据来源，不混入受管目录占用。
 
+### Skill 的固定版本与共享引用
+
+Skill 的运行文件范围继承 `development/common/payload_contract.ps1`，测试、benchmark 和缓存等开发材料不参与运行投影及其内容版本。Evo 消费公共 owner 生成的清单，不另写一套过滤条件。题目与组合仍分开：组合显式选择 skill 成员，不因使用共享缓存而自动加入其他 skill。
+
+提交时固定选中来源的内容身份；首次运行才为选中的 skill 集合生成受管共享版本，后续工作区通过 `.agents/skills/<目录名>` 的 Windows 目录联接（junction）引用其中的成员目录。版本内保持 `payload/<skill-name>/...` 的相邻关系，Codex 返回真实路径后，已有跨 skill 相对引用仍能访问同集合成员。每个 skill 保持自己的正文、引用文件和脚本结构，不拼成一个提示词，也不改写链接来适配缓存。
+
+共享键只包含所选 skill 的稳定目录名和过滤后的内容；集合相同而模型、hook 等其他配置不同的评测也可复用。不同 skill 集合各自保存版本，不承诺跨集合单文件去重。缓存使用独立内容副本，不链接正在维护的源目录。提交后、运行前源码变化会要求创建新研究；新研究或优化候选生成新版本，已有版本不会被覆盖。
+
+共享 payload 通过 Windows ACL 阻止当前用户的普通写入、新增、删除和改名，同时允许读取；缓存 owner 保留原权限及当前用户可执行的维护恢复方式。该保护不承诺抵御同一账户主动修改权限；共享目标内容或绑定不符时结果无效，不能当作任务零分。脚本应把运行产物写到自己的工作区，不写回固定 skill 内容。
+
+链接位置、固定目标和内容身份由投影清单维护；来源、缓存和清单不形成双向同步。槽位重置只解除受管链接，不沿链接复制证据或删除共享内容；未知链接仍报错。共享文件在受管磁盘统计中只计算一次，不按工作区数量重复累计。已有复制式投影由同一装配入口迁移，清理共享版本必须确认使用关系并通过缓存 owner 恢复权限。
+
+缓存位于 `<state-root>/skill-cache`，由 Evo 生成清单、恢复权限记录和引用登记。查看和回收使用正式入口，`--version` 采用查询返回的短版本别名：
+
+```powershell
+python.exe development/agent-evaluation/agent_eval.py evo skill-cache-status --project-root (Get-Location).Path --state-root $EvoState
+python.exe development/agent-evaluation/agent_eval.py evo skill-cache-prune --project-root (Get-Location).Path --state-root $EvoState --version '<查询返回的版本别名>'
+```
+
+`skill-cache-status` 的 `used_bytes` 汇总已发布版本文件，`staging` 列出未完成物化；包含暂存、队列和工作区的总占用仍由 `resources` 查询。`skill-cache-prune` 只处理显式指定且没有受管引用的版本，也可按暂存别名恢复中断的物化；与正在准备同一版本的过程互斥，工作区仍在使用时拒绝删除。缓存清单和恢复记录由入口维护，不手工修改 ACL、链接或登记文件。
+
+执行后若观察到共享输入或引用被污染，attempt 中的 `skill-cache-invalid.json` 由 Codex adapter 保存当次无效事实，恢复入口继续保留该判断和已知用量。后来恢复文件或解除链接不能倒推原评测输入有效；该记录随本次证据归档，不手工删除以恢复评分。
+
 ## 人工与模型评分
 
 人工评审字段声明为 `assessment` 粒度。`review-export --spec <research.json> --artifacts <facts.json> --state-root <state> --scoring <id> --field <field-id> --output <review.json>` 导出可编辑评审包；可用 `--blind` 隐去组合绑定，`--grain/--row` 缩小待评对象。盲比只隐去框架身份，内容本身仍可能透露来源。

@@ -298,6 +298,17 @@ PROJECTORS: dict[str, Callable[[dict[str, Any], int], dict[str, Any]]] = {
 
 
 def project_model(value: dict[str, Any], *, items: int = 20) -> dict[str, Any]:
+    if isinstance(value, dict) and value.get('schema') == 'agentbase-evo-skill-cache/v1':
+        versions = value.get('versions', [])[:items]
+        return {**_base(value['schema']), 'operation': value.get('operation', 'skill-cache-status'),
+                'root': value.get('root'), 'used_bytes': value.get('used_bytes'),
+                'versions': [{key: item for key, item in row.items() if key != 'identity_sha256'} for row in versions],
+                'staging': value.get('staging', [])[:items],
+                'omitted_versions': max(0, len(value.get('versions', [])) - items),
+                'omitted_staging': max(0, len(value.get('staging', [])) - items)}
+    if isinstance(value, dict) and value.get('schema') == 'agentbase-evo-skill-cache-prune/v1':
+        return {**_base(value['schema']), 'operation': 'skill-cache-prune',
+                'version': value.get('version'), 'removed': value.get('removed')}
     if isinstance(value, dict) and value.get('schema') == 'agentbase-evo-code-reading-import/v1':
         return {**_base(value['schema']), 'operation': 'code-reading-import',
                 **{key: value.get(key) for key in ('output', 'id', 'item_count', 'required_locations',
@@ -351,6 +362,7 @@ def render_model(value: dict[str, Any], limit: int = 1200) -> str:
     projection = project_model(value, items=1)
     if projection.get("operation") in {"init", "submit", "validate", "save", "calculate", "grade-start", "grade-run",
                                         "code-reading-import", "swe-import",
+                                        "skill-cache-status", "skill-cache-prune",
                                         "review-prepare", "review-sync", "evaluate", "optimization", "optimize-export"}:
         minimal = {"schema": projection["schema"], "operation": projection["operation"], "success": True, "recovery": RECOVERY}
         for key in ("study", "output", "valid"):
