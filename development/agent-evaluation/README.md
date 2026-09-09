@@ -4,6 +4,8 @@
 
 Evo 通过 `agent_eval.py evo <action>` 使用，实际接口与数据生命周期见其说明。以下章节维护原 SWE 合同，Evo 不继承其中仅针对 SWE 的全组件默认投影、关闭 hooks 和逐题资格要求；共享投影、启动与用量仍归原 owner。
 
+已有本地 SWE corpus 可通过 [`evo swe-import`](evo/README.md#使用本地-windows-swe-题组) 生成独立题组目录，再由研究规格引用。题组不定义模型、组件或运行参数；Evo 真正执行 SWE 题目时仍须消费原 SWE qualification 与独立 Verifier。导入和静态检查不会运行题目。
+
 ## 职责与真源
 
 - `corpus/schema.json`：本地 corpus 的结构合同；不定义真实题目集合。
@@ -11,7 +13,8 @@ Evo 通过 `agent_eval.py evo <action>` 使用，实际接口与数据生命周�
 - `corpus/final-v1.json`：既有本机真实 corpus 的默认路径；文件缺失时可通过 `--corpus <local-json>` 显式选择另一份本地 corpus。
 - `agent_eval.py`：CLI、逐题状态机、资格、尝试、恢复和报告。
 - `evo/`：组合规格、队列、资源与恢复、评分和人工评审；真实数据和状态位于本机独立根目录。
-- `agentbase_codex.py` 与 `invoke_candidate.ps1`：候选工作区投影、Codex CLI 调用、JSONL 使用量和 API 等价成本收据。
+- `evo/swe_catalog.py`：本地 SWE 题组目录的静态投影与研究引用展开；原 corpus 继续持有题目权威，运行选择归研究规格。
+- `agentbase_codex.py` 与 `invoke_candidate.ps1`：候选题目提示和依赖运行时、工作区组件投影、Codex CLI 调用、JSONL 使用量和 API 等价成本收据。
 - `windows_verifier.py`：依赖准备、Windows adapter、patch 应用、检查、报告转换和固定 grader。
 - `evaluation_core.py`：路径边界、身份、锁、不可变收据、Git 工作区和通用状态。
 - `windows-adapters/`：本机 corpus 可引用的逐题、哈希固定 Windows fixture patch；真实 patch 不由 Git 分发。

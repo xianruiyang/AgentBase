@@ -246,6 +246,7 @@ def run_codex_job(
     process_environment: Mapping[str, str] | None = None,
     timeout_seconds: int = 3600,
     cancel_check: Callable[[], bool] | None = None,
+    task_runtime_bin: Path | None = None,
 ) -> dict[str, Any]:
     """Run one frozen Evo job with its selected Codex-facing component projection."""
 
@@ -322,6 +323,11 @@ def run_codex_job(
         executable = Path(found).resolve() if found else None
     if executable is None or not executable.is_file():
         raise CodexAdapterPrecondition("Codex executable is unavailable in the job environment")
+    if task_runtime_bin is not None:
+        task_runtime_bin = task_runtime_bin.resolve()
+        # The dependency owner supplies a workspace venv/pnpm or the host npm bin.
+        if not task_runtime_bin.is_dir():
+            raise CodexAdapterPrecondition("task runtime bin must be an existing directory")
     argv = [
         "pwsh.exe", "-NoProfile", "-NonInteractive", "-File",
         str(project / "development" / "agent-evaluation" / "invoke_candidate.ps1"),
@@ -331,6 +337,8 @@ def run_codex_job(
         "-ReasoningEffort", str(reasoning), "-CodexExecutablePath", str(executable),
         "-TimeoutSeconds", str(timeout_seconds), "-ResultSchema", EVO_CODEX_RESULT_SCHEMA,
     ]
+    if task_runtime_bin is not None:
+        argv.extend(["-TaskRuntimeBinPath", str(task_runtime_bin)])
     if projection.get("hooks_enabled") is True:
         argv.append("-EnableHooks")
     tool_paths = projection.get("tool_paths", [])

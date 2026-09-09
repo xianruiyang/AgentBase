@@ -443,7 +443,7 @@ def _codex_executable_from_tools(tools: Mapping[str, Any]) -> Path:
     return path
 
 
-def _verifier_runtime_identity(
+def verifier_runtime_identity(
     task: Mapping[str, Any],
     runtime_tools: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -479,7 +479,7 @@ def command_oracle(args: argparse.Namespace) -> int:
     run_root = state_root / "qualification-runs" / run_id
     run_root.mkdir(parents=True, exist_ok=False)
     tools = verifier_runtime_tools(require_task(corpus, task_id))
-    verifier_runtime = _verifier_runtime_identity(require_task(corpus, task_id), tools)
+    verifier_runtime = verifier_runtime_identity(require_task(corpus, task_id), tools)
     repetitions: list[dict[str, Any]] = []
     p2p_exclusions: list[str] = []
     baseline_policy = require_task(corpus, task_id).get("windows_oracle", {}).get(
@@ -627,7 +627,7 @@ def _write_candidate_receipt(
     )
 
 
-def _run_candidate_verifier(
+def run_candidate_verifier(
     *,
     project_root: Path,
     state_root: Path,
@@ -765,7 +765,7 @@ def command_run(args: argparse.Namespace) -> int:
                 attempt_root,
                 args.codex_executable,
             )
-            verifier_runtime = _verifier_runtime_identity(
+            verifier_runtime = verifier_runtime_identity(
                 task,
                 verifier_runtime_tools(task),
             )
@@ -932,7 +932,7 @@ def command_run(args: argparse.Namespace) -> int:
                 attempt,
                 stage="verifier-running",
             )
-            verifier = _run_candidate_verifier(
+            verifier = run_candidate_verifier(
                 project_root=project_root,
                 state_root=state_root,
                 work_root=work_root,
@@ -1193,7 +1193,7 @@ def command_recover(args: argparse.Namespace) -> int:
                     attempt,
                     stage="verifier-running",
                 )
-                verifier = _run_candidate_verifier(
+                verifier = run_candidate_verifier(
                     project_root=project_root,
                     state_root=state_root,
                     work_root=work_root,

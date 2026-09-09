@@ -2142,7 +2142,7 @@ class DeterministicEntryTests(unittest.TestCase):
                     return_value=attempt,
                 ) as update_attempt,
                 mock.patch.object(agent_eval, "capture_candidate_patch") as capture_patch,
-                mock.patch.object(agent_eval, "_run_candidate_verifier") as run_verifier,
+                mock.patch.object(agent_eval, "run_candidate_verifier") as run_verifier,
             ):
                 with self.assertRaisesRegex(
                     evaluation_core.EvaluationError,

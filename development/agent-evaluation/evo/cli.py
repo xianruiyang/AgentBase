@@ -14,8 +14,8 @@ from .spec import EvoError, load_artifacts, load_spec, read_json
 
 
 def command_modules():
-    from . import calculator_cli, evaluate_cli, grading_cli, optimization_cli, review_cli, runtime_cli
-    return (runtime_cli, evaluate_cli, review_cli, calculator_cli, grading_cli, optimization_cli)
+    from . import calculator_cli, evaluate_cli, grading_cli, optimization_cli, review_cli, runtime_cli, swe_cli
+    return (runtime_cli, evaluate_cli, review_cli, calculator_cli, grading_cli, optimization_cli, swe_cli)
 
 
 def _write(value: str, output: Path | None) -> None:
@@ -45,6 +45,22 @@ def _ensure_distinct_output(output: Path | None, inputs: list[Path]) -> None:
     target = os.path.normcase(str(output.resolve()))
     if any(target == os.path.normcase(str(path.resolve())) for path in inputs):
         raise EvoError("output path must not overwrite an input")
+
+
+def _checked_spec(path: Path) -> dict[str, Any]:
+    spec = load_spec(path)
+    from evaluation_core import EvaluationError, default_project_root
+    from .swe_adapter import validate_binding
+    try:
+        for item in spec['evaluations']['items']:
+            runtime = {**spec.get('runtime', {}), **item.get('runtime', {})}
+            if runtime.get('swe') is not None and runtime.get('adapter') is not None:
+                if runtime['adapter'] != 'codex':
+                    raise EvoError('SWE task execution requires runtime.adapter=codex')
+                validate_binding(runtime, project_root=default_project_root())
+    except EvaluationError as exc:
+        raise EvoError(str(exc)) from exc
+    return spec
 
 
 def parser() -> argparse.ArgumentParser:
@@ -87,14 +103,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 value = module.handle(args)
                 if value is not None:
                     # These owners already write their explicit output artifact.
-                    _emit(value, args, already_written=args.action in {"calculate", "review-export", "review-merge", "grade-merge"})
+                    _emit(value, args, already_written=args.action in {"calculate", "review-export", "review-merge", "grade-merge", "swe-import"})
                 return 0
         if args.action == "validate":
-            spec = load_spec(args.spec)
+            from .swe_catalog import CATALOG_SCHEMA, load_catalog
+            spec = (load_catalog(args.spec) if read_json(args.spec).get('schema') == CATALOG_SCHEMA
+                    else _checked_spec(args.spec))
             _emit({"valid": True, "schema": spec["schema"], "id": spec["id"], "version": spec["version"]}, args)
         elif args.action == "plan":
             _ensure_distinct_output(args.output, [args.spec])
-            _emit(build_plan(load_spec(args.spec)), args)
+            _emit(build_plan(_checked_spec(args.spec)), args)
         elif args.action == "score":
             _ensure_distinct_output(args.output, [args.spec, args.artifacts])
             _emit(score_artifacts(load_spec(args.spec), load_artifacts(args.artifacts), args.scoring_ids), args)

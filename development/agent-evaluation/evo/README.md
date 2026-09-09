@@ -41,6 +41,44 @@ python.exe development/agent-evaluation/agent_eval.py evo score --spec developme
 
 超出声明式公式的计算使用 `calculate --manifest <calculator.json> --spec <research.json> --artifacts <facts.json> --output <derived.json> --allow-local-code`。manifest 的 `agentbase-evo-calculator/v1` 合同固定 `id/version`、代码相对路径与 SHA-256、`argv`、超时和输出上限；只有一个完整参数 `{calculator}` 被替换为代码路径。程序从标准输入读取冻结 JSON，返回声明的派生字段和 `input_rows` 来源。该入口会执行用户明确选中的本地代码。
 
+## 使用本地 Windows SWE 题组
+
+题组与评测配置分开维护。`swe-import` 只把既有 Windows SWE corpus 的题目身份、任务家族、固定输入版本、作答协议和 suite 映射生成独立的 `agentbase-evo-swe-catalog/v1` 目录。目录不包含模型、推理参数、组件选择、观察指标、激活状态、并发、预算或环境路径，也不复制题面、答案和补丁。
+
+```powershell
+python.exe development/agent-evaluation/agent_eval.py evo swe-import --corpus C:/local/corpus.json --output C:/local/swe-catalog.json
+python.exe development/agent-evaluation/agent_eval.py evo validate --spec C:/local/swe-catalog.json
+```
+
+导入不排队、不准备源码或依赖、不运行 qualification、Verifier 或模型。输出必须是新文件；真实目录与原 corpus 一样只留本机。目录只保存 corpus 身份，不绑定生成机的绝对路径；单独 validate 检查目录结构，研究引用时再对照其环境映射的原 corpus。目录是 corpus 的派生产物，修改题目或组在原 corpus 完成，再重新导入；不把生成目录当成第二个题库维护入口。
+
+独立的研究规格保留自己的七类组件、评分、`selection`、预算与运行参数，使用下列字段引用目录。`sha256` 填入目录文件的实际 SHA-256；相对 `source` 以研究规格所在目录为基准。只规划或对已有产物评分可省略整个 `runtime`，无需模型或本机环境映射；实际提交执行才要求完整运行配置。
+
+```json
+{
+  "evaluations": {
+    "catalog": {"source": "swe-catalog.json", "sha256": "<catalog SHA-256>"},
+    "observations": ["quality", "usage", "timing", "public-trace"]
+  },
+  "selection": {"combinations": ["chosen-combination"], "groups": ["chosen-suite"], "replicates": 1},
+  "runtime": {
+    "adapter": "codex", "model": "<chosen model>", "reasoning_effort": "<chosen effort>",
+    "max_agents": 1, "token_reservation": 1000000, "timeout_seconds": 3600,
+    "swe": {
+      "corpus": "C:/local/corpus.json",
+      "state_root": "C:/local/swe-state", "work_root": "C:/local/swe-work",
+      "work_reservation_mb": 2048
+    }
+  }
+}
+```
+
+这是已有研究规格的字段片段；组合 ID、组 ID、模型与容量应按该次评测选择，示例数值不是所有题目的资源保证。省略 `selection.groups` 时目录没有默认激活组。`load_spec` 只读展开题目绑定，submit 再冻结完整执行身份；目录或 corpus 变化需显式更新绑定并新建研究，旧作业不追随变化。inline `items/groups` 与目录引用不能同时作为题组真源。
+
+只有随后显式 `run` 才执行题目。SWE 扩展仍使用 Codex 组合投影、用量与公开轨迹 owner，复用原 SWE 固定来源、qualification、补丁限制与独立 Verifier；`quality.reward` 来自原固定 grader。已有源码和资格从 SWE state 复用；缺少当前资格会报前置条件，不自动执行 `prepare/oracle`。SWE state/work 与 Evo project/state/work、安装根互相分离。`work_reservation_mb` 计入每个作业的磁盘预留；工作目录仍按原 SWE owner 创建 candidate/Verifier，依赖准备和 clone 不承诺跨题复用。
+
+SWE 的题面、允许补丁路径、公开检查和 grader 由原题目合同提供；不能用通用 `runtime.files/verifier/answer_contains` 替换，额外行为配置通过所选组件维护。模型完成后的恢复只处理已有 patch 与 Verifier 阶段，不重新调用模型。题目执行的中间状态与收据归当前 Evo attempt，历史 SWE 结果和资格不被覆盖；公开事实继续由 Evo `results/trace` 读取，分数可离线重算。实际运行兼容性须由后续明确授权的题目运行证明，静态导入和合成检查不作此保证。
+
 ## 本地队列
 
 `init` 建立共享状态根的本机上限；`submit` 只冻结和排队；`run` 才执行作业。单研究 `budget.concurrency` 不得突破共享上限。`runtime.max_agents` 预留主代理与后代总容量，必须与选中 Codex 设置兼容，不能静默降低受测配置满足限额。

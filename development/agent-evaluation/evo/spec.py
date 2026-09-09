@@ -86,6 +86,8 @@ def read_json(path: Path) -> dict[str, Any]:
 
 def load_spec(path: Path) -> dict[str, Any]:
     spec = read_json(path)
+    from .swe_catalog import resolve_catalog
+    spec = resolve_catalog(spec, path)
     validate_spec(spec)
     return spec
 

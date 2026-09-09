@@ -162,6 +162,11 @@ class Store:
                 slots = positive(runtime.get('max_agents', 1), 'max_agents', 256) if is_model else 0
                 reservation = positive(runtime.get('token_reservation', 100_000), 'token_reservation') if is_model else 0
                 disk_reservation = sum(entry['bytes'] for entries in job.get('source_inventory', {}).values() for entry in entries)
+                swe = runtime.get('swe')
+                if isinstance(swe, dict):
+                    disk_reservation += positive(
+                        swe.get('work_reservation_mb'), 'runtime.swe.work_reservation_mb', 1024 * 1024
+                    ) * 1024**2
                 db.execute('INSERT INTO jobs(study,identity,plan,runtime,model_slots,token_reservation,disk_reservation) VALUES(?,?,?,?,?,?,?)',
                            (study, job['execution_identity'], canonical(job), canonical(runtime), slots, reservation, disk_reservation))
             self.event(db, study, None, 'submitted', {'job_count': len(jobs)})

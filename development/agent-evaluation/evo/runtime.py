@@ -124,12 +124,15 @@ def execution_sources(spec: dict, job: dict, project: Path, roots: list[Path]) -
     return sources
 
 
-def execution_recipe(adapter: str, project: Path) -> dict:
+def execution_recipe(adapter: str, project: Path, *, swe: bool = False) -> dict:
     paths = [Path(__file__).with_name('env_pool.py')]
     if adapter == 'codex':
         evaluation_root = Path(__file__).resolve().parent.parent
         paths.extend([Path(__file__).with_name('codex_adapter.py'),
                       evaluation_root / 'agentbase_codex.py', evaluation_root / 'invoke_candidate.ps1'])
+        if swe:
+            paths.extend([Path(__file__).with_name('swe_adapter.py'), evaluation_root / 'evaluation_core.py',
+                          evaluation_root / 'windows_verifier.py', evaluation_root / 'agent_eval.py'])
     files = []
     for path in paths:
         if not path.is_file():
@@ -172,6 +175,12 @@ def submit(store: Store, spec_path: Path, project: Path, work: Path) -> int:
             validate_argv(runtime.get('argv'))
         elif not all(isinstance(runtime.get(k), str) and runtime[k] for k in ('model', 'reasoning_effort')):
             raise EvoError('Codex model and reasoning_effort must be explicitly selected in runtime')
+        if runtime.get('swe') is not None:
+            if runtime['adapter'] != 'codex':
+                raise EvoError('runtime.swe requires runtime.adapter=codex')
+            from .swe_adapter import validate_runtime as validate_swe_runtime
+            runtime['swe'] = validate_swe_runtime(runtime, project_root=project, evo_state_root=store.root,
+                                                   evo_work_root=work)
         files = runtime.get('files', [])
         if not isinstance(files, list):
             raise EvoError('runtime.files must be an array')
@@ -186,7 +195,7 @@ def submit(store: Store, spec_path: Path, project: Path, work: Path) -> int:
         job['runtime'] = runtime
         roots = candidate_roots(store, runtime, project, work)
         job['source_inventory'] = execution_sources(spec, job, project, roots)
-        job['execution_recipe'] = execution_recipe(runtime['adapter'], project)
+        job['execution_recipe'] = execution_recipe(runtime['adapter'], project, swe=runtime.get('swe') is not None)
         job['execution_identity'] = job_identity(spec, job, item)
     return store.submit(spec, jobs, project, work)
 
@@ -217,6 +226,26 @@ def immutable_json(path: Path, value: dict) -> None:
         handle.write(payload)
 
 
+def _swe_codex_inputs(study: dict, job: dict, swe_state: dict) -> tuple[dict, dict]:
+    spec = copy.deepcopy(study['spec'])
+    plan = copy.deepcopy(job['plan'])
+    prompt = swe_state['task_prompt']
+    item = next(item for item in spec['evaluations']['items'] if item['id'] == plan['item'])
+    item.pop('prompt', None)
+    item.setdefault('runtime', {})['prompt'] = prompt
+    return spec, plan
+
+
+def _persisted_model_invoked(attempt: Path, known: bool) -> bool:
+    raw_path = attempt / 'codex-result.json'
+    if raw_path.is_file():
+        try:
+            return known or read_json(raw_path).get('model_invoked') is True
+        except Exception:
+            pass
+    return known or (attempt / 'codex-rollout-before.json').is_file()
+
+
 def disk_bytes(*roots: Path) -> int:
     total = 0
     for root in roots:
@@ -230,15 +259,27 @@ def disk_bytes(*roots: Path) -> int:
     return total
 
 
-def resources(store: Store, study: int | None = None) -> dict:
-    """Scan managed storage only when explicitly requested; capacity remains global."""
-    if study is not None:
-        store.study(study)
+def managed_storage_roots(store: Store, study: int | None = None) -> list[Path]:
+    """Return Evo-owned roots; legacy SWE state and cold sources stay external/read-only."""
     roots = [store.root, *store.work_roots()]
+    for job in store.jobs():
+        swe = job.get('runtime', {}).get('swe')
+        if isinstance(swe, dict) and isinstance(swe.get('work_root'), str):
+            namespace = swe.get('owner_namespace')
+            if isinstance(namespace, str) and namespace:
+                roots.append(Path(swe['work_root']) / 'evo' / namespace)
     unique_roots: list[Path] = []
     for root in sorted({path.resolve() for path in roots}, key=lambda path: len(path.parts)):
         if not any(root.is_relative_to(parent) for parent in unique_roots):
             unique_roots.append(root)
+    return unique_roots
+
+
+def resources(store: Store, study: int | None = None) -> dict:
+    """Scan managed storage only when explicitly requested; capacity remains global."""
+    if study is not None:
+        store.study(study)
+    unique_roots = managed_storage_roots(store)
     managed_error = None
     try:
         managed = disk_bytes(*unique_roots)
@@ -531,6 +572,9 @@ def _complete_from_raw(store: Store, study: dict, job: dict, installed_codex_roo
             if workspace.is_relative_to(work) and (workspace / '.evo-slot.json').is_file():
                 from .env_pool import EnvironmentPool
                 EnvironmentPool(work, store.root).release(workspace)
+        if job['runtime'].get('swe') is not None:
+            from .swe_adapter import cleanup_job as cleanup_swe_job
+            cleanup_swe_job(job['runtime'], attempt)
         return True
     if raw.get('schema') != 'agentbase.evo-codex-run/v1' or raw.get('model_invoked') is not True:
         store.finish(job['id'], 'uncertain', usage=raw.get('usage', {}).get('total_tokens'),
@@ -541,6 +585,29 @@ def _complete_from_raw(store: Store, study: dict, job: dict, installed_codex_roo
         store.finish(job['id'], 'uncertain', usage=raw.get('usage', {}).get('total_tokens'),
                      usage_complete=bool(raw.get('usage_complete')),
                      error=f'Raw Codex receipt status is {raw.get("status", "unknown")}; recovery will not repeat it')
+        return True
+    if job['runtime'].get('swe') is not None:
+        from .swe_adapter import finalize_job
+        intent = read_json(attempt / 'intent.json')
+        swe_result = finalize_job(
+            project_root=Path(study['project']), runtime=job['runtime'], study_id=job['study'], job_id=job['id'],
+            attempt_root=attempt, environment=os.environ, raw_receipt=raw,
+        )
+        receipt = {
+            'schema': 'agentbase-evo-run/v1', 'execution_identity': job['identity'],
+            'attempt': job.get('attempt_seq', 1), 'job': job['id'], 'study': job['study'],
+            'codex': raw, 'swe': swe_result, 'subject_seconds': raw.get('duration_seconds', 0),
+            'values': swe_result['values'], 'usage': raw.get('usage', {}).get('total_tokens'),
+            'usage_complete': bool(raw.get('usage_complete')), 'projection': intent.get('projection'),
+        }
+        receipt['trace'] = recovered_trace if recovered_trace is not None else {
+            'schema': 'agentbase.evo-codex-trace/v1', 'capability': 'unavailable', 'observed': [],
+            'missing': ['recover requires installed Codex root to rebuild trace'], 'private_reasoning_archived': False,
+        }
+        receipt['awaiting_human'] = bool(job['runtime'].get('rubric'))
+        receipt['facts'] = _facts(study, job, receipt)
+        immutable_json(attempt / 'receipt.json', receipt)
+        settle(store, job, receipt)
         return True
     receipt: dict[str, Any] = {
         'schema': 'agentbase-evo-run/v1', 'execution_identity': job['identity'],
@@ -581,16 +648,43 @@ def execute(store: Store, job: dict, installed_codex_root: Path | None) -> None:
     invoked = False
     try:
         check_roots(Path(study['project']), store.root, Path(study['work']), installed_codex_root)
-        candidate_roots(store, job['runtime'], Path(study['project']), Path(study['work']), installed_codex_root)
+        roots = candidate_roots(store, job['runtime'], Path(study['project']), Path(study['work']), installed_codex_root)
         if receipt_path.exists():
             settle(store, job, read_json(receipt_path))
             return
         if job['runtime']['adapter'] == 'codex' and _complete_from_raw(store, study, job, installed_codex_root):
             return
-        workspace = prepare_workspace(store, study, job)
         attempt.mkdir(parents=True, exist_ok=True)
         runtime = job['runtime']
         cancelled = lambda: store.study(job['study'])['state'] == 'cancelled'
+        if cancelled():
+            raise EvoError('cancelled before subject preparation')
+        if runtime.get('swe') is not None:
+            if installed_codex_root is None:
+                raise EvoError('Codex run requires --installed-codex-root')
+            from .swe_adapter import validate_runtime as validate_swe_runtime
+            current_swe = validate_swe_runtime(
+                runtime, project_root=Path(study['project']), evo_state_root=store.root,
+                evo_work_root=Path(study['work']), installed_codex_root=installed_codex_root,
+            )
+            if current_swe != runtime['swe']:
+                raise EvoError('frozen SWE binding changed since submit')
+            if execution_sources(study['spec'], job['plan'], Path(study['project']), roots) != job['plan']['source_inventory']:
+                raise EvoError('selected source changed since submit; create a new frozen study')
+            from .swe_adapter import prepare_job as prepare_swe_job
+            config = store.config()
+            active_reservations = sum(j['disk_reservation'] for j in store.jobs() if j['state'] in RESOURCE_HELD)
+            if disk_bytes(*managed_storage_roots(store)) + active_reservations > config['max_disk_mb'] * 1024**2:
+                raise RetryLater('managed disk budget is waiting for SWE workspace capacity')
+            if shutil.disk_usage(Path(runtime['swe']['work_root']).anchor).free - job['disk_reservation'] < config['min_free_mb'] * 1024**2:
+                raise RetryLater('minimum free disk reserve is waiting for SWE workspace capacity')
+            swe_state = prepare_swe_job(
+                project_root=Path(study['project']), runtime=runtime, study_id=job['study'], job_id=job['id'],
+                attempt_root=attempt, environment=os.environ,
+            )
+            workspace = Path(swe_state['workspace'])
+        else:
+            workspace = prepare_workspace(store, study, job)
         store.phase(job['id'], 'running')
         if cancelled():
             raise EvoError('cancelled before subject launch')
@@ -608,9 +702,16 @@ def execute(store: Store, job: dict, installed_codex_root: Path | None) -> None:
                 raise EvoError('Codex run requires --installed-codex-root')
             from .codex_adapter import run_codex_job
             try:
+                codex_plan = job['plan']
+                codex_spec = study['spec']
+                task_options = {}
+                if runtime.get('swe') is not None:
+                    codex_spec, codex_plan = _swe_codex_inputs(study, job, swe_state)
+                    task_options['task_runtime_bin'] = Path(swe_state['task_runtime']['bin_directory'])
                 result = run_codex_job(project_root=Path(study['project']), workspace=workspace, attempt_root=attempt,
-                                       installed_codex_root=installed_codex_root, spec=study['spec'], job=job['plan'],
-                                       timeout_seconds=runtime['timeout_seconds'], cancel_check=cancelled)
+                                       installed_codex_root=installed_codex_root, spec=codex_spec, job=codex_plan,
+                                       process_environment=os.environ, timeout_seconds=runtime['timeout_seconds'],
+                                       cancel_check=cancelled, **task_options)
             except Exception as exc:
                 marker = getattr(exc, 'model_invoked', None)
                 invoked = False if marker is False else (attempt / 'codex-rollout-before.json').exists()
@@ -620,11 +721,16 @@ def execute(store: Store, job: dict, installed_codex_root: Path | None) -> None:
             if isinstance(raw, str):
                 raw = read_json(Path(raw))
             if result.get('status') != 'completed':
-                state = result.get('status') if result.get('status') in ('failed', 'cancelled', 'uncertain') else 'uncertain'
+                state = ('uncertain' if runtime.get('swe') is not None and invoked else
+                         result.get('status') if result.get('status') in ('failed', 'cancelled', 'uncertain') else 'uncertain')
                 store.finish(job['id'], state, usage=raw.get('usage', {}).get('total_tokens') if isinstance(raw, dict) else None,
                              usage_complete=bool(isinstance(raw, dict) and raw.get('usage_complete')),
                              error=f'Codex adapter ended as {result.get("status", "unknown")}')
-                if state == 'uncertain':
+                if runtime.get('swe') is not None:
+                    if not invoked:
+                        from .swe_adapter import cleanup_job as cleanup_swe_job
+                        cleanup_swe_job(runtime, attempt)
+                elif state == 'uncertain':
                     from .env_pool import EnvironmentPool
                     EnvironmentPool(Path(study['work']), store.root).quarantine(workspace, 'Codex outcome is uncertain')
                 else:
@@ -634,8 +740,15 @@ def execute(store: Store, job: dict, installed_codex_root: Path | None) -> None:
             receipt.update(codex=raw, trace=result.get('trace'), projection=result.get('projection'), subject_seconds=raw.get('duration_seconds', 0),
                            values={}, usage=raw.get('usage', {}).get('total_tokens'), usage_complete=raw.get('usage_complete', False))
             store.phase(job['id'], 'verifying')
-            verifier = runtime.get('verifier')
-            if verifier:
+            if runtime.get('swe') is not None:
+                from .swe_adapter import finalize_job as finalize_swe_job
+                swe_result = finalize_swe_job(
+                    project_root=Path(study['project']), runtime=runtime, study_id=job['study'], job_id=job['id'],
+                    attempt_root=attempt, environment=os.environ, raw_receipt=raw,
+                )
+                receipt['swe'] = swe_result
+                receipt['values'] = swe_result['values']
+            elif (verifier := runtime.get('verifier')):
                 argv = validate_argv(verifier['argv'])
                 answer = attempt / 'codex-logs' / 'last-message.txt'
                 argv = [a.replace('{answer}', str(answer)).replace('{workspace}', str(workspace)) for a in argv]
@@ -652,20 +765,29 @@ def execute(store: Store, job: dict, installed_codex_root: Path | None) -> None:
         store.defer(job['id'], str(exc))
         return
     except (Exception,) as exc:
+        if job['runtime'].get('swe') is not None:
+            invoked = _persisted_model_invoked(attempt, invoked)
         # A started model with unknown outcome is never automatically resubmitted.
         state = 'uncertain' if invoked and job['runtime']['adapter'] == 'codex' else 'failed'
-        if store.study(job['study'])['state'] == 'cancelled':
+        if store.study(job['study'])['state'] == 'cancelled' and not (
+            job['runtime'].get('swe') is not None and invoked
+        ):
             state = 'cancelled'
         store.finish(job['id'], state, usage_complete=not invoked or job['runtime']['adapter'] == 'command',
                      usage=0 if not invoked or job['runtime']['adapter'] == 'command' else None,
                      error=str(exc)[:800])
         if 'workspace' in locals():
-            from .env_pool import EnvironmentPool
-            pool = EnvironmentPool(Path(study['work']), store.root)
-            if state == 'uncertain':
-                pool.quarantine(workspace, str(exc))
+            if job['runtime'].get('swe') is not None:
+                if not invoked:
+                    from .swe_adapter import cleanup_job as cleanup_swe_job
+                    cleanup_swe_job(job['runtime'], attempt)
             else:
-                pool.release(workspace)
+                from .env_pool import EnvironmentPool
+                pool = EnvironmentPool(Path(study['work']), store.root)
+                if state == 'uncertain':
+                    pool.quarantine(workspace, str(exc))
+                else:
+                    pool.release(workspace)
 
 
 def settle(store: Store, job: dict, receipt: dict) -> None:
@@ -673,6 +795,9 @@ def settle(store: Store, job: dict, receipt: dict) -> None:
         raise EvoError('receipt identity does not match the persisted attempt')
     if receipt.get('attempt', job.get('attempt_seq', 1)) != job.get('attempt_seq', 1):
         raise EvoError('receipt attempt does not match the persisted attempt')
+    if job['runtime'].get('swe') is not None:
+        from .swe_adapter import cleanup_job as cleanup_swe_job
+        cleanup_swe_job(job['runtime'], store.root / 'jobs' / f'j{job["id"]}')
     store.finish(job['id'], 'awaiting_human' if receipt.get('awaiting_human') else 'completed',
                  receipt=f'jobs/j{job["id"]}/receipt.json', usage=receipt.get('usage'),
                  usage_complete=bool(receipt.get('usage_complete')))
@@ -729,7 +854,8 @@ def recover(store: Store, study: int, installed_codex_root: Path | None = None, 
             store.require_retryable_not_invoked(study, retry_not_invoked)
             prior = next(job for job in store.jobs(study) if job['id'] == retry_not_invoked)
             refreshed = dict(prior['plan'])
-            refreshed['execution_recipe'] = execution_recipe(prior['runtime']['adapter'], Path(store.study(study)['project']))
+            refreshed['execution_recipe'] = execution_recipe(
+                prior['runtime']['adapter'], Path(store.study(study)['project']), swe=prior['runtime'].get('swe') is not None)
             item = next(item for item in store.study(study)['spec']['evaluations']['items'] if item['id'] == refreshed['item'])
             refreshed['execution_identity'] = job_identity(store.study(study)['spec'], refreshed, item)
             attempt_root = store.root / 'jobs' / f'j{retry_not_invoked}'

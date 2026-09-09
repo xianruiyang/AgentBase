@@ -1056,15 +1056,16 @@ def prepare_candidate_metadata_root(workspace: Path) -> Path:
     return metadata
 
 
-def stage_candidate_metadata(
-    project_root: Path,
+def stage_candidate_task_context(
     state_root: Path,
     corpus: Mapping[str, Any],
     task_id: str,
     workspace: Path,
-    attempt_root: Path,
     dependency_values: Mapping[str, str],
+    *,
+    prompt_path: Path | None = None,
 ) -> dict[str, Any]:
+    """Stage the shared SWE task prompt and dependency runtime for any candidate surface."""
     metadata = prepare_candidate_metadata_root(workspace)
     instruction_source = task_asset_root(state_root, corpus, task_id) / "instruction.md"
     shutil.copy2(instruction_source, metadata / "task.md")
@@ -1083,18 +1084,40 @@ def stage_candidate_metadata(
         f"{public_checks}"
         f"{CANDIDATE_COMPLETION_INSTRUCTION}"
     )
-    prompt_path = attempt_root.resolve() / "candidate-prompt.txt"
-    write_text_atomic(prompt_path, prompt)
+    if prompt_path is not None:
+        write_text_atomic(prompt_path.resolve(), prompt)
+    task_runtime = dependency_runtime_projection(task, dependency_values)
+    return {
+        "metadata_root": str(metadata),
+        "prompt": prompt,
+        "prompt_path": str(prompt_path.resolve()) if prompt_path is not None else None,
+        "task_runtime": task_runtime,
+    }
+
+
+def stage_candidate_metadata(
+    project_root: Path,
+    state_root: Path,
+    corpus: Mapping[str, Any],
+    task_id: str,
+    workspace: Path,
+    attempt_root: Path,
+    dependency_values: Mapping[str, str],
+) -> dict[str, Any]:
+    task_context = stage_candidate_task_context(
+        state_root, corpus, task_id, workspace, dependency_values,
+        prompt_path=attempt_root.resolve() / "candidate-prompt.txt",
+    )
+    task_context.pop("prompt", None)
+    metadata = Path(task_context["metadata_root"])
     skill_projection = stage_candidate_skill_projection(
         project_root,
         workspace,
         metadata,
     )
     codex_projection = stage_candidate_codex_projection(project_root, workspace)
-    task_runtime = dependency_runtime_projection(task, dependency_values)
     return {
-        "metadata_root": str(metadata),
-        "prompt_path": str(prompt_path),
+        **task_context,
         "codex_projection": codex_projection,
         "skill_root_path": skill_projection["root"],
         "skill_probe_manifest_path": skill_projection["manifest_path"],
@@ -1103,7 +1126,6 @@ def stage_candidate_metadata(
             "projection_identity_sha256"
         ],
         "expected_skill_file_count": skill_projection["file_count"],
-        "task_runtime": task_runtime,
     }
 
 

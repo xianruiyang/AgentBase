@@ -298,6 +298,11 @@ PROJECTORS: dict[str, Callable[[dict[str, Any], int], dict[str, Any]]] = {
 
 
 def project_model(value: dict[str, Any], *, items: int = 20) -> dict[str, Any]:
+    if isinstance(value, dict) and value.get('schema') == 'agentbase-evo-swe-import/v1':
+        return {**_base(value['schema']), 'operation': 'swe-import',
+                **{key: value.get(key) for key in ('output', 'id', 'item_count', 'queued', 'executed')},
+                'groups': value.get('groups', [])[:items],
+                'omitted_groups': max(0, len(value.get('groups', [])) - items)}
     if isinstance(value, dict) and set(value) == {"limits"}:
         return _small_result(value, "init")
     if isinstance(value, dict) and set(value) == {"study"}:

@@ -56,6 +56,7 @@ class EvoCodexAdapterTests(unittest.TestCase):
                 "process_environment",
                 "timeout_seconds",
                 "cancel_check",
+                "task_runtime_bin",
             ],
         )
 
@@ -401,6 +402,9 @@ class EvoCodexAdapterTests(unittest.TestCase):
             (codex_home / "auth.json").write_text("{}\n", encoding="utf-8")
             executable = root / "codex.exe"
             executable.write_bytes(b"fixture")
+            # npm tasks use the prepared host toolchain rather than a workspace venv.
+            task_runtime_bin = root / "host-node-runtime"
+            task_runtime_bin.mkdir(parents=True)
             receipt = {
                 "schema": "agentbase.evo-codex-run/v1",
                 "status": "completed",
@@ -444,6 +448,7 @@ class EvoCodexAdapterTests(unittest.TestCase):
                     job={"combination": "combo", "item": "item"},
                     process_environment={"AGENTBASE_CODEX_EXECUTABLE_PATH": str(executable)},
                     timeout_seconds=60,
+                    task_runtime_bin=task_runtime_bin,
                 )
             self.assertEqual(result["status"], "completed")
             self.assertEqual(result["raw_receipt"], finalized)
@@ -451,6 +456,7 @@ class EvoCodexAdapterTests(unittest.TestCase):
             argv = popen.call_args.args[0]
             self.assertIn("gpt-test", argv)
             self.assertIn("agentbase.evo-codex-run/v1", argv)
+            self.assertEqual(argv[argv.index("-TaskRuntimeBinPath") + 1], str(task_runtime_bin))
 
 
 if __name__ == "__main__":
