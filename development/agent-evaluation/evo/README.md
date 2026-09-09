@@ -41,6 +41,28 @@ python.exe development/agent-evaluation/agent_eval.py evo score --spec developme
 
 超出声明式公式的计算使用 `calculate --manifest <calculator.json> --spec <research.json> --artifacts <facts.json> --output <derived.json> --allow-local-code`。manifest 的 `agentbase-evo-calculator/v1` 合同固定 `id/version`、代码相对路径与 SHA-256、`argv`、超时和输出上限；只有一个完整参数 `{calculator}` 被替换为代码路径。程序从标准输入读取冻结 JSON，返回声明的派生字段和 `input_rows` 来源。该入口会执行用户明确选中的本地代码。
 
+## 使用本地独立代码阅读题组
+
+`code-reading-import` 读取 `agentbase.code-reading-source/v1` 题目真源与已经准备好的独立工程副本，生成 `agentbase-evo-code-reading-catalog/v1` 目录。它不复制活跃项目、不排队、不调用模型，也不安装工程依赖。
+
+```powershell
+python.exe development/agent-evaluation/agent_eval.py evo code-reading-import --source C:/local/reading/questions.json --snapshot-root C:/local/reading/workspaces --output C:/local/reading/catalog.json
+python.exe development/agent-evaluation/agent_eval.py evo validate --spec C:/local/reading/catalog.json
+python.exe development/agent-evaluation/agent_eval.py evo plan --spec C:/local/reading/research.json
+```
+
+题目真源的顶层为 `schema/id/version/items/groups`。每个 item 包含 `id/family/workspace/prompt/answer_max_lines/required_locations`，可选 `supporting` 保存人工复核依据；`workspace` 相对 `snapshot-root`，不保存活跃项目的绝对路径。`required_locations` 支持仅 `path`、`path+line` 或 `path+start_line+end_line`，行号为 1-based、范围包含首尾；可选 `label` 只用于区分答案项。分组只有 `id/items`，激活、模型、协作容量、组件、观察指标和预算由独立研究配置持有。
+
+目录按每个工程冻结完整文件清单与内容指纹，同一工程供多题复用。修改题目在原 source 完成，修改工程形成新副本版本，再导入新目录；导入拒绝覆盖旧目录文件。真实题目、人工依据、工程与研究配置放在本地忽略目录，题面和答案不放入模型搜索的工程树。保留正常源码与工程上下文，排除构建缓存、宿主状态及历史题目/答案/评测材料；不能只挑出答案文件伪装成原工程搜索范围。
+
+研究沿用 `evaluations.catalog={"source":"catalog.json","sha256":"<catalog SHA-256>"}`，通过 `selection.groups` 选择组；目录不默认激活任何组。只做 validate/plan/score 可省略 runtime。实际 submit/run 使用既有 Codex adapter，并在独立运行配置中提供 `runtime.code_reading={"snapshot_root":"C:/local/reading/workspaces"}`，模型、预算、并发等字段沿用下文运行合同。state/work/安装目录不得与快照工程互相覆盖。
+
+模型在 Evo 独占槽位中运行，读取指定的冻结工程；快照根的规则文件作为题目数据，不由组合投影加载为运行配置。源工程不按每个作业复制，执行前后校验完整输入身份。该合同不声称对同一 Windows 用户下全部文件实施操作系统级隐藏；题目不得通过可见工程暴露答案，源码写入或身份漂移使结果无效，不能解释为模型零分。
+
+作答协议为一个 JSON 对象：`locations` 保存定位项，语义说明可放顶层 `explanation` 字符串。定位必须相对题目工程根，不能把 Evo 槽位当成相对基准。自动评分按匹配位置计数，重复相同位置去重；额外错误位置每处扣一个定位项，`reward=max(0,命中项数-额外错误项数)/必需项数`。完整通过要求全部命中且无额外错误。格式失败保留错误诊断及已消耗用量；辅助语义说明不进入自动分母，可通过既有人工评审入口单独判定。该结构化协议与历史自由文本协议有差异，必须分别版本化，不能直接混合成绩。
+
+结果复用 Evo 原有用量、公开轨迹、队列、恢复和自定义计算链，记录定位命中/分母、额外位置、通过情况与 reward。修改评分配置只重算已有事实，不重新调用模型。恢复只处理已经存在的作答及评分；没有可恢复作答时保留不确定状态，不自动补跑。
+
 ## 使用本地 Windows SWE 题组
 
 题组与评测配置分开维护。`swe-import` 只把既有 Windows SWE corpus 的题目身份、任务家族、固定输入版本、作答协议和 suite 映射生成独立的 `agentbase-evo-swe-catalog/v1` 目录。目录不包含模型、推理参数、组件选择、观察指标、激活状态、并发、预算或环境路径，也不复制题面、答案和补丁。
@@ -142,7 +164,7 @@ controller 只取得当前允许文件与开发反馈，返回 `agentbase-evo-pr
 
 ## 存储与可追溯边界
 
-源码、state root、work root、真实 Codex 根必须彼此分离。真实题目、模型轨迹、人工评分和账户数据仅保留本机；提交内容只有框架与合成例。
+源码、state root、work root、真实 Codex 根必须彼此分离。Git 只接收框架、schema、通用说明和合成测试；真实题目、答案、复制工程、实际研究/运行/评分配置、模型轨迹、评分结果和账户数据都只在本地。仓库内实际研究资产放在整体忽略的 `development/agent-evaluation/local/`，也可放仓库外；合成 fixture 不承载实际题目或本机配置。state/work 仍使用独立的仓库外路径，不能把被 Git 忽略解释为允许与受测工程或安装目录混用。
 
 | 内容 | 权威来源与生命周期 |
 | --- | --- |

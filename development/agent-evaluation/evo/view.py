@@ -298,6 +298,10 @@ PROJECTORS: dict[str, Callable[[dict[str, Any], int], dict[str, Any]]] = {
 
 
 def project_model(value: dict[str, Any], *, items: int = 20) -> dict[str, Any]:
+    if isinstance(value, dict) and value.get('schema') == 'agentbase-evo-code-reading-import/v1':
+        return {**_base(value['schema']), 'operation': 'code-reading-import',
+                **{key: value.get(key) for key in ('output', 'id', 'item_count', 'required_locations',
+                                                   'queued', 'executed')}}
     if isinstance(value, dict) and value.get('schema') == 'agentbase-evo-swe-import/v1':
         return {**_base(value['schema']), 'operation': 'swe-import',
                 **{key: value.get(key) for key in ('output', 'id', 'item_count', 'queued', 'executed')},
@@ -346,6 +350,7 @@ def render_model(value: dict[str, Any], limit: int = 1200) -> str:
         count //= 2
     projection = project_model(value, items=1)
     if projection.get("operation") in {"init", "submit", "validate", "save", "calculate", "grade-start", "grade-run",
+                                        "code-reading-import", "swe-import",
                                         "review-prepare", "review-sync", "evaluate", "optimization", "optimize-export"}:
         minimal = {"schema": projection["schema"], "operation": projection["operation"], "success": True, "recovery": RECOVERY}
         for key in ("study", "output", "valid"):

@@ -14,8 +14,8 @@ from .spec import EvoError, load_artifacts, load_spec, read_json
 
 
 def command_modules():
-    from . import calculator_cli, evaluate_cli, grading_cli, optimization_cli, review_cli, runtime_cli, swe_cli
-    return (runtime_cli, evaluate_cli, review_cli, calculator_cli, grading_cli, optimization_cli, swe_cli)
+    from . import calculator_cli, code_reading_cli, evaluate_cli, grading_cli, optimization_cli, review_cli, runtime_cli, swe_cli
+    return (runtime_cli, evaluate_cli, review_cli, calculator_cli, grading_cli, optimization_cli, swe_cli, code_reading_cli)
 
 
 def _write(value: str, output: Path | None) -> None:
@@ -58,6 +58,11 @@ def _checked_spec(path: Path) -> dict[str, Any]:
                 if runtime['adapter'] != 'codex':
                     raise EvoError('SWE task execution requires runtime.adapter=codex')
                 validate_binding(runtime, project_root=default_project_root())
+            if runtime.get('code_reading') is not None and runtime.get('adapter') is not None:
+                if runtime['adapter'] != 'codex':
+                    raise EvoError('code-reading task execution requires runtime.adapter=codex')
+                from .code_reading_adapter import validate_binding as validate_code_reading
+                validate_code_reading(runtime)
     except EvaluationError as exc:
         raise EvoError(str(exc)) from exc
     return spec
@@ -103,12 +108,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 value = module.handle(args)
                 if value is not None:
                     # These owners already write their explicit output artifact.
-                    _emit(value, args, already_written=args.action in {"calculate", "review-export", "review-merge", "grade-merge", "swe-import"})
+                    _emit(value, args, already_written=args.action in {"calculate", "review-export", "review-merge", "grade-merge", "swe-import", "code-reading-import"})
                 return 0
         if args.action == "validate":
             from .swe_catalog import CATALOG_SCHEMA, load_catalog
-            spec = (load_catalog(args.spec) if read_json(args.spec).get('schema') == CATALOG_SCHEMA
-                    else _checked_spec(args.spec))
+            from .code_reading_catalog import CATALOG_SCHEMA as CODE_READING_SCHEMA, load_catalog as load_code_reading_catalog
+            raw_schema = read_json(args.spec).get('schema')
+            spec = (load_catalog(args.spec) if raw_schema == CATALOG_SCHEMA else
+                    load_code_reading_catalog(args.spec) if raw_schema == CODE_READING_SCHEMA else _checked_spec(args.spec))
             _emit({"valid": True, "schema": spec["schema"], "id": spec["id"], "version": spec["version"]}, args)
         elif args.action == "plan":
             _ensure_distinct_output(args.output, [args.spec])

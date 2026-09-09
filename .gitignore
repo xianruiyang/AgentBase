@@ -47,6 +47,7 @@ development/skill-routing/evidence/pending/
 development/skill-routing/evidence/*.lock
 
 # Real evaluation data stays on this host; only frameworks and synthetic fixtures are shared.
+/development/agent-evaluation/local/
 development/agent-evaluation/corpus/*.json
 !development/agent-evaluation/corpus/schema.json
 development/agent-evaluation/windows-adapters/*.patch

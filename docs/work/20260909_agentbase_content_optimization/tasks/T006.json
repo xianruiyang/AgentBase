@@ -1,0 +1,41 @@
+{
+  "dependencies": [
+    {
+      "consumes": [
+        "Evo 正式运行和评分入口"
+      ],
+      "id": "T005",
+      "type": "hard"
+    }
+  ],
+  "id": "T006",
+  "mutation_scope": [
+    "development/agent-evaluation/**",
+    ".gitignore",
+    "docs/work/20260909_agentbase_content_optimization/**"
+  ],
+  "outcome": "阅读题与实际项目分离，冻结输入和校准答案由 Evo 运行及评分消费，实际数据与配置仅在本地",
+  "outputs": [
+    "通用代码阅读协议与本地独立题组"
+  ],
+  "reasoning_hint": null,
+  "revision": 1,
+  "schema": "task.record",
+  "source_ids": [
+    "REQ-014",
+    "UDES-003",
+    "CON-002",
+    "SOL-013"
+  ],
+  "suggested_skills": [],
+  "title": "独立代码阅读题接入 Evo",
+  "validation_dimensions": [
+    "路径/单行/范围",
+    "输入漂移",
+    "评分及恢复",
+    "数据与配置隔离"
+  ],
+  "verification": [
+    "合成首题经过实际适配器和评分器；私有题库静态校验；Git 边界；禁止真实模型评测"
+  ]
+}

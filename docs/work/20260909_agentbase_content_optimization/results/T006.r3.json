@@ -1,0 +1,59 @@
+{
+  "changed_files": [],
+  "evidence_for": [
+    "REQ-014",
+    "UDES-003",
+    "CON-002",
+    "DES-013",
+    "SOL-013"
+  ],
+  "evidence_refs": [
+    {
+      "kind": "interface-contract",
+      "ref": "development/agent-evaluation/evo/README.md"
+    },
+    {
+      "kind": "synthetic-verification",
+      "ref": "development/agent-evaluation/tests/test_evo_code_reading.py"
+    },
+    {
+      "kind": "verification-entry",
+      "ref": "development/agent-evaluation/test_agent_evaluation_infrastructure.ps1"
+    },
+    {
+      "kind": "local-only-recovery",
+      "ref": "development/agent-evaluation/local/code-reading-v1/README.md"
+    },
+    {
+      "kind": "local-only-static-evidence",
+      "ref": "development/agent-evaluation/local/code-reading-v1/static-audit.json"
+    }
+  ],
+  "invalidated_source_ids": [],
+  "outcome": "独立代码阅读题已接入 Evo；实际题库、冻结工程和研究配置只留本地，Git 仅包含框架、通用说明与合成测试。",
+  "outputs": [
+    "正式 code-reading-import 入口和统一 evaluations.catalog 接入",
+    "独立工程快照、经源码复核的题目与本地研究配置",
+    "既有 Codex 运行、用量、公开轨迹、定位评分及恢复链接入"
+  ],
+  "schema": "task.result",
+  "source_snapshot_ref": "sha256:93366c17c187f7c92aac7d1641ba1cba93bf6ff0c978203ec7fa413d1091276d",
+  "task_id": "T006",
+  "task_revision": 1,
+  "unresolved": [
+    "未运行真实模型评测，不声明模型行为或新旧作答协议成绩等价；实际运行仍需在本地研究配置中明确选择组件、模型和预算。未执行 Deploy 或 Release。"
+  ],
+  "validation_coverage": [
+    "路径、单行、完整范围及重复/额外/非法定位作答",
+    "真实传入启动器并落盘的提示词与冻结工程指向",
+    "输入漂移、入口 junction 和域绑定冲突",
+    "已有作答恢复评分、缺失作答保持不确定并保留已知用量，均不重新调用模型",
+    "SWE 目录兼容、目录指纹先于 schema 分派验证",
+    "独立复制及真实数据和配置的 Git 隔离"
+  ],
+  "verification": [
+    "test_agent_evaluation_infrastructure.ps1：196 项通过，正式入口禁用模型 evaluator；模型传输仅由合成测试替代",
+    "本地目录与冻结源码重新核对通过；Evo plan 生成九项计划而不排队执行",
+    "Git 忽略范围覆盖实际题目、答案、复制工程及研究配置；候选框架与文档未发现本机用户路径或真实项目题目内容"
+  ]
+}

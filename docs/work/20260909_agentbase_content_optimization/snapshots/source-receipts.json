@@ -5,14 +5,16 @@
     "source-T002-1": "sha256:f0d921129f71fea76eeeca4002b5f85a6234f72934ebedf4a92c33acd261b768",
     "source-T003-1": "sha256:c997c90c4fed92383f57545d64472df7022974bb093167b1ae9010ffbc0b89f7",
     "source-T004-1": "sha256:0e6df79fb822bc2f32d10eead33746293de8c51a6b345a4e7883fbfc407a1918",
-    "source-T005-1": "sha256:dd35cdd7ff3146ced7536fac90078086938de10c60a34977422bd5b6ac5cbe9b"
+    "source-T005-1": "sha256:dd35cdd7ff3146ced7536fac90078086938de10c60a34977422bd5b6ac5cbe9b",
+    "source-T006-1": "sha256:93366c17c187f7c92aac7d1641ba1cba93bf6ff0c978203ec7fa413d1091276d"
   },
   "next_by_task": {
     "T001": 3,
     "T002": 2,
     "T003": 2,
     "T004": 2,
-    "T005": 2
+    "T005": 2,
+    "T006": 2
   },
   "schema": "task.source-receipts"
 }

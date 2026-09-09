@@ -124,7 +124,7 @@ def execution_sources(spec: dict, job: dict, project: Path, roots: list[Path]) -
     return sources
 
 
-def execution_recipe(adapter: str, project: Path, *, swe: bool = False) -> dict:
+def execution_recipe(adapter: str, project: Path, *, swe: bool = False, code_reading: bool = False) -> dict:
     paths = [Path(__file__).with_name('env_pool.py')]
     if adapter == 'codex':
         evaluation_root = Path(__file__).resolve().parent.parent
@@ -133,6 +133,9 @@ def execution_recipe(adapter: str, project: Path, *, swe: bool = False) -> dict:
         if swe:
             paths.extend([Path(__file__).with_name('swe_adapter.py'), evaluation_root / 'evaluation_core.py',
                           evaluation_root / 'windows_verifier.py', evaluation_root / 'agent_eval.py'])
+        if code_reading:
+            paths.extend([Path(__file__).with_name('code_reading_adapter.py'),
+                          Path(__file__).with_name('code_reading_catalog.py')])
     files = []
     for path in paths:
         if not path.is_file():
@@ -175,12 +178,21 @@ def submit(store: Store, spec_path: Path, project: Path, work: Path) -> int:
             validate_argv(runtime.get('argv'))
         elif not all(isinstance(runtime.get(k), str) and runtime[k] for k in ('model', 'reasoning_effort')):
             raise EvoError('Codex model and reasoning_effort must be explicitly selected in runtime')
+        if runtime.get('swe') is not None and runtime.get('code_reading') is not None:
+            raise EvoError('runtime cannot combine SWE and code-reading domain bindings')
         if runtime.get('swe') is not None:
             if runtime['adapter'] != 'codex':
                 raise EvoError('runtime.swe requires runtime.adapter=codex')
             from .swe_adapter import validate_runtime as validate_swe_runtime
             runtime['swe'] = validate_swe_runtime(runtime, project_root=project, evo_state_root=store.root,
                                                    evo_work_root=work)
+        if runtime.get('code_reading') is not None:
+            if runtime['adapter'] != 'codex':
+                raise EvoError('runtime.code_reading requires runtime.adapter=codex')
+            from .code_reading_adapter import validate_binding as validate_code_reading
+            runtime['code_reading'] = validate_code_reading(runtime)
+            from .code_reading_adapter import validate_roots as validate_code_reading_roots
+            validate_code_reading_roots(runtime['code_reading'], state_root=store.root, work_root=work)
         files = runtime.get('files', [])
         if not isinstance(files, list):
             raise EvoError('runtime.files must be an array')
@@ -195,7 +207,8 @@ def submit(store: Store, spec_path: Path, project: Path, work: Path) -> int:
         job['runtime'] = runtime
         roots = candidate_roots(store, runtime, project, work)
         job['source_inventory'] = execution_sources(spec, job, project, roots)
-        job['execution_recipe'] = execution_recipe(runtime['adapter'], project, swe=runtime.get('swe') is not None)
+        job['execution_recipe'] = execution_recipe(runtime['adapter'], project, swe=runtime.get('swe') is not None,
+                                                   code_reading=runtime.get('code_reading') is not None)
         job['execution_identity'] = job_identity(spec, job, item)
     return store.submit(spec, jobs, project, work)
 
@@ -609,6 +622,26 @@ def _complete_from_raw(store: Store, study: dict, job: dict, installed_codex_roo
         immutable_json(attempt / 'receipt.json', receipt)
         settle(store, job, receipt)
         return True
+    if job['runtime'].get('code_reading') is not None:
+        from .code_reading_adapter import grade_attempt
+        item = next(item for item in study['spec']['evaluations']['items'] if item['id'] == job['plan']['item'])
+        graded = grade_attempt(item, job['runtime']['code_reading'], attempt / 'codex-logs' / 'last-message.txt')
+        receipt = {
+            'schema': 'agentbase-evo-run/v1', 'execution_identity': job['identity'],
+            'attempt': job.get('attempt_seq', 1), 'job': job['id'], 'study': job['study'],
+            'codex': raw, 'code_reading': graded['score'], 'subject_seconds': raw.get('duration_seconds', 0),
+            'values': graded['values'], 'usage': raw.get('usage', {}).get('total_tokens'),
+            'usage_complete': bool(raw.get('usage_complete')),
+        }
+        receipt['trace'] = recovered_trace if recovered_trace is not None else {
+            'schema': 'agentbase.evo-codex-trace/v1', 'capability': 'unavailable', 'observed': [],
+            'missing': ['recover requires installed Codex root to rebuild trace'], 'private_reasoning_archived': False,
+        }
+        receipt['awaiting_human'] = bool(job['runtime'].get('rubric'))
+        receipt['facts'] = _facts(study, job, receipt)
+        immutable_json(attempt / 'receipt.json', receipt)
+        settle(store, job, receipt)
+        return True
     receipt: dict[str, Any] = {
         'schema': 'agentbase-evo-run/v1', 'execution_identity': job['identity'],
         'job': job['id'], 'study': job['study'], 'codex': raw,
@@ -685,6 +718,12 @@ def execute(store: Store, job: dict, installed_codex_root: Path | None) -> None:
             workspace = Path(swe_state['workspace'])
         else:
             workspace = prepare_workspace(store, study, job)
+            if runtime.get('code_reading') is not None:
+                from .code_reading_adapter import validate_binding as validate_code_reading, validate_roots as validate_code_reading_roots
+                if validate_code_reading(runtime) != runtime['code_reading']:
+                    raise EvoError('frozen code-reading snapshot changed since submit')
+                validate_code_reading_roots(runtime['code_reading'], state_root=store.root,
+                                            work_root=Path(study['work']), installed_codex_root=installed_codex_root)
         store.phase(job['id'], 'running')
         if cancelled():
             raise EvoError('cancelled before subject launch')
@@ -708,6 +747,12 @@ def execute(store: Store, job: dict, installed_codex_root: Path | None) -> None:
                 if runtime.get('swe') is not None:
                     codex_spec, codex_plan = _swe_codex_inputs(study, job, swe_state)
                     task_options['task_runtime_bin'] = Path(swe_state['task_runtime']['bin_directory'])
+                elif runtime.get('code_reading') is not None:
+                    from .code_reading_adapter import subject_prompt
+                    codex_spec = copy.deepcopy(study['spec'])
+                    item = next(item for item in codex_spec['evaluations']['items'] if item['id'] == job['plan']['item'])
+                    # The Codex adapter gives an item prompt precedence over a runtime prompt.
+                    item['prompt'] = subject_prompt(item, runtime['code_reading'])
                 result = run_codex_job(project_root=Path(study['project']), workspace=workspace, attempt_root=attempt,
                                        installed_codex_root=installed_codex_root, spec=codex_spec, job=codex_plan,
                                        process_environment=os.environ, timeout_seconds=runtime['timeout_seconds'],
@@ -748,6 +793,12 @@ def execute(store: Store, job: dict, installed_codex_root: Path | None) -> None:
                 )
                 receipt['swe'] = swe_result
                 receipt['values'] = swe_result['values']
+            elif runtime.get('code_reading') is not None:
+                from .code_reading_adapter import grade_attempt
+                item = next(item for item in study['spec']['evaluations']['items'] if item['id'] == job['plan']['item'])
+                graded = grade_attempt(item, runtime['code_reading'], attempt / 'codex-logs' / 'last-message.txt')
+                receipt['code_reading'] = graded['score']
+                receipt['values'] = graded['values']
             elif (verifier := runtime.get('verifier')):
                 argv = validate_argv(verifier['argv'])
                 answer = attempt / 'codex-logs' / 'last-message.txt'
@@ -765,16 +816,28 @@ def execute(store: Store, job: dict, installed_codex_root: Path | None) -> None:
         store.defer(job['id'], str(exc))
         return
     except (Exception,) as exc:
-        if job['runtime'].get('swe') is not None:
+        if job['runtime'].get('swe') is not None or job['runtime'].get('code_reading') is not None:
             invoked = _persisted_model_invoked(attempt, invoked)
+        failure_usage = None
+        failure_usage_complete = False
+        if invoked and job['runtime'].get('code_reading') is not None:
+            try:
+                persisted_raw = read_json(attempt / 'codex-result.json')
+                failure_usage = persisted_raw.get('usage', {}).get('total_tokens')
+                failure_usage_complete = bool(persisted_raw.get('usage_complete'))
+            except Exception:
+                pass
         # A started model with unknown outcome is never automatically resubmitted.
         state = 'uncertain' if invoked and job['runtime']['adapter'] == 'codex' else 'failed'
         if store.study(job['study'])['state'] == 'cancelled' and not (
             job['runtime'].get('swe') is not None and invoked
         ):
             state = 'cancelled'
-        store.finish(job['id'], state, usage_complete=not invoked or job['runtime']['adapter'] == 'command',
-                     usage=0 if not invoked or job['runtime']['adapter'] == 'command' else None,
+        store.finish(job['id'], state,
+                     usage_complete=(failure_usage_complete if invoked and job['runtime'].get('code_reading') is not None
+                                     else not invoked or job['runtime']['adapter'] == 'command'),
+                     usage=(failure_usage if invoked and job['runtime'].get('code_reading') is not None
+                            else 0 if not invoked or job['runtime']['adapter'] == 'command' else None),
                      error=str(exc)[:800])
         if 'workspace' in locals():
             if job['runtime'].get('swe') is not None:
@@ -855,7 +918,9 @@ def recover(store: Store, study: int, installed_codex_root: Path | None = None, 
             prior = next(job for job in store.jobs(study) if job['id'] == retry_not_invoked)
             refreshed = dict(prior['plan'])
             refreshed['execution_recipe'] = execution_recipe(
-                prior['runtime']['adapter'], Path(store.study(study)['project']), swe=prior['runtime'].get('swe') is not None)
+                prior['runtime']['adapter'], Path(store.study(study)['project']),
+                swe=prior['runtime'].get('swe') is not None,
+                code_reading=prior['runtime'].get('code_reading') is not None)
             item = next(item for item in store.study(study)['spec']['evaluations']['items'] if item['id'] == refreshed['item'])
             refreshed['execution_identity'] = job_identity(store.study(study)['spec'], refreshed, item)
             attempt_root = store.root / 'jobs' / f'j{retry_not_invoked}'
@@ -890,7 +955,17 @@ def recover(store: Store, study: int, installed_codex_root: Path | None = None, 
                     if not _complete_from_raw(store, store.study(study), job, installed_codex_root):
                         store.finish(job['id'], 'uncertain', error='No final receipt; inspect owned process and raw artifacts. Recovery does not launch a model.')
                 except Exception as exc:
-                    store.finish(job['id'], 'uncertain', error=f'Post-model recovery failed without rerunning the model: {str(exc)[:700]}')
+                    usage = None
+                    usage_complete = False
+                    try:
+                        persisted_raw = read_json(raw_path)
+                        if persisted_raw.get('model_invoked') is True:
+                            usage = persisted_raw.get('usage', {}).get('total_tokens')
+                            usage_complete = bool(persisted_raw.get('usage_complete'))
+                    except Exception:
+                        pass
+                    store.finish(job['id'], 'uncertain', usage=usage, usage_complete=usage_complete,
+                                 error=f'Post-model recovery failed without rerunning the model: {str(exc)[:700]}')
             else:
                 store.finish(job['id'], 'uncertain', error='No final receipt; inspect owned process and raw artifacts. Recovery does not launch a model.')
     return store.status(study)

@@ -1,0 +1,286 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from pathlib import Path
+from unittest import mock
+
+EVALUATION_ROOT = Path(__file__).resolve().parents[1]
+if str(EVALUATION_ROOT) not in sys.path:
+    sys.path.insert(0, str(EVALUATION_ROOT))
+
+from evo.cli import main
+from evo.code_reading_adapter import score_answer, validate_binding
+from evo.code_reading_catalog import import_catalog, snapshot_inventory
+from evo.runtime import artifacts, recover, run, submit
+from evo.scoring import score_artifacts
+from evo.spec import EvoError, load_spec
+from evo.store import Store
+
+
+class EvoCodeReadingTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name).resolve()
+        self.project = self.root / 'project'
+        self.snapshot_root = self.project / 'local' / 'workspaces'
+        self.workspace = self.snapshot_root / 'sample'
+        self.workspace.mkdir(parents=True)
+        (self.workspace / 'src').mkdir()
+        (self.workspace / 'src' / 'value.py').write_text('def value():\n    return 1\n', encoding='utf-8')
+        self.source = self.root / 'questions.json'
+        self.source.write_text(json.dumps({
+            'schema': 'agentbase.code-reading-source/v1', 'id': 'synthetic-reading', 'version': '1',
+            'items': [{'id': 'find-value', 'family': 'python', 'workspace': 'sample',
+                       'prompt': 'Locate value.', 'answer_max_lines': 3,
+                       'required_locations': [
+                           {'path': 'src/value.py'}, {'path': 'src/value.py', 'line': 1},
+                           {'path': 'src/value.py', 'start_line': 1, 'end_line': 2}],
+                       'supporting': ['value returns one']}],
+            'groups': [{'id': 'all', 'items': ['find-value']}],
+        }), encoding='utf-8')
+
+    def _catalog(self) -> Path:
+        path = self.root / 'catalog.json'
+        value = import_catalog(self.source, self.snapshot_root)
+        path.write_text(json.dumps(value), encoding='utf-8')
+        return path
+
+    def _spec(self, catalog: Path) -> tuple[Path, dict]:
+        digest = hashlib.sha256(catalog.read_bytes()).hexdigest()
+        spec = {
+            'schema': 'agentbase-evo-research/v1', 'id': 'reading-run', 'version': '1',
+            'components': {kind: [] for kind in ('agents_md', 'skills', 'hooks', 'mcp', 'tools', 'agents', 'codex_settings')},
+            'combinations': [{'id': 'empty', 'members': {}}],
+            'runtime': {'adapter': 'codex', 'model': 'synthetic', 'reasoning_effort': 'low',
+                        'max_agents': 1, 'token_reservation': 100,
+                        'code_reading': {'snapshot_root': str(self.snapshot_root)}},
+            'evaluations': {'catalog': {'source': str(catalog), 'sha256': digest},
+                            'observations': ['quality.required_found', 'quality.required_total',
+                                             'quality.extra_locations', 'quality.passed', 'quality.reward']},
+            'fields': [
+                {'id': 'quality.required_found', 'type': 'integer', 'unit': 'count', 'grain': 'attempt', 'source': 'location grader'},
+                {'id': 'quality.required_total', 'type': 'integer', 'unit': 'count', 'grain': 'attempt', 'source': 'location grader'},
+                {'id': 'quality.extra_locations', 'type': 'integer', 'unit': 'count', 'grain': 'attempt', 'source': 'location grader'},
+                {'id': 'quality.passed', 'type': 'boolean', 'unit': 'flag', 'grain': 'attempt', 'source': 'location grader'},
+                {'id': 'quality.reward', 'type': 'number', 'unit': 'ratio', 'grain': 'attempt', 'source': 'location grader'},
+            ],
+            'scoring': [{'id': 'quality', 'version': '1', 'metrics': [
+                {'id': 'reward', 'unit': 'ratio', 'expression': {'aggregate': 'mean', 'field': 'quality.reward'}}]}],
+            'selection': {'combinations': ['empty'], 'groups': ['all'], 'replicates': 1},
+            'budget': {'concurrency': 1, 'max_tokens': 1000},
+        }
+        path = self.project / 'research.json'
+        path.write_text(json.dumps(spec), encoding='utf-8')
+        return path, spec
+
+    def test_import_validate_and_plan_one_frozen_snapshot(self) -> None:
+        catalog = self.root / 'catalog.json'
+        imported = StringIO()
+        with redirect_stdout(imported):
+            self.assertEqual(main(['code-reading-import', '--source', str(self.source), '--snapshot-root',
+                                   str(self.snapshot_root), '--output', str(catalog)]), 0)
+        projection = json.loads(imported.getvalue())
+        self.assertEqual((projection['operation'], projection['item_count'], projection['required_locations']),
+                         ('code-reading-import', 1, 3))
+        spec_path, _ = self._spec(catalog)
+        self.assertEqual(main(['validate', '--spec', str(spec_path), '--view', 'machine']), 0)
+        output = StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main(['plan', '--spec', str(spec_path), '--view', 'machine']), 0)
+        self.assertEqual(len(json.loads(output.getvalue())['jobs']), 1)
+        loaded = load_spec(spec_path)
+        self.assertEqual(loaded['evaluations']['items'][0]['required_locations'][0], {'path': 'src/value.py'})
+
+    def test_queue_stub_transport_uses_real_location_grader_and_score(self) -> None:
+        catalog = self._catalog()
+        spec_path, _ = self._spec(catalog)
+        state, work, codex = self.root / 'state', self.root / 'work', self.root / 'codex'
+        codex.mkdir(); (codex / 'auth.json').write_text('{}', encoding='utf-8')
+        store = Store(state); store.initialize(concurrency=1, model_capacity=1, max_disk_mb=64, min_free_mb=1)
+        study = submit(store, spec_path, self.project, work)
+        def transport(**kwargs):
+            selected = next(item for item in kwargs['spec']['evaluations']['items'] if item['id'] == 'find-value')
+            self.assertIn(str(self.workspace.resolve()), selected['prompt'])
+            self.assertIn('Return exactly one JSON object', selected['prompt'])
+            logs = kwargs['attempt_root'] / 'codex-logs'; logs.mkdir(parents=True)
+            (logs / 'last-message.txt').write_text(json.dumps({'locations': [
+                {'path': 'src/value.py'}, {'path': 'src/value.py', 'line': 1},
+                {'path': 'src/value.py', 'start_line': 1, 'end_line': 2}]}), encoding='utf-8')
+            raw = {'schema': 'agentbase.evo-codex-run/v1', 'status': 'completed', 'model_invoked': True,
+                   'duration_seconds': .1, 'usage': {'total_tokens': 7}, 'usage_complete': True}
+            return {'status': 'completed', 'model_invoked': True, 'raw_receipt': raw,
+                    'trace': {'schema': 'agentbase.evo-codex-trace/v1'}, 'projection': {}}
+        with mock.patch.dict(os.environ, {'AGENT_EVALUATION_DISABLE_MODEL': '0',
+                                          'AGENTBASE_AGENT_EVALUATOR_DISABLED': '0'}), \
+                mock.patch('evo.codex_adapter.run_codex_job', side_effect=transport):
+            status = run(store, study=study, installed_codex_root=codex)
+        self.assertEqual(status['counts'], {'completed': 1})
+        facts = artifacts(store, study)
+        self.assertEqual(facts['rows'][0]['values']['quality.required_found'], 3)
+        self.assertEqual(facts['rows'][0]['values']['quality.extra_locations'], 0)
+        self.assertTrue(facts['rows'][0]['values']['quality.passed'])
+        self.assertEqual(facts['rows'][0]['values']['quality.reward'], 1)
+        score = score_artifacts(load_spec(spec_path), facts)
+        self.assertEqual(score['scores'][0]['groups'][0]['metrics'][0]['value'], 1)
+
+    def test_codex_adapter_persists_the_selected_task_prompt(self) -> None:
+        from evo import codex_adapter
+        workspace, attempt, codex = self.root / 'slot', self.root / 'attempt', self.root / 'installed'
+        for path in (workspace, attempt, codex):
+            path.mkdir()
+        (codex / 'auth.json').write_text('{}', encoding='utf-8')
+        executable = self.root / 'codex.exe'; executable.write_bytes(b'fixture')
+        prompt = 'read frozen snapshot and return strict JSON'
+        spec = {'runtime': {'adapter': 'codex', 'model': 'synthetic', 'reasoning_effort': 'low'},
+                'components': {}, 'combinations': [{'id': 'empty', 'members': {}}],
+                'evaluations': {'items': [{'id': 'reading', 'prompt': prompt,
+                                           'runtime': {'prompt': 'must not win'}}]}}
+        raw = {'schema': 'agentbase.evo-codex-run/v1', 'status': 'completed', 'model_invoked': True,
+               'usage': {'total_tokens': 1}, 'usage_complete': True}
+        class Process:
+            returncode = 0
+            def poll(self): return 0
+        def start(*_args, **_kwargs):
+            (attempt / 'codex-result.json').write_text(json.dumps(raw), encoding='utf-8')
+            return Process()
+        with (mock.patch.dict(os.environ, {'AGENTBASE_AGENT_EVALUATOR_DISABLED': '0'}),
+              mock.patch.object(codex_adapter.agentbase_codex, 'stage_codex_component_projection',
+                                return_value={'hooks_enabled': False, 'tool_paths': []}),
+              mock.patch.object(codex_adapter, '_codex_preflight', return_value={}),
+              mock.patch.object(codex_adapter.agentbase_codex, 'candidate_rollout_snapshot', return_value={}),
+              mock.patch.object(codex_adapter, 'recover_codex_artifacts',
+                                return_value={'raw_receipt': raw, 'trace': {}}),
+              mock.patch.object(codex_adapter.subprocess, 'Popen', side_effect=start)):
+            result = codex_adapter.run_codex_job(
+                project_root=self.project, workspace=workspace, attempt_root=attempt,
+                installed_codex_root=codex, spec=spec, job={'combination': 'empty', 'item': 'reading'},
+                process_environment={'AGENTBASE_CODEX_EXECUTABLE_PATH': str(executable)}, timeout_seconds=60)
+        self.assertEqual(result['status'], 'completed')
+        self.assertEqual((attempt / 'candidate-prompt.txt').read_text(encoding='utf-8'), prompt)
+
+    def test_completed_raw_recovers_answer_without_calling_model(self) -> None:
+        catalog = self._catalog(); spec_path, _ = self._spec(catalog)
+        store = Store(self.root / 'state')
+        store.initialize(concurrency=1, model_capacity=1, max_disk_mb=64, min_free_mb=1)
+        study = submit(store, spec_path, self.project, self.root / 'work')
+        job = store.claim(study); self.assertIsNotNone(job)
+        attempt = store.root / 'jobs' / f"j{job['id']}"
+        store.phase(job['id'], 'running')
+        (attempt / 'codex-logs').mkdir(parents=True)
+        (attempt / 'codex-logs' / 'last-message.txt').write_text(json.dumps({'locations': [
+            {'path': 'src/value.py'}, {'path': 'src/value.py', 'line': 1},
+            {'path': 'src/value.py', 'start_line': 1, 'end_line': 2}]}), encoding='utf-8')
+        raw = {'schema': 'agentbase.evo-codex-run/v1', 'status': 'completed', 'model_invoked': True,
+               'duration_seconds': .1, 'usage': {'total_tokens': 9}, 'usage_complete': True}
+        (attempt / 'codex-result.json').write_text(json.dumps(raw), encoding='utf-8')
+        with mock.patch('evo.codex_adapter.run_codex_job', side_effect=AssertionError('model rerun')) as launch:
+            result = recover(store, study)
+        launch.assert_not_called()
+        self.assertEqual(result['counts'], {'completed': 1})
+        self.assertEqual(store.jobs(study)[0]['usage'], 9)
+
+    def test_completed_raw_missing_answer_stays_uncertain_with_usage(self) -> None:
+        catalog = self._catalog(); spec_path, _ = self._spec(catalog)
+        store = Store(self.root / 'state')
+        store.initialize(concurrency=1, model_capacity=1, max_disk_mb=64, min_free_mb=1)
+        study = submit(store, spec_path, self.project, self.root / 'work')
+        job = store.claim(study); self.assertIsNotNone(job)
+        attempt = store.root / 'jobs' / f"j{job['id']}"; attempt.mkdir(parents=True)
+        store.phase(job['id'], 'running')
+        raw = {'schema': 'agentbase.evo-codex-run/v1', 'status': 'completed', 'model_invoked': True,
+               'usage': {'total_tokens': 11}, 'usage_complete': True}
+        (attempt / 'codex-result.json').write_text(json.dumps(raw), encoding='utf-8')
+        with mock.patch('evo.codex_adapter.run_codex_job', side_effect=AssertionError('model rerun')) as launch:
+            result = recover(store, study)
+        launch.assert_not_called()
+        self.assertEqual(result['counts'], {'uncertain': 1})
+        recovered = store.jobs(study)[0]
+        self.assertEqual((recovered['usage'], recovered['usage_complete']), (11, True))
+
+    def test_location_grammar_deduplicates_and_rejects_bad_ranges(self) -> None:
+        item = {'required_locations': [{'path': 'a.py'}, {'path': 'a.py', 'line': 2}]}
+        result = score_answer(item, json.dumps({'locations': [
+            {'path': 'a.py'}, {'path': 'a.py'}, {'path': 'a.py', 'line': 2}, {'path': 'extra.py'}]}))
+        self.assertEqual((result['required_found'], result['required_total'], result['extra_count'], result['reward']),
+                         (2, 2, 1, .5))
+        self.assertFalse(result['passed'])
+        invalid = score_answer(item, json.dumps({'locations': [
+            {'path': 'a.py', 'start_line': 3, 'end_line': 2}]}))
+        self.assertEqual((invalid['valid'], invalid['reward']), (False, 0))
+        self.assertIn('range', invalid['format_error'])
+        malformed = score_answer(item, '{not-json')
+        self.assertEqual((malformed['valid'], malformed['required_total'], malformed['reward']), (False, 2, 0))
+
+    def test_import_rejects_duplicate_required_semantics_even_when_labels_differ(self) -> None:
+        value = json.loads(self.source.read_text(encoding='utf-8'))
+        value['items'][0]['required_locations'] = [
+            {'path': 'src/value.py', 'line': 1, 'label': 'primary'},
+            {'path': 'src/value.py', 'line': 1, 'label': 'supporting'},
+        ]
+        self.source.write_text(json.dumps(value), encoding='utf-8')
+        with self.assertRaisesRegex(EvoError, 'duplicate location'):
+            import_catalog(self.source, self.snapshot_root)
+
+    def test_import_rejects_empty_family_and_submit_rejects_two_domain_bindings(self) -> None:
+        source = json.loads(self.source.read_text(encoding='utf-8'))
+        source['items'][0]['family'] = ''
+        self.source.write_text(json.dumps(source), encoding='utf-8')
+        with self.assertRaisesRegex(EvoError, 'family/prompt/answer_max_lines'):
+            import_catalog(self.source, self.snapshot_root)
+        source['items'][0]['family'] = 'python'
+        self.source.write_text(json.dumps(source), encoding='utf-8')
+        catalog = self._catalog(); spec_path, spec = self._spec(catalog)
+        spec['runtime']['swe'] = {}
+        spec_path.write_text(json.dumps(spec), encoding='utf-8')
+        store = Store(self.root / 'state')
+        store.initialize(concurrency=1, model_capacity=1, max_disk_mb=64, min_free_mb=1)
+        with self.assertRaisesRegex(EvoError, 'cannot combine SWE and code-reading'):
+            submit(store, spec_path, self.project, self.root / 'work')
+
+    def test_import_checks_lines_without_decoding_snapshot_source(self) -> None:
+        binary = self.workspace / 'src' / 'legacy.cpp'
+        binary.write_bytes(b'one\r\nlegacy-\x96-byte\r\n')
+        value = json.loads(self.source.read_text(encoding='utf-8'))
+        value['items'][0]['required_locations'] = [
+            {'path': 'src/legacy.cpp', 'line': 2},
+            {'path': 'src/legacy.cpp', 'start_line': 1, 'end_line': 2},
+        ]
+        self.source.write_text(json.dumps(value), encoding='utf-8')
+        self.assertEqual(len(import_catalog(self.source, self.snapshot_root)['items'][0]['required_locations']), 2)
+        value['items'][0]['required_locations'][1]['end_line'] = 3
+        self.source.write_text(json.dumps(value), encoding='utf-8')
+        with self.assertRaisesRegex(EvoError, 'outside the frozen source'):
+            import_catalog(self.source, self.snapshot_root)
+
+    def test_snapshot_change_blocks_binding_before_or_after_subject(self) -> None:
+        frozen = snapshot_inventory(self.workspace)
+        binding = {'snapshot_root': str(self.snapshot_root), 'workspace': 'sample', 'snapshot': frozen}
+        self.assertEqual(validate_binding({'code_reading': binding}), binding)
+        (self.workspace / 'src' / 'value.py').write_text('changed\n', encoding='utf-8')
+        with self.assertRaisesRegex(EvoError, 'differs'):
+            validate_binding({'code_reading': binding})
+
+    def test_snapshot_inventory_rejects_a_junction_entrypoint(self) -> None:
+        link = self.root / 'snapshot-junction'
+        created = subprocess.run(['cmd.exe', '/d', '/c', 'mklink', '/J', str(link), str(self.workspace)],
+                                 capture_output=True, text=True)
+        if created.returncode != 0:
+            self.skipTest(f'junction fixture unavailable: {created.stderr.strip()}')
+        try:
+            with self.assertRaisesRegex(EvoError, 'must not be a link'):
+                snapshot_inventory(link)
+        finally:
+            link.rmdir()
+
+
+if __name__ == '__main__':
+    unittest.main()

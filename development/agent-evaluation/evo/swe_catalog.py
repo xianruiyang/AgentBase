@@ -80,6 +80,13 @@ def resolve_catalog(spec: dict, spec_path: Path) -> dict:
     if not all(isinstance(binding[key], str) and binding[key] for key in ('source', 'sha256')):
         raise EvoError('catalog source and sha256 must be nonempty strings')
     path = (spec_path.parent / binding['source']).resolve()
+    try:
+        if sha256_file(path) != binding['sha256']:
+            raise EvoError('catalog changed; update the explicit research catalog binding')
+    except OSError as exc:
+        raise EvoError(f'catalog binding is unavailable: {exc}') from exc
+    if read_json(path).get('schema') != CATALOG_SCHEMA:
+        return spec
     runtime = spec.get('runtime', {})
     if not isinstance(runtime, dict):
         raise EvoError('research runtime must be an object')
