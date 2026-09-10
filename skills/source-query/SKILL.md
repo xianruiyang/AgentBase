@@ -1,6 +1,6 @@
 ---
 name: source-query
-description: 仅在 srcq 分页或截断阻断当前必要证据，需诊断 srcq 当前能力、错误或降级是否为产品缺陷，需取得定义、引用或有界调用候选，需实际执行 AST rule/rewrite 或 srcq machine/native/artifact 与 scc 定向投影，文本仍不能确定完整语法边界或结构关系，或快速候选后真实符号语义仍有歧义时使用；AST 无匹配后尚缺能改变下一次查询的源码证据时先回到普通文本或有界读取，不触发本 skill；普通 rg/fd/scc、hyperfine、规则审查或工具名提及也不触发。
+description: 用于 srcq 必要结果的分页恢复、缺陷诊断、特殊输出/统计投影、明确的 AST rule/rewrite，或普通文本与已知正文不足后的定义/引用/调用候选、语法结构和精确符号查询。普通 rg/fd/scc、有界文件读取、hyperfine、规则审查不触发；任务需要找定义不等于文本已经不足。AST 无匹配且无新增源码线索时先回到文本，不盲目重试。
 ---
 
 # Source Query

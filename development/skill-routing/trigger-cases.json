@@ -90,11 +90,11 @@
     "evidence_checkpoint_before_continue": "反例改变失效范围、当前消费者或下一动作时，先停止依赖工作并把反例、失效来源、当前验证 case 和下一动作写回已有 owner，再重新裁决和继续。",
     "dimension_bounded_validation": "本标签不适用于 owner、契约、oracle 均明确、无共享未知且可低成本穷举的小闭集；此类直接走局部快速路径，不建立 coverage basis。其他声明随多种组件、载体、模式、状态、版本或持久化边界变化，且存在实质组合扩量或共享未知时，在批量实现或测试编写前形成 claim、有效 dimensions、equivalence、interactions、代表 cases 与 promotion 组成的 coverage basis；每个 case 必须新增判别信息，pairwise 不外推高阶交互，穷举只用于明确逐组合认证或无充分等价证据的高后果交互，结论限制在实际覆盖或有可复核依据的等价类。",
     "tool_defect_reproduction": "声称当前工具缺少能力或存在缺陷前，核对实际身份与对应帮助并重放原输入，区分输入错误、范围重叠、正常协议、预期降级、截断和产品故障。",
-    "batched_independent_tool_calls": "两个以上已知、独立、必要的只读工具调用同轮发出；有依赖、前项可取消/改变后项、冲突或风险时串行，禁止投机和 shell 伪批量。",
+    "batched_independent_tool_calls": "两个以上已知、独立、必要的只读工具调用并行；有依赖、前项可取消/改变后项、冲突或风险时串行，不投机或用 shell 伪批量。每条命令与外层整批返回分别受预算限制，计入包装开销；必要结果可能超限时缩小范围、拆批或显式调整受支持的外层预算。截断后按来源/行区间补缺或沿正式续页恢复，不原样重复整批。",
     "model_interaction_surface": "当前请求要求设计、选择或改变模型直接或间接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面只投影当前动作所需语义，不用 Base64、完整哈希、UUID 等长不透明码承担身份，在不损失必要语义下按实测或已验证保守估算选择最低 Token 格式；机器面保持稳定完整，生成物不作为语义修改入口。",
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和用户或正式来源确认的范围出发，选择最低充分入口；临时名称、目录或类型过滤不单独证明全集、不存在或唯一。只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
-    "bounded_subagent_delegation": "用户明确分工优先。主代理保留规划、架构、关键文档、实施与验收；独立取证用 evidence，步骤与判定明确的执行用 operator。两类 experiment 只承接探索量较大且能独立交付的实现，短小或需主代理持续裁决的探索由主代理完成；预计十来分钟只是成本线索，不设硬门槛。困难或视觉实验在满足同一独立交付条件后选 advanced-experiment，难度高不单独构成委派或升级理由。委派不要求主线程有并行工作，无独立必要工作就用 wait_agent 显式传 timeout_ms=1800000；这是调用约定，不改变工具默认值，服从宿主及更高优先级限制。一次等待覆盖团队多个代理，消息、完成或用户输入可提前唤醒；无新事实的超时不代表停滞，继续等待而非轮询、重复推演或催报。固定角色显式 fork_turns=none。主代理直接给必要事实、来源、修改边界和验收条件；实验开工前只合并澄清会改变动作且需主代理裁决的歧义，可查事实自行核实，输入充分不强制复述、确认或申请开工。生命周期验收明确阶段、对象与观察关系；失败先核场景、身份与时序，后续恢复不倒推先前状态。授权内自主修复与选择方法，不汇报普通决定、构建失败或阶段通过；必要权限资源缺失、合同须重裁，或合理路径已试且无新增判别证据的下一动作时才停止依赖部分并一次报告事实、已试方法、状态与所缺裁决。不得以弱化验收、无界重试或未获合同支持的强制绕过、恢复边界改变、正式入口替换来回避阻塞；旧代码存在不证明适用。越权动作、共享资源受损或反例已推翻其他在途工作前提时立即停报。最终集中交付方法、关键依据、文件符号及行位置、验证证据、未验证范围，以及已解决、仍阻塞和范围外问题；不另发完成消息或写冗余报告。主代理不例行催报、审核未完成试错或重复探索，最终按实际差异与决定性证据验收，具体缺口再深入，合格实现不强制重写。operator 仍按确定执行合同报告阶段与异常。两类 experiment 按需委派一层 evidence 无需另授权限；先用已有结果，简单查询自行完成，仍缺独立取证才比较续用与新建。experiment 不得创建其他角色，evidence 与 operator 不得委派。实际消费者读关键原文，根主代理保留正式裁决。evidence 同时只有一个当前派发者，跨分支续派须原派发者明确交接，结果共享或 completed 不转移派发权；结果送达当前派发者，不改变宿主关系，不绕过接口限制或另建代理池台账。",
+    "bounded_subagent_delegation": "用户明确分工优先。主代理保留规划、架构、关键文档、实施与验收；当前尚缺的源码、文档、配置、日志与工具用法定位优先交给 evidence；陌生模块入口、调用关系、复用点和验证位置均适用，不以任务大小、已知文件数量或能否并行为前提，不先代查。已有证据充分或一次已知位置读取即可闭合时直接处理。步骤与判定明确的必要操作，预计有长输出或多轮运行观察时优先用 operator，命令简单不排除使用；可直接取得短结果且无需多轮观察时自行执行。两类 experiment 只承接探索量较大且能独立交付的实现，短小或需主代理持续裁决的探索由主代理完成；预计十来分钟只是成本线索，不设硬门槛。困难或视觉实验在满足同一独立交付条件后选 advanced-experiment，难度高不单独构成委派或升级理由。委派不要求主线程有并行工作，无独立必要工作就用 wait_agent 显式传 timeout_ms=1800000；这是调用约定，不改变工具默认值，服从宿主及更高优先级限制。一次等待覆盖团队多个代理，消息、完成或用户输入可提前唤醒；无新事实的超时不代表停滞，继续等待而非轮询、重复推演或催报。固定角色显式 fork_turns=none。主代理直接给必要事实、来源、修改边界和验收条件；实验开工前只合并澄清会改变动作且需主代理裁决的歧义，可查事实自行核实，输入充分不强制复述、确认或申请开工。生命周期验收明确阶段、对象与观察关系；失败先核场景、身份与时序，后续恢复不倒推先前状态。授权内自主修复与选择方法，不汇报普通决定、构建失败或阶段通过；必要权限资源缺失、合同须重裁，或合理路径已试且无新增判别证据的下一动作时才停止依赖部分并一次报告事实、已试方法、状态与所缺裁决。不得以弱化验收、无界重试或未获合同支持的强制绕过、恢复边界改变、正式入口替换来回避阻塞；旧代码存在不证明适用。越权动作、共享资源受损或反例已推翻其他在途工作前提时立即停报。最终集中交付方法、关键依据、文件符号及行位置、验证证据、未验证范围，以及已解决、仍阻塞和范围外问题；不另发完成消息或写冗余报告。主代理不例行催报、审核未完成试错或重复探索，最终按实际差异与决定性证据验收，具体缺口再深入，合格实现不强制重写。operator 默认集中交付主代理所需结果、关键异常、未完成项及证据位置；普通阶段与既定步骤可处理的异常不即时回传，只有需要主代理动作的阻塞或风险及约定交接点才中断。原始日志按需落盘，不要求通读或全量回传；不足时向原代理追问具体缺口，不默认重跑。停止步骤未覆盖的失败、策略拒绝或授权缺口，不变更命令形式绕过拒绝。委派不增加无必要操作或清理。两类 experiment 按需委派一层 evidence 无需另授权限；先用已有结果，一次已知位置读取即可闭合时自行完成，其余定位按缺口比较续用与新建。experiment 不得创建其他角色，evidence 与 operator 不得委派。实际消费者读关键原文，根主代理保留正式裁决。evidence 同时只有一个当前派发者，跨分支续派须原派发者明确交接，结果共享或 completed 不转移派发权；结果送达当前派发者，不改变宿主关系，不绕过接口限制或另建代理池台账。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。",
     "replacement_closure": "修改既有行为且候选会新增长期机制或适配时，写入前区分原 owner 内改写、替换和由不同当前契约支撑的独立并存；替换把旧同责生产路径与只绑定旧实现的验证资产纳入同一完成闭环，临时并存有真实调用方和退出条件，不把退役留作无 owner 的清理。",
@@ -226,7 +226,15 @@
     "skill-known-change-reload",
     "task-cli-authoring-references",
     "task-cli-execution-references",
-    "task-cli-completion-references"
+    "task-cli-completion-references",
+    "batch-read-aggregate-budget",
+    "batch-truncation-recover-missing-ranges",
+    "source-definition-text-first",
+    "evidence-leaf-no-orchestration",
+    "subagent-unavailable-direct-work",
+    "short-request-shared-premise",
+    "completed-work-no-cosmetic-reopen",
+    "candidate-selftest-failure-ownership"
   ],
   "strict_reference_case_ids": [
     "single-domain-root-cause-analysis",
@@ -267,7 +275,9 @@
     "fragile-command-runner-escalation",
     "task-cli-authoring-references",
     "task-cli-execution-references",
-    "task-cli-completion-references"
+    "task-cli-completion-references",
+    "short-request-shared-premise",
+    "candidate-selftest-failure-ownership"
   ],
   "cases": [
     {
@@ -1611,8 +1621,7 @@
         "decision-frontier.md"
       ],
       "expected_subagent_orchestration_references": [
-        "evidence-packet.md",
-        "coordination.md"
+        "evidence-packet.md"
       ],
       "expected_behavior_tags": [
         "read_only",
@@ -1695,8 +1704,7 @@
       ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "evidence-packet.md",
-        "coordination.md"
+        "evidence-packet.md"
       ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
@@ -1713,8 +1721,7 @@
       "forbidden_skills": [],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "evidence-packet.md",
-        "coordination.md"
+        "evidence-packet.md"
       ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
@@ -1733,8 +1740,7 @@
       ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "experiment-lifecycle.md",
-        "coordination.md"
+        "experiment-lifecycle.md"
       ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
@@ -1757,8 +1763,7 @@
         "failure-and-cost.md"
       ],
       "expected_subagent_orchestration_references": [
-        "experiment-lifecycle.md",
-        "coordination.md"
+        "experiment-lifecycle.md"
       ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
@@ -1777,8 +1782,7 @@
       ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "experiment-lifecycle.md",
-        "coordination.md"
+        "experiment-lifecycle.md"
       ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
@@ -1788,7 +1792,7 @@
     {
       "id": "subagent-implicit-evidence-benefit",
       "kind": "positive",
-      "request": "一个局部实现的修改预计十来分钟，但需先确定已限定组件内哪些消费者仍调用旧入口，目前只知道组件目录，未知相关文件，取证值得独立交接。用户没有指定分工；主代理亲自实现，暂无其他独立工作。请安排只读取证，返回相关路径、行范围、必要反例与覆盖限制，由主代理阅读关键原文后决定。不要因实现短小而排除 evidence，也不将这段实现另派给 experiment。",
+      "request": "一个局部实现预计十来分钟，需先找到限定组件内仍调用旧入口的消费者，目前只知道组件目录。主代理将亲自实现，暂无其他独立工作；角色可用，用户未指定分工。请确定下一步如何取得所缺的位置与调用关系。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -1797,8 +1801,7 @@
       ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "evidence-packet.md",
-        "coordination.md"
+        "evidence-packet.md"
       ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
@@ -1808,11 +1811,13 @@
     {
       "id": "subagent-known-files-related-evidence",
       "kind": "positive",
-      "request": "当前接口和 owner 已确认，主代理准备亲自完成局部接入，已知两个入口文件，但仍需在限定组件内找到调用方、旧路径以及对应原生通知契约的位置，无法用一次直接读取补齐。用户未指定分工。请安排只读取证，给文件路径、行范围、关系两端和简短导航；由主代理读取原文判断如何接入，不要求子代理选择方案。",
+      "request": "当前接口和 owner 已确认，主代理准备亲自完成局部接入，已知两个入口文件，但仍需在限定组件内找到调用方、旧路径以及对应原生通知契约的位置，无法用一次直接读取补齐。角色可用，用户未指定分工。请确定如何补齐这些材料以支持接入判断。",
       "expected_skills": ["subagent-orchestration"],
       "forbidden_skills": ["symbol-structure-workflow"],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": ["evidence-packet.md", "coordination.md"],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md"
+      ],
       "expected_behavior_tags": ["bounded_subagent_delegation"],
       "forbidden_behavior_tags": []
     },
@@ -1823,7 +1828,9 @@
       "expected_skills": ["subagent-orchestration"],
       "forbidden_skills": ["symbol-structure-workflow"],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": ["evidence-packet.md", "coordination.md"],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md"
+      ],
       "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
       "forbidden_behavior_tags": ["modify_authorized_scope"]
     },
@@ -1834,8 +1841,43 @@
       "expected_skills": ["subagent-orchestration"],
       "forbidden_skills": ["symbol-structure-workflow"],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": ["evidence-packet.md", "coordination.md"],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md"
+      ],
       "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
+    },
+    {
+      "id": "subagent-unfamiliar-module-navigation",
+      "kind": "positive",
+      "request": "请解释这个陌生模块的配置如何从文档进入运行入口，限定在给定组件目录。当前只有 README 路径，还需定位配置读取和实际消费位置；无需改代码或运行业务。角色可用，主代理暂无其他工作，用户未指定分工。",
+      "expected_skills": ["subagent-orchestration"],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": ["evidence-packet.md"],
+      "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
+    },
+    {
+      "id": "subagent-small-reuse-search",
+      "kind": "positive",
+      "request": "给已确定的入口增加一个小参数，行为与验收已明确；先在限定组件里找到现有参数解析和校验的复用实现，目前只知道目录。主代理会亲自修改，角色可用，用户未指定分工。",
+      "expected_skills": ["subagent-orchestration"],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": ["evidence-packet.md"],
+      "expected_behavior_tags": ["bounded_subagent_delegation"],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-one-known-source-read",
+      "kind": "negative",
+      "request": "用户已提供配置读取函数的精确文件和行位置；只需读这个完整短函数，确认是否处理空字符串，无其他调用关系或材料缺口。用户未要求委派。",
+      "expected_skills": [],
+      "forbidden_skills": ["subagent-orchestration"],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": ["read_only"],
       "forbidden_behavior_tags": ["modify_authorized_scope"]
     },
     {
@@ -1859,8 +1901,7 @@
       "forbidden_skills": [],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "evidence-packet.md",
-        "coordination.md"
+        "evidence-packet.md"
       ],
       "expected_behavior_tags": [
         "read_only",
@@ -1880,8 +1921,7 @@
       "forbidden_skills": [],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "evidence-packet.md",
-        "coordination.md"
+        "evidence-packet.md"
       ],
       "expected_behavior_tags": [
         "read_only",
@@ -1954,9 +1994,7 @@
         "reasoning-governor"
       ],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": [
-        "coordination.md"
-      ],
+      "expected_subagent_orchestration_references": [],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
       ],
@@ -1974,8 +2012,7 @@
       ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "experiment-lifecycle.md",
-        "coordination.md"
+        "experiment-lifecycle.md"
       ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
@@ -1992,8 +2029,7 @@
       "forbidden_skills": [],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "experiment-lifecycle.md",
-        "coordination.md"
+        "experiment-lifecycle.md"
       ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
@@ -2010,8 +2046,7 @@
       "forbidden_skills": [],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "experiment-lifecycle.md",
-        "coordination.md"
+        "experiment-lifecycle.md"
       ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
@@ -2028,8 +2063,7 @@
       "forbidden_skills": [],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "evidence-packet.md",
-        "coordination.md"
+        "evidence-packet.md"
       ],
       "expected_behavior_tags": [
         "read_only",
@@ -2117,8 +2151,7 @@
       ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "evidence-packet.md",
-        "coordination.md"
+        "evidence-packet.md"
       ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
@@ -2130,7 +2163,7 @@
     {
       "id": "subagent-bounded-operator-execution",
       "kind": "positive",
-      "request": "目标、步骤、精确对象集、等价依据、允许动作、修改归属与验收均已确认，只剩 12 个难以可靠脚本化的简单重复修改，代表项也已经验证。请实际委派 operator 按既定步骤完成，不重复首项准入；出现步骤未覆盖的反例、失败或未知时停止相关操作并返回，不改设计或猜测修复。主代理随后复核实际差异与结果。按有意义的阶段简报完成范围、异常和下一步，主代理检查方向，不逐项等待批准。",
+      "request": "目标、步骤、精确对象集、等价依据、允许动作、修改归属与验收均已确认，只剩 12 个难以可靠脚本化的简单重复修改，代表项也已经验证。请实际委派 operator 按既定步骤完成，不重复首项准入；出现步骤未覆盖的反例、失败或未知时停止相关操作并返回，不改设计或猜测修复。普通阶段集中到末尾交付完成范围、关键异常和证据位置，主代理随后复核实际差异与结果。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -2140,8 +2173,7 @@
       ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "operator-execution.md",
-        "coordination.md"
+        "operator-execution.md"
       ],
       "expected_behavior_tags": [
         "modify_authorized_scope",
@@ -2165,8 +2197,7 @@
         "failure-and-cost.md"
       ],
       "expected_subagent_orchestration_references": [
-        "operator-execution.md",
-        "coordination.md"
+        "operator-execution.md"
       ],
       "expected_behavior_tags": [
         "expensive_action_preflight",
@@ -2177,7 +2208,7 @@
     {
       "id": "subagent-scriptable-batch-no-benefit",
       "kind": "negative",
-      "request": "目标、输入、转换规则和验收都已确认，500 个同构文件可以由现有确定性脚本一次处理并生成机器可检验结果。用户没有要求子代理；直接由主代理调用脚本并验收，不要把可可靠脚本化的机械批处理委派给 operator。",
+      "request": "目标、输入、转换规则和验收都已确认，500 个同构文件可由现有确定性脚本快速一次处理，直接返回简短完成统计和失败位置，无需多轮观察或展开长输出。用户没有要求子代理；请调用脚本并验收。",
       "expected_skills": [],
       "forbidden_skills": [
         "subagent-orchestration"
@@ -2189,6 +2220,39 @@
         "bounded_subagent_delegation"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-simple-command-long-observation",
+      "kind": "positive",
+      "request": "当前必要操作只有一条已验证命令，输入、允许动作与判定依据稳定；运行会持续产生大量日志，需要按已知阶段检查状态并等待结束，没有现成的汇总入口。无需修代码或设计方案，主代理暂无其他工作，角色可用，用户未指定分工。请安排执行，最后给结果和关键异常位置。",
+      "expected_skills": ["subagent-orchestration"],
+      "forbidden_skills": ["task-table-manager"],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": ["operator-execution.md"],
+      "expected_behavior_tags": ["bounded_subagent_delegation"],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-operator-result-followup",
+      "kind": "positive",
+      "request": "原 operator 已完成本次操作，返回成功状态和日志位置，但主代理还需要确认最终处理数是否包含跳过项。原代理仍可续派，日志仍在且输入未变。请补齐这一信息，不重跑操作，也不把完整日志读入主代理。",
+      "expected_skills": ["subagent-orchestration"],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": ["operator-execution.md"],
+      "expected_behavior_tags": ["bounded_subagent_delegation"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
+    },
+    {
+      "id": "subagent-operator-concentrated-delivery",
+      "kind": "negative",
+      "request": "你当前是 operator，三个已授权步骤顺利完成，退出码均为零；生成的日志包含数千行常规输出和一条不影响通过、但主代理需知道的兼容警告。没有约定中间交接点，也没有阻塞。请集中交付完成范围、警告及日志位置，不回传常规输出，不隐去警告；保留原结果以便后续追问。",
+      "expected_skills": [],
+      "forbidden_skills": ["subagent-orchestration"],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": ["bounded_subagent_delegation"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
     },
     {
       "id": "subagent-user-forbids",
@@ -3770,8 +3834,7 @@
       "forbidden_skills": [],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
-        "evidence-packet.md",
-        "coordination.md"
+        "evidence-packet.md"
       ],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
@@ -3800,6 +3863,124 @@
       "forbidden_behavior_tags": [
         "modify_authorized_scope"
       ]
+    },
+    {
+      "id": "batch-read-aggregate-budget",
+      "kind": "behavior",
+      "request": "只读查看四个已确认的小文件，内容分别是不同且必要的接口说明，彼此无依赖。每个文件约 3000 Token，外层工具最多返回 10000 Token，内层每条命令可返回 20000。请安排读取并确保必要正文完整可见；没有共同产品未知，也不需要改工具或跑性能评测。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "execution-governor",
+        "source-query"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "batched_independent_tool_calls"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "batch-truncation-recover-missing-ranges",
+      "kind": "behavior",
+      "request": "上一批 Get-Content 命令成功，但外层汇总明确截断。已完整看到接口 A 和 B，只缺文件 C 的 120—210 行，源码未变化。请补齐这段必要证据；不是 srcq 分页或故障，也不需要分析成本原因或修改工具。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
+        "execution-governor"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "source-definition-text-first",
+      "kind": "behavior",
+      "request": "只读定位一个项目函数的定义和直接调用方。已知正式源码目录，尚未搜索，无同名/重载或复杂语法歧义证据，普通文本查询足以开始。不需要委派，请查到位置后读取相关完整定义。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query",
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "evidence-leaf-no-orchestration",
+      "kind": "behavior",
+      "request": "你当前是 evidence，已经收到具体取证问题、已知文件范围和完整角色指令。只需读取两个已知接口定义并返回路径、行号与简短导航，当前派发者就是父代理，不涉及移交或查询异常。直接完成取证，不创建子代理。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration",
+        "source-query"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-unavailable-direct-work",
+      "kind": "behavior",
+      "request": "当前运行时没有子代理创建/续派接口，配置文件中虽列出 evidence 但本任务未暴露该角色。请在已知组件目录内只读找出指定旧入口的调用位置，普通文本查询即可开始；不要安装、探测性创建或恢复代理能力。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration",
+        "source-query"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "short-request-shared-premise",
+      "kind": "behavior",
+      "request": "需求只有一句“给现有两个消费者增加同一种可选标记”，但实现前已发现它们共用一个尚未验证的状态缓存，标记能否隔离会同时改变两处结果。owner、设计和 oracle 已明确；只读选择首先验证哪个真实消费者和后续顺序，不把短题面当作局部未知，也不建设最终用例矩阵。",
+      "expected_skills": [
+        "execution-governor"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only",
+        "vertical_validation_closure"
+      ],
+      "forbidden_behavior_tags": [],
+      "expected_execution_governor_references": [
+        "decision-frontier.md"
+      ]
+    },
+    {
+      "id": "completed-work-no-cosmetic-reopen",
+      "kind": "behavior",
+      "request": "已授权功能、直接调用方、文档和必要测试均已完成并通过，未出现新反例。现有 import 排列符合项目风格，可重建缓存不进入交付也不干扰验证，用户没有要求整理。请交付本次结果，不因这些收尾事项重新搜索、改代码或重跑测试。",
+      "expected_skills": [],
+      "forbidden_skills": ["execution-governor", "change-governance", "delivery-workflow", "task-table-manager"],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": ["read_only", "no_scope_expansion", "decision_relevant_findings"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
+    },
+    {
+      "id": "candidate-selftest-failure-ownership",
+      "kind": "behavior",
+      "request": "一次昂贵验证停在候选新增的 self-test。完整调用证据已给出：外部环境和正式启动器正常，候选自身构造子进程参数时漏传了必需的程序集路径；现有验收合同明确包括该 self-test。请只读判定当前失败类别、被遮蔽范围和下一动作，不因错误发生在验证阶段就把它归为外部基础设施，也不重跑或修改代码。",
+      "expected_skills": ["execution-governor"],
+      "forbidden_skills": ["change-governance", "source-query"],
+      "expected_change_governance_references": [],
+      "expected_execution_governor_references": ["failure-and-cost.md"],
+      "expected_behavior_tags": ["read_only", "fact_first"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
     }
   ]
 }

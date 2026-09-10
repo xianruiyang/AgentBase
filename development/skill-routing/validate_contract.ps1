@@ -93,11 +93,13 @@ $projectAgentsItem = Get-Item -LiteralPath $projectAgentsPath
 Assert-True ($globalItem.Length -le [int]$contract.global_max_bytes) "Global AGENTS.md is $($globalItem.Length) bytes; contract limit is $($contract.global_max_bytes)"
 Assert-True (($globalItem.Length + $projectAgentsItem.Length) -le 28672) "Global and project AGENTS.md exceed the reserved Codex instruction budget"
 
-$globalRuleLines = @(Get-Content -LiteralPath $globalPath -Encoding UTF8 | Where-Object { $_ -match '^(must|should|must not)\b' })
-$invalidRuleLines = @($globalRuleLines | Where-Object { $_ -notmatch '^(must|should|must not):\s+\S' })
-Assert-True ($invalidRuleLines.Count -eq 0) "Global AGENTS.md contains a malformed normative rule label"
-$duplicateRules = @($globalRuleLines | Group-Object | Where-Object { $_.Count -gt 1 })
-Assert-True ($duplicateRules.Count -eq 0) "Global AGENTS.md contains duplicate normative rules"
+$globalText = Get-Content -LiteralPath $globalPath -Raw -Encoding UTF8
+Assert-True (-not [string]::IsNullOrWhiteSpace($globalText)) "Global AGENTS.md is empty"
+# Natural-language instructions have no required normative prefix. Check exact
+# repeated paragraphs without interpreting their strength or semantic wording.
+$globalParagraphs = @($globalText -split '(?:\r?\n)[ \t]*(?:\r?\n)' | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -notmatch '^#{1,6}\s+[^\r\n]+$' })
+$duplicateParagraphs = @($globalParagraphs | Group-Object | Where-Object { $_.Count -gt 1 })
+Assert-True ($duplicateParagraphs.Count -eq 0) "Global AGENTS.md contains duplicate paragraphs"
 
 foreach ($skill in $requiredSkills) {
     $skillRoot = Join-Path (Join-Path $ProjectRoot "skills") $skill
