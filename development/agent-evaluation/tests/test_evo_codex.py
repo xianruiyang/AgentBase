@@ -79,6 +79,7 @@ class EvoCodexAdapterTests(unittest.TestCase):
                 "cancel_check",
                 "task_runtime_bin",
                 "skill_cache_root",
+                "output_schema",
             ],
         )
 
@@ -175,6 +176,36 @@ class EvoCodexAdapterTests(unittest.TestCase):
         self.assertIn("[string]$TaskRuntimeBinPath = ''", text)
         self.assertIn("$startInfo.ArgumentList.Add($argument)", text)
         self.assertIn("[string]$RuntimeCodexRoot = ''", text)
+
+    def test_launcher_places_optional_answer_schema_on_exec_without_splitting_path(self) -> None:
+        launcher = (EVALUATION_ROOT / 'invoke_candidate.ps1').read_text(encoding='utf-8')
+        block = launcher[launcher.index("$arguments = New-Object"):launcher.index('$promptItem =')]
+        quote = lambda value: "'" + str(value).replace("'", "''") + "'"
+        common = PROJECT_ROOT / 'development/common/codex_cli_runtime.ps1'
+        with tempfile.TemporaryDirectory() as directory:
+            schema = Path(directory) / "answer's schema.json"
+            schema.write_text('{}', encoding='utf-8')
+            for selected in ('', str(schema)):
+                with self.subTest(schema=selected):
+                    script = '\n'.join([
+                        "$ErrorActionPreference = 'Stop'", f'. {quote(common)}',
+                        f'$resolvedOutputSchema = {quote(selected)}',
+                        "$Model = 'synthetic'; $ReasoningEffort = 'low'",
+                        "$projectTrustKey = '\"synthetic\"'; $EnableHooks = $false; $ConfigOverride = @()",
+                        "$lastMessagePath = 'answer.txt'; $resolvedWorkspace = 'workspace'",
+                        block, 'ConvertTo-Json -InputObject $arguments.ToArray() -Compress',
+                    ])
+                    result = subprocess.run(['pwsh.exe', '-NoProfile', '-NonInteractive', '-Command', script],
+                                            capture_output=True, text=True, encoding='utf-8', timeout=30)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    argv = json.loads(result.stdout)
+                    self.assertEqual(argv[0], 'exec')
+                    self.assertEqual(argv[-1], '-')
+                    if selected:
+                        self.assertEqual(argv.count('--output-schema'), 1)
+                        self.assertEqual(argv[argv.index('--output-schema') + 1], selected)
+                    else:
+                        self.assertNotIn('--output-schema', argv)
 
     def test_attempt_runtime_home_links_only_auth_and_retains_native_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

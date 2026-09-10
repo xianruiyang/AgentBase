@@ -258,6 +258,7 @@ def run_codex_job(
     cancel_check: Callable[[], bool] | None = None,
     task_runtime_bin: Path | None = None,
     skill_cache_root: Path | None = None,
+    output_schema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run one frozen Evo job with its selected Codex-facing component projection."""
 
@@ -318,14 +319,19 @@ def run_codex_job(
     except (EvaluationError, OSError) as exc:
         raise CodexAdapterPrecondition(str(exc)) from exc
     prompt_path = attempt / "candidate-prompt.txt"
+    output_schema_path = attempt / "candidate-output-schema.json"
     result_path = attempt / "codex-result.json"
     before_path = attempt / "codex-rollout-before.json"
     launcher_stdout_path = attempt / "codex-launcher.stdout"
     launcher_stderr_path = attempt / "codex-launcher.stderr"
     if any(path.exists() for path in (prompt_path, result_path, before_path, launcher_stdout_path, launcher_stderr_path)):
         raise CodexAdapterPrecondition("Evo attempt owns pre-existing Codex adapter artifacts")
+    if output_schema is not None and output_schema_path.exists():
+        raise CodexAdapterPrecondition("Evo attempt owns a pre-existing answer schema")
     try:
         write_text_atomic(prompt_path, str(prompt))
+        if output_schema is not None:
+            write_json_atomic(output_schema_path, dict(output_schema))
     except OSError as exc:
         raise CodexAdapterPrecondition(f"cannot persist the bounded Codex prompt: {exc}") from exc
     environment = dict(os.environ if process_environment is None else process_environment)
@@ -360,6 +366,8 @@ def run_codex_job(
     ]
     if task_runtime_bin is not None:
         argv.extend(["-TaskRuntimeBinPath", str(task_runtime_bin)])
+    if output_schema is not None:
+        argv.extend(["-OutputSchemaPath", str(output_schema_path)])
     if projection.get("hooks_enabled") is True:
         argv.append("-EnableHooks")
     tool_paths = projection.get("tool_paths", [])

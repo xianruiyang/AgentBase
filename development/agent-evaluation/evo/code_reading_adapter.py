@@ -52,6 +52,22 @@ def subject_prompt(item: Mapping[str, Any], binding: Mapping[str, Any]) -> str:
     )
 
 
+def answer_schema() -> dict[str, Any]:
+    """Constrain transport shape, never expected paths, locations, or semantics."""
+    shapes = []
+    for coordinates in ((), ('line',), ('start_line', 'end_line')):
+        properties = {'path': {'type': 'string'}}
+        properties.update({key: {'type': 'integer'} for key in coordinates})
+        shapes.append({'type': 'object', 'properties': properties,
+                       'required': list(properties), 'additionalProperties': False})
+    # Strict structured output requires every declared field. An empty string
+    # represents an omitted explanation; offline grading still accepts omission.
+    return {'type': 'object', 'properties': {
+        'locations': {'type': 'array', 'items': {'anyOf': shapes}},
+        'explanation': {'type': 'string'},
+    }, 'required': ['locations', 'explanation'], 'additionalProperties': False}
+
+
 def _answer_location(value: Any) -> tuple[Any, ...]:
     if not isinstance(value, dict) or set(value) not in ({'path'}, {'path', 'line'}, {'path', 'start_line', 'end_line'}):
         raise EvoError('code-reading answer locations must use the declared path/line/range JSON shapes')
@@ -79,7 +95,7 @@ def score_answer(item: Mapping[str, Any], answer_text: str) -> dict[str, Any]:
         required.add(_answer_location(projected))
     total = len(required)
     def invalid(message: str) -> dict[str, Any]:
-        return {'schema': 'agentbase.evo-code-reading-score/v1', 'valid': False, 'passed': False,
+        return {'schema': 'agentbase.evo-code-reading-score/v2', 'valid': False, 'passed': False,
                 'format_error': message, 'required_found': 0, 'required_total': total,
                 'extra_count': 0, 'extra': [], 'reward': 0, 'matched': [], 'reported_unique': 0}
     if len(answer_text.encode('utf-8')) > 1024 * 1024:
@@ -96,10 +112,16 @@ def score_answer(item: Mapping[str, Any], answer_text: str) -> dict[str, Any]:
         observed = {_answer_location(value) for value in answer['locations']}
     except EvoError as exc:
         return invalid(str(exc))
-    found = sorted(required & observed, key=repr)
-    extra = sorted(observed - required, key=repr)
+    # File-only questions score file identity. Once any precise location is
+    # required in a file, preserve exact matching there: a broad path/range must
+    # not hide a wrong field, call site, or definition boundary.
+    precise_paths = {value[0] for value in required if len(value) > 1}
+    file_only_paths = {value[0] for value in required if len(value) == 1} - precise_paths
+    scored = {(value[0],) if value[0] in file_only_paths else value for value in observed}
+    found = sorted(required & scored, key=repr)
+    extra = sorted(scored - required, key=repr)
     reward = max(0, len(found) - len(extra)) / total if total else None
-    return {'schema': 'agentbase.evo-code-reading-score/v1', 'valid': True,
+    return {'schema': 'agentbase.evo-code-reading-score/v2', 'valid': True,
             'passed': len(found) == total and not extra, 'format_error': None,
             'required_found': len(found), 'required_total': total,
             'extra_count': len(extra), 'extra': [list(value) for value in extra], 'reward': reward,

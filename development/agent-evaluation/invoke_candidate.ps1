@@ -18,6 +18,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$CodexExecutablePath,
     [string]$TaskRuntimeBinPath = '',
+    [string]$OutputSchemaPath = '',
     [string[]]$ConfigOverride = @(),
     [switch]$EnableHooks,
     [string]$ResultSchema = 'agentbase.windows-swe-codex-run/v8',
@@ -42,6 +43,12 @@ else {
     (Resolve-Path -LiteralPath $RuntimeCodexRoot).Path
 }
 $resolvedPrompt = (Resolve-Path -LiteralPath $PromptPath).Path
+$resolvedOutputSchema = if ([string]::IsNullOrWhiteSpace($OutputSchemaPath)) {
+    ''
+}
+else {
+    (Resolve-Path -LiteralPath $OutputSchemaPath).Path
+}
 $resolvedCodex = (Resolve-Path -LiteralPath $CodexExecutablePath).Path
 $resolvedTaskRuntimeBin = if ([string]::IsNullOrWhiteSpace($TaskRuntimeBinPath)) {
     ''
@@ -181,6 +188,13 @@ $startedMarkerPath = Join-Path $logRoot 'model-process-started.txt'
 $projectTrustKey = ConvertTo-AgentBaseCodexTomlString ($resolvedWorkspace.ToLowerInvariant())
 
 $arguments = New-Object 'System.Collections.Generic.List[string]'
+$outputSchemaRecord = $null
+if ($resolvedOutputSchema) {
+    $outputSchemaRecord = [ordered]@{
+        path = $resolvedOutputSchema
+        sha256 = (Get-FileHash -LiteralPath $resolvedOutputSchema -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+}
 foreach ($argument in @(
     'exec'
     '--ignore-user-config'
@@ -198,6 +212,10 @@ foreach ($argument in @(
     "projects={$projectTrustKey={trust_level=`"trusted`"}}"
 )) {
     $arguments.Add([string]$argument)
+}
+if ($resolvedOutputSchema) {
+    $arguments.Add('--output-schema')
+    $arguments.Add($resolvedOutputSchema)
 }
 if ($EnableHooks) {
     $arguments.Add('--dangerously-bypass-hook-trust')
@@ -314,6 +332,7 @@ $result = [ordered]@{
     diagnostic = $diagnosticText
     codex = $identity
     config_override_sha256 = $overrideHash
+    output_schema = $outputSchemaRecord
     event_count = $jsonlSummary.event_count
     thread_started_count = $jsonlSummary.thread_started_count
     root_thread_id = $jsonlSummary.thread_id

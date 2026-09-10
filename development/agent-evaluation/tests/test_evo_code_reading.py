@@ -17,7 +17,7 @@ if str(EVALUATION_ROOT) not in sys.path:
     sys.path.insert(0, str(EVALUATION_ROOT))
 
 from evo.cli import main
-from evo.code_reading_adapter import score_answer, validate_binding
+from evo.code_reading_adapter import answer_schema, score_answer, validate_binding
 from evo.code_reading_catalog import import_catalog, snapshot_inventory
 from evo.runtime import artifacts, recover, run, submit
 from evo.scoring import score_artifacts
@@ -111,6 +111,7 @@ class EvoCodeReadingTests(unittest.TestCase):
             selected = next(item for item in kwargs['spec']['evaluations']['items'] if item['id'] == 'find-value')
             self.assertIn(str(self.workspace.resolve()), selected['prompt'])
             self.assertIn('Return exactly one JSON object', selected['prompt'])
+            self.assertEqual(kwargs['output_schema'], answer_schema())
             logs = kwargs['attempt_root'] / 'codex-logs'; logs.mkdir(parents=True)
             (logs / 'last-message.txt').write_text(json.dumps({'locations': [
                 {'path': 'src/value.py'}, {'path': 'src/value.py', 'line': 1},
@@ -149,7 +150,10 @@ class EvoCodeReadingTests(unittest.TestCase):
         class Process:
             returncode = 0
             def poll(self): return 0
-        def start(*_args, **_kwargs):
+        def start(argv, **_kwargs):
+            schema_path = Path(argv[argv.index('-OutputSchemaPath') + 1])
+            self.assertEqual(schema_path, attempt / 'candidate-output-schema.json')
+            self.assertEqual(json.loads(schema_path.read_text(encoding='utf-8')), answer_schema())
             (attempt / 'codex-result.json').write_text(json.dumps(raw), encoding='utf-8')
             return Process()
         with (mock.patch.dict(os.environ, {'AGENTBASE_AGENT_EVALUATOR_DISABLED': '0'}),
@@ -163,7 +167,8 @@ class EvoCodeReadingTests(unittest.TestCase):
             result = codex_adapter.run_codex_job(
                 project_root=self.project, workspace=workspace, attempt_root=attempt,
                 installed_codex_root=codex, spec=spec, job={'combination': 'empty', 'item': 'reading'},
-                process_environment={'AGENTBASE_CODEX_EXECUTABLE_PATH': str(executable)}, timeout_seconds=60)
+                process_environment={'AGENTBASE_CODEX_EXECUTABLE_PATH': str(executable)}, timeout_seconds=60,
+                output_schema=answer_schema())
         self.assertEqual(result['status'], 'completed')
         self.assertEqual((attempt / 'candidate-prompt.txt').read_text(encoding='utf-8'), prompt)
 
@@ -235,6 +240,32 @@ class EvoCodeReadingTests(unittest.TestCase):
         self.assertIn('range', invalid['format_error'])
         malformed = score_answer(item, '{not-json')
         self.assertEqual((malformed['valid'], malformed['required_total'], malformed['reward']), (False, 2, 0))
+
+    def test_file_only_requirements_accept_qualified_paths_without_duplicate_credit(self) -> None:
+        item = {'required_locations': [{'path': 'a.py'}, {'path': 'b.py'}]}
+        result = score_answer(item, json.dumps({'locations': [
+            {'path': 'a.py', 'line': 2}, {'path': 'a.py', 'line': 3},
+            {'path': 'b.py', 'start_line': 1, 'end_line': 4}]}))
+        self.assertEqual(result['schema'], 'agentbase.evo-code-reading-score/v2')
+        self.assertEqual((result['required_found'], result['extra_count'], result['reported_unique']), (2, 0, 3))
+        self.assertTrue(result['passed'])
+        wrong_file = score_answer(item, json.dumps({'locations': [
+            {'path': 'a.py', 'line': 2}, {'path': 'other.py', 'line': 2}]}))
+        self.assertEqual((wrong_file['required_found'], wrong_file['extra_count']), (1, 1))
+        self.assertFalse(wrong_file['passed'])
+
+    def test_precise_requirements_do_not_accept_nearby_or_broad_locations(self) -> None:
+        for extra_required in ([], [{'path': 'a.py'}]):
+            item = {'required_locations': extra_required + [
+                {'path': 'a.py', 'line': 2}, {'path': 'a.py', 'start_line': 5, 'end_line': 8}]}
+            for wrong in ({'path': 'a.py', 'line': 3},
+                          {'path': 'a.py', 'start_line': 1, 'end_line': 10},
+                          {'path': 'a.py', 'start_line': 5, 'end_line': 9}):
+                with self.subTest(extra_required=extra_required, wrong=wrong):
+                    result = score_answer(item, json.dumps({'locations': [{'path': 'a.py'}, wrong]}))
+                    self.assertEqual(result['required_found'], len(extra_required))
+                    self.assertGreater(result['extra_count'], 0)
+                    self.assertFalse(result['passed'])
 
     def test_import_rejects_duplicate_required_semantics_even_when_labels_differ(self) -> None:
         value = json.loads(self.source.read_text(encoding='utf-8'))
