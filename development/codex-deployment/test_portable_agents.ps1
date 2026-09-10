@@ -126,7 +126,12 @@ try {
     Assert-Rejected -Label "unreviewed extra field" -FixtureRoot $extraFieldRoot -ExpectedMessage "*must contain only name, description, model, model_reasoning_effort*"
 
     $sensitiveRoot = New-AgentFixture -Name "sensitive-field"
-    $sensitiveText = (Get-Content -LiteralPath (Join-Path $sensitiveRoot "experiment.toml") -Raw -Encoding UTF8).Replace('当前实现范围', 'password 配置范围')
+    $sensitiveText = Get-Content -LiteralPath (Join-Path $sensitiveRoot "experiment.toml") -Raw -Encoding UTF8
+    $instructionsHeader = 'developer_instructions = """'
+    if ([regex]::Matches($sensitiveText, [regex]::Escape($instructionsHeader)).Count -ne 1) {
+        throw 'Sensitive fixture requires exactly one developer_instructions header'
+    }
+    $sensitiveText = $sensitiveText.Replace($instructionsHeader, $instructionsHeader + [Environment]::NewLine + 'password 配置范围')
     Write-FixtureText -Path (Join-Path $sensitiveRoot "experiment.toml") -Text $sensitiveText
     Assert-Rejected -Label "sensitive assignment vocabulary" -FixtureRoot $sensitiveRoot -ExpectedMessage "*contains a machine path, external dependency, or sensitive setting*"
 
