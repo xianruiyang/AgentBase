@@ -10,7 +10,7 @@
 4. 需要 `srcq` 状态时，运行其正式安装器 `Status`、`srcq doctor` 和 `srcq query scc doctor`；源码版本、已发行版本和本机已安装版本分别取证，不互相外推。
 5. 需要 LSP 时读取 `vscode-lsp-mcp` 的 status 与 `list_workspaces`。若 VS Code 已打开而 workspace 为 0，先请用户执行 **Reload Window**；不自行关闭编辑器、重装扩展或重复部署。
 6. 新任务应从当前运行时暴露的自定义角色确认 `evidence`、`experiment`、`advanced-experiment` 与 `operator` 已加载；不要从安装文件存在推断运行时已经生效。新建或实质变化的角色只在明确需要验证时做一次有界真实调用；若新任务仍暴露旧角色集合，完整退出并重启 Codex 桌面宿主后再开任务。
-7. 默认分工由 `subagent-orchestration` 维护：困难推理或需要截图、渲染反馈的实现实验使用 `advanced-experiment`；普通和高级 experiment 在当前实验范围内按需委派一层 `evidence` 分担搜索，无需另行授权，不得创建其他角色。evidence 与 operator 不得创建子代理，简单查询由当前执行者直接完成。
+7. 默认分工与等待由 `subagent-orchestration` 维护：两类 experiment 只承接值得独立交付的较大探索，短小或需主代理持续裁决的实现直接由主代理完成；困难或视觉实验仍须满足独立交付条件。两类实验自主推进、最终集中交付，在当前范围内按需委派一层 `evidence` 分担搜索，无需另行授权，不得创建其他角色。evidence 与 operator 不得创建子代理，简单查询由当前执行者直接完成。
 8. 线程推理深度只在用户明确要求查看、设置、固定、改变、重评或解除时操作；不得因任务难度、成本、Goal、计划或后继工作自主查询、升降或恢复。SessionStart 的状态投影只读，不是变更授权。
 9. `Deploy` 只把仓库候选应用到指定 Codex 消费者；每次写入真实 Codex 根都需要用户对当次部署的明确授权。`Release` 是形成版本、标签或分发资产的独立发行合同，也不得从部署、Git 或历史授权继承。
 10. 没有相关改动时不运行完整验证、真实模型评测或九项评测；候选稳定后只按实际影响范围运行一次必要验证。

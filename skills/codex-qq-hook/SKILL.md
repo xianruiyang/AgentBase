@@ -5,7 +5,7 @@ description: 管理和排查 Codex QQ 通知。用于用户明确要求配置完
 
 # Codex QQ 通知
 
-用中文回复，结果先行。完成提醒按工作区和对话授权，主动直发按全局目标通道独立授权；两者共享机器人配置和传输，不互相推导开关。
+用中文回复，结果先行。完成提醒按工作区和对话授权，主动直发按全局目标通道独立授权；两者只共享机器人配置和传输，开关互不推导。
 
 ## 路由
 
@@ -13,7 +13,7 @@ description: 管理和排查 Codex QQ 通知。用于用户明确要求配置完
 - 开启、关闭、查看或执行主动直发：完整读取 [direct-message.md](references/direct-message.md)；模型不得自行开启或更换目标。
 - 安装、刷新或迁移 hook：完整读取 [setup.md](references/setup.md)。
 - 设置或更换机器人、目标 QQ 用户、OpenID、AppID 或 AppSecret：完整读取 [global-bot.md](references/global-bot.md)。
-- 排查未收到提醒、hook 链路或日志：完整读取 [troubleshooting.md](references/troubleshooting.md)；未发送原因尚未确认时，同时使用 `$change-governance` 并读取其 `causal-analysis.md`。仅解释已确认原因或核对已知状态时，不因此进入根因分析。
+- 排查未收到提醒、hook 链路或日志：完整读取 [troubleshooting.md](references/troubleshooting.md)；未发送原因未确认时，同时使用 `$change-governance` 并读取其 `causal-analysis.md`。仅解释已确认原因或核对已知状态时不因此进入根因分析。
 
 ## 配置文件
 
@@ -23,7 +23,7 @@ description: 管理和排查 Codex QQ 通知。用于用户明确要求配置完
 <WORKSPACE>\.codex\qq-hook-settings.json
 ```
 
-执行 `enable` 或 `disable` 时，如果文件不存在就创建，不要让用户先手动创建。执行 `status` 时不得创建目录、文件或补写默认字段，只在内存中使用默认配置生成状态。
+`enable` 或 `disable` 在文件不存在时创建；`status` 不得创建目录、文件或补写默认字段，只在内存中用默认配置生成状态。
 
 最小配置：
 
@@ -51,8 +51,7 @@ description: 管理和排查 Codex QQ 通知。用于用户明确要求配置完
 - `default_enabled`: 默认是否允许本工作区所有对话发送提醒。保持 `false`。
 - `enabled_thread_ids`: 已开启提醒的对话 ID 列表。
 - `disabled_thread_ids`: 已关闭提醒的对话 ID 列表。
-- `enabled_thread_names`: 保留字段，不用它开启提醒。
-- `disabled_thread_names`: 保留字段，不用它关闭提醒。
+- `enabled_thread_names`、`disabled_thread_names`: 保留字段，不用于开关提醒。
 - `message.stop_template`: 完成提醒使用的消息模板，默认 `work_complete`。
 - `message.prefix`: 消息前缀，默认一个空格。
 - `message.max_chars`: 整条 QQ 消息最大长度。
@@ -63,7 +62,7 @@ description: 管理和排查 Codex QQ 通知。用于用户明确要求配置完
 
 ## 开启当前对话
 
-把当前对话 ID 加入 `enabled_thread_ids`，同时从 `disabled_thread_ids` 移除。
+把当前对话 ID 加入 `enabled_thread_ids`，并从 `disabled_thread_ids` 移除。
 
 可用脚本修改，脚本会自动创建配置文件：
 
@@ -76,7 +75,7 @@ $SkillDir = '<skill_dir>'
 
 ## 关闭当前对话
 
-把当前对话 ID 加入 `disabled_thread_ids`，同时从 `enabled_thread_ids` 移除。
+把当前对话 ID 加入 `disabled_thread_ids`，并从 `enabled_thread_ids` 移除。
 
 ```powershell
 $SkillDir = '<skill_dir>'
@@ -101,4 +100,4 @@ $SkillDir = '<skill_dir>'
 - 当前对话 ID 是否在 `disabled_thread_ids`。
 - `default_enabled` 当前是 `true` 还是 `false`。
 
-如果当前上下文没有对话 ID，不要编造。请用户提供对话 ID，或只说明工作区配置文件当前内容。
+当前上下文没有对话 ID 时不得编造；请用户提供，或只说明工作区配置文件内容。

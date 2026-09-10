@@ -9,14 +9,14 @@ description: 仅在 srcq 分页或截断阻断当前必要证据，需诊断 src
 
 只读取当前缺口对应的引用：
 
-- 分页使必要结果尚未展示：query 的 `@more` 后直接执行 `@next` 提供的 `srcq more q<number>` 短命令，不改写句柄、不自行重组 cursor、控制面或原生 argv，也不读取引用；该句柄只是当前 spool 中的临时游标，不把旧句柄记录为持久引用。正文截断实际影响判断时先按已返回定位有界直读。缺少 `@next`、续页异常或明确需要特殊原生、machine/native/artifact 时，rg/fd 读取 [rg-fd.md](references/rg-fd.md)，scc 读取 [scc.md](references/scc.md)。
-- 用户要求判断 srcq 是否缺少能力、错误返回或投影降级是否为产品缺陷，或当前失败会改变查询方案：读取 [diagnostics.md](references/diagnostics.md)，先核对实际版本、对应帮助和原命令，再区分输入、范围、正常协议、降级与产品机制。
+- 分页使必要结果尚未展示：query 的 `@more` 后直接执行 `@next` 给出的 `srcq more q<number>`，不读引用、不改写临时句柄、不重组 cursor、控制面或原生 argv，也不持久记录句柄。正文截断影响判断时按已返回定位有界直读。缺少 `@next`、续页异常或需要特殊原生、machine/native/artifact 时，rg/fd 读 [rg-fd.md](references/rg-fd.md)，scc 读 [scc.md](references/scc.md)。
+- 需判断 srcq 能力、错误或投影降级是否为产品缺陷，或失败会改变查询方案：读 [diagnostics.md](references/diagnostics.md)，先核对版本、对应帮助和原命令，再区分输入、范围、正常协议、降级与产品机制。
 - 实际需要 scc 的 files、hotspots、lossless、raw、machine、native、artifact、输出副作用边界或结构化续页：读取 [scc.md](references/scc.md)。
-- 普通文本或已知正文不足，实际需要定义、引用、incoming/outgoing 调用或 workspace symbol 候选：先读取 [symbol-relations.md](references/symbol-relations.md)，优先走位置/限定名和默认限时范围；限时返回不是无结果证据，快速结果充分即停止。
+- 普通文本或已知正文不足，需定义、引用、incoming/outgoing 调用或 workspace symbol 候选：先读 [symbol-relations.md](references/symbol-relations.md)，优先位置/限定名和默认限时范围；限时不等于无结果，证据充分即停止。
 - 文本仍不能确定语法边界、控制流或结构关系，或明确需要 rule/rewrite：读取 [ast.md](references/ast.md)。
-- 文本、AST 或 `srcq symbol` 快速候选后仍有会改变结论的定义身份、重载、类型、精确引用、层级或 Provider 诊断歧义：定义、引用、调用或 workspace symbol 路径保留上述 [symbol-relations.md](references/symbol-relations.md) 并再读取 [lsp.md](references/lsp.md)；已知位置只缺独立 Provider 诊断时只读 `lsp.md`。只发现当前缺失能力。
+- 文本、AST 或 `srcq symbol` 候选后，仍有会改变结论的身份、重载、类型、精确引用、层级或 Provider 诊断歧义：定义、引用、调用或 workspace symbol 路径保留 [symbol-relations.md](references/symbol-relations.md) 并再读 [lsp.md](references/lsp.md)；已知位置只缺 Provider 诊断时只读 `lsp.md`。只发现当前缺失能力。
 
-若上述条件均不成立，返回普通 `srcq fd` / `srcq rg` / `srcq scc` 或已知文件有界读取；普通命令基准直接使用 `hyperfine`；证据充分即停止，普通查询不为预防性了解工具调用 help、doctor 或 capabilities。
+否则返回普通 `srcq fd` / `srcq rg` / `srcq scc` 或已知文件有界读取；命令基准直接用 `hyperfine`。普通查询不为预防性了解工具调用 help、doctor 或 capabilities。
 
 当前任务只审查本规则或其他查询规则、并未执行相应查询时，不读取引用。
 

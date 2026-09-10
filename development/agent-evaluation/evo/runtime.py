@@ -133,6 +133,7 @@ def execution_recipe(adapter: str, project: Path, *, swe: bool = False, code_rea
     if adapter == 'codex':
         evaluation_root = Path(__file__).resolve().parent.parent
         paths.extend([Path(__file__).with_name('codex_adapter.py'),
+                      Path(__file__).with_name('runtime_home.py'),
                       Path(__file__).with_name('skill_cache.py'), Path(__file__).with_name('manage_skill_cache.ps1'),
                       evaluation_root / 'agentbase_codex.py', evaluation_root / 'invoke_candidate.ps1',
                       evaluation_root.parent / 'common' / 'get_payload_manifest.ps1',
@@ -519,8 +520,14 @@ def _facts(study: dict, job: dict, receipt: dict, lifecycle: dict | None = None)
     trace_complete = (len(trace_streams) == len(raw.get('agent_usage', [])) and
                       all(stream.get('coverage', {}).get('complete_scan') is True for stream in trace_streams))
     receipt_location = job.get('receipt') or f'jobs/j{job["id"]}/receipt.json'
+    attempt_source_record = {'kind': 'evo-receipt', 'location': receipt_location}
+    if receipt.get('_usage_projected') is True:
+        attempt_source_record = {
+            'kind': 'evo-usage-projection', 'location': receipt_location,
+            'inputs': [receipt_location, f'jobs/j{job["id"]}/codex-result.json'],
+        }
     rows.append({'id': f'j{job["id"]}:attempt', 'grain': 'attempt', 'dimensions': dim, 'values': selected,
-                 'source': {'kind': 'evo-receipt', 'location': receipt_location},
+                 'source': attempt_source_record,
                  'completeness': 'complete' if all(v is not None for v in selected.values()) and
                  (not attempt_observation_fields or trace_complete) else 'partial'})
     agents = raw.get('agent_usage', [])
@@ -606,7 +613,7 @@ def _complete_from_raw(store: Store, study: dict, job: dict, installed_codex_roo
     raw_path = attempt / 'codex-result.json'
     if not raw_path.is_file():
         return False
-    if installed_codex_root is not None:
+    if installed_codex_root is not None or (attempt / 'codex-runtime-home.json').is_file():
         from .codex_adapter import recover_codex_artifacts
         recovered = recover_codex_artifacts(project_root=Path(study['project']), attempt_root=attempt,
                                              installed_codex_root=installed_codex_root)
@@ -729,6 +736,89 @@ def _complete_from_raw(store: Store, study: dict, job: dict, installed_codex_roo
     immutable_json(attempt / 'receipt.json', receipt)
     settle(store, job, receipt)
     return True
+
+
+def _raw_matches_subject(receipt: dict, intent: dict, job: dict, raw: dict) -> bool:
+    """Bind a mutable usage owner to the immutable subject snapshot that created it."""
+    receipt_raw = receipt.get('codex')
+    if (not isinstance(receipt_raw, dict)
+            or receipt.get('job') != job['id'] or receipt.get('study') != job['study']
+            or receipt.get('execution_identity') != job['identity']
+            or intent.get('execution_identity') != job['identity']):
+        return False
+    root_thread_id = raw.get('root_thread_id')
+    if (not isinstance(root_thread_id, str) or not root_thread_id
+            or receipt_raw.get('root_thread_id') != root_thread_id):
+        return False
+    receipt_cli = receipt_raw.get('codex')
+    raw_cli = raw.get('codex')
+    if isinstance(receipt_cli, dict) and isinstance(raw_cli, dict):
+        for field in ('path', 'version', 'sha256'):
+            if field in receipt_cli or field in raw_cli:
+                if receipt_cli.get(field) != raw_cli.get(field):
+                    return False
+    return True
+
+
+def _usage_projection_from_raw(store: Store, study: dict, job: dict,
+                               installed_codex_root: Path | None) -> dict | None:
+    """Read refreshed usage from its raw owner without replacing the final subject receipt."""
+    if job['state'] not in ('completed', 'awaiting_human') or job['usage_complete']:
+        return None
+    attempt = store.root / 'jobs' / f'j{job["id"]}'
+    receipt_path = attempt / 'receipt.json'
+    raw_path = attempt / 'codex-result.json'
+    intent_path = attempt / 'intent.json'
+    if not receipt_path.is_file() or not raw_path.is_file() or not intent_path.is_file():
+        return None
+    receipt = read_json(receipt_path)
+    intent = read_json(intent_path)
+    if (receipt.get('schema') != 'agentbase-evo-run/v1'
+            or receipt.get('job') != job['id'] or receipt.get('study') != job['study']
+            or receipt.get('execution_identity') != job['identity']
+            or intent.get('execution_identity') != job['identity']):
+        raise EvoError('settled usage recovery binding does not match its immutable subject receipt')
+    persisted_raw = read_json(raw_path)
+    if not _raw_matches_subject(receipt, intent, job, persisted_raw):
+        raise EvoError('raw Codex usage owner does not match its immutable subject receipt')
+    from .codex_adapter import recover_codex_artifacts
+    recovered = recover_codex_artifacts(
+        project_root=Path(study['project']), attempt_root=attempt,
+        installed_codex_root=installed_codex_root,
+    )
+    raw = recovered['raw_receipt']
+    usage = raw.get('usage', {})
+    if (not _raw_matches_subject(receipt, intent, job, raw)
+            or raw.get('schema') != 'agentbase.evo-codex-run/v1'
+            or raw.get('status') != 'completed' or raw.get('model_invoked') is not True
+            or raw.get('usage_complete') is not True
+            or type(usage.get('total_tokens')) is not int or usage['total_tokens'] < 0):
+        return None
+    return {'raw': raw, 'trace': recovered['trace'], 'receipt': receipt}
+
+
+def _project_current_usage(store: Store, job: dict, receipt: dict) -> dict:
+    """Project a complete, same-subject raw usage owner into facts at read time."""
+    if job['runtime']['adapter'] != 'codex':
+        return receipt
+    attempt = store.root / 'jobs' / f'j{job["id"]}'
+    raw_path = attempt / 'codex-result.json'
+    intent_path = attempt / 'intent.json'
+    if not raw_path.is_file() or not intent_path.is_file():
+        return receipt
+    raw = read_json(raw_path)
+    intent = read_json(intent_path)
+    if (not _raw_matches_subject(receipt, intent, job, raw)
+            or raw.get('schema') != 'agentbase.evo-codex-run/v1'
+            or raw.get('status') != 'completed' or raw.get('model_invoked') is not True
+            or raw.get('usage_complete') is not True):
+        return receipt
+    projected = copy.deepcopy(receipt)
+    projected['codex'] = raw
+    projected['usage'] = raw.get('usage', {}).get('total_tokens')
+    projected['usage_complete'] = True
+    projected['_usage_projected'] = True
+    return projected
 
 
 def execute(store: Store, job: dict, installed_codex_root: Path | None) -> None:
@@ -956,8 +1046,16 @@ def run(store: Store, *, study: int | None = None, installed_codex_root: Path | 
 
 def recover(store: Store, study: int, installed_codex_root: Path | None = None, *,
             confirm_not_invoked: int | None = None, evidence: str | None = None,
-            retry_not_invoked: int | None = None) -> dict:
+            retry_not_invoked: int | None = None, confirm_stopped: int | None = None) -> dict:
     with CaseLock(store.root, 'evo-scheduler'):
+        if confirm_stopped is not None:
+            prior = store.reconcile_stopped(study, confirm_stopped, evidence or '')
+            work = Path(store.study(study)['work']).resolve()
+            if prior['workspace_slot']:
+                workspace = work / f'slot-{prior["workspace_slot"]:04d}'
+                if (workspace / '.evo-slot.json').is_file():
+                    from .env_pool import EnvironmentPool
+                    EnvironmentPool(work, store.root).release(workspace)
         if confirm_not_invoked is not None:
             raw = store.root / 'jobs' / f'j{confirm_not_invoked}' / 'codex-result.json'
             if raw.exists():
@@ -974,6 +1072,13 @@ def recover(store: Store, study: int, installed_codex_root: Path | None = None, 
         if retry_not_invoked is not None:
             store.require_retryable_not_invoked(study, retry_not_invoked)
             prior = next(job for job in store.jobs(study) if job['id'] == retry_not_invoked)
+            if prior.get('workspace_slot'):
+                work = Path(store.study(study)['work']).resolve()
+                workspace = work / f'slot-{prior["workspace_slot"]:04d}'
+                if (workspace / '.evo-slot.json').is_file():
+                    from .env_pool import EnvironmentPool
+                    EnvironmentPool(work, store.root, Path(store.study(study)['project'])).restore_projection_owner(
+                        workspace)
             refreshed = dict(prior['plan'])
             refreshed['execution_recipe'] = execution_recipe(
                 prior['runtime']['adapter'], Path(store.study(study)['project']),
@@ -995,6 +1100,17 @@ def recover(store: Store, study: int, installed_codex_root: Path | None = None, 
                                     identity=refreshed['execution_identity'], plan=refreshed)
         for job in store.jobs(study):
             raw_path = store.root / 'jobs' / f'j{job["id"]}' / 'codex-result.json'
+            if (job['runtime']['adapter'] == 'codex'
+                    and job['state'] in ('completed', 'awaiting_human')
+                    and not job['usage_complete']):
+                projection = _usage_projection_from_raw(
+                    store, store.study(study), job, installed_codex_root)
+                if projection is not None:
+                    usage = projection['raw']['usage']['total_tokens']
+                    store.finish(
+                        job['id'], job['state'], receipt=job['receipt'], usage=usage,
+                        usage_complete=True, error=job.get('error'))
+                continue
             failed_precondition_candidate = False
             if job['state'] == 'failed' and job['runtime']['adapter'] == 'codex' and raw_path.is_file():
                 raw_candidate = read_json(raw_path)
@@ -1058,6 +1174,7 @@ def artifacts(store: Store, study: int, projection_spec: dict | None = None) -> 
         projected_job = {**job, 'plan': {**job['plan'], 'groups': group_membership.get(job['plan']['item'], [])}}
         if job['receipt']:
             receipt = read_json(inside(store.root, job['receipt']))
+            receipt = _project_current_usage(store, job, receipt)
             derived_trace = store.root / 'jobs' / f'j{job["id"]}' / 'codex-trace.json'
             if derived_trace.is_file():
                 receipt = {**receipt, 'trace': read_json(derived_trace)}

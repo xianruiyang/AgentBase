@@ -6,6 +6,7 @@ param(
     [string]$Workspace,
     [Parameter(Mandatory = $true)]
     [string]$InstalledCodexRoot,
+    [string]$RuntimeCodexRoot = '',
     [Parameter(Mandatory = $true)]
     [string]$PromptPath,
     [Parameter(Mandatory = $true)]
@@ -28,6 +29,18 @@ $ErrorActionPreference = 'Stop'
 $resolvedProject = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $resolvedWorkspace = (Resolve-Path -LiteralPath $Workspace).Path
 $resolvedCodexRoot = (Resolve-Path -LiteralPath $InstalledCodexRoot).Path
+$declaredRuntimeCodexRoot = if ([string]::IsNullOrWhiteSpace($RuntimeCodexRoot)) {
+    $resolvedCodexRoot
+}
+else {
+    [IO.Path]::GetFullPath($RuntimeCodexRoot)
+}
+$resolvedRuntimeCodexRoot = if ([string]::IsNullOrWhiteSpace($RuntimeCodexRoot)) {
+    $resolvedCodexRoot
+}
+else {
+    (Resolve-Path -LiteralPath $RuntimeCodexRoot).Path
+}
 $resolvedPrompt = (Resolve-Path -LiteralPath $PromptPath).Path
 $resolvedCodex = (Resolve-Path -LiteralPath $CodexExecutablePath).Path
 $resolvedTaskRuntimeBin = if ([string]::IsNullOrWhiteSpace($TaskRuntimeBinPath)) {
@@ -37,6 +50,7 @@ else {
     (Resolve-Path -LiteralPath $TaskRuntimeBinPath).Path
 }
 $resolvedResult = [IO.Path]::GetFullPath($ResultPath)
+$expectedEvoRuntimeRoot = Join-Path (Split-Path -Parent $resolvedResult) 'codex-runtime-home'
 $commonRuntime = Join-Path $resolvedProject 'development\common\codex_cli_runtime.ps1'
 . $commonRuntime
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
@@ -142,8 +156,8 @@ function Invoke-AgentBaseBoundedProcess {
     }
 }
 
-if (-not (Test-Path -LiteralPath (Join-Path $resolvedCodexRoot 'auth.json') -PathType Leaf)) {
-    throw 'Installed Codex root has no auth.json'
+if (-not (Test-Path -LiteralPath (Join-Path $resolvedRuntimeCodexRoot 'auth.json') -PathType Leaf)) {
+    throw 'Codex runtime root has no auth.json'
 }
 if (-not (Test-Path -LiteralPath (Join-Path $resolvedWorkspace '.codex\config.toml') -PathType Leaf)) {
     throw 'Candidate workspace has no projected .codex/config.toml'
@@ -225,7 +239,7 @@ try {
         -Executable $resolvedCodex `
         -Arguments $arguments.ToArray() `
         -WorkingDirectory $resolvedWorkspace `
-        -CodexHome $resolvedCodexRoot `
+        -CodexHome $resolvedRuntimeCodexRoot `
         -RuntimeBin $resolvedTaskRuntimeBin `
         -StartedMarkerPath $startedMarkerPath `
         -StandardInput $prompt `
@@ -243,6 +257,21 @@ catch {
         exit 2
     }
     throw
+}
+finally {
+    if ($resolvedRuntimeCodexRoot -ne $resolvedCodexRoot) {
+        $runtimeItem = Get-Item -LiteralPath $declaredRuntimeCodexRoot -Force -ErrorAction SilentlyContinue
+        $isExpectedRuntime = [string]::Equals(
+            $declaredRuntimeCodexRoot,
+            $expectedEvoRuntimeRoot,
+            [StringComparison]::OrdinalIgnoreCase
+        )
+        $isReparsePoint = $null -ne $runtimeItem -and
+            ($runtimeItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+        if ($isExpectedRuntime -and -not $isReparsePoint) {
+            Remove-Item -LiteralPath (Join-Path $declaredRuntimeCodexRoot 'auth.json') -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 if (([string]$codexProcess.stdout).Length -gt 16777216 -or
     ([string]$codexProcess.stderr).Length -gt 2097152) {

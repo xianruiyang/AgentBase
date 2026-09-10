@@ -120,7 +120,7 @@ python.exe development/agent-evaluation/agent_eval.py evo results --state-root $
 
 ### 七类组件投影
 
-Codex 组合的可运行示例见[七组件合成规格](../tests/fixtures/evo/components/seven-component-research.json)。AGENTS 指令选择单个文本文件，skill 选择包含 `SKILL.md` 的目录，agent 选择 TOML 文件或含 profile 的目录，Codex 设置选择 TOML 文件。多个配置声明冲突时拒绝运行，不用覆盖次序决定结果。评测进程固定无人值守与受管可写工作区，安装根仅提供已授权的运行凭据和原生会话用量来源。
+Codex 组合的可运行示例见[七组件合成规格](../tests/fixtures/evo/components/seven-component-research.json)。AGENTS 指令选择单个文本文件，skill 选择包含 `SKILL.md` 的目录，agent 选择 TOML 文件或含 profile 的目录，Codex 设置选择 TOML 文件。多个配置声明冲突时拒绝运行，不用覆盖次序决定结果。评测进程固定无人值守与受管可写工作区。每个 attempt 的独立最小 Codex home 是实际运行与原生会话用量来源，启动时只从安装根的普通 `auth.json` 建立同卷硬链接；不读取、打印或复制认证内容，完成或异常后解除链接并保留会话证据。白板组合因此不会继承安装根的全局 AGENTS、config、skills 或 agents，选中组件仍只通过工作区投影进入候选。
 
 hook、MCP、工具选择带 `component.json` 的源码或已准备产物目录，schema 为 `agentbase-evo-component/v1`，`kind` 与组件种类一致：
 
@@ -132,11 +132,15 @@ hook、MCP、工具选择带 `component.json` 的源码或已准备产物目录�
 
 路径与依赖必须属于选中组件；不复制整个安装目录、不自动安装依赖。原生产组件的编译仍走其正式入口，Evo 接收已准备、可运行的产物或脚本。投影按源码和产物身份校验；同一槽位中未变且未被污染的内容复用，变化时仅替换受管投影，必要运行产物在重置前归档。
 
-`runtime.max_agents` 包含 root。为 1 时关闭本次进程的多代理功能；大于 1 时用后代容量配合队列总预留。显式设置与该限制冲突时先修正规格。配置文件存在只能证明投影，实际加载由本机真实场景的命令、MCP 结果、hook 产物和子代理事件证明。
+`runtime.max_agents` 包含 root。为 1 时同时设置 `agents.enabled=false` 与 `features.multi_agent=false`，并拒绝选入自定义 agent profile，确保本次进程不暴露子代理工具；大于 1 时启用 agents 并用后代容量配合队列总预留。所选 Codex 设置中的 `agents.enabled`、旧 feature 开关或容量与该限制冲突时拒绝投影，不能靠覆盖次序改变受测组合。配置文件存在只能证明投影，实际加载由本机真实场景的命令、MCP 结果、hook 产物和子代理事件证明。
 
-`status/watch` 不启动模型，关闭监控不取消作业。`pause` 停止新派发；`cancel` 只取消本次拥有的工作。`recover` 以已持久化的执行证据对账，已完成 subject 不重跑；结果不明保持未结算。人工待评释放执行资源，必要证据与评分归档继续保留。预算预留控制作业级派发，不承诺对模型内部每个请求实施 Token 硬限。
+`status/watch` 不启动模型，关闭监控不取消作业。`pause` 停止新派发；`cancel` 只取消本次拥有的工作。`recover` 以已持久化的执行证据对账，已完成 subject 不重跑；新 attempt 按 `codex-runtime-home.json` 中的固定相对目录恢复原生会话与用量，旧收据仍按既有安装根解释，结果不明保持未结算。若 completed 或 awaiting-human 作业已有最终收据但用量未结算，恢复只从绑定同一执行身份的 `codex-result.json` 用量 owner 补齐原生用量并更新数据库总量；最终 subject `receipt.json`、质量、Verifier 结果保持不变，facts 读取时明确投影当前完整用量和逐代理事实。认证链接在恢复时也会清理，原生刷新若在 runtime home 内替换认证文件只作为临时状态保留到清理，不反写安装根。人工待评释放执行资源，必要证据与评分归档继续保留。预算预留控制作业级派发，不承诺对模型内部每个请求实施 Token 硬限。
 
-`resources --state-root <state>` 按需查询受管 state/work 实际占用、预留、磁盘预算、卷空闲空间及 job/model 容量，`--study s1` 可限定复用统计。status/watch 只展示数据库可计算的轻量容量摘要，不每轮扫描磁盘。原生 Codex 会话账本由宿主维护，属于外部证据来源，不混入受管目录占用。
+若槽位复用在模型启动前失败，且状态已明确记录 `usage=0`、`usage_complete=true`，先用 `recover --confirm-not-invoked <job> --evidence '<直接证据>'` 固化人工核对，再用 `recover --retry-not-invoked <job> --evidence '<重试依据>'` 排回原研究。重试入口会在需要时从同一槽位已归档的 `workspace-diff` 候选中恢复与当前引用身份一致的投影清单，但仅在最终收据、工作区身份、skill-cache 登记、真实 junction 目标和内容全部一致时恢复；未知链接、不一致或多个不同身份的匹配候选仍拒绝。多个失败题逐题完成这两步，最后再执行一次 `run`。
+
+取消中断了 launcher、未生成最终收据时，作业可能保持 `uncertain`。确认该作业全部自有进程已停止后，用 `recover --confirm-stopped <job> --evidence '<停止的直接依据>'` 释放执行槽位；仅接受已取消研究中的 uncertain 作业。此显式核对记录由队列事件持有，不替代进程检查，不生成作答或质量收据，不把未知用量改为零或完整，也不重新运行模型。原生记录和工作区证据保留，后续用量分析须标明未结算边界。
+
+`resources --state-root <state>` 按需查询受管 state/work 实际占用、预留、磁盘预算、卷空闲空间及 job/model 容量，`--study s1` 可限定复用统计。status/watch 只展示数据库可计算的轻量容量摘要，不每轮扫描磁盘。Evo 原生 Codex 会话账本位于 attempt 的独立 runtime home，属于受管工作证据并计入 state 占用；安装根会话账本只供旧收据兼容恢复，不是新 attempt 的用量来源。
 
 ### Skill 的固定版本与共享引用
 

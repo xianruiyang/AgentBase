@@ -59,6 +59,8 @@ def add_commands(commands) -> None:
             parser.add_argument('--installed-codex-root', type=Path)
         if name == 'recover':
             parser.add_argument('--confirm-not-invoked', type=job_id)
+            parser.add_argument('--confirm-stopped', type=job_id,
+                                help='attest owned processes have stopped; cancel without claiming complete usage or quality')
             parser.add_argument('--evidence')
             parser.add_argument('--retry-not-invoked', type=job_id)
         if name == 'watch':
@@ -97,12 +99,13 @@ def handle(args) -> dict | None:
     if action in ('run', 'resume'):
         return runtime.run(store, study=ident, installed_codex_root=args.installed_codex_root)
     if action == 'recover':
-        actions = sum(value is not None for value in (args.confirm_not_invoked, args.retry_not_invoked))
+        confirm_stopped = getattr(args, 'confirm_stopped', None)
+        actions = sum(value is not None for value in (args.confirm_not_invoked, args.retry_not_invoked, confirm_stopped))
         if actions > 1 or (actions == 0 and args.evidence is not None) or (actions == 1 and args.evidence is None):
             raise EvoError('choose one reconciliation action and provide --evidence with it')
         return runtime.recover(store, ident, args.installed_codex_root,
                                confirm_not_invoked=args.confirm_not_invoked, evidence=args.evidence,
-                               retry_not_invoked=args.retry_not_invoked)
+                               retry_not_invoked=args.retry_not_invoked, confirm_stopped=confirm_stopped)
     if action == 'results':
         from .grading import study_artifacts_with_model_grades
         from .runtime_review import study_artifacts_with_reviews, sync_study_reviews

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -158,7 +159,10 @@ class EvoSkillCacheTests(unittest.TestCase):
             self.assertIn('value one', (workspaces[1] / '.agents' / 'skills' / 'sample-skill' / 'SKILL.md').read_text())
             self.assertIn('value two', (workspaces[0] / '.agents' / 'skills' / 'sample-skill' / 'SKILL.md').read_text())
             pool.record_baseline(workspaces[0], jobs[2]); pool.release(workspaces[0])
-            pool.acquire(1, jobs[3], set())
+            reused = pool.acquire(1, jobs[3], set(), {'.agents/skills'})
+            pool.record_baseline(reused, jobs[3])
+            pool.release(reused)
+            pool.acquire(1, {'id': 6, 'identity': 'job-6', 'attempt_seq': 1}, set())
             pool.acquire(2, jobs[4], set())
             old_version = cache.versions / second_ref['version_alias']
             old_manifest = json.loads((old_version / 'manifest.json').read_text(encoding='utf-8'))
@@ -171,6 +175,67 @@ class EvoSkillCacheTests(unittest.TestCase):
             cache.remove_unreferenced_version(second_ref['identity_sha256'])
             self.assertTrue(Path(changed_ref['target']).is_dir())
             cache.remove_unreferenced_version(changed_ref['identity_sha256'])
+
+    def test_slot_reuse_updates_projection_owner_when_only_one_skill_reference_is_retained(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); candidate = root / 'candidate'
+            first, second = candidate / 'first-skill', candidate / 'second-skill'
+            first.mkdir(parents=True); second.mkdir(parents=True)
+            (first / 'SKILL.md').write_text('# First\n', encoding='utf-8')
+            (second / 'SKILL.md').write_text('# Second\n', encoding='utf-8')
+            state, work = root / 'state', root / 'work'; state.mkdir()
+            pool = EnvironmentPool(work, state, PROJECT_ROOT)
+            jobs = [{'id': number, 'identity': f'job-{number}', 'attempt_seq': 1} for number in (1, 2)]
+            workspace = pool.acquire(1, jobs[0], set())
+            projection = agentbase_codex.stage_codex_component_projection(
+                project_root=PROJECT_ROOT, workspace=workspace,
+                selected={'skills': [{'id': 'first', 'source': str(first)}, {'id': 'second', 'source': str(second)}]},
+                candidate_source_roots=[candidate], skill_cache_root=state / 'skill-cache')
+            pool.record_baseline(workspace, jobs[0]); pool.release(workspace)
+            retained_link = '.agents/skills/first-skill'
+            reused = pool.acquire(1, jobs[1], set(), {retained_link})
+            pool.record_baseline(reused, jobs[1])
+            manifest = json.loads((reused / '.agentbase' / 'evo-codex-projection.json').read_text(encoding='utf-8'))
+            references = manifest['result']['skill_references']
+            self.assertEqual([Path(reference['link']).name for reference in references], ['first-skill'])
+            self.assertTrue((reused / retained_link).is_junction())
+            self.assertFalse((reused / '.agents' / 'skills' / 'second-skill').exists())
+            self.assertFalse(any(entry['path'].startswith('.agents/skills/second-skill/')
+                                 for entry in manifest['result']['files']))
+            cache = SkillCache(PROJECT_ROOT, state)
+            for reference in references:
+                cache.remove_reference(reference)
+            cache.remove_unreferenced_version(projection['skill_references'][0]['identity_sha256'])
+
+    def test_archived_projection_owner_recovers_real_junction_before_slot_retry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); source = root / 'candidate' / 'sample-skill'; source.mkdir(parents=True)
+            (source / 'SKILL.md').write_text('# Shared\n', encoding='utf-8')
+            state, work = root / 'state', root / 'work'; state.mkdir()
+            pool = EnvironmentPool(work, state, PROJECT_ROOT)
+            job = {'id': 1, 'identity': 'job-1', 'attempt_seq': 1}
+            workspace = pool.acquire(1, job, set())
+            projection = agentbase_codex.stage_codex_component_projection(
+                project_root=PROJECT_ROOT, workspace=workspace,
+                selected={'skills': [{'id': 'stable', 'source': str(source)}]},
+                candidate_source_roots=[source.parent], skill_cache_root=state / 'skill-cache')
+            pool.record_baseline(workspace, job)
+            attempt = state / 'jobs' / 'j1'; (attempt / 'workspace-diff' / '.agentbase').mkdir(parents=True)
+            manifest = workspace / '.agentbase' / 'evo-codex-projection.json'
+            shutil.copy2(manifest, attempt / 'workspace-diff' / '.agentbase' / manifest.name)
+            (attempt / 'intent.json').write_text(json.dumps({'workspace': str(workspace)}), encoding='utf-8')
+            (attempt / 'receipt.json').write_text(json.dumps({'projection': projection}), encoding='utf-8')
+            manifest.unlink()
+            self.assertTrue((workspace / '.agents' / 'skills' / 'sample-skill').is_junction())
+            with self.assertRaisesRegex(Exception, 'unmanaged link'):
+                pool.record_baseline(workspace, job)
+            self.assertTrue(pool.restore_projection_owner(workspace))
+            pool.record_baseline(workspace, job)
+            self.assertFalse(pool.restore_projection_owner(workspace))
+            cache = SkillCache(PROJECT_ROOT, state)
+            for reference in projection['skill_references']:
+                cache.remove_reference(reference)
+            cache.remove_unreferenced_version(projection['skill_references'][0]['identity_sha256'])
 
     def test_swe_cleanup_detaches_reference_without_deleting_shared_version(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

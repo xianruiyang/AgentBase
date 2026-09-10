@@ -62,6 +62,43 @@ class EnvironmentPool:
         meta['baseline'] = self._inventory(workspace)
         meta_path.write_text(canonical(meta) + '\n', encoding='utf-8')
 
+    def restore_projection_owner(self, workspace: Path) -> bool:
+        """Restore an archived projection manifest only after its live references validate."""
+        manifest = workspace / '.agentbase' / 'evo-codex-projection.json'
+        if manifest.exists() or manifest.is_symlink():
+            return False
+        if self.project_root is None:
+            raise EvoError('projection owner recovery requires its Evo project owner')
+        from .skill_cache import SkillCache
+        candidates = []
+        jobs_root = self.state_root / 'jobs'
+        for job_root in jobs_root.glob('j*'):
+            archived = job_root / 'workspace-diff' / '.agentbase' / manifest.name
+            receipt = job_root / 'receipt.json'
+            intent = job_root / 'intent.json'
+            if not archived.is_file() or archived.is_symlink() or not receipt.is_file() or not intent.is_file():
+                continue
+            try:
+                if Path(json.loads(intent.read_text(encoding='utf-8'))['workspace']).resolve() != workspace.resolve():
+                    continue
+                value = json.loads(archived.read_text(encoding='utf-8'))
+                references = value.get('result', {}).get('skill_references', [])
+                recorded = json.loads(receipt.read_text(encoding='utf-8')).get('projection', {}).get('skill_references', [])
+                if references and references == recorded:
+                    candidates.append((archived, references))
+            except (KeyError, OSError, ValueError, json.JSONDecodeError):
+                continue
+        identities = {canonical(references) for _, references in candidates}
+        if len(identities) > 1:
+            raise EvoError('multiple archived projection owners match the writable slot')
+        if not candidates:
+            return False
+        archived, references = candidates[-1]
+        SkillCache(self.project_root, self.state_root).validate_workspace_references(workspace, references, content=True)
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(archived, manifest)
+        return True
+
     def quarantine(self, workspace: Path, reason: str) -> None:
         meta_path = workspace / '.evo-slot.json'
         if not meta_path.exists():
@@ -142,7 +179,35 @@ class EnvironmentPool:
                 baseline.pop(relative, None)
             else:
                 retained_references.append(reference)
-        remove = set(ordinary_changed) | {name for name in baseline if not retained(name)}
+        if retained_references and len(retained_references) != len(references):
+            manifest_path = workspace / '.agentbase' / 'evo-codex-projection.json'
+            manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+            removed_links = {
+                Path(reference['link']).relative_to(workspace).as_posix()
+                for reference in references if reference not in retained_references
+            }
+            def retained_file(entry: dict) -> bool:
+                name = entry.get('path')
+                return isinstance(name, str) and not any(
+                    name == link or name.startswith(link + '/') for link in removed_links)
+            files = [entry for entry in manifest.get('files', []) if retained_file(entry)]
+            result = manifest.get('result', {})
+            result['files'] = [entry for entry in result.get('files', []) if retained_file(entry)]
+            result['skill_files'] = [entry for entry in result.get('skill_files', []) if retained_file(entry)]
+            result['skill_references'] = retained_references
+            payload = {'schema': 'agentbase.evo-codex-projection/v1', 'files': result['files']}
+            result['identity_sha256'] = hashlib.sha256(canonical(payload).encode('utf-8')).hexdigest()
+            manifest['files'] = files
+            manifest_path.write_text(canonical(manifest) + '\n', encoding='utf-8')
+        # The projection manifest is the authority that makes retained junctions
+        # distinguishable from unknown links during the next baseline inventory.
+        # It is still archived as changed evidence, but must live as long as all
+        # of the references it identifies are retained.
+        projection_owner = '.agentbase/evo-codex-projection.json'
+        preserved_owner = projection_owner if retained_references else None
+        remove = (set(ordinary_changed) | {name for name in baseline if not retained(name)})
+        if preserved_owner is not None:
+            remove.discard(preserved_owner)
         for name in sorted(remove, key=lambda value: len(Path(value).parts), reverse=True):
             path = workspace / Path(name)
             if path.is_file():

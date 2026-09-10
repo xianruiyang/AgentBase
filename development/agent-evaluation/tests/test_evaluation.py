@@ -412,6 +412,38 @@ class CandidateRuntimeTests(unittest.TestCase):
         self.assertEqual(receipt["api_equivalent_cost"]["total_usd_nanos"], 890650)
         self.assertEqual(receipt["api_equivalent_cost"]["total_usd"], "0.000890650")
 
+    def test_unpriced_models_preserve_complete_root_and_child_usage(self) -> None:
+        usage = {"total_tokens": 130, "input_tokens": 100, "cached_input_tokens": 40,
+                 "cache_write_input_tokens": 10, "output_tokens": 30, "reasoning_output_tokens": 12}
+        for root_model in ("gpt-5.6-sol", "unpriced-test-model"):
+            with self.subTest(root_model=root_model), tempfile.TemporaryDirectory() as directory:
+                home = Path(directory)
+                before = agentbase_codex.candidate_rollout_snapshot(home)
+                write_usage_rollout(home / "sessions/root.jsonl", thread_id="root", usage=usage,
+                                    model=root_model)
+                write_usage_rollout(home / "sessions/child.jsonl", thread_id="child", usage=usage,
+                                    usage_events=[usage, usage], parent_thread_id="root",
+                                    role="experiment", model="unpriced-test-model")
+                value = agentbase_codex.finalize_candidate_agent_usage(
+                    {"model_invoked": True, "root_thread_id": "root", "root_usage": usage,
+                     "usage_collection_error": "previous pricing coverage failure"},
+                    codex_home=home, before=before)
+                self.assertTrue(value["usage_complete"])
+                self.assertEqual(value["usage"]["total_tokens"], 390)
+                self.assertEqual(value["subagent_usage"]["total_tokens"], 260)
+                self.assertNotIn("usage_collection_error", value)
+                cost = value["api_equivalent_cost"]
+                self.assertFalse(cost["complete"])
+                self.assertIsNone(cost["total_usd_nanos"])
+                self.assertIsNone(cost["subagent_usd_nanos"])
+                self.assertEqual(cost["unpriced_models"], ["unpriced-test-model"])
+                self.assertEqual(cost["request_count"], 3)
+                self.assertEqual(cost["root_usd_nanos"] is None, root_model == "unpriced-test-model")
+                child = value["agent_usage"][1]
+                self.assertEqual(child["requests"][0]["model"], "unpriced-test-model")
+                self.assertEqual(child["pricing_groups"][0]["request_count"], 2)
+                self.assertIsNone(child["pricing_groups"][0]["cost_usd"])
+
     def test_candidate_cost_applies_long_context_pricing_per_response(self) -> None:
         below_threshold = {
             "total_tokens": 150010,

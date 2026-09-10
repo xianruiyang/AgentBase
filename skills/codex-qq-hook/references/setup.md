@@ -4,7 +4,7 @@
 
 ## 入口选择
 
-- 复制或克隆完整 `AgentBase` 项目时，优先构建并安装 `agentbase-core` 插件；插件自带以 `${PLUGIN_ROOT}` 定位的 hooks。全局规则与可移植设置使用项目部署入口的 `Plugin` 模式，不再把同名 skill 或全局 hooks 安装一遍。
+- 复制或克隆完整 `AgentBase` 项目时，优先构建并安装自带 `${PLUGIN_ROOT}` hooks 的 `agentbase-core` 插件。全局规则与可移植设置使用项目部署入口的 `Plugin` 模式，不重复安装同名 skill 或全局 hooks。
 - 已有 `<CodexRoot>\skills` 安装尚未迁移时，可继续使用项目部署入口的 `DirectCompatibility` 模式；该模式是兼容路径，不与插件同时启用。
 - 只有当前 skill 被独立安装、且没有 `AgentBase` 项目部署入口时，才使用下方 `install_global_qq_hook.ps1`。
 
@@ -44,8 +44,8 @@ $SkillDir = '<skill_dir>'
 <USERPROFILE>\.agents\skills\codex-qq-hook
 ```
 
-然后向安装脚本显式传入 `<CodexRoot>`，配置全局 `qq-hook-global-settings.json`，设置 `QQ_BOT_APP_SECRET` 用户环境变量，并重新信任 hook。旧版 `<CodexRoot>\skills\codex-qq-hook` 仍可作为迁移期来源，但不能用目录层级反推 Codex 根目录。
+然后向安装脚本显式传入 `<CodexRoot>`，配置全局 `qq-hook-global-settings.json`，设置 `QQ_BOT_APP_SECRET` 用户环境变量并重新信任 hook。旧版 `<CodexRoot>\skills\codex-qq-hook` 可作迁移期来源，但不能用目录层级反推 Codex 根目录。
 
 不要迁移真实 `QQ_BOT_APP_SECRET` 到文件。
 
-`<skill_dir>` 是本文件所属 skill 目录；`<CodexRoot>` 由显式参数、`CODEX_HOME` 或默认用户 Codex 目录确定，与 skill 被插件缓存或本地目录加载的位置无关。
+`<skill_dir>` 是本文件所属 skill 目录；`<CodexRoot>` 由显式参数、`CODEX_HOME` 或默认用户 Codex 目录确定，与 skill 的插件缓存或本地加载位置无关。

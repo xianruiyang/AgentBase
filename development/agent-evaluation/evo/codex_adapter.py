@@ -11,6 +11,7 @@ from typing import Any, Callable, Mapping
 
 import agentbase_codex
 from evaluation_core import EvaluationError, PreconditionError, read_json, write_json_atomic, write_text_atomic
+from evo.runtime_home import cleanup_runtime_auth_after, prepare_runtime_home, runtime_home_from_receipt
 
 
 EVO_CODEX_RESULT_SCHEMA = "agentbase.evo-codex-run/v1"
@@ -114,13 +115,17 @@ def refresh_codex_trace(
     *,
     project_root: Path,
     attempt_root: Path,
-    installed_codex_root: Path,
+    installed_codex_root: Path | None,
 ) -> dict[str, Any]:
     """Rebuild the bounded public native trace without changing the subject receipt."""
 
     attempt = attempt_root.resolve()
     receipt = read_json(attempt / "codex-result.json")
-    trace = _audit_trace(project_root.resolve(), installed_codex_root.resolve(), receipt)
+    codex_home = runtime_home_from_receipt(
+        attempt_root=attempt,
+        installed_codex_root=installed_codex_root,
+    )
+    trace = _audit_trace(project_root.resolve(), codex_home, receipt)
     trace_path = attempt / "codex-trace.json"
     write_json_atomic(trace_path, trace)
     return {"trace": trace, "trace_path": str(trace_path)}
@@ -170,7 +175,7 @@ def _codex_preflight(
         "codex_version": agentbase_codex.bounded_text(version_text, 200),
         "config_parsed_and_projected": True,
         "v2_agent_capacity_projected": True,
-        "authentication": "existing-file-present",
+        "authentication": "attempt-scoped-hardlink-present",
         "launcher_contract": {
             "ignore_user_config": True,
             "strict_config": True,
@@ -182,16 +187,20 @@ def _codex_preflight(
     }
 
 
+@cleanup_runtime_auth_after
 def recover_codex_artifacts(
     *,
     project_root: Path,
     attempt_root: Path,
-    installed_codex_root: Path,
+    installed_codex_root: Path | None,
 ) -> dict[str, Any]:
     """Finalize an already-written Codex receipt and trace without invoking a model."""
 
     attempt = attempt_root.resolve()
-    codex_home = installed_codex_root.resolve()
+    codex_home = runtime_home_from_receipt(
+        attempt_root=attempt,
+        installed_codex_root=installed_codex_root,
+    )
     result_path = attempt / "codex-result.json"
     before_path = attempt / "codex-rollout-before.json"
     if not result_path.is_file() or not before_path.is_file():
@@ -235,6 +244,7 @@ def recover_codex_artifacts(
     }
 
 
+@cleanup_runtime_auth_after
 def run_codex_job(
     *,
     project_root: Path,
@@ -258,10 +268,10 @@ def run_codex_job(
     if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int) or not 60 <= timeout_seconds <= 14400:
         raise CodexAdapterPrecondition("Codex timeout_seconds must be an integer from 60 to 14400")
     roots = [path.resolve() for path in (project_root, workspace, attempt_root, installed_codex_root)]
-    project, work, attempt, codex_home = roots
-    if not project.is_dir() or not work.is_dir() or not attempt.is_dir() or not codex_home.is_dir():
+    project, work, attempt, installed_home = roots
+    if not project.is_dir() or not work.is_dir() or not attempt.is_dir() or not installed_home.is_dir():
         raise CodexAdapterPrecondition("Evo Codex job roots must exist before preparation")
-    if not (codex_home / "auth.json").is_file():
+    if not (installed_home / "auth.json").is_file():
         raise CodexAdapterPrecondition("installed Codex root has no auth.json")
     combinations = _by_id(list(spec.get("combinations", [])), "combination")
     items = _by_id(list(spec.get("evaluations", {}).get("items", [])), "evaluation item")
@@ -331,11 +341,19 @@ def run_codex_job(
         # The dependency owner supplies a workspace venv/pnpm or the host npm bin.
         if not task_runtime_bin.is_dir():
             raise CodexAdapterPrecondition("task runtime bin must be an existing directory")
+    try:
+        codex_home, runtime_home_record = prepare_runtime_home(
+            attempt_root=attempt,
+            installed_codex_root=installed_home,
+        )
+    except (OSError, PreconditionError) as exc:
+        raise CodexAdapterPrecondition(str(exc)) from exc
     argv = [
         "pwsh.exe", "-NoProfile", "-NonInteractive", "-File",
         str(project / "development" / "agent-evaluation" / "invoke_candidate.ps1"),
         "-ProjectRoot", str(project), "-Workspace", str(work),
-        "-InstalledCodexRoot", str(codex_home), "-PromptPath", str(prompt_path),
+        "-InstalledCodexRoot", str(installed_home), "-RuntimeCodexRoot", str(codex_home),
+        "-PromptPath", str(prompt_path),
         "-ResultPath", str(result_path), "-Model", str(model),
         "-ReasoningEffort", str(reasoning), "-CodexExecutablePath", str(executable),
         "-TimeoutSeconds", str(timeout_seconds), "-ResultSchema", EVO_CODEX_RESULT_SCHEMA,
@@ -382,20 +400,24 @@ def run_codex_job(
             )
         except OSError as exc:
             raise CodexAdapterPrecondition(f"shared Codex launcher did not start: {exc}") from exc
-        while process.poll() is None:
-            if cancel_check is not None and cancel_check():
-                cancelled = True
-                process_tree_terminated = _terminate_tree(process)
-                break
-            if time.monotonic() - started > timeout_seconds + 300:
-                timed_out = True
-                process_tree_terminated = _terminate_tree(process)
-                break
-            if launcher_stdout_path.stat().st_size > 2 * 1024 * 1024 or launcher_stderr_path.stat().st_size > 2 * 1024 * 1024:
-                process_tree_terminated = _terminate_tree(process)
-                timed_out = True
-                break
-            time.sleep(0.1)
+        try:
+            while process.poll() is None:
+                if cancel_check is not None and cancel_check():
+                    cancelled = True
+                    process_tree_terminated = _terminate_tree(process)
+                    break
+                if time.monotonic() - started > timeout_seconds + 300:
+                    timed_out = True
+                    process_tree_terminated = _terminate_tree(process)
+                    break
+                if launcher_stdout_path.stat().st_size > 2 * 1024 * 1024 or launcher_stderr_path.stat().st_size > 2 * 1024 * 1024:
+                    process_tree_terminated = _terminate_tree(process)
+                    timed_out = True
+                    break
+                time.sleep(0.1)
+        except BaseException:
+            process_tree_terminated = _terminate_tree(process)
+            raise
     receipt: dict[str, Any] | None = None
     trace = {"schema": "agentbase.evo-codex-trace/v1", "capability": "unavailable", "observed": [], "missing": ["raw receipt unavailable"], "private_reasoning_archived": False}
     if result_path.is_file():
@@ -403,7 +425,7 @@ def run_codex_job(
             recovered = recover_codex_artifacts(
                 project_root=project,
                 attempt_root=attempt,
-                installed_codex_root=codex_home,
+                installed_codex_root=installed_home,
             )
             receipt = recovered["raw_receipt"]
             trace = recovered["trace"]
@@ -450,6 +472,7 @@ def run_codex_job(
         "launcher_stderr_path": str(launcher_stderr_path),
         "projection": projection,
         "preflight": preflight,
+        "runtime_home": runtime_home_record,
         "raw_receipt": receipt,
         "raw_receipt_path": str(result_path),
         "trace": trace,

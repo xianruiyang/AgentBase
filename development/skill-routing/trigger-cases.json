@@ -94,7 +94,7 @@
     "model_interaction_surface": "当前请求要求设计、选择或改变模型直接或间接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面只投影当前动作所需语义，不用 Base64、完整哈希、UUID 等长不透明码承担身份，在不损失必要语义下按实测或已验证保守估算选择最低 Token 格式；机器面保持稳定完整，生成物不作为语义修改入口。",
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和用户或正式来源确认的范围出发，选择最低充分入口；临时名称、目录或类型过滤不单独证明全集、不存在或唯一。只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
-    "bounded_subagent_delegation": "用户明确分工优先；未指定时主代理保留规划、架构、关键文档治理、正式质量与验收，证据待定位用 evidence，需要操作试错的有界实现用 experiment，普通配置不足以可靠完成的困难推理或视觉反馈实验用 advanced-experiment，步骤和判定明确的执行用 operator。已知位置直接读、明确修改、成熟命令可直接闭合时不绕行委派。委派不以主线程有并行工作为前提，无独立必要工作就等待，不制造任务。固定角色显式 fork_turns=none；普通和高级 experiment 在当前实验范围内按需委派一层 evidence 分担独立搜索，无需主代理另行授权；简单查询自行完成，同一问题优先续用已有 evidence。experiment 不得创建其他角色，evidence 与 operator 不得创建任何子代理。实际消费者读 evidence 的关键原文，根主代理保留正式裁决；experiment 持续打通指定路径，合格实现审查后可直接接纳。生命周期验收交接明确关键观察关系，具体实现细节由 experiment 查明；行为验证失败先核对场景、阶段、身份与时序，后续恢复不倒推先前阶段成立。旧实现不替代当前 API 契约；未获合同支持的强制绕过、恢复边界改变、正式入口替换或验收弱化，在候选修改和运行前交回重裁。主代理直接交付可开工的必要事实、来源与未决问题；已有证据足够不唤醒代理，仍缺独立取证时比较续用与新建。evidence 同时只有一个当前派发者；跨分支续派先由原派发者明确交接，结果共享或 completed 状态不自动转移派发权。交接不改变宿主父子关系，结果须送达当前派发者；接口不支持时不绕过，不另建代理池或台账。普通/高级 experiment 的重要决定在展开依赖工作前简报依据与影响，供主代理及时纠偏；普通进展集中交付，只为解除其他工作的等待或实质影响协作的延期、异常补充通知，不在结束前重复发送完成消息。operator 仍按确定执行合同报告阶段与异常。授权内且可恢复的推进不逐步等批准，需重裁才暂停相关工作；主代理不逐条确认或复述普通进展。",
+    "bounded_subagent_delegation": "用户明确分工优先。主代理保留规划、架构、关键文档、实施与验收；独立取证用 evidence，步骤与判定明确的执行用 operator。两类 experiment 只承接探索量较大且能独立交付的实现，短小或需主代理持续裁决的探索由主代理完成；预计十来分钟只是成本线索，不设硬门槛。困难或视觉实验在满足同一独立交付条件后选 advanced-experiment，难度高不单独构成委派或升级理由。委派不要求主线程有并行工作，无独立必要工作就用 wait_agent 显式传 timeout_ms=1800000；这是调用约定，不改变工具默认值，服从宿主及更高优先级限制。一次等待覆盖团队多个代理，消息、完成或用户输入可提前唤醒；无新事实的超时不代表停滞，继续等待而非轮询、重复推演或催报。固定角色显式 fork_turns=none。主代理直接给必要事实、来源、修改边界和验收条件；实验开工前只合并澄清会改变动作且需主代理裁决的歧义，可查事实自行核实，输入充分不强制复述、确认或申请开工。生命周期验收明确阶段、对象与观察关系；失败先核场景、身份与时序，后续恢复不倒推先前状态。授权内自主修复与选择方法，不汇报普通决定、构建失败或阶段通过；必要权限资源缺失、合同须重裁，或合理路径已试且无新增判别证据的下一动作时才停止依赖部分并一次报告事实、已试方法、状态与所缺裁决。不得以弱化验收、无界重试或未获合同支持的强制绕过、恢复边界改变、正式入口替换来回避阻塞；旧代码存在不证明适用。越权动作、共享资源受损或反例已推翻其他在途工作前提时立即停报。最终集中交付方法、关键依据、文件符号及行位置、验证证据、未验证范围，以及已解决、仍阻塞和范围外问题；不另发完成消息或写冗余报告。主代理不例行催报、审核未完成试错或重复探索，最终按实际差异与决定性证据验收，具体缺口再深入，合格实现不强制重写。operator 仍按确定执行合同报告阶段与异常。两类 experiment 按需委派一层 evidence 无需另授权限；先用已有结果，简单查询自行完成，仍缺独立取证才比较续用与新建。experiment 不得创建其他角色，evidence 与 operator 不得委派。实际消费者读关键原文，根主代理保留正式裁决。evidence 同时只有一个当前派发者，跨分支续派须原派发者明确交接，结果共享或 completed 不转移派发权；结果送达当前派发者，不改变宿主关系，不绕过接口限制或另建代理池台账。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。",
     "replacement_closure": "修改既有行为且候选会新增长期机制或适配时，写入前区分原 owner 内改写、替换和由不同当前契约支撑的独立并存；替换把旧同责生产路径与只绑定旧实现的验证资产纳入同一完成闭环，临时并存有真实调用方和退出条件，不把退役留作无 owner 的清理。",
@@ -197,14 +197,22 @@
     "subagent-scriptable-batch-no-benefit",
     "subagent-discussion-only",
     "subagent-implicit-evidence-benefit",
+    "subagent-known-files-related-evidence",
+    "subagent-validation-preparation-evidence",
+    "subagent-post-change-source-evidence",
+    "subagent-complete-evidence-no-repeat",
     "subagent-implicit-experiment-benefit",
     "subagent-advanced-visual-experiment",
+    "subagent-advanced-nonvisual-experiment",
     "subagent-experiment-on-demand-evidence",
     "advanced-experiment-on-demand-evidence",
     "subagent-experiment-simple-query",
     "subagent-user-forbids",
     "subagent-short-local-no-benefit",
     "subagent-cheap-direct-operation-no-benefit",
+    "subagent-short-exploration-no-benefit",
+    "subagent-coupled-exploration-no-benefit",
+    "subagent-team-wait-timeout",
     "subagent-evidence-rejects-nesting",
     "subagent-evidence-leaf-role",
     "subagent-operator-no-child-agents",
@@ -236,11 +244,16 @@
     "subagent-serial-masked-implementation-experiment",
     "subagent-known-direction-operation-experiment",
     "subagent-existing-execution-monitor",
+    "subagent-team-wait-timeout",
     "subagent-bounded-operator-execution",
     "subagent-known-build-operator",
     "subagent-implicit-evidence-benefit",
+    "subagent-known-files-related-evidence",
+    "subagent-validation-preparation-evidence",
+    "subagent-post-change-source-evidence",
     "subagent-implicit-experiment-benefit",
     "subagent-advanced-visual-experiment",
+    "subagent-advanced-nonvisual-experiment",
     "subagent-experiment-on-demand-evidence",
     "advanced-experiment-on-demand-evidence",
     "vertical-validation-closure-selection",
@@ -1731,7 +1744,7 @@
     {
       "id": "subagent-serial-masked-implementation-experiment",
       "kind": "positive",
-      "request": "一串实现可能同时藏有多处问题，当前每修一点就启动一次昂贵验证只会让前一失败依次遮蔽后一失败。请实际委派 experiment，在已确认文件所有权、有恢复依据和停止预算的工作区内连续修改与运行针对性验证，打通指定实现链再返回真实补丁、关键约束和验证结果；出现需要修改公共设计或验收的问题才交回裁决。主代理审阅后可直接接纳合格实现，只修正不符合架构的部分，不机械重写或重跑全部测试。重要实现路径、取舍或验证策略的决定应在展开依赖工作前简报依据与影响，方便主代理及时纠偏；普通编译、测试切换和阶段通过无需单独报送，最终回复集中交付，授权内且可恢复的推进不逐步等批准。",
+      "request": "一串实现可能同时藏有多处问题，当前每修一点就启动一次昂贵验证只会让前一失败依次遮蔽后一失败。请实际委派 experiment，在已确认文件所有权、有恢复依据和停止预算的工作区内独立修改与针对性验证，打通指定实现链后集中交付采用的方法、关键依据、文件与行位置、验证结果及已解决和剩余问题。输入已充分，候选方法可在现有合同内自主选择，不强制开工确认；普通构建失败、资料缺失和阶段通过自行处理，不逐次报告或等待批准。只有必要资源或裁决缺失、合理路径已试而没有新增判别证据的下一动作，或已证反例危及共享工作时才停止相关工作并返回。主代理最终按实际差异和决定性证据验收，不在过程中审阅未完成试错、追发修正或重复探索，合格实现可直接接纳。",
       "expected_skills": [
         "execution-governor",
         "subagent-orchestration"
@@ -1755,7 +1768,7 @@
     {
       "id": "subagent-known-direction-operation-experiment",
       "kind": "positive",
-      "request": "owner、契约和初步实现方向已经明确，但一个只有实际运行才能确认的库行为会决定实现细节，并可能暴露后继错误。当前工作区已划分允许修改的文件，输入、验收依据和恢复方式明确；主代理尚未开始试错，用户没有指定分工。验收要求失败发生在产物写入后，并在恢复开始前直接观察对象已被重载；同一回调可能也用于写入前检查点，具体调用顺序尚待实现代理查明，不能拿恢复后对象消失代替先前的重载证据。需要通过操作消除不确定性并把指定路径实现、验证到可审查，再由主代理正式定稿；不必先复制完整环境，也不把每个普通错误都交回。若修复要改变恢复边界或绕过原生检查，先核对契约并交回重裁，不能仅因旧实现中已有 fallback 就直接修改。",
+      "request": "owner、契约和初步实现方向已经明确，但几个只有实际运行才能确认的库行为会决定实现细节，预计需较长探索。工作区已划分文件，输入、验收与恢复明确，可独立推进到最终审查，无需主代理持续选择方案；用户没有指定分工。验收要求失败发生在产物写入后，并在恢复开始前直接观察对象已被重载；同一回调也可能用于写入前检查点，具体调用顺序待实现者核查，不能用恢复后对象消失代替先前重载证据。事实可自行查明，不要求为未知回调次数先向主代理确认；选错注入位置先修触发条件，不放宽断言。若已证必须改变恢复边界或绕过原生检查才可继续，须在候选修改前交回重裁，不能仅因旧代码有 fallback 就直接采用。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -1775,7 +1788,7 @@
     {
       "id": "subagent-implicit-evidence-benefit",
       "kind": "positive",
-      "request": "一个局部实现需要确定已限定组件内哪些消费者仍调用旧入口，目前只知道组件目录，不知道相关文件位置。用户没有指定分工；下一步设计依赖这些证据，主代理暂无其他独立工作。取得简短描述、相关路径与行范围以及必要反例或覆盖限制，让主代理直接阅读关键原文后决定；不足时继续采集具体缺口，不提交长篇调查过程。",
+      "request": "一个局部实现的修改预计十来分钟，但需先确定已限定组件内哪些消费者仍调用旧入口，目前只知道组件目录，未知相关文件，取证值得独立交接。用户没有指定分工；主代理亲自实现，暂无其他独立工作。请安排只读取证，返回相关路径、行范围、必要反例与覆盖限制，由主代理阅读关键原文后决定。不要因实现短小而排除 evidence，也不将这段实现另派给 experiment。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -1791,6 +1804,50 @@
         "bounded_subagent_delegation"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-known-files-related-evidence",
+      "kind": "positive",
+      "request": "当前接口和 owner 已确认，主代理准备亲自完成局部接入，已知两个入口文件，但仍需在限定组件内找到调用方、旧路径以及对应原生通知契约的位置，无法用一次直接读取补齐。用户未指定分工。请安排只读取证，给文件路径、行范围、关系两端和简短导航；由主代理读取原文判断如何接入，不要求子代理选择方案。",
+      "expected_skills": ["subagent-orchestration"],
+      "forbidden_skills": ["symbol-structure-workflow"],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": ["evidence-packet.md", "coordination.md"],
+      "expected_behavior_tags": ["bounded_subagent_delegation"],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-validation-preparation-evidence",
+      "kind": "positive",
+      "request": "单个组件的预期行为和修改范围均已确认，主代理将编写一个局部恢复测试；已知测试目录和部分文件，需要先定位可复用 fixture、测试 API、失败注入回调的调用位置与相关断言。用户未指定分工，这段搜索可独立完成。请安排取证，返回路径、行范围和必要上下文线索，由主代理读原文确定注入阶段与证明能力；当前不运行测试、不编写实现，也不把静态位置当作运行时已发生的证明。",
+      "expected_skills": ["subagent-orchestration"],
+      "forbidden_skills": ["symbol-structure-workflow"],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": ["evidence-packet.md", "coordination.md"],
+      "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
+    },
+    {
+      "id": "subagent-post-change-source-evidence",
+      "kind": "positive",
+      "request": "主代理已完成一处局部修改，接口和验收合同未变；已知差异文件，但尚缺限定调用方中受影响调用位置和仍引用旧路径的位置。这项搜索值得独立交接，用户没有指定分工。请安排只读定位，给精确路径、行范围、简短相关性说明与未覆盖范围；主代理亲自阅读后判断是否漏接，子代理不交付质量结论，不重做实现，也不泛泛搜索其他问题。",
+      "expected_skills": ["subagent-orchestration"],
+      "forbidden_skills": ["symbol-structure-workflow"],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": ["evidence-packet.md", "coordination.md"],
+      "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
+    },
+    {
+      "id": "subagent-complete-evidence-no-repeat",
+      "kind": "negative",
+      "request": "局部修改后的相关调用位置、完整关键原文与查询覆盖依据均已在当前上下文，来源没有变化，也没有待查的其他关系。请据此判断这处调用是否符合已明确合同；用户未要求委派，不另找材料，不例行发起修改后独立复核。",
+      "expected_skills": [],
+      "forbidden_skills": ["subagent-orchestration"],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": ["read_only"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
     },
     {
       "id": "subagent-query-capability-discovery",
@@ -1854,9 +1911,61 @@
       ]
     },
     {
+      "id": "subagent-short-exploration-no-benefit",
+      "kind": "negative",
+      "request": "用户未指定分工。一个已知模块的局部实现需要运行一个小探针才能确定参数行为，预计十来分钟能完成修改与验证；接口、验收和恢复方式明确，交接与复核会重复大部分理解工作。请完成这个小任务，不因为存在操作后才可见的未知就自动委派 experiment。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-coupled-exploration-no-benefit",
+      "kind": "negative",
+      "request": "用户未要求委派。当前实现虽预计持续数小时，但多个步骤都依赖主代理正在维护的连续上下文和相互影响的判断，无法给出能独立执行到交付的子任务边界；若分出去，主代理仍必须每步读相同源码并决定下一动作。公共职责和验收合同不变，请直接完成当前实现，不仅因耗时长或困难而拆出两类 experiment。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-team-wait-timeout",
+      "kind": "behavior",
+      "request": "两名已派发的 experiment 正在独立工作，主代理暂无其他必要工作。上一次等待超时，没有消息、资源异常或已到任务时限的证据。请继续等待团队交付，不轮询状态或重复推演；当前宿主支持 wait_agent 的 30 分钟超时且没有更短上位限制，应显式传入该约定时长。任一代理消息、完成或用户输入都可提前唤醒，不要求两者全部完成后才能返回。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "codex-event-logger",
+        "reasoning-governor"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
       "id": "subagent-implicit-experiment-benefit",
       "kind": "positive",
-      "request": "两条实现路径都符合已有静态证据，选择仍取决于实际运行约束。实现目标、允许写入范围和验收依据明确，现有工作区能恢复改动；用户没有要求使用哪类代理，主代理也没有独立并行工作。需要实际修改和运行消除不确定性，连续打通本次任务路径并交付可审查实现，不停在只确认第一个探针可运行，也不穷尽无关潜在问题。",
+      "request": "两条实现路径都符合合同与静态证据，选择取决于实际运行约束，预计需要较长的实现探索。目标、写入范围、验收和恢复明确，方法选择已在授权内，执行者可独立打通整段工作；主代理无需参与过程中决策，只在末尾验收。用户没有指定分工，主代理也没有独立并行工作。请完成本次路径并交付方法、改动和验证，不只确认第一个探针成功，不穷尽无关问题，也不为保持忙碌另造主代理任务。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -1877,6 +1986,24 @@
       "id": "subagent-advanced-visual-experiment",
       "kind": "positive",
       "request": "一个已授权的编辑器实现需要连续修改、运行并比较真实截图反馈，局部命令成功不能证明视觉结果；普通速度优先实验配置不足以可靠完成这项视觉判断。请委派高级实验角色在已限定文件和场景内打通实现，返回实际视觉读回与可审查改动，主代理最终验收。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "experiment-lifecycle.md",
+        "coordination.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-advanced-nonvisual-experiment",
+      "kind": "positive",
+      "request": "公共接口、修改范围和验收已确定，一个无界面的算法实现仍需较长的跨接口因果推理，普通实验配置不足以可靠完成。请委派 advanced-experiment 独立实施并集中交付方法、文件和行位置、数值验证与问题结论。任务不涉及视觉验收，不要求截图或渲染读回；普通失败已在合同内解决，不把逐次失败和阶段进度转录进最终报告。",
       "expected_skills": [
         "subagent-orchestration"
       ],

@@ -772,7 +772,7 @@ def stage_codex_component_projection(
     config.pop("desktop", None)
     config["approval_policy"] = "never"
     config["sandbox_mode"] = "danger-full-access"
-    config.setdefault("agents", {})["enabled"] = True
+    agents_config = config.setdefault("agents", {})
     features = config.setdefault("features", {})
     if hooks_by_event:
         configured_hooks = config["features"].get("hooks")
@@ -780,9 +780,14 @@ def stage_codex_component_projection(
             raise EvaluationError("selected Codex settings disable selected hooks")
         config["features"]["hooks"] = True
     if max_agents is not None:
-        agents = config["agents"]
+        agents = agents_config
         configured = agents.get("max_concurrent_threads_per_session")
+        configured_enabled = agents.get("enabled")
         if max_agents == 1:
+            if selected.get("agents"):
+                raise PreconditionError("selected agent profiles conflict with single-root max_agents=1")
+            if configured_enabled is True:
+                raise PreconditionError("selected agents.enabled=true conflicts with single-root max_agents=1")
             if configured is not None:
                 raise PreconditionError(
                     "selected agents.max_concurrent_threads_per_session conflicts with single-root max_agents=1"
@@ -790,9 +795,12 @@ def stage_codex_component_projection(
             if features.get("multi_agent") is True:
                 raise PreconditionError("selected features.multi_agent=true conflicts with single-root max_agents=1")
             agents["max_concurrent_threads_per_session"] = 1
+            agents["enabled"] = False
             features["multi_agent"] = False
         else:
             child_capacity = max_agents - 1
+            if configured_enabled is False:
+                raise PreconditionError("selected agents.enabled=false conflicts with max_agents greater than one")
             if configured is not None and configured != child_capacity:
                 raise PreconditionError(
                     "selected agents.max_concurrent_threads_per_session="
@@ -801,7 +809,10 @@ def stage_codex_component_projection(
             if features.get("multi_agent") is False:
                 raise PreconditionError("selected features.multi_agent=false conflicts with max_agents greater than one")
             agents["max_concurrent_threads_per_session"] = child_capacity
+            agents["enabled"] = True
             features["multi_agent"] = True
+    else:
+        agents_config["enabled"] = True
 
     pending_path.parent.mkdir(parents=True, exist_ok=True)
     write_json_atomic(pending_path, {"schema": "agentbase.evo-codex-projection-pending/v1",
@@ -1490,7 +1501,14 @@ def _price_response(
     canonical_model = str(aliases.get(requested_model, requested_model))
     rates = pricing["models"].get(canonical_model)
     if not isinstance(rates, Mapping):
-        raise EvaluationError(f"API pricing snapshot does not cover model {requested_model}")
+        # Token evidence is independent of coverage in a dated price table.
+        return {
+            "requested_model": requested_model,
+            "priced_model": canonical_model,
+            "long_context": int(usage["input_tokens"]) > int(
+                pricing["long_context"]["input_threshold_tokens_exclusive"]),
+            "cost_usd_nanos": None,
+        }
     ordinary_input_tokens = (
         int(usage["input_tokens"])
         - int(usage["cached_input_tokens"])
@@ -1706,7 +1724,9 @@ def _parse_candidate_rollout(
                         },
                     )
                     group["request_count"] += 1
-                    group["cost_usd_nanos"] += int(priced["cost_usd_nanos"])
+                    group["cost_usd_nanos"] = (
+                        None if group["cost_usd_nanos"] is None or priced["cost_usd_nanos"] is None
+                        else group["cost_usd_nanos"] + int(priced["cost_usd_nanos"]))
                     _sum_token_usage(group["usage"], last_usage)
                     group["requested_models"].add(priced["requested_model"])
     if metadata is None:
@@ -1723,12 +1743,15 @@ def _parse_candidate_rollout(
     total_cost_usd_nanos = 0
     for key in sorted(pricing_groups):
         group = pricing_groups[key]
-        total_cost_usd_nanos += int(group["cost_usd_nanos"])
+        total_cost_usd_nanos = (
+            None if total_cost_usd_nanos is None or group["cost_usd_nanos"] is None
+            else total_cost_usd_nanos + int(group["cost_usd_nanos"]))
         groups.append(
             {
                 **{name: value for name, value in group.items() if name != "requested_models"},
                 "requested_models": sorted(group["requested_models"]),
-                "cost_usd": format_usd_nanos(int(group["cost_usd_nanos"])),
+                "cost_usd": (format_usd_nanos(int(group["cost_usd_nanos"]))
+                             if group["cost_usd_nanos"] is not None else None),
             }
         )
     return {
@@ -1745,9 +1768,10 @@ def _parse_candidate_rollout(
         "request_count": response_count,
         "requests": requests,
         "long_context_request_count": long_context_response_count,
-        "pricing_complete": usage_complete,
+        "pricing_complete": usage_complete and total_cost_usd_nanos is not None,
         "api_equivalent_cost_usd_nanos": total_cost_usd_nanos,
-        "api_equivalent_cost_usd": format_usd_nanos(total_cost_usd_nanos),
+        "api_equivalent_cost_usd": (format_usd_nanos(total_cost_usd_nanos)
+                                    if total_cost_usd_nanos is not None else None),
         "pricing_groups": groups,
         "subagent_history_start_ordinal": metadata.get("subagent_history_start_ordinal"),
         "expected_child_thread_ids": sorted(expected_child_thread_ids),
@@ -1841,12 +1865,17 @@ def candidate_agent_usage_receipt(
     long_context_request_count = 0
     for record in ordered_records:
         _sum_token_usage(aggregate, record["usage"])
-        aggregate_cost_usd_nanos += int(record["api_equivalent_cost_usd_nanos"])
+        record_cost = record["api_equivalent_cost_usd_nanos"]
+        aggregate_cost_usd_nanos = (
+            None if aggregate_cost_usd_nanos is None or record_cost is None
+            else aggregate_cost_usd_nanos + int(record_cost))
         request_count += int(record["request_count"])
         long_context_request_count += int(record["long_context_request_count"])
         if record["thread_id"] != root_thread_id:
             _sum_token_usage(subagent, record["usage"])
-            subagent_cost_usd_nanos += int(record["api_equivalent_cost_usd_nanos"])
+            subagent_cost_usd_nanos = (
+                None if subagent_cost_usd_nanos is None or record_cost is None
+                else subagent_cost_usd_nanos + int(record_cost))
             subagent_request_count += int(record["request_count"])
     usage_complete = all(bool(record["usage_complete"]) for record in ordered_records)
     pricing_complete = usage_complete and all(
@@ -1865,11 +1894,13 @@ def candidate_agent_usage_receipt(
         "subagent_request_count": subagent_request_count,
         "long_context_request_count": long_context_request_count,
         "total_usd_nanos": aggregate_cost_usd_nanos,
-        "root_usd_nanos": aggregate_cost_usd_nanos - subagent_cost_usd_nanos,
+        "root_usd_nanos": root["api_equivalent_cost_usd_nanos"],
         "subagent_usd_nanos": subagent_cost_usd_nanos,
-        "total_usd": format_usd_nanos(aggregate_cost_usd_nanos),
-        "root_usd": format_usd_nanos(aggregate_cost_usd_nanos - subagent_cost_usd_nanos),
-        "subagent_usd": format_usd_nanos(subagent_cost_usd_nanos),
+        "total_usd": (format_usd_nanos(aggregate_cost_usd_nanos) if aggregate_cost_usd_nanos is not None else None),
+        "root_usd": root["api_equivalent_cost_usd"],
+        "subagent_usd": (format_usd_nanos(subagent_cost_usd_nanos) if subagent_cost_usd_nanos is not None else None),
+        "unpriced_models": sorted({group["model"] for record in ordered_records
+                                    for group in record["pricing_groups"] if group["cost_usd_nanos"] is None}),
     }
     payload = {
         "schema": CODEX_AGENT_USAGE_SCHEMA,
@@ -1920,6 +1951,8 @@ def finalize_candidate_agent_usage(
             "api_equivalent_cost": receipt["api_equivalent_cost"],
         }
     )
+    if result["usage_complete"]:
+        result.pop("usage_collection_error", None)
     return result
 
 

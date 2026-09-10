@@ -307,6 +307,23 @@ class Store:
                 db.execute("UPDATE jobs SET state='cancelled',ended=?,reason='study cancelled before dispatch' WHERE study=? AND state='queued'", (time.time(), study))
             self.event(db, study, None, state, {})
 
+    def reconcile_stopped(self, study: int, job: int, evidence: str) -> dict:
+        """Release a confirmed stopped attempt without inventing a result or complete usage."""
+        if not isinstance(evidence, str) or not evidence.strip() or len(evidence) > 800:
+            raise EvoError('reconciliation evidence must be 1..800 characters')
+        with self.connect(True) as db:
+            row = db.execute('SELECT * FROM jobs WHERE id=? AND study=?', (job, study)).fetchone()
+            state = db.execute('SELECT state FROM studies WHERE id=?', (study,)).fetchone()
+            if not row or not state or state['state'] != 'cancelled' or row['state'] != 'uncertain':
+                raise EvoError('confirm stopped requires an uncertain job in a cancelled study')
+            if row['receipt'] is not None:
+                raise EvoError('job already has a final receipt; recover that receipt instead')
+            db.execute("UPDATE jobs SET state='cancelled',reason='confirmed stopped; usage remains as observed',ended=? WHERE id=?",
+                       (time.time(), job))
+            self.event(db, study, job, 'reconciled_stopped',
+                       {'evidence': evidence.strip(), 'preserved_error': row['error']})
+            return dict(row)
+
     def reconcile_not_invoked(self, study: int, job: int, evidence: str) -> dict:
         if not isinstance(evidence, str) or not evidence.strip() or len(evidence) > 800:
             raise EvoError('reconciliation evidence must be 1..800 characters')
@@ -314,8 +331,9 @@ class Store:
             row = db.execute('SELECT * FROM jobs WHERE id=? AND study=?', (job, study)).fetchone()
             if not row:
                 raise EvoError('job does not belong to the selected study')
-            if row['state'] != 'uncertain' and not (row['state'] == 'failed' and row['usage'] is None
-                                                     and not row['usage_complete']):
+            if row['state'] != 'uncertain' and not (row['state'] == 'failed' and (
+                    (row['usage'] is None and not row['usage_complete']) or
+                    (row['usage'] == 0 and row['usage_complete']))):
                 raise EvoError('only an uncertain or unsettled failed job can be reconciled as not invoked')
             if row['receipt'] is not None:
                 raise EvoError('job already has a final receipt')

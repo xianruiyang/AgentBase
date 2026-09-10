@@ -20,7 +20,7 @@ Evo 通过 `agent_eval.py evo <action>` 使用，实际接口与数据生命周�
 - `windows-adapters/`：本机 corpus 可引用的逐题、哈希固定 Windows fixture patch；真实 patch 不由 Git 分发。
 - `test_agent_evaluation_infrastructure.ps1`：模型禁用时的确定性组件验证。
 
-安装 Codex 根只提供现有 `auth.json` 和 session 使用量账本，不是项目真源。候选配置、全局规则、自定义 agents 和 skills 每次从本仓库真源投影；不复制或链接凭据，不维护独立 Codex home、权限画像或宿主后端状态。
+安装 Codex 根不是项目真源。原 SWE 执行仍由 Codex CLI 从指定安装根读取认证和 session 使用量账本；Evo 则为每个 attempt 建立独立最小 Codex home，只在启动期间以同卷硬链接提供安装根现有 `auth.json`，并从该 attempt home 采集用量与公开轨迹。候选配置、全局规则、自定义 agents 和 skills 每次从本仓库真源投影；两条路径都不复制凭据，也不维护宿主权限画像或后端状态。
 
 ## 当前执行模型
 
@@ -54,7 +54,7 @@ Evo 通过 `agent_eval.py evo <action>` 使用，实际接口与数据生命周�
 - 命令超时、后代进程树终止和有界日志；
 - `recover` 只复用已有 candidate patch/receipt 并重跑 Verifier，绝不重跑模型。
 
-已退出且没有兼容入口的旧机制包括 elevated setup/status/check、permission profile、ACL/deny/canary 探针、认证 hardlink、model catalog projection、无模型 preflight、专用 sandbox runtime 与专用清理脚本。不要在调用方重新实现这些机制。
+原 SWE 已退出且没有兼容入口的旧机制包括 elevated setup/status/check、permission profile、ACL/deny/canary 探针、认证 hardlink、model catalog projection、无模型 preflight、专用 sandbox runtime 与专用清理脚本。不要在 SWE 调用方重新实现这些机制；Evo 的 attempt 级白板隔离按其自身合同使用短期认证硬链接，不改变 SWE 执行模式。
 
 ## 候选投影与环境
 
@@ -104,6 +104,8 @@ state root 保存准备好的源码、资产、资格、attempt 和不可变收�
 ## 评分与证据边界
 
 Verifier 先准备独立依赖，再应用 Windows adapter、候选或 reference patch、hidden tests，执行 corpus 命令并转换报告，最后调用固定 grader。报告分别保留任务 reward、资格、覆盖、耗时、候选及子代理 token、按官方 API 单价计算的等价成本和基础设施健康；不合成整体质量分，不把 API 等价成本说成订阅实际账单。
+
+共享用量 owner 将原生 Token 完整性与价格覆盖分开：费率快照未覆盖某个模型时，仍保留该模型全部请求和用量，将相关成本及包含它的成本总量留空，并在 `api_equivalent_cost.unpriced_models` 列明模型。`usage_complete` 不因此降级，`pricing_complete` 则保持 false；不按相邻模型推定价格，已知的其他代理成本仍可单独读取。
 
 配置和资产存在只证明静态投影。真实候选行为、子代理使用、检查结果和 reward 只有对应运行收据能够证明。没有运行本地 corpus 中的真实题目时，不得把确定性基础设施测试外推为真实评测完成。
 

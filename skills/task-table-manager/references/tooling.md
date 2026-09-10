@@ -6,7 +6,7 @@
 taskctl <command> --task-dir <AbsoluteTaskDir>
 ```
 
-只在 CLI 能降低编辑、查询或恢复成本时使用；任务较少或 CLI 不可用时仍按正式文档合同继续。CLI 不签发开始、推进、完成或重开许可，也不把诊断、状态或计数升级为语义结论。
+只在 CLI 能降低编辑、查询或恢复成本时使用；任务少或 CLI 不可用时按正式文档合同继续。CLI 不签发开始、推进、完成或重开许可，也不把诊断、状态或计数升级为语义结论。
 
 ## 按命令加载
 
@@ -25,16 +25,16 @@ completion-context                           completion-tooling.md
 
 ## 消费者视图
 
-- `--view model` 是默认值，面向直接进入 Codex 上下文的结果；使用分行的紧凑 HJSON 风格文本，只保留缺失后会改变当前判断、动作、验证或恢复的字段。该视图服务模型阅读，不承诺机器解析。
-- `--view machine` 面向程序、测试和完整字段检查，保持稳定紧凑 JSON；需要缩进 JSON 时同时使用 `--pretty`，`--pretty` 不适用于 model 视图。
+- `--view model` 默认面向 Codex 上下文，以分行紧凑 HJSON 风格只保留缺失后会改变判断、动作、验证或恢复的字段；不承诺机器解析。
+- `--view machine` 面向程序、测试和完整字段检查，保持稳定紧凑 JSON；缩进时加 `--pretty`，它不适用于 model。
 - 两种视图消费同一个命令 handler 的权威结果；renderer 不重新计算任务状态、诊断、候选关系、分页或证据时效。model 与 machine stdout/stderr 均固定为 UTF-8。
-- 跨进程恢复所需的完整内容身份只保留在 machine 视图和 taskctl 自有索引；model 视图返回 `source-T<ID>-<序号>` 持久来源收据或 `review-<代际>-<序号>` 有界复核收据。模型只原样回传短收据，不解析其组成或读取完整身份映射；复核收据升级与缓存恢复见 completion-tooling。
+- 跨进程恢复所需的完整内容身份只在 machine 视图和 taskctl 索引中；model 返回 `source-T<ID>-<序号>` 持久来源收据或 `review-<代际>-<序号>` 有界复核收据。模型只原样回传，不解析或读取完整身份映射；升级与缓存恢复见 completion-tooling。
 - 模型预算由 `--model-token-budget` 控制并在选择完整语义单元时生效；机器 `context/show/completion-context` 的既有 `--budget` 仍表示 JSON 字符预算。
 - 若程序此前依赖默认 JSON，迁移为显式 `--view machine`；没有已证实消费者时不保留第二个隐式默认入口。
 
 ## 共享失败边界
 
-门禁只保护路径/对象身份、破坏性覆盖、锁与 CAS 并发、输入输出上限、短收据到完整身份的唯一解析、显式不可变收据身份和最终复核快照一致性。门禁错误返回 `gate.id`、`gate.risk`、`gate.scope`、`gate.recovery` 和 `gate.retryable`；当前命令族的具体门禁由对应引用维护。
+门禁只保护路径/对象身份、破坏性覆盖、锁与 CAS、输入输出上限、短收据到完整身份的唯一解析、显式不可变收据身份和最终复核快照一致性。错误返回 `gate.id`、`gate.risk`、`gate.scope`、`gate.recovery`、`gate.retryable`；具体门禁由命令族引用维护。
 
 依赖环、owner、状态流转、可解析非标准语义、重复值、上游未决、覆盖度、验证充分性、结果来源时效和整体完成均只诊断并交由模型按文档与证据裁决。
 

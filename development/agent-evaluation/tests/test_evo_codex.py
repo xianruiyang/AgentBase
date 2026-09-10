@@ -23,6 +23,7 @@ import agentbase_codex  # noqa: E402
 from evaluation_core import EvaluationError, PreconditionError  # noqa: E402
 from evo.codex_adapter import recover_codex_artifacts, refresh_codex_trace, run_codex_job  # noqa: E402
 from evo.skill_cache import SkillCache  # noqa: E402
+from evo.runtime_home import prepare_runtime_home, remove_runtime_auth, runtime_home_from_receipt  # noqa: E402
 
 
 class EvoCodexAdapterTests(unittest.TestCase):
@@ -91,6 +92,7 @@ class EvoCodexAdapterTests(unittest.TestCase):
             )
             config = tomllib.loads((workspace / ".codex" / "config.toml").read_text(encoding="utf-8"))
             self.assertEqual(config["developer_instructions"], "selected rule\n")
+            self.assertTrue(config["agents"]["enabled"])
             self.assertEqual(config["agents"]["max_concurrent_threads_per_session"], 2)
             self.assertTrue((workspace / ".agents" / "skills" / "one" / "SKILL.md").is_file())
             self.assertFalse((workspace / ".agents" / "skills" / "two").exists())
@@ -154,18 +156,105 @@ class EvoCodexAdapterTests(unittest.TestCase):
         self.assertIn("schema = $ResultSchema", text)
         self.assertIn("[string]$TaskRuntimeBinPath = ''", text)
         self.assertIn("$startInfo.ArgumentList.Add($argument)", text)
+        self.assertIn("[string]$RuntimeCodexRoot = ''", text)
+
+    def test_attempt_runtime_home_links_only_auth_and_retains_native_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            attempt = root / "attempt"
+            installed = root / "installed"
+            attempt.mkdir()
+            installed.mkdir()
+            source = installed / "auth.json"
+            source.write_text("{}\n", encoding="utf-8")
+            (installed / "AGENTS.md").write_text("host rules\n", encoding="utf-8")
+            (installed / "config.toml").write_text("model = 'host'\n", encoding="utf-8")
+            (installed / "skills").mkdir()
+
+            runtime_home, record = prepare_runtime_home(
+                attempt_root=attempt,
+                installed_codex_root=installed,
+            )
+
+            self.assertEqual(record["authentication"], "temporary-same-volume-hardlink")
+            self.assertEqual(source.stat().st_ino, (runtime_home / "auth.json").stat().st_ino)
+            self.assertEqual(sorted(path.name for path in runtime_home.iterdir()), ["auth.json"])
+            (runtime_home / "sessions").mkdir()
+            rollout = runtime_home / "sessions" / "rollout.jsonl"
+            rollout.write_text("{}\n", encoding="utf-8")
+            remove_runtime_auth(attempt_root=attempt)
+            self.assertFalse((runtime_home / "auth.json").exists())
+            self.assertTrue((runtime_home / "sessions" / "rollout.jsonl").is_file())
+            self.assertEqual(
+                runtime_home_from_receipt(attempt_root=attempt, installed_codex_root=installed),
+                runtime_home,
+            )
+            agentbase_codex.write_json_atomic(
+                attempt / "codex-result.json",
+                {"schema": "agentbase.evo-codex-run/v1", "agent_usage": [
+                    {"rollout": {"path": "sessions/rollout.jsonl"}, "requests": []}
+                ]},
+            )
+            refreshed = refresh_codex_trace(
+                project_root=EVALUATION_ROOT.parents[1], attempt_root=attempt,
+                installed_codex_root=None,
+            )
+            self.assertEqual(refreshed["trace"]["capability"], "partial")
+            self.assertEqual(
+                runtime_home_from_receipt(attempt_root=attempt, installed_codex_root=None),
+                runtime_home,
+            )
+
+    def test_runtime_home_rejects_linked_auth_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            attempt = root / "attempt"
+            installed = root / "installed"
+            attempt.mkdir()
+            installed.mkdir()
+            target = root / "auth-target.json"
+            target.write_text("{}\n", encoding="utf-8")
+            try:
+                (installed / "auth.json").symlink_to(target)
+            except OSError:
+                self.skipTest("symlink creation is unavailable")
+            with self.assertRaisesRegex(PreconditionError, "regular file"):
+                prepare_runtime_home(attempt_root=attempt, installed_codex_root=installed)
+
+    def test_runtime_auth_cleanup_refuses_a_replaced_home(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            attempt = root / "attempt"
+            installed = root / "installed"
+            attempt.mkdir()
+            installed.mkdir()
+            source = installed / "auth.json"
+            source.write_text("{}\n", encoding="utf-8")
+            runtime_home, _ = prepare_runtime_home(attempt_root=attempt, installed_codex_root=installed)
+            (runtime_home / "auth.json").unlink()
+            runtime_home.rmdir()
+            try:
+                runtime_home.symlink_to(installed, target_is_directory=True)
+            except OSError:
+                self.skipTest("directory symlink creation is unavailable")
+            with self.assertRaisesRegex(PreconditionError, "reparse point"):
+                remove_runtime_auth(attempt_root=attempt)
+            self.assertTrue(source.is_file())
 
     def test_launcher_really_binds_an_empty_runtime_bin_before_fake_subject(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             workspace = root / "workspace"
-            codex_home = root / "codex-home"
+            codex_home = root / "installed-codex-home"
             attempt = root / "attempt"
+            runtime_home = attempt / "codex-runtime-home"
             (workspace / ".codex").mkdir(parents=True)
             codex_home.mkdir()
             attempt.mkdir()
+            runtime_home.mkdir()
             (workspace / ".codex" / "config.toml").write_text('approval_policy = "never"\n', encoding="utf-8")
             (codex_home / "auth.json").write_text("{}\n", encoding="utf-8")
+            os.link(codex_home / "auth.json", runtime_home / "auth.json")
             prompt = attempt / "prompt.txt"
             result = attempt / "result.json"
             prompt.write_text("bounded fake subject\n", encoding="utf-8")
@@ -182,6 +271,7 @@ class EvoCodexAdapterTests(unittest.TestCase):
                     "-ProjectRoot", str(EVALUATION_ROOT.parents[1]),
                     "-Workspace", str(workspace),
                     "-InstalledCodexRoot", str(codex_home),
+                    "-RuntimeCodexRoot", str(runtime_home),
                     "-PromptPath", str(prompt),
                     "-ResultPath", str(result),
                     "-Model", "fake-model",
@@ -203,6 +293,8 @@ class EvoCodexAdapterTests(unittest.TestCase):
             self.assertTrue(value["process_started"])
             self.assertIsNone(value["model_invoked"])
             self.assertEqual(value["status"], "failed")
+            self.assertTrue((codex_home / "auth.json").is_file())
+            self.assertFalse((runtime_home / "auth.json").exists())
 
     def test_single_root_uses_valid_dormant_agent_capacity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -218,7 +310,55 @@ class EvoCodexAdapterTests(unittest.TestCase):
             )
             config = tomllib.loads(Path(projection["config_path"]).read_text(encoding="utf-8"))
             self.assertEqual(config["agents"]["max_concurrent_threads_per_session"], 1)
+            self.assertFalse(config["agents"]["enabled"])
             self.assertFalse(config["features"]["multi_agent"])
+
+    def test_single_root_rejects_selected_agent_profiles_and_enabled_setting(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            workspace = root / "workspace"
+            project.mkdir()
+            workspace.mkdir()
+            profile = project / "evidence.toml"
+            profile.write_text('name = "evidence"\n', encoding="utf-8")
+            with self.assertRaisesRegex(PreconditionError, "selected agent profiles"):
+                agentbase_codex.stage_codex_component_projection(
+                    project_root=project, workspace=workspace,
+                    selected={"agents": [{"id": "evidence", "source": str(profile)}]},
+                    max_agents=1, candidate_source_roots=[project],
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            workspace = root / "workspace"
+            project.mkdir()
+            workspace.mkdir()
+            setting = project / "enabled.toml"
+            setting.write_text("[agents]\nenabled = true\n", encoding="utf-8")
+            with self.assertRaisesRegex(PreconditionError, "agents.enabled=true"):
+                agentbase_codex.stage_codex_component_projection(
+                    project_root=project, workspace=workspace,
+                    selected={"codex_settings": [{"id": "enabled", "source": str(setting)}]},
+                    max_agents=1, candidate_source_roots=[project],
+                )
+
+    def test_multi_agent_rejects_disabled_agents_setting(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            workspace = root / "workspace"
+            project.mkdir()
+            workspace.mkdir()
+            setting = project / "disabled.toml"
+            setting.write_text("[agents]\nenabled = false\n", encoding="utf-8")
+            with self.assertRaisesRegex(PreconditionError, "agents.enabled=false"):
+                agentbase_codex.stage_codex_component_projection(
+                    project_root=project, workspace=workspace,
+                    selected={"codex_settings": [{"id": "disabled", "source": str(setting)}]},
+                    max_agents=7, candidate_source_roots=[project],
+                )
 
     def test_recovery_loads_repository_audit_with_its_sibling_import(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -466,6 +606,9 @@ class EvoCodexAdapterTests(unittest.TestCase):
             self.assertIn("gpt-test", argv)
             self.assertIn("agentbase.evo-codex-run/v1", argv)
             self.assertEqual(argv[argv.index("-TaskRuntimeBinPath") + 1], str(task_runtime_bin))
+            runtime_home = attempt / "codex-runtime-home"
+            self.assertEqual(argv[argv.index("-RuntimeCodexRoot") + 1], str(runtime_home))
+            self.assertFalse((runtime_home / "auth.json").exists())
 
 
 if __name__ == "__main__":
