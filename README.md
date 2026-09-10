@@ -55,7 +55,7 @@ QQ 通知默认关闭，按工作区或任务启用；线程推理深度的查�
 | `advanced-experiment` | 处理普通实验难以可靠完成的问题，或需要截图、渲染等视觉反馈的实验 |
 | `operator` | 执行步骤与判定明确的操作，隔离长输出与多轮运行观察，集中返回必要结果 |
 
-具体模型和参数在 [`global/agents/`](global/agents/) 中维护。主代理负责规划、审核和验收；普通和高级 experiment 可在当前实验内按需委派一层 evidence 分担搜索，无需另行授权。evidence 与 operator 不得创建子代理。
+具体模型和参数在 [`global/agents/`](global/agents/) 中维护。主代理负责规划、审核和验收；普通和高级 experiment 使用相同触发原则，在当前实验内按需委派一层 evidence 分担搜索、operator 隔离明确操作，无需另行授权。同一实验同时最多一个专属 operator，结果由所属 experiment 接收并处理；evidence 与 operator 不得创建子代理。
 
 ### 配套工具
 

@@ -2056,7 +2056,7 @@
     {
       "id": "subagent-experiment-on-demand-evidence",
       "kind": "positive",
-      "request": "你当前是 experiment，父代理只给出了实验目标、实现范围和验收，没有单独授予嵌套权限。实现中出现三个跨模块接口候选，需要独立检索正式文档与调用位置，形成有来源的候选对照后才能继续；请先取得这份只读证据。公共契约与实现范围不变，不能创建其他角色或把验收裁决转交取证代理。",
+      "request": "你当前是 experiment，父代理只给出了实验目标、实现范围和验收，没有单独授予嵌套权限。实现中出现三个跨模块接口候选，需要检索正式文档与调用位置后才能继续；请取得这份只读定位证据。公共契约与实现范围不变，当前没有明确操作需交给 operator，也不能把验收裁决转交 evidence。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -2067,6 +2067,102 @@
       ],
       "expected_behavior_tags": [
         "read_only",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "experiment-search-priority-evidence",
+      "kind": "behavior",
+      "request": "你当前是 experiment，已知一个入口文件，但还不知道配置来源、调用方和可复用 fixture，预计需要多次短搜索才能定位。实现范围稳定，根主代理无需参与裁决，自己暂时也没有并行工作。请补齐必要定位，不先自行查完再委派，不把多次搜索都当成已知位置短读取。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "experiment-dedicated-operator",
+      "kind": "behavior",
+      "request": "你当前是 experiment，候选已稳定，已授权的局部构建与验证步骤、成功判定、恢复方式和文件所有权均已明确，前置检查已完成。预计产生长日志并需多轮观察；目前没有本实验 operator。请按需交给一个专属 operator，普通结果返回给你处理，禁止扩大验证和清理范围。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "operator-execution.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "advanced-experiment-reuse-operator",
+      "kind": "behavior",
+      "request": "你当前是 advanced-experiment，已有本实验专属 operator 完成上一项明确操作，结果有效且它可续派。现在需要同一环境下另一个已授权的确定操作，预计长输出，步骤、判定、文件与资源边界已明确。请续用原 operator，不另建第二个，不复制环境，结果由你接纳并亲自检查相关视觉读回。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [
+        "operator-execution.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "experiment-wait-evidence-and-operator",
+      "kind": "behavior",
+      "request": "你当前是 experiment，已分别派发一个 evidence 和一个专属 operator 承担独立取证与确定操作，暂无独立必要工作。当前宿主支持 collaboration.wait_agent(timeout_ms=1800000)，没有冲突的更高优先级限制。请等待它们的结果，任一消息可唤醒，不请根主代理代等，不轮询或自行重做。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "experiment-operator-no-eager-team",
+      "kind": "behavior",
+      "request": "你当前是 experiment，已有证据充分，只需在已授权位置完成一个局部修改并运行一次结果简短、无需多轮观察的已知验证命令。请直接推进，不为了配齐团队而创建 evidence 或 operator。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "operator-experiment-failure-recipient",
+      "kind": "behavior",
+      "request": "你当前是 experiment 的专属 operator，执行正式构建时遇到步骤未覆盖的类型错误，构建未完成。请停止依赖该产物的测试，把退出码、首个相关错误和日志位置交给所属 experiment 决定修复；不要修改实现、另建代理或直接要求根主代理处理。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": [],
+      "expected_behavior_tags": [
         "bounded_subagent_delegation"
       ],
       "forbidden_behavior_tags": []
@@ -2342,7 +2438,7 @@
     {
       "id": "subagent-operator-no-child-agents",
       "kind": "negative",
-      "request": "你当前是 operator，既定执行遇到步骤未覆盖的接口问题，需要独立源码调查才能决定后续操作。请报告直接异常和缺口，交回主代理分配；不自行创建 evidence、experiment 或其他子代理，也不创建或分叉用户任务。",
+      "request": "你当前是 experiment 创建的专属 operator，既定执行遇到步骤未覆盖的接口问题，需要源码调查才能决定后续操作。请将直接异常和缺口交回所属 experiment；不自行创建 evidence、experiment 或其他子代理，不创建或分叉用户任务，也不把这个局部失败直接转报根主代理。",
       "expected_skills": [],
       "forbidden_skills": [
         "subagent-orchestration"
@@ -3827,7 +3923,7 @@
     {
       "id": "advanced-experiment-on-demand-evidence",
       "kind": "positive",
-      "request": "你当前是 advanced-experiment，主代理没有单独授予嵌套权限。当前视觉实验需要独立核对几个渲染接口的正式契约，搜索范围和需回答的问题已经清楚；请先取得这份只读证据再继续实验。你仍需亲自阅读关键原文并检查视觉结果，不能创建其他角色或把公共契约裁决转交取证代理。",
+      "request": "你当前是 advanced-experiment，主代理没有单独授予嵌套权限。当前视觉实验需要核对几个渲染接口的正式契约，搜索范围和问题已经清楚；请先取得这份只读定位证据再继续实验。你仍需亲自阅读关键原文并检查视觉结果，当前无需操作执行，不把公共契约裁决转交 evidence。",
       "expected_skills": [
         "subagent-orchestration"
       ],
