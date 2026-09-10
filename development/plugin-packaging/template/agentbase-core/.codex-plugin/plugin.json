@@ -1,6 +1,6 @@
 {
   "name": "agentbase-core",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "AgentBase 关键基础工具与工程治理 skill 的本地可发布集合。",
   "author": {
     "name": "AgentBase maintainers"

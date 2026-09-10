@@ -90,7 +90,7 @@
     "evidence_checkpoint_before_continue": "反例改变失效范围、当前消费者或下一动作时，先停止依赖工作并把反例、失效来源、当前验证 case 和下一动作写回已有 owner，再重新裁决和继续。",
     "dimension_bounded_validation": "本标签不适用于 owner、契约、oracle 均明确、无共享未知且可低成本穷举的小闭集；此类直接走局部快速路径，不建立 coverage basis。其他声明随多种组件、载体、模式、状态、版本或持久化边界变化，且存在实质组合扩量或共享未知时，在批量实现或测试编写前形成 claim、有效 dimensions、equivalence、interactions、代表 cases 与 promotion 组成的 coverage basis；每个 case 必须新增判别信息，pairwise 不外推高阶交互，穷举只用于明确逐组合认证或无充分等价证据的高后果交互，结论限制在实际覆盖或有可复核依据的等价类。",
     "tool_defect_reproduction": "声称当前工具缺少能力或存在缺陷前，核对实际身份与对应帮助并重放原输入，区分输入错误、范围重叠、正常协议、预期降级、截断和产品故障。",
-    "batched_independent_tool_calls": "两个以上已知、独立、必要的只读工具调用并行；有依赖、前项可取消/改变后项、冲突或风险时串行，不投机或用 shell 伪批量。每条命令与外层整批返回分别受预算限制，计入包装开销；必要结果可能超限时缩小范围、拆批或显式调整受支持的外层预算。截断后按来源/行区间补缺或沿正式续页恢复，不原样重复整批。",
+    "batched_independent_tool_calls": "已知、独立、必要的工具调用，包括读取与已授权执行，尽量通过工具接口合批并行发出并逐项检查结果；有先后依赖、写入冲突、共享资源竞争或前项结果可改变/取消后项时串行，不以拼接 shell 命令冒充并行。大文件的完整定义或章节片段同样可合批，确需整读的大文件单独处理。每条命令与外层整批返回分别受预算限制，计入包装开销；可能超限时缩小范围、拆批或显式调整受支持的外层预算，不为合批增加无关内容或操作。截断后按来源/行区间补缺或沿正式续页恢复，不原样重复整批。",
     "model_interaction_surface": "当前请求要求设计、选择或改变模型直接或间接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面只投影当前动作所需语义，不用 Base64、完整哈希、UUID 等长不透明码承担身份，在不损失必要语义下按实测或已验证保守估算选择最低 Token 格式；机器面保持稳定完整，生成物不作为语义修改入口。",
     "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和用户或正式来源确认的范围出发，选择最低充分入口；临时名称、目录或类型过滤不单独证明全集、不存在或唯一。只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
@@ -1985,7 +1985,7 @@
     {
       "id": "subagent-team-wait-timeout",
       "kind": "behavior",
-      "request": "两名已派发的 experiment 正在独立工作，主代理暂无其他必要工作。上一次等待超时，没有消息、资源异常或已到任务时限的证据。请继续等待团队交付，不轮询状态或重复推演；当前宿主支持 wait_agent 的 30 分钟超时且没有更短上位限制，应显式传入该约定时长。任一代理消息、完成或用户输入都可提前唤醒，不要求两者全部完成后才能返回。",
+      "request": "两名已派发的 experiment 正在独立工作，主代理暂无其他必要工作。上一次等待超时，没有消息、资源异常或已到任务时限的证据。当前会话已加载 developer_instructions：仅等待子代理时使用 wait_agent，显式 timeout_ms=1800000，不为固定进度播报缩短等待；宿主支持该时长且没有冲突的更高优先级限制。请继续等待团队交付，不轮询或重复推演。任一代理消息、完成或用户输入都可提前唤醒，不要求两者全部完成后才能返回。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -3867,7 +3867,7 @@
     {
       "id": "batch-read-aggregate-budget",
       "kind": "behavior",
-      "request": "只读查看四个已确认的小文件，内容分别是不同且必要的接口说明，彼此无依赖。每个文件约 3000 Token，外层工具最多返回 10000 Token，内层每条命令可返回 20000。请安排读取并确保必要正文完整可见；没有共同产品未知，也不需要改工具或跑性能评测。",
+      "request": "只读查看四段已确认、彼此独立且必要的接口说明，其中两段分别覆盖两个小文件全文，另两段是大文件中的完整章节，行范围均已知。每段约 3000 Token，外层工具最多返回 10000 Token，内层每条命令可返回 20000。请安排读取并确保必要正文完整可见；没有共同产品未知，也不需要改工具或跑性能评测。",
       "expected_skills": [],
       "forbidden_skills": [
         "execution-governor",
@@ -3879,6 +3879,36 @@
         "batched_independent_tool_calls"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "batch-independent-authorized-execution",
+      "kind": "behavior",
+      "request": "两个已授权的确定性生成命令分别写入互不相关的目录，输入已固定，输出路径和资源互不共享，任何一项结果均不改变另一项是否需要执行。两条命令已验证、运行短、只返回简短结果，不需要子代理。请执行并分别检查退出码和产物。",
+      "expected_skills": [],
+      "forbidden_skills": ["execution-governor", "subagent-orchestration", "powershell-usage"],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": ["modify_authorized_scope", "batched_independent_tool_calls"],
+      "forbidden_behavior_tags": ["read_only"]
+    },
+    {
+      "id": "batch-dependent-execution-serial",
+      "kind": "behavior",
+      "request": "两个已授权命令使用既有正式模板：先构建一个组件，成功后运行依赖本次产物的测试。两者共用输出目录；构建若失败，不应启动测试。输入和判定稳定，都是短操作，不需要子代理或新增流程。请按依赖执行，不因命令已知就同时发出。",
+      "expected_skills": [],
+      "forbidden_skills": ["execution-governor", "subagent-orchestration", "powershell-usage"],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": ["modify_authorized_scope", "batched_independent_tool_calls"],
+      "forbidden_behavior_tags": ["read_only"]
+    },
+    {
+      "id": "batch-large-file-sections",
+      "kind": "behavior",
+      "request": "用户已给出三个大型源码文件内的完整定义行范围，三个定义独立且均需读取，合计约 4000 Token，当前外层返回预算 10000 Token。没有其他依赖缺口，无需整读任何文件，也无需委派。请读取这三处必要正文，不因源文件较大而逐个串行查询。",
+      "expected_skills": [],
+      "forbidden_skills": ["source-query", "execution-governor", "subagent-orchestration"],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": ["read_only", "batched_independent_tool_calls"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
     },
     {
       "id": "batch-truncation-recover-missing-ranges",
@@ -3969,6 +3999,28 @@
       "forbidden_skills": ["execution-governor", "change-governance", "delivery-workflow", "task-table-manager"],
       "expected_change_governance_references": [],
       "expected_behavior_tags": ["read_only", "no_scope_expansion", "decision_relevant_findings"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
+    },
+    {
+      "id": "evidence-intake-progressive-source-read",
+      "kind": "behavior",
+      "request": "evidence 已返回三个较大文件中的完整函数行范围，分别定位读取入口、持锁区间和释放路径，并给出两端调用关系。主代理尚未读原文，现在只需确认锁是否跨请求持有；这些片段足以开始，整读三个文件会超过整批返回预算。请据此读取原文作判断；若发现遗漏的调用或状态依赖，再补对应内容。不修改代码或运行测试。",
+      "expected_skills": ["subagent-orchestration"],
+      "forbidden_skills": ["source-query", "execution-governor"],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": ["evidence-packet.md"],
+      "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
+    },
+    {
+      "id": "evidence-intake-small-complete-type",
+      "kind": "behavior",
+      "request": "evidence 已定位一个 45 行的小型协议文件，指出请求和响应类型的起始行。当前需要检查全部字段的对应关系，文件只有这些定义与必要声明，全文可在短输出内完整返回。请读取并核对，不因 evidence 提供了行号而把一个完整小类型拆成多次查询，不修改文件。",
+      "expected_skills": ["subagent-orchestration"],
+      "forbidden_skills": ["source-query", "execution-governor"],
+      "expected_change_governance_references": [],
+      "expected_subagent_orchestration_references": ["evidence-packet.md"],
+      "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
       "forbidden_behavior_tags": ["modify_authorized_scope"]
     },
     {

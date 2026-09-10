@@ -43,6 +43,7 @@
       { "id": "config:root/web_search", "table": "", "key": "web_search" },
       { "id": "config:root/service_tier", "table": "", "key": "service_tier" },
       { "id": "config:root/project_doc_max_bytes", "table": "", "key": "project_doc_max_bytes" },
+      { "id": "config:root/developer_instructions", "table": "", "key": "developer_instructions" },
       { "id": "config:agents/enabled", "table": "agents", "key": "enabled" },
       { "id": "config:agents/max_concurrent_threads_per_session", "table": "agents", "key": "max_concurrent_threads_per_session" },
       { "id": "config:agents/default_subagent_model", "table": "agents", "key": "default_subagent_model" },

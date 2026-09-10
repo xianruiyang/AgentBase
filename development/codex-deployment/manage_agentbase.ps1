@@ -497,6 +497,18 @@ function Test-PortableConfigSource {
         throw "Portable Codex config is missing: $Path"
     }
 
+    $actualLines = @(Get-Content -LiteralPath $Path -Encoding UTF8 | ForEach-Object { $_.Trim() } | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_) -and -not $_.StartsWith('#')
+    })
+    $developerInstructionLines = @($actualLines | Where-Object { $_ -match '^developer_instructions\s*=' })
+    # The line-based merge owner supports one unescaped basic string here.
+    # Instruction semantics remain owned by global/config.toml.
+    if ($developerInstructionLines.Count -ne 1 -or
+        $developerInstructionLines[0] -notmatch '^developer_instructions = "([^"\\\r\n]+)"$' -or
+        [string]::IsNullOrWhiteSpace($Matches[1])) {
+        throw 'Portable developer_instructions must be one nonempty, single-line basic string without escapes'
+    }
+
     $expectedLines = @(
         'model_reasoning_summary = "none"'
         'model_verbosity = "low"'
@@ -506,6 +518,7 @@ function Test-PortableConfigSource {
         'web_search = "live"'
         'service_tier = "default"'
         'project_doc_max_bytes = 65536'
+        $developerInstructionLines[0]
         '[agents]'
         'enabled = true'
         'max_concurrent_threads_per_session = 6'
@@ -523,9 +536,6 @@ function Test-PortableConfigSource {
         'show-context-window-usage = true'
         'enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "ultra", "max"]'
     )
-    $actualLines = @(Get-Content -LiteralPath $Path -Encoding UTF8 | ForEach-Object { $_.Trim() } | Where-Object {
-        -not [string]::IsNullOrWhiteSpace($_) -and -not $_.StartsWith('#')
-    })
     $unexpected = @($actualLines | Where-Object { $expectedLines -notcontains $_ })
     if ($unexpected.Count -gt 0) {
         throw "Portable Codex config contains an unreviewed line: $($unexpected[0])"

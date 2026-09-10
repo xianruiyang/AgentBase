@@ -15,6 +15,7 @@ sandbox_mode = "danger-full-access"
 web_search = "live"
 service_tier = "default"
 project_doc_max_bytes = 65536
+developer_instructions = "没有独立必要工作、仅等待已派发子代理交付时，调用 collaboration.wait_agent 并显式设置 timeout_ms=1800000（30 分钟）。此类事件等待期间，不因固定频率的进度播报缩短等待或主动轮询；子代理消息、完成或用户输入可提前唤醒，唤醒后处理实际需要动作的事件。"
 
 [agents]
 enabled = true
