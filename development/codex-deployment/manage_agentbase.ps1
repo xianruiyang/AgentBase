@@ -521,7 +521,7 @@ function Test-PortableConfigSource {
         $developerInstructionLines[0]
         '[agents]'
         'enabled = true'
-        'max_concurrent_threads_per_session = 6'
+        'max_concurrent_threads_per_session = 8'
         'default_subagent_model = "gpt-5.6-luna"'
         'default_subagent_reasoning_effort = "medium"'
         '[features]'
