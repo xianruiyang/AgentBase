@@ -314,14 +314,27 @@ def _tool_identity(name: str, path: Path) -> dict[str, Any]:
     }
 
 
-def resolve_codex_identity(explicit_path: Path | None = None) -> dict[str, Any]:
-    path = (
-        explicit_path.resolve()
-        if explicit_path is not None
-        else _resolve_application(("codex.exe", "codex"))
-    )
+def resolve_codex_executable(
+    explicit_path: Path | None = None, *, environment: Mapping[str, str] | None = None,
+) -> Path:
+    """Use the host preparation/routing owner, never ambiguous desktop PATH discovery."""
+    if explicit_path is not None:
+        path = explicit_path.resolve()
+    else:
+        owner = str(COMMON_DIR / "codex_cli_runtime.ps1").replace("'", "''")
+        result = run_capture(
+            ["pwsh.exe", "-NoProfile", "-NonInteractive", "-Command",
+             f". '{owner}'\nResolve-AgentBaseCodexNativeExecutable -NpmPrefix (Get-AgentBaseUserNpmPrefix)"],
+            env=environment, timeout=60,
+        )
+        path = Path(result.stdout.decode("utf-8-sig").strip()).resolve()
     if not path.is_file():
         raise EvaluationError(f"Codex executable not found: {path}")
+    return path
+
+
+def resolve_codex_identity(explicit_path: Path | None = None) -> dict[str, Any]:
+    path = resolve_codex_executable(explicit_path)
     return {
         "schema": "agentbase.codex-cli-identity/v1",
         **_tool_identity("codex", path),

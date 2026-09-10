@@ -27,6 +27,24 @@ from evo.runtime_home import prepare_runtime_home, remove_runtime_auth, runtime_
 
 
 class EvoCodexAdapterTests(unittest.TestCase):
+    def test_default_cli_uses_shared_owner_not_desktop_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            native = Path(temp) / "npm-native.exe"
+            native.write_bytes(b"fixture")
+            environment = {"PATH": "desktop-first"}
+            result = subprocess.CompletedProcess([], 0, str(native).encode("utf-8"), b"")
+            with mock.patch.object(agentbase_codex, "run_capture", return_value=result) as capture, \
+                    mock.patch.object(agentbase_codex.shutil, "which", side_effect=AssertionError("PATH fallback")):
+                self.assertEqual(agentbase_codex.resolve_codex_executable(environment=environment), native)
+                self.assertEqual(capture.call_args.kwargs["env"], environment)
+                self.assertIn("Resolve-AgentBaseCodexNativeExecutable", capture.call_args.args[0][-1])
+
+    def test_invalid_explicit_cli_does_not_fall_back(self) -> None:
+        with tempfile.TemporaryDirectory() as temp, \
+                mock.patch.object(agentbase_codex, "run_capture", side_effect=AssertionError("fallback")):
+            with self.assertRaises(EvaluationError):
+                agentbase_codex.resolve_codex_executable(Path(temp) / "missing.exe")
+
     @staticmethod
     def _write_rollout(path: Path, thread_id: str, usage: dict[str, int], *, parent: str | None = None, expected_child: str | None = None) -> None:
         metadata = {"id": thread_id}

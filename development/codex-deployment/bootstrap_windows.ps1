@@ -388,7 +388,7 @@ function Get-CodexCliState {
         $supportsIsolation = $supportsIsolation -and $help.Contains($requiredOption)
     }
     $pathReady = Test-UserNpmPathPrecedence -NpmPrefix $npmPrefix
-    $versionReady = $null -ne $versionObject -and $versionObject -eq [version]"0.151.0"
+    $versionReady = $null -ne $versionObject -and $versionObject -ge [version]"0.151.0"
     return [pscustomobject]@{
         name = "Codex CLI"
         command = "codex.exe"
@@ -613,9 +613,12 @@ if ($Action -eq "Install") {
         Add-PersistedPathEntries
     }
     $codexState = Get-CodexCliState
-    if (-not $codexState.available -or [string]$codexState.version -ne "0.151.0" -or -not [bool]$codexState.isolation_options_supported) {
+    if (-not $codexState.available -or [version]$codexState.version -lt [version]"0.151.0") {
         Install-CodexCli
         Add-PersistedPathEntries
+    }
+    elseif (-not [bool]$codexState.isolation_options_supported) {
+        throw "Installed Codex CLI lacks required exec options; select a compatible runtime explicitly. Bootstrap will not downgrade it."
     }
     Set-UserNpmPathPrecedence
     $states = @(Get-HostPrerequisiteState)

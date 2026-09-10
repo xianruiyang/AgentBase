@@ -330,12 +330,12 @@ def run_codex_job(
         raise CodexAdapterPrecondition(f"cannot persist the bounded Codex prompt: {exc}") from exc
     environment = dict(os.environ if process_environment is None else process_environment)
     explicit = environment.get("AGENTBASE_CODEX_EXECUTABLE_PATH")
-    executable = Path(explicit).resolve() if explicit else None
-    if executable is None:
-        found = shutil.which("codex.exe", path=environment.get("PATH")) or shutil.which("codex", path=environment.get("PATH"))
-        executable = Path(found).resolve() if found else None
-    if executable is None or not executable.is_file():
-        raise CodexAdapterPrecondition("Codex executable is unavailable in the job environment")
+    try:
+        executable = agentbase_codex.resolve_codex_executable(
+            Path(explicit) if explicit else None, environment=environment,
+        )
+    except EvaluationError as exc:
+        raise CodexAdapterPrecondition(str(exc)) from exc
     if task_runtime_bin is not None:
         task_runtime_bin = task_runtime_bin.resolve()
         # The dependency owner supplies a workspace venv/pnpm or the host npm bin.

@@ -22,6 +22,8 @@ Evo 通过 `agent_eval.py evo <action>` 使用，实际接口与数据生命周�
 
 安装 Codex 根不是项目真源。原 SWE 执行仍由 Codex CLI 从指定安装根读取认证和 session 使用量账本；Evo 则为每个 attempt 建立独立最小 Codex home，只在启动期间以同卷硬链接提供安装根现有 `auth.json`，并从该 attempt home 采集用量与公开轨迹。候选配置、全局规则、自定义 agents 和 skills 每次从本仓库真源投影；两条路径都不复制凭据，也不维护宿主权限画像或后端状态。
 
+默认 CLI 由 `agentbase_codex.resolve_codex_executable` 调用共享的 `development/common/codex_cli_runtime.ps1` 解析用户 npm 原生入口，SWE 预检与 Evo 执行共用此选择；不从桌面 PATH 猜测。Evo 可通过 `AGENTBASE_CODEX_EXECUTABLE_PATH` 显式选择运行文件，指定文件无效即拒绝。实际文件经预检后以绝对路径传入 launcher，版本和身份保留在原生收据中；对照运行应核对该身份，普通 `codex --version` 不替代它。
+
 ## 当前执行模型
 
 候选和 Verifier 都作为受信任的本地开发进程运行，但使用两个从同一固定 base 创建的独立工作区：
