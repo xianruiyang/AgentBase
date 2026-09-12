@@ -61,9 +61,13 @@ python.exe development/agent-evaluation/agent_eval.py evo plan --spec C:/local/r
 
 作答协议为一个 JSON 对象：`locations` 保存定位项，语义说明可放顶层 `explanation` 字符串。定位必须相对题目工程根，不能把 Evo 槽位当成相对基准。自动评分 `agentbase.evo-code-reading-score/v2` 按题目要求的粒度计数：一个文件只要求路径时，回答附带行号或范围仍按该文件去重计分，附带行号的正确性不由文件级评分证明；该文件存在任何精确行或范围要求时，仍逐项精确匹配，不用同文件、附近行或包含范围代替所问位置。
 
+默认格式为 `flat-v1`。研究可显式选择 `runtime.code_reading.answer_format="file-groups-v1"`，输出 `{"files":[{"path":"src/example.py","at":["file","2","4-8"]}],"explanation":"..."}`：同文件共享完整相对路径，`at` 的字符串分别表示仅文件、单行、包含首尾的范围；每组至少一个位置。格式由运行配置维护并随作业冻结，不进入题目、oracle 或角色提示。adapter 按所选格式生成提示/schema，并将原始回答严格解码为同一定位元组评分；不修正文件归属、行号或倒置范围，也不减少解释要求。恢复沿用冻结格式，旧作业不会自动接受新格式。格式转换只证明表示等价，模型回答质量与 Token 收益仍须实测。
+
+需要位置与简述相邻时，可选择 `file-notes-v1`：每个文件的 `at` 数组替换为 `entries:[{"at":"4-8","note":"实体及必要事实"}]`；顶层 `explanation` 保留共享范围或不确定项。每条 note 属于同条位置，仍由人工评审其准确性和覆盖；位置评分不从 note 抽取漏填的位置。两种紧凑格式的生成 schema 均限制 `at` 为 `file`、正整数或范围字符串，不能放文件路径；范围顺序仍由 grader 检查。这三种格式共用冻结、严格解码与恢复链，默认格式不因某次研究结果改变。
+
 重复相同位置去重；未匹配位置每处扣一个定位项，`reward=max(0,命中项数-未匹配项数)/必需项数`，完整定位通过要求全部命中且无未匹配项。未匹配可能是错误，也可能是辅助来源或冗余表达；原始输出保留，不能仅据计数裁决语义错误。格式失败保留错误诊断及已消耗用量。解释的准确性、必要覆盖与精炼程度由人工评审单独判定；自动通过不证明完整回答质量。既有 v1 收据不覆盖；重评已有作答需保存独立的带来源派生结果。历史自由文本协议与本结构化协议分别记录，不能混合成绩。
 
-Codex 执行此题型时，`code_reading_adapter.answer_schema` 将上述结构投影为 attempt 内 `candidate-output-schema.json`，由 `codex_adapter` 经共享 launcher 的 `--output-schema` 交给 CLI。该派生物只包含三种位置形状与解释字符串，不包含答案、路径枚举或参考语义；CLI 严格结构要求解释字段存在，无需说明时使用空字符串。launcher 收据保存 schema 路径与执行前指纹，随 attempt 留存，按相同框架版本可重建；模型不维护该文件。离线 grader 仍独立校验原始回答，不自动补括号、抽取片段或修写失败作答。SWE 和其他未选择答案 schema 的执行保持原输出方式。
+Codex 执行此题型时，`code_reading_adapter.answer_schema` 将所选格式投影为 attempt 内 `candidate-output-schema.json`，由 `codex_adapter` 经共享 launcher 的 `--output-schema` 交给 CLI。该派生物只包含位置容器与解释字符串，不包含答案、路径枚举或参考语义；CLI 严格结构要求解释字段存在，无需说明时使用空字符串。launcher 收据保存 schema 路径与执行前指纹，随 attempt 留存，按相同框架版本可重建；模型不维护该文件。离线 grader 仍独立校验原始回答，不自动补括号、抽取片段或修写失败作答。SWE 和其他未选择答案 schema 的执行保持原输出方式。
 
 结果复用 Evo 原有用量、公开轨迹、队列、恢复和自定义计算链，记录定位命中/分母、额外位置、通过情况与 reward。修改评分配置只重算已有事实，不重新调用模型。恢复只处理已经存在的作答及评分；没有可恢复作答时保留不确定状态，不自动补跑。
 

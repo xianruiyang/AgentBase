@@ -16,6 +16,12 @@ MAX_SNAPSHOT_FILES = 200_000
 MAX_SNAPSHOT_BYTES = 8 * 1024**3
 
 
+def validate_answer_format(value: Any) -> str:
+    if value not in ('flat-v1', 'file-groups-v1', 'file-notes-v1'):
+        raise EvoError('code-reading answer_format must be flat-v1, file-groups-v1, or file-notes-v1')
+    return value
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open('rb') as handle:
@@ -225,8 +231,13 @@ def resolve_catalog(spec: dict[str, Any], spec_path: Path) -> dict[str, Any]:
     catalog = load_catalog(path, binding['sha256'])
     runtime = spec.get('runtime', {})
     code_runtime = runtime.get('code_reading') if isinstance(runtime, dict) else None
-    if code_runtime is not None and (not isinstance(code_runtime, dict) or set(code_runtime) != {'snapshot_root'}):
-        raise EvoError('research runtime.code_reading requires only snapshot_root')
+    if code_runtime is not None and (not isinstance(code_runtime, dict) or
+                                    'snapshot_root' not in code_runtime or
+                                    set(code_runtime) - {'snapshot_root', 'answer_format'}):
+        raise EvoError('research runtime.code_reading requires snapshot_root and optional answer_format')
+    answer_options = {}
+    if code_runtime is not None and 'answer_format' in code_runtime:
+        answer_options['answer_format'] = validate_answer_format(code_runtime['answer_format'])
     snapshot_root = Path(str(code_runtime['snapshot_root'])) if code_runtime is not None else None
     if snapshot_root is not None and not snapshot_root.is_absolute():
         raise EvoError('runtime.code_reading.snapshot_root must be absolute')
@@ -241,6 +252,7 @@ def resolve_catalog(spec: dict[str, Any], spec_path: Path) -> dict[str, Any]:
             'prompt': item['prompt'], 'answer_max_lines': item['answer_max_lines'],
             'required_locations': copy.deepcopy(item['required_locations']),
             'runtime': {'code_reading': {**({'snapshot_root': str(snapshot_root.resolve())} if snapshot_root else {}),
+                                         **answer_options,
                                          'workspace': item['workspace'], 'snapshot': copy.deepcopy(snapshot)}},
         })
     result['catalog_source'] = {'source': str(path), 'sha256': binding['sha256']}

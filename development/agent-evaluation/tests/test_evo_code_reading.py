@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -26,6 +27,17 @@ from evo.store import Store
 
 
 class EvoCodeReadingTests(unittest.TestCase):
+    def test_compact_transport_rejects_paths_in_coordinate_slots(self) -> None:
+        # A real answer put its group path in at as well as in path. Prevent
+        # this transport-valid / grader-invalid mismatch before generation.
+        for answer_format, key in (('file-groups-v1', 'at'), ('file-notes-v1', 'entries')):
+            entry = answer_schema(answer_format)['properties']['files']['items']['properties'][key]['items']
+            coordinate = entry['properties']['at'] if key == 'entries' else entry
+            for valid in ('file', '1', '38-71'):
+                self.assertIsNotNone(re.fullmatch(coordinate['pattern'], valid))
+            for invalid in ('src/handler.ts', '', '0', '-1', '1:2', '01', '1\n'):
+                self.assertIsNone(re.fullmatch(coordinate['pattern'], invalid))
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -101,8 +113,20 @@ class EvoCodeReadingTests(unittest.TestCase):
         self.assertEqual(loaded['evaluations']['items'][0]['required_locations'][0], {'path': 'src/value.py'})
 
     def test_queue_stub_transport_uses_real_location_grader_and_score(self) -> None:
+        self._check_transport('flat-v1')
+
+    def test_grouped_transport_uses_selected_prompt_schema_and_same_grader(self) -> None:
+        self._check_transport('file-groups-v1')
+
+    def test_noted_transport_uses_selected_prompt_schema_and_same_grader(self) -> None:
+        self._check_transport('file-notes-v1')
+
+    def _check_transport(self, answer_format: str) -> None:
         catalog = self._catalog()
-        spec_path, _ = self._spec(catalog)
+        spec_path, spec = self._spec(catalog)
+        if answer_format != 'flat-v1':
+            spec['runtime']['code_reading']['answer_format'] = answer_format
+            spec_path.write_text(json.dumps(spec), encoding='utf-8')
         state, work, codex = self.root / 'state', self.root / 'work', self.root / 'codex'
         codex.mkdir(); (codex / 'auth.json').write_text('{}', encoding='utf-8')
         store = Store(state); store.initialize(concurrency=1, model_capacity=1, max_disk_mb=64, min_free_mb=1)
@@ -111,11 +135,18 @@ class EvoCodeReadingTests(unittest.TestCase):
             selected = next(item for item in kwargs['spec']['evaluations']['items'] if item['id'] == 'find-value')
             self.assertIn(str(self.workspace.resolve()), selected['prompt'])
             self.assertIn('Return exactly one JSON object', selected['prompt'])
-            self.assertEqual(kwargs['output_schema'], answer_schema())
+            self.assertIn('with a locations array' if answer_format == 'flat-v1' else 'with a files array', selected['prompt'])
+            self.assertEqual(kwargs['output_schema'], answer_schema(answer_format))
             logs = kwargs['attempt_root'] / 'codex-logs'; logs.mkdir(parents=True)
-            (logs / 'last-message.txt').write_text(json.dumps({'locations': [
+            answer = {'locations': [
                 {'path': 'src/value.py'}, {'path': 'src/value.py', 'line': 1},
-                {'path': 'src/value.py', 'start_line': 1, 'end_line': 2}]}), encoding='utf-8')
+                {'path': 'src/value.py', 'start_line': 1, 'end_line': 2}]}
+            if answer_format == 'file-groups-v1':
+                answer = {'files': [{'path': 'src/value.py', 'at': ['file', '1', '1-2']}]}
+            elif answer_format == 'file-notes-v1':
+                answer = {'files': [{'path': 'src/value.py', 'entries': [
+                    {'at': at, 'note': 'source fact'} for at in ('file', '1', '1-2')]}]}
+            (logs / 'last-message.txt').write_text(json.dumps(answer), encoding='utf-8')
             raw = {'schema': 'agentbase.evo-codex-run/v1', 'status': 'completed', 'model_invoked': True,
                    'duration_seconds': .1, 'usage': {'total_tokens': 7}, 'usage_complete': True}
             return {'status': 'completed', 'model_invoked': True, 'raw_receipt': raw,
@@ -173,17 +204,37 @@ class EvoCodeReadingTests(unittest.TestCase):
         self.assertEqual((attempt / 'candidate-prompt.txt').read_text(encoding='utf-8'), prompt)
 
     def test_completed_raw_recovers_answer_without_calling_model(self) -> None:
-        catalog = self._catalog(); spec_path, _ = self._spec(catalog)
+        self._check_recover('flat-v1')
+
+    def test_grouped_recovery_uses_frozen_format_without_calling_model(self) -> None:
+        self._check_recover('file-groups-v1')
+
+    def test_noted_recovery_uses_frozen_format_without_calling_model(self) -> None:
+        self._check_recover('file-notes-v1')
+
+    def _check_recover(self, answer_format: str) -> None:
+        catalog = self._catalog(); spec_path, spec = self._spec(catalog)
+        spec['runtime']['code_reading']['answer_format'] = answer_format
+        spec_path.write_text(json.dumps(spec), encoding='utf-8')
         store = Store(self.root / 'state')
         store.initialize(concurrency=1, model_capacity=1, max_disk_mb=64, min_free_mb=1)
         study = submit(store, spec_path, self.project, self.root / 'work')
+        # Edits to the research file must not change an already submitted job.
+        spec['runtime']['code_reading']['answer_format'] = 'flat-v1'
+        spec_path.write_text(json.dumps(spec), encoding='utf-8')
         job = store.claim(study); self.assertIsNotNone(job)
         attempt = store.root / 'jobs' / f"j{job['id']}"
         store.phase(job['id'], 'running')
         (attempt / 'codex-logs').mkdir(parents=True)
-        (attempt / 'codex-logs' / 'last-message.txt').write_text(json.dumps({'locations': [
+        answer = {'locations': [
             {'path': 'src/value.py'}, {'path': 'src/value.py', 'line': 1},
-            {'path': 'src/value.py', 'start_line': 1, 'end_line': 2}]}), encoding='utf-8')
+            {'path': 'src/value.py', 'start_line': 1, 'end_line': 2}]}
+        if answer_format == 'file-groups-v1':
+            answer = {'files': [{'path': 'src/value.py', 'at': ['file', '1', '1-2']}]}
+        elif answer_format == 'file-notes-v1':
+            answer = {'files': [{'path': 'src/value.py', 'entries': [
+                {'at': at, 'note': 'source fact'} for at in ('file', '1', '1-2')]}]}
+        (attempt / 'codex-logs' / 'last-message.txt').write_text(json.dumps(answer), encoding='utf-8')
         raw = {'schema': 'agentbase.evo-codex-run/v1', 'status': 'completed', 'model_invoked': True,
                'duration_seconds': .1, 'usage': {'total_tokens': 9}, 'usage_complete': True}
         (attempt / 'codex-result.json').write_text(json.dumps(raw), encoding='utf-8')
@@ -192,6 +243,60 @@ class EvoCodeReadingTests(unittest.TestCase):
         launch.assert_not_called()
         self.assertEqual(result['counts'], {'completed': 1})
         self.assertEqual(store.jobs(study)[0]['usage'], 9)
+        self.assertTrue(artifacts(store, study)['rows'][0]['values']['quality.passed'])
+
+    def test_grouped_grammar_preserves_exact_scoring_and_rejects_invalid_coordinates(self) -> None:
+        item = {'required_locations': [{'path': 'a.py'}, {'path': 'a.py', 'line': 2},
+                                       {'path': 'b.py', 'start_line': 3, 'end_line': 5}]}
+        flat = {'locations': item['required_locations'] + [{'path': 'a.py'}, {'path': 'other.py', 'line': 9}]}
+        grouped = {'files': [{'path': 'a.py', 'at': ['file', '2']}, {'path': 'b.py', 'at': ['3-5']},
+                             {'path': 'a.py', 'at': ['file']}, {'path': 'other.py', 'at': ['9']}]}
+        self.assertEqual(score_answer(item, json.dumps(flat)),
+                         score_answer(item, json.dumps(grouped), answer_format='file-groups-v1'))
+        self.assertFalse(score_answer(item, json.dumps(grouped))['valid'])
+        self.assertFalse(score_answer(item, json.dumps(flat), answer_format='file-groups-v1')['valid'])
+        noted = {'files': [{'path': group['path'], 'entries': [{'at': at, 'note': 'source fact'} for at in group['at']]}
+                           for group in grouped['files']]}
+        self.assertEqual(score_answer(item, json.dumps(flat)),
+                         score_answer(item, json.dumps(noted), answer_format='file-notes-v1'))
+        self.assertFalse(score_answer(item, json.dumps(noted), answer_format='file-groups-v1')['valid'])
+        for entry in ({'at': '2'}, {'at': '2', 'note': None}, {'at': '2-1', 'note': ''}):
+            self.assertFalse(score_answer(item, json.dumps({'files': [{'path': 'a.py', 'entries': [entry]}]}),
+                                          answer_format='file-notes-v1')['valid'])
+        for at in ([], ['0'], ['01'], ['-1'], ['2-1'], ['2-'], ['2:5'], ['2,5'], [' 2'], [True], [2], [None], ['１']):
+            with self.subTest(at=at):
+                answer = {'files': [{'path': 'a.py', 'at': at}]}
+                self.assertFalse(score_answer(item, json.dumps(answer), answer_format='file-groups-v1')['valid'])
+        for path in ('../a.py', '', str(self.workspace)):
+            self.assertFalse(score_answer(item, json.dumps({'files': [{'path': path, 'at': ['file']}]}),
+                                          answer_format='file-groups-v1')['valid'])
+        for at in ('3', '1-9', '3-6'):
+            result = score_answer({'required_locations': [{'path': 'a.py', 'line': 2},
+                                                          {'path': 'a.py', 'start_line': 3, 'end_line': 5}]},
+                                  json.dumps({'files': [{'path': 'a.py', 'at': [at]}]}),
+                                  answer_format='file-groups-v1')
+            self.assertEqual(result['required_found'], 0)
+            self.assertEqual(result['extra_count'], 1)
+
+    def test_answer_format_binding_is_validated_and_part_of_job_identity(self) -> None:
+        catalog = self._catalog(); spec_path, spec = self._spec(catalog)
+        store = Store(self.root / 'state')
+        store.initialize(concurrency=1, model_capacity=1, max_disk_mb=64, min_free_mb=1)
+        flat = submit(store, spec_path, self.project, self.root / 'work')
+        spec['runtime']['code_reading']['answer_format'] = 'file-groups-v1'
+        spec_path.write_text(json.dumps(spec), encoding='utf-8')
+        grouped = submit(store, spec_path, self.project, self.root / 'work')
+        flat_job, grouped_job = store.jobs(flat)[0], store.jobs(grouped)[0]
+        self.assertNotEqual(flat_job['identity'], grouped_job['identity'])
+        binding = load_spec(spec_path)['evaluations']['items'][0]['runtime']['code_reading']
+        self.assertEqual(validate_binding({'code_reading': binding})['answer_format'], 'file-groups-v1')
+        for invalid in ('auto', '', None, True, []):
+            spec['runtime']['code_reading']['answer_format'] = invalid
+            spec_path.write_text(json.dumps(spec), encoding='utf-8')
+            with self.assertRaisesRegex(EvoError, 'answer_format'):
+                load_spec(spec_path)
+            with self.assertRaisesRegex(EvoError, 'answer_format'):
+                validate_binding({'code_reading': {**binding, 'answer_format': invalid}})
 
     def test_completed_raw_missing_answer_stays_uncertain_with_usage(self) -> None:
         catalog = self._catalog(); spec_path, _ = self._spec(catalog)

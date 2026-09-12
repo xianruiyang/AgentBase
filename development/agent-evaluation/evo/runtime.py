@@ -900,7 +900,7 @@ def execute(store: Store, job: dict, installed_codex_root: Path | None) -> None:
                     item = next(item for item in codex_spec['evaluations']['items'] if item['id'] == job['plan']['item'])
                     # The Codex adapter gives an item prompt precedence over a runtime prompt.
                     item['prompt'] = subject_prompt(item, runtime['code_reading'])
-                    task_options['output_schema'] = answer_schema()
+                    task_options['output_schema'] = answer_schema(runtime['code_reading'].get('answer_format', 'flat-v1'))
                 result = run_codex_job(project_root=Path(study['project']), workspace=workspace, attempt_root=attempt,
                                        installed_codex_root=installed_codex_root, spec=codex_spec, job=codex_plan,
                                        process_environment=os.environ, timeout_seconds=runtime['timeout_seconds'],
