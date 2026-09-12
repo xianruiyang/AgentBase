@@ -169,6 +169,7 @@
     "qq-troubleshooting-with-powershell",
     "qq-direct-message-required",
     "qq-known-cause-explanation",
+    "non-qq-hook-known-trust-warning",
     "delivery-confirmed-target-contract",
     "vertical-validation-closure-selection",
     "counterexample-checkpoint-before-continue",
@@ -1400,6 +1401,36 @@
       ]
     },
     {
+      "id": "non-qq-plugin-hook-diagnosis",
+      "kind": "negative",
+      "request": "Codex 的一个代码格式化插件显示 Hook 配置错误，请只读排查这个插件的报错原因。",
+      "expected_skills": ["change-governance"],
+      "forbidden_skills": ["codex-qq-hook"],
+      "expected_change_governance_references": ["causal-analysis.md"],
+      "expected_behavior_tags": ["read_only"],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
+    },
+    {
+      "id": "non-qq-hook-known-trust-warning",
+      "kind": "negative",
+      "request": "已确认代码格式化插件的 Hook 因修改后未重新信任而出现警告，脚本内容没有其他错误。请只用一句话解释警告，不查配置、不执行命令。",
+      "expected_skills": [],
+      "forbidden_skills": ["codex-qq-hook", "change-governance"],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [],
+      "forbidden_behavior_tags": ["modify_authorized_scope"]
+    },
+    {
+      "id": "qq-hook-migration-with-unrelated-plugin-warning",
+      "kind": "boundary",
+      "request": "请把 QQ 完成提醒的 Hook 迁移到新工作区。同页另一个图像插件也有 Hook 警告，那只是背景，本次不处理它。",
+      "expected_skills": ["codex-qq-hook"],
+      "forbidden_skills": ["change-governance"],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": ["modify_authorized_scope"],
+      "forbidden_behavior_tags": []
+    },
+    {
       "id": "cross-turn-dependent-plan",
       "kind": "positive",
       "request": "这个迁移要跨多轮执行，任务之间有真实依赖，并且下周需要快速恢复上下文和查看执行状态；请建立并执行任务表。",
@@ -1691,6 +1722,50 @@
         "protected_user_baseline"
       ],
       "forbidden_behavior_tags": []
+    },
+    {
+      "id": "subagent-config-identity-gap",
+      "kind": "boundary",
+      "request": "现有 evidence 找到了另一个项目的同名服务配置，已明确它与当前服务的加载关系未确认。请向原 evidence 续派，只定位当前项目的实际配置来源和加载关系；未找到就交付缺口，不用邻近配置补齐答案，不进入故障机制调查。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "source-query",
+        "symbol-structure-workflow"
+      ],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "subagent-runtime-probe-context",
+      "kind": "positive",
+      "request": "请委派 operator 执行已确认的服务状态查询：目标实例、工作目录、配置根、启动参数、只读入口和结果判定均已给定，需多轮等待并筛选长输出。保持原调用上下文；条件不能复现就返回缺口，另一个环境的成功或警告只能作为明确标注的对照。不要修改服务或扩大排查。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "execution-governor"
+      ],
+      "expected_subagent_orchestration_references": [
+        "operator-execution.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "subagent-static-evidence-map",
