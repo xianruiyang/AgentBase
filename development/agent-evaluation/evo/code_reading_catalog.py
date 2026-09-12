@@ -17,8 +17,8 @@ MAX_SNAPSHOT_BYTES = 8 * 1024**3
 
 
 def validate_answer_format(value: Any) -> str:
-    if value not in ('flat-v1', 'file-groups-v1', 'file-notes-v1'):
-        raise EvoError('code-reading answer_format must be flat-v1, file-groups-v1, or file-notes-v1')
+    if value not in ('flat-v1', 'file-groups-v1', 'file-notes-v1', 'path-tree-v1'):
+        raise EvoError('code-reading answer_format must be flat-v1, file-groups-v1, file-notes-v1, or path-tree-v1')
     return value
 
 

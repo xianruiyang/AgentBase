@@ -121,6 +121,9 @@ class EvoCodeReadingTests(unittest.TestCase):
     def test_noted_transport_uses_selected_prompt_schema_and_same_grader(self) -> None:
         self._check_transport('file-notes-v1')
 
+    def test_path_tree_transport_uses_selected_prompt_schema_and_same_grader(self) -> None:
+        self._check_transport('path-tree-v1')
+
     def _check_transport(self, answer_format: str) -> None:
         catalog = self._catalog()
         spec_path, spec = self._spec(catalog)
@@ -135,7 +138,13 @@ class EvoCodeReadingTests(unittest.TestCase):
             selected = next(item for item in kwargs['spec']['evaluations']['items'] if item['id'] == 'find-value')
             self.assertIn(str(self.workspace.resolve()), selected['prompt'])
             self.assertIn('Return exactly one JSON object', selected['prompt'])
-            self.assertIn('with a locations array' if answer_format == 'flat-v1' else 'with a files array', selected['prompt'])
+            expected_prompt = {
+                'flat-v1': 'with a locations array',
+                'file-groups-v1': 'with a files array',
+                'file-notes-v1': 'with a files array',
+                'path-tree-v1': 'with a tree string',
+            }[answer_format]
+            self.assertIn(expected_prompt, selected['prompt'])
             self.assertEqual(kwargs['output_schema'], answer_schema(answer_format))
             logs = kwargs['attempt_root'] / 'codex-logs'; logs.mkdir(parents=True)
             answer = {'locations': [
@@ -146,6 +155,8 @@ class EvoCodeReadingTests(unittest.TestCase):
             elif answer_format == 'file-notes-v1':
                 answer = {'files': [{'path': 'src/value.py', 'entries': [
                     {'at': at, 'note': 'source fact'} for at in ('file', '1', '1-2')]}]}
+            elif answer_format == 'path-tree-v1':
+                answer = {'tree': 'src/\n  value.py  file,1,1-2\n    > source fact', 'explanation': ''}
             (logs / 'last-message.txt').write_text(json.dumps(answer), encoding='utf-8')
             raw = {'schema': 'agentbase.evo-codex-run/v1', 'status': 'completed', 'model_invoked': True,
                    'duration_seconds': .1, 'usage': {'total_tokens': 7}, 'usage_complete': True}
@@ -212,6 +223,9 @@ class EvoCodeReadingTests(unittest.TestCase):
     def test_noted_recovery_uses_frozen_format_without_calling_model(self) -> None:
         self._check_recover('file-notes-v1')
 
+    def test_path_tree_recovery_uses_frozen_format_without_calling_model(self) -> None:
+        self._check_recover('path-tree-v1')
+
     def _check_recover(self, answer_format: str) -> None:
         catalog = self._catalog(); spec_path, spec = self._spec(catalog)
         spec['runtime']['code_reading']['answer_format'] = answer_format
@@ -234,6 +248,8 @@ class EvoCodeReadingTests(unittest.TestCase):
         elif answer_format == 'file-notes-v1':
             answer = {'files': [{'path': 'src/value.py', 'entries': [
                 {'at': at, 'note': 'source fact'} for at in ('file', '1', '1-2')]}]}
+        elif answer_format == 'path-tree-v1':
+            answer = {'tree': 'src/\n  value.py  file,1,1-2\n    > source fact', 'explanation': ''}
         (attempt / 'codex-logs' / 'last-message.txt').write_text(json.dumps(answer), encoding='utf-8')
         raw = {'schema': 'agentbase.evo-codex-run/v1', 'status': 'completed', 'model_invoked': True,
                'duration_seconds': .1, 'usage': {'total_tokens': 9}, 'usage_complete': True}
@@ -278,6 +294,111 @@ class EvoCodeReadingTests(unittest.TestCase):
             self.assertEqual(result['required_found'], 0)
             self.assertEqual(result['extra_count'], 1)
 
+    def test_path_tree_scores_explicit_ancestry_and_same_named_files(self) -> None:
+        item = {'required_locations': [
+            {'path': 'src/lib/alpha.py', 'line': 2},
+            {'path': 'src/lib/alpha.py', 'start_line': 4, 'end_line': 8},
+            {'path': 'src/lib/only.py'},
+            {'path': 'pkg/alpha.py', 'line': 5},
+            {'path': 'pkg/nested/alpha.py', 'line': 7},
+        ]}
+        answer = {
+            'tree': '\n'.join((
+                'src/lib/',
+                '  alpha.py  2,4-8',
+                '    > preserves the relation and its result',
+                '  only.py  file',
+                'pkg/',
+                '  alpha.py  5',
+                '  nested/alpha.py  7',
+            )),
+            'explanation': 'The two directories are the relevant shared scope.',
+        }
+        result = score_answer(item, json.dumps(answer), answer_format='path-tree-v1')
+        self.assertEqual((result['valid'], result['required_found'], result['required_total'],
+                          result['extra_count'], result['reported_unique'], result['reward']),
+                         (True, 5, 5, 0, 5, 1))
+        self.assertTrue(result['passed'])
+
+    def test_path_tree_preserves_file_level_scoring_and_default_flat_compatibility(self) -> None:
+        item = {'required_locations': [{'path': 'a.py'}]}
+        answer = {'tree': 'a.py  3,4-8', 'explanation': ''}
+        result = score_answer(item, json.dumps(answer), answer_format='path-tree-v1')
+        self.assertEqual((result['required_found'], result['required_total'], result['extra_count'],
+                          result['reported_unique'], result['reward']), (1, 1, 0, 2, 1))
+        self.assertTrue(result['passed'])
+
+        default_schema = answer_schema()
+        tree_schema = answer_schema('path-tree-v1')
+        self.assertIn('locations', default_schema['properties'])
+        self.assertNotIn('tree', default_schema['properties'])
+        self.assertEqual(tree_schema['required'], ['tree', 'explanation'])
+        self.assertEqual(tree_schema['properties']['tree'], {'type': 'string'})
+        self.assertEqual(tree_schema['properties']['explanation'], {'type': 'string'})
+        self.assertFalse(score_answer(item, json.dumps(answer))['valid'])
+
+    def test_path_tree_requires_safe_grammar_and_does_not_infer_locations_from_descriptions(self) -> None:
+        item = {'required_locations': [{'path': 'a.py', 'line': 1}]}
+        malformed = {
+            'odd indentation': ' a.py  1',
+            'skipped indentation': 'a/\n    a.py  1',
+            'below a file leaf': 'a.py  1\n  child.py  2',
+            'blank line': 'a.py  1\n\nb.py  2',
+            'tab': 'a.py\t1',
+            'trailing whitespace': 'a.py  1 ',
+            'missing positions': 'a.py',
+            'empty directory': 'a/',
+            'description without marker': 'a.py  1\n    source fact',
+            'description missing space': 'a.py  1\n    >source fact',
+            'description without file': '    > source fact\na.py  1',
+            'description at wrong depth': 'a.py  1\n      > source fact',
+            'empty description': 'a.py  1\n    > ',
+            'duplicate casefold file': 'a.py  1\na.PY  1',
+            'file as directory parent': 'a  file\na/\n  child.py  1',
+            'compressed file ancestor conflict': 'a  file\na/b/\n  child.py  1',
+            'parent traversal': '../a.py  1',
+            'dot segment': './a.py  1',
+            'empty path segment': 'a//b.py  1',
+            'absolute path': '/a.py  1',
+            'drive path': 'C:/a.py  1',
+            'backslash path': 'a\\b.py  1',
+            'zero coordinate': 'a.py  0',
+            'reversed range': 'a.py  2-1',
+            'empty coordinate': 'a.py  1,',
+            'leading-zero coordinate': 'a.py  01',
+        }
+        for label, tree in malformed.items():
+            with self.subTest(tree=label):
+                result = score_answer(item, json.dumps({'tree': tree, 'explanation': ''}),
+                                      answer_format='path-tree-v1')
+                self.assertFalse(result['valid'])
+
+        inferred = score_answer(
+            {'required_locations': [{'path': 'a.py', 'start_line': 5, 'end_line': 8}]},
+            json.dumps({'tree': 'a.py  file\n  > lines 5-8', 'explanation': 'shared scope'}),
+            answer_format='path-tree-v1')
+        self.assertEqual((inferred['valid'], inferred['required_found'], inferred['required_total'],
+                          inferred['extra_count'], inferred['reward']), (True, 0, 1, 1, 0))
+        self.assertFalse(inferred['passed'])
+
+    def test_path_tree_precise_ranges_require_exact_file_and_boundary(self) -> None:
+        item = {'required_locations': [
+            {'path': 'src/a.py', 'start_line': 5, 'end_line': 8},
+            {'path': 'pkg/a.py', 'line': 3},
+        ]}
+        cases = {
+            'missing range': 'src/\n  a.py  file\npkg/\n  a.py  3',
+            'short range': 'src/\n  a.py  5-7\npkg/\n  a.py  3',
+            'misbound range': 'other/\n  a.py  5-8\npkg/\n  a.py  3',
+        }
+        for label, tree in cases.items():
+            with self.subTest(tree=label):
+                result = score_answer(item, json.dumps({'tree': tree, 'explanation': ''}),
+                                      answer_format='path-tree-v1')
+                self.assertEqual((result['valid'], result['required_found'], result['required_total'],
+                                  result['extra_count'], result['reward']), (True, 1, 2, 1, 0))
+                self.assertFalse(result['passed'])
+
     def test_answer_format_binding_is_validated_and_part_of_job_identity(self) -> None:
         catalog = self._catalog(); spec_path, spec = self._spec(catalog)
         store = Store(self.root / 'state')
@@ -286,10 +407,15 @@ class EvoCodeReadingTests(unittest.TestCase):
         spec['runtime']['code_reading']['answer_format'] = 'file-groups-v1'
         spec_path.write_text(json.dumps(spec), encoding='utf-8')
         grouped = submit(store, spec_path, self.project, self.root / 'work')
-        flat_job, grouped_job = store.jobs(flat)[0], store.jobs(grouped)[0]
+        spec['runtime']['code_reading']['answer_format'] = 'path-tree-v1'
+        spec_path.write_text(json.dumps(spec), encoding='utf-8')
+        tree = submit(store, spec_path, self.project, self.root / 'work')
+        flat_job, grouped_job, tree_job = (store.jobs(flat)[0], store.jobs(grouped)[0],
+                                           store.jobs(tree)[0])
         self.assertNotEqual(flat_job['identity'], grouped_job['identity'])
+        self.assertNotEqual(grouped_job['identity'], tree_job['identity'])
         binding = load_spec(spec_path)['evaluations']['items'][0]['runtime']['code_reading']
-        self.assertEqual(validate_binding({'code_reading': binding})['answer_format'], 'file-groups-v1')
+        self.assertEqual(validate_binding({'code_reading': binding})['answer_format'], 'path-tree-v1')
         for invalid in ('auto', '', None, True, []):
             spec['runtime']['code_reading']['answer_format'] = invalid
             spec_path.write_text(json.dumps(spec), encoding='utf-8')

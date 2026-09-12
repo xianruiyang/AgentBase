@@ -48,6 +48,16 @@ def subject_prompt(item: Mapping[str, Any], binding: Mapping[str, Any]) -> str:
     target = (Path(binding['snapshot_root']) / binding['workspace']).resolve()
     answer_format = validate_answer_format(binding.get('answer_format', 'flat-v1'))
     output_instruction = (
+        'Return exactly one JSON object with a tree string and an explanation string. '
+        'In tree, share directory prefixes using two spaces per indentation level; a directory line ends in /. '
+        'A file leaf is name, two spaces, then comma-separated positions: file, positive line numbers, '
+        'or 1-based inclusive ranges. Example tree: "src/lib/\\n  a.py  2,4-8\\n    > brief necessary description\\n  b.py  6". '
+        'Use / separated relative paths, optionally compressing directory chains into one line. '
+        'Put each file in one leaf; its optional brief descriptions start with > and one space, indented one level below it. '
+        'Preserve each requested position in the leaf; descriptions do not add locations. '
+        'Do not use tabs, branch decorations, empty directories or skipped indentation levels. '
+        'Use explanation only for shared scope or uncertainty; put necessary file-specific semantics below the file. '
+        if answer_format == 'path-tree-v1' else
         'Return exactly one JSON object with a files array. Each file group is '
         '{"path":"relative/path","entries":[{"at":"1","note":"entity: necessary source facts"}]}. '
         'Each at string denotes a file-only location ("file"), one positive line number, '
@@ -76,6 +86,10 @@ def subject_prompt(item: Mapping[str, Any], binding: Mapping[str, Any]) -> str:
 
 def answer_schema(answer_format: str = 'flat-v1') -> dict[str, Any]:
     """Constrain transport shape, never expected paths, locations, or semantics."""
+    if validate_answer_format(answer_format) == 'path-tree-v1':
+        return {'type': 'object', 'properties': {
+            'tree': {'type': 'string'}, 'explanation': {'type': 'string'},
+        }, 'required': ['tree', 'explanation'], 'additionalProperties': False}
     if validate_answer_format(answer_format) != 'flat-v1':
         entries_key = 'entries' if answer_format == 'file-notes-v1' else 'at'
         coordinate_schema = {'type': 'string', 'pattern': _COORDINATE_PATTERN}
@@ -146,6 +160,73 @@ def _group_locations(groups: Any, *, notes: bool = False) -> list[dict[str, Any]
     return locations
 
 
+def _tree_locations(tree: str) -> list[dict[str, Any]]:
+    """Decode explicit tree ancestry; descriptions never infer or repair positions."""
+    directories: list[dict[str, Any]] = []
+    groups: list[dict[str, Any]] = []
+    files: set[str] = set()
+    directory_paths: set[str] = set()
+    last_leaf_depth: int | None = None
+
+    def close_to(depth: int) -> None:
+        while len(directories) > depth:
+            if not directories.pop()['has_file']:
+                raise EvoError('code-reading tree contains an empty directory')
+
+    def safe_relative(path: str) -> None:
+        if not path or path != path.strip() or any(c in path for c in '\\:\t\r\n') \
+                or any(part in ('', '.', '..') for part in path.split('/')):
+            raise EvoError('code-reading tree path must be a safe / separated relative path')
+
+    def register_path(path: str, *, directory: bool) -> None:
+        normalized = path.casefold()
+        parts = normalized.split('/')
+        ancestors = {'/'.join(parts[:i]) for i in range(1, len(parts))}
+        if ancestors & files or normalized in files or (not directory and normalized in directory_paths):
+            raise EvoError('code-reading tree repeats a file or uses a file as a directory')
+        directory_paths.update(ancestors)
+        if directory:
+            directory_paths.add(normalized)
+        else:
+            files.add(normalized)
+
+    for line in tree.splitlines():
+        if not line.strip() or '\t' in line or line != line.rstrip():
+            raise EvoError('code-reading tree has a blank line, tab or trailing whitespace')
+        spaces = len(line) - len(line.lstrip(' '))
+        if spaces % 2:
+            raise EvoError('code-reading tree requires two-space indentation')
+        depth, body = spaces // 2, line[spaces:]
+        if body.startswith('> '):
+            if last_leaf_depth is None or depth != last_leaf_depth + 1 or not body[2:].strip():
+                raise EvoError('code-reading tree description must belong to a file leaf')
+            continue
+        last_leaf_depth = None
+        close_to(depth)
+        if depth != len(directories):
+            raise EvoError('code-reading tree skips a directory level or nests below a file')
+        prefix = directories[-1]['path'] + '/' if directories else ''
+        if body.endswith('/'):
+            safe_relative(body[:-1])
+            register_path(prefix + body[:-1], directory=True)
+            directories.append({'path': prefix + body[:-1], 'has_file': False})
+            continue
+        if '  ' not in body:
+            raise EvoError('code-reading tree file requires two spaces before its positions')
+        name, coordinates = body.rsplit('  ', 1)
+        safe_relative(name)
+        path = prefix + name
+        register_path(path, directory=False)
+        groups.append({'path': path, 'at': [value.strip() for value in coordinates.split(',')]})
+        for directory in directories:
+            directory['has_file'] = True
+        last_leaf_depth = depth
+    close_to(0)
+    if not groups:
+        raise EvoError('code-reading tree requires a file leaf')
+    return _group_locations(groups)
+
+
 def score_answer(item: Mapping[str, Any], answer_text: str, *, answer_format: str = 'flat-v1') -> dict[str, Any]:
     validate_answer_format(answer_format)
     required = set()
@@ -163,13 +244,15 @@ def score_answer(item: Mapping[str, Any], answer_text: str, *, answer_format: st
         answer = json.loads(answer_text)
     except json.JSONDecodeError as exc:
         return invalid(f'answer must be one strict JSON object: {exc.msg}')
-    location_key = 'locations' if answer_format == 'flat-v1' else 'files'
-    if not isinstance(answer, dict) or set(answer) - {location_key, 'explanation'} or not isinstance(answer.get(location_key), list):
+    location_key = 'locations' if answer_format == 'flat-v1' else 'tree' if answer_format == 'path-tree-v1' else 'files'
+    location_type = str if answer_format == 'path-tree-v1' else list
+    if not isinstance(answer, dict) or set(answer) - {location_key, 'explanation'} or not isinstance(answer.get(location_key), location_type):
         return invalid(f'answer requires {location_key} and optional explanation only')
     if 'explanation' in answer and not isinstance(answer['explanation'], str):
         return invalid('explanation must be a string')
     try:
         locations = (answer['locations'] if answer_format == 'flat-v1' else
+                     _tree_locations(answer['tree']) if answer_format == 'path-tree-v1' else
                      _group_locations(answer['files'], notes=answer_format == 'file-notes-v1'))
         observed = {_answer_location(value) for value in locations}
     except (EvoError, ValueError) as exc:
