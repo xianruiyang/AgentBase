@@ -18,7 +18,7 @@ if str(EVALUATION_ROOT) not in sys.path:
     sys.path.insert(0, str(EVALUATION_ROOT))
 
 from evo.cli import main
-from evo.code_reading_adapter import answer_schema, score_answer, validate_binding
+from evo.code_reading_adapter import answer_schema, score_answer, subject_prompt, validate_binding
 from evo.code_reading_catalog import import_catalog, snapshot_inventory
 from evo.runtime import artifacts, recover, run, submit
 from evo.scoring import score_artifacts
@@ -123,6 +123,36 @@ class EvoCodeReadingTests(unittest.TestCase):
 
     def test_path_tree_transport_uses_selected_prompt_schema_and_same_grader(self) -> None:
         self._check_transport('path-tree-v1')
+
+    def test_subject_prompt_preserves_format_specific_explanation_contract(self) -> None:
+        task_prompt = (
+            'Locate value.py and explain the source relationship, exact condition, affected object, '
+            'and result. Include the requested explanation.'
+        )
+        item = {'prompt': task_prompt}
+        old_tail = 'Paths are relative to the frozen snapshot root. Optional explanation text belongs in a top-level explanation string.'
+        binding = {'snapshot_root': str(self.snapshot_root), 'workspace': 'sample'}
+        prompts = {}
+        for answer_format in ('flat-v1', 'file-groups-v1', 'file-notes-v1', 'path-tree-v1'):
+            with self.subTest(answer_format=answer_format):
+                current = {**binding, 'answer_format': answer_format}
+                rendered = subject_prompt(item, current)
+                prompts[answer_format] = rendered
+                self.assertIn(task_prompt, rendered)
+                self.assertIn('Read the frozen source snapshot at this absolute path:', rendered)
+
+        self.assertTrue(prompts['flat-v1'].endswith(old_tail))
+        self.assertTrue(prompts['file-groups-v1'].endswith(old_tail))
+        for answer_format in ('file-notes-v1', 'path-tree-v1'):
+            self.assertNotIn(old_tail, prompts[answer_format])
+            # The final mapping must agree with the selected containers, without
+            # freezing all wording of the model-facing instructions.
+            tail = prompts[answer_format].rsplit('Paths are relative to the frozen snapshot root.', 1)[1]
+            self.assertIn('adjacent', tail)
+            self.assertIn('explanation', tail)
+            self.assertIn('shared scope', tail)
+        self.assertIn('with a tree string and an explanation string', prompts['path-tree-v1'])
+        self.assertIn('with a files array', prompts['file-notes-v1'])
 
     def _check_transport(self, answer_format: str) -> None:
         catalog = self._catalog()
