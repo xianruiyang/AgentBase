@@ -205,7 +205,21 @@ assets. Original snapshots and ordinary per-deployment rollback receipts have
 different lifetimes; ordinary backup cleanup must never remove the original
 recovery point. Recovery copies originals, preserving them for repeated use.
 
-Close Codex before restoring. Preview returns one complete object with `changes`,
+`PreviewRestore` is read-only and may run inside Codex. For `RestoreOriginal` or
+`Rollback`, first open PowerShell 7 independently from Windows Start or Windows
+Terminal, outside Codex's integrated terminal and command tools. Keep that window
+open, exit Codex normally, then run the reviewed restore command there. The
+recovery script does not close Codex or detach its PowerShell process from a host.
+
+When Codex assists with recovery, it may preview and prepare the exact command
+with the recovery-script, Codex-root and backup paths. It must hand that command
+to the user for the independent window, not terminate its own host and attempt
+to continue restoring. Starting another `pwsh` through Codex does not by itself
+establish an independent execution lifetime. These instructions apply to real
+Codex installations; isolated synthetic recovery tests do not require closing the
+developer's host.
+
+Preview returns one complete object with `changes`,
 `conflicts` and `external_actions`; direct formatting shows counts and the first
 eight paths, and explicitly points to `.changes` when more paths exist. No config
 values or backup contents are included in the model-facing preview. Status adds
@@ -218,6 +232,7 @@ $preview.conflicts
 & '.\development\codex-deployment\manage_agentbase.ps1' -Action RestoreOriginal -CodexRoot (Join-Path $env:USERPROFILE '.codex')
 ```
 
+Run the mutating commands above only in the independent window after Codex exits.
 `RestoreOriginal` recomputes its preview under the deployment write lock, verifies
 original payloads and current fingerprints, and refuses all writes if any conflict
 exists. TOML restoration changes only captured managed keys; later personal keys,

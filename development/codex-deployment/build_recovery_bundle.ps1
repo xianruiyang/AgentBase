@@ -43,13 +43,22 @@ This directory contains recovery code only. Original user data stays under the
 chosen Codex root's backups/AgentBase-original directory. Keep both available.
 No Codex login, model, Python, source checkout, or installed CLI is required.
 
-Close Codex before recovery. Preview without writing:
+Preview is read-only and may run inside Codex:
 
     pwsh -File .\restore.ps1 -CodexRoot '<your-codex-root>'
 
-Restore after reviewing the preview:
+After reviewing the preview, open PowerShell 7 independently from Windows Start
+or Windows Terminal, outside Codex's integrated terminal and command tools. Keep
+that window open, exit Codex normally, and run the restore command there from
+this recovery directory:
 
     pwsh -File .\restore.ps1 -Action RestoreOriginal -CodexRoot '<your-codex-root>'
+
+The same independent-window requirement applies to -Action Rollback. This tool
+does not close Codex or detach its PowerShell process from a host. If Codex helps,
+it should only preview and prepare the exact command and paths for you; it must
+not terminate its own host and then attempt to continue restoring. Starting
+another pwsh through Codex does not by itself establish an independent lifetime.
 
 If the preview reports plugin use, first disable/uninstall agentbase-core through
 the official Codex plugin entry, then pass -PluginDisabled to acknowledge that
