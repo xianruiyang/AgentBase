@@ -501,24 +501,25 @@ def _facts(study: dict, job: dict, receipt: dict, lifecycle: dict | None = None)
     if request_count is not None:
         value['usage.request_count'] = request_count
     trace_streams = (receipt.get('trace') or {}).get('observed', [])
+    trace_complete = (bool(trace_streams) and len(trace_streams) == len(raw.get('agent_usage', [])) and
+                      all(stream.get('coverage', {}).get('complete_scan') is True for stream in trace_streams))
     event_counts = Counter(event.get('kind') for stream in trace_streams for event in stream.get('events', []))
     for kind, count in event_counts.items():
         if kind:
             value[f'events.{kind}_count'] = count
-    value['tools.attempts'] = event_counts.get('tool_call') if trace_streams else None
+    tool_count = event_counts.get('tool_call', 0 if trace_complete else None) if trace_streams else None
+    value['tools.attempts'] = tool_count
     rows = []
     declared = {f['id'] for f in fields if f['grain'] == 'attempt'}
     attempt_usage = {**usage, 'request_count': request_count}
     attempt_source = {'usage': attempt_usage, 'timing': {key.removeprefix('timing.'): item for key, item in
                       {'timing.subject_seconds': receipt['subject_seconds'], **(lifecycle or {})}.items()},
                       'events': {f'{key}_count': count for key, count in event_counts.items()},
-                      'tools': {'attempts': event_counts.get('tool_call') if trace_streams else None},
+                       'tools': {'attempts': tool_count},
                       'values': receipt.get('values', {})}
     selected = _extract_fields(fields, 'attempt', attempt_source, value)
     attempt_observation_fields = [field for field in fields if field['grain'] == 'attempt' and
                                   _observation_field(field)]
-    trace_complete = (len(trace_streams) == len(raw.get('agent_usage', [])) and
-                      all(stream.get('coverage', {}).get('complete_scan') is True for stream in trace_streams))
     receipt_location = job.get('receipt') or f'jobs/j{job["id"]}/receipt.json'
     attempt_source_record = {'kind': 'evo-receipt', 'location': receipt_location}
     if receipt.get('_usage_projected') is True:
@@ -543,9 +544,11 @@ def _facts(study: dict, job: dict, receipt: dict, lifecycle: dict | None = None)
         for event_kind, count in counts.items():
             if event_kind:
                 agent_source[f'events.{event_kind}_count'] = count
-        agent_source['tools.attempts'] = counts.get('tool_call') if stream is not None else None
+        stream_complete = bool(stream and stream.get('coverage', {}).get('complete_scan') is True)
+        agent_tool_count = counts.get('tool_call', 0 if stream_complete else None) if stream is not None else None
+        agent_source['tools.attempts'] = agent_tool_count
         structured_agent = {**agent, 'events': {f'{key}_count': count for key, count in counts.items()},
-                            'tools': {'attempts': counts.get('tool_call') if stream is not None else None}}
+                            'tools': {'attempts': agent_tool_count}}
         agent_values = _extract_fields(fields, 'agent', structured_agent, agent_source)
         agent_observation_fields = [field for field in fields if field['grain'] == 'agent' and _observation_field(field)]
         rows.append({'id': f'j{job["id"]}:agent{number}', 'grain': 'agent',

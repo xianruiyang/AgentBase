@@ -17,6 +17,39 @@ from evo.store import Store
 
 
 class EvoFactsTests(unittest.TestCase):
+    def test_no_tool_calls_are_zero_only_with_complete_observation(self) -> None:
+        study = {"spec": {"fields": [
+            {"id": "quality.reward", "grain": "attempt"},
+            {"id": "usage.total_tokens", "grain": "attempt"},
+            {"id": "tools.attempts", "grain": "attempt"},
+            {"id": "tool_count", "grain": "attempt", "extract": {"from": "attempt", "path": "tools.attempts"}},
+            {"id": "agent_tools", "grain": "agent", "extract": {"from": "agent", "path": "tools.attempts"}},
+        ]}}
+        job = {"id": 1, "study": 1, "runtime": {"adapter": "codex"},
+               "plan": {"combination": "c", "item": "i", "replicate": 1, "groups": ["g"]}}
+        cases = [
+            ([{"coverage": {"complete_scan": True}, "events": [{"kind": "input"}, {"kind": "progress"}]}], 0),
+            ([{"coverage": {"complete_scan": False}, "events": [{"kind": "input"}]}], None),
+            ([{"events": []}], None),
+            ([], None),
+        ]
+        for streams, expected in cases:
+            with self.subTest(streams=streams):
+                receipt = {"subject_seconds": 1.0, "values": {"quality.reward": 1},
+                           "codex": {"usage": {"total_tokens": 30}, "usage_complete": True,
+                                     "agent_usage": [{"thread_id": "root", "usage_complete": True}]},
+                           "trace": {"observed": streams}}
+                rows = _facts(study, job, receipt)
+                attempt = rows[0]
+                agent = next(row for row in rows if row["grain"] == "agent")
+                self.assertEqual(attempt["values"]["tools.attempts"], expected)
+                self.assertEqual(attempt["values"]["tool_count"], expected)
+                self.assertEqual(agent["values"]["agent_tools"], expected)
+                self.assertEqual(attempt["values"]["quality.reward"], 1)
+                self.assertEqual(attempt["values"]["usage.total_tokens"], 30)
+                self.assertEqual(attempt["completeness"], "complete" if expected == 0 else "partial")
+                self.assertEqual(agent["completeness"], "complete" if expected == 0 else "partial")
+
     def test_trace_rejects_stale_pagination_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             store = Store(Path(temporary) / "state")

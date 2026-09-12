@@ -37,6 +37,8 @@ python.exe development/agent-evaluation/agent_eval.py evo score --spec developme
 
 事件字段按实际类别计数，例如 `events.tool_call_count`、`events.mcp_tool_call_count`、`events.wait_count`。`tools.attempts` 对应公开 `tool_call` 事件，不是工具内部全部动作的总数；命令与 MCP 完成事件另列，嵌套动作不要与外层调用不加区分地累计。未提供的类别或记录覆盖不足保持缺失，使用者应结合 trace coverage 选择计算口径。
 
+`tools.attempts` 在对应代理的轨迹扫描完整且没有工具调用时为 `0`；attempt 汇总还要求所有已记录代理的轨迹齐全。缺失或不完整的轨迹不能据此推定零调用。该计数由原始公开轨迹投影，修正规则后可重新生成结果视图，不改写历史收据。
+
 评分配置的 `select` 按行的 `dimensions` 过滤，例如 `{"role":"evidence"}` 或 `{"model":["gpt-5.6-sol","gpt-5.6-luna"]}`；`group_by` 按所选维度分组。聚合表达式也可带 `select` 和基于值的 `where`。同一指标应使用同一粒度的数据，不能把 attempt 总量与 agent 分量再次相加。原生记录没有逐请求证据时只保留已知代理汇总，不把按价格分组的汇总伪装成请求。
 
 超出声明式公式的计算使用 `calculate --manifest <calculator.json> --spec <research.json> --artifacts <facts.json> --output <derived.json> --allow-local-code`。manifest 的 `agentbase-evo-calculator/v1` 合同固定 `id/version`、代码相对路径与 SHA-256、`argv`、超时和输出上限；只有一个完整参数 `{calculator}` 被替换为代码路径。程序从标准输入读取冻结 JSON，返回声明的派生字段和 `input_rows` 来源。该入口会执行用户明确选中的本地代码。
