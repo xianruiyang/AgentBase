@@ -2990,14 +2990,11 @@
     },
     {
       "id": "project-metadata-refresh",
-      "kind": "positive",
-      "request": "架构入口变更后，重写 project-metadata.md 的当前状态和验证依据。",
-      "expected_skills": [
+      "kind": "negative",
+      "request": "这个项目已有 project-metadata.md 和 file-metadata.md，分别保存项目摘要和入口索引。请按已确认的新路径更新两处旧链接，沿用项目现有格式；目标、职责和验证结论均未改变。",
+      "expected_skills": [],
+      "forbidden_skills": [
         "change-governance"
-      ],
-      "forbidden_skills": [],
-      "expected_change_governance_references": [
-        "records-and-metadata.md"
       ],
       "expected_behavior_tags": [
         "modify_authorized_scope"
