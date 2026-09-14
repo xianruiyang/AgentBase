@@ -840,6 +840,40 @@
       "forbidden_behavior_tags": []
     },
     {
+      "id": "source-query-text-sufficient-no-upgrade",
+      "kind": "negative",
+      "request": "已用 rg/fd 找到三个调用候选，定向阅读已足以确认所需定义与调用位置。请返回这些位置；不因有多个候选或任务涉及调用而升级查询方法。",
+      "expected_skills": [],
+      "forbidden_skills": [
+        "source-query"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "source-query-text-insufficient-method-routing",
+      "kind": "positive",
+      "request": "rg/fd 与已知正文的定向阅读仍无法区分影响结论的两个同名调用目标。路径正确，必要正文已读完整，也没有缺失分页。请按剩余缺口选择适用查询方法，只读取得可区分的证据。",
+      "expected_skills": [
+        "source-query"
+      ],
+      "forbidden_skills": [
+        "symbol-structure-workflow"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
       "id": "ast-syntactic-definition-range",
       "kind": "positive",
       "request": "已知函数名，需要取得声明或定义的完整语法范围与正文边界；文本候选不足以可靠判断边界，但不要求从调用位置解析真实符号身份。",
