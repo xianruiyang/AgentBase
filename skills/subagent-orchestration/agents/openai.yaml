@@ -1,4 +1,4 @@
 interface:
   display_name: "Subagent Orchestration"
   short_description: "按独立交付价值组织取证、实验与确定执行，集中交付并由主代理验收"
-  default_prompt: "使用 $subagent-orchestration 选择值得独立交接的工作；两类 experiment 自主推进、集中交付并按需使用一层 evidence，主代理无独立必要工作时按 skill 约定等待，最终验收实际结果。"
+  default_prompt: "使用 $subagent-orchestration 分派工作：evidence 定位关键原文并给出读取范围或方法，operator 隔离明确操作，两类 experiment 独立探索并集中交付；无独立必要工作时按约定等待，最终验收实际结果。"

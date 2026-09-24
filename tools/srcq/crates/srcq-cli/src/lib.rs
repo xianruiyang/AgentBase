@@ -8,6 +8,8 @@ pub mod defaults_output;
 pub mod diagnostics;
 pub mod processor;
 pub mod query_gateway;
+pub mod read;
+mod source_text;
 pub mod symbol_query;
 
 use std::ffi::{OsStr, OsString};
@@ -46,6 +48,20 @@ pub fn command() -> Command {
         .subcommand(direct_gateway_subcommand("scc", "scc"))
         .subcommand(symbol_subcommand())
         .subcommand(
+            Command::new("read")
+                .about("Read a file or a 1-based inclusive line range; stop at EOF")
+                .arg(Arg::new("path").required(true).value_parser(clap::value_parser!(PathBuf)))
+                .arg(Arg::new("start").requires("end").value_parser(clap::value_parser!(usize))
+                    .help("First line (1-based); omit both bounds to read the whole file"))
+                .arg(Arg::new("end").requires("start").value_parser(clap::value_parser!(usize))
+                    .help("Last line (inclusive); may exceed EOF"))
+                .arg(Arg::new("number").long("Number").action(ArgAction::SetTrue)
+                    .conflicts_with("no-number")
+                    .help("Prefix original line numbers (default; case-insensitive)"))
+                .arg(Arg::new("no-number").long("NoNumber").action(ArgAction::SetTrue)
+                    .help("Output original text without line numbers (case-insensitive)")),
+        )
+        .subcommand(
             Command::new("more")
                 .about("Continue a model query from its short handle")
                 .arg(Arg::new("handle").value_name("HANDLE").required(true)),
@@ -80,7 +96,7 @@ pub fn command() -> Command {
                 ),
         )
         .after_help(
-            "Operational syntax: srcq <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: srcq <schema|capabilities|doctor> ...\nCache syntax: srcq cache <get|query|info|remove|gc> ...\nProcess syntax: srcq process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...\nSource syntax: srcq <rg|fd|scc> <native argv...>\nSymbol syntax: srcq symbol definition [NAME|--at PATH:LINE:COLUMN] ...\nModel continuation: srcq more <HANDLE>\nExplicit query controls: srcq query <rg|fd|scc> <exec|defaults|doctor> [options] -- <native argv...>",
+            "Operational syntax: srcq <exec|defaults> [wrapper options] -- <ast-grep argv...>\nInspection syntax: srcq <schema|capabilities|doctor> ...\nCache syntax: srcq cache <get|query|info|remove|gc> ...\nProcess syntax: srcq process <validate|select|filter|count|group|containing|group-locations|sort|dedupe|merge|to-jsonl|from-jsonl> ...\nSource syntax: srcq <rg|fd|scc> <native argv...>\nFile read: srcq read <PATH> [<START> <END>] [--Number | --NoNumber] (1-based, inclusive; EOF ends output; omit bounds for whole file)\nSymbol syntax: srcq symbol definition [NAME|--at PATH:LINE:COLUMN] ...\nModel continuation: srcq more <HANDLE>\nExplicit query controls: srcq query <rg|fd|scc> <exec|defaults|doctor> [options] -- <native argv...>",
         )
 }
 
@@ -699,6 +715,7 @@ pub enum CliAction {
     Inspect(InspectionCommand),
     Gateway(GatewayCommand),
     Symbol(SymbolCommand),
+    Read(read::ReadCommand),
     More(String),
 }
 
@@ -1055,7 +1072,22 @@ pub fn parse_invocation_from(
 pub fn parse_cli_from(
     args: impl IntoIterator<Item = OsString>,
 ) -> Result<CliAction, CliParseError> {
-    let raw: Vec<OsString> = args.into_iter().collect();
+    let mut raw: Vec<OsString> = args.into_iter().collect();
+    if raw.get(1).is_some_and(|value| value == "read") {
+        for value in raw.iter_mut().skip(2).take_while(|value| *value != "--") {
+            if value
+                .to_str()
+                .is_some_and(|value| value.eq_ignore_ascii_case("--number"))
+            {
+                *value = OsString::from("--Number");
+            } else if value
+                .to_str()
+                .is_some_and(|value| value.eq_ignore_ascii_case("--nonumber"))
+            {
+                *value = OsString::from("--NoNumber");
+            }
+        }
+    }
     if raw.get(1).is_some_and(|value| {
         value == OsStr::new("cache")
             || value == OsStr::new("process")
@@ -1066,6 +1098,7 @@ pub fn parse_cli_from(
             || value == OsStr::new("fd")
             || value == OsStr::new("scc")
             || value == OsStr::new("symbol")
+            || value == OsStr::new("read")
             || value == OsStr::new("more")
             || value == OsStr::new("query")
     }) {
@@ -1111,6 +1144,18 @@ pub fn parse_cli_from(
                 values,
             ))),
             Some(("symbol", values)) => parse_symbol_command(values).map(CliAction::Symbol),
+            Some(("read", values)) => Ok(CliAction::Read(read::ReadCommand {
+                path: values
+                    .get_one::<PathBuf>("path")
+                    .cloned()
+                    .expect("required path"),
+                start: values.get_one::<usize>("start").copied().unwrap_or(1),
+                end: values
+                    .get_one::<usize>("end")
+                    .copied()
+                    .unwrap_or(usize::MAX),
+                number: !values.get_flag("no-number"),
+            })),
             Some(("more", values)) => values
                 .get_one::<String>("handle")
                 .cloned()

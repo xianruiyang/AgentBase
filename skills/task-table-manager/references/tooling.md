@@ -34,7 +34,7 @@ completion-context                           completion-tooling.md
 
 ## 共享失败边界
 
-门禁只保护路径/对象身份、破坏性覆盖、锁与 CAS、输入输出上限、短收据到完整身份的唯一解析、显式不可变收据身份和最终复核快照一致性。错误返回 `gate.id`、`gate.risk`、`gate.scope`、`gate.recovery`、`gate.retryable`；具体门禁由命令族引用维护。
+既有命令对路径/对象身份、破坏性覆盖、锁与 CAS、输入输出上限、收据身份和分页快照返回局部错误，字段为 `gate.id`、`gate.risk`、`gate.scope`、`gate.recovery`、`gate.retryable`，具体恢复见命令族引用。这是接口现状，不授予新增门禁或阻断其他任务的权限。
 
 依赖环、owner、状态流转、可解析非标准语义、重复值、上游未决、覆盖度、验证充分性、结果来源时效和整体完成均只诊断并交由模型按文档与证据裁决。
 

@@ -77,28 +77,28 @@
     "protected_user_baseline": "用户确认的需求或用户设计保持受保护；新证据要求改变时先延后并交由用户裁决。",
     "final_user_scope_only": "最终完成只按当前用户确认的需求、验收条件和用户设计判断，不以中间产物或状态代替。",
     "document_authority": "工作流目标、阶段、状态、依赖、完成与例外由适用文档定义，工具输出不是规则源。",
-    "cli_assistive_only": "文档驱动工作流的辅助 CLI 只做编辑、查询、压缩和机械校验，不签发语义执行许可或代判完成；可执行正式合同指定的局部机械门禁，局部通过不证明整体完成。",
-    "local_mechanical_gates": "只要请求实际调用 workctl/taskctl 或设计其规则就适用：CLI 只对可机械证明、局部且可恢复的操作危险设门禁，并返回原因与恢复动作。",
-    "collaborative_requirement_insight": "明确且无冲突的结果、范围与验收直接作为任务合同；仅在歧义、冲突、错误前提或实现设想与结果不一致会改变动作时，结合场景、规范与证据校准意图，不以自行概括替代明确要求。",
+    "cli_assistive_only": "文档驱动工作流的辅助 CLI 只做编辑、查询、压缩和机械校验，不签发语义执行许可或代判完成；既有局部错误不扩大为任务或项目门禁。",
+    "local_mechanical_gates": "请求调用 workctl/taskctl 或裁决门禁时适用。未经用户明确授权不新增或扩大门禁、不自设检查前提；仅对有直接证据的数据丢失损坏、越权访问写入、崩溃资源耗尽设置最小局部保护。开发、测试、正式环境同受限制，测试失败、材料不齐和假想风险不成为阻断理由。",
+    "collaborative_requirement_insight": "目标明确、信息充分时直接执行；仅补查会影响实现的未知。材料冲突按当前用户要求、维护位置和适用版本判断，仍无法确定且影响结果时再询问用户。",
     "quality_token_speed_order": "先选择需求对齐、正确、安全、可维护且有完成证据的方案；质量同等充分时降低 Token，前两者不变差时再提速。",
     "local_task_fast_path": "当前有界动作的 owner、契约和验收明确，没有支配多个动作的共享未知且不改变长期职责时，直接读取、修改、局部验证并停止，不进入完整需求、架构或治理审计。",
     "vertical_validation_closure": "多个后续动作共享尚未验证或刚被反例推翻的前提时，先熔断依赖它的平级扩量；该边界在扩量前 preflight 与反例写回时同样适用。上游设计与职责已确认后，先锁定适用公共合同与 owner、一个活动消费者、有效 oracle、暂缓范围和解除条件，再在既定设计内深度优先完成该正式可用结果；成立或被推翻前不静默切换消费者，不铺平级实现、fixture、示例与测试，也不把多个未闭环消费者绑定为验证批次。收缩的是同时展开的结果数量与证据成本，不是正式实现；首个结果不重新设计系统。进展按正式消费者闭环和支配未知消除表达，不按代码量、测试量、构建次数或活动分支数表达。它可与 evidence_checkpoint_before_continue 或 impact_closure 同时适用。",
     "observable_behavior_accountability": "适用规则、skill 或工具已正确提供但模型仍产生可预防错误时，把可观察行为作为系统失败证据，定位规则、路由、动作入口、反馈、状态回流或验证缺口；不以正文存在免责，也不按表象堆规则。",
     "rule_execution_failure_localization": "受支持场景出现可预防错误时，按直接 trace 区分规则/能力缺失、skill/引用/入口未触发、规则已读但动作未遵守、动作合规但状态未写回；只修正已证明的最早失效 owner，未到达层保持未知。",
-    "expensive_action_preflight": "昂贵动作第一次完整运行前按适用项一次确认待证判断与反证、输入/schema/fixture、路径权限依赖、runner 生命周期、oracle 产品到达性和重复运行变化依据，并返回 ready 或直接阻塞、遮蔽范围与恢复动作；首次运行在目标机制前失败后，重跑前把直接失败与同链可低成本观察的邻接前置合并为一次有界 preflight，不声称预知运行时错误；领域 runner 持有具体实现。",
-    "stable_candidate_validation": "不得仅因用户补充或轮次变化启动完整回归、独立模型评测或部署校验；内容、目标或验收仍在形成时保留能改变实现的低成本局部检查，候选稳定后按实际契约与最终影响范围验证。用户补充确实改变契约或影响范围时同步调整适用验证；用户明确延后完整验证时遵守其时点，不从本标签产生模型评测授权。",
+    "expensive_action_preflight": "已授权昂贵动作需要前置诊断时，复用领域入口、已有日志和定向阅读，区分实际输入、权限、依赖、生命周期及产品到达性；只报告具体失败、遮蔽和恢复线索，不创建必填清单或自设继续工作的门禁，不自动重跑。",
+    "stable_candidate_validation": "已授权验证在候选稳定后按约定范围进行；用户补充、输入变化或证据缺口不授权新增测试、扩测或重复验证。测试内容及副作用限于当次作用域，不污染开发或正式环境的共享配置状态及正常路径、不混入正式交付、不成为其他任务的前提或全局门禁。未验证如实说明。",
     "evidence_checkpoint_before_continue": "反例改变失效范围、当前消费者或下一动作时，先停止依赖工作并把反例、失效来源、当前验证 case 和下一动作写回已有 owner，再重新裁决和继续。",
-    "dimension_bounded_validation": "本标签不适用于 owner、契约、oracle 均明确、无共享未知且可低成本穷举的小闭集；此类直接走局部快速路径，不建立 coverage basis。其他声明随多种组件、载体、模式、状态、版本或持久化边界变化，且存在实质组合扩量或共享未知时，在批量实现或测试编写前形成 claim、有效 dimensions、equivalence、interactions、代表 cases 与 promotion 组成的 coverage basis；每个 case 必须新增判别信息，pairwise 不外推高阶交互，穷举只用于明确逐组合认证或无充分等价证据的高后果交互，结论限制在实际覆盖或有可复核依据的等价类。",
+    "dimension_bounded_validation": "仅组织用户明确要求的测试，不授权新增、扩量或重复验证。本标签不适用于 owner、契约、oracle 均明确、无共享未知且可低成本穷举的小闭集；此类直接走局部快速路径，不建立 coverage basis。其他声明随多种组件、载体、模式、状态、版本或持久化边界变化，且存在实质组合扩量或共享未知时，在批量实现或测试编写前形成 claim、有效 dimensions、equivalence、interactions、代表 cases 与 promotion 组成的 coverage basis；每个 case 必须新增判别信息，pairwise 不外推高阶交互，穷举仅限用户明确要求，不以高后果或成本低自行扩测，结论限制在实际覆盖或有可复核依据的等价类。",
     "tool_defect_reproduction": "声称当前工具缺少能力或存在缺陷前，核对实际身份与对应帮助并重放原输入，区分输入错误、范围重叠、正常协议、预期降级、截断和产品故障。",
-    "batched_independent_tool_calls": "已知、独立、必要的工具调用，包括读取与已授权执行，尽量通过工具接口合批并行发出并逐项检查结果；有先后依赖、写入冲突、共享资源竞争或前项结果可改变/取消后项时串行，不以拼接 shell 命令冒充并行。大文件的完整定义或章节片段同样可合批，确需整读的大文件单独处理。每条命令与外层整批返回分别受预算限制，计入包装开销；可能超限时缩小范围、拆批或显式调整受支持的外层预算，不为合批增加无关内容或操作。截断后按来源/行区间补缺或沿正式续页恢复，不原样重复整批。",
+    "batched_independent_tool_calls": "已知、独立、必要的工具调用，包括读取与已授权执行，尽量通过工具接口合批并行发出并逐项检查结果；有先后依赖、写入冲突、共享资源竞争或前项结果可改变/取消后项时串行，不以拼接 shell 命令冒充并行。",
     "model_interaction_surface": "当前请求要求设计、选择或改变模型直接或间接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面只投影当前动作所需语义，不用 Base64、完整哈希、UUID 等长不透明码承担身份，在不损失必要语义下按实测或已验证保守估算选择最低 Token 格式；机器面保持稳定完整，生成物不作为语义修改入口。",
-    "minimal_evidence_closure": "源码查找从当前仍缺的直接证据和用户或正式来源确认的范围出发，选择最低充分入口；临时名称、目录或类型过滤不单独证明全集、不存在或唯一。只有实际证据不足才升级，充分即停止，并保留必要关系、范围和定位。",
+    "minimal_evidence_closure": "优先查项目资料、本地正式文档和知识库；资料不足或需核实时效信息时查询外部来源，按权威性、适用范围和时效判断依据。取证从当前缺口和确认的来源范围出发；名称、目录或类型过滤不独自证明全集、不存在或唯一。交付关键原文的读取位置、范围或只读查询方法及简短导航；文件给必要起止行，网页/知识库给直接来源与章节或读取接口，help 给查询命令，易失状态保留必要观察。短小原文可直接带回。读取文本文件内容使用 PATH 中的 srcq read <路径> <起行> <止行>（从1开始、含两端，默认带原始行号）；已有定位直接采用 evidence 或查询的起止行，多条精准范围读取指令合批调用，不把离散片段包成大区间；发现具体缺口只补缺失部分。遇到不熟悉的内容，不为理解上下文而默认整读或猜测范围，先让 evidence 定位具体行范围；派发者不重复搜索或做无关动作，没有独立必要工作时用 collaboration.wait_agent(timeout_ms=1800000) 等待结果。只有起始位置则定向补齐必要定义，证据充分即停止。查询结果给出 @next srcq more q… 时，若还需后续结果，直接执行该命令续页。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
-    "bounded_subagent_delegation": "用户明确分工优先。主代理保留规划、架构、关键文档、实施与验收；当前尚缺的源码、文档、配置、日志与工具用法定位优先交给 evidence；陌生模块入口、调用关系、复用点和验证位置均适用，不以任务大小、已知文件数量或能否并行为前提，不先代查。已有证据充分或一次已知位置读取即可闭合时直接处理。步骤与判定明确的必要操作，预计有长输出或多轮运行观察时优先用 operator，命令简单不排除使用；可直接取得短结果且无需多轮观察时自行执行。两类 experiment 只承接探索量较大且能独立交付的实现，短小或需主代理持续裁决的探索由主代理完成；预计十来分钟只是成本线索，不设硬门槛。困难或视觉实验在满足同一独立交付条件后选 advanced-experiment，难度高不单独构成委派或升级理由。委派不要求主线程有并行工作，无独立必要工作就用 wait_agent 显式传 timeout_ms=1800000；这是调用约定，不改变工具默认值，服从宿主及更高优先级限制。一次等待覆盖团队多个代理，消息、完成或用户输入可提前唤醒；无新事实的超时不代表停滞，继续等待而非轮询、重复推演或催报。固定角色显式 fork_turns=none。主代理直接给必要事实、来源、修改边界和验收条件；实验开工前只合并澄清会改变动作且需主代理裁决的歧义，可查事实自行核实，输入充分不强制复述、确认或申请开工。生命周期验收明确阶段、对象与观察关系；失败先核场景、身份与时序，后续恢复不倒推先前状态。授权内自主修复与选择方法，不汇报普通决定、构建失败或阶段通过；必要权限资源缺失、合同须重裁，或合理路径已试且无新增判别证据的下一动作时才停止依赖部分并一次报告事实、已试方法、状态与所缺裁决。不得以弱化验收、无界重试或未获合同支持的强制绕过、恢复边界改变、正式入口替换来回避阻塞；旧代码存在不证明适用。越权动作、共享资源受损或反例已推翻其他在途工作前提时立即停报。最终集中交付方法、关键依据、文件符号及行位置、验证证据、未验证范围，以及已解决、仍阻塞和范围外问题；不另发完成消息或写冗余报告。主代理不例行催报、审核未完成试错或重复探索，最终按实际差异与决定性证据验收，具体缺口再深入，合格实现不强制重写。operator 默认集中交付主代理所需结果、关键异常、未完成项及证据位置；普通阶段与既定步骤可处理的异常不即时回传，只有需要主代理动作的阻塞或风险及约定交接点才中断。原始日志按需落盘，不要求通读或全量回传；不足时向原代理追问具体缺口，不默认重跑。停止步骤未覆盖的失败、策略拒绝或授权缺口，不变更命令形式绕过拒绝。委派不增加无必要操作或清理。两类 experiment 按需委派一层 evidence 无需另授权限；先用已有结果，一次已知位置读取即可闭合时自行完成，其余定位按缺口比较续用与新建。experiment 不得创建其他角色，evidence 与 operator 不得委派。实际消费者读关键原文，根主代理保留正式裁决。evidence 同时只有一个当前派发者，跨分支续派须原派发者明确交接，结果共享或 completed 不转移派发权；结果送达当前派发者，不改变宿主关系，不绕过接口限制或另建代理池台账。",
+    "bounded_subagent_delegation": "用户明确分工优先。主代理保留规划、架构、关键文档、实施与验收；当前尚缺的源码、文档、网络、知识库、工具用法（如 help）、日志与运行状态的原文定位优先交给 evidence；交付可直接读取的位置、必要范围或查询方法及简短导航，短小关键原文可直接带回；陌生模块入口、调用关系、复用点和验证位置均适用，不以任务大小、已知文件数量或能否并行为前提，不先代查。已有证据充分或一次已知位置读取即可闭合时直接处理。搜索未知来源或跨文件关系、执行明确操作前读取编排 skill。步骤与判定明确的构建、测试、打包和批量操作交给 operator 执行并汇总；其他长输出或多轮观察同样适用。一次即时状态查询可自行执行，不把完整执行链拆成短命令绕开委派，不重复子代理已完成的步骤。两类 experiment 只承接探索量较大且能独立交付的实现，短小或需主代理持续裁决的探索由主代理完成；预计十来分钟只是成本线索，不设硬门槛。困难或视觉实验在满足同一独立交付条件后选 advanced-experiment，难度高不单独构成委派或升级理由。委派不要求主线程有并行工作，无独立必要工作就用 wait_agent 显式传 timeout_ms=1800000；这是调用约定，不改变工具默认值，服从宿主及更高优先级限制。一次等待覆盖团队多个代理，消息、完成或用户输入可提前唤醒；无新事实的超时不代表停滞，继续等待而非轮询、重复推演或催报。固定角色显式 fork_turns=none。主代理直接给必要事实、来源、修改边界和验收条件；实验开工前只合并澄清会改变动作且需主代理裁决的歧义，可查事实自行核实，输入充分不强制复述、确认或申请开工。生命周期验收明确阶段、对象与观察关系；失败先核场景、身份与时序，后续恢复不倒推先前状态。授权内自主修复与选择方法，不汇报普通决定、构建失败或阶段通过；必要权限资源缺失、合同须重裁，或合理路径已试且无新增判别证据的下一动作时才停止依赖部分并一次报告事实、已试方法、状态与所缺裁决。不得以弱化验收、无界重试或未获合同支持的强制绕过、恢复边界改变、正式入口替换来回避阻塞；旧代码存在不证明适用。越权动作、共享资源受损或反例已推翻其他在途工作前提时立即停报。最终集中交付方法、关键依据、文件符号及行位置、验证证据、未验证范围，以及已解决、仍阻塞和范围外问题；不另发完成消息或写冗余报告。主代理不例行催报、审核未完成试错或重复探索，最终按实际差异与决定性证据验收，具体缺口再深入，合格实现不强制重写。operator 默认集中交付主代理所需结果、关键异常、未完成项及证据位置；普通阶段与既定步骤可处理的异常不即时回传，只有需要主代理动作的阻塞或风险及约定交接点才中断。原始日志按需落盘，不要求通读或全量回传；不足时向原代理追问具体缺口，不默认重跑。停止步骤未覆盖的失败、策略拒绝或授权缺口，不变更命令形式绕过拒绝。委派不增加无必要操作或清理。两类 experiment 按需委派一层 evidence、operator 无需另授权限，同一实验同时最多一个专属 operator；先用已有结果，一次已知位置短读取或即时状态查询即可闭合时自行完成，其余按缺口比较续用与新建。experiment 不得创建这两类以外的角色，evidence 与 operator 不得委派。实际消费者读关键原文，根主代理保留正式裁决。evidence 同时只有一个当前派发者，跨分支续派须原派发者明确交接，结果共享或 completed 不转移派发权；evidence 默认由最终回复一次性交付可独立阅读的证据索引，不用 send_message 代替交付或发送普通进度。仅需立即纠偏的关键反例、无法继续且需派发者处理的阻碍，或跨分支结果不能自动送达时才发消息；能结束本轮就直接最终回复。跨分支消息只送所需原文入口与必要导航，最终回复仍保留证据索引，不以已发送或去向通知代替。不改变宿主关系，不绕过接口限制或另建代理池台账。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。",
     "replacement_closure": "修改既有行为且候选会新增长期机制或适配时，写入前区分原 owner 内改写、替换和由不同当前契约支撑的独立并存；替换把旧同责生产路径与只绑定旧实现的验证资产纳入同一完成闭环，临时并存有真实调用方和退出条件，不把退役留作无 owner 的清理。",
-    "decision_relevant_findings": "测试、门禁或评审发现只有直接证明当前目标、契约或完成条件被违反时才进入当前实现；仍保护稳定契约的检查更新，只绑定已退出实现的检查删除或降级，建议和相邻风险分开报告。修正后先重验受影响路径，只有新证据扩大影响范围时才扩大复核。"
+    "decision_relevant_findings": "测试、门禁或评审发现只有直接证明当前目标或契约被违反时才进入当前实现；只绑定已退出实现的检查删除或降级，建议和相邻风险分开报告。反例不自动授权补测、扩测或设置门禁。"
   },
   "peer_skills": [
     {
@@ -285,33 +285,77 @@
       "id": "single-domain-root-cause-analysis",
       "kind": "positive",
       "request": "给定的完整日志和最小复现指向单个领域故障，请分析根因和因果机制。本次只读分析，不要求修复或设计验证；不涉及共享前提、长期职责调整、批量扩量、昂贵验证、重复执行失败或任务记录。",
-      "expected_skills": ["change-governance"],
-      "forbidden_skills": ["execution-governor", "delivery-workflow", "task-table-manager"],
-      "expected_change_governance_references": ["causal-analysis.md"],
-      "expected_behavior_tags": ["read_only"],
-      "forbidden_behavior_tags": ["modify_authorized_scope", "vertical_validation_closure"]
+      "expected_skills": [
+        "change-governance"
+      ],
+      "forbidden_skills": [
+        "execution-governor",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [
+        "causal-analysis.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope",
+        "vertical_validation_closure"
+      ]
     },
     {
       "id": "single-expensive-preflight-no-expansion",
       "kind": "behavior",
       "request": "下一步是一次固定输入的昂贵验证，唯一真实消费者、owner、oracle 和待证判断已经确认，没有共享未知、平级消费者或组合扩量。请只检查已选正式 runner 的路径权限、依赖和生命周期等适用前置，返回 ready 或 blocked 及恢复动作；不要运行验证、建立活动切片锁或创建任务记录。",
-      "expected_skills": ["execution-governor"],
-      "forbidden_skills": ["change-governance", "delivery-workflow", "task-table-manager"],
+      "expected_skills": [
+        "execution-governor"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
       "expected_change_governance_references": [],
-      "expected_execution_governor_references": ["failure-and-cost.md"],
-      "expected_behavior_tags": ["read_only", "expensive_action_preflight"],
-      "forbidden_behavior_tags": ["modify_authorized_scope", "vertical_validation_closure"]
+      "expected_execution_governor_references": [
+        "failure-and-cost.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "expensive_action_preflight"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope",
+        "vertical_validation_closure"
+      ]
     },
     {
       "id": "standalone-task-completion",
       "kind": "positive",
       "request": "这个独立长期任务没有 delivery 阶段文档，source_ids 为空。明确用户要求、任务合同和直接验证证据均已给出且稳定，未改变长期职责或契约。请按这些要求复核结果，并用 taskctl complete 记录完成；使用执行时捕获的模型短收据，不补建交付文档、不修改合同、不扩大验证。",
-      "expected_skills": ["task-table-manager"],
-      "forbidden_skills": ["delivery-workflow", "change-governance", "execution-governor"],
+      "expected_skills": [
+        "task-table-manager"
+      ],
+      "forbidden_skills": [
+        "delivery-workflow",
+        "change-governance",
+        "execution-governor"
+      ],
       "expected_change_governance_references": [],
-      "expected_task_table_manager_references": ["execution.md", "tooling.md", "execution-tooling.md"],
-      "expected_behavior_tags": ["modify_authorized_scope", "final_user_scope_only", "cli_assistive_only", "local_mechanical_gates"],
-      "forbidden_behavior_tags": ["authority_lifecycle"]
+      "expected_task_table_manager_references": [
+        "execution.md",
+        "tooling.md",
+        "execution-tooling.md"
+      ],
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "final_user_scope_only",
+        "cli_assistive_only",
+        "local_mechanical_gates"
+      ],
+      "forbidden_behavior_tags": [
+        "authority_lifecycle"
+      ]
     },
     {
       "id": "mechanical-document-edit",
@@ -1312,20 +1356,36 @@
       "id": "event-log-agent-audit",
       "kind": "positive",
       "request": "请从已提供精确路径的 Codex 原生会话记录统计该任务创建过的子代理角色和复用次数，只读历史，不创建或唤醒代理。",
-      "expected_skills": ["codex-event-logger"],
-      "forbidden_skills": ["subagent-orchestration", "reasoning-governor", "task-table-manager"],
+      "expected_skills": [
+        "codex-event-logger"
+      ],
+      "forbidden_skills": [
+        "subagent-orchestration",
+        "reasoning-governor",
+        "task-table-manager"
+      ],
       "expected_change_governance_references": [],
-      "expected_behavior_tags": ["read_only"],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
       "forbidden_behavior_tags": []
     },
     {
       "id": "event-log-wait-timeline",
       "kind": "positive",
       "request": "按已给原生会话日志路径，列出昨天指定一小时内的等待开始、结束和期间的工具事件；只投影事实，不评价耗时原因，不读取推理内容或改线程设置。",
-      "expected_skills": ["codex-event-logger"],
-      "forbidden_skills": ["reasoning-governor", "subagent-orchestration", "execution-governor"],
+      "expected_skills": [
+        "codex-event-logger"
+      ],
+      "forbidden_skills": [
+        "reasoning-governor",
+        "subagent-orchestration",
+        "execution-governor"
+      ],
       "expected_change_governance_references": [],
-      "expected_behavior_tags": ["read_only"],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
       "forbidden_behavior_tags": []
     },
     {
@@ -1333,7 +1393,10 @@
       "kind": "negative",
       "request": "当前消息已给完整统计：创建了 3 个 experiment 和 2 个 evidence。请只计算合计数量，不重新读取历史。",
       "expected_skills": [],
-      "forbidden_skills": ["codex-event-logger", "subagent-orchestration"],
+      "forbidden_skills": [
+        "codex-event-logger",
+        "subagent-orchestration"
+      ],
       "expected_change_governance_references": [],
       "expected_behavior_tags": [],
       "forbidden_behavior_tags": []
@@ -1438,30 +1501,51 @@
       "id": "non-qq-plugin-hook-diagnosis",
       "kind": "negative",
       "request": "Codex 的一个代码格式化插件显示 Hook 配置错误，请只读排查这个插件的报错原因。",
-      "expected_skills": ["change-governance"],
-      "forbidden_skills": ["codex-qq-hook"],
-      "expected_change_governance_references": ["causal-analysis.md"],
-      "expected_behavior_tags": ["read_only"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_skills": [
+        "change-governance"
+      ],
+      "forbidden_skills": [
+        "codex-qq-hook"
+      ],
+      "expected_change_governance_references": [
+        "causal-analysis.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "non-qq-hook-known-trust-warning",
       "kind": "negative",
       "request": "已确认代码格式化插件的 Hook 因修改后未重新信任而出现警告，脚本内容没有其他错误。请只用一句话解释警告，不查配置、不执行命令。",
       "expected_skills": [],
-      "forbidden_skills": ["codex-qq-hook", "change-governance"],
+      "forbidden_skills": [
+        "codex-qq-hook",
+        "change-governance"
+      ],
       "expected_change_governance_references": [],
       "expected_behavior_tags": [],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "qq-hook-migration-with-unrelated-plugin-warning",
       "kind": "boundary",
       "request": "请把 QQ 完成提醒的 Hook 迁移到新工作区。同页另一个图像插件也有 Hook 警告，那只是背景，本次不处理它。",
-      "expected_skills": ["codex-qq-hook"],
-      "forbidden_skills": ["change-governance"],
+      "expected_skills": [
+        "codex-qq-hook"
+      ],
+      "forbidden_skills": [
+        "change-governance"
+      ],
       "expected_change_governance_references": [],
-      "expected_behavior_tags": ["modify_authorized_scope"],
+      "expected_behavior_tags": [
+        "modify_authorized_scope"
+      ],
       "forbidden_behavior_tags": []
     },
     {
@@ -1599,7 +1683,7 @@
     {
       "id": "combinatorial-test-authoring-before-closure",
       "kind": "behavior",
-      "request": "一个事务的设计、owner、公开契约和依赖已经确认，由 5 种载体、4 种模式和 3 种持久化策略组成；目前还没有任何一个最终可用结果跑通，我已经开始按 60 个 tuple 逐个建立 fixture 和测试，进度停滞。请继续当前实现并决定下一步的实现与测试顺序；不要重新设计系统，最终覆盖要求仍保留。",
+      "request": "一个事务的设计、owner、公开契约和依赖已经确认，由 5 种载体、4 种模式和 3 种持久化策略组成；目前没有最终可用结果跑通，按 60 个 tuple 建 fixture 和测试已使进度停滞。请继续当前实现并分析已有测试覆盖；本轮不新增测试、不扩测、不重跑。测试状态仅限本次作用域，不能修改开发环境共享配置或成为其他任务前提。不要重新设计系统，最终覆盖缺口如实说明。",
       "expected_skills": [
         "execution-governor"
       ],
@@ -1901,7 +1985,7 @@
     {
       "id": "subagent-implicit-evidence-benefit",
       "kind": "positive",
-      "request": "一个局部实现预计十来分钟，需先找到限定组件内仍调用旧入口的消费者，目前只知道组件目录。主代理将亲自实现，暂无其他独立工作；角色可用，用户未指定分工。请确定下一步如何取得所缺的位置与调用关系。",
+      "request": "一个局部实现预计十来分钟，主代理已知代码修改位置，但缺少所用工具 help 中的选项说明及当前版本官方网页的参数约束，尚未查明具体章节。主代理将亲自实现，暂无其他独立工作；角色可用，用户未指定分工。请确定如何取得这些关键原文的读取入口，已有材料不能用一次已知位置读取补齐。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -1920,62 +2004,101 @@
     {
       "id": "subagent-known-files-related-evidence",
       "kind": "positive",
-      "request": "当前接口和 owner 已确认，主代理准备亲自完成局部接入，已知两个入口文件，但仍需在限定组件内找到调用方、旧路径以及对应原生通知契约的位置，无法用一次直接读取补齐。角色可用，用户未指定分工。请确定如何补齐这些材料以支持接入判断。",
-      "expected_skills": ["subagent-orchestration"],
-      "forbidden_skills": ["symbol-structure-workflow"],
+      "request": "当前接口和 owner 已确认，主代理准备亲自完成局部接入，已知两个入口文件，但仍需在限定组件内找到调用方、旧路径以及对应原生通知契约，无法用一次直接读取补齐。角色可用，用户未指定分工。请确定如何取得可直接阅读的必要源码范围或契约来源以支持接入判断。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "symbol-structure-workflow"
+      ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
         "evidence-packet.md"
       ],
-      "expected_behavior_tags": ["bounded_subagent_delegation"],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
       "forbidden_behavior_tags": []
     },
     {
       "id": "subagent-validation-preparation-evidence",
       "kind": "positive",
       "request": "单个组件的预期行为和修改范围均已确认，主代理将编写一个局部恢复测试；已知测试目录和部分文件，需要先定位可复用 fixture、测试 API、失败注入回调的调用位置与相关断言。用户未指定分工，这段搜索可独立完成。请安排取证，返回路径、行范围和必要上下文线索，由主代理读原文确定注入阶段与证明能力；当前不运行测试、不编写实现，也不把静态位置当作运行时已发生的证明。",
-      "expected_skills": ["subagent-orchestration"],
-      "forbidden_skills": ["symbol-structure-workflow"],
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "symbol-structure-workflow"
+      ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
         "evidence-packet.md"
       ],
-      "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_behavior_tags": [
+        "read_only",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "subagent-post-change-source-evidence",
       "kind": "positive",
       "request": "主代理已完成一处局部修改，接口和验收合同未变；已知差异文件，但尚缺限定调用方中受影响调用位置和仍引用旧路径的位置。这项搜索值得独立交接，用户没有指定分工。请安排只读定位，给精确路径、行范围、简短相关性说明与未覆盖范围；主代理亲自阅读后判断是否漏接，子代理不交付质量结论，不重做实现，也不泛泛搜索其他问题。",
-      "expected_skills": ["subagent-orchestration"],
-      "forbidden_skills": ["symbol-structure-workflow"],
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "symbol-structure-workflow"
+      ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [
         "evidence-packet.md"
       ],
-      "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_behavior_tags": [
+        "read_only",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "subagent-unfamiliar-module-navigation",
       "kind": "positive",
       "request": "请解释这个陌生模块的配置如何从文档进入运行入口，限定在给定组件目录。当前只有 README 路径，还需定位配置读取和实际消费位置；无需改代码或运行业务。角色可用，主代理暂无其他工作，用户未指定分工。",
-      "expected_skills": ["subagent-orchestration"],
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
       "forbidden_skills": [],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": ["evidence-packet.md"],
-      "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "subagent-small-reuse-search",
       "kind": "positive",
       "request": "给已确定的入口增加一个小参数，行为与验收已明确；先在限定组件里找到现有参数解析和校验的复用实现，目前只知道目录。主代理会亲自修改，角色可用，用户未指定分工。",
-      "expected_skills": ["subagent-orchestration"],
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
       "forbidden_skills": [],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": ["evidence-packet.md"],
-      "expected_behavior_tags": ["bounded_subagent_delegation"],
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
       "forbidden_behavior_tags": []
     },
     {
@@ -1983,22 +2106,34 @@
       "kind": "negative",
       "request": "用户已提供配置读取函数的精确文件和行位置；只需读这个完整短函数，确认是否处理空字符串，无其他调用关系或材料缺口。用户未要求委派。",
       "expected_skills": [],
-      "forbidden_skills": ["subagent-orchestration"],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [],
-      "expected_behavior_tags": ["read_only"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "subagent-complete-evidence-no-repeat",
       "kind": "negative",
       "request": "局部修改后的相关调用位置、完整关键原文与查询覆盖依据均已在当前上下文，来源没有变化，也没有待查的其他关系。请据此判断这处调用是否符合已明确合同；用户未要求委派，不另找材料，不例行发起修改后独立复核。",
       "expected_skills": [],
-      "forbidden_skills": ["subagent-orchestration"],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [],
-      "expected_behavior_tags": ["read_only"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_behavior_tags": [
+        "read_only"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "subagent-query-capability-discovery",
@@ -2309,7 +2444,7 @@
     {
       "id": "subagent-evidence-dispatch-handoff",
       "kind": "positive",
-      "request": "你是主代理，准备交给 experiment 一个边界已明确的实现任务。已有 evidence 保存相关接口调查上下文，旧任务已结束，但实现中还需多轮定向取证。请直接给 experiment 已知结论与来源，并把该 evidence 的后续取证派发交给它，明确范围和结果接收。运行时的最终回复仍只会返回创建者；本次交接不能丢失结果，也不能让你和 experiment 同时追加任务，不创建新代理池或记录副本。",
+      "request": "你是主代理，准备交给 experiment 一个边界已明确的实现任务。已有 evidence 保存相关接口调查上下文，旧任务已结束，但实现中还需多轮定向取证。请直接给 experiment 已知结论与来源，并把该 evidence 的后续取证派发交给它，明确范围和结果接收。运行时的最终回复仍只会返回创建者；本次交接不能丢失结果，也不能让你和 experiment 同时追加任务，不创建新代理池或记录副本。 仅因跨分支不能自动送达才向新派发者发送最小结论与定位，最终回复仍须保留可独立阅读的证据索引。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -2368,7 +2503,7 @@
     {
       "id": "subagent-bounded-operator-execution",
       "kind": "positive",
-      "request": "目标、步骤、精确对象集、等价依据、允许动作、修改归属与验收均已确认，只剩 12 个难以可靠脚本化的简单重复修改，代表项也已经验证。请实际委派 operator 按既定步骤完成，不重复首项准入；出现步骤未覆盖的反例、失败或未知时停止相关操作并返回，不改设计或猜测修复。普通阶段集中到末尾交付完成范围、关键异常和证据位置，主代理随后复核实际差异与结果。",
+      "request": "实现已完成，请执行已授权的正式 Debug、Release 构建及自测。命令、工作目录、输入和成功判定均已给定，预计单次输出较短；角色可用，主代理暂无其他独立工作，用户没有指定分工。请组织启动、等待与结果检查；失败返回直接错误供主代理修正，不探索改写产品。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -2430,34 +2565,56 @@
       "id": "subagent-simple-command-long-observation",
       "kind": "positive",
       "request": "当前必要操作只有一条已验证命令，输入、允许动作与判定依据稳定；运行会持续产生大量日志，需要按已知阶段检查状态并等待结束，没有现成的汇总入口。无需修代码或设计方案，主代理暂无其他工作，角色可用，用户未指定分工。请安排执行，最后给结果和关键异常位置。",
-      "expected_skills": ["subagent-orchestration"],
-      "forbidden_skills": ["task-table-manager"],
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "task-table-manager"
+      ],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": ["operator-execution.md"],
-      "expected_behavior_tags": ["bounded_subagent_delegation"],
+      "expected_subagent_orchestration_references": [
+        "operator-execution.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
       "forbidden_behavior_tags": []
     },
     {
       "id": "subagent-operator-result-followup",
       "kind": "positive",
       "request": "原 operator 已完成本次操作，返回成功状态和日志位置，但主代理还需要确认最终处理数是否包含跳过项。原代理仍可续派，日志仍在且输入未变。请补齐这一信息，不重跑操作，也不把完整日志读入主代理。",
-      "expected_skills": ["subagent-orchestration"],
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
       "forbidden_skills": [],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": ["operator-execution.md"],
-      "expected_behavior_tags": ["bounded_subagent_delegation"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_subagent_orchestration_references": [
+        "operator-execution.md"
+      ],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "subagent-operator-concentrated-delivery",
       "kind": "negative",
-      "request": "你当前是 operator，三个已授权步骤顺利完成，退出码均为零；生成的日志包含数千行常规输出和一条不影响通过、但主代理需知道的兼容警告。没有约定中间交接点，也没有阻塞。请集中交付完成范围、警告及日志位置，不回传常规输出，不隐去警告；保留原结果以便后续追问。",
+      "request": "你当前是 operator，三个已授权步骤顺利完成，退出码均为零；生成的日志包含数千行常规输出和一条不影响通过、但主代理需知道的兼容警告。没有需要派发者立即处理的事项。请通过最终回复集中交付完成范围、警告及日志位置，不先用 send_message 发送同一结果，不回传常规输出，不隐去警告；保留原结果以便后续追问。",
       "expected_skills": [],
-      "forbidden_skills": ["subagent-orchestration"],
+      "forbidden_skills": [
+        "subagent-orchestration"
+      ],
       "expected_change_governance_references": [],
       "expected_subagent_orchestration_references": [],
-      "expected_behavior_tags": ["bounded_subagent_delegation"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "subagent-user-forbids",
@@ -3038,7 +3195,7 @@
     {
       "id": "shared-blocking-gate",
       "kind": "positive",
-      "request": "两个真实消费者已经通过同一公开写入入口反复把目标路径写错并造成不可恢复覆盖，修正 owner 和接口仍不能约束入口外的写入。请设计一个共享阻断检查，证明每个失败都代表契约违反，并验证合法写入不受影响。",
+      "request": "两个真实消费者已经通过同一公开写入入口反复写错路径并造成不可恢复覆盖，直接证据充分。请设计仅保护该次写入的最小局部检查；不得把开发环境测试失败、材料不齐或假想风险变成其他任务的前提或全局门禁。本轮只设计，不新增或运行测试。",
       "expected_skills": [
         "change-governance"
       ],
@@ -3466,7 +3623,7 @@
     {
       "id": "workflow-cli-gate-boundary",
       "kind": "behavior",
-      "request": "请完善长期交付链和任务表，并统一设计适用于两套 CLI 的共享门禁政策：目标、状态、依赖和完成规则必须写在文档中并由 agent 判断，CLI 只辅助编辑查询。只允许少量能机械证明且保护当前写入或查询快照的局部门禁，其余都返回诊断。",
+      "request": "请完善长期交付链和任务表，并同步两套 CLI 的门禁政策：目标、状态、依赖和完成由文档与 agent 判断，CLI 只辅助编辑查询。未经明确授权不新增扩大门禁；仅对有直接证据的数据损坏丢失、越权访问写入、崩溃资源耗尽设置最小局部保护。开发、测试和正式环境同受限制，测试失败或材料不齐不能阻断其他任务，不改工具实现。",
       "expected_skills": [
         "change-governance",
         "delivery-workflow",
@@ -4069,7 +4226,7 @@
     {
       "id": "batch-read-aggregate-budget",
       "kind": "behavior",
-      "request": "只读查看四段已确认、彼此独立且必要的接口说明，其中两段分别覆盖两个小文件全文，另两段是大文件中的完整章节，行范围均已知。每段约 3000 Token，外层工具最多返回 10000 Token，内层每条命令可返回 20000。请安排读取并确保必要正文完整可见；没有共同产品未知，也不需要改工具或跑性能评测。",
+      "request": "evidence 已返回四段彼此独立且必要的接口说明位置，其中两段分别覆盖两个小文件全文，另两段是大文件中的完整章节，文件路径和行范围均已知。请按这些定位读取原文。每段约 3000 Token，外层工具最多返回 10000 Token，内层每条命令可返回 20000。请安排读取并确保必要正文完整可见；没有共同产品未知，也不需要改工具或跑性能评测。",
       "expected_skills": [],
       "forbidden_skills": [
         "execution-governor",
@@ -4078,7 +4235,8 @@
       "expected_change_governance_references": [],
       "expected_behavior_tags": [
         "read_only",
-        "batched_independent_tool_calls"
+        "batched_independent_tool_calls",
+        "minimal_evidence_closure"
       ],
       "forbidden_behavior_tags": []
     },
@@ -4087,30 +4245,57 @@
       "kind": "behavior",
       "request": "两个已授权的确定性生成命令分别写入互不相关的目录，输入已固定，输出路径和资源互不共享，任何一项结果均不改变另一项是否需要执行。两条命令已验证、运行短、只返回简短结果，不需要子代理。请执行并分别检查退出码和产物。",
       "expected_skills": [],
-      "forbidden_skills": ["execution-governor", "subagent-orchestration", "powershell-usage"],
+      "forbidden_skills": [
+        "execution-governor",
+        "subagent-orchestration",
+        "powershell-usage"
+      ],
       "expected_change_governance_references": [],
-      "expected_behavior_tags": ["modify_authorized_scope", "batched_independent_tool_calls"],
-      "forbidden_behavior_tags": ["read_only"]
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "batched_independent_tool_calls"
+      ],
+      "forbidden_behavior_tags": [
+        "read_only"
+      ]
     },
     {
       "id": "batch-dependent-execution-serial",
       "kind": "behavior",
       "request": "两个已授权命令使用既有正式模板：先构建一个组件，成功后运行依赖本次产物的测试。两者共用输出目录；构建若失败，不应启动测试。输入和判定稳定，都是短操作，不需要子代理或新增流程。请按依赖执行，不因命令已知就同时发出。",
       "expected_skills": [],
-      "forbidden_skills": ["execution-governor", "subagent-orchestration", "powershell-usage"],
+      "forbidden_skills": [
+        "execution-governor",
+        "subagent-orchestration",
+        "powershell-usage"
+      ],
       "expected_change_governance_references": [],
-      "expected_behavior_tags": ["modify_authorized_scope", "batched_independent_tool_calls"],
-      "forbidden_behavior_tags": ["read_only"]
+      "expected_behavior_tags": [
+        "modify_authorized_scope",
+        "batched_independent_tool_calls"
+      ],
+      "forbidden_behavior_tags": [
+        "read_only"
+      ]
     },
     {
       "id": "batch-large-file-sections",
       "kind": "behavior",
       "request": "用户已给出三个大型源码文件内的完整定义行范围，三个定义独立且均需读取，合计约 4000 Token，当前外层返回预算 10000 Token。没有其他依赖缺口，无需整读任何文件，也无需委派。请读取这三处必要正文，不因源文件较大而逐个串行查询。",
       "expected_skills": [],
-      "forbidden_skills": ["source-query", "execution-governor", "subagent-orchestration"],
+      "forbidden_skills": [
+        "source-query",
+        "execution-governor",
+        "subagent-orchestration"
+      ],
       "expected_change_governance_references": [],
-      "expected_behavior_tags": ["read_only", "batched_independent_tool_calls"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_behavior_tags": [
+        "read_only",
+        "batched_independent_tool_calls"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "batch-truncation-recover-missing-ranges",
@@ -4145,7 +4330,7 @@
     {
       "id": "evidence-leaf-no-orchestration",
       "kind": "behavior",
-      "request": "你当前是 evidence，已经收到具体取证问题、已知文件范围和完整角色指令。只需读取两个已知接口定义并返回路径、行号与简短导航，当前派发者就是父代理，不涉及移交或查询异常。直接完成取证，不创建子代理。",
+      "request": "你当前是 evidence，已读两个接口的完整定义、对应官方网页章节和工具 help，父代理需要据此决定下一步操作。来源与版本已确认，无查询异常，也未指定只要单行号。请集中交付关键原文的读取入口和必要范围，短小的关键 help 原文可直接带回。当前派发者就是父代理，无需中途纠偏、继续委派或先发 send_message。",
       "expected_skills": [],
       "forbidden_skills": [
         "subagent-orchestration",
@@ -4198,43 +4383,124 @@
       "kind": "behavior",
       "request": "已授权功能、直接调用方、文档和必要测试均已完成并通过，未出现新反例。现有 import 排列符合项目风格，可重建缓存不进入交付也不干扰验证，用户没有要求整理。请交付本次结果，不因这些收尾事项重新搜索、改代码或重跑测试。",
       "expected_skills": [],
-      "forbidden_skills": ["execution-governor", "change-governance", "delivery-workflow", "task-table-manager"],
+      "forbidden_skills": [
+        "execution-governor",
+        "change-governance",
+        "delivery-workflow",
+        "task-table-manager"
+      ],
       "expected_change_governance_references": [],
-      "expected_behavior_tags": ["read_only", "no_scope_expansion", "decision_relevant_findings"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_behavior_tags": [
+        "read_only",
+        "no_scope_expansion",
+        "decision_relevant_findings"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "evidence-intake-progressive-source-read",
       "kind": "behavior",
       "request": "evidence 已返回三个较大文件中的完整函数行范围，分别定位读取入口、持锁区间和释放路径，并给出两端调用关系。主代理尚未读原文，现在只需确认锁是否跨请求持有；这些片段足以开始，整读三个文件会超过整批返回预算。请据此读取原文作判断；若发现遗漏的调用或状态依赖，再补对应内容。不修改代码或运行测试。",
-      "expected_skills": ["subagent-orchestration"],
-      "forbidden_skills": ["source-query", "execution-governor"],
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "source-query",
+        "execution-governor"
+      ],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": ["evidence-packet.md"],
-      "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "evidence-intake-small-complete-type",
       "kind": "behavior",
       "request": "evidence 已定位一个 45 行的小型协议文件，指出请求和响应类型的起始行。当前需要检查全部字段的对应关系，文件只有这些定义与必要声明，全文可在短输出内完整返回。请读取并核对，不因 evidence 提供了行号而把一个完整小类型拆成多次查询，不修改文件。",
-      "expected_skills": ["subagent-orchestration"],
-      "forbidden_skills": ["source-query", "execution-governor"],
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "source-query",
+        "execution-governor"
+      ],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": ["evidence-packet.md"],
-      "expected_behavior_tags": ["read_only", "bounded_subagent_delegation"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_subagent_orchestration_references": [
+        "evidence-packet.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
     },
     {
       "id": "candidate-selftest-failure-ownership",
       "kind": "behavior",
       "request": "一次昂贵验证停在候选新增的 self-test。完整调用证据已给出：外部环境和正式启动器正常，候选自身构造子进程参数时漏传了必需的程序集路径；现有验收合同明确包括该 self-test。请只读判定当前失败类别、被遮蔽范围和下一动作，不因错误发生在验证阶段就把它归为外部基础设施，也不重跑或修改代码。",
-      "expected_skills": ["execution-governor"],
-      "forbidden_skills": ["change-governance", "source-query"],
+      "expected_skills": [
+        "execution-governor"
+      ],
+      "forbidden_skills": [
+        "change-governance",
+        "source-query"
+      ],
       "expected_change_governance_references": [],
-      "expected_execution_governor_references": ["failure-and-cost.md"],
-      "expected_behavior_tags": ["read_only", "fact_first"],
-      "forbidden_behavior_tags": ["modify_authorized_scope"]
+      "expected_execution_governor_references": [
+        "failure-and-cost.md"
+      ],
+      "expected_behavior_tags": [
+        "read_only",
+        "fact_first"
+      ],
+      "forbidden_behavior_tags": [
+        "modify_authorized_scope"
+      ]
+    },
+    {
+      "id": "experiment-independent-implementation-validation",
+      "kind": "behavior",
+      "request": "把这个路径不清晰、多个缺陷相互影响的较大实验交给 experiment。目标、文件范围、操作权限和验收已明确，构建环境可用；让它自主探索解法、完成实现与必要验证后集中交付，说明重要隐藏问题及处理方法，已解决但易复发的坑也要带回。不安排确认收到或逐步批准，不由主代理代转普通构建失败，也不为搜集问题扩大修复范围。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
+    },
+    {
+      "id": "experiment-resource-conflict-cleared",
+      "kind": "behavior",
+      "request": "先前两个实验共用构建环境，需要根代理协调顺序；现在另一项已结束，资源冲突已解除，当前实验的目标、权限与验收没有变化。请把后续验证和范围内修正交回原 experiment，不继续逐次代发构建并转送失败日志。",
+      "expected_skills": [
+        "subagent-orchestration"
+      ],
+      "forbidden_skills": [
+        "delivery-workflow",
+        "task-table-manager"
+      ],
+      "expected_change_governance_references": [],
+      "expected_behavior_tags": [
+        "bounded_subagent_delegation"
+      ],
+      "forbidden_behavior_tags": []
     }
   ]
 }

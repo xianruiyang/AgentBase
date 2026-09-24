@@ -24,7 +24,7 @@ must: 实验环境仅经正式入口选本项目资产，不整树复制 Codex�
 
 must: `.codex/`、`codexRuntimeLogFile/`、`node_modules/`、`dist/`、`target/`、运行日志、覆盖率和部署沙箱是本地状态或可重建产物，不得作为项目真源提交
 
-must: 测试、fixture、benchmark 语料、runner、原始结果与审计仅属开发资产，不进 Codex payload；`Plugin`/`DirectCompatibility` 同受 payload 合同且须移除受管旧测试。有消费者的 doctor/自检按运行职责裁决，不得把项目测试当运行能力
+must: 测试隔离及门禁限制同时覆盖开发、测试和正式环境，遵守全局规则；局部测试不得成为其他任务的前置条件。测试、fixture、benchmark 语料、runner、原始结果与审计仅属开发资产，不进 Codex payload；`Plugin`/`DirectCompatibility` 同受 payload 合同且须移除受管旧测试。有消费者的 doctor/自检按运行职责裁决，不得把项目测试当运行能力
 
 must: 新增、退役或移交由正式 Codex 部署入口管理的路径或配置键时，在 `development/codex-deployment/managed_asset_lifecycle.json` 中维护稳定身份和显式生命周期转换；不得把当前来源不再枚举直接解释为安装目标应删除，也不得在对应旧版本直接升级边界仍受支持时删除历史身份
 

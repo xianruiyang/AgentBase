@@ -50,7 +50,7 @@ render    生成 WORK_STATUS.md 只读视图
 
 ## 允许的局部门禁
 
-`workctl` 只能用下列类型阻断当前命令：
+以下记录 `workctl` 已有命令的局部错误合同，不授予新增、扩大门禁或阻断其他任务的权限；新增保护按全局门禁条款裁决：
 
 - `WORK-PATH` / `WORK-OVERWRITE`：路径越界、生成物覆盖真源，或初始化/快照覆盖已有数据。
 - `WORK-LOCK` / `WORK-SNAPSHOT-RACE`：工作区正在写入，或快照取得期间来源发生变化。

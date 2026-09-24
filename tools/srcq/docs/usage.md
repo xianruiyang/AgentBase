@@ -10,10 +10,26 @@ srcq process <validate|select|filter|count|group|sort|dedupe|merge|to-jsonl|from
 srcq symbol <capabilities|definition|references|calls> ...
 srcq <schema|capabilities|doctor> ...
 srcq <rg|fd|scc> <native argv...>
+srcq read <path> [<start> <end>] [--Number | --NoNumber]
 srcq query <rg|fd|scc> <exec|defaults|doctor> ...
 ```
 
 AST `exec/defaults` 与 query `exec/defaults` 的 `--` 是强制边界。左侧由 srcq 解析，右侧 token 作为参数数组交给对应原生引擎，不经二次 shell 解析。普通 `srcq rg|fd|scc` 入口没有 wrapper 参数，其 backend 后全部 token 都是原生 argv。
+
+## 按行读取文件
+
+```powershell
+srcq read 'src/Client.cs' 58 108
+srcq read 'D:/project/src/Client.cs' 58 108
+srcq read 'src/Client.cs' 58 108 --NoNumber
+srcq read 'src/Client.cs'
+```
+
+`read` 只读一个文件，起止行从 1 开始、包含两端，以 LF 或 CRLF 分行。起止行一起省略时读取全文；止行超过文件末尾时读到末尾，起行已超过末尾或文件为空时成功返回空内容。相对路径基于调用进程的当前工作目录，绝对路径直接使用，不展开通配符。不启动查询引擎，不依赖缓存或索引。
+
+stdout 默认在所选原文每行前加上 `原始行号:`，空行也编号。末尾加 `--NoNumber` 返回纯原文；保留 `--Number` 显式开启编号。两个选项均不区分大小写，同时指定会报参数冲突。两种输出都不加标题或回执，不压缩、不分页；UTF-8（含 BOM）、带 BOM 的 UTF-16 和严格可解码的 GBK/CP936 沿用源码解码合同，输出为 UTF-8。空行和原有行尾保留，文件末尾换行不另算一个空行。缺少路径、只提供一个行号、零行号、逆序、不可读或不可解码时非零退出，stderr 给出原因，stdout 不返回部分内容。
+
+源码文件是唯一事实源；模型和脚本消费本次选择的原文，调用者负责选择范围或全文及外层输出预算。命令不修改文件、不生成持久副本，文件变化后重新定位并读取；它不判断所选内容是否有必要。
 
 ## 文本、文件与源码指标
 

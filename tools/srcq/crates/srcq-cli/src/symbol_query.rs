@@ -2105,62 +2105,7 @@ fn normalize_ast_stdin_source(file: &Path, source: Vec<u8>) -> Result<Vec<u8>, S
 }
 
 fn decode_source_text(file: &Path, source: Vec<u8>) -> Result<String, SymbolFailure> {
-    if let Some(bytes) = source.strip_prefix(&[0xff, 0xfe]) {
-        if bytes.len() % 2 != 0 {
-            return Err(SymbolFailure::input(format!(
-                "UTF-16LE source has an incomplete code unit: {}",
-                file.display()
-            )));
-        }
-        let units = bytes
-            .chunks_exact(2)
-            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-            .collect::<Vec<_>>();
-        String::from_utf16(&units).map_err(|error| {
-            SymbolFailure::input(format!(
-                "cannot decode UTF-16LE source {}: {error}",
-                file.display()
-            ))
-        })
-    } else if let Some(bytes) = source.strip_prefix(&[0xfe, 0xff]) {
-        if bytes.len() % 2 != 0 {
-            return Err(SymbolFailure::input(format!(
-                "UTF-16BE source has an incomplete code unit: {}",
-                file.display()
-            )));
-        }
-        let units = bytes
-            .chunks_exact(2)
-            .map(|chunk| u16::from_be_bytes([chunk[0], chunk[1]]))
-            .collect::<Vec<_>>();
-        String::from_utf16(&units).map_err(|error| {
-            SymbolFailure::input(format!(
-                "cannot decode UTF-16BE source {}: {error}",
-                file.display()
-            ))
-        })
-    } else if source.contains(&0) {
-        Err(SymbolFailure::input(format!(
-            "source contains NUL bytes; UTF-16 text requires a BOM: {}",
-            file.display()
-        )))
-    } else {
-        match String::from_utf8(source) {
-            Ok(text) => Ok(text),
-            Err(error) => {
-                let bytes = error.into_bytes();
-                let (decoded, had_errors) = encoding_rs::GBK.decode_without_bom_handling(&bytes);
-                if had_errors || decoded.contains('\0') {
-                    Err(SymbolFailure::input(format!(
-                        "source is not valid UTF-8, BOM-marked UTF-16, or Windows GBK text: {}",
-                        file.display()
-                    )))
-                } else {
-                    Ok(decoded.into_owned())
-                }
-            }
-        }
-    }
+    crate::source_text::decode(file, source).map_err(SymbolFailure::input)
 }
 
 fn scan_occurrences(
