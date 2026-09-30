@@ -97,6 +97,7 @@ class EvoCodexAdapterTests(unittest.TestCase):
             (project / "skills" / "one" / "SKILL.md").write_text("one\n", encoding="utf-8")
             (project / "skills" / "two" / "SKILL.md").write_text("two\n", encoding="utf-8")
             (project / "agents" / "worker.toml").write_text('model = "gpt-test"\n', encoding="utf-8")
+            (project / "settings.toml").write_text('developer_instructions = "portable addon"\n', encoding="utf-8")
             projection = agentbase_codex.stage_codex_component_projection(
                 project_root=PROJECT_ROOT,
                 workspace=workspace,
@@ -104,13 +105,16 @@ class EvoCodexAdapterTests(unittest.TestCase):
                     "agents_md": [{"id": "rules", "source": str(project / "rules" / "AGENTS.md")}],
                     "skills": [{"id": "one", "source": str(project / "skills" / "one")}],
                     "agents": [{"id": "roles", "source": str(project / "agents")}],
+                    "codex_settings": [{"id": "settings", "source": str(project / "settings.toml")}],
                 },
                 max_agents=3,
                 candidate_source_roots=[project],
                 skill_cache_root=root / "state" / "skill-cache",
             )
             config = tomllib.loads((workspace / ".codex" / "config.toml").read_text(encoding="utf-8"))
-            self.assertEqual(config["developer_instructions"], "selected rule\n")
+            self.assertEqual(config["developer_instructions"], "portable addon")
+            self.assertEqual(Path(projection["global_instructions_path"]).read_text(encoding="utf-8"), "selected rule\n")
+            self.assertIn(".agentbase/components/agents-md/AGENTS.md", {row["path"] for row in projection["files"]})
             self.assertTrue(config["agents"]["enabled"])
             self.assertEqual(config["agents"]["max_concurrent_threads_per_session"], 2)
             self.assertTrue((workspace / ".agents" / "skills" / "one" / "SKILL.md").is_file())
@@ -207,7 +211,7 @@ class EvoCodexAdapterTests(unittest.TestCase):
                     else:
                         self.assertNotIn('--output-schema', argv)
 
-    def test_attempt_runtime_home_links_only_auth_and_retains_native_evidence(self) -> None:
+    def test_attempt_runtime_home_uses_selected_rules_and_retains_native_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             attempt = root / "attempt"
@@ -219,15 +223,20 @@ class EvoCodexAdapterTests(unittest.TestCase):
             (installed / "AGENTS.md").write_text("host rules\n", encoding="utf-8")
             (installed / "config.toml").write_text("model = 'host'\n", encoding="utf-8")
             (installed / "skills").mkdir()
+            selected_rules = root / "selected-AGENTS.md"
+            selected_rules.write_text("selected rule\n", encoding="utf-8")
 
             runtime_home, record = prepare_runtime_home(
                 attempt_root=attempt,
                 installed_codex_root=installed,
+                global_instructions_path=selected_rules,
             )
 
             self.assertEqual(record["authentication"], "temporary-same-volume-hardlink")
             self.assertEqual(source.stat().st_ino, (runtime_home / "auth.json").stat().st_ino)
-            self.assertEqual(sorted(path.name for path in runtime_home.iterdir()), ["auth.json"])
+            self.assertEqual(sorted(path.name for path in runtime_home.iterdir()), ["AGENTS.md", "auth.json"])
+            self.assertEqual((runtime_home / "AGENTS.md").read_text(encoding="utf-8"), "selected rule\n")
+            self.assertEqual(record["global_instructions"]["source"], "selected-agents-md-projection")
             (runtime_home / "sessions").mkdir()
             rollout = runtime_home / "sessions" / "rollout.jsonl"
             rollout.write_text("{}\n", encoding="utf-8")

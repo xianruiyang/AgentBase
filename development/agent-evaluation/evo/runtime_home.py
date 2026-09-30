@@ -6,7 +6,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Any
 
-from evaluation_core import PreconditionError, write_json_atomic
+from evaluation_core import PreconditionError, sha256_file, write_json_atomic
 
 
 RUNTIME_HOME_RECORD = "codex-runtime-home.json"
@@ -17,14 +17,21 @@ def _is_reparse_point(path: Path) -> bool:
     return bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
 
 
-def prepare_runtime_home(*, attempt_root: Path, installed_codex_root: Path) -> tuple[Path, dict[str, Any]]:
-    """Create an attempt-owned blank Codex home with a temporary auth hardlink."""
+def prepare_runtime_home(*, attempt_root: Path, installed_codex_root: Path,
+                         global_instructions_path: Path | None = None) -> tuple[Path, dict[str, Any]]:
+    """Create an attempt home with temporary auth and only explicitly selected global rules."""
 
     attempt = attempt_root.resolve()
     installed = installed_codex_root.resolve()
     runtime_home = attempt / "codex-runtime-home"
     record_path = attempt / RUNTIME_HOME_RECORD
     source = installed / "auth.json"
+    global_rules = global_instructions_path.absolute() if global_instructions_path is not None else None
+    if global_rules is not None:
+        if not global_rules.is_file() or global_rules.is_symlink() or _is_reparse_point(global_rules):
+            raise PreconditionError("selected global AGENTS source must be a regular projection file")
+        if global_rules.resolve().is_relative_to(installed):
+            raise PreconditionError("selected global AGENTS source cannot come from the installed Codex root")
     if installed == runtime_home or installed == attempt or installed.is_relative_to(attempt):
         raise PreconditionError("installed Codex root must be separate from the Evo attempt runtime home")
     if record_path.exists() or runtime_home.exists():
@@ -37,12 +44,15 @@ def prepare_runtime_home(*, attempt_root: Path, installed_codex_root: Path) -> t
         raise PreconditionError("Evo runtime home must share a volume with installed Codex auth.json")
     runtime_home.mkdir()
     auth = runtime_home / "auth.json"
+    instructions_target = runtime_home / "AGENTS.md"
     try:
         os.link(source, auth)
         if not auth.is_file() or auth.is_symlink() or _is_reparse_point(auth):
             raise PreconditionError("Evo runtime authentication link is not a regular hardlink")
         if source.stat().st_ino != auth.stat().st_ino or source.stat().st_dev != auth.stat().st_dev:
             raise PreconditionError("Evo runtime authentication did not preserve file identity")
+        if global_rules is not None:
+            instructions_target.write_bytes(global_rules.read_bytes())
         record = {
             "schema": "agentbase.evo-codex-runtime-home/v1",
             "runtime_home": runtime_home.name,
@@ -50,10 +60,17 @@ def prepare_runtime_home(*, attempt_root: Path, installed_codex_root: Path) -> t
             "authentication_source": "installed-codex-root/auth.json",
             "authentication_linked_at_launch": True,
         }
+        if global_rules is not None:
+            record["global_instructions"] = {
+                "path": "AGENTS.md",
+                "source": "selected-agents-md-projection",
+                "sha256": sha256_file(instructions_target),
+            }
         write_json_atomic(record_path, record)
         return runtime_home, record
     except Exception:
         auth.unlink(missing_ok=True)
+        instructions_target.unlink(missing_ok=True)
         try:
             runtime_home.rmdir()
         except OSError:

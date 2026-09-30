@@ -145,7 +145,9 @@ python.exe development/agent-evaluation/agent_eval.py evo results --state-root $
 
 ### 七类组件投影
 
-Codex 组合的可运行示例见[七组件合成规格](../tests/fixtures/evo/components/seven-component-research.json)。AGENTS 指令选择单个文本文件，skill 选择包含 `SKILL.md` 的目录，agent 选择 TOML 文件或含 profile 的目录，Codex 设置选择 TOML 文件。多个配置声明冲突时拒绝运行，不用覆盖次序决定结果。评测进程固定无人值守与受管可写工作区。每个 attempt 的独立最小 Codex home 是实际运行与原生会话用量来源，启动时只从安装根的普通 `auth.json` 建立同卷硬链接；不读取、打印或复制认证内容，完成或异常后解除链接并保留会话证据。白板组合因此不会继承安装根的全局 AGENTS、config、skills 或 agents，选中组件仍只通过工作区投影进入候选。
+Codex 组合的可运行示例见[七组件合成规格](../tests/fixtures/evo/components/seven-component-research.json)。AGENTS 指令选择单个文本文件，skill 选择包含 `SKILL.md` 的目录，agent 选择 TOML 文件或含 profile 的目录，Codex 设置选择 TOML 文件。多个配置声明冲突时拒绝运行，不用覆盖次序决定结果。评测进程固定无人值守与受管可写工作区。每个 attempt 的独立最小 Codex home 是实际运行与原生会话用量来源，启动时只从安装根的普通 `auth.json` 建立同卷硬链接；不读取、打印或复制认证内容，完成或异常后解除链接并保留会话证据。白板组合不会继承安装根的全局 AGENTS、config、skills 或 agents。
+
+选中的 `agents_md` 经工作区 `.agentbase/components/agents-md/AGENTS.md` 生成唯一受管派生内容，再写入 attempt 的 `codex-runtime-home/AGENTS.md`，由 Codex 原生全局用户指令层供主、子代理加载。portable config 的 `developer_instructions` 与角色 TOML 保持各自职责；全局正文不覆盖或重复拼入它们。派生文件、身份和实际消费者由投影清单及 runtime-home 收据绑定，重新装配可恢复；没有选中 `agents_md` 时不生成该文件。旧收据仍按原承载方式恢复，不把旧测试结果当作新装配的行为证据。`--ignore-rules` 只隔离 execpolicy `.rules`，不会关闭 `AGENTS.md` 加载。
 
 hook、MCP、工具选择带 `component.json` 的源码或已准备产物目录，schema 为 `agentbase-evo-component/v1`，`kind` 与组件种类一致：
 

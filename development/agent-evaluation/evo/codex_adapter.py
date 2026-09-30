@@ -351,6 +351,8 @@ def run_codex_job(
         codex_home, runtime_home_record = prepare_runtime_home(
             attempt_root=attempt,
             installed_codex_root=installed_home,
+            global_instructions_path=Path(projection["global_instructions_path"])
+            if projection.get("global_instructions_path") is not None else None,
         )
     except (OSError, PreconditionError) as exc:
         raise CodexAdapterPrecondition(str(exc)) from exc

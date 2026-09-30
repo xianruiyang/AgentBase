@@ -64,6 +64,8 @@ Evo 通过 `agent_eval.py evo <action>` 使用，实际接口与数据生命周�
 
 模型 shell 使用 `development/common/codex_shell_environment_policy.json` 的共享过滤合同；连接环境和题目依赖环境由各自入口显式投影。认证只由 Codex CLI 从指定安装根读取，不进入仓库、prompt、patch 或结构化收据。Web search 被禁用不等于网络隔离；需要网络安全保证的任务必须由相应网络 owner 单独提供和验证，不能把本评测器当作网络沙箱。
 
+以上 config 内嵌全局正文是既有 SWE 投影合同。EVO 的七组件装配使用独立 attempt home 的原生 `AGENTS.md` 层，避免自定义角色覆盖 config 开发者指令时丢失全局规则；只加载显式选中的仓库内容，具体来源、派生文件和恢复合同见 [EVO 说明](evo/README.md)。
+
 ## 本地语料与资格
 
 本地 corpus 决定具体 Python/TypeScript 任务。每题包含精确上游提交、六个哈希固定资产、允许修改路径、工具链、Windows adapter（如需）、公开/隐藏检查和 grader 配置。框架不内置题目数量、题名、目标仓库或参考答案。
