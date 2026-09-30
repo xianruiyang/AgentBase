@@ -155,15 +155,20 @@ class EnvironmentPool:
         changed = [name for name, value in current.items() if baseline.get(name) != value]
         ordinary_changed = [name for name in changed if current[name].get('kind') != 'skill-reference']
         archive = self.state_root / 'jobs' / f'j{prior}' / 'workspace-diff'
-        total = sum(current[name]['bytes'] for name in ordinary_changed)
-        if total > 64 * 1024 * 1024:
-            self.quarantine(workspace, 'workspace difference exceeds 64 MiB archive bound')
-            raise EvoError('workspace difference exceeds archive bound; slot quarantined')
+        projection_owner = '.agentbase/evo-codex-projection.json'
         for name in ordinary_changed:
             source = workspace / Path(name)
             target = archive / Path(name)
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
+            # The projection owner is still needed to validate retained links.
+            # Other changed files leave this slot below, so move them directly
+            # into evidence. Same-volume moves avoid copying build outputs;
+            # cross-volume moves retain shutil's copy-before-remove behavior.
+            # State-wide disk/free-space limits remain the capacity authority.
+            if name == projection_owner:
+                shutil.copy2(source, target)
+            else:
+                shutil.move(str(source), str(target))
         # Preserve unchanged assets selected again. Changed/new outputs are
         # archived, and retired source assets leave the slot.
         retained = lambda name: name in desired or any(name == prefix or name.startswith(prefix + '/') for prefix in desired_prefixes)
@@ -203,7 +208,6 @@ class EnvironmentPool:
         # distinguishable from unknown links during the next baseline inventory.
         # It is still archived as changed evidence, but must live as long as all
         # of the references it identifies are retained.
-        projection_owner = '.agentbase/evo-codex-projection.json'
         preserved_owner = projection_owner if retained_references else None
         remove = (set(ordinary_changed) | {name for name in baseline if not retained(name)})
         if preserved_owner is not None:
