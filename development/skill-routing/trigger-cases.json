@@ -94,7 +94,7 @@
     "model_interaction_surface": "当前请求要求设计、选择或改变模型直接或间接读取、生成或修改的工具返回、文件、日志、索引或生成视图时，先按 owner、消费者、当前责任和生命周期确定唯一真源与正式入口；模型面只投影当前动作所需语义，不用 Base64、完整哈希、UUID 等长不透明码承担身份，在不损失必要语义下按实测或已验证保守估算选择最低 Token 格式；机器面保持稳定完整，生成物不作为语义修改入口。",
     "minimal_evidence_closure": "优先查项目资料、本地正式文档和知识库；资料不足或需核实时效信息时查询外部来源，按权威性、适用范围和时效判断依据。取证从当前缺口和确认的来源范围出发；名称、目录或类型过滤不独自证明全集、不存在或唯一。交付关键原文的读取位置、范围或只读查询方法及简短导航；文件给必要起止行，网页/知识库给直接来源与章节或读取接口，help 给查询命令，易失状态保留必要观察。短小原文可直接带回。读取文本文件内容使用 PATH 中的 srcq read <路径> <起行> <止行>（从1开始、含两端，默认带原始行号）；已有定位直接采用 evidence 或查询的起止行，多条精准范围读取指令合批调用，不把离散片段包成大区间；发现具体缺口只补缺失部分。遇到不熟悉的内容，不为理解上下文而默认整读或猜测范围，先让 evidence 定位具体行范围；派发者不重复搜索或做无关动作，没有独立必要工作时用 collaboration.wait_agent(timeout_ms=1800000) 等待结果。只有起始位置则定向补齐必要定义，证据充分即停止。查询结果给出 @next srcq more q… 时，若还需后续结果，直接执行该命令续页。",
     "user_reasoning_override": "用户明确固定当前对话或工作范围的推理深度时，在其声明期限内保持该选择，不以模型自主判断、Goal 状态或额度动机猜测覆盖。",
-    "bounded_subagent_delegation": "用户明确分工优先。主代理保留规划、架构、关键文档、实施与验收；当前尚缺的关键原始信息优先交给 evidence，根据问题与线索在只读边界内自主选择文件、命令与 help、CLI/API、查询脚本、网络、知识库、日志或运行状态查询；交付可直接读取的位置、必要范围或查询方法及简短导航，短小关键原文或查询结果可直接带回；陌生模块入口、调用关系、复用点和验证位置均适用，不以任务大小、已知文件数量或能否并行为前提，不先代查。已有证据充分或一次已知位置读取即可闭合时直接处理。满足委派条件时先读取编排 skill。operator 只承接步骤与判定明确，且执行有一定规模、预计输出较多或需多轮观察的工作；按完整执行段的实际工作量判断，不按构建、测试、打包或脚本类别自动委派。短小且结果简短的执行直接做，不重复子代理已完成的步骤。两类 experiment 只承接探索量较大且能独立交付的实现，短小或需主代理持续裁决的探索由主代理完成；预计十来分钟只是成本线索，不设硬门槛。困难或视觉实验在满足同一独立交付条件后选 advanced-experiment，难度高不单独构成委派或升级理由。委派不要求主线程有并行工作，无独立必要工作就用 wait_agent 显式传 timeout_ms=1800000；这是调用约定，不改变工具默认值，服从宿主及更高优先级限制。一次等待覆盖团队多个代理，消息、完成或用户输入可提前唤醒；无新事实的超时不代表停滞，继续等待而非轮询、重复推演或催报。固定角色显式 fork_turns=none。主代理直接给必要事实、来源、修改边界和验收条件；实验开工前只合并澄清会改变动作且需主代理裁决的歧义，可查事实自行核实，输入充分不强制复述、确认或申请开工。生命周期验收明确阶段、对象与观察关系；失败先核场景、身份与时序，后续恢复不倒推先前状态。授权内自主修复与选择方法，不汇报普通决定、构建失败或阶段通过；必要权限资源缺失、合同须重裁，或合理路径已试且无新增判别证据的下一动作时才停止依赖部分并一次报告事实、已试方法、状态与所缺裁决。不得以弱化验收、无界重试或未获合同支持的强制绕过、恢复边界改变、正式入口替换来回避阻塞；旧代码存在不证明适用。越权动作、共享资源受损或反例已推翻其他在途工作前提时立即停报。最终集中交付方法、关键依据、文件符号及行位置、验证证据、未验证范围，以及已解决、仍阻塞和范围外问题；不另发完成消息或写冗余报告。主代理不例行催报、审核未完成试错或重复探索，最终按实际差异与决定性证据验收，具体缺口再深入，合格实现不强制重写。operator 默认简短交付当前决定所需的结果与必要定位，正常完成通常一两句足够，仅补影响下一步的异常或缺口，不逐项报平安；普通阶段与既定步骤可处理的异常不即时回传，只有需要主代理动作的阻塞或风险及约定交接点才中断。原始日志按需落盘，不要求通读或全量回传；不足时向原代理追问具体缺口，不默认重跑。停止步骤未覆盖的失败、策略拒绝或授权缺口，不变更命令形式绕过拒绝。委派不增加无必要操作或清理。两类 experiment 按需委派一层 evidence、operator 无需另授权限，同一实验同时最多一个专属 operator；先用已有结果，一次已知位置短读取或短小且结果简短的执行即可闭合时自行完成，其余按缺口比较续用与新建。experiment 不得创建这两类以外的角色，evidence 与 operator 不得委派。实际消费者据关键原始证据判断，短小原文或查询结果已充分时直接使用，有具体缺口再按来源定位补读或查询；根主代理保留正式裁决。evidence 同时只有一个当前派发者，跨分支续派须原派发者明确交接，结果共享或 completed 不转移派发权；evidence 默认由最终回复一次性交付可独立阅读的证据索引，不用 send_message 代替交付或发送普通进度。仅需立即纠偏的关键反例、无法继续且需派发者处理的阻碍，或跨分支结果不能自动送达时才发消息；能结束本轮就直接最终回复。跨分支消息只送所需原文入口与必要导航，最终回复仍保留证据索引，不以已发送或去向通知代替。不改变宿主关系，不绕过接口限制或另建代理池台账。",
+    "bounded_subagent_delegation": "用户明确分工优先。主代理保留规划、架构、关键文档、实施与验收；当前尚缺的关键原始信息优先交给 evidence，根据问题与线索在只读边界内自主选择文件、命令与 help、CLI/API、查询脚本、网络、知识库、日志或运行状态查询；交付可直接读取的位置、必要范围或查询方法及简短导航，短小关键原文或查询结果可直接带回；陌生模块入口、调用关系、复用点和验证位置均适用，不以任务大小、已知文件数量或能否并行为前提，不先代查。已有证据充分或一次已知位置读取即可闭合时直接处理。满足委派条件时先读取编排 skill。operator 专用于规则与判定明确、预期多次触发的重复工作，或无需频繁干预的超长时间观察。一次交清可复用规则，后续以 followup_task 给原 operator 新输入，或按明确的继续、停止与资源边界自行循环；普通一次性操作直接做，不重复子代理已完成的步骤。两类 experiment 只承接探索量较大且能独立交付的实现，短小或需主代理持续裁决的探索由主代理完成；预计十来分钟只是成本线索，不设硬门槛。困难或视觉实验在满足同一独立交付条件后选 advanced-experiment，难度高不单独构成委派或升级理由。委派不要求主线程有并行工作，无独立必要工作就用 wait_agent 显式传 timeout_ms=1800000；这是调用约定，不改变工具默认值，服从宿主及更高优先级限制。一次等待覆盖团队多个代理，消息、完成或用户输入可提前唤醒；无新事实的超时不代表停滞，继续等待而非轮询、重复推演或催报。固定角色显式 fork_turns=none。主代理直接给必要事实、来源、修改边界和验收条件；实验开工前只合并澄清会改变动作且需主代理裁决的歧义，可查事实自行核实，输入充分不强制复述、确认或申请开工。生命周期验收明确阶段、对象与观察关系；失败先核场景、身份与时序，后续恢复不倒推先前状态。授权内自主修复与选择方法，不汇报普通决定、构建失败或阶段通过；必要权限资源缺失、合同须重裁，或合理路径已试且无新增判别证据的下一动作时才停止依赖部分并一次报告事实、已试方法、状态与所缺裁决。不得以弱化验收、无界重试或未获合同支持的强制绕过、恢复边界改变、正式入口替换来回避阻塞；旧代码存在不证明适用。越权动作、共享资源受损或反例已推翻其他在途工作前提时立即停报。最终集中交付方法、关键依据、文件符号及行位置、验证证据、未验证范围，以及已解决、仍阻塞和范围外问题；不另发完成消息或写冗余报告。主代理不例行催报、审核未完成试错或重复探索，最终按实际差异与决定性证据验收，具体缺口再深入，合格实现不强制重写。operator 默认简短交付当前决定所需的结果与必要定位，正常完成通常一两句足够，仅补影响下一步的异常或缺口，不逐项报平安；普通阶段与既定步骤可处理的异常不即时回传，只有需要主代理动作的阻塞或风险及约定交接点才中断。原始日志按需落盘，不要求通读或全量回传；不足时向原代理追问具体缺口，不默认重跑。停止步骤未覆盖的失败、策略拒绝或授权缺口，不变更命令形式绕过拒绝。委派不增加无必要操作或清理。两类 experiment 仅可按需委派一层 evidence，无需另行授权；先用已有结果，一次已知位置短读取即可闭合时自行完成。operator 仅由根主代理按重复执行或超长观察条件创建和续派。evidence 与 operator 不得委派。实际消费者据关键原始证据判断，短小原文或查询结果已充分时直接使用，有具体缺口再按来源定位补读或查询；根主代理保留正式裁决。evidence 同时只有一个当前派发者，跨分支续派须原派发者明确交接，结果共享或 completed 不转移派发权；evidence 默认由最终回复一次性交付可独立阅读的证据索引，不用 send_message 代替交付或发送普通进度。仅需立即纠偏的关键反例、无法继续且需派发者处理的阻碍，或跨分支结果不能自动送达时才发消息；能结束本轮就直接最终回复。跨分支消息只送所需原文入口与必要导航，最终回复仍保留证据索引，不以已发送或去向通知代替。不改变宿主关系，不绕过接口限制或另建代理池台账。",
     "adaptive_execution_plan": "模型按任务是否需要跨步骤保持关键不确定性、依赖、不可交换顺序、分工、验收或恢复状态决定建立或不建立执行计划；单步且无需保持状态时不建形式计划，用户要求查看计划只决定交付形式。",
     "skill_context_lifecycle": "每轮重新判断 skill 是否适用；同一来源的完整正文在未压缩有效上下文中且无已知变化时复用，正文不可用或已知变化时只为本轮已选 skill 重读，压缩不触发历史 skill 批量加载。",
     "replacement_closure": "修改既有行为且候选会新增长期机制或适配时，写入前区分原 owner 内改写、替换和由不同当前契约支撑的独立并存；替换把旧同责生产路径与只绑定旧实现的验证资产纳入同一完成闭环，临时并存有真实调用方和退出条件，不把退役留作无 owner 的清理。",
@@ -1866,7 +1866,7 @@
     {
       "id": "subagent-runtime-probe-context",
       "kind": "positive",
-      "request": "请委派 operator 执行已确认的服务状态查询：目标实例、工作目录、配置根、启动参数、只读入口和结果判定均已给定，需多轮等待并筛选长输出。保持原调用上下文；条件不能复现就返回缺口，另一个环境的成功或警告只能作为明确标注的对照。不要修改服务或扩大排查。",
+      "request": "同类服务状态检查后续会按同一规则多次触发，请一次交清可复用规则，并委派 operator 执行本轮。目标实例、工作目录、配置根、启动参数、只读入口和结果判定均已给定。保持原调用上下文；条件不能复现就返回缺口，另一个环境的成功或警告只能作为明确标注的对照。不要修改服务或扩大排查。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -2333,43 +2333,39 @@
       "forbidden_behavior_tags": []
     },
     {
-      "id": "experiment-dedicated-operator",
-      "kind": "behavior",
-      "request": "你当前是 experiment，候选已稳定，已授权的局部构建与验证步骤、成功判定、恢复方式和文件所有权均已明确，前置检查已完成。预计产生长日志并需多轮观察；目前没有本实验 operator。请按需交给一个专属 operator，普通结果返回给你处理，禁止扩大验证和清理范围。",
-      "expected_skills": [
+      "id": "experiment-no-operator-delegation",
+      "kind": "negative",
+      "request": "你当前是 experiment，后续多个候选会反复触发已明确的局部构建与验证流程，执行规则、成功判定、停止条件、恢复方式和文件所有权均已知。请独立推进本轮操作，遵守仅可委派 evidence 的角色边界，不创建 operator，禁止扩大验证和清理范围。",
+      "expected_skills": [],
+      "forbidden_skills": [
         "subagent-orchestration"
       ],
-      "forbidden_skills": [],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": [
-        "operator-execution.md"
-      ],
+      "expected_subagent_orchestration_references": [],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
       ],
       "forbidden_behavior_tags": []
     },
     {
-      "id": "advanced-experiment-reuse-operator",
-      "kind": "behavior",
-      "request": "你当前是 advanced-experiment，已有本实验专属 operator 完成上一项明确操作，结果有效且它可续派。现在需要同一环境下另一个已授权的确定操作，预计长输出，步骤、判定、文件与资源边界已明确。请续用原 operator，不另建第二个，不复制环境，结果由你接纳并亲自检查相关视觉读回。",
-      "expected_skills": [
+      "id": "advanced-experiment-no-operator-reuse",
+      "kind": "negative",
+      "request": "你当前是 advanced-experiment，知道一个由根主代理创建的 operator 及其上一轮有效结果。现在需在已授权环境中执行规则与判定明确的重复操作，无需新增取证。请自行完成并检查相关视觉读回；知道句柄或收到结果不赋予你创建或续派 operator 的权限，不把实验操作转交根主代理代跑。",
+      "expected_skills": [],
+      "forbidden_skills": [
         "subagent-orchestration"
       ],
-      "forbidden_skills": [],
       "expected_change_governance_references": [],
-      "expected_subagent_orchestration_references": [
-        "operator-execution.md"
-      ],
+      "expected_subagent_orchestration_references": [],
       "expected_behavior_tags": [
         "bounded_subagent_delegation"
       ],
       "forbidden_behavior_tags": []
     },
     {
-      "id": "experiment-wait-evidence-and-operator",
+      "id": "experiment-wait-evidence",
       "kind": "behavior",
-      "request": "你当前是 experiment，已分别派发一个 evidence 和一个专属 operator 承担独立取证与确定操作，暂无独立必要工作。当前宿主支持 collaboration.wait_agent(timeout_ms=1800000)，没有冲突的更高优先级限制。请等待它们的结果，任一消息可唤醒，不请根主代理代等，不轮询或自行重做。",
+      "request": "你当前是 experiment，已派发一个 evidence 承担本实验的独立取证，暂无独立必要工作。当前宿主支持 collaboration.wait_agent(timeout_ms=1800000)，没有冲突的更高优先级限制。请等待其结果，消息可唤醒，不请根主代理代等，不轮询或自行重做。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -2384,7 +2380,7 @@
     {
       "id": "experiment-operator-no-eager-team",
       "kind": "behavior",
-      "request": "你当前是 experiment，已有证据充分，只需在已授权位置完成一个局部修改并运行一次结果简短、无需多轮观察的已知验证命令。请直接推进，不为了配齐团队而创建 evidence 或 operator。",
+      "request": "你当前是 experiment，已有证据充分，只需在已授权位置完成一个局部修改并运行一次结果简短的已知验证命令，没有后续重复执行或超长观察需求。请直接推进，不为了配齐团队而创建 evidence 或 operator。",
       "expected_skills": [],
       "forbidden_skills": [
         "subagent-orchestration"
@@ -2397,9 +2393,9 @@
       "forbidden_behavior_tags": []
     },
     {
-      "id": "operator-experiment-failure-recipient",
+      "id": "operator-root-failure-recipient",
       "kind": "behavior",
-      "request": "你当前是 experiment 的专属 operator，执行正式构建时遇到步骤未覆盖的类型错误，构建未完成。请停止依赖该产物的测试，把退出码、首个相关错误和日志位置交给所属 experiment 决定修复；不要修改实现、另建代理或直接要求根主代理处理。",
+      "request": "你当前是根主代理委派的 operator，按既定重复构建规则执行本轮时遇到规则未覆盖的类型错误，构建未完成。请停止依赖该产物的测试，把退出码、首个相关错误和日志位置集中交给根主代理决定修复；不要修改实现、另建代理或另行转交 experiment。",
       "expected_skills": [],
       "forbidden_skills": [
         "subagent-orchestration"
@@ -2503,7 +2499,7 @@
     {
       "id": "subagent-bounded-operator-execution",
       "kind": "positive",
-      "request": "实现已完成，请执行已授权的正式 Debug、Release 构建及自测。命令、工作目录、输入和成功判定均已给定，连续步骤之间无需新的模型判断，但需分别启动、等待并检查多个构建和自测进程，整个执行段工作量较大，单次输出较短；角色可用，主代理暂无其他独立工作，用户没有指定分工。请把启动、等待、既定检查和结果汇总作为一个完整执行段交付，不按每条命令拆派；仅按已给恢复分支处理异常，未覆盖的失败交回派发者，不探索改写产品。正常完成只需简短结论与必要证据位置。",
+      "request": "后续多个候选均需按同一规则触发正式 Debug、Release 构建及自测，当前已授权处理队列中的三个候选。命令、工作目录、变动输入、成功判定、停止条件和恢复分支均已给定，连续步骤无需新判断；角色可用，主代理暂无独立工作。请一次交清可复用规则，让 operator 按确定规则逐个完成启动、等待、既定检查和结果汇总，队列为空即停；后续可用新输入续派，不按每条命令拆派，不自动运行未授权候选。未覆盖的失败交回派发者，不探索改写产品。正常完成简短给出结论与必要证据位置。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -2523,22 +2519,20 @@
     },
     {
       "id": "subagent-known-build-operator",
-      "kind": "positive",
-      "request": "候选已经稳定，正式构建命令、冻结输入、环境、日志位置、成功 oracle、时限和恢复动作均已确认。构建耗时较长，主代理没有其他独立必要工作；请完成昂贵动作 preflight 后实际委派 operator 启动、等待并分析这一次构建，主代理等待其结果。输入未变时不得盲目重跑，失败返回直接错误和遮蔽范围，不修改代码探索修复。",
+      "kind": "negative",
+      "request": "候选已经稳定，正式构建命令、冻结输入、环境、日志位置、成功 oracle、时限和恢复动作均已确认。仅需这一次昂贵构建，没有后续重复使用或超长时间观察需求。请完成昂贵动作 preflight 后由当前执行者启动、等待并读取结果，不委派 operator。输入未变时不得盲目重跑，失败返回直接错误和遮蔽范围，不修改代码探索修复。",
       "expected_skills": [
-        "execution-governor",
-        "subagent-orchestration"
+        "execution-governor"
       ],
       "forbidden_skills": [
-        "task-table-manager"
+        "task-table-manager",
+        "subagent-orchestration"
       ],
       "expected_change_governance_references": [],
       "expected_execution_governor_references": [
         "failure-and-cost.md"
       ],
-      "expected_subagent_orchestration_references": [
-        "operator-execution.md"
-      ],
+      "expected_subagent_orchestration_references": [],
       "expected_behavior_tags": [
         "expensive_action_preflight",
         "bounded_subagent_delegation"
@@ -2548,7 +2542,7 @@
     {
       "id": "subagent-scriptable-batch-no-benefit",
       "kind": "negative",
-      "request": "目标、输入、转换规则和验收都已确认，500 个同构文件可由现有 Python 脚本一次快速处理，仅输出两行完成统计和失败位置，无需多轮观察，派发和汇总反而比执行更重。用户没有要求子代理；请调用脚本并验收。",
+      "request": "目标、输入、转换规则和验收已确认，仅需一次处理这批 500 个同构文件，没有后续重复使用或超长观察需求。现有 Python 脚本可一次快速处理，只输出两行完成统计和失败位置。用户没有要求子代理；请由当前执行者调用脚本并验收。",
       "expected_skills": [],
       "forbidden_skills": [
         "subagent-orchestration"
@@ -2564,7 +2558,7 @@
     {
       "id": "subagent-simple-command-long-observation",
       "kind": "positive",
-      "request": "当前必要操作只有一条已验证命令，输入、允许动作与判定依据稳定；运行会持续产生日志，需要按已知阶段检查状态、采样和截图，没有现成的汇总入口。无需修代码或设计方案，主代理暂无其他工作，角色可用，用户未指定分工。请把连续操作组织为一个执行段，做到约定的首个视觉判断点后集中返回证据供派发者查看，再决定后续动作；不要按每次采样或截图拆派，也不要为了少交接跳过检查或越过判断点。",
+      "request": "当前需对已启动的任务做超长时间观察，主要等待，无需频繁操作或新判断。对象、信号来源、观察间隔、允许动作、判定与停止条件已明确；必要时按规则采样和截图，暂无现成汇总入口。无需修代码或设计方案，主代理暂无其他工作，角色可用，用户未指定分工。请交给 operator 持续观察，到约定停止条件或首个视觉判断点后集中返回证据；不要逐次采样拆派或越过判断点。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -2583,7 +2577,7 @@
     {
       "id": "subagent-operator-result-followup",
       "kind": "positive",
-      "request": "原 operator 已完成本次操作，返回成功状态和日志位置，但主代理还需要确认最终处理数是否包含跳过项。原代理仍可续派，日志仍在且输入未变。请补齐这一信息，不重跑操作，也不把完整日志读入主代理。",
+      "request": "原 operator 已按可复用规则完成本轮，返回成功状态和日志位置，但主代理还需要确认最终处理数是否包含跳过项。原代理仍可续派，日志仍在且输入未变。请补齐这一信息，不重跑操作，也不把完整日志读入主代理。",
       "expected_skills": [
         "subagent-orchestration"
       ],
@@ -2602,7 +2596,7 @@
     {
       "id": "subagent-operator-concentrated-delivery",
       "kind": "negative",
-      "request": "你当前是 operator，三个已授权步骤顺利完成，退出码均为零；生成的日志包含数千行常规输出和一条不影响通过、但主代理需知道的兼容警告。没有需要派发者立即处理的事项。请通过最终回复集中交付完成范围、警告及日志位置，不先用 send_message 发送同一结果，不回传常规输出，不隐去警告；保留原结果以便后续追问。",
+      "request": "你当前是 operator，本轮按可复用规则执行的三个已授权步骤顺利完成，退出码均为零，已达到本轮停止条件；日志包含数千行常规输出和一条不影响通过、但主代理需知道的兼容警告。没有需派发者立即处理的事项。请通过最终回复简短集中交付完成范围、警告及日志位置，不先用 send_message 发送同一结果，不回传常规输出，不隐去警告；保留原结果以便后续追问。",
       "expected_skills": [],
       "forbidden_skills": [
         "subagent-orchestration"
@@ -2704,7 +2698,7 @@
     {
       "id": "subagent-operator-no-child-agents",
       "kind": "negative",
-      "request": "你当前是 experiment 创建的专属 operator，既定执行遇到步骤未覆盖的接口问题，需要源码调查才能决定后续操作。请将直接异常和缺口交回所属 experiment；不自行创建 evidence、experiment 或其他子代理，不创建或分叉用户任务，也不把这个局部失败直接转报根主代理。",
+      "request": "你当前是根主代理创建的 operator，按可复用规则执行时遇到未覆盖的接口问题，需要源码调查才能决定后续操作。请将直接异常和缺口交回根主代理；不自行创建 evidence、experiment 或其他子代理，不创建或分叉用户任务，也不向其他代理转交该工作。",
       "expected_skills": [],
       "forbidden_skills": [
         "subagent-orchestration"

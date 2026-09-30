@@ -1,6 +1,6 @@
 ---
 name: subagent-orchestration
-description: 在搜索未知来源或跨文件关系前派发 evidence；步骤与判定明确，且执行有一定规模、预计输出较多或需多轮观察时派发 operator。负责创建、复用、等待与接纳；实验须较大且可独立交付。用户禁用、角色不可用、已知位置短读取或短小且结果简短的执行不触发；evidence 与 operator 不加载本编排流程。
+description: 在搜索未知来源或跨文件关系前派发 evidence；工作规则明确且预期多次触发，或需超长时间观察且无需频繁干预时派发 operator。负责创建、复用、等待与接纳；实验须较大且可独立交付。用户禁用、角色不可用、已知位置短读取或普通一次性操作不触发；evidence 与 operator 不加载本编排流程。
 ---
 
 # Subagent Orchestration
@@ -11,13 +11,13 @@ description: 在搜索未知来源或跨文件关系前派发 evidence；步骤�
 
 - **evidence**：从问题和已有线索起步，在只读边界内自主选择文件、命令、API、网络、知识库或运行状态查询，获取下一步所需的关键原始信息。交付读取位置、必要范围或查询方法及简短导航，短小原文或查询结果可直接带回。按 [evidence-packet.md](references/evidence-packet.md) 交接，实际消费者据原始证据判断，证据充分即停止。
 - **experiment / advanced-experiment**：承接路径不清晰、多层问题交织等可独立交付的较大探索，带回解决方法、验证证据与重要发现。短小或需主代理持续裁决的工作直接做；十来分钟只是成本线索，不是硬门槛。困难/视觉实验仍须满足独立交付条件。读 [experiment-lifecycle.md](references/experiment-lifecycle.md)。
-- **operator**：对象、步骤和判定明确，且执行有一定规模、预计输出较多或需多轮观察时才委派；短小且结果简短的执行直接做，步骤明确本身不构成委派理由。按完整执行段判断规模，委派后覆盖到下一个必要判断点，包含连续操作、等待、既定检查和结果汇总，不按每个脚本、截图或采样拆派。读 [operator-execution.md](references/operator-execution.md)。
+- **operator**：专用于规则与判定明确、预期多次触发的重复工作，或无需频繁干预的超长时间观察。一次交清规则，后续以新输入续派，或按明确条件自行循环；覆盖到约定的停止条件或下一个必要判断点，集中返回结果。普通一次性操作直接做。读 [operator-execution.md](references/operator-execution.md)。
 
 先复用有效结果；上下文相关、归属清楚时用 `followup_task` 续派，否则 `spawn_agent`。固定角色显式 `fork_turns="none"`，任务给目标、范围、必要来源和预期交付；写入再给文件所有权、用户改动及恢复边界。任务说明不要求固定表格。派发失败时按实际错误处理，不空等。
 
 派发者需要子代理采取行动或返回结果时，无论其是否仍在运行，都用 `followup_task`；派发者的 `send_message` 仅用于无需行动或回复的通知。子代理结果默认由最终回复交付，即时消息例外按角色指令处理。
 
-以上 evidence、operator 触发规则同样适用于两类 experiment；已有证据充分或一次已知位置短读取即可闭合时自行处理，不把多轮搜索拆称简单查询而全部自行承担。实验内可按需委派一层 evidence、operator，无需额外授权，不扩大原任务范围；同一实验同时最多一个专属 operator，按需创建并续用，不预先配齐。evidence 与 operator 不得创建子代理或创建/分叉用户任务。仅 evidence 跨分支移交派发权、结果送达不明或归属冲突时读 [coordination.md](references/coordination.md#证据复用与派发交接)；普通创建、同派发者续用和接纳不加载它。
+以上 evidence 触发规则同样适用于两类 experiment；已有证据充分或一次已知位置短读取即可闭合时自行处理，不把多轮搜索拆称简单查询而全部自行承担。实验内仅可按需委派一层 evidence，无需额外授权，不扩大原任务范围；operator 仅由根主代理创建和续派。evidence 与 operator 不得创建子代理或创建/分叉用户任务。仅 evidence 跨分支移交派发权、结果送达不明或归属冲突时读 [coordination.md](references/coordination.md#证据复用与派发交接)；普通创建、同派发者续用和接纳不加载它。
 
 ## 等待与接纳
 
