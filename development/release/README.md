@@ -17,7 +17,9 @@ tag 为 `agentbase-v<version>`。srcq、workflow-cli、MCP 的版本和资产仍
 主包包含可独立开发/部署的源码与合成框架测试；真正进入 Codex 的 plugin/直接部署
 payload 继续由既有过滤合同排除所有开发资产。
 
-它从导出的正式源码调用现有插件构建器和官方校验器，再调用恢复包构建器，产生：
+它默认从导出的正式源码调用现有插件构建器和官方校验器，再调用恢复包构建器。旧官方校验器缺失时，只有取得用户对当次发行替代校验的明确授权，才可使用 `-AllowMissingOfficialPluginValidator`：插件先在隔离目录完成本地部署、路由、结构、引用和 payload 检查，再组装进该次发行包。清单记录 `official_plugin_validation=false` 和例外原因；这不证明官方或原生运行时校验通过，发布仍需审计资产并实际下载核验。校验器存在时仍执行官方校验。
+
+产生以下资产：
 
 - `agentbase-<version>-windows.zip`：源码/部署入口，以及预构建插件和恢复入口；
 - `agentbase-core-<version>.zip`：已验证插件，可独立分发；

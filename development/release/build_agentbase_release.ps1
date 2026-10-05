@@ -1,6 +1,7 @@
 param(
     [string]$ProjectRoot = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)),
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+    [switch]$AllowMissingOfficialPluginValidator
 )
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
@@ -26,7 +27,25 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Git source export failed' }
     [IO.Compression.ZipFile]::ExtractToDirectory($sourceArchive, $source)
     & (Join-Path $source 'development/codex-deployment/manage_agentbase.ps1') -Action Validate -ProjectRoot $source | Out-Null
-    $pluginRoot = & (Join-Path $source 'development/plugin-packaging/build_plugin.ps1') -ProjectRoot $source
+    $pluginBuilder = Join-Path $source 'development/plugin-packaging/build_plugin.ps1'
+    $pluginValidatorPath = Join-Path $env:USERPROFILE '.codex/skills/.system/plugin-creator/scripts/validate_plugin.py'
+    $officialPluginValidation = $true
+    $pluginValidationException = $null
+    if ($AllowMissingOfficialPluginValidator -and -not (Test-Path -LiteralPath $pluginValidatorPath -PathType Leaf)) {
+        $pluginRoot = & $pluginBuilder -ProjectRoot $source -OutputRoot (Join-Path $stage 'plugin-preflight') -SkipOfficialValidation
+        $packagedPluginRoot = Join-Path $source 'development/plugin-packaging/dist/agentbase-core'
+        $stagePrefix = [IO.Path]::GetFullPath($stage).TrimEnd('\') + '\'
+        foreach ($generated in @([string]$pluginRoot, $packagedPluginRoot)) {
+            if (-not [IO.Path]::GetFullPath($generated).StartsWith($stagePrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe release plugin staging move' }
+        }
+        New-Item -ItemType Directory -Path (Split-Path -Parent $packagedPluginRoot) -Force | Out-Null
+        Move-Item -LiteralPath ([string]$pluginRoot) -Destination $packagedPluginRoot
+        $pluginRoot = $packagedPluginRoot
+        $officialPluginValidation = $false
+        $pluginValidationException = 'Legacy official validator unavailable; user-authorized substitution for this release: local deployment, routing, structure, reference and payload checks.'
+    } else {
+        $pluginRoot = & $pluginBuilder -ProjectRoot $source
+    }
     $recovery = Join-Path $source 'recovery'
     & (Join-Path $source 'development/codex-deployment/build_recovery_bundle.ps1') -OutputDirectory $recovery | Out-Null
 
@@ -56,9 +75,10 @@ try {
             workflow_cli = [IO.File]::ReadAllText((Join-Path $source 'tools/workflow-cli/VERSION')).Trim()
         }
         bundled_cli_binaries = $false
-        official_plugin_validation = $true
+        official_plugin_validation = $officialPluginValidation
         assets = $assets
     }
+    if ($pluginValidationException) { $manifest['official_plugin_validation_exception'] = $pluginValidationException }
     $utf8 = [Text.UTF8Encoding]::new($false)
     $manifestPath = Join-Path $output 'manifest.json'
     [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 8) + "`n", $utf8)

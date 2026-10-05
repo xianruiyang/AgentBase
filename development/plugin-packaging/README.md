@@ -19,6 +19,6 @@
 & '.\development\plugin-packaging\build_plugin.ps1' -ProjectRoot (Get-Location).Path
 ```
 
-`-SkipOfficialValidation` 只允许配合显式、隔离的 `-OutputRoot` 用于本地检查可移植复制和清单合同，不能写入默认 `dist`，也不能作为正式可安装产物的证据。
+`-SkipOfficialValidation` 只允许配合显式、隔离的 `-OutputRoot` 用于本地检查可移植复制和清单合同，不能直接写入默认 `dist`，也不证明官方校验通过。仅当旧官方校验器缺失且用户明确授权当次替代校验时，[主包发行入口](../release/README.md)可将隔离检查产物组装进该次发行，并在清单记录例外；不改变普通构建的官方校验要求。
 
 插件和 `DirectCompatibility` 的同名 skill/hook 不得同时启用。插件安装、Codex Deploy、主机前置条件、状态读回和回滚见[部署说明](../codex-deployment/README.md)；每次真实 Deploy 都需当次明确同意。版本与分发资产按[主包发行入口](../release/README.md)维护，Release 不安装插件或部署 Codex。
